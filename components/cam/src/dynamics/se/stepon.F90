@@ -384,8 +384,9 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
+      ! AaronDonahue added ftype=3
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0) then
+      if (ftype<=0.or.ftype==3) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -502,18 +503,101 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    use camsrfexch,  only: cam_out_t     
    use dyn_comp,    only: dyn_run
    use time_mod,    only: tstep
+   !+++PMC & ASD
+   ! Add modules needed to calculate dyn_state update using physic tendencies
+   ! for parallel split approach.
+   use control_mod,     only: ftype, qsplit
+   use dimensions_mod,  only: nlev, nelemd, np
+   use dyn_comp,        only: TimeLevel
+   use time_mod,        only: TimeLevel_Qdp
+   use hycoef,          only: hyai, hybi, ps0
+   use cam_logfile,     only: iulog
+   ! note: ncnst is module-level variable.
+   !---PMC & ASD
    real(r8), intent(in) :: dtime   ! Time-step
    type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
    integer :: rc
+   !+++PMC & ASD
+   ! Include variables required to apply parallel splitting algorithm
+   integer :: i,j,k,ie,ic,tl_f, tl_fQdp
+   real(r8) :: dp_tmp
+   !---PMC & ASD
 
    call t_barrierf('sync_dyn_run', mpicom)
    call t_startf ('dyn_run')
    call dyn_run(dyn_out,rc)	
    call t_stopf  ('dyn_run')
 
+!========================================================================================
+   !+++PMC & ASD
+   !MIMIC PARALLEL PHYS AND DYN BY APPLYING PHYS TEND AFTER DYN FINISHED.
+   !note: physics tendencies converted into dynamics structures were stored as 
+   !dyn_in%elem(ie)%derived%{Q,T,M} in stepon_run2.
+
+   if (ftype==3) then
+      ! apply forcing to state tl_f
+      ! requires forward-in-time timestepping, checked in namelist_mod.F90
+      ! NEED TO CHECK THAT TIMELEVEL HASTN'T BEEN ADVANCED WITHIN DYN???
+      tl_f = TimeLevel%n0   ! timelevel which was adjusted by physics
+      call TimeLevel_Qdp(TimeLevel, qsplit, tl_fQdp)
+
+      do ie = 1,nelemd  ! Cycle through all elements
+         do k = 1,nlev  ! Cycle through all levels
+            do j = 1,np ! Cycle through all points on element
+               do i = 1,np
+                  do ic = 1,pcnst ! Cycle through all tracers
+                     ! Apply forcing to tracer
+                     dyn_out%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
+                            dyn_out%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) + &
+                            dtime*dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1)
+                     ! Apply clipping (where needed) to avoid negative mass
+                     dyn_out%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
+                            max(0._r8,dyn_out%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp))
+                  end do ! ic
+                  ! Apply forcing to V and T
+                  dyn_out%elem(ie)%state%v(i,j,:,k,tl_f)= &
+                         dyn_out%elem(ie)%state%v(i,j,:,k,tl_f) +  &
+                         dtime*dyn_in%elem(ie)%derived%FM(i,j,:,k,1)
+
+                  dyn_out%elem(ie)%state%T(i,j,k,tl_f)= &
+                         dyn_out%elem(ie)%state%T(i,j,k,tl_f) + &
+                         dtime*dyn_in%elem(ie)%derived%FT(i,j,k,1)
+                  ! Pressure is assumed to remain constant during physics, but
+                  ! precipitation and evaporation change column mass. To maintain consistency,
+                  ! we must update surface pressure to account for changes in vertically-integrated
+                  ! water vapor loading. BEWARE critical region if using OpenMP over k (AAM)
+                  dyn_out%elem(ie)%state%ps_v(i,j,tl_f)= &
+                         dyn_out%elem(ie)%state%ps_v(i,j,tl_f) + dyn_in%elem(ie)%derived%FQ(i,j,k,1,1)*dtime
+
+               end do ! i
+            end do ! j
+         end do ! k
+         ! Updating ps has the effect of redrawing cell edges in our sigma coordinate system. Because  
+         ! layer boundaries are redrawn, cell-averaged Q values must be recalculated. Qdp is assumed 
+         ! unchanged by this redrawing, so Q can be computed as Qdp divided by the new dp values. I
+         ! (PMC) think it's probably inappropriate to assume Qdp is constant when cell edges are redrawn
+         ! but leave this for future work.
+         !$omp parallel do private(k, j, i, ic, dp_tmp)
+         do k=1,nlev
+            do ic=1,pcnst
+               do j=1,np
+                  do i=1,np
+                     ! Now that ps_v is updated, Q must be recalculated for
+                     ! consistency.
+                     dp_tmp = ( hyai(k+1) - hyai(k) )*ps0 + &
+                            ( hybi(k+1) - hybi(k))*dyn_out%elem(ie)%state%ps_v(i,j,tl_f)
+                     dyn_out%elem(ie)%state%Q(i,j,k,ic)= &
+                            dyn_out%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp)/dp_tmp
+                  end do ! i
+               end do ! j
+            end do ! ic
+         end do ! k
+      end do ! ie
+   end if ! ftype==3
+!========================================================================================
 end subroutine stepon_run3
 
 
