@@ -35,6 +35,7 @@ def buildnml(case, caseroot, compname):
     elm_bldnml_opts     = case.get_value("ELM_BLDNML_OPTS")
     elm_nml_use_case    = case.get_value("ELM_NML_USE_CASE")
     elm_force_coldstart = case.get_value("ELM_FORCE_COLDSTART")
+    elm_interface_mode  = case.get_value("ELM_INTERFACE_MODE")
     comp_interface      = case.get_value("COMP_INTERFACE")
     comp_glc            = case.get_value("COMP_GLC")
     din_loc_root        = case.get_value("DIN_LOC_ROOT")
@@ -52,7 +53,7 @@ def buildnml(case, caseroot, compname):
     run_refcase         = case.get_value("RUN_REFCASE")
     run_refdate         = case.get_value("RUN_REFDATE")
     run_reftod          = case.get_value("RUN_REFTOD")
-    casebuild		= case.get_value("CASEBUILD")
+    casebuild           = case.get_value("CASEBUILD")
 
     elmconf_dir = os.path.join(casebuild, "elmconf")
 
@@ -191,6 +192,10 @@ def buildnml(case, caseroot, compname):
         sysmod += " -config {}/config_cache.xml {}".format(elmconf_dir, elm_bldnml_opts)
         if mask_grid != "reg":
             sysmod += " -mask {}".format(mask_grid)
+
+        # add 'elm-interface-mode' runtime options (for coupling with pflotran and others)
+        if elm_interface_mode != "UNSET":
+            sysmod += " -elm_interface_mode {}".format(elm_interface_mode)
 
         # check if the case still attempts to use user_nl_clm, stop proceeding if detected
         if os.path.exists(os.path.join(caseroot, "user_nl_clm")):
