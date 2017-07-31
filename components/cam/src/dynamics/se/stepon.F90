@@ -386,7 +386,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
       ! AaronDonahue added ftype=3
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0.or.ftype==3) then
+      if (ftype<=0.or.ftype==3.or.ftype==30) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -537,7 +537,7 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    !note: physics tendencies converted into dynamics structures were stored as 
    !dyn_in%elem(ie)%derived%{Q,T,M} in stepon_run2.
 
-   if (ftype==3) then
+   if (ftype==3.or.ftype==30) then
       ! apply forcing to state tl_f
       ! requires forward-in-time timestepping, checked in namelist_mod.F90
       ! NEED TO CHECK THAT TIMELEVEL HASTN'T BEEN ADVANCED WITHIN DYN???

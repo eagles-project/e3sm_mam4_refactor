@@ -4496,6 +4496,10 @@ end subroutine print_active_fldlst
     use sat_hist,      only: sat_hist_write
     use interp_mod,    only: set_interp_hfile
     use cam_pio_utils, only: cam_pio_closefile
+!+++ AaronDonahue
+   use spmd_utils,       only: iam
+   use ppgrid,           only: begchunk, endchunk
+!--- AaronDonahue
 
     logical, intent(in), optional :: rgnht_in(ptapes)
     !
@@ -4531,7 +4535,6 @@ end subroutine print_active_fldlst
     integer :: dtime            ! seconds component of current time
 #endif
     real(r8) :: kp, ap, f107, f107a
-
     !-----------------------------------------------------------------------
     ! get solar/geomagnetic activity data...
     call solar_parms_get( f107_s=f107, f107a_s=f107a, ap_s=ap, kp_s=kp )
@@ -4712,9 +4715,11 @@ end subroutine print_active_fldlst
           ! Write field to history tape.  Note that this is NOT threaded due to netcdf limitations
           !
           call t_startf ('dump_field')
+!          if (begchunk.le.endchunk) then ! AaronDonahue
           do f=1,nflds(t)
             call dump_field(f, t, restart)
           end do
+!          end if ! AaronDonahue
           call t_stopf ('dump_field')
           !
           ! Zero history buffers and accumulators now that the fields have been written.

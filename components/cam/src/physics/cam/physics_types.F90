@@ -1084,7 +1084,7 @@ end subroutine physics_ptend_copy
 
     if(ncol<=0) then
        write(iulog,*) lchnk, ncol
-       call endrun('physics_state_set_grid')
+!       call endrun('physics_state_set_grid')  ! Changed by AaronDonahue
     end if
 
     call get_rlon_all_p(lchnk, ncol, rlon)

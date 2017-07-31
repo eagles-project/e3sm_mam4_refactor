@@ -356,6 +356,9 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
+!+++ AaronDonahue
+   use spmd_utils,       only: iam
+!--- AaronDonahue
 
    type(cam_out_t), intent(inout)        :: cam_out(begchunk:endchunk)
    type(cam_in_t) , intent(inout)        :: cam_in(begchunk:endchunk)
@@ -371,7 +374,6 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
 #endif
 !-----------------------------------------------------------------------
 ! print_step_cost
-
    !
    !----------------------------------------------------------
    ! History and restart logic: Write and/or dispose history tapes if required

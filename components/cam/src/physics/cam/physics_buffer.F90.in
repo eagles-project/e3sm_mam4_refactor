@@ -332,10 +332,11 @@ CONTAINS
     !
     if(buffer_initialized) return
     ! Allocate at least 1 to avoid unallocated error in ideal physics
+!    allocate(pbuf2d(max(1,currentpbufflds),begchunk:max(begchunk,endchunk))) ! AaronDonahue changed for parallel-split 
     allocate(pbuf2d(max(1,currentpbufflds),begchunk:endchunk)) 
     if(currentpbufflds<1) return
 
-    do c = begchunk, endchunk
+    do c = begchunk, endchunk 
       hdrbuffer => hdrbuffertop
       do i = 1, currentpbufflds
         if(.not. hdrbuffer%added) then
@@ -348,7 +349,9 @@ CONTAINS
     end do
     
     buffer_initialized=.true.
+    if (begchunk.le.endchunk) then ! Added by AaronDonahue for parallel-split
     call pbuf_allocate(pbuf2d, 'global')
+    end if
 #ifdef DEBUG
     call pbuf2d_print(pbuf2d)
 #endif
@@ -375,6 +378,8 @@ CONTAINS
 
     if(allocate_all) then
        do i=1,currentpbufflds
+          !+++Aaron Donahue added for parallel-split
+!          if (begchunk.le.endchunk) then
           select case(pbuf2d(i,begchunk)%hdr%dtype)
           case(TYPEDOUBLE)
              call pbuf_allocate_field_double(pbuf2d, i, dtype_r8)
@@ -385,6 +390,10 @@ CONTAINS
           case(TYPEINT)
              call pbuf_allocate_field_int(pbuf2d, i, dtype_i4)
           end select
+!          else ! AaronDonahue
+!             call pbuf_allocate_field_int(pbuf2d, i, dtype_i4)
+!          end if
+          !--- Aaron Donahue
        end do
     else if(persistence .eq. 'physpkg') then
        do i=1,currentpbufflds
@@ -485,6 +494,8 @@ CONTAINS
       do j = 1, ngrid_types
         if (pbuf_do_deallocate(pbuf2d(i,begchunk)%hdr, persistence, j)) then
           if (buffer_field_is_alloc(pbuf2d(i,begchunk)%bfg(j))) then
+             !+++Aaron Donahue added for parallel-split
+!             if (begchunk.le.endchunk) then
              select case(pbuf2d(i,begchunk)%hdr%dtype)
              case(TYPEDOUBLE)
                 do c = begchunk,endchunk
@@ -499,6 +510,8 @@ CONTAINS
                   call buffer_field_deallocate(pbuf2d(i,c)%bfg(j), dtype_i4)
                 end do
              end select
+!             end if ! AaronDonahue
+             !--- AaronDonahue
            end if
         end if
       end do    ! ngrid_types

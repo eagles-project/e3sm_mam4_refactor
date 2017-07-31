@@ -99,7 +99,10 @@ module phys_grid
    use cam_abortutils,   only: endrun
    use perf_mod
    use cam_logfile,      only: iulog
-
+!+++ AaronDonahue
+  use parallel_mod,     only: par
+  use control_mod, only: ftype
+!--- AaronDonahue
    implicit none
    save
 
@@ -412,7 +415,6 @@ contains
     nullify(coord_map)
     nullify(lat_coord)
     nullify(lon_coord)
-
     call t_adj_detailf(-2)
     call t_startf("phys_grid_init")
 
@@ -797,6 +799,7 @@ contains
     nlchunks = npchunks(iam)
     begchunk = pchunkid(iam)   + lastblock
     endchunk = pchunkid(iam+1) + lastblock - 1
+    print *, 'ASD - beg/end chunk', iam, begchunk, endchunk
     !
     allocate( lchunks(begchunk:endchunk) )
     do cid=1,nchunks
@@ -3962,6 +3965,16 @@ logical function phys_grid_initialized ()
    proc_smp_map(0) = 0
 #endif
 
+! AaronDonahue
+   if (ftype==30) then
+   if (masterproc) write(iulog,*) 'ASD - phys_npes = ', par%nprocs, ': setting dyn cores threads to 0'
+   do p = 0,npes-1
+      if (p<par%nprocs) then
+         npthreads(p) = 0
+      end if
+   end do  
+   end if
+! AaronDonahue
 !
 ! Determine index range for dynamics blocks
 !
@@ -4210,6 +4223,13 @@ logical function phys_grid_initialized ()
          endif
          nchunks = nchunks + nsmpchunks(smp)
       enddo
+!+++ AaronDonahue
+      do p = 0,npes-1
+         if (npthreads(p).eq.0) then 
+            nchunks = nchunks + 1
+         end if
+      end do
+!--- AaronDonahue
 !
 ! Determine maximum number of columns to assign to chunks
 ! in a given SMP
@@ -4409,6 +4429,14 @@ logical function phys_grid_initialized ()
 !
    call assign_chunks(npthreads, nsmpx, proc_smp_mapx, &
                       nsmpthreads, nsmpchunks)
+   !+++ AaronDonahue
+   do jb = firstblock,lastblock
+      p = get_block_owner_d(jb)
+      if (masterproc) then
+         write(iulog,'(A15,i8,1x,i8)') 'ASD Dyn-Cores: ', jb, p
+      end if
+   end do
+   !--- AaronDonahue
 !
 ! Clean up
 !
@@ -4856,6 +4884,9 @@ logical function phys_grid_initialized ()
    integer :: column_count(0:npes-1)     ! number of columns from current chunk
                                          !  assigned to each process in dynamics
                                          !  decomposition
+!+++ AaronDonahue
+   integer :: loc_xtra_chnks, totchunks, totcols, j
+!--- AaronDonahue
 !-----------------------------------------------------------------------
 !
 ! Count number of processes per virtual SMP and determine virtual SMP
@@ -4973,6 +5004,38 @@ logical function phys_grid_initialized ()
       enddo
 !
    enddo
+!+++ AaronDonahue
+   totcols = 0
+   totchunks = 0
+   do cid = cid_offset(0),cid_offset(nsmpx)-1 
+      do i=1,chunks(cid)%ncols
+         curgcol   = chunks(cid)%gcol(i)
+         j         = chunks(cid)%owner
+         block_cnt = get_gcol_block_cnt_d(curgcol)
+         call get_gcol_block_d(curgcol,block_cnt,blockids,bcids)
+         do jb=1,block_cnt
+            p = get_block_owner_d(blockids(jb))
+            if (masterproc) then
+               write(iulog,'(A15,4(i8,1x))') 'ASD Columns: ', j, curgcol, p, blockids(jb)
+            end if
+         end do
+      end do
+   end do
+   do p = 0,npes-1
+      totcols = totcols + gs_col_num(p)
+      totchunks = totchunks + npchunks(p)
+      if (npchunks(p).eq.0) then
+         chunks(cid)%owner = p
+         cid = cid+1
+         npchunks(p) = 1
+      end if
+   end do
+   if(masterproc) write(iulog,'(a30,i8,1x,i8)') 'ASD totchunks, totcols: ', totchunks, totcols 
+   if(masterproc) write(iulog,'(a30,i8,1x,i8)') 'ASD maxchunks, maxcols: ', maxval(npchunks), maxval(gs_col_num)
+   do p = 0,npes-1
+      if(masterproc) write(iulog,'(a30,3(1x,i8))') 'ASD p, npchunks, num cols: ', p, npchunks(p), gs_col_num(p)
+   end do
+!--- AaronDonahue
 !
    return
    end subroutine assign_chunks
