@@ -30,7 +30,7 @@ module spmd_dyn
 CONTAINS
 !========================================================================
 
-  subroutine spmd_readnl(nlfilename, dyn_npes)
+  subroutine spmd_readnl(nlfilename, dyn_npes, dyn_npes_stride)
 
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
@@ -41,6 +41,9 @@ CONTAINS
 
     character(len=*), intent(in) :: nlfilename
     integer, intent(out) :: dyn_npes
+    !+++ AaronDonahue
+    integer, intent(out) :: dyn_npes_stride
+    !--- AaronDonahue
     integer :: ierr           ! error code
     integer :: unitn          ! namelist unit number
     integer :: color, nproc_tmp
@@ -48,12 +51,13 @@ CONTAINS
 
     logical :: dyn_equi_by_col
     integer :: dyn_alltoall
-    integer :: dyn_npes_stride
+    !integer :: dyn_npes_stride
     integer :: dyn_allgather
 
 
 
 !   Note that only dyn_npes is currently used by the SE dycore
+!   AaronDonahue: And now dyn_npes_stride is an option for the SE dycore
     namelist /spmd_dyn_inparm/ dyn_alltoall, &
              dyn_allgather,  &
              dyn_equi_by_col,&
@@ -63,6 +67,9 @@ CONTAINS
 
 
     dyn_npes = npes
+!+++ AaronDonahue
+    dyn_npes_stride = 1
+!---AaronDonahue
 
     if (masterproc) then
        write(iulog,*) 'Read in spmd_dyn_inparm namelist from: ', trim(nlfilename)
@@ -84,11 +91,15 @@ CONTAINS
                ' bad value for dyn_npes' )
        endif
        write (iulog,*) 'SE will use ', dyn_npes, '  tasks'
+       write (iulog,*) 'SE will distribute tasks at ', dyn_npes_stride, '  spacing'  ! AaronDonahue
        close( unitn )
        call freeunit( unitn )
     endif
 
     call mpibcast (dyn_npes,1,mpiint,0,mpicom)
+!+++ AaronDonahue
+    call mpibcast (dyn_npes_stride,1,mpiint,0,mpicom)
+!--- AaronDonahue
 
   end subroutine spmd_readnl
 

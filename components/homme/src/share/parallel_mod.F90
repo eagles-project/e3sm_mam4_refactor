@@ -47,11 +47,15 @@ module parallel_mod
     integer :: nprocs                     ! number of processes in group
     integer :: comm                       ! local communicator
     integer :: intercomm(0:ncomponents-1) ! inter communicator list
-    logical :: masterproc                 
+    logical :: masterproc                
+!+++ AaronDonahue
+    logical :: dynproc                    ! Am I a dynamics processor
+!--- AaronDonahue 
   end type
 
 #ifdef CAM
   type (parallel_t)    :: par              ! parallel structure for distributed memory programming
+  integer, public, allocatable :: dynprocs(:)
 #endif
   integer, parameter :: nrepro_vars=MAX(10,nlev*qsize_d)
   real(kind=8), public, allocatable :: global_shared_buf(:,:)
@@ -76,6 +80,9 @@ module parallel_mod
   public :: psum_1d
   public :: pmax_1d,pmin_1d
 
+!+++ AaronDonahue
+  integer, public :: npes_stride 
+!--- AaronDonahue
 contains
 
 ! ================================================
@@ -102,18 +109,16 @@ contains
 !  initmp:
 !  Initializes the parallel (message passing)
 !  environment, returns a parallel_t structure..
-!  
-!  Revision History
-!
-!  Aaron Donahue 17.06.27: Fixed bug with multiple communication groups
-!              created when dyn_npes<npes for ATM model.
 ! ================================================
      
-  function initmp(npes_in) result(par)
+  function initmp(npes_in,stride_in) result(par)
 #ifdef CAM
     use spmd_utils, only : mpicom
 #endif      
     integer, intent(in), optional ::  npes_in
+!+++ AaronDonahue
+    integer, intent(in), optional ::  stride_in
+!--- AaronDonahue
     type (parallel_t) par
 
 #ifdef _MPI
@@ -136,6 +141,9 @@ contains
     integer :: color
     integer :: iam_cam, npes_cam
     integer :: npes_homme
+!+++ AaronDonahue
+    integer :: max_stride, jj 
+!--- AaronDonahue
 #endif
     !================================================
     !     Basic MPI initialization
@@ -158,25 +166,46 @@ contains
        npes_homme=npes_cam
     end if
     call MPI_comm_rank(mpicom,iam_cam,ierr)
-    color = iam_cam/npes_homme
-    call mpi_comm_split(mpicom, color, iam_cam, par%comm, ierr)
-    if (iam_cam >= npes_homme) then
-       par%rank   = 0
-       par%nprocs = 0
-       par%comm   = MPI_COMM_NULL
+!+++ AaronDonahue
+    allocate(dynprocs(0:npes_cam-1))
+    dynprocs(:) = 0
+    if(present(stride_in)) then
+       npes_stride = stride_in
     else
-       call MPI_comm_rank(par%comm,par%rank,ierr)
-       call MPI_comm_size(par%comm,par%nprocs,ierr)
+       npes_stride = 1
     end if
+    ! Calculate optimal stride (if needed)
+    max_stride = npes_cam/npes_homme
+    if (npes_stride == 0 .or. npes_stride .gt. max_stride) then
+       npes_stride = max_stride
+    end if
+!    color = iam_cam/npes_homme
+!    if (npes_stride .gt. 1) then
+       color = 1
+       do jj = 0,npes_homme-1
+          dynprocs(jj*npes_stride) = 1
+          if (iam_cam == jj*npes_stride) then
+             color = 0
+          end if
+       end do 
+!    end if
+!--- AaronDonahue
+    call mpi_comm_split(mpicom, color, iam_cam, par%comm, ierr)
+    if (color == 0) then
+       par%dynproc = .TRUE.
+    else
+       par%dynproc = .FALSE.
+    endif
 #else
     par%comm     = MPI_COMM_WORLD
+#endif
     call MPI_comm_rank(par%comm,par%rank,ierr)
     call MPI_comm_size(par%comm,par%nprocs,ierr)
-#endif
 
     par%masterproc = .FALSE.
-    if(par%rank .eq. par%root .and. par%nprocs > 0) par%masterproc = .TRUE.
+    if(par%rank .eq. par%root) par%masterproc = .TRUE.
     if (par%masterproc) write(iulog,*)'number of MPI processes: ',par%nprocs
+    if (par%masterproc) write(iulog,*)'dynamics processors stride: ',npes_stride
            
     if (MPI_DOUBLE_PRECISION==20 .and. MPI_REAL8==18) then
        ! LAM MPI defined MPI_REAL8 differently from MPI_DOUBLE_PRECISION
@@ -194,9 +223,7 @@ contains
     !   then use this information to determined the 
     !   number of MPI processes per node    
     ! ================================================ 
-#ifdef CAM
-    if (iam_cam<par%nprocs) then
-#endif
+
     my_name(:) = ''
     call MPI_Get_Processor_Name(my_name,namelen,ierr)
 
@@ -299,9 +326,7 @@ contains
     endif
 
     deallocate(the_names)
-#ifdef CAM
-    end if ! (iam_cam<par%nprocs)
-#endif 
+ 
 #else
     par%root          =  0 
     par%rank          =  0

@@ -100,7 +100,7 @@ module phys_grid
    use perf_mod
    use cam_logfile,      only: iulog
 !+++ AaronDonahue
-  use parallel_mod,     only: par
+  use parallel_mod,     only: par, dynprocs, stride=>npes_stride
   use control_mod, only: ftype
 !--- AaronDonahue
    implicit none
@@ -423,22 +423,23 @@ contains
     ! Initialize physics grid, using dynamics grid
     ! a) column coordinates
 
-    call get_horiz_grid_dim_d(hdim1_d,hdim2_d)
-    ngcols = hdim1_d*hdim2_d
-    allocate( clat_d(1:ngcols) )
-    allocate( clon_d(1:ngcols) )
-    allocate( lat_d(1:ngcols) )
-    allocate( lon_d(1:ngcols) )
-    allocate( cdex(1:ngcols) )
+    call get_horiz_grid_dim_d(hdim1_d,hdim2_d)  ! Grab the grid dimensions (In SE hdim1_d = # columns in dynamics mesh, hdim2_d = 1)
+    ngcols = hdim1_d*hdim2_d ! total number of columns in dynamics mesh
+ ! Allocate lat/lon arrays by # of columns
+    allocate( clat_d(1:ngcols) ) ! column latitudes 
+    allocate( clon_d(1:ngcols) ) ! column longitudes
+    allocate( lat_d(1:ngcols) )  ! column degree latitudes
+    allocate( lon_d(1:ngcols) )  ! column degree longitudes
+    allocate( cdex(1:ngcols) )   ! permutation array used in physics column sorting
     clat_d = 100000.0_r8
     clon_d = 100000.0_r8
-    call get_horiz_grid_d(ngcols, clat_d_out=clat_d, clon_d_out=clon_d, lat_d_out=lat_d, lon_d_out=lon_d)
-    latmin = MINVAL(ABS(lat_d))
+    call get_horiz_grid_d(ngcols, clat_d_out=clat_d, clon_d_out=clon_d, lat_d_out=lat_d, lon_d_out=lon_d) ! Grab lat/lon info from dynamics mesh
+    latmin = MINVAL(ABS(lat_d))  
     lonmin = MINVAL(ABS(lon_d))
 !!XXgoldyXX: To do: replace collection above with local physics points
 
     ! count number of "real" column indices
-    ngcols_p = 0
+    ngcols_p = 0 
     do i=1,ngcols
        if (clon_d(i) < 100000.0_r8) then
           ngcols_p = ngcols_p + 1
@@ -446,22 +447,25 @@ contains
     enddo
 
     ! sort over longitude and identify unique longitude coordinates
-    call IndexSet(ngcols,cdex)
-    call IndexSort(ngcols,cdex,clon_d,descend=.false.)
+    call IndexSet(ngcols,cdex)  ! MCT allocate cdex array
+    call IndexSort(ngcols,cdex,clon_d,descend=.false.)  ! Use cdex to sort over longitude
     clon_p_tmp = clon_d(cdex(1))
     clon_p_tot = 1
 
+    ! Now find only unique longitude values
     do i=2,ngcols_p
-       if (clon_d(cdex(i)) > clon_p_tmp) then
-          clon_p_tot = clon_p_tot + 1
-          clon_p_tmp = clon_d(cdex(i))
+       if (clon_d(cdex(i)) > clon_p_tmp) then ! Then this is a unique and new longitude value
+          clon_p_tot = clon_p_tot + 1         ! count one more unique longitude value
+          clon_p_tmp = clon_d(cdex(i))        ! update the test for uniqueness
        endif
     enddo
 
-    allocate( clon_p(1:clon_p_tot) )
-    allocate( clon_p_cnt(1:clon_p_tot) )
-    allocate( londeg_p(1:clon_p_tot) )
-
+    ! Allocate arrays for unique set of longitude values
+    allocate( clon_p(1:clon_p_tot) )  ! Set of unique longitude values
+    allocate( clon_p_cnt(1:clon_p_tot) )  ! Number of repeats for each longitude value 
+    allocate( londeg_p(1:clon_p_tot) )  ! Set of unique column degree longitude values
+    ! Cycle through all longitudes and count the number of repeats for each
+    ! unique value as well as assign unique longitude values to arrays.
     pre_i = 1
     clon_p_tot = 1
     clon_p(1) = clon_d(cdex(1))
@@ -478,6 +482,7 @@ contains
     clon_p_cnt(clon_p_tot) = (ngcols_p+1)-pre_i
 
     ! sort over latitude and identify unique latitude coordinates
+    ! Same treatment as above for longitudes but with latitudes.
     call IndexSet(ngcols,cdex)
     call IndexSort(ngcols,cdex,clat_d,descend=.false.)
     clat_p_tmp = clat_d(cdex(1))
@@ -591,28 +596,32 @@ contains
     !
     ! Determine block index bounds
     !
-    call get_block_bounds_d(firstblock,lastblock)
+    call get_block_bounds_d(firstblock,lastblock) ! dynamics blocks, in SE first and last block represent the first (1) and laste (nelemd) elements.
 
     ! Allocate storage to save number of chunks and columns assigned to each
     ! process during chunk creation and assignment
     !
-    allocate( npchunks(0:npes-1) )
-    allocate( gs_col_num(0:npes-1) )
-    npchunks(:) = 0
+    allocate( npchunks(0:npes-1) )  ! record of the number of chunks assigned to each processor
+    allocate( gs_col_num(0:npes-1) ) ! record of the number of columns assigned to each processor
+    npchunks(:) = 0  ! Initialize these at 0
     gs_col_num(:) = 0
 
+!===============================================================!
+! Now begins the process of creating chunks, assigning columns  !
+! to those chunks and assigning those chunks to processors.     !
+!===============================================================!
     !
-    ! Option -1: each dynamics block is a single chunk
+    ! Option -1: each dynamics block is a single chunk  (Not commonly used)
     !            
     if (lbal_opt == -1) then
        !
        ! Check that pcols >= maxblksiz
        !
        maxblksiz = 0
-       do jb=firstblock,lastblock
-          maxblksiz = max(maxblksiz,get_block_gcol_cnt_d(jb))
+       do jb=firstblock,lastblock ! Cycle through all dynamics elements
+          maxblksiz = max(maxblksiz,get_block_gcol_cnt_d(jb)) ! Update the largest block size (in other words the maximum amount of columns per element)
        enddo
-       if (pcols < maxblksiz) then
+       if (pcols < maxblksiz) then ! If code expects a smaller maximum cols size kill program 
 	  write(iulog,*) 'pcols = ',pcols, ' maxblksiz=',maxblksiz
           call endrun ('PHYS_GRID_INIT error: phys_loadbalance -1 specified but PCOLS < MAXBLKSIZ')
        endif
@@ -620,7 +629,7 @@ contains
        !
        ! Determine total number of chunks
        !
-       nchunks = (lastblock-firstblock+1)
+       nchunks = (lastblock-firstblock+1)  ! In this case number of chunks is dependent on the number of elements
 
        !
        ! Set max virtual SMP node size
@@ -630,54 +639,57 @@ contains
        !
        ! Allocate and initialize chunks data structure
        !
-       allocate( cdex(1:maxblksiz) )
+       allocate( cdex(1:maxblksiz) ) 
        allocate( chunks(1:nchunks) )
 
-       do cid=1,nchunks
+       do cid=1,nchunks  ! Cycle through all the chunks (in this case all elements)
           ! get number of global column indices in block
-          max_ncols = get_block_gcol_cnt_d(cid+firstblock-1)
+          max_ncols = get_block_gcol_cnt_d(cid+firstblock-1)  ! Determine the number of columns in this element
           ! fill cdex array with global indices from current block
           call get_block_gcol_d(cid+firstblock-1,max_ncols,cdex)
 
-          ncols = 0
-          do i=1,max_ncols
+          ncols = 0  ! Initialize the number of columns for this chunk at 0
+          do i=1,max_ncols  ! cycle through all columns associated with this dynamics block
              ! check whether global index is for a column that dynamics
              ! intends to pass to the physics
-             curgcol_d = cdex(i)
+             curgcol_d = cdex(i) ! assign as the current global column index from dynamics, this particular column
              if (dyn_to_latlon_gcol_map(curgcol_d) .ne. -1) then
                 ! yes - then save the information
-                ncols = ncols + 1
-                chunks(cid)%gcol(ncols) = curgcol_d
-                chunks(cid)%lat(ncols) = lat_p(curgcol_d)
-                chunks(cid)%lon(ncols) = lon_p(curgcol_d)
+                ncols = ncols + 1  ! Increase the number of columns tally
+                chunks(cid)%gcol(ncols) = curgcol_d ! Assign global column index to chunk
+                chunks(cid)%lat(ncols) = lat_p(curgcol_d) ! Assign column latitude to chunk
+                chunks(cid)%lon(ncols) = lon_p(curgcol_d) ! Assign column longitude to chunk
              endif
           enddo
-          chunks(cid)%ncols = ncols
+          chunks(cid)%ncols = ncols ! Record the number of columns in this chunk
        enddo
 
        ! Clean-up
-       deallocate( cdex )
+       deallocate( cdex )  ! Memory clean up through array deallocation
        deallocate( lat_p )
        deallocate( lon_p )
 
        !
        ! Specify parallel decomposition 
        !
+       ! I.e. assign chunks to processors
        do cid=1,nchunks
 #if (defined SPMD)
-          p = get_block_owner_d(cid+firstblock-1)
+          p = get_block_owner_d(cid+firstblock-1) ! Determine which processor owns this chunk
+          if (ftype == 30) p = p+1
 #else
-          p = 0
+          p = 0  ! Or there is no parallel decomp
 #endif
-          chunks(cid)%owner = p
-          npchunks(p)       = npchunks(p) + 1
-          gs_col_num(p)     = gs_col_num(p) + chunks(cid)%ncols
+          chunks(cid)%owner = p ! Assign this chunk to processor p
+          npchunks(p)       = npchunks(p) + 1 ! Increase tally of the number of chunks assigned to this processor
+          gs_col_num(p)     = gs_col_num(p) + chunks(cid)%ncols ! increase the tally of the number of columns assigned to this processor.
        enddo
        !
        ! Set flag indicating columns in physics and dynamics 
        ! decompositions reside on the same processes
        !
-       local_dp_map = .true. 
+       local_dp_map = .false.
+       if (ftype.ne.30) local_dp_map = .true. 
        !
     else
        !
@@ -735,20 +747,20 @@ contains
        ! are colocated, not requiring any interprocess communication
        ! in the coupling.
        local_dp_map = .true.   
-       do cid=1,nchunks
-          do i=1,chunks(cid)%ncols
-             curgcol_d = chunks(cid)%gcol(i)
-             block_cnt = get_gcol_block_cnt_d(curgcol_d)
-             call get_gcol_block_d(curgcol_d,block_cnt,blockids,bcids)
-             do jb=1,block_cnt
-                owner_d = get_block_owner_d(blockids(jb)) 
-                if (owner_d .ne. chunks(cid)%owner) then
+       do cid=1,nchunks  ! Cycle through all chunks
+          do i=1,chunks(cid)%ncols  ! Cycle through all columns in this chunk
+             curgcol_d = chunks(cid)%gcol(i) ! determine the dynamics element which owns this column
+             block_cnt = get_gcol_block_cnt_d(curgcol_d)  ! Determine the number of columns owned by this dynamics element
+             call get_gcol_block_d(curgcol_d,block_cnt,blockids,bcids) ! Grab the full set of columns owned by this element
+             do jb=1,block_cnt ! Cycle through all columns on this element
+                owner_d = get_block_owner_d(blockids(jb))  ! Determine the processor that owns this columns
+                if (owner_d .ne. chunks(cid)%owner) then ! If not the same as the processor that owns this chunk then this is not a local map.
                    local_dp_map = .false.   
                 endif
              enddo
           enddo
        enddo
-    endif
+    endif ! END if lbal_opt
     !
     ! Allocate and initialize data structures for gather/scatter
     !  
@@ -967,7 +979,7 @@ contains
           end if
        end do
        !
-    endif
+    endif  ! End (if .not. local_dp_map)
 
     ! Final clean-up
     deallocate( gs_col_offset )
@@ -3182,7 +3194,7 @@ logical function phys_grid_initialized ()
 !========================================================================
 
    subroutine transpose_block_to_chunk(record_size, block_buffer, &
-                                       chunk_buffer, window)
+                                       chunk_buffer, window, comm_group)
                                        
 !----------------------------------------------------------------------- 
 ! 
@@ -3218,6 +3230,12 @@ logical function phys_grid_initialized ()
    integer, intent(in), optional :: window
                                        ! MPI-2 window id for
                                        ! chunk_buffer
+   !+++AaronDonahue
+   integer, intent(in), optional :: comm_group
+                                       ! optional comm_group
+                                       ! to replace mpicom
+   !---AaronDonahue
+      
 
 !---------------------------Local workspace-----------------------------
 #if ( defined SPMD )
@@ -3236,6 +3254,15 @@ logical function phys_grid_initialized ()
    type (blockdescriptor), allocatable, save :: sendbl(:), recvbl(:)
    integer ione, ierror, mod_method
 # endif
+!+++ AaronDonahue
+   integer :: comm  ! Communication group
+
+   comm = mpicom
+   if (present(comm_group)) comm = comm_group
+   if (present(window)) print *, 'ASD - window is present'
+   if (present(comm_group)) print *, 'ASD - comm_group is present'
+!--- AaronDonahue
+
 !-----------------------------------------------------------------------
    if (first) then
 ! Compute send/recv/put counts and displacements
@@ -3296,7 +3323,7 @@ logical function phys_grid_initialized ()
          rcvcnts(p) = record_size*btofc_chk_num(p)
       enddo
 !
-      call mpialltoallint(rdispls, 1, pdispls, 1, mpicom)
+      call mpialltoallint(rdispls, 1, pdispls, 1, comm)
 !
 # if defined(MODCM_DP_TRANSPOSE)
       if (phys_alltoall .ge. modmin_alltoall) then
@@ -3353,7 +3380,7 @@ logical function phys_grid_initialized ()
 
          enddo
 
-         call get_partneroffset(mpicom, sendbl, recvbl)
+         call get_partneroffset(comm, sendbl, recvbl)
 
       endif
 # endif
@@ -3361,7 +3388,7 @@ logical function phys_grid_initialized ()
       prev_record_size = record_size
    endif
 !
-   call t_barrierf('sync_tran_btoc', mpicom)
+   call t_barrierf('sync_tran_btoc', comm)
    if (phys_alltoall < 0) then
       if ((max_nproc_smpx > npes/2) .and. (nproc_busy_d > npes/2)) then
          lopt = 0
@@ -3381,24 +3408,24 @@ logical function phys_grid_initialized ()
                            dp_coup_steps, dp_coup_proc, &
                            block_buffer, bbuf_siz, sndcnts, sdispls, mpir8, &
                            chunk_buffer, cbuf_siz, rcvcnts, rdispls, mpir8, &
-                           msgtag, pdispls, mpir8, window, mpicom)
+                           msgtag, pdispls, mpir8, window, comm)
       else
          call altalltoallv(lopt, iam, npes,    &
                            dp_coup_steps, dp_coup_proc, &
                            block_buffer, bbuf_siz, sndcnts, sdispls, mpir8, &
                            chunk_buffer, cbuf_siz, rcvcnts, rdispls, mpir8, &
-                           msgtag, pdispls, mpir8, lwindow, mpicom)
+                           msgtag, pdispls, mpir8, lwindow, comm)
       endif
 !
    else
 !
 # if defined(MODCM_DP_TRANSPOSE)
-      call mp_sendirr(mpicom, sendbl, recvbl, block_buffer, chunk_buffer)
-      call mp_recvirr(mpicom, sendbl, recvbl, block_buffer, chunk_buffer)
+      call mp_sendirr(comm, sendbl, recvbl, block_buffer, chunk_buffer)
+      call mp_recvirr(comm, sendbl, recvbl, block_buffer, chunk_buffer)
 # else
       call mpialltoallv(block_buffer, sndcnts, sdispls, mpir8, &
                         chunk_buffer, rcvcnts, rdispls, mpir8, &
-                        mpicom)
+                        comm)
 # endif
 !
    endif
@@ -3969,7 +3996,7 @@ logical function phys_grid_initialized ()
    if (ftype==30) then
    if (masterproc) write(iulog,*) 'ASD - phys_npes = ', par%nprocs, ': setting dyn cores threads to 0'
    do p = 0,npes-1
-      if (p<par%nprocs) then
+      if (dynprocs(p)==1) then
          npthreads(p) = 0
       end if
    end do  

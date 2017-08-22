@@ -155,7 +155,7 @@ module namelist_mod
 #endif
     type (parallel_t), intent(in) ::  par
     character(len=MAX_FILE_LEN) :: mesh_file
-    integer :: se_ftype, se_limiter_option
+    integer :: se_ftype, se_limiter_option 
     integer :: se_phys_tscale, se_nsplit
     integer :: interp_nlat, interp_nlon, interp_gridtype, interp_type
     integer :: i, ii, j
