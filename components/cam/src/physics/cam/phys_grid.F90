@@ -3259,8 +3259,8 @@ logical function phys_grid_initialized ()
 
    comm = mpicom
    if (present(comm_group)) comm = comm_group
-   if (present(window)) print *, 'ASD - window is present'
-   if (present(comm_group)) print *, 'ASD - comm_group is present'
+!   if (present(window)) print *, 'ASD - window is present'
+!   if (present(comm_group)) print *, 'ASD - comm_group is present'
 !--- AaronDonahue
 
 !-----------------------------------------------------------------------

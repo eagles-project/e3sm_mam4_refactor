@@ -37,6 +37,7 @@ module stepon
   public stepon_run1    ! run method phase 1
   public stepon_run2    ! run method phase 2
   public stepon_run3    ! run method phase 3
+  public stepon_run4    ! run method phase 4 ! AaronDonahue
   public stepon_final  ! Finalization
 
 !----------------------------------------------------------------------
@@ -531,6 +532,35 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    call dyn_run(dyn_out,rc)	
    call t_stopf  ('dyn_run')
 
+end subroutine stepon_run3
+
+subroutine stepon_run4(dtime, cam_out, phys_state, dyn_in, dyn_out, phys_tend)
+   use camsrfexch,  only: cam_out_t     
+   use dyn_comp,    only: dyn_run
+   use time_mod,    only: tstep
+   !+++PMC & ASD
+   ! Add modules needed to calculate dyn_state update using physic tendencies
+   ! for parallel split approach.
+   use control_mod,     only: ftype, qsplit
+   use dimensions_mod,  only: nlev, nelemd, np
+   use dyn_comp,        only: TimeLevel
+   use time_mod,        only: TimeLevel_Qdp
+   use hycoef,          only: hyai, hybi, ps0
+   use cam_logfile,     only: iulog
+   ! note: ncnst is module-level variable.
+   !---PMC & ASD
+   real(r8), intent(in) :: dtime   ! Time-step
+   type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
+   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
+   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   integer :: rc
+   !+++PMC & ASD
+   ! Include variables required to apply parallel splitting algorithm
+   type(physics_tend), intent(inout) :: phys_tend(begchunk:endchunk)
+   integer :: i,j,k,ie,ic,tl_f, tl_fQdp
+   real(r8) :: dp_tmp
+   !---PMC & ASD
 !========================================================================================
    !+++PMC & ASD
    !MIMIC PARALLEL PHYS AND DYN BY APPLYING PHYS TEND AFTER DYN FINISHED.
@@ -596,9 +626,9 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
             end do ! ic
          end do ! k
       end do ! ie
-   end if ! ftype==3
+   end if ! ftype==3 or 30
 !========================================================================================
-end subroutine stepon_run3
+end subroutine stepon_run4
 
 
 !----------------------------------------------------------------------- 
