@@ -210,11 +210,12 @@ subroutine cam_run1(cam_in, cam_out)
 !-----------------------------------------------------------------------
    
    use physpkg,          only: phys_run1
-   use stepon,           only: stepon_run1
+   use stepon,           only: stepon_run1, stepon_run3
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
    use time_manager,     only: get_nstep
+   use control_mod,      only: ftype ! AaronDonahue
 
    type(cam_in_t)  :: cam_in(begchunk:endchunk)
    type(cam_out_t) :: cam_out(begchunk:endchunk)
@@ -250,6 +251,18 @@ subroutine cam_run1(cam_in, cam_out)
    call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out)
    call t_stopf  ('phys_run1')
 
+   !
+   !----------------------------------------------------------
+   ! Call dynamics concurrently with physics-bc if True PS  AaronDonahue
+   !----------------------------------------------------------
+   !
+   if (ftype.eq.30) then !AaronDonahue
+      call t_barrierf ('sync_stepon_run3', mpicom)
+      call t_startf ('stepon_run3')
+      call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
+      call t_stopf  ('stepon_run3')
+   end if !AaronDonahue
+
 end subroutine cam_run1
 
 !
@@ -273,6 +286,7 @@ subroutine cam_run2( cam_out, cam_in )
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
+   use control_mod,      only: ftype ! AaronDonahue
 
    type(cam_out_t), intent(inout) :: cam_out(begchunk:endchunk)
    type(cam_in_t),  intent(inout) :: cam_in(begchunk:endchunk)
@@ -288,11 +302,14 @@ subroutine cam_run2( cam_out, cam_in )
    !
    ! Second phase of dynamics (at least couple from physics to dynamics)
    !
-   call t_barrierf ('sync_stepon_run2', mpicom)
-   call t_startf ('stepon_run2')
-   call stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
+   ! If PS, skip this step for now
+   if (ftype.ne.3 .and. ftype.ne.30) then
+      call t_barrierf ('sync_stepon_run2', mpicom)
+      call t_startf ('stepon_run2')
+      call stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run2')
+      call t_stopf  ('stepon_run2')
+   end if
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run2_memusage')
@@ -313,22 +330,34 @@ subroutine cam_run3( cam_out )
 !           dynamics happens before physics in phase 1.
 !
 !-----------------------------------------------------------------------
-   use stepon,           only: stepon_run3
+   use stepon,           only: stepon_run2,stepon_run3, stepon_run4
    use time_manager,     only: is_first_step, is_first_restart_step
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
+   use control_mod,      only: ftype ! AaronDonahue
 
    type(cam_out_t), intent(inout) :: cam_out(begchunk:endchunk)
 !-----------------------------------------------------------------------
    !
    ! Third phase of dynamics
    !
-   call t_barrierf ('sync_stepon_run3', mpicom)
-   call t_startf ('stepon_run3')
-   call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
+   if (ftype.ne.30) then ! Don't run dynamics again if True PS - AaronDonahue
+      call t_barrierf ('sync_stepon_run3', mpicom)
+      call t_startf ('stepon_run3')
+      call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run3')
+      call t_stopf  ('stepon_run3')
+   end if ! ftype ne 30
+
+   ! For PS, now update state based on physics tendencies.
+   if (ftype.eq.3 .or. ftype.eq.30) then
+      call t_barrierf ('sync_stepon_run2', mpicom)
+      call t_startf ('stepon_run2')
+      call stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
+
+      call t_stopf  ('stepon_run2')
+   end if ! ftype
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run3_memusage')
