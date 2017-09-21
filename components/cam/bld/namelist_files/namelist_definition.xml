@@ -5706,11 +5706,13 @@ Default: Set by build-namelist.
 </entry>
 
 <entry id="se_ftype" type="integer" category="se"
-       group="ctl_nl" valid_values="0,1,2" >
+       group="ctl_nl" valid_values="0,1,2,3,30" >
 CAM physics forcing option:
 0: tendencies
 1: adjustments
 2: hybrid
+3: parallel (same compute cores)
+30: parallel (separate compute cores)
 Default: Set by build-namelist.
 </entry>
 
