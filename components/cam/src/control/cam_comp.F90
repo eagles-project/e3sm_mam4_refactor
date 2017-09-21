@@ -330,7 +330,7 @@ subroutine cam_run3( cam_out )
 !           dynamics happens before physics in phase 1.
 !
 !-----------------------------------------------------------------------
-   use stepon,           only: stepon_run2,stepon_run3, stepon_run4
+   use stepon,           only: stepon_run2,stepon_run3
    use time_manager,     only: is_first_step, is_first_restart_step
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
