@@ -324,8 +324,9 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=1:  apply all forcings as an adjustment
+      ! ftype=3,30: apply forcings as adjustment using PS approach
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype==1) then
+      if (ftype==1 .or. ftype==3 .or. ftype ==30) then
          ! apply forcing to state tl_f
          ! requires forward-in-time timestepping, checked in namelist_mod.F90
 !$omp parallel do private(k)
@@ -345,6 +346,9 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
                      ! apply forcing to Qdp
                      dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
                           dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) + fq 
+                     ! Apply clipping (where needed) to avoid negative mass  ! AaronDonahue
+                     dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
+                         max(0._r8,dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp))
 
                      ! BEWARE critical region if using OpenMP over k (AAM)
                      if (ic==1) then
@@ -516,7 +520,6 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    call t_stopf  ('dyn_run')
 
 end subroutine stepon_run3
-
 
 
 subroutine stepon_run4(dtime, cam_out, phys_state, dyn_in, dyn_out)

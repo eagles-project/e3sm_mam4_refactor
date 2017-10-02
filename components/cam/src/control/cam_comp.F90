@@ -327,7 +327,7 @@ subroutine cam_run3( cam_out )
 !           dynamics happens before physics in phase 1.
 !
 !-----------------------------------------------------------------------
-   use stepon,           only: stepon_run2,stepon_run3,stepon_run4
+   use stepon,           only: stepon_run3,stepon_run4
    use time_manager,     only: is_first_step, is_first_restart_step
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
@@ -347,12 +347,14 @@ subroutine cam_run3( cam_out )
       call t_stopf  ('stepon_run3')
    end if ! ftype ne 30
 
-   if (ftype.eq.30.or.ftype.eq.3) then
+   ! For PS, now update state based on physics tendencies.
+   if (ftype.eq.3 .or. ftype.eq.30) then
       call t_barrierf ('sync_stepon_run4', mpicom)
       call t_startf ('stepon_run4')
-      call stepon_run4( dtime,cam_out,phys_state,dyn_in,dyn_out )
+      call stepon_run4( phys_state, phys_tend, dyn_in, dyn_out )
+
       call t_stopf  ('stepon_run4')
-   end if
+   end if ! ftype
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run3_memusage')
