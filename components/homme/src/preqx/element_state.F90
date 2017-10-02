@@ -28,6 +28,7 @@ module element_state
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
     real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,2)               ! Tracer mass                        7
+    real (kind=real_kind) :: Q0  (np,np,nlev,qsize_d)                 ! Tracer concentration at dp_couple  8
 
   end type elem_state_t
 

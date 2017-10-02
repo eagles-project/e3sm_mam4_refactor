@@ -305,10 +305,12 @@ contains
        
        do ie=1,nelemd
           elem(ie)%state%Q(:,:,:,m_cnst)=0.0_r8
+          elem(ie)%state%Q0(:,:,:,m_cnst)=0.0_r8
           indx = 1
           do j = 1, np
              do i = 1, np
                 elem(ie)%state%Q(i,j,:,m_cnst) = tmp(indx,:,ie)
+                elem(ie)%state%Q0(i,j,:,m_cnst) = tmp(indx,:,ie)
                 indx = indx + 1
              end do
           end do

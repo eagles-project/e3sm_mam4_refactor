@@ -297,6 +297,7 @@ CONTAINS
           if(runtype == 0) then
              do ie=nets,nete
                 elem(ie)%state%q(:,:,:,:)=0.0_r8
+                elem(ie)%state%q0(:,:,:,:)=0.0_r8
                 elem(ie)%derived%fq(:,:,:,:,:)=0.0_r8
              end do
           end if
@@ -313,6 +314,7 @@ CONTAINS
                 elem(ie)%state%v(:,:,:,:,:) =0.0_r8
 
                 elem(ie)%state%q(:,:,:,:)=0.0_r8
+                elem(ie)%state%q0(:,:,:,:)=0.0_r8
 
              end do
           end if

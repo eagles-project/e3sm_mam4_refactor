@@ -623,6 +623,9 @@ end subroutine check_energy_get_integrals
        end if
     else
        heat_glob = 0._r8
+       if (masterproc) then
+          write(iulog,'(1x,a9,1x,i8)') "nstep", nstep
+       end if
     end if  !  (begchunk .le. endchunk)
     
   end subroutine check_energy_gmean

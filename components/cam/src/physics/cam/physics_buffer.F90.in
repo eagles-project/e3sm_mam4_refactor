@@ -348,7 +348,9 @@ CONTAINS
     end do
     
     buffer_initialized=.true.
-    call pbuf_allocate(pbuf2d, 'global')
+    if (begchunk.le.endchunk) then
+       call pbuf_allocate(pbuf2d, 'global')
+    end if
 #ifdef DEBUG
     call pbuf2d_print(pbuf2d)
 #endif

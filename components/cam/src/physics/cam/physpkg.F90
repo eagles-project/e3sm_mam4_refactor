@@ -1244,7 +1244,9 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     call t_stopf ('carma_accumulate_stats')
 
     call t_startf ('physpkg_st2')
-    call pbuf_deallocate(pbuf2d, 'physpkg')
+    if (begchunk.le.endchunk) then
+       call pbuf_deallocate(pbuf2d, 'physpkg')
+    end if
 
     call pbuf_update_tim_idx()
     call diag_deallocate()
@@ -1272,9 +1274,11 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     type(physics_tend ), pointer :: phys_tend(:)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
-    if(associated(pbuf2d)) then
-       call pbuf_deallocate(pbuf2d,'global')
-       deallocate(pbuf2d)
+    if (begchunk.le.endchunk) then
+       if(associated(pbuf2d)) then
+          call pbuf_deallocate(pbuf2d,'global')
+          deallocate(pbuf2d)
+       end if
     end if
     deallocate(phys_state)
     deallocate(phys_tend)
@@ -1526,7 +1530,7 @@ if (l_tracer_aero) then
          cam_in%cflx)
 
     ! Chemistry calculation
-    if (chem_is_active()) then
+    if (chem_is_active().and.ncol.gt.0) then
        call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, &
             pbuf,  fh2o, fsds)
 
@@ -1633,8 +1637,9 @@ if (l_gw_drag) then
     ! Gravity wave drag
     !===================================================
     call t_startf('gw_tend')
-
-    call gw_tend(state, sgh, pbuf, ztodt, ptend, cam_in)
+    if (ncol.gt.0) then
+       call gw_tend(state, sgh, pbuf, ztodt, ptend, cam_in)
+    end if
 
     call physics_update(state, ptend, ztodt, tend)
     ! Check energy integrals

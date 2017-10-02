@@ -37,6 +37,7 @@ module stepon
   public stepon_run1    ! run method phase 1
   public stepon_run2    ! run method phase 2
   public stepon_run3    ! run method phase 3
+  public stepon_run4    ! run method phase 4
   public stepon_final  ! Finalization
 
 !----------------------------------------------------------------------
@@ -323,9 +324,8 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=1:  apply all forcings as an adjustment
-      ! ftype=3,30: apply forcings as adjustment using PS approach
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype==1 .or. ftype==3 .or. ftype ==30) then
+      if (ftype==1) then
          ! apply forcing to state tl_f
          ! requires forward-in-time timestepping, checked in namelist_mod.F90
 !$omp parallel do private(k)
@@ -345,9 +345,6 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
                      ! apply forcing to Qdp
                      dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
                           dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) + fq 
-                     ! Apply clipping (where needed) to avoid negative mass  ! AaronDonahue
-                     dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
-                         max(0._r8,dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp))
 
                      ! BEWARE critical region if using OpenMP over k (AAM)
                      if (ic==1) then
@@ -389,7 +386,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0) then
+      if (ftype<=0.or.ftype.eq.3) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -408,7 +405,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
                      
                      dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1)=&
                           (  dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1) - &
-                          dyn_in%elem(ie)%state%Q(i,j,k,ic))*rec2dt*dp_tmp
+                          dyn_in%elem(ie)%state%Q0(i,j,k,ic))*rec2dt*dp_tmp
                   end do
                end do
             end do
@@ -520,6 +517,36 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
 
 end subroutine stepon_run3
 
+
+
+subroutine stepon_run4(dtime, cam_out, phys_state, dyn_in, dyn_out)
+   use camsrfexch,     only: cam_out_t     
+   use dyn_comp,       only: TimeLevel, hvcoord
+   use dimensions_mod, only: nelemd
+   use prim_advance_mod,   only: applycamforcing
+   use control_mod,    only: qsplit
+   use parallel_mod,     only : par
+   use spmd_utils,  only : iam
+   use time_mod,        only: TimeLevel_Qdp
+   real(r8), intent(in) :: dtime   ! Time-step
+   type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
+   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
+   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   integer :: tl_f, n0_qdp
+
+   if (iam >= par%nprocs) return
+
+   tl_f = TimeLevel%n0    ! current timelevel
+
+   call t_startf("ApplyCAMForcing")
+   call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp)
+   call ApplyCAMForcing(dyn_in%elem, hvcoord,tl_f,n0_qdp, dtime,1,nelemd)
+   call t_stopf("ApplyCAMForcing")
+
+   return
+
+end subroutine stepon_run4
 !----------------------------------------------------------------------- 
 !BOP
 ! !ROUTINE:  stepon_final --- Dynamics finalization

@@ -72,6 +72,7 @@ CONTAINS
     real (kind=r8),        pointer     :: pbuf_frontga(:,:)
 
     integer :: ncols,i,j,ierr
+    integer :: k,ic
 
     integer (kind=int_kind)  :: ioff, m
     integer :: pgcols(pcols), idmb1(1), idmb2(1), idmb3(1)
@@ -116,6 +117,11 @@ CONTAINS
 
           call UniquePoints(elem(ie)%idxP, elem(ie)%state%phis, phis_tmp(1:ncols,ie))
           call UniquePoints(elem(ie)%idxP, nlev,pcnst, elem(ie)%state%Q(:,:,:,:), Q_tmp(1:ncols,:,:,ie))
+          do k = 1,nlev  ! Save Q state at the beginning of the timestep
+             do ic = 1,pcnst
+                elem(ie)%state%Q0(:,:,k,ic) = elem(ie)%state%Q(:,:,k,ic)
+             end do ! ic
+          end do ! k
        end do
        call t_stopf('UniquePoints')
 
@@ -302,6 +308,7 @@ CONTAINS
   subroutine p_d_coupling(phys_state, phys_tend,  dyn_in)
     use shr_vmath_mod, only: shr_vmath_log
     use cam_control_mod, only : adiabatic
+    use control_mod, only: ftype  ! AaronDonahue
     implicit none
 
 ! !INPUT PARAMETERS:
@@ -362,7 +369,7 @@ CONTAINS
                 uv_tmp(ioff,2,ilyr,ie)   = phys_tend(lchnk)%dvdt(icol,ilyr)
 
                 do m=1,pcnst
-                   q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
+                      q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
                 end do
              end do
 

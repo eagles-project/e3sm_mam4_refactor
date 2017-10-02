@@ -431,6 +431,7 @@ CONTAINS
        elem(ie)%derived%fT = 0._r8
        elem(ie)%derived%fQ = 0._r8
        elem(ie)%state%Q = 0._r8
+       elem(ie)%state%Q0 = 0._r8
     end do
 
     call pio_read_darray(File, omegadesc, iodesc3d, var3d, ierr)
@@ -517,6 +518,7 @@ CONTAINS
                 do i=1,np
                    cnt=cnt+1
                    elem(ie)%state%Q(i,j,k,q) = var3d(cnt)
+                   elem(ie)%state%Q0(i,j,k,q) = var3d(cnt)
                 end do
              end do
           end do

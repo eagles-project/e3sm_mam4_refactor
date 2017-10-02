@@ -99,6 +99,8 @@ module phys_grid
    use cam_abortutils,   only: endrun
    use perf_mod
    use cam_logfile,      only: iulog
+   use parallel_mod,     only: par
+   use control_mod,      only: ftype
 
    implicit none
    save
@@ -3963,6 +3965,14 @@ logical function phys_grid_initialized ()
 #endif
 
 !
+! Assign 0 threads to dynamics only processors
+!
+   if (ftype.eq.30) then
+      do p = 0,npes-1
+         if (p.lt.par%nprocs) npthreads(p) = 0
+      end do
+   end if
+!
 ! Determine index range for dynamics blocks
 !
    call get_block_bounds_d(firstblock,lastblock)
@@ -4210,6 +4220,15 @@ logical function phys_grid_initialized ()
          endif
          nchunks = nchunks + nsmpchunks(smp)
       enddo
+!
+! Assign extra chunks for dynamics only processors that will be empty
+!
+      do p = 0,npes-1
+         if (npthreads(p).eq.0) then
+            nchunks = nchunks + 1
+         end if
+      end do
+
 !
 ! Determine maximum number of columns to assign to chunks
 ! in a given SMP
@@ -4973,6 +4992,19 @@ logical function phys_grid_initialized ()
       enddo
 !
    enddo
+
+!
+!  Assign empty chunks to processors without any chunks
+!
+   cid = cid_offset(nsmpx)
+   do p = 0,npes-1
+      if (npchunks(p).eq.0) then
+         chunks(cid)%owner = p
+         cid = cid + 1
+         npchunks(p) = 1
+!         gs_col_num(p) = 0
+      end if
+   end do
 !
    return
    end subroutine assign_chunks
