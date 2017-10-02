@@ -324,7 +324,6 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=1:  apply all forcings as an adjustment
-      ! ftype=3,30: apply forcings as adjustment using PS approach
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       if (ftype==1) then
          ! apply forcing to state tl_f
@@ -386,6 +385,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
+      ! ftype=3,30: return tendencies for the PS approach
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       if (ftype<=0.or.ftype.eq.3) then
 

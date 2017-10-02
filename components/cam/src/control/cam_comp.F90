@@ -351,7 +351,7 @@ subroutine cam_run3( cam_out )
    if (ftype.eq.3 .or. ftype.eq.30) then
       call t_barrierf ('sync_stepon_run4', mpicom)
       call t_startf ('stepon_run4')
-      call stepon_run4( phys_state, phys_tend, dyn_in, dyn_out )
+      call stepon_run4( dtime, cam_out, phys_state, dyn_in, dyn_out )
 
       call t_stopf  ('stepon_run4')
    end if ! ftype
