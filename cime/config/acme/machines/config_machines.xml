@@ -335,10 +335,10 @@
 
 <!-- KNL nodes of Cori -->
 <machine MACH="cori-knl">
-  <DESC>Cori. XC40 Cray system at NERSC. KNL partition. os is CNL, 68 pes/node (for now only use 64), batch system is SLURM</DESC>
+  <DESC>Cori. XC40 Cray system at NERSC. KNL partition. os is CNL, 68 pes/node, batch system is SLURM</DESC>
   <NODENAME_REGEX>cori-knl-haswell-is-default</NODENAME_REGEX>
   <TESTS>acme_developer</TESTS>
-  <COMPILERS>intel,intel18,gnu</COMPILERS>
+  <COMPILERS>intel,intel18,intel-craypat,gnu</COMPILERS>
   <MPILIBS>mpt,impi</MPILIBS>
   <CIME_OUTPUT_ROOT>$ENV{SCRATCH}/acme_scratch/cori-knl</CIME_OUTPUT_ROOT>
   <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
@@ -431,6 +431,16 @@
       <command name="load">intel/18.0.0.128</command>
     </modules>
 
+    <modules compiler="intel-craypat">
+      <command name="load">PrgEnv-intel</command>
+      <command name="rm">intel</command>
+      <command name="load">intel/18.0.1.163</command>
+      <command name="rm">perftools-base</command>
+      <command name="rm">perftools</command>
+      <command name="load">perftools-base</command>
+      <command name="load">perftools</command>
+    </modules>
+
     <modules compiler="gnu">
       <command name="swap">PrgEnv-intel PrgEnv-gnu</command>
       <command name="rm">gcc</command>
@@ -492,6 +502,12 @@
   <environment_variables compiler="intel18">
     <env name="MPICH_MEMORY_REPORT">1</env>
     <env name="FORT_BUFFERED">yes</env>
+  </environment_variables>
+  <environment_variables compiler="intel-craypat">
+    <env name="MPICH_MEMORY_REPORT">1</env>
+    <env name="FORT_BUFFERED">yes</env>
+    <env name="PAT_RT_SUMMARY">0</env>
+    <env name="PAT_RT_SAMPLING_INTERVAL">10000</env>
   </environment_variables>
 </machine>
 
