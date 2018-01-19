@@ -44,7 +44,9 @@ public :: &
    diag_surf,          &! output diagnostics of the surface
    diag_export,        &! output export state
    diag_physvar_ic,    &
-   diag_readnl          ! read namelist options
+   diag_readnl,        &! read namelist options
+   qneg_init,          &! initialize QNEG output ( AaronDonahue)
+   qneg_write         ! write QNEG output ( AaronDonahue)
 
 logical, public :: inithist_all = .false. ! Flag to indicate set of fields to be 
                                           ! included on IC file
@@ -1926,4 +1928,58 @@ end subroutine diag_phys_tend_writeout
 
    end subroutine diag_state_b4_phys_write
 
-end module cam_diagnostics
+!===============================================================================
+   subroutine qneg_init()
+
+
+   use cam_history,        only: addfld
+   use qneg,               only: qneg3_mat,qneg4_mat,qneg3_numflds, &
+                                 qneg4_numflds
+!-----------------------------------------------------------------------
+!
+! Purpose:
+! Initialize qneg matrices and field arrays to be used with optional
+! QNEG3 and QNEG4 output variables
+!
+! Author: A.S. Donahue (LLNL)
+!
+!-----------------------------------------------------------------------
+
+   integer :: k,m
+
+
+   ! Setup QNEG field outputs
+   do m = 1,pcnst
+      call addfld('QNEG3_'//trim(cnst_name(m)),(/ 'lev', 'qneg3' /),'A','unitless','QNEG3 error frequency for '//trim(cnst_name(m))) 
+   end do
+      call addfld('QNEG4',(/ 'qneg4' /),'A','unitless','QNEG4 error frequency for Q') 
+
+   ! Allocate QNEG error matrices to be used with output
+   allocate(qneg3_mat(pcols,pver,pcnst,qneg3_numflds))
+   allocate(qneg4_mat(pcols,qneg4_numflds))
+ 
+   qneg3_mat(:,:,:,:) = 0.0
+   qneg4_mat(:,:)     = 0.0
+
+   return
+
+   end subroutine qneg_init
+!===============================================================================
+   subroutine qneg_write(lchnk)
+
+   use cam_history,        only: outfld
+   use qneg,               only: qneg3_mat, qneg4_mat
+
+   integer, intent(in) :: lchnk
+   integer :: m
+   integer :: qnegsum, i,j,k
+
+   do m = 1,pcnst
+      if (qnegsum>0) print *, 'ASD: qnegsum = ',qnegsum,' for m=', m
+      call outfld('QNEG3_'//trim(cnst_name(m)),qneg3_mat(:,:,m,:),pcols,lchnk) 
+   end do
+   call outfld('QNEG4',qneg4_mat(:,:),pcols,lchnk) 
+
+   end subroutine qneg_write
+!===============================================================================
+ end module cam_diagnostics

@@ -152,6 +152,7 @@ subroutine phys_register
     use subcol_utils,       only: is_subcol_on
     use output_aerocom_aie, only: output_aerocom_aie_register, do_aerocom_ind3
 
+    use qneg,               only: qneg_register
     !---------------------------Local variables-----------------------------
     !
     integer  :: m        ! loop index
@@ -169,6 +170,9 @@ subroutine phys_register
                       use_subcol_microp_out    = use_subcol_microp, &
                       state_debug_checks_out   = state_debug_checks, &
                       micro_do_icesupersat_out = micro_do_icesupersat)
+
+    ! Initialize qneg
+    call qneg_register()
 
     ! Initialize dyn_time_lvls
     call pbuf_init_time()
@@ -679,7 +683,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use co2_cycle,          only: co2_init, co2_transport
     use convect_deep,       only: convect_deep_init
     use convect_shallow,    only: convect_shallow_init
-    use cam_diagnostics,    only: diag_init
+    use cam_diagnostics,    only: diag_init, qneg_init ! AaronDonahue
     use gw_drag,            only: gw_init
     use cam3_aero_data,     only: cam3_aero_data_on, cam3_aero_data_init
     use cam3_ozone_data,    only: cam3_ozone_data_on, cam3_ozone_data_init
@@ -717,7 +721,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use nudging,            only: Nudge_Model,nudging_init
     use output_aerocom_aie, only: output_aerocom_aie_init, do_aerocom_ind3
 
-
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -730,6 +733,9 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     real(r8) :: dp1 = huge(1.0_r8) !set in namelist, assigned in cloud_fraction.F90
 
     !-----------------------------------------------------------------------
+
+    ! QNEG error initialize (AaronDonahue)
+    call qneg_init()
 
     call physics_type_alloc(phys_state, phys_tend, begchunk, endchunk, pcols)
 
@@ -1313,7 +1319,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use chemistry,          only: chem_is_active, chem_timestep_tend, chem_emissions
-    use cam_diagnostics,    only: diag_phys_tend_writeout
+    use cam_diagnostics,    only: diag_phys_tend_writeout, qneg_write ! AaronDonahue
     use gw_drag,            only: gw_tend
     use vertical_diffusion, only: vertical_diffusion_tend
     use rayleigh_friction,  only: rayleigh_friction_tend
@@ -1348,6 +1354,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use qneg,               only: qneg4 ! AaronDonahue
 
     implicit none
 
@@ -1771,6 +1778,7 @@ end if ! l_ac_energy_chk
     end do
     water_vap_ac_2d(:ncol) = ftem(:ncol,1)
 
+    call qneg_write(lchnk)  ! AaronDonahue
 end subroutine tphysac
 
 subroutine tphysbc (ztodt,               &
@@ -1844,6 +1852,7 @@ subroutine tphysbc (ztodt,               &
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
+    use qneg,            only: qneg3, massborrow ! AaronDonahue
 
     implicit none
 

@@ -211,6 +211,7 @@ contains
     use phys_control, only: phys_getopts
     use physconst,    only: physconst_update ! Routine which updates physconst variables (WACCM-X)
     use ppgrid,       only: begchunk, endchunk
+    use qneg,         only: qneg3, massborrow ! AaronDonahue
 
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(inout)  :: ptend   ! Parameterization tendencies
@@ -342,7 +343,7 @@ contains
           ! don't call qneg3 for number concentration variables
           if (m /= ixnumice  .and.  m /= ixnumliq .and. &
               m /= ixnumrain .and.  m /= ixnumsnow ) then
-             name = trim(ptend%name) // '/' // trim(cnst_name(m))
+             name = trim(ptend%name)! // '/' // trim(cnst_name(m))
 !!== KZ_WATCON 
              if(use_mass_borrower) then 
                 call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.)
@@ -360,7 +361,6 @@ contains
           end if
 
        end if
-
     end do
 
     !------------------------------------------------------------------------
