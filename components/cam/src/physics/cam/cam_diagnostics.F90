@@ -51,6 +51,7 @@ logical, public :: inithist_all = .false. ! Flag to indicate set of fields to be
                                           !  .false.  include only required fields
                                           !  .true.   include required *and* optional fields
 
+
 ! Private data
 
 integer :: dqcond_num                     ! number of constituents to compute convective
@@ -174,10 +175,18 @@ subroutine diag_init()
    call addfld ('PHIS',horiz_only,    'I','m2/s2','Surface geopotential')
 
    call addfld ('PS',horiz_only,    'A','Pa','Surface pressure')
+   call addfld ('PS_0',horiz_only,    'A','Pa','Surface pressure, pre-dynamics') ! AaronDonahue
+   call addfld ('PDEL',(/ 'lev' /), 'A','Pa','Pressure difference between levels') ! AaronDonahue
+   call addfld ('PDEL0',(/ 'lev' /), 'A','Pa','Pressure difference between levels') ! AaronDonahue
    call addfld ('T',(/ 'lev' /), 'A','K','Temperature')
    call addfld ('U',(/ 'lev' /), 'A','m/s','Zonal wind')
    call addfld ('V',(/ 'lev' /), 'A','m/s','Meridional wind')
    call addfld (cnst_name(1),(/ 'lev' /), 'A','kg/kg',cnst_longname(1))
+   call addfld ('CLUBB_Q',(/ 'lev' /), 'A','kg/kg',cnst_longname(1)//' Pre-CLUBB') ! AaronDonahue
+   call addfld ('CLUBB_FQ',(/ 'lev' /), 'A','kg/kg',cnst_longname(1)//' Post-CLUBB') ! AaronDonahue
+   call addfld ('DYN_Q',(/ 'lev' /), 'A','kg/kg',cnst_longname(1)//' After Dynamics') ! AaronDonahue
+   call addfld ('PHY_Q',(/ 'lev' /), 'A','kg/kg',cnst_longname(1)//' Before Physics') ! AaronDonahue
+   call addfld ('PHY_Qac',(/ 'lev' /), 'A','kg/kg',cnst_longname(1)//' After Physics') ! AaronDonahue
 
    ! State before physics
    call addfld ('TBP',(/ 'lev' /), 'A','K','Temperature (before physics)'       )
@@ -328,6 +337,9 @@ subroutine diag_init()
    if (history_amwg) then
       call add_default ('PHIS    '  , 1, ' ')
       call add_default ('PS      '  , 1, ' ')
+      call add_default ('PS_0    '  , 1, ' ') ! AaronDonahue
+      call add_default ('PDEL    '  , 1, ' ') ! AaronDonahue
+      call add_default ('PDEL0   '  , 1, ' ') ! AaronDonahue
       call add_default ('T       '  , 1, ' ')
       call add_default ('U       '  , 1, ' ')
       call add_default ('V       '  , 1, ' ')
@@ -408,6 +420,9 @@ subroutine diag_init()
    if ( history_budget ) then
       call add_default ('PHIS    '  , history_budget_histfile_num, ' ')
       call add_default ('PS      '  , history_budget_histfile_num, ' ')
+      call add_default ('PS_0    '  , history_budget_histfile_num, ' ') ! AaronDonahue
+      call add_default ('PDEL    '  , history_budget_histfile_num, ' ') ! AaronDonahue
+      call add_default ('PDEL0   '  , history_budget_histfile_num, ' ') ! AaronDonahue
       call add_default ('T       '  , history_budget_histfile_num, ' ')
       call add_default ('U       '  , history_budget_histfile_num, ' ')
       call add_default ('V       '  , history_budget_histfile_num, ' ')
@@ -881,8 +896,15 @@ end subroutine diag_conv_tend_ini
 
     call outfld('T       ',state%t , pcols   ,lchnk   )
     call outfld('PS      ',state%ps, pcols   ,lchnk   )
+    call outfld('PS_0    ',state%ps_0, pcols   ,lchnk   )
+    call outfld('PDEL    ',state%pdel, pcols   ,lchnk ) ! AaronDonahue
+    call outfld('PDEL0   ',state%pdel0, pcols   ,lchnk ) ! AaronDonahue
     call outfld('U       ',state%u , pcols   ,lchnk   )
     call outfld('V       ',state%v , pcols   ,lchnk   )
+    call outfld('DYN_Q'  ,state%qd(1,1,1),pcols ,lchnk ) ! AaronDonahue
+    call outfld('PHY_Q'  ,state%qp(1,1,1),pcols ,lchnk ) ! AaronDonahue
+    call outfld('CLUBB_Q',state%qc(1,1,1),pcols,lchnk) ! AaronDonahue    
+    call outfld('CLUBB_FQ',state%qc(1,1,2),pcols,lchnk) ! AaronDonahue    
     do m=1,pcnst
        if ( cnst_cam_outfld(m) ) then
           call outfld(cnst_name(m),state%q(1,1,m),pcols ,lchnk )
@@ -1925,5 +1947,4 @@ end subroutine diag_phys_tend_writeout
    if ( cnst_cam_outfld(ixcldice) ) call outfld (bpcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
 
    end subroutine diag_state_b4_phys_write
-
 end module cam_diagnostics

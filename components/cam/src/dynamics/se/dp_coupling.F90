@@ -58,10 +58,12 @@ CONTAINS
     integer (kind=int_kind)  :: ie               ! indices over elements
     integer (kind=int_kind)  :: lchnk, icol, ilyr      ! indices over chunks, columns, layers
     real (kind=real_kind)    :: ps_tmp(npsq,nelemd)         ! temporary array to hold ps
+    real (kind=real_kind)    :: ps0_tmp(npsq,nelemd)         ! temporary array to hold ps pre-dyn (AaronDonahue)
     real (kind=real_kind)    :: phis_tmp(npsq,nelemd)       ! temporary array to hold phis  
     real (kind=real_kind)    :: T_tmp(npsq,pver,nelemd)     ! temporary array to hold T
     real (kind=real_kind)    :: uv_tmp(npsq,2,pver,nelemd)     ! temporary array to hold u and v
     real (kind=real_kind)    :: q_tmp(npsq,pver,pcnst,nelemd) ! temporary to hold advected constituents
+    real (kind=real_kind)    :: qd_tmp(npsq,pver,pcnst,nelemd) ! temporary to hold advected constituents (AaronDonahue)
     real (kind=real_kind)    :: omega_tmp(npsq,pver,nelemd) ! temporary array to hold omega
 
     ! Frontogenesis
@@ -110,18 +112,21 @@ CONTAINS
        do ie=1,nelemd
           ncols = elem(ie)%idxP%NumUniquePts
           call UniquePoints(elem(ie)%idxP, elem(ie)%state%ps_v(:,:,tl_f), ps_tmp(1:ncols,ie))
+          call UniquePoints(elem(ie)%idxP, elem(ie)%state%ps_v0(:,:,tl_f), ps0_tmp(1:ncols,ie))
           call UniquePoints(elem(ie)%idxP, nlev, elem(ie)%state%T(:,:,:,tl_f), T_tmp(1:ncols,:,ie))
           call UniquePoints(elem(ie)%idxP, 2, nlev, elem(ie)%state%V(:,:,:,:,tl_f), uv_tmp(1:ncols,:,:,ie))
           call UniquePoints(elem(ie)%idxP, nlev, elem(ie)%derived%omega_p, omega_tmp(1:ncols,:,ie))
 
           call UniquePoints(elem(ie)%idxP, elem(ie)%state%phis, phis_tmp(1:ncols,ie))
           call UniquePoints(elem(ie)%idxP, nlev,pcnst, elem(ie)%state%Q(:,:,:,:), Q_tmp(1:ncols,:,:,ie))
+          call UniquePoints(elem(ie)%idxP, nlev,pcnst, elem(ie)%state%Qd(:,:,:,:), Qd_tmp(1:ncols,:,:,ie))
        end do
        call t_stopf('UniquePoints')
 
        if (use_gw_front) call gws_src_fnct(elem, tl_f, frontgf, frontga)
     else
        ps_tmp(:,:) = 0._r8
+       ps0_tmp(:,:) = 0._r8
        T_tmp(:,:,:) = 0._r8
        uv_tmp(:,:,:,:) = 0._r8
        omega_tmp(:,:,:) = 0._r8
@@ -131,6 +136,7 @@ CONTAINS
        end if
        phis_tmp(:,:) = 0._r8
        Q_tmp(:,:,:,:) = 0._r8
+       Qd_tmp(:,:,:,:) = 0._r8
     endif !! par%dynproc
 
     call t_startf('dpcopy')
@@ -154,6 +160,7 @@ CONTAINS
              ioff=idmb2(1)
 
              phys_state(lchnk)%ps(icol)=ps_tmp(ioff,ie)
+             phys_state(lchnk)%ps_0(icol)=ps0_tmp(ioff,ie)
              phys_state(lchnk)%phis(icol)=phis_tmp(ioff,ie)
              do ilyr=1,pver
                 phys_state(lchnk)%t(icol,ilyr)=T_tmp(ioff,ilyr,ie)	   
@@ -170,6 +177,7 @@ CONTAINS
              do m=1,pcnst
                 do ilyr=1,pver
                    phys_state(lchnk)%q(icol,ilyr,m)=Q_tmp(ioff,ilyr,m,ie)
+                   phys_state(lchnk)%qd(icol,ilyr,m)=Qd_tmp(ioff,ilyr,m,ie)
                 end do
              end do
           end do
@@ -177,7 +185,7 @@ CONTAINS
 
     else  ! .not. local_dp_map
 
-       tsize = 4 + pcnst
+       tsize = 4 + 2*pcnst
        if (use_gw_front) tsize = tsize + 2
 
        allocate(bbuffer(tsize*block_buf_nrecs))
@@ -193,6 +201,7 @@ CONTAINS
                 bbuffer(bpter(icol,0)+2:bpter(icol,0)+tsize-1) = 0.0_r8
                 
                 bbuffer(bpter(icol,0))   = ps_tmp(icol,ie)
+                bbuffer(bpter(icol,0)+2) = ps0_tmp(icol,ie)
                 bbuffer(bpter(icol,0)+1) = phis_tmp(icol,ie)
 
                 do ilyr=1,pver
@@ -208,6 +217,7 @@ CONTAINS
 
                    do m=1,pcnst
                       bbuffer(bpter(icol,ilyr)+tsize-pcnst-1+m) = Q_tmp(icol,ilyr,m,ie)
+                      bbuffer(bpter(icol,ilyr)+tsize-pcnst-1+m-pcnst) = Qd_tmp(icol,ilyr,m,ie)
                    end do
                 end do
 
@@ -239,6 +249,7 @@ CONTAINS
           do icol=1,ncols
 
              phys_state(lchnk)%ps   (icol)     = cbuffer(cpter(icol,0))
+             phys_state(lchnk)%ps_0 (icol)     = cbuffer(cpter(icol,0)+2)
              phys_state(lchnk)%phis (icol)     = cbuffer(cpter(icol,0)+1)
 
              do ilyr=1,pver
@@ -255,6 +266,7 @@ CONTAINS
 
                 do m=1,pcnst
                    phys_state(lchnk)%q  (icol,ilyr,m) = cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m)
+                   phys_state(lchnk)%qd (icol,ilyr,m) = cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m-pcnst)
                 end do
 
              end do
@@ -479,6 +491,7 @@ CONTAINS
     real(r8) :: se(pcols,begchunk:endchunk)   
     real(r8) :: ke_glob(1),se_glob(1)
     real(r8) :: zvirv(pcols,pver)    ! Local zvir array pointer
+    real(r8) :: pint0(pcols,pver+1)    ! pdel tmp array (AaronDonahue)
 
     integer :: m, i, k, ncol
 
@@ -492,6 +505,7 @@ CONTAINS
        ncol = get_ncols_p(lchnk)
        do k=1,nlev
           do i=1,ncol
+             pint0(i,k)=hyai(k)*ps0+hybi(k)*phys_state(lchnk)%ps_0(i)  !AaronDonahue
              phys_state(lchnk)%pint(i,k)=hyai(k)*ps0+hybi(k)*phys_state(lchnk)%ps(i)
              phys_state(lchnk)%pmid(i,k)=hyam(k)*ps0+hybm(k)*phys_state(lchnk)%ps(i)
           end do
@@ -500,6 +514,7 @@ CONTAINS
        end do
        do i=1,ncol
           phys_state(lchnk)%pint(i,pverp)=hyai(pverp)*ps0+hybi(pverp)*phys_state(lchnk)%ps(i)
+          pint0(i,pverp)=hyai(pverp)*ps0+hybi(pverp)*phys_state(lchnk)%ps_0(i)
        end do
        call shr_vmath_log(phys_state(lchnk)%pint(1:ncol,pverp),phys_state(lchnk)%lnpint(1:ncol,pverp),ncol)
 
@@ -507,9 +522,11 @@ CONTAINS
        do k=1,nlev
           do i=1,ncol
              phys_state(lchnk)%pdel (i,k) = phys_state(lchnk)%pint(i,k+1) - phys_state(lchnk)%pint(i,k)
+             phys_state(lchnk)%pdel0 (i,k) = pint0(i,k+1) - pint0(i,k)  ! AaronDonahue
              phys_state(lchnk)%rpdel(i,k) = 1._r8/phys_state(lchnk)%pdel(i,k)
              phys_state(lchnk)%exner (i,k) = (phys_state(lchnk)%pint(i,pver+1) &
                                              / phys_state(lchnk)%pmid(i,k))**cappa
+             phys_state(lchnk)%qp(i,k,:) = phys_state(lchnk)%q(i,k,:)
           end do
        end do
 

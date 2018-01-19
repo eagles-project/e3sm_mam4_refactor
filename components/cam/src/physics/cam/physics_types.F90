@@ -28,7 +28,6 @@ module physics_types
   public physics_ptend
   
 ! Public interfaces
-
   public physics_update
   public physics_state_check ! Check state object for invalid data.
   public physics_ptend_reset
@@ -65,6 +64,7 @@ module physics_types
           lat,     &! latitude (radians)
           lon,     &! longitude (radians)
           ps,      &! surface pressure
+          ps_0,    &! surface pressure pre-dynamics  (AaronDonahue)
           psdry,   &! dry surface pressure
           phis,    &! surface geopotential
           ulat,    &! unique latitudes  (radians)
@@ -78,6 +78,7 @@ module physics_types
           pmid,    &! midpoint pressure (Pa) 
           pmiddry, &! midpoint pressure dry (Pa) 
           pdel,    &! layer thickness (Pa)
+          pdel0,   &! layer thickness (Pa) pre-dynamics (AaronDonahue)
           pdeldry, &! layer thickness dry (Pa)
           rpdel,   &! reciprocal of layer thickness (Pa)
           rpdeldry,&! recipricol layer thickness dry (Pa)
@@ -87,6 +88,9 @@ module physics_types
           zm        ! geopotential height above surface at midpoints (m)
 
      real(r8), dimension(:,:,:),allocatable      :: &
+          qd, &         ! constituent mixing ratio (kg/kg moist or dry air depending on type) after DYN ! AaronDonahue
+          qc, &         ! constituent mixing ratio (kg/kg moist or dry air depending on type) pre-CLUBB ! AaronDonahue
+          qp, &         ! constituent mixing ratio (kg/kg moist or dry air depending on type) beginning of Physics ! AaronDonahue
           q         ! constituent mixing ratio (kg/kg moist or dry air depending on type)
 
      real(r8), dimension(:,:),allocatable        :: &
@@ -358,9 +362,7 @@ contains
                 state%q(:ncol,k,m) = min(1.e10_r8,state%q(:ncol,k,m))
              end do
           end if
-
        end if
-
     end do
 
     !------------------------------------------------------------------------
@@ -544,6 +546,8 @@ contains
     ! 1-D variables
     call shr_assert_in_domain(state%ps(:ncol),          is_nan=.false., &
          varname="state%ps",        msg=msg)
+    call shr_assert_in_domain(state%ps_0(:ncol),        is_nan=.false., &  ! AaronDonahue
+         varname="state%ps_0",        msg=msg)
     call shr_assert_in_domain(state%psdry(:ncol),       is_nan=.false., &
          varname="state%psdry",     msg=msg)
     call shr_assert_in_domain(state%phis(:ncol),        is_nan=.false., &
@@ -574,6 +578,8 @@ contains
          varname="state%pmiddry",   msg=msg)
     call shr_assert_in_domain(state%pdel(:ncol,:),      is_nan=.false., &
          varname="state%pdel",      msg=msg)
+    call shr_assert_in_domain(state%pdel0(:ncol,:),      is_nan=.false., &
+         varname="state%pdel0",      msg=msg)
     call shr_assert_in_domain(state%pdeldry(:ncol,:),   is_nan=.false., &
          varname="state%pdeldry",   msg=msg)
     call shr_assert_in_domain(state%rpdel(:ncol,:),     is_nan=.false., &
@@ -604,6 +610,14 @@ contains
     ! 3-D variables
     call shr_assert_in_domain(state%q(:ncol,:,:),       is_nan=.false., &
          varname="state%q",         msg=msg)
+    call shr_assert_in_domain(state%qd(:ncol,:,:),       is_nan=.false., &
+         varname="state%qd",         msg=msg)
+    call shr_assert_in_domain(state%qc(:ncol,:,:),       is_nan=.false., &
+         varname="state%qc",         msg=msg)
+    call shr_assert_in_domain(state%qp(:ncol,:,:),       is_nan=.false., &
+         varname="state%qp",         msg=msg)
+
+
 
     ! Now run other checks (i.e. values are finite and within a range that
     ! is physically meaningful).
@@ -618,6 +632,8 @@ contains
     ! 1-D variables
     call shr_assert_in_domain(state%ps(:ncol),          lt=posinf_r8, gt=0._r8, &
          varname="state%ps",        msg=msg)
+    call shr_assert_in_domain(state%ps_0(:ncol),        lt=posinf_r8, gt=0._r8, & ! AaronDonahue
+         varname="state%ps_0",        msg=msg)
     call shr_assert_in_domain(state%psdry(:ncol),       lt=posinf_r8, gt=0._r8, &
          varname="state%psdry",     msg=msg)
     call shr_assert_in_domain(state%phis(:ncol),        lt=posinf_r8, gt=neginf_r8, &
@@ -648,6 +664,8 @@ contains
          varname="state%pmiddry",   msg=msg)
     call shr_assert_in_domain(state%pdel(:ncol,:),      lt=posinf_r8, gt=neginf_r8, &
          varname="state%pdel",      msg=msg)
+    call shr_assert_in_domain(state%pdel0(:ncol,:),      lt=posinf_r8, gt=neginf_r8, &
+         varname="state%pdel0",      msg=msg)
     call shr_assert_in_domain(state%pdeldry(:ncol,:),   lt=posinf_r8, gt=neginf_r8, &
          varname="state%pdeldry",   msg=msg)
     call shr_assert_in_domain(state%rpdel(:ncol,:),     lt=posinf_r8, gt=neginf_r8, &
@@ -679,6 +697,12 @@ contains
     do m = 1,pcnst
        call shr_assert_in_domain(state%q(:ncol,:,m),    lt=posinf_r8, ge=qmin(m), &
             varname="state%q ("//trim(cnst_name(m))//")", msg=msg)
+       call shr_assert_in_domain(state%qd(:ncol,:,m),    lt=posinf_r8, ge=qmin(m), &
+            varname="state%qd ("//trim(cnst_name(m))//")", msg=msg)
+       call shr_assert_in_domain(state%qc(:ncol,:,m),    lt=posinf_r8, ge=qmin(m), &
+            varname="state%qc ("//trim(cnst_name(m))//")", msg=msg)
+       call shr_assert_in_domain(state%qp(:ncol,:,m),    lt=posinf_r8, ge=qmin(m), &
+            varname="state%qp ("//trim(cnst_name(m))//")", msg=msg)
     end do
 
   end subroutine physics_state_check
@@ -1506,6 +1530,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%ps(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%ps')
   
+  allocate(state%ps_0(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%ps_0')
+  
   allocate(state%psdry(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%psdry')
   
@@ -1542,6 +1569,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%pdel(psetcols,pver), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%pdel')
   
+  allocate(state%pdel0(psetcols,pver), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%pdel0')
+  
   allocate(state%pdeldry(psetcols,pver), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%pdeldry')
   
@@ -1565,6 +1595,15 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   
   allocate(state%q(psetcols,pver,pcnst), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%q')
+  
+  allocate(state%qp(psetcols,pver,pcnst), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%qp')
+  
+  allocate(state%qc(psetcols,pver,pcnst), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%qc')
+  
+  allocate(state%qd(psetcols,pver,pcnst), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%qd')
   
   allocate(state%pint(psetcols,pver+1), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%pint')
@@ -1607,6 +1646,7 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%ulat(:) = inf
   state%ulon(:) = inf
   state%ps(:) = inf
+  state%ps_0(:) = inf
   state%psdry(:) = inf
   state%phis(:) = inf
   state%t(:,:) = inf
@@ -1617,6 +1657,7 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%pmid(:,:) = inf
   state%pmiddry(:,:) = inf
   state%pdel(:,:) = inf
+  state%pdel0(:,:) = inf
   state%pdeldry(:,:) = inf
   state%rpdel(:,:) = inf
   state%rpdeldry(:,:) = inf
@@ -1625,6 +1666,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%exner(:,:) = inf
   state%zm(:,:) = inf
   state%q(:,:,:) = inf
+  state%qp(:,:,:) = inf
+  state%qc(:,:,:) = inf
+  state%qd(:,:,:) = inf
       
   state%pint(:,:) = inf
   state%pintdry(:,:) = inf
@@ -1656,6 +1700,9 @@ subroutine physics_state_dealloc(state)
   
   deallocate(state%ps, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%ps')
+  
+  deallocate(state%ps_0, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%ps_0')
   
   deallocate(state%psdry, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%psdry')
@@ -1693,6 +1740,9 @@ subroutine physics_state_dealloc(state)
   deallocate(state%pdel, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%pdel')
   
+  deallocate(state%pdel0, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%pdel0')
+  
   deallocate(state%pdeldry, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%pdeldry')
   
@@ -1716,6 +1766,15 @@ subroutine physics_state_dealloc(state)
   
   deallocate(state%q, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%q')
+  
+  deallocate(state%qp, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%qp')
+  
+  deallocate(state%qc, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%qc')
+  
+  deallocate(state%qd, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%qd')
   
   deallocate(state%pint, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%pint')

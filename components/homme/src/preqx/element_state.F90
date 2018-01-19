@@ -25,8 +25,10 @@ module element_state
     real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
     real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
     real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
+    real (kind=real_kind) :: ps_v0(np,np,timelevels)                  ! surface pressure                   4
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
     real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
+    real (kind=real_kind) :: Qd  (np,np,nlev,qsize_d)                 ! Tracer concentration after dyn     9  (AaronDonahue)
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,2)               ! Tracer mass                        7
 
   end type elem_state_t

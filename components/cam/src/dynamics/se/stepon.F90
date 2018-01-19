@@ -385,7 +385,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0) then
+      if (ftype<=0.or.ftype==3) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -410,6 +410,13 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
             end do
          end do
       endif
+      !+++ASD
+      do j=1,np
+         do i=1,np
+            dyn_in%elem(ie)%state%ps_v0(i,j,1) = dyn_in%elem(ie)%state%ps_v(i,j,tl_f)
+         end do ! i
+      end do ! j
+      !---ASD
    end do
    call t_stopf('stepon_bndry_exch')
 
@@ -500,19 +507,71 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
 subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    use camsrfexch,  only: cam_out_t     
-   use dyn_comp,    only: dyn_run
-   use time_mod,    only: tstep
+   use dyn_comp,    only: dyn_run, TimeLevel, hvcoord ! AaronDonahue
+   use time_mod,    only: tstep, TimeLevel_Qdp
+   !+++ ASD
+   use hycoef,          only: hyai, hybi, ps0
+   use vertremap_base, only: remap1
+   use control_mod, only: ftype, qsplit
+   use dimensions_mod, only: nelemd, nlev, np
+   use prim_advance_mod,   only: applycamforcing
+   !--- ASD
    real(r8), intent(in) :: dtime   ! Time-step
    type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
    integer :: rc
+   !+++ ASD
+   integer :: tl_f, n0_qdp, n1_qdp, k,ie
+   real (r8), dimension(np,np,nlev,2)  :: ttmp
+   real(r8) :: dp0(np,np,nlev),dp1(np,np,nlev)
+   !--- ASD
+
+   if (ftype.ne.3) then
+      do ie = 1,nelemd
+         dyn_in%elem(ie)%state%Qd(:,:,:,:) = dyn_in%elem(ie)%state%Q(:,:,:,:)
+      end do
+   end if
 
    call t_barrierf('sync_dyn_run', mpicom)
    call t_startf ('dyn_run')
    call dyn_run(dyn_out,rc)	
    call t_stopf  ('dyn_run')
+   
+   !+++ ASD
+   if (ftype==3) then
+      do ie = 1,nelemd
+         dyn_in%elem(ie)%state%Qd(:,:,:,:) = dyn_in%elem(ie)%state%Q(:,:,:,:)
+      end do
+      tl_f = TimeLevel%n0 ! current timelevel
+      call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp)
+      ! Remap
+!      do ie = 1,nelemd
+!      do k=1,nlev
+!          dp0(:,:,k) = ( hyai(k+1) - hyai(k) )*ps0 + &
+!               ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v0(:,:,1)
+!          dp1(:,:,k) = ( hyai(k+1) - hyai(k) )*ps0 + &
+!               ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(:,:,tl_f)
+!      enddo
+!      enddo
+!      ttmp(:,:,:,1)=dyn_in%elem(ie)%derived%FT(:,:,:)*dp0
+!      call remap1(ttmp,np,1,dp0,dp1)
+!      dyn_in%elem(ie)%derived%FT(:,:,:)=ttmp(:,:,:,1)/dp1
+!
+!      ttmp(:,:,:,1)=dyn_in%elem(ie)%derived%FM(:,:,1,:)*dp0
+!      ttmp(:,:,:,2)=dyn_in%elem(ie)%derived%FM(:,:,2,:)*dp0
+!      call remap1(ttmp,np,2,dp0,dp1)
+!      dyn_in%elem(ie)%derived%FM(:,:,1,:)=ttmp(:,:,:,1)/dp1
+!      dyn_in%elem(ie)%derived%FM(:,:,2,:)=ttmp(:,:,:,2)/dp1
+!
+!      call remap1(dyn_in%elem(ie)%derived%FQ(:,:,:,:),np,pcnst,dp0,dp1)
+
+      call t_startf("ApplyCAMForcing")
+      call ApplyCAMForcing(dyn_in%elem, hvcoord,tl_f,n0_qdp, dtime,1,nelemd)
+      call t_stopf("ApplyCAMForcing")
+   end if
+   !--- ASD
 
 end subroutine stepon_run3
 
