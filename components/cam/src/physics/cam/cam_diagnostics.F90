@@ -1933,8 +1933,8 @@ end subroutine diag_phys_tend_writeout
 
 
    use cam_history,        only: addfld
-   use qneg,               only: qneg3_mat,qneg4_mat,qneg3_numflds, &
-                                 qneg4_numflds
+   use qneg,               only: qneg3_numflds, &
+                                 qneg4_numflds,qneg3_numcnst,qneg4_numcnst
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -1949,36 +1949,23 @@ end subroutine diag_phys_tend_writeout
 
 
    ! Setup QNEG field outputs
-   do m = 1,pcnst
-      call addfld('QNEG3_'//trim(cnst_name(m)),(/ 'lev', 'qneg3' /),'A','unitless','QNEG3 error frequency for '//trim(cnst_name(m))) 
-   end do
-      call addfld('QNEG4',(/ 'qneg4' /),'A','unitless','QNEG4 error frequency for Q') 
-
-   ! Allocate QNEG error matrices to be used with output
-   allocate(qneg3_mat(pcols,pver,pcnst,qneg3_numflds))
-   allocate(qneg4_mat(pcols,qneg4_numflds))
- 
-   qneg3_mat(:,:,:,:) = 0.0
-   qneg4_mat(:,:)     = 0.0
+   call addfld('QNEG3',(/ 'lev', 'qneg3c', 'qneg3' /),'A','unitless','QNEG3 error frequency') 
+   call addfld('QNEG4',(/ 'qneg4c', 'qneg4'  /),'A','unitless','QNEG4 error frequency') 
 
    return
 
    end subroutine qneg_init
 !===============================================================================
-   subroutine qneg_write(lchnk)
+   subroutine qneg_write(state)
 
    use cam_history,        only: outfld
-   use qneg,               only: qneg3_mat, qneg4_mat
 
-   integer, intent(in) :: lchnk
-   integer :: m
-   integer :: qnegsum, i,j,k
+   type(physics_state), intent(in) :: state
+   integer :: lchnk
 
-   do m = 1,pcnst
-      if (qnegsum>0) print *, 'ASD: qnegsum = ',qnegsum,' for m=', m
-      call outfld('QNEG3_'//trim(cnst_name(m)),qneg3_mat(:,:,m,:),pcols,lchnk) 
-   end do
-   call outfld('QNEG4',qneg4_mat(:,:),pcols,lchnk) 
+   lchnk = state%lchnk
+   call outfld('QNEG3',state%qneg3(:,:,:,:),pcols,lchnk) 
+   call outfld('QNEG4',state%qneg4(:,:,:),pcols,lchnk) 
 
    end subroutine qneg_write
 !===============================================================================

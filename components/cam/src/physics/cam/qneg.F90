@@ -17,15 +17,17 @@ public ::         &
    qneg_register, &
 !   qneg_init,     &
 !   qneg_write,    &
-   massborrow
+   massborrow,    &
+   qqflx_fixer
 
 ! Public fields
-real(r8), allocatable, public     :: qneg3_mat(:,:,:,:) ! Matrix of qneg3 errors
-real(r8), allocatable, public     :: qneg4_mat(:,:) ! Matrix of qneg4 errors
+!real(r8), allocatable, public     :: qneg3_mat(:,:,:,:) ! Matrix of qneg3 errors
+!real(r8), allocatable, public     :: qneg4_mat(:,:,:) ! Matrix of qneg4 errors
 integer, public                   :: qneg3_numflds, qneg4_numflds
+integer, public                   :: qneg3_numcnst, qneg4_numcnst
 ! Private fields
-character*40, allocatable :: qneg3_flds(:)  ! List of fields which call qneg3 errors
-character*40, allocatable :: qneg4_flds(:)  ! List of fields which call qneg4 errors
+character*40, allocatable :: qneg3_flds(:), qneg3_cnst(:)  ! List of fields/constituents which call qneg3 errors
+character*40, allocatable :: qneg4_flds(:), qneg4_cnst(:)  ! List of fields/constituents which call qneg4 errors
 
 contains
 
@@ -41,42 +43,19 @@ subroutine qneg_register()
    character*40 :: tmp3_flds(30), tmp4_flds(30)
 
 
-   ! Add each field
+   !----  Add each QNEG3 field
    k=0
-!   k=k+1
-!   qneg3_flds(k) = 'chkenergyfix'
-!   k=k+1
-!   qneg3_flds(k) = 'dadadj'
-   k=k+1
-   tmp3_flds(k) = 'zm_convr'
-   k=k+1
-   tmp3_flds(k) = 'zm_conv_evap'
-!   k=k+1
-!   qneg3_flds(k) = 'momtran'
+
    k=k+1
    tmp3_flds(k) = 'zm_conv_tend'
-!   k=k+1
-!   qneg3_flds(k) = 'convect_shallow (off)'
    k=k+1
    tmp3_flds(k) = 'convect_shallow'
    k=k+1
    tmp3_flds(k) = 'clubb'
    k=k+1
-   tmp3_flds(k) = 'micro_mg'
-!   k=k+1
-!   qneg3_flds(k) = 'cldwat'
-!   k=k+1
-!   qneg3_flds(k) = 'aero_model_wetdep'
-!   k=k+1
-!   qneg3_flds(k) = 'radheat'
-!   k=k+1
-!   qneg3_flds(k) = 'chemistry'
-!   k=k+1
-!   qneg3_flds(k) = 'rayleigh friction'
-!   k=k+1
-!   qneg3_flds(k) = 'aero_model_drydep'
-!   k=k+1
-!   qneg3_flds(k) = 'Gravity wave drag'
+   tmp3_flds(k) = 'cldwat'
+   k=k+1
+   tmp3_flds(k) = 'radheat'
    k = k+1
    tmp3_flds(k) = 'TPHYSBCb'
    k = k+1
@@ -84,7 +63,9 @@ subroutine qneg_register()
 
    qneg3_numflds = k
 
-   k=1
+   !----  Add each QNEG4 field
+   k=0
+   k=k+1
    tmp4_flds(k) = 'TPHYSAC'
 
    qneg4_numflds = k
@@ -97,56 +78,122 @@ subroutine qneg_register()
    do k = 1,qneg4_numflds
       qneg4_flds(k) = tmp4_flds(k)
    end do
+
+   !----  Add each QNEG3 species
+   k=0
+   k=k+1
+   tmp3_flds(k) = trim('Q') !trim(cnst_name(1))
+   k=k+1
+   tmp3_flds(k) = trim('CLDLIQ') !trim(cnst_name(2))
+   k=k+1
+   tmp3_flds(k) = trim('CLDICE') !trim(cnst_name(3))
+   
+   qneg3_numcnst = k
+   !----  Add each QNEG4 species
+   k=0
+   k=k+1
+   tmp4_flds(k) = trim('Q') !trim(cnst_name(1))
+   
+   qneg4_numcnst = k
+
+   allocate(qneg3_cnst(qneg3_numcnst))
+   allocate(qneg4_cnst(qneg4_numcnst))
+   do k = 1,qneg3_numcnst
+      qneg3_cnst(k) = tmp3_flds(k)
+   end do
+   do k = 1,qneg4_numcnst
+      qneg4_cnst(k) = tmp4_flds(k)
+   end do
+
    ! Register qneg hist coordinates
-   call add_hist_coord('qneg3', qneg3_numflds, 'qneg3 field length')
-   call add_hist_coord('qneg4', qneg4_numflds, 'qneg4 field length')
+   call add_hist_coord('qneg3',  qneg3_numflds, 'qneg3 field length')
+   call add_hist_coord('qneg4',  qneg4_numflds, 'qneg4 field length')
+   call add_hist_coord('qneg3c', qneg3_numcnst, 'qneg3 species length')
+   call add_hist_coord('qneg4c', qneg4_numcnst, 'qneg4 species length')
 
    ! Write key for QNEG error output to ATM logfile
    if (masterproc) then
       write(iulog,*) '===================================================='
       write(iulog,*) 'QNEG3 Errors Output Master List'
+      write(iulog,*) 'QNEG3(time,#fields,#const.,nlev,ncols)'
       write(iulog,*) '-------------------------------'
       write(iulog,'(A24,A6)') 'Field', 'Index'
       do k = 1,qneg3_numflds
          write(iulog,'(A24,I6)') qneg3_flds(k), k
       end do ! k
       write(iulog,*) '-------------------------------'
+      write(iulog,'(A24,A6)') 'Constituent', 'Index'
+      do k = 1,qneg3_numcnst
+         write(iulog,'(A24,I6)') qneg3_cnst(k), k
+      end do ! k
+      write(iulog,*) '-------------------------------'
       write(iulog,*) 'QNEG4 Errors Output Master List'
+      write(iulog,*) 'QNEG4(time,#fields,#const,ncols)'
       write(iulog,*) '-------------------------------'
       write(iulog,'(A24,A6)') 'Field', 'Index'
       do k = 1,qneg4_numflds
          write(iulog,'(A24,I6)') qneg4_flds(k), k
+      end do ! k
+      write(iulog,*) '-------------------------------'
+      write(iulog,'(A24,A6)') 'Constituent', 'Index'
+      do k = 1,qneg4_numcnst
+         write(iulog,'(A24,I6)') qneg4_cnst(k), k
       end do ! k
       write(iulog,*) '===================================================='
    end if ! masterproc
 
 end subroutine qneg_register
 !===============================================================================
-subroutine qneg_ind(name,qtype,ind)
+subroutine qneg_ind(name,m,qtype,ind,indc)
 
    character (len=*), intent(in) :: name
-   integer,intent(in)       :: qtype
-   integer,intent(out)      :: ind
+   integer,intent(in)       :: qtype,m
+   integer,intent(out)      :: ind,indc
    integer                  :: k
 
    ind = 0
+   indc = 0
+
+   ! First check for the field
    select case(qtype)
    case(3)
       do k = 1,qneg3_numflds
          if (trim(name).eq.trim(qneg3_flds(k))) then
             ind = k
-            return
+            goto 999
          end if ! name
       end do ! k
    case(4)
       do k = 1,qneg4_numflds
          if (trim(name).eq.trim(qneg4_flds(k))) then
             ind = k
-            return
+            goto 999
          end if ! name
       end do ! k
    case default
       ind = 0  ! Need to add logic here for error message
+   end select
+
+   ! Then check for the constituent
+999 if (ind.eq.0) return ! No need to check, this won't be recorded
+
+   select case(qtype)
+      case(3)
+         do k = 1,qneg3_numcnst
+            if (trim(cnst_name(m)).eq.trim(qneg3_cnst(k))) then
+               indc = k
+               return
+            end if ! name
+         end do ! k
+      case(4)
+         do k = 1,qneg4_numcnst
+            if (trim(cnst_name(m)).eq.trim(qneg4_cnst(k))) then
+               indc = k
+               return
+            end if ! name
+         end do ! k
+      case default
+         indc = 0  ! Need to add logic here for error message
    end select
 
    return
@@ -154,7 +201,7 @@ subroutine qneg_ind(name,qtype,ind)
 end subroutine qneg_ind
 !===============================================================================
 subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
-                  lconst_end       ,qmin    ,q       ,lfix )
+                  lconst_end       ,qmin    ,q       ,lfix, qneg3mat )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -199,9 +246,11 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
 ! Input/Output arguments
 !
    real(r8), intent(inout) :: q(ncold,lver,lconst_beg:lconst_end) ! moisture/tracer field
+   real(r8), intent(inout) :: qneg3mat(ncold,lver,qneg3_numcnst,qneg3_numflds) ! moisture/tracer field
 !
 !---------------------------Local workspace-----------------------------
 !
+
    integer indx(ncol,lver)  ! array of indices of points < qmin
    integer nval(lver)       ! number of points < qmin for 1 level
    integer nvals            ! number of values found < qmin
@@ -215,13 +264,18 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
 
    real(r8) worst           ! biggest violator
 
-   integer qneg_idx,subind         ! index in qneg fields matrix (AaronDonahue)
+   integer qneg_idx,qneg_idc         ! index in qneg fields matrix (AaronDonahue)
+   logical qneg_rec                  ! Flag if qneg is recorded for this field/constituent
 !-----------------------------------------------------------------------
 !
-   call qneg_ind(subnam,3,qneg_idx) ! Get index for this field (AaronDonahue)
 
    do m=lconst_beg,lconst_end
-      if (qneg_idx > 0)  qneg3_mat(:,:,m,qneg_idx) = 0.0 ! Initialize qneg_mat for this constituent (AaronDonahue)
+      qneg_rec = .false.
+      call qneg_ind(subnam,m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+      if (qneg_idx*qneg_idc > 0)  then
+         qneg_rec = .true.
+         qneg3mat(:,:,qneg_idc,qneg_idx) = qneg_idc*10.0 + qneg_idx !0.0 ! Initialize qneg_mat for this constituent (AaronDonahue)
+      end if
       nvals = 0
       found = .false.
       worst = 1.e35_r8
@@ -237,7 +291,7 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
          nn = 0
          do i=1,ncol
             if (q(i,k,m) < qmin(m)) then
-               if (qneg_idx > 0) qneg3_mat(i,k,m,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+!               if (qneg_rec) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
                nn = nn + 1
                indx(nn,k) = i
             end if
@@ -271,11 +325,11 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
       end do
       if (lfix) then 
          if (found .and. abs(worst)>max(qmin(m),1.e-8_r8)) then 
-            write(iulog,9001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,qmin(m),worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw
+            write(iulog,9001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,qmin(m),worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw,qneg_rec,qneg_idc,qneg_idx
          end if
       else
          if (print_fixer_message .and. found .and. abs(worst)>max(qmin(m),1.e-8_r8)) then 
-            write(iulog,8001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw
+            write(iulog,8001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw,qneg_rec,qneg_idc,qneg_idx
          end if
       end if
    end do
@@ -283,15 +337,15 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
    return
 8001 format(' QNEG3 from ',a,':m=',i3,' lat/lchnk=',i7, &
             ' Min. mixing ratio violated at ',i4,' points. ', &
-            ' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3)
+            ' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3,',',L1,',',i3,',',i3)
 9001 format(' QNEG3 from ',a,':m=',i3,' lat/lchnk=',i7, &
             ' Min. mixing ratio violated at ',i4,' points.  Reset to ', &
-            1p,e8.1,' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3)
+            1p,e8.1,' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3,',',L1,',',i3,',',i3)
 end subroutine qneg3
 
 !====================================================================================
 subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
-                  qbot    ,srfrpdel,shflx   ,lhflx   ,qflx    )
+                  qbot    ,srfrpdel,shflx   ,lhflx   ,qflx, qneg4mat    )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -330,6 +384,7 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
    real(r8), intent(inout) :: shflx(pcols)   ! Surface sensible heat flux (J/m2/s)
    real(r8), intent(inout) :: lhflx(pcols)   ! Surface latent   heat flux (J/m2/s)
    real(r8), intent(inout) :: qflx (pcols,pcnst)   ! surface water flux (kg/m^2/s)
+   real(r8), intent(inout) :: qneg4mat(pcols,qneg4_numcnst,qneg4_numflds)
 !
 !---------------------------Local workspace-----------------------------
 !
@@ -341,9 +396,14 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
    real(r8):: worst             ! biggest violator
    real(r8):: excess(pcols)     ! Excess downward sfc latent heat flux
 !
-   integer qneg_idx,subind      ! index in qneg fields matrix (AaronDonahue)
+   integer qneg_idx,qneg_idc      ! index in qneg fields matrix (AaronDonahue)
+   logical qneg_rec               ! Flag if qneg4 recorded for this field/constituent
 !-----------------------------------------------------------------------
-   call qneg_ind(subnam,4,qneg_idx) ! Get index for this field (AaronDonahue)
+   qneg_rec = .false.
+   call qneg_ind(subnam,1,4,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+   if (qneg_idx*qneg_idc > 0)  then
+      qneg_rec = .true.
+   end if
 !
 ! Compute excess downward (negative) q flux compared to a theoretical
 ! maximum downward q flux.  The theoretical max is based upon the
@@ -351,14 +411,13 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
 !
    nptsexc = 0
    do i = 1,ncol
-      if (qneg_idx > 0)  qneg4_mat(:,qneg_idx) = 0.0 ! Initialize qneg_mat for this constituent (AaronDonahue)
       excess(i) = qflx(i,1) - (qmin(1) - qbot(i,1))/(ztodt*gravit*srfrpdel(i))
 !
 ! If there is an excess downward (negative) q flux, then subtract
 ! excess from "qflx" and "lhflx" and add to "shflx".
 !
       if (excess(i) < 0._r8) then
-         if (qneg_idx > 0) qneg4_mat(i,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+         if (qneg_rec) qneg4mat(i,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
          nptsexc = nptsexc + 1
          indxexc(nptsexc) = i
          qflx (i,1) = qflx (i,1) - excess(i)
@@ -378,7 +437,7 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
             iw = i
          end if
       end do
-      write(iulog,9001) subnam,nptsexc,worst, lchnk, iw, get_rlat_p(lchnk,iw),get_rlon_p(lchnk,iw)
+      write(iulog,9001) subnam,nptsexc,worst, lchnk, iw, get_rlat_p(lchnk,iw),get_rlon_p(lchnk,iw),qneg_rec,qneg_idc,qneg_idx
    end if
 !
    return
@@ -389,10 +448,11 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
             ,', i = ',i5 &
             ,', same as lat =', f8.4 &
             ,', lon =', f8.4 &
+            ,',',L1,',',i3,',',i3 &
            )
 end subroutine qneg4
 ! ===============================================================================
-subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel) 
+subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel,qneg3mat) 
 
 !!....................................................................... 
 !! The mass borrower borrows tracer mass from an adjacent layer. 
@@ -432,6 +492,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel)
   real(r8), intent(in) :: qmin(mbeg:mend)             ! smallest value
   real(r8), intent(in) :: pdel(pcols,pver)            ! pressure thickness 
   real(r8), intent(inout) :: q(pcols,pver,mbeg:mend)  ! moisture/tracer field
+  real(r8), intent(inout) :: qneg3mat(pcols,pver,qneg3_numcnst,qneg3_numflds) ! moisture/tracer field
 
 !! local 
 !!....................................................................... 
@@ -441,18 +502,22 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel)
   real(r8):: nmass, zeps
   real(r8):: bmass(pcols)
 
-  integer :: qneg_idx
+  integer :: qneg_idx, qneg_idc
+  logical :: qneg_rec
   !! init
   !!....................................................................... 
 
-  call qneg_ind(subnam,3,qneg_idx) ! Get index for this field (AaronDonahue)
   zeps = epsilon(1.0_r8)
 
   !! loop over tracers
   !!....................................................................... 
 
   do m = mbeg, mend
-      if (qneg_idx > 0)  qneg3_mat(:,:,m,qneg_idx) = 0.0 ! Initialize qneg_mat for this constituent (AaronDonahue)
+      qneg_rec = .false.
+      call qneg_ind(subnam,m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+      if (qneg_idx*qneg_idc > 0) then
+          qneg_rec = .true.
+      end if
 
      ic(1:ncol) = 0 
 
@@ -485,7 +550,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel)
               bmass(i) = (nmass - qmin(m)) * pdel(i,k)
 
               q(i,k,m) = qmin(m) 
-              if (qneg_idx > 0) qneg3_mat(i,k,m,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+              if (qneg_rec) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
 
               ic(i) = ic(i) + 1 
 
@@ -539,7 +604,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel)
 
                  bmass(i) = (nmass - qmin(m))*pdel(i,k)
                  q(i,k,m) = qmin(m)
-                 if (qneg_idx > 0) qneg3_mat(i,k,m,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+                 if (qneg_idx > 0) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
 
               end if !! nmass > 0.0_r8 
 
@@ -562,6 +627,206 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel)
   return 
   end subroutine massborrow
 ! ===============================================================================
+
+subroutine qqflx_fixer (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
+                        q, rpdel,shflx   ,lhflx   ,qflx    )
+
+!!........................................................................
+!! Water conservation fixer 
+!! 
+!! If QFLX is too negative, the condensation or deposition water vapor at 
+!! the surface will take all the available moisture in surface layer. This 
+!! will cause problems in the vertical diffusion calculation, where QFLX 
+!! is applied. In the original CESM model, QNEG4 is called to correct QFLX 
+!! so that it won't take out all the available moisture from the surface layer.
+!! 
+!! The new fixer, named as qqflx fixer, borrows water vapor from the whole 
+!! column above the surface layer proportionally and add moisture into the 
+!! surface layer, so that it can compensate the downward (negative) QFLX. 
+!!
+!! The excess downward (negative) q flux is compared to a theoretical
+!! maximum downward q flux.  The theoretical max is based upon the
+!! given moisture content of lowest level of the model atmosphere.
+!!
+!! Author: Kai Zhang (kai.zhang@pnnl.gov) and Phil Rasch 
+!!........................................................................
+
+   use shr_kind_mod,    only: r8 => shr_kind_r8
+   use ppgrid,          only: pcols, pver
+   use phys_grid,       only: get_lat_p, get_lon_p, get_wght_all_p 
+   use physconst,       only: gravit, latvap
+   use constituents,    only: qmin, pcnst
+   use cam_logfile,     only: iulog
+   use spmd_utils,      only: masterproc
+   use cam_abortutils,  only: endrun
+   use phys_control,    only: print_fixer_message
+
+   implicit none
+
+   integer, parameter :: i_wv = 1 
+   real(r8),parameter :: factor = 1.5_r8 
+
+!! Input arguments
+!!........................................................................
+
+   character*8, intent(in) :: subnam         ! name of calling routine
+
+   integer, intent(in) :: lchnk              ! chunk index
+   integer, intent(in) :: ncol               ! number of atmospheric columns
+
+   real(r8), intent(in) :: ztodt             ! time step
+   real(r8), intent(in) :: rpdel(pcols,pver) ! 1./(pint(k+1)-pint(k))
+
+!! Input/Output arguments
+!!........................................................................
+
+   real(r8), intent(in) :: shflx(pcols)        ! surface sensible heat flux (J/m2/s)
+   real(r8), intent(in) :: lhflx(pcols)        ! surface latent   heat flux (J/m2/s)
+   real(r8), intent(in) :: qflx (pcols,pcnst)  ! surface water flux (kg/m^2/s)
+   real(r8), intent(inout) :: q(pcols,pver,pcnst) ! moisture (kg/kg)
+
+!! Local workspace
+!!........................................................................
+
+
+   real(r8):: excess(pcols)     ! excess downward surface latent heat flux 
+
+   integer :: i, k 
+   real(r8) :: wst(pver)        ! local
+   real(r8) :: wsp              ! local
+   real(r8) :: wpnet            ! local 
+   real(r8) :: qori             ! local 
+   real(r8) :: qbot             ! local 
+   real(r8) :: dqbot            ! local 
+   real(r8) :: ratio            ! local 
+   real(r8) :: dwpbot           ! local 
+   real(r8) :: qflx_org         ! local 
+
+!! begin
+!!........................................................................
+
+
+   !! loop over cols
+   !!....................................................................... 
+
+   do i = 1, ncol
+
+      !! check if downward water flux is too large
+      !!....................................................................... 
+
+      excess(i) = qflx(i,i_wv) - (qmin(i_wv) - q(i,pver,i_wv))/(ztodt*gravit*rpdel(i,pver))
+
+      if (excess(i) < 0.0_r8 ) then
+
+         qori = q(i,pver,i_wv) 
+
+         !! new q at the bottom to balance the negative qflx 
+         !!....................................................................... 
+
+         qbot = qmin(i_wv) - qflx(i,i_wv) * ztodt*gravit*rpdel(i,pver) 
+
+         !! due to process splitting, it could happen that the estimated qbot is 
+         !! not sufficiently large to compensate the negative qflx in the vertical 
+         !! diffusion scheme, so an adjust factor can be applied. 
+         !!....................................................................... 
+
+         qbot = qbot * factor
+
+         !! change of q at the bottom
+         !!....................................................................... 
+
+         dqbot = qbot - q(i,pver,i_wv) 
+
+         !! change of q * pdel /g  
+         !!....................................................................... 
+
+         dwpbot = dqbot / (gravit*rpdel(i,pver))
+
+         if(dwpbot.lt.0._r8) then 
+            call endrun('qflx_fixer: dwpbot < 0 ')  
+         end if 
+
+         wsp = 0._r8 
+
+         do k = 1, pver-1 
+            wst(k) = q(i,k,i_wv) / (gravit*rpdel(i,k))
+            wsp    = wsp + wst(k) 
+         end do
+
+         wpnet = wsp - dwpbot
+
+         if(wpnet.gt.0._r8 .and. wsp.gt.0._r8) then 
+          
+            !! if there is sufficient water vapor in the column, scale q at each level
+            !! to compensate the potential water vapor sink in the surface layer. 
+            !!....................................................................... 
+ 
+            ratio = wpnet / wsp 
+
+            q(i,1:pver-1,i_wv) = q(i,1:pver-1,i_wv) * ratio  
+             
+            q(i,pver,i_wv) = qbot 
+
+            write(iulog,*) ' ### qflx_fixer ### ', &
+                           ' chunk', lchnk, &
+                           ' col', i, &
+                           ' lat = ', get_lat_p(lchnk,i), &
+                           ' lon = ', get_lon_p(lchnk,i), & 
+                           ' qflx = ', qflx(i,i_wv), &
+                           ' qori = ', qori, &
+                           ' qnew = ', qbot, &
+                           ' column wp = ', wsp, & 
+                           ' dwp by qflx = ', dwpbot, & 
+                           ' q scaled to ', 100.*ratio, "%"
+
+         else 
+
+            write(iulog,*) ' ### qqflx_fixer ### ', &
+                           ' chunk', lchnk, &
+                           ' col', i, &
+                           ' lat = ', get_lat_p(lchnk,i), &
+                           ' lon = ', get_lon_p(lchnk,i), & 
+                           ' original qflx = ', qflx_org, &  
+                           ' qsurf = ', qori, & 
+                           ' column wp = ', wsp, & 
+                           ' dwp by qflx = ', dwpbot
+            write(iulog,*) ' column does not have enough water to compensate water vapor sink due to negative qflx !!! '
+
+            call endrun('qflx_fixer: spurious negative qflx ') 
+
+
+!!            !! if the column above the surface layer doens't have enough water
+!!            !! use qneg4 to fix qflx and printout the conservation error message
+!!            !!....................................................................... 
+!!          
+!!            qflx_org   = qflx (i,i_wv) 
+!! 
+!!            qflx (i,i_wv) = qflx (i,i_wv) - excess(i)
+!!            lhflx(i)   = lhflx(i) - excess(i)*latvap
+!!            shflx(i)   = shflx(i) + excess(i)*latvap
+!!
+!!            write(iulog,*) ' ### qqflx_fixer ### ', &
+!!                           ' chunk', lchnk, &
+!!                           ' col', i, &
+!!                           ' lat = ', get_lat_p(lchnk,i), &
+!!                           ' lon = ', get_lon_p(lchnk,i), & 
+!!                           ' original qflx = ', qflx_org, &  
+!!                           ' modified qflx = ', qflx(i,i_wv), & 
+!!                           ' qsurf = ', qori, & 
+!!                           ' column wp = ', wsp, & 
+!!                           ' dwp by qflx = ', dwpbot
+
+         end if !! if(wpnet.gt.0._r8 .and. wsp.gt.0._r8) 
+         
+     end if !! if (excess(i) < 0.0_r8 ) 
+ 
+   end do !! i 
+
+!! end
+!!........................................................................
+
+   return
+end subroutine qqflx_fixer
 
 
 

@@ -15,6 +15,7 @@ module physics_types
   use phys_control, only: waccmx_is, use_mass_borrower
   use shr_const_mod,only: shr_const_rwv
   use perf_mod,     only: t_startf, t_stopf
+  use qneg,               only: qneg3_numflds,qneg4_numflds,qneg3_numcnst,qneg4_numcnst
 
   implicit none
   private          ! Make default type private to the module
@@ -86,6 +87,12 @@ module physics_types
           exner,   &! inverse exner function w.r.t. surface pressure (ps/p)^(R/cp)
           zm        ! geopotential height above surface at midpoints (m)
 
+     real(r8), dimension(:,:,:,:),allocatable      :: &
+          qneg3 ! constituent qneg3 error frequency (unitless)
+
+     real(r8), dimension(:,:,:),allocatable      :: &
+          qneg4 ! constituent qneg4 error frequency (unitless)
+
      real(r8), dimension(:,:,:),allocatable      :: &
           q         ! constituent mixing ratio (kg/kg moist or dry air depending on type)
 
@@ -148,6 +155,11 @@ module physics_types
           v                  ! v momentum tendency (m/s/s)
      real(r8), dimension(:,:,:),allocatable :: &
           q                  ! consituent tendencies (kg/kg/s)
+     real(r8), dimension(:,:,:,:),allocatable      :: &
+          qneg3 ! constituent qneg3 error frequency (unitless)
+     real(r8), dimension(:,:,:),allocatable      :: &
+          qneg4 ! constituent qneg4 error frequency (unitless)
+
 
 ! boundary fluxes
      real(r8), dimension(:),allocatable     ::&
@@ -224,7 +236,7 @@ contains
                     ! This is usually only needed by calls from physpkg.
 !
 !---------------------------Local storage-------------------------------
-    integer :: i,k,m                               ! column,level,constituent indices
+    integer :: i,k,m,n                               ! column,level,constituent indices
     integer :: ixcldice, ixcldliq                  ! indices for CLDICE and CLDLIQ
     integer :: ixnumice, ixnumliq
     integer :: ixnumsnow, ixnumrain
@@ -346,10 +358,10 @@ contains
              name = trim(ptend%name)! // '/' // trim(cnst_name(m))
 !!== KZ_WATCON 
              if(use_mass_borrower) then 
-                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.)
-                call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel)
+                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.,ptend%qneg3)
+                call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel, ptend%qneg3)
              else
-                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.)
+                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.,ptend%qneg3)
              end if 
 !!== KZ_WATCON 
           else
@@ -362,6 +374,15 @@ contains
 
        end if
     end do
+    if (any(ptend%lq(:))) then
+       do m = 1,qneg3_numcnst
+          do n = 1,qneg3_numflds
+             do k = ptend%top_level, ptend%bot_level
+                state%qneg3(:,k,m,n) = ptend%qneg3(:,k,m,n)
+             end do ! k
+          end do ! n
+       end do ! m
+    end if ! any 
 
     !------------------------------------------------------------------------
     ! This is a temporary fix for the large H, H2 in WACCM-X
@@ -691,13 +712,14 @@ contains
 ! Where ptend logical flags = .false, don't change ptend_sum
 !-----------------------------------------------------------------------
 
+  use qneg,               only: qneg3_numflds,qneg4_numflds,qneg3_numcnst,qneg4_numcnst
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(in)     :: ptend   ! New parameterization tendencies
     type(physics_ptend), intent(inout)  :: ptend_sum   ! Sum of incoming ptend_sum and ptend
     integer, intent(in)                 :: ncol    ! number of columns
 
 !---------------------------Local storage-------------------------------
-    integer :: i,k,m                               ! column,level,constituent indices
+    integer :: i,k,m,n                             ! column,level,constituent indices
     integer :: psetcols                            ! maximum number of columns
     integer :: ierr = 0
 
@@ -813,6 +835,10 @@ contains
           allocate(ptend_sum%cflx_top(psetcols,pcnst), stat=ierr)
           if ( ierr /= 0 ) call endrun('physics_ptend_sum error: allocation error for ptend_sum%cflx_top')
           ptend_sum%cflx_top=0.0_r8
+
+          allocate(ptend_sum%qneg3(psetcols,pver,qneg3_numcnst,qneg3_numflds), stat=ierr)
+          if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend_sum%qneg3')
+          ptend_sum%qneg3=0.0_r8
        end if
 
        do m = 1, pcnst
@@ -830,7 +856,17 @@ contains
           end if
        end do
 
+       do m = 1,qneg3_numcnst
+          do n = 1,qneg3_numflds
+             do k = ptend%top_level, ptend%bot_level
+                do i = 1,ncol
+                   ptend_sum%qneg3(i,k,m,n) = ptend_sum%qneg3(i,k,m,n) + ptend%qneg3(i,k,m,n)
+                end do !i
+             end do ! k
+          end do ! n
+       end do ! m
     end if
+
     call t_stopf('physics_ptend_sum')
 
   end subroutine physics_ptend_sum
@@ -946,6 +982,7 @@ subroutine physics_ptend_copy(ptend, ptend_cp)
       ptend_cp%q = ptend%q
       ptend_cp%cflx_srf  = ptend%cflx_srf
       ptend_cp%cflx_top  = ptend%cflx_top
+      ptend_cp%qneg3     = ptend%qneg3
    end if
 
 end subroutine physics_ptend_copy
@@ -982,10 +1019,12 @@ end subroutine physics_ptend_copy
        ptend%q = 0._r8
        ptend%cflx_srf = 0._r8
        ptend%cflx_top = 0._r8
+       ptend%qneg3 = 0._r8
     end if
 
     ptend%top_level = 1
     ptend%bot_level = pver
+
 
     return
   end subroutine physics_ptend_reset
@@ -1476,6 +1515,7 @@ end subroutine set_dry_to_wet
 subroutine physics_state_alloc(state,lchnk,psetcols)
 
   use infnan, only : inf, assignment(=)
+  use qneg,               only: qneg3_numflds,qneg4_numflds,qneg3_numcnst,qneg4_numcnst
 
 ! allocate the individual state components
 
@@ -1497,6 +1537,11 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
 
   !----------------------------------
 
+  allocate(state%qneg3(psetcols,pver,qneg3_numcnst,qneg3_numflds), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%qneg3')
+  allocate(state%qneg4(psetcols,qneg4_numcnst,qneg4_numflds), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%qneg4')
+ 
   allocate(state%lat(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%lat')
   
@@ -1625,6 +1670,8 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%exner(:,:) = inf
   state%zm(:,:) = inf
   state%q(:,:,:) = inf
+  state%qneg3(:,:,:,:) = inf
+  state%qneg4(:,:,:)   = inf
       
   state%pint(:,:) = inf
   state%pintdry(:,:) = inf
@@ -1648,6 +1695,11 @@ subroutine physics_state_dealloc(state)
   type(physics_state), intent(inout) :: state
   integer                            :: ierr = 0
 
+  deallocate(state%qneg3, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%qneg3')
+  deallocate(state%qneg4, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%qneg4')
+ 
   deallocate(state%lat, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%lat')
   
@@ -1830,7 +1882,7 @@ end subroutine physics_tend_dealloc
 
 subroutine physics_ptend_alloc(ptend,psetcols)
 
-! allocate the individual ptend components
+! allocate the i`ndividual ptend components
 
   type(physics_ptend), intent(inout) :: ptend
 
@@ -1882,6 +1934,9 @@ subroutine physics_ptend_alloc(ptend,psetcols)
 
      allocate(ptend%cflx_top(psetcols,pcnst), stat=ierr)
      if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend%cflx_top')
+
+     allocate(ptend%qneg3(psetcols,pver,qneg3_numcnst,qneg3_numflds), stat=ierr)
+     if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend%qneg3')
   end if
 
 end subroutine physics_ptend_alloc
@@ -1932,6 +1987,9 @@ subroutine physics_ptend_dealloc(ptend)
 
   if(allocated(ptend%cflx_top))   deallocate(ptend%cflx_top, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_ptend_dealloc error: deallocation error for ptend%cflx_top')
+
+  if (allocated(ptend%qneg3))  deallocate(ptend%qneg3, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_ptend_dealloc error: deallocation error for ptend%qneg3')
 
 end subroutine physics_ptend_dealloc
 

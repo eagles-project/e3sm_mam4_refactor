@@ -1510,7 +1510,7 @@ end if ! l_tracer_aero
 
        call qneg4('TPHYSAC '       ,lchnk               ,ncol  ,ztodt ,               &
             state%q(1,pver,1),state%rpdel(1,pver) ,cam_in%shf ,         &
-            cam_in%lhf , cam_in%cflx )
+            cam_in%lhf , cam_in%cflx , state%qneg4)
 
     end if 
 
@@ -1778,7 +1778,7 @@ end if ! l_ac_energy_chk
     end do
     water_vap_ac_2d(:ncol) = ftem(:ncol,1)
 
-    call qneg_write(lchnk)  ! AaronDonahue
+    call qneg_write(state)  ! AaronDonahue
 end subroutine tphysac
 
 subroutine tphysbc (ztodt,               &
@@ -1852,7 +1852,7 @@ subroutine tphysbc (ztodt,               &
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
-    use qneg,            only: qneg3, massborrow ! AaronDonahue
+    use qneg,            only: qneg3, massborrow, qqflx_fixer ! AaronDonahue
 
     implicit none
 
@@ -2121,13 +2121,13 @@ subroutine tphysbc (ztodt,               &
       !! printout diagnostic information
       !!.................................................................
        call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .False.)
+            1, pcnst, qmin  ,state%q, .False., state%qneg3)
 
       !! tracer borrower for mass conservation 
       !!.................................................................
 
        do m = 1, pcnst 
-          call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel)
+          call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, state%qneg3)
        end do
 
 !!      call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
@@ -2138,7 +2138,7 @@ subroutine tphysbc (ztodt,               &
       !!.................................................................
 
       call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
-           1, pcnst, qmin  ,state%q, .True. )
+           1, pcnst, qmin  ,state%q, .True. ,state%qneg3)
 
     end if 
 
@@ -2158,12 +2158,12 @@ subroutine tphysbc (ztodt,               &
        !!.................................................................
 
        call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .False. )
+            1, pcnst, qmin  ,state%q, .False. ,state%qneg3)
 
        !! tracer borrower for mass conservation 
        !!.................................................................
        do m = 1, pcnst
-          call massborrow("PHYBC02",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel)
+          call massborrow("PHYBC02",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, state%qneg3)
        end do
 
 !!       call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
@@ -2175,7 +2175,7 @@ subroutine tphysbc (ztodt,               &
        !!.................................................................
 
        call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .True. )
+            1, pcnst, qmin  ,state%q, .True. ,state%qneg3)
 
     end if
 
