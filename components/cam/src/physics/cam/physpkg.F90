@@ -1821,7 +1821,8 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, &
-         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
+         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale, &
+         physics_ptend_dealloc !AaronDonahue
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld
     use physconst,       only: cpair, latvap, gravit, rga
@@ -1852,7 +1853,7 @@ subroutine tphysbc (ztodt,               &
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
-    use qneg,            only: qneg3, massborrow, qqflx_fixer ! AaronDonahue
+    use qneg,            only: qneg3, massborrow, qqflx_fixer, qneg_ind ! AaronDonahue
 
     implicit none
 
@@ -1887,6 +1888,7 @@ subroutine tphysbc (ztodt,               &
     type(physics_ptend)   :: ptend_aero       ! ptend for microp_aero
     type(physics_ptend)   :: ptend_aero_sc    ! ptend for microp_aero on sub-columns
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
+    type(physics_ptend)   :: ptend_qneg       ! ptend for sub-columns
 
     integer :: nstep                          ! current timestep number
 
@@ -2016,6 +2018,7 @@ subroutine tphysbc (ztodt,               &
     logical :: l_st_mic
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
+    integer qneg_idx,qneg_idc         ! index in qneg fields matrix (AaronDonahue)
 
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
@@ -2112,6 +2115,9 @@ subroutine tphysbc (ztodt,               &
     tend %dvdt(:ncol,:pver)  = 0._r8
 
 !!== KZ_WCON
+    lq(:) = .FALSE.
+    lq(1) = .TRUE.
+    call physics_ptend_init(ptend_qneg, state%psetcols, 'TPHYSBCb',lq = lq) ! AaronDonahue
     call check_qflx (state, tend, "PHYBC01", nstep, ztodt, cam_in%cflx(:,1))
     call check_water(state, tend, "PHYBC01", nstep, ztodt)
 
@@ -2121,13 +2127,13 @@ subroutine tphysbc (ztodt,               &
       !! printout diagnostic information
       !!.................................................................
        call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .False., state%qneg3)
+            1, pcnst, qmin  ,state%q, .False., ptend_qneg%qneg3)
 
       !! tracer borrower for mass conservation 
       !!.................................................................
 
        do m = 1, pcnst 
-          call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, state%qneg3)
+          call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, ptend_qneg%qneg3)
        end do
 
 !!      call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
@@ -2138,10 +2144,17 @@ subroutine tphysbc (ztodt,               &
       !!.................................................................
 
       call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
-           1, pcnst, qmin  ,state%q, .True. ,state%qneg3)
+           1, pcnst, qmin  ,state%q, .True. ,ptend_qneg%qneg3)
 
-    end if 
-
+    end if
+!!== AaronDonahue 
+! Add qneg errors for writing
+    do m = 1,pcnst
+       call qneg_ind(trim('TPHYSBCb'),m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+       if (qneg_idx*qneg_idc > 0)  state%qneg3(:,:,qneg_idc,qneg_idx) = ptend_qneg%qneg3(:,:,m)
+    end do 
+    call physics_ptend_dealloc(ptend_qneg)
+!!== AaronDonahue
 !!== KZ_WCON
 
     ! Validate state coming from the dynamics.
@@ -2151,6 +2164,7 @@ subroutine tphysbc (ztodt,               &
     call clybry_fam_adj( ncol, lchnk, map2chm, state%q, pbuf )
 
 !!== KZ_WCON
+    call physics_ptend_init(ptend_qneg, state%psetcols, 'TPHYSBCc', lq = lq) ! AaronDonahue
 
     if(use_mass_borrower) then
 
@@ -2158,12 +2172,12 @@ subroutine tphysbc (ztodt,               &
        !!.................................................................
 
        call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .False. ,state%qneg3)
+            1, pcnst, qmin  ,state%q, .False. ,ptend_qneg%qneg3)
 
        !! tracer borrower for mass conservation 
        !!.................................................................
        do m = 1, pcnst
-          call massborrow("PHYBC02",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, state%qneg3)
+          call massborrow("PHYBC02",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel, ptend_qneg%qneg3)
        end do
 
 !!       call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
@@ -2175,9 +2189,17 @@ subroutine tphysbc (ztodt,               &
        !!.................................................................
 
        call qneg3('TPHYSBCc',lchnk  ,ncol    ,pcols   ,pver    , &
-            1, pcnst, qmin  ,state%q, .True. ,state%qneg3)
+            1, pcnst, qmin  ,state%q, .True. ,ptend_qneg%qneg3)
 
     end if
+!!== AaronDonahue 
+! Add qneg errors for writing
+    do m = 1,pcnst
+       call qneg_ind(trim('TPHYSBCc'),m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+       if (qneg_idx*qneg_idc > 0)  state%qneg3(:,:,qneg_idc,qneg_idx) = ptend_qneg%qneg3(:,:,m)
+    end do 
+    call physics_ptend_dealloc(ptend_qneg)
+!!== AaronDonahue
 
 
     call check_water(state, tend, "PHYBC02", nstep, ztodt)

@@ -1,3 +1,10 @@
+! TODO:
+! 1) Set up qneg fields as a namelist variable
+! 2) Handle updating qneg state using a subroutine instead of in physics update
+!    and wherever qneg3 is called.
+! 3) possible handle if qneg write stuff is actually called using if statements,
+!    to avoid pointless do loops that aren't needed if no output is used.
+
 module qneg
 
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -15,14 +22,11 @@ public ::         &
    qneg3,         &
    qneg4,         &
    qneg_register, &
-!   qneg_init,     &
-!   qneg_write,    &
    massborrow,    &
-   qqflx_fixer
+   qqflx_fixer,   &
+   qneg_ind
 
 ! Public fields
-!real(r8), allocatable, public     :: qneg3_mat(:,:,:,:) ! Matrix of qneg3 errors
-!real(r8), allocatable, public     :: qneg4_mat(:,:,:) ! Matrix of qneg4 errors
 integer, public                   :: qneg3_numflds, qneg4_numflds
 integer, public                   :: qneg3_numcnst, qneg4_numcnst
 ! Private fields
@@ -54,8 +58,6 @@ subroutine qneg_register()
    tmp3_flds(k) = 'clubb'
    k=k+1
    tmp3_flds(k) = 'cldwat'
-   k=k+1
-   tmp3_flds(k) = 'radheat'
    k = k+1
    tmp3_flds(k) = 'TPHYSBCb'
    k = k+1
@@ -246,7 +248,7 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
 ! Input/Output arguments
 !
    real(r8), intent(inout) :: q(ncold,lver,lconst_beg:lconst_end) ! moisture/tracer field
-   real(r8), intent(inout) :: qneg3mat(ncold,lver,qneg3_numcnst,qneg3_numflds) ! moisture/tracer field
+   real(r8), intent(inout) :: qneg3mat(ncold,lver,lconst_beg:lconst_end) ! moisture/tracer field
 !
 !---------------------------Local workspace-----------------------------
 !
@@ -264,18 +266,10 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
 
    real(r8) worst           ! biggest violator
 
-   integer qneg_idx,qneg_idc         ! index in qneg fields matrix (AaronDonahue)
-   logical qneg_rec                  ! Flag if qneg is recorded for this field/constituent
 !-----------------------------------------------------------------------
 !
 
    do m=lconst_beg,lconst_end
-      qneg_rec = .false.
-      call qneg_ind(subnam,m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
-      if (qneg_idx*qneg_idc > 0)  then
-         qneg_rec = .true.
-         qneg3mat(:,:,qneg_idc,qneg_idx) = qneg_idc*10.0 + qneg_idx !0.0 ! Initialize qneg_mat for this constituent (AaronDonahue)
-      end if
       nvals = 0
       found = .false.
       worst = 1.e35_r8
@@ -291,7 +285,7 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
          nn = 0
          do i=1,ncol
             if (q(i,k,m) < qmin(m)) then
-!               if (qneg_rec) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+               qneg3mat(i,k,m) = qneg3mat(i,k,m) + 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
                nn = nn + 1
                indx(nn,k) = i
             end if
@@ -325,11 +319,11 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
       end do
       if (lfix) then 
          if (found .and. abs(worst)>max(qmin(m),1.e-8_r8)) then 
-            write(iulog,9001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,qmin(m),worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw,qneg_rec,qneg_idc,qneg_idx
+            write(iulog,9001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,qmin(m),worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw
          end if
       else
          if (print_fixer_message .and. found .and. abs(worst)>max(qmin(m),1.e-8_r8)) then 
-            write(iulog,8001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw,qneg_rec,qneg_idc,qneg_idx
+            write(iulog,8001)subnam//'/'//trim(cnst_name(m)),m,idx,nvals,worst,get_rlon_p(idx,iw),get_rlat_p(idx,iw),kw
          end if
       end if
    end do
@@ -337,10 +331,10 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
    return
 8001 format(' QNEG3 from ',a,':m=',i3,' lat/lchnk=',i7, &
             ' Min. mixing ratio violated at ',i4,' points. ', &
-            ' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3,',',L1,',',i3,',',i3)
+            ' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3)
 9001 format(' QNEG3 from ',a,':m=',i3,' lat/lchnk=',i7, &
             ' Min. mixing ratio violated at ',i4,' points.  Reset to ', &
-            1p,e8.1,' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3,',',L1,',',i3,',',i3)
+            1p,e8.1,' Worst =',e8.1,' at lon,lat,k=',f8.4,',',f8.4,i3)
 end subroutine qneg3
 
 !====================================================================================
@@ -437,7 +431,7 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
             iw = i
          end if
       end do
-      write(iulog,9001) subnam,nptsexc,worst, lchnk, iw, get_rlat_p(lchnk,iw),get_rlon_p(lchnk,iw),qneg_rec,qneg_idc,qneg_idx
+      write(iulog,9001) subnam,nptsexc,worst, lchnk, iw, get_rlat_p(lchnk,iw),get_rlon_p(lchnk,iw)
    end if
 !
    return
@@ -448,7 +442,6 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
             ,', i = ',i5 &
             ,', same as lat =', f8.4 &
             ,', lon =', f8.4 &
-            ,',',L1,',',i3,',',i3 &
            )
 end subroutine qneg4
 ! ===============================================================================
@@ -492,7 +485,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel,qneg3mat)
   real(r8), intent(in) :: qmin(mbeg:mend)             ! smallest value
   real(r8), intent(in) :: pdel(pcols,pver)            ! pressure thickness 
   real(r8), intent(inout) :: q(pcols,pver,mbeg:mend)  ! moisture/tracer field
-  real(r8), intent(inout) :: qneg3mat(pcols,pver,qneg3_numcnst,qneg3_numflds) ! moisture/tracer field
+  real(r8), intent(inout) :: qneg3mat(pcols,pver,mbeg:mend) ! moisture/tracer field
 
 !! local 
 !!....................................................................... 
@@ -550,7 +543,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel,qneg3mat)
               bmass(i) = (nmass - qmin(m)) * pdel(i,k)
 
               q(i,k,m) = qmin(m) 
-              if (qneg_rec) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+              if (qneg_rec) qneg3mat(i,k,m) = qneg3mat(i,k,m) + 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
 
               ic(i) = ic(i) + 1 
 
@@ -604,7 +597,7 @@ subroutine massborrow(subnam,lchnk,ncol,pcols,mbeg,mend,qmin,q,pdel,qneg3mat)
 
                  bmass(i) = (nmass - qmin(m))*pdel(i,k)
                  q(i,k,m) = qmin(m)
-                 if (qneg_idx > 0) qneg3mat(i,k,qneg_idc,qneg_idx) = 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
+                 if (qneg_idx > 0) qneg3mat(i,k,m) = qneg3mat(i,k,m) + 1.0 ! Record qneg error for this constituent and time (AaronDonahue)
 
               end if !! nmass > 0.0_r8 
 

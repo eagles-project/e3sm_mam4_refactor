@@ -155,9 +155,9 @@ module physics_types
           v                  ! v momentum tendency (m/s/s)
      real(r8), dimension(:,:,:),allocatable :: &
           q                  ! consituent tendencies (kg/kg/s)
-     real(r8), dimension(:,:,:,:),allocatable      :: &
-          qneg3 ! constituent qneg3 error frequency (unitless)
      real(r8), dimension(:,:,:),allocatable      :: &
+          qneg3 ! constituent qneg3 error frequency (unitless)
+     real(r8), dimension(:),allocatable      :: &
           qneg4 ! constituent qneg4 error frequency (unitless)
 
 
@@ -223,7 +223,7 @@ contains
     use phys_control, only: phys_getopts
     use physconst,    only: physconst_update ! Routine which updates physconst variables (WACCM-X)
     use ppgrid,       only: begchunk, endchunk
-    use qneg,         only: qneg3, massborrow ! AaronDonahue
+    use qneg,         only: qneg3, qneg_ind, massborrow ! AaronDonahue
 
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(inout)  :: ptend   ! Parameterization tendencies
@@ -261,6 +261,7 @@ contains
     ! Whether to do validation of state on each call.
     logical :: state_debug_checks
 
+    integer qneg_idx,qneg_idc         ! index in qneg fields matrix (AaronDonahue)
     !-----------------------------------------------------------------------
 
     ! The column radiation model does not update the state
@@ -361,7 +362,7 @@ contains
                 call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.,ptend%qneg3)
                 call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel, ptend%qneg3)
              else
-                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.,ptend%qneg3)
+                call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.,ptend%qneg3(1,1,m))
              end if 
 !!== KZ_WATCON 
           else
@@ -372,17 +373,14 @@ contains
              end do
           end if
 
+          call qneg_ind(trim(name),m,3,qneg_idx,qneg_idc) ! Get index for this field (AaronDonahue)
+          do k = ptend%top_level, ptend%bot_level
+             if (qneg_idx*qneg_idc > 0)  then
+                state%qneg3(:,k,qneg_idc,qneg_idx) = ptend%qneg3(:,k,m)
+             end if
+          end do ! k
        end if
     end do
-    if (any(ptend%lq(:))) then
-       do m = 1,qneg3_numcnst
-          do n = 1,qneg3_numflds
-             do k = ptend%top_level, ptend%bot_level
-                state%qneg3(:,k,m,n) = ptend%qneg3(:,k,m,n)
-             end do ! k
-          end do ! n
-       end do ! m
-    end if ! any 
 
     !------------------------------------------------------------------------
     ! This is a temporary fix for the large H, H2 in WACCM-X
@@ -836,7 +834,7 @@ contains
           if ( ierr /= 0 ) call endrun('physics_ptend_sum error: allocation error for ptend_sum%cflx_top')
           ptend_sum%cflx_top=0.0_r8
 
-          allocate(ptend_sum%qneg3(psetcols,pver,qneg3_numcnst,qneg3_numflds), stat=ierr)
+          allocate(ptend_sum%qneg3(psetcols,pver,pcnst), stat=ierr)
           if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend_sum%qneg3')
           ptend_sum%qneg3=0.0_r8
        end if
@@ -847,6 +845,7 @@ contains
              do k = ptend%top_level, ptend%bot_level
                 do i = 1,ncol
                    ptend_sum%q(i,k,m) = ptend_sum%q(i,k,m) + ptend%q(i,k,m)
+                   ptend_sum%qneg3(i,k,m) = ptend_sum%qneg3(i,k,m) + ptend%qneg3(i,k,m)
                 end do
              end do
              do i = 1,ncol
@@ -855,16 +854,6 @@ contains
              end do
           end if
        end do
-
-       do m = 1,qneg3_numcnst
-          do n = 1,qneg3_numflds
-             do k = ptend%top_level, ptend%bot_level
-                do i = 1,ncol
-                   ptend_sum%qneg3(i,k,m,n) = ptend_sum%qneg3(i,k,m,n) + ptend%qneg3(i,k,m,n)
-                end do !i
-             end do ! k
-          end do ! n
-       end do ! m
     end if
 
     call t_stopf('physics_ptend_sum')
@@ -1935,7 +1924,7 @@ subroutine physics_ptend_alloc(ptend,psetcols)
      allocate(ptend%cflx_top(psetcols,pcnst), stat=ierr)
      if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend%cflx_top')
 
-     allocate(ptend%qneg3(psetcols,pver,qneg3_numcnst,qneg3_numflds), stat=ierr)
+     allocate(ptend%qneg3(psetcols,pver,pcnst), stat=ierr)
      if ( ierr /= 0 ) call endrun('physics_ptend_alloc error: allocation error for ptend%qneg3')
   end if
 
