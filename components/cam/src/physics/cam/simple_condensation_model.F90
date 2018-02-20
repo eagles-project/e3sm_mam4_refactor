@@ -20,6 +20,7 @@ module simple_condensation_model
   private
   public :: simple_RKZ_tend
   public :: simple_RKZ_init
+  public :: f_ql_consistency_tend
 
 contains
 
@@ -461,5 +462,99 @@ contains
    qmeold(:ncol,:pver)           =  qme(:ncol,:pver) ! save qme for next step 
 
   end subroutine simple_RKZ_tend
+
+  !------------------------------------------------------------------------
+  ! Check if we have the peculiar case of f = 0 but ql > 0. 
+  ! If so, evaporate all ql, and adjust qv, T accordingly.
+  !------------------------------------------------------------------------
+  subroutine f_ql_consistency_tend(state, ptend, dtime, ixcldliq, rkz_cldfrc_opt)
+
+  use shr_kind_mod, only: r8=>shr_kind_r8
+  use constituents, only: pcnst
+  use physics_types,only: physics_state, physics_ptend, physics_ptend_init
+  use wv_saturation, only: qsat_water
+  use physconst,     only: latvap
+  use simple_cloud_fraction, only: smpl_frc
+  use cam_history,   only: outfld
+
+  implicit none
+  !
+  ! arguments
+  !
+  type(physics_state), intent(in), target    :: state       ! State variables
+  type(physics_ptend), intent(out)           :: ptend       ! Package tendencies
+
+  real(r8), intent(in) :: dtime               ! Set model physics timestep
+  integer,  intent(in) :: ixcldliq            ! constituent index 
+  integer,  intent(in) :: rkz_cldfrc_opt       ! cloud fraction scheme 
+
+  ! tmp work arrays
+
+ !integer  :: lchnk                  ! index of (grid) chunk handled by this call of the subroutine
+  integer  :: ncol                   ! number of active columns in this chunk for which calculations will be done
+  logical  :: lq(pcnst)              ! logical array used when calling subroutine physics_ptend_init indicating 
+                                     ! which tracers are affected by this parameterization
+
+  real(r8) :: rdtime
+
+  real(r8) ::         ast(pcols,pver)! cloud fraction
+
+  real(r8) ::        qsat(pcols,pver)! saturation specific humidity
+  real(r8) ::         esl(pcols,pver)! saturation vapor pressure (output from subroutine qsat_water, not used)
+  real(r8) ::     dqsatdT(pcols,pver)! dqsat/dT
+  real(r8) ::         gam(pcols,pver)! L/cpair * dqsat/dT
+
+  real(r8) :: rhu00                  ! threshold grid-box-mean RH used in the diagnostic cldfrc scheme
+  real(r8) :: rhgbm(pcols,pver)      ! grid box mean relative humidity
+  real(r8) ::     dastdRH(pcols,pver)! df/dRH where f is the cloud fraction and RH the relative humidity
+
+  real(r8) :: qme   (pcols,pver)     ! total condensation rate
+
+  real(r8),parameter ::  ql_min = 1e-12_r8
+  real(r8),parameter :: ast_min = 1e-5_r8
+
+  !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  rdtime = 1._r8/dtime
+  ncol  = state%ncol
+ !lchnk = state%lchnk  ! needed by "call outfld" for model output
+
+  ! Calculate saturation specific humidity (qsat) and its derivative wrt temperature (dqsatdT)
+
+  do k=1,pver
+  do i=1,ncol
+     call qsat_water( state%t(i,k), state%pmid(i,k), esl(i,k), qsat(i,k), gam(i,k), dqsatdT(i,k) )
+  end do
+  end do
+ !call outfld('RKZ_qsat', qsat, pcols, lchnk)
+
+  ! Calculate the grid-box-mean relative humidity (rhgbm)
+
+  rhgbm(:ncol,:pver) = state%q(:ncol,:pver,1)/qsat(:ncol,:pver)
+
+  ! Diagnose cloud fraction (ast)
+
+  call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
+                  ast, rhu00, dastdRH,                              &! inout, out, out
+                  rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in
+
+  ! Evaporate all cloud liquid if f ~ 0. 
+
+  qme(:ncol,:pver) = 0._r8
+  where ( ast(:ncol,:pver).le.ast_min .and. state%q(:,:,ixcldliq) .gt. ql_min ) 
+    qme(:ncol,:pver) = - state%q(:ncol,:pver,ixcldliq)*rdtime
+  end where
+
+  ! Tendencies to be returned to the calling routine. 
+
+   lq(:) = .FALSE.
+   lq(1) = .TRUE.
+   lq(ixcldliq) = .TRUE.
+   call physics_ptend_init(ptend,state%psetcols, "f_ql_consistency", ls=.true., lq=lq)
+
+   ptend%q(:ncol,:pver,1)        = -qme(:ncol,:pver)
+   ptend%q(:ncol,:pver,ixcldliq) =  qme(:ncol,:pver)
+   ptend%s(:ncol,:pver)          =  qme(:ncol,:pver) *latvap
+        
+  end subroutine f_ql_consistency_tend 
 
 end module simple_condensation_model

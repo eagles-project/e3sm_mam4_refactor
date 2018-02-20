@@ -1818,7 +1818,7 @@ subroutine tphysbc (ztodt,               &
     use microp_driver,   only: microp_driver_tend
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
-    use simple_condensation_model, only: simple_RKZ_tend
+    use simple_condensation_model, only: simple_RKZ_tend, f_ql_consistency_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
@@ -2460,6 +2460,16 @@ end if
            !case (1) ! saturation adjustment scheme from Reed and Jablonowski
 
             case (2) ! simplified Rasch-Kristjansson-Zhang scheme
+
+               ! First remove cases with f = 0 but ql > 0 through evaporation
+
+               call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, rkz_cldfrc_opt)
+               call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
+               call physics_update(state, ptend, ztodt, tend)
+               call check_energy_chng(state, tend, "f_ql_consistency_tend", nstep, ztodt, &
+                    zero, zero, zero, zero)
+
+               ! Calculate condensation rate using simplified RKZ scheme
 
                itim_old  = pbuf_old_tim_idx()
 
