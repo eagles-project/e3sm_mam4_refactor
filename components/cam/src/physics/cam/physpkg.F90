@@ -2025,6 +2025,7 @@ subroutine tphysbc (ztodt,               &
 
     integer :: simple_macrop_opt = -1   ! -1 = NOT using simple macrophysics schemes
     integer :: rkz_cldfrc_opt
+    integer :: rkz_ql_f_opt
     integer :: rkz_term_A_opt
     integer :: rkz_term_B_opt
     integer :: rkz_term_C_opt
@@ -2053,6 +2054,7 @@ subroutine tphysbc (ztodt,               &
                       ,rkz_term_C_opt_out     = rkz_term_C_opt &
                       ,rkz_term_C_ql_opt_out  = rkz_term_C_ql_opt &
                       ,rkz_term_C_fmin_out    = rkz_term_C_fmin &
+                      ,rkz_ql_f_opt_out       = rkz_ql_f_opt &
                       ,l_rkz_lmt_2_out        = l_rkz_lmt_2 &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
                       ,l_rkz_lmt_4_out        = l_rkz_lmt_4 &
@@ -2463,7 +2465,8 @@ end if
 
                ! First remove cases with f = 0 but ql > 0 through evaporation
 
-               call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, rkz_cldfrc_opt)
+               call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, &
+                                           rkz_cldfrc_opt, rkz_ql_f_opt)
                call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
                call physics_update(state, ptend, ztodt, tend)
                call check_energy_chng(state, tend, "f_ql_consistency_tend", nstep, ztodt, &

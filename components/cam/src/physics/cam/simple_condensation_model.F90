@@ -71,6 +71,12 @@ contains
     call addfld ('RKZ_Av',(/'lev'/), 'I','kg/kg/s','grid-box mean qv tendency caused by other processes')
     call addfld ('RKZ_AT',(/'lev'/), 'I','kg/kg/s','grid-box mean temperature tendency caused by other processes')
 
+    call addfld ('RKZ_zqme', (/'lev'/), 'I', 'kg/kg/s', 'condensation rate before limiters in the simple RKZ scheme')
+    call addfld ('RKZ_qme',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate after limiters in the simple RKZ scheme')
+
+    call addfld ('RKZ_qme_lm4',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate difference before and after limiter4')
+
+
   end subroutine simple_RKZ_init
 
   !------------------------------------------------------------------------
@@ -154,6 +160,9 @@ contains
   real(r8) :: ttend(pcols,pver)      ! Temperature tendency caused by other processes
 
   real(r8) :: qme   (pcols,pver)     ! total condensation rate
+
+  real(r8) :: qmebf   (pcols,pver)   ! total condensation rate before appling limiter 
+  real(r8) :: qmedf   (pcols,pver)   ! difference of total condensation rate before and after limiter application
 
   real(r8) :: term_A (pcols,pver)
   real(r8) :: term_B (pcols,pver)
@@ -359,6 +368,7 @@ contains
      !------------------------------------------------------------------
      ! Send diagnostics to output
      !------------------------------------------------------------------
+     call outfld('RKZ_zqme',   qme,    pcols, lchnk)
      call outfld('RKZ_term_A', term_A, pcols, lchnk)
      call outfld('RKZ_term_B', term_B, pcols, lchnk)
      call outfld('RKZ_term_C', term_C, pcols, lchnk)
@@ -425,7 +435,8 @@ contains
      ! Limit condensation/evaporation rate to avoid negative water concentrations
      !---------------------------------------------------------------------------
      if (l_rkz_lmt_4) then
-
+        
+        qmebf(:ncol,:pver)  = qme(:ncol,:pver) 
         ! Avoid negative qv
 
         zqvnew(:ncol,:pver) = state%q(:ncol,:pver,1) - dtime*qme(:ncol,:pver)
@@ -439,8 +450,14 @@ contains
         where( zqlnew(:ncol,:pver).lt.zsmall )
            qme(:ncol,:pver) = ( zsmall - state%q(:ncol,:pver,ixcldliq) )*rdtime
         end where
+        
+        qmedf(:ncol,:pver)  = qme(:ncol,:pver) - qmebf(:ncol,:pver)
+        call outfld('RKZ_qme_lm4',   qmedf,    pcols, lchnk)
 
      end if
+
+     ! Send limited condensation rate to output
+     call outfld('RKZ_qme', qme, pcols, lchnk)
 
   else
 
@@ -467,7 +484,8 @@ contains
   ! Check if we have the peculiar case of f = 0 but ql > 0. 
   ! If so, evaporate all ql, and adjust qv, T accordingly.
   !------------------------------------------------------------------------
-  subroutine f_ql_consistency_tend(state, ptend, dtime, ixcldliq, rkz_cldfrc_opt)
+  subroutine f_ql_consistency_tend(state, ptend, dtime, ixcldliq, &
+                                   rkz_cldfrc_opt, rkz_ql_f_opt)
 
   use shr_kind_mod, only: r8=>shr_kind_r8
   use constituents, only: pcnst
@@ -486,7 +504,8 @@ contains
 
   real(r8), intent(in) :: dtime               ! Set model physics timestep
   integer,  intent(in) :: ixcldliq            ! constituent index 
-  integer,  intent(in) :: rkz_cldfrc_opt       ! cloud fraction scheme 
+  integer,  intent(in) :: rkz_cldfrc_opt      ! cloud fraction scheme 
+  integer,  intent(in) :: rkz_ql_f_opt        ! limiter scheme for qlmin and fmin
 
   ! tmp work arrays
 
@@ -494,24 +513,25 @@ contains
   integer  :: ncol                   ! number of active columns in this chunk for which calculations will be done
   logical  :: lq(pcnst)              ! logical array used when calling subroutine physics_ptend_init indicating 
                                      ! which tracers are affected by this parameterization
+  integer  :: i,k                    ! loop indices for column and vertical layer
 
   real(r8) :: rdtime
 
-  real(r8) ::         ast(pcols,pver)! cloud fraction
+  real(r8) ::     ast(pcols,pver)! cloud fraction
 
-  real(r8) ::        qsat(pcols,pver)! saturation specific humidity
-  real(r8) ::         esl(pcols,pver)! saturation vapor pressure (output from subroutine qsat_water, not used)
+  real(r8) ::     qsat(pcols,pver)! saturation specific humidity
+  real(r8) ::     esl(pcols,pver)! saturation vapor pressure (output from subroutine qsat_water, not used)
   real(r8) ::     dqsatdT(pcols,pver)! dqsat/dT
-  real(r8) ::         gam(pcols,pver)! L/cpair * dqsat/dT
+  real(r8) ::     gam(pcols,pver)! L/cpair * dqsat/dT
 
-  real(r8) :: rhu00                  ! threshold grid-box-mean RH used in the diagnostic cldfrc scheme
-  real(r8) :: rhgbm(pcols,pver)      ! grid box mean relative humidity
+  real(r8) ::     rhu00                  ! threshold grid-box-mean RH used in the diagnostic cldfrc scheme
+  real(r8) ::     rhgbm(pcols,pver)      ! grid box mean relative humidity
   real(r8) ::     dastdRH(pcols,pver)! df/dRH where f is the cloud fraction and RH the relative humidity
 
-  real(r8) :: qme   (pcols,pver)     ! total condensation rate
+  real(r8) ::     qme(pcols,pver)     ! total condensation rate
 
-  real(r8),parameter ::  ql_min = 1e-12_r8
-  real(r8),parameter :: ast_min = 1e-5_r8
+  real(r8) ::     ql_min 
+  real(r8) ::     ast_min 
 
   !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   rdtime = 1._r8/dtime
@@ -536,6 +556,19 @@ contains
   call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
                   ast, rhu00, dastdRH,                              &! inout, out, out
                   rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in
+
+  !!!!set up the minimum threshold for cloud fraction and cloud liquid water 
+  select case (rkz_ql_f_opt)
+  case(0) ! minimum is zero for both
+     ql_min  = 0._r8
+     ast_min = 0._r8
+  case(1) ! set a threshold for ql and ast
+     ql_min  = 1e-12_r8
+     ast_min = 1e-5_r8
+  case default
+      write(iulog,*) "Unrecognized value of rkz_term_B_opt:",rkz_ql_f_opt,". Abort."
+      call endrun
+  end select
 
   ! Evaporate all cloud liquid if f ~ 0. 
 
