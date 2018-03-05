@@ -1189,9 +1189,14 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 
    integer k,kp1,km1
 
+! to turn on/off the change below just comment/uncomment this line for now
+#define SHAN_SIMD
+
    if ( is_unact ) then
       !     the qactold*(1-overlap) terms are resuspension of activated material
+#ifdef SHAN_SIMD
       !$omp simd
+#endif
       do k=top_lev,pver
          kp1=min(k+1,pver)
          km1=max(k-1,top_lev)
@@ -1214,7 +1219,9 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
       q(pver)=max(q(pver),0._r8)
       !        endif
    else
+#ifdef SHAN_SIMD
       !$omp simd
+#endif
       do k=top_lev,pver
          kp1=min(k+1,pver)
          km1=max(k-1,top_lev)
