@@ -1191,6 +1191,7 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 
    if ( is_unact ) then
       !     the qactold*(1-overlap) terms are resuspension of activated material
+      !$omp simd
       do k=top_lev,pver
          kp1=min(k+1,pver)
          km1=max(k-1,top_lev)
@@ -1213,6 +1214,7 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
       q(pver)=max(q(pver),0._r8)
       !        endif
    else
+      !$omp simd
       do k=top_lev,pver
          kp1=min(k+1,pver)
          km1=max(k-1,top_lev)
