@@ -22,7 +22,7 @@ use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 use wv_saturation,    only: qsat
 use phys_control,     only: phys_getopts
 use ref_pres,         only: top_lev => trop_cloud_top_lev
-use shr_spfn_mod,     only: erf => shr_spfn_erf
+!! use shr_spfn_mod,     only: erf => shr_spfn_erf
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_mode_num, rad_cnst_get_aer_mmr, &
                             rad_cnst_get_aer_props, rad_cnst_get_mode_props,                &
                             rad_cnst_get_mam_mmr_idx, rad_cnst_get_mode_num_idx
@@ -435,6 +435,7 @@ subroutine dropmixnuc( &
    integer  :: idx1000
    logical  :: zmflag
 
+   real(r8) :: shan_t1(pver)
 
    !-------------------------------------------------------------------------------
 
@@ -1061,6 +1062,8 @@ subroutine dropmixnuc( &
          raertend = 0._r8
          qqcwtend = 0._r8
 
+         shan_t1(:) = pdel(i, :)
+       
          do m = 1, ntot_amode
             do l = 0, nspec_amode(m)
 
@@ -1070,8 +1073,8 @@ subroutine dropmixnuc( &
                raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(i,top_lev:pver))*dtinv
                qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(i,top_lev:pver))*dtinv
 
-               coltend(i,mm)    = sum( pdel(i,:)*raertend )/gravit
-               coltend_cw(i,mm) = sum( pdel(i,:)*qqcwtend )/gravit
+               coltend(i,mm)    = sum( shan_t1*raertend )/gravit
+               coltend_cw(i,mm) = sum( shan_t1*qqcwtend )/gravit
 
                ptend%q(i,:,lptr) = 0.0_r8
                ptend%q(i,top_lev:pver,lptr) = raertend(top_lev:pver)           ! set tendencies for interstitial aerosol
@@ -1743,6 +1746,8 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    integer phase ! phase of aerosol
    !-------------------------------------------------------------------------------
 
+   real(r8) :: shan(pcols)
+
    lchnk = state%lchnk
    ncol  = state%ncol
    tair  => state%t
@@ -1751,7 +1756,7 @@ subroutine ccncalc(state, pbuf, cs, ccn)
       amcubecoef(ntot_amode), &
       argfactor(ntot_amode)   )
 
-   super(:)=supersat(:)*0.01_r8
+   super(:)=1.0_r8/(supersat(:)*0.01_r8)
    sq2=sqrt(2._r8)
    twothird=2._r8/3._r8
    surften=0.076_r8
@@ -1788,7 +1793,7 @@ subroutine ccncalc(state, pbuf, cs, ccn)
          endwhere
          do l=1,psat
             do i=1,ncol
-               arg(i)=argfactor(m)*log(sm(i)/super(l))
+               arg(i)=argfactor(m)*log(sm(i)*super(l))
                ccn(i,k,l)=ccn(i,k,l)+naerosol(i)*0.5_r8*(1._r8-erf(arg(i)))
             enddo
          enddo
