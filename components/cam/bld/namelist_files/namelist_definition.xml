@@ -2659,6 +2659,20 @@ in the RKZ simple macrophysics scheme
 Default: 1E-3 
 </entry>
 
+<entry id="rkz_zsmall_opt" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Choice of min. water vapor and cloud liquid water as a safegurd for limiter 4/5
+in the RKZ simple macrophysics scheme
+Default: 1
+</entry>
+
+<entry id="rkz_lmt5_opt" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Choice of implementation for limiter 5 for different conditions
+in the RKZ simple macrophysics scheme
+Default: 1
+</entry>
+
 <entry id="l_rkz_lmt_2" type="logical" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
 Turn on limiter 2 for condensation
@@ -2677,10 +2691,17 @@ Turn on limiter 4 for condensation
 Default: FALSE
 </entry>
 
+<<<<<<< HEAD
 <entry id="rkz_ql_f_opt" type="integer" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
 Choice of numerical implementation for ql and f constrain in the RKZ simple macrophysics scheme
 Default: 0
+=======
+<entry id="l_rkz_lmt_5" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Turn on limiter 5 for condensation
+Default: FALSE
+>>>>>>> origin/huiwanpnnl/atm/condensation
 </entry>
 
 <!-- Physics sub-column switches -->

@@ -2031,10 +2031,12 @@ subroutine tphysbc (ztodt,               &
     integer :: rkz_term_C_opt
     integer :: rkz_term_C_ql_opt
     real(r8):: rkz_term_C_fmin
+    integer :: rkz_zsmall_opt
+    integer :: rkz_lmt5_opt
     logical :: l_rkz_lmt_2
     logical :: l_rkz_lmt_3
     logical :: l_rkz_lmt_4
-
+    logical :: l_rkz_lmt_5
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
@@ -2054,10 +2056,16 @@ subroutine tphysbc (ztodt,               &
                       ,rkz_term_C_opt_out     = rkz_term_C_opt &
                       ,rkz_term_C_ql_opt_out  = rkz_term_C_ql_opt &
                       ,rkz_term_C_fmin_out    = rkz_term_C_fmin &
+<<<<<<< HEAD
                       ,rkz_ql_f_opt_out       = rkz_ql_f_opt &
+=======
+                      ,rkz_zsmall_opt_out     = rkz_zsmall_opt &
+                      ,rkz_lmt5_opt_out       = rkz_lmt5_opt &
+>>>>>>> origin/huiwanpnnl/atm/condensation
                       ,l_rkz_lmt_2_out        = l_rkz_lmt_2 &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
                       ,l_rkz_lmt_4_out        = l_rkz_lmt_4 &
+                      ,l_rkz_lmt_5_out        = l_rkz_lmt_5 &
                       )
     
     !-----------------------------------------------------------------------
@@ -2459,7 +2467,13 @@ end if
           if (macrop_scheme .ne. 'CLUBB_SGS') then
 
             select case (simple_macrop_opt) ! simple condensation models
-           !case (1) ! saturation adjustment scheme from Reed and Jablonowski
+            case (1) ! saturation adjustment scheme from Reed and Jablonowski
+
+               call reed_jablonowski_sat_adj_tend(state, ptend, cld_macmic_ztodt)
+               call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
+               call physics_update(state, ptend, ztodt, tend)
+               call check_energy_chng(state, tend, "Reed-Jablonowski saturation adjustment", nstep, ztodt, &
+                    zero, zero, zero, zero)
 
             case (2) ! simplified Rasch-Kristjansson-Zhang scheme
 
@@ -2499,9 +2513,12 @@ end if
                                      rkz_term_C_opt, &
                                      rkz_term_C_ql_opt, &
                                      rkz_term_C_fmin, &
+                                     rkz_zsmall_opt, &
+                                     rkz_lmt5_opt, &
                                      l_rkz_lmt_2, &
                                      l_rkz_lmt_3, &
-                                     l_rkz_lmt_4  &
+                                     l_rkz_lmt_4, &
+                                     l_rkz_lmt_5  &
                                      )
 
                call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
