@@ -1823,6 +1823,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use simple_condensation_model, only: simple_RKZ_tend
+    use kessler_autoconv, only: kessler_autocon_tend
     use reed_jablonowski_condensation_model, only: reed_jablonowski_sat_adj_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
@@ -2621,6 +2622,35 @@ end if
           !===================================================
         if (l_st_mic) then
 
+         select case (simple_microp_opt) ! simple condensation models
+         case (1) ! Kessler autoconversion
+
+             ! Recalculate cloud fraction for cloud microphysics ---
+
+             ! Calculate saturation specific humidity (qsat) and its
+             ! derivative wrt temperature (dqsatdT)
+             do k=1,pver
+             do i=1,ncol
+               call qsat_water( state%t(i,k), state%pmid(i,k), esl(i,k), qsat(i,k), gam(i,k), dqsatdT(i,k) )
+             end do
+             end do
+
+             ! Calculate the cloud fraction (astwat) 
+             call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
+                             astwat, rhu00, rhgbm, dfacdRH, dlnastdRH,         &! inout, out, out
+                             rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in
+
+             ! Call the autoconversion scheme, then update model state
+             call kessler_autoconv_tend(state, ptend, cld_macmic_ztodt, ixcldliq, astwat, &
+                                        kessler_autoconv_tau, kessler_autoconv_ql_crit)
+
+             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
+             call physics_update(state, ptend, ztodt, tend)
+             call check_energy_chng(state, tend, "kessler_autoconv_tend", nstep, ztodt, &
+                                    zero, zero, zero, zero)
+
+         case (-1) ! NOT using simplified microphysics--------------------------------------------
+ 
           if (is_subcol_on()) then
              ! Allocate sub-column structures. 
              call physics_state_alloc(state_sc, lchnk, psubcols*pcols)
@@ -2686,6 +2716,12 @@ end if
                snow_str(:ncol)/cld_macmic_num_steps, zero)
 
           call t_stopf('microp_tend')
+
+         case default !-------------------------------------------------------------------------------
+            write(iulog,*) "Unrecognized value of simple_microp_opt:",simple_microp_opt,". Abort."
+            call  endrun
+         end select ! simple cloud microphysics or CAM default -----------------------------------
+ 
         end if ! l_st_mic
 
           prec_sed_macmic(:ncol) = prec_sed_macmic(:ncol) + prec_sed(:ncol)
