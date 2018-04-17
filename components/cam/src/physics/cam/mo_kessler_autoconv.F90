@@ -57,8 +57,9 @@ contains
   real(r8) :: zconst   ! ( exp(-dtime/kessler_autoconv_tau) - 1 )/dtime
   real(r8) :: ql_excess(pcols,pver)
 
-  integer  :: ncol  
   logical  :: lq(pcnst)              ! logical array used when calling subroutine physics_ptend_init indicating 
+  integer  :: lchnk                  ! index of (grid) chunk handled by this call of the subroutine
+  integer  :: ncol                   ! number of active columns in this chunk for which calculations will be done
 
   ncol = state%ncol
   zconst = ( exp(-dtime/kessler_autoconv_tau) - 1._r8 )/dtime
@@ -77,7 +78,7 @@ contains
 
   ql_excess = state%q(:ncol,:pver,ixcldliq) - ast(:ncol,:pver)*kessler_autoconv_ql_crit
   where ( ql_excess(:ncol,:pver).gt.0._r8 ) 
-    ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zcost 
+    ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zconst 
   end where
 
   call outfld('KES_ql_excess',    ql_excess,    pcols, lchnk)
