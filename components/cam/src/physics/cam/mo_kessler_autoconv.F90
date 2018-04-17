@@ -77,7 +77,7 @@ contains
 
   ptend%q(:ncol,:pver,ixcldliq) = 0._r8   ! initialize liquid tendency with zero
 
-  ql_excess = state%q(:ncol,:pver,ixcldliq) - ast(:ncol,:pver)*kessler_autoconv_ql_crit
+  ql_excess(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq) - ast(:ncol,:pver)*kessler_autoconv_ql_crit
   where ( ql_excess(:ncol,:pver).gt.0._r8 ) 
     ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zconst 
   end where

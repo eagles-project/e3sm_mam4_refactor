@@ -2050,7 +2050,7 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rkz_lmt_4
     logical :: l_rkz_lmt_5
 
-    integer :: simple_microp_opt
+    integer :: simple_microp_opt = -1   ! -1 = NOT using simple macrophysics schemes
     real(r8):: kessler_autoconv_tau, kessler_autoconv_ql_crit
     
     !Shixuan Zhang (2018/03): added for simple condensation model convergence test 
@@ -2090,6 +2090,9 @@ subroutine tphysbc (ztodt,               &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
                       ,l_rkz_lmt_4_out        = l_rkz_lmt_4 &
                       ,l_rkz_lmt_5_out        = l_rkz_lmt_5 &
+                      ,simple_microp_opt_out  = simple_microp_opt &
+                      ,kessler_autoconv_tau_out      = kessler_autoconv_tau &
+                      ,kessler_autoconv_ql_crit_out  = kessler_autoconv_ql_crit &
                       )
     
     !-----------------------------------------------------------------------
