@@ -91,6 +91,7 @@ module physpkg
   logical           :: prog_modal_aero     ! Prognostic modal aerosols present
   logical           :: micro_do_icesupersat
   integer           :: simple_macrop_opt
+  integer           :: simple_microp_opt
 
   !======================================================================= 
 contains
@@ -2045,6 +2046,9 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rkz_lmt_4
     logical :: l_rkz_lmt_5
 
+    integer :: simple_microp_opt
+    real(r8):: kessler_autoconv_tau, kessler_autoconv_ql_crit
+    
     !Shixuan Zhang (2018/03): added for simple condensation model convergence test 
     real(r8), pointer, dimension(:,:) :: qmeold     ! total condensation rate in previous step 
     real(r8), pointer, dimension(:,:) :: astwat     ! cloud fraction after condensation      

@@ -42,6 +42,7 @@ contains
   real(r8) :: ql_excess(pcols,pver)
 
   integer  :: ncol  
+  logical  :: lq(pcnst)              ! logical array used when calling subroutine physics_ptend_init indicating 
 
   ncol = state%ncol
   zconst = ( exp(-dtime/kessler_autoconv_tau) - 1._r8 )/dtime
