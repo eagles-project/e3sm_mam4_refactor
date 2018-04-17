@@ -2609,6 +2609,26 @@ macro and microphysics are either both on or both off.)
 Default: TRUE
 </entry>
 
+<entry id="simple_microp_opt" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Choice of simple cloud microphysics scheme
+Default: -1
+</entry>
+
+<entry id="kessler_autoconv_tau" type="real" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Time scale for the autoconversion to remove cloud liquid water
+in the Kessler simple microphysics scheme
+Default: 1000.0
+</entry>
+
+<entry id="kessler_autoconv_ql_crit" type="real" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Critical value of cloud liquid water to trigger the autoconversion 
+in the Kessler simple microphysics scheme
+Default: 5.0E-4
+</entry>
+
 <entry id="l_rad" type="logical" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
 Do radiative transfer and heating/cooling calculation.
