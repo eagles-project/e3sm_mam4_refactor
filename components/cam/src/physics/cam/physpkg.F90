@@ -872,7 +872,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     end if
 
     call phys_getopts(simple_microp_opt_out=simple_microp_opt)
-    call kessler_autoconv_init()
+       call kessler_autoconv_init()
 
 
     call qbo_init

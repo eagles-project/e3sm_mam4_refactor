@@ -62,7 +62,11 @@ contains
   integer  :: lchnk                  ! index of (grid) chunk handled by this call of the subroutine
   integer  :: ncol                   ! number of active columns in this chunk for which calculations will be done
 
-  ncol = state%ncol
+  ncol  = state%ncol
+  lchnk = state%lchnk  ! needed by "call outfld" for model output
+
+  ql_excess(:ncol,:pver)        = 0._r8   ! initialize ql_excess with zero for safe 
+
   zconst = ( exp(-dtime/kessler_autoconv_tau) - 1._r8 )/dtime
 
   !===================================================================
@@ -78,11 +82,11 @@ contains
   ptend%q(:ncol,:pver,ixcldliq) = 0._r8   ! initialize liquid tendency with zero
 
   ql_excess(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq) - ast(:ncol,:pver)*kessler_autoconv_ql_crit
-  where ( ql_excess(:ncol,:pver).gt.0._r8 ) 
+  where ( ql_excess(:ncol,:pver) .gt. 0._r8 ) 
     ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zconst 
   end where
 
-  call outfld('KES_ql_excess',    ql_excess,    pcols, lchnk)
+  call outfld('KES_ql_excess', ql_excess, pcols, lchnk)
 
   end subroutine kessler_autoconv_tend
 
