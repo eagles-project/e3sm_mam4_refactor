@@ -39,7 +39,7 @@ contains
 
   use constituents, only: pcnst
   use physics_types,only: physics_state, physics_ptend, physics_ptend_init
- !use cam_history,  only: outfld
+  use cam_history,  only: outfld
 
   implicit none
   !
