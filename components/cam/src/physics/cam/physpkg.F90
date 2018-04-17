@@ -1828,7 +1828,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use simple_condensation_model, only: simple_RKZ_tend
-    use kessler_autoconv, only: kessler_autocon_tend
+    use kessler_autoconv, only: kessler_autoconv_tend
     use reed_jablonowski_condensation_model, only: reed_jablonowski_sat_adj_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale

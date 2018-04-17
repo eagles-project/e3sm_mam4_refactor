@@ -8,7 +8,7 @@ module kessler_autoconv
   implicit none
   private
 
-  public :: kessler_autoconv_tend 
+  public :: kessler_autoconv_tend  kessler_autoconv_init
 
 contains
 

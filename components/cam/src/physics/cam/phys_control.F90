@@ -168,7 +168,7 @@ logical :: l_rkz_lmt_3       = .false.
 logical :: l_rkz_lmt_4       = .true.
 logical :: l_rkz_lmt_5       = .false.
 !!!!!!!Options for configuring a simple microphysics scheme 
-integer :: simple_microp_opt = 1
+integer :: simple_microp_opt = -1   ! -1 = NOT using simple microphysics schemes 
 real(r8):: kessler_autoconv_tau     = 1000.0
 real(r8):: kessler_autoconv_ql_crit = 5e-4_r8
 
@@ -545,7 +545,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    logical,           intent(out), optional :: l_rkz_lmt_4_out
    logical,           intent(out), optional :: l_rkz_lmt_5_out
 
-   logical,           intent(out), optional :: simple_microp_opt_out
+   integer,           intent(out), optional :: simple_microp_opt_out
    real(r8),          intent(out), optional :: kessler_autoconv_tau_out
    real(r8),          intent(out), optional :: kessler_autoconv_ql_crit_out
 
