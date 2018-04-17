@@ -24,7 +24,8 @@ contains
 
     implicit none
 
-    call addfld ('KES_ql_excess',  (/'lev'/), 'I','kg/kg','Liquid water removed by kessler scheme')
+    call addfld ('KES_ql_excess',(/'lev'/),'I','kg/kg',  'Grid-box mean liquid water excess to be removed by Kessler scheme')
+    call addfld ('KES_autoconv', (/'lev'/),'I','kg/kg/s','Actual autoconversion rate from the Kessler scheme')
 
   end subroutine kessler_autoconv_init
 
@@ -86,7 +87,8 @@ contains
     ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zconst 
   end where
 
-  call outfld('KES_ql_excess', ql_excess, pcols, lchnk)
+  call outfld('KES_ql_excess', ql_excess,             pcols, lchnk)
+  call outfld('KES_autoconv',  ptend%q(:,:,ixcldliq), pcols, lchnk)
 
   end subroutine kessler_autoconv_tend
 
