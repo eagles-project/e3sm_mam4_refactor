@@ -306,9 +306,9 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_rkz_lmt_4,                     1 , mpilog,  0, mpicom)
    call mpibcast(l_rkz_lmt_5,                     1 , mpilog,  0, mpicom)
 
-   call mpibcast(simple_microp_opt                1 , mpilog,  0, mpicom)
-   call mpibcast(kessler_autoconv_tau             1 , mpir8,   0, mpicom)
-   call mpibcast(kessler_autoconv_ql_crit         1 , mpir8,   0, mpicom)
+   call mpibcast(simple_microp_opt,               1 , mpilog,  0, mpicom)
+   call mpibcast(kessler_autoconv_tau,            1 , mpir8,   0, mpicom)
+   call mpibcast(kessler_autoconv_ql_crit,        1 , mpir8,   0, mpicom)
 
    call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
    call mpibcast(prc_coef1,                       1 , mpir8,   0, mpicom)

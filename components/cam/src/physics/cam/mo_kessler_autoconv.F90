@@ -12,6 +12,22 @@ module kessler_autoconv
 
 contains
 
+  !------------------------------------------------------------------------
+  ! Initialization of the kessler simple microphysics model.
+  ! Currently this contains just registration of output variables.
+  !------------------------------------------------------------------------
+
+  subroutine kessler_autoconv_init()
+
+    use cam_history,    only: addfld
+
+    implicit none
+
+    call addfld ('KES_ql_excess',  (/'lev'/), 'I','kg/kg','Liquid water removed by kessler scheme')
+
+  end subroutine kessler_autoconv_init
+
+
   !--------------------------------------------------------------------------------------
   ! This subroutine is an implementation of the Kessler autoconversion parameterization.
   ! For time stepping, autoconversion is treated in isolation from other processes,
@@ -63,6 +79,8 @@ contains
   where ( ql_excess(:ncol,:pver).gt.0._r8 ) 
     ptend%q(:ncol,:pver,ixcldliq) = ql_excess(:ncol,:pver)*zcost 
   end where
+
+  call outfld('KES_ql_excess',    ql_excess,    pcols, lchnk)
 
   end subroutine kessler_autoconv_tend
 

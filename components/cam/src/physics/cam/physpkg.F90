@@ -722,7 +722,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     use simple_condensation_model, only: simple_RKZ_init
     use reed_jablonowski_condensation_model, only: reed_jablonowski_init
-
+    use kessler_autoconv, only: kessler_autoconv_init
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -870,6 +870,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     if (simple_macrop_opt.eq.2) then
        call simple_RKZ_init()
     end if
+
+    call phys_getopts(simple_microp_opt_out=simple_microp_opt)
+    call kessler_autoconv_init()
+
 
     call qbo_init
 
