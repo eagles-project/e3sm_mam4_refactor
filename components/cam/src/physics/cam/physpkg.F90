@@ -2049,6 +2049,7 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rkz_lmt_3
     logical :: l_rkz_lmt_4
     logical :: l_rkz_lmt_5
+    logical :: l_rkz_qme_check
 
     integer :: simple_microp_opt = -1   ! -1 = NOT using simple macrophysics schemes
     real(r8):: kessler_autoconv_tau, kessler_autoconv_ql_crit
@@ -2086,6 +2087,7 @@ subroutine tphysbc (ztodt,               &
                       ,rkz_term_C_fmin_out    = rkz_term_C_fmin &
                       ,rkz_zsmall_opt_out     = rkz_zsmall_opt &
                       ,rkz_lmt5_opt_out       = rkz_lmt5_opt &
+                      ,l_rkz_qme_check_out    = l_rkz_qme_check &
                       ,l_rkz_lmt_2_out        = l_rkz_lmt_2 &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
                       ,l_rkz_lmt_4_out        = l_rkz_lmt_4 &
@@ -2537,6 +2539,7 @@ end if
                                      rkz_term_C_fmin, &
                                      rkz_zsmall_opt, &
                                      rkz_lmt5_opt, &
+                                     l_rkz_qme_check, &
                                      l_rkz_lmt_2, &
                                      l_rkz_lmt_3, &
                                      l_rkz_lmt_4, &

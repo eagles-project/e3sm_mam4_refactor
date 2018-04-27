@@ -115,6 +115,7 @@ contains
                              rkz_term_C_fmin, & 
                              rkz_zsmall_opt, &
                              rkz_lmt5_opt, &
+                             l_rkz_qme_check, &
                              l_rkz_lmt_2, &
                              l_rkz_lmt_3, &
                              l_rkz_lmt_4, &
@@ -164,6 +165,7 @@ contains
   logical,  intent(in) :: l_rkz_lmt_3
   logical,  intent(in) :: l_rkz_lmt_4
   logical,  intent(in) :: l_rkz_lmt_5
+  logical,  intent(in) :: l_rkz_qme_check
 
   ! tmp work arrays
 
@@ -558,6 +560,22 @@ contains
      ! Sum up all three contributors to the grid-box mean condensation.
      !------------------------------------------------------------------
      qme(:ncol,:pver) = term_A(:ncol,:pver) + term_B(:ncol,:pver) + term_C(:ncol,:pver)
+
+     if (l_rkz_qme_check) then
+       ! 3. when rh < rhu00, evaporate existing cloud water
+       ! ================================================== 
+        where ((rhgbm(:ncol,:pver) .lt. rhu00) .and. (state%q(:ncol,:pver,ixcldliq) .gt. 0._r8)) 
+          qme(:ncol,:pver) = -min(max(0._r8,(qsat(:ncol,:pver) - state%q(:ncol,:pver,1))) &
+                                  ,state%q(:ncol,:pver,ixcldliq))*rdtime 
+        endwhere
+
+       ! 4. no condensation nor evaporation
+       ! ==================================                
+        where ((rhgbm(:ncol,:pver) .lt. rhu00) .and. (state%q(:ncol,:pver,ixcldliq) .le. 0._r8))
+          qme(:ncol,:pver) = 0   
+        end where
+
+     end if 
 
      !------------------------------------------------------------------
      ! Send diagnostics to output
