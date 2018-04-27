@@ -115,6 +115,7 @@ contains
                              rkz_term_C_fmin, & 
                              rkz_zsmall_opt, &
                              rkz_lmt5_opt, &
+                             l_rkz_qme_check, &
                              l_rkz_lmt_2, &
                              l_rkz_lmt_3, &
                              l_rkz_lmt_4, &
@@ -164,6 +165,7 @@ contains
   logical,  intent(in) :: l_rkz_lmt_3
   logical,  intent(in) :: l_rkz_lmt_4
   logical,  intent(in) :: l_rkz_lmt_5
+  logical,  intent(in) :: l_rkz_qme_check
 
   ! tmp work arrays
 
@@ -414,6 +416,22 @@ contains
      CASE (9,19)
        ql_incld(:ncol,:pver) = lcwat(:ncol,:pver)/max(astwat(:ncol,:pver),rkz_term_C_fmin)
 
+     CASE (27)
+       !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
+       where (ast(:ncol,:pver).gt.rkz_term_C_fmin)then 
+        ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/ast(:ncol,:pver)
+       elsewhere
+        ql_incld(:ncol,:pver) = 0._r8
+       end where
+       
+     CASE (29)
+       !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
+       where (astwat(:ncol,:pver).gt.rkz_term_C_fmin)then
+        ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/astwat(:ncol,:pver)
+       elsewhere
+        ql_incld(:ncol,:pver) = 0._r8
+       end where
+
      CASE DEFAULT
        write(iulog,*) "Unrecognized value of rkz_term_C_ql_opt:",rkz_term_C_ql_opt,". Abort."
        call endrun
@@ -542,6 +560,22 @@ contains
      ! Sum up all three contributors to the grid-box mean condensation.
      !------------------------------------------------------------------
      qme(:ncol,:pver) = term_A(:ncol,:pver) + term_B(:ncol,:pver) + term_C(:ncol,:pver)
+
+     if (l_rkz_qme_check) then
+       ! 3. when rh < rhu00, evaporate existing cloud water
+       ! ================================================== 
+        where ((rhgbm(:ncol,:pver) .lt. rhu00) .and. (state%q(:ncol,:pver,ixcldliq) .gt. 0._r8)) 
+          qme(:ncol,:pver) = -min(max(0._r8,(qsat(:ncol,:pver) - state%q(:ncol,:pver,1))) &
+                                  ,state%q(:ncol,:pver,ixcldliq))*rdtime 
+        endwhere
+
+       ! 4. no condensation nor evaporation
+       ! ==================================                
+        where ((rhgbm(:ncol,:pver) .lt. rhu00) .and. (state%q(:ncol,:pver,ixcldliq) .le. 0._r8))
+          qme(:ncol,:pver) = 0   
+        end where
+
+     end if 
 
      !------------------------------------------------------------------
      ! Send diagnostics to output
