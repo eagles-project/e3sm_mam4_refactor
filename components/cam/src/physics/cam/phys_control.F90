@@ -465,7 +465,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
                        ,simple_macrop_opt_out, rkz_cldfrc_opt_out, rkz_term_A_opt_out, rkz_term_B_opt_out &
                        ,rkz_term_C_opt_out, rkz_term_C_ql_opt_out, rkz_term_C_fmin_out, rkz_zsmall_opt_out &
-                       ,rkz_lmt5_opt_out, l_rkz_qme_check_out, l_rkz_lmt_2_out, l_rkz_lmt_3_out, l_rkz_lmt_4_out, &
+                       ,rkz_lmt5_opt_out, l_rkz_qme_check_out, l_rkz_lmt_2_out, l_rkz_lmt_3_out, l_rkz_lmt_4_out &
                        ,l_rkz_lmt_5_out, simple_microp_opt_out, kessler_autoconv_tau_out, kessler_autoconv_ql_crit_out &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
@@ -543,7 +543,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    real(r8),          intent(out), optional :: rkz_term_C_fmin_out
    integer,           intent(out), optional :: rkz_zsmall_opt_out
    integer,           intent(out), optional :: rkz_lmt5_opt_out
-   integer,           intent(out), optional :: l_rkz_qme_check_out
+   logical,           intent(out), optional :: l_rkz_qme_check_out
    logical,           intent(out), optional :: l_rkz_lmt_2_out
    logical,           intent(out), optional :: l_rkz_lmt_3_out
    logical,           intent(out), optional :: l_rkz_lmt_4_out

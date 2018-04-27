@@ -418,7 +418,7 @@ contains
 
      CASE (27)
        !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
-       where (ast(:ncol,:pver).gt.rkz_term_C_fmin)then 
+       where (ast(:ncol,:pver).gt.rkz_term_C_fmin)
         ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/ast(:ncol,:pver)
        elsewhere
         ql_incld(:ncol,:pver) = 0._r8
@@ -426,7 +426,7 @@ contains
        
      CASE (29)
        !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
-       where (astwat(:ncol,:pver).gt.rkz_term_C_fmin)then
+       where (astwat(:ncol,:pver).gt.rkz_term_C_fmin)
         ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/astwat(:ncol,:pver)
        elsewhere
         ql_incld(:ncol,:pver) = 0._r8
