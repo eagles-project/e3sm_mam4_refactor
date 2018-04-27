@@ -414,6 +414,22 @@ contains
      CASE (9,19)
        ql_incld(:ncol,:pver) = lcwat(:ncol,:pver)/max(astwat(:ncol,:pver),rkz_term_C_fmin)
 
+     CASE (27)
+       !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
+       where (ast(:ncol,:pver).gt.rkz_term_C_fmin)then 
+        ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/ast(:ncol,:pver)
+       elsewhere
+        ql_incld(:ncol,:pver) = 0._r8
+       end where
+       
+     CASE (29)
+       !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
+       where (astwat(:ncol,:pver).gt.rkz_term_C_fmin)then
+        ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/astwat(:ncol,:pver)
+       elsewhere
+        ql_incld(:ncol,:pver) = 0._r8
+       end where
+
      CASE DEFAULT
        write(iulog,*) "Unrecognized value of rkz_term_C_ql_opt:",rkz_term_C_ql_opt,". Abort."
        call endrun

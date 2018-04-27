@@ -169,8 +169,9 @@ logical :: l_rkz_lmt_4       = .true.
 logical :: l_rkz_lmt_5       = .false.
 !!!!!!!Options for configuring a simple microphysics scheme 
 integer :: simple_microp_opt = -1   ! -1 = NOT using simple microphysics schemes 
-real(r8):: kessler_autoconv_tau     = 1000.0
-real(r8):: kessler_autoconv_ql_crit = 5e-4_r8
+real(r8):: kessler_autoconv_tau     = 1000.0  ! autoconversion time scale (seconds) in Kessler scheme
+real(r8):: kessler_autoconv_ql_crit = 5e-4_r8 ! critical in-cloud liquid concentration (kg/kg) for
+                                              ! triggering autoconversion in Kessler scheme
 
 !======================================================================= 
 contains
@@ -306,7 +307,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_rkz_lmt_4,                     1 , mpilog,  0, mpicom)
    call mpibcast(l_rkz_lmt_5,                     1 , mpilog,  0, mpicom)
 
-   call mpibcast(simple_microp_opt,               1 , mpilog,  0, mpicom)
+   call mpibcast(simple_microp_opt,               1 , mpiint,  0, mpicom)
    call mpibcast(kessler_autoconv_tau,            1 , mpir8,   0, mpicom)
    call mpibcast(kessler_autoconv_ql_crit,        1 , mpir8,   0, mpicom)
 
