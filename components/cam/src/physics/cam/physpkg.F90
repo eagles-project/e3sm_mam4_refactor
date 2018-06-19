@@ -720,7 +720,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use output_aerocom_aie, only: output_aerocom_aie_init, do_aerocom_ind3
 
     use simple_condensation_model, only: simple_RKZ_init
-
+    use reed_jablonowski_condensation_model, only: reed_jablonowski_init
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -862,6 +862,9 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     if (do_clubb_sgs) call clubb_ini_cam(pbuf2d,dp1)
 
     call phys_getopts(simple_macrop_opt_out=simple_macrop_opt)
+    if (simple_macrop_opt.eq.1) then
+       call reed_jablonowski_init
+    end if
     if (simple_macrop_opt.eq.2) then
        call simple_RKZ_init()
     end if
@@ -1819,6 +1822,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use simple_condensation_model, only: simple_RKZ_tend, f_ql_consistency_tend
+    use reed_jablonowski_condensation_model, only: reed_jablonowski_sat_adj_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
@@ -2056,12 +2060,9 @@ subroutine tphysbc (ztodt,               &
                       ,rkz_term_C_opt_out     = rkz_term_C_opt &
                       ,rkz_term_C_ql_opt_out  = rkz_term_C_ql_opt &
                       ,rkz_term_C_fmin_out    = rkz_term_C_fmin &
-<<<<<<< HEAD
                       ,rkz_ql_f_opt_out       = rkz_ql_f_opt &
-=======
                       ,rkz_zsmall_opt_out     = rkz_zsmall_opt &
                       ,rkz_lmt5_opt_out       = rkz_lmt5_opt &
->>>>>>> origin/huiwanpnnl/atm/condensation
                       ,l_rkz_lmt_2_out        = l_rkz_lmt_2 &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
                       ,l_rkz_lmt_4_out        = l_rkz_lmt_4 &
@@ -2479,12 +2480,12 @@ end if
 
                ! First remove cases with f = 0 but ql > 0 through evaporation
 
-               call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, &
-                                           rkz_cldfrc_opt, rkz_ql_f_opt)
-               call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
-               call physics_update(state, ptend, ztodt, tend)
-               call check_energy_chng(state, tend, "f_ql_consistency_tend", nstep, ztodt, &
-                    zero, zero, zero, zero)
+               !call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, &
+               !                             rkz_cldfrc_opt, rkz_ql_f_opt)
+               !call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
+               !call physics_update(state, ptend, ztodt, tend)
+               !call check_energy_chng(state, tend, "f_ql_consistency_tend", nstep, ztodt, &
+               !     zero, zero, zero, zero)
 
                ! Calculate condensation rate using simplified RKZ scheme
 
@@ -2524,6 +2525,15 @@ end if
                call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
                call physics_update(state, ptend, ztodt, tend)
                call check_energy_chng(state, tend, "macrop_tend", nstep, ztodt, &
+                    zero, zero, zero, zero)
+
+               ! Second remove cases with f = 0 but ql > 0 through evaporation
+
+               call f_ql_consistency_tend( state, ptend, cld_macmic_ztodt, ixcldliq, &
+                                           rkz_cldfrc_opt, rkz_ql_f_opt)
+               call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
+               call physics_update(state, ptend, ztodt, tend)
+               call check_energy_chng(state, tend, "f_ql_consistency_tend", nstep, ztodt, &
                     zero, zero, zero, zero)
 
             case(-1) ! Park macrophysics

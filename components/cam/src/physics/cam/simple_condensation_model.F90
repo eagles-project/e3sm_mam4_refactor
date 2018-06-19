@@ -76,6 +76,7 @@ contains
 
     call addfld ('RKZ_zqme', (/'lev'/), 'I', 'kg/kg/s', 'condensation rate before limiters in the simple RKZ scheme')
     call addfld ('RKZ_qme',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate after limiters in the simple RKZ scheme')
+    call addfld ('RKZ_qme_evp',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate due to evaporation before the simple RKZ scheme')
 
     call addfld ('RKZ_qme_lm4_qv',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate difference before and after limiter 4 for qv in the simple RKZ scheme')
     call addfld ('RKZ_qme_lm4_ql',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate difference before and after limiter 4 for ql in the simple RKZ scheme')
@@ -86,11 +87,6 @@ contains
     call addfld ('RKZ_qlerr_lm4',  (/'lev'/), 'I', 'kg/kg', 'clipping in ql by limiter 4 for ql in the simple RKZ scheme')
     call addfld ('RKZ_sqerr_lm4',  (/'lev'/), 'I', 'kJ/kg', 'clipping in dry static energy by limiter 4 for qv in the simple RKZ scheme')
     call addfld ('RKZ_slerr_lm4',  (/'lev'/), 'I', 'kJ/kg', 'clipping in dry static energy by limiter 4 for ql in the simple RKZ scheme')
-
-    call addfld ('RKZ_zqme', (/'lev'/), 'I', 'kg/kg/s', 'condensation rate before limiters in the simple RKZ scheme')
-    call addfld ('RKZ_qme',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate after limiters in the simple RKZ scheme')
-
-    call addfld ('RKZ_qme_lm4',  (/'lev'/), 'I', 'kg/kg/s', 'condensation rate difference before and after limiter4')
 
 
   end subroutine simple_RKZ_init
@@ -186,10 +182,7 @@ contains
 
   real(r8) :: qmebf   (pcols,pver)   ! total condensation rate before appling limiter 
   real(r8) :: qmedf   (pcols,pver)   ! difference of total condensation rate before and after limiter application
-<<<<<<< HEAD
-=======
   real(r8) :: tmp     (pcols,pver)   ! temporary work array 
->>>>>>> origin/huiwanpnnl/atm/condensation
 
   real(r8) :: term_A (pcols,pver)
   real(r8) :: term_B (pcols,pver)
@@ -299,7 +292,6 @@ contains
 
         term_B(:ncol,:pver) = - 0.5_r8*ltend(:ncol,:pver)
 
-
      case(3)
      ! For testing only: Following Zhang et al. (2003), assume the in-cloud A_l
      ! equals the grid-box mean A_l.! Hence, - (\overline{A_l} - f \hat{A_l}) =
@@ -310,6 +302,14 @@ contains
         where( ltend(:ncol,:pver) .lt. 0._r8)
           term_B(:ncol,:pver) = 0._r8
         end where
+
+     case(12)
+     ! For testing only: 
+        term_B(:ncol,:pver) = - (1._r8 -ast(:ncol,:pver))*qtend(:ncol,:pver)
+
+     case(13)
+     ! For testing only: 
+        term_B(:ncol,:pver) = - (1._r8-ast(:ncol,:pver))*qtend(:ncol,:pver)*0.1_r8
 
      case default
          write(iulog,*) "Unrecognized value of rkz_term_B_opt:",rkz_term_B_opt,". Abort."
@@ -510,7 +510,6 @@ contains
            zsterr(:ncol,:pver) = qme(:ncol,:pver)*latvap - qmebf(:ncol,:pver)*latvap
         end where
         qmedf(:ncol,:pver)  = qme(:ncol,:pver) - qmebf(:ncol,:pver)
-
         call outfld('RKZ_qme_lm4_qv',   qmedf,    pcols, lchnk)
         call outfld('RKZ_qverr_lm4',   zqverr,    pcols, lchnk)
         call outfld('RKZ_sqerr_lm4',   zsterr,    pcols, lchnk)
@@ -527,22 +526,13 @@ contains
            zqlerr(:ncol,:pver) = zqlnew(:ncol,:pver)
            zsterr(:ncol,:pver) = qme(:ncol,:pver)*latvap - qmebf(:ncol,:pver)*latvap
         end where
-<<<<<<< HEAD
-        
         qmedf(:ncol,:pver)  = qme(:ncol,:pver) - qmebf(:ncol,:pver)
-        call outfld('RKZ_qme_lm4',   qmedf,    pcols, lchnk)
-=======
-        qmedf(:ncol,:pver)  = qme(:ncol,:pver) - qmebf(:ncol,:pver)
->>>>>>> origin/huiwanpnnl/atm/condensation
-
         call outfld('RKZ_qme_lm4_ql',   qmedf,    pcols, lchnk)
         call outfld('RKZ_qlerr_lm4',   zqlerr,    pcols, lchnk)
         call outfld('RKZ_slerr_lm4',   zsterr,    pcols, lchnk)
         
      end if
 
-<<<<<<< HEAD
-=======
      !---------------------------------------------------------------------------
      ! Limit condensation/evaporation rate to avoid negative water
      ! concentrations. Also, let qme=0 when f=0 and df/dt=0.
@@ -590,7 +580,6 @@ contains
 
      end if
 
->>>>>>> origin/huiwanpnnl/atm/condensation
      ! Send limited condensation rate to output
      call outfld('RKZ_qme', qme, pcols, lchnk)
 
@@ -667,11 +656,12 @@ contains
 
   real(r8) ::     ql_min 
   real(r8) ::     ast_min 
+  integer  ::     lchnk               ! index of (grid) chunk handled by this call of the subroutine
 
   !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   rdtime = 1._r8/dtime
   ncol  = state%ncol
- !lchnk = state%lchnk  ! needed by "call outfld" for model output
+  lchnk = state%lchnk  ! needed by "call outfld" for model output
 
   ! Calculate saturation specific humidity (qsat) and its derivative wrt temperature (dqsatdT)
 
@@ -711,6 +701,7 @@ contains
   where ( ast(:ncol,:pver).le.ast_min .and. state%q(:,:,ixcldliq) .gt. ql_min ) 
     qme(:ncol,:pver) = - state%q(:ncol,:pver,ixcldliq)*rdtime
   end where
+  call outfld('RKZ_qme_evp',  qme,    pcols, lchnk)
 
   ! Tendencies to be returned to the calling routine. 
 
