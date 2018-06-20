@@ -22,8 +22,8 @@ contains
 
     implicit none
 !!!!add history fileds!!!!!!!!!!!!!!!!!!!!!
-    call addfld ('RKZ_dqdt', (/'lev'/), 'I', 'kg/kg/s', 'condensation rate in the Reed-Jablonowski scheme')
-    call addfld ('RKZ_dsdt', (/'lev'/), 'I', 'J/kg/s', 'dry static energy tendency in the Reed-Jablonowski scheme')
+    call addfld ('RJ_mac_dqdt', (/'lev'/), 'I', 'kg/kg/s', 'condensation rate in the Reed-Jablonowski scheme')
+    call addfld ('RJ_mac_dsdt', (/'lev'/), 'I', 'J/kg/s', 'dry static energy tendency in the Reed-Jablonowski scheme')
 
   end subroutine reed_jablonowski_init
 
@@ -211,8 +211,8 @@ subroutine reed_jablonowski_sat_adj_tend( state, ptend, dtime )
       ptend%q(:ncol,:pver,1) = dqdt(:ncol,:pver)
       ptend%s(:ncol,:pver)   = dsdt(:ncol,:pver)
 
-   call outfld('RKZ_dqdt', dqdt, pcols, lchnk)
-   call outfld('RKZ_dsdt', dsdt, pcols, lchnk)
+   call outfld('RJ_mac_dqdt', dqdt, pcols, lchnk)
+   call outfld('RJ_mac_dsdt', dsdt, pcols, lchnk)
    
 !===============================================================================
 ! Send variables to history file - THIS PROCESS WILL BE MODEL SPECIFIC
