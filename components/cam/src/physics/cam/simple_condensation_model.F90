@@ -427,7 +427,7 @@ contains
      CASE (29)
        !!if cloud fraction f < fmin theb ql_incld = 0.0 else ql_incld=ql_bar/f
        where (astwat(:ncol,:pver).gt.rkz_term_C_fmin)
-        ql_incld(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)/astwat(:ncol,:pver)
+        ql_incld(:ncol,:pver) = lcwat(:ncol,:pver)/astwat(:ncol,:pver)
        elsewhere
         ql_incld(:ncol,:pver) = 0._r8
        end where
@@ -572,7 +572,7 @@ contains
        ! 4. no condensation nor evaporation
        ! ==================================                
         where ((rhgbm(:ncol,:pver) .lt. rhu00) .and. (state%q(:ncol,:pver,ixcldliq) .le. 0._r8))
-          qme(:ncol,:pver) = 0   
+          qme(:ncol,:pver) = 0._r8   
         end where
 
      end if 
@@ -590,10 +590,10 @@ contains
      case(0)
          dfdt(:ncol,:pver) = 0._r8 
 
-     case(1)
+     case(1,21)
          dfdt(:ncol,:pver) = rdtime*( ast(:ncol,:pver) - ast_old(:ncol,:pver) ) 
   
-     case(2)
+     case(2,22)
          dfdt(:ncol,:pver) = dastdRH(:ncol,:pver) *( zforcing(:ncol,:pver) - zc3(:ncol,:pver)*qme(:ncol,:pver) )
 
      case(3)
@@ -601,12 +601,6 @@ contains
 
      case(4)
          dfdt(:ncol,:pver) = ast(:ncol,:pver)*dlnastdRH(:ncol,:pver) *( zforcing(:ncol,:pver) - zc3(:ncol,:pver)*qme(:ncol,:pver) )
-
-     case(21)
-         dfdt(:ncol,:pver) = rdtime*( ast(:ncol,:pver) - ast_old(:ncol,:pver) )
-
-     case(22)
-         dfdt(:ncol,:pver) = dastdRH(:ncol,:pver) *( zforcing(:ncol,:pver) - zc3(:ncol,:pver)*qme(:ncol,:pver) )
 
      case default
          write(iulog,*) "Unrecognized value of rkz_term_C_opt:",rkz_term_C_opt,". Abort."
