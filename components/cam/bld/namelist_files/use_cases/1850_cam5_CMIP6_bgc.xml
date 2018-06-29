@@ -2,7 +2,7 @@
 <namelist_defaults>
 
 <!-- Solar constant from CMIP6 input4MIPS -->
-<solar_data_file>atm/cam/solar/Solar_1850control_input4MIPS_c20171101.nc</solar_data_file>
+<solar_data_file>atm/cam/solar/Solar_1850control_input4MIPS_c20180629.nc</solar_data_file>
 <solar_data_ymd>18500101</solar_data_ymd>
 <solar_data_type>FIXED</solar_data_type>
 
