@@ -239,7 +239,8 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
                          scm_iop_srf_prop_in, scm_relaxation_in, &
 			 scm_relaxation_low_in, scm_relaxation_high_in, &
                          scm_diurnal_avg_in, scm_crm_mode_in, scm_observed_aero_in, &
-			 swrad_off_in, lwrad_off_in, precip_off_in, scm_clubb_iop_name_in)
+			 swrad_off_in, lwrad_off_in, precip_off_in, scm_clubb_iop_name_in,&
+                         l_fixiop_u_in,l_fixiop_v_in,iop_fixer_opt_in)
 !-----------------------------------------------------------------------
   real(r8), intent(in), optional       :: scmlon_in, scmlat_in
   character*(max_path_len), intent(in), optional :: iopfile_in

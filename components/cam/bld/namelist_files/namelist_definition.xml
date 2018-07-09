@@ -4272,7 +4272,7 @@ Default: FALSE
 <entry id="iop_fixer_opt" type="integer" category="scam"
        group="cam_inparm" valid_values="">
 Set to option 1 or 2 to turn on adjustement of u,v winds in ic for scm.
-Default: 0
+Default: -1
 </entry>
 
 <entry id="swrad_off" type="logical" category="scam"

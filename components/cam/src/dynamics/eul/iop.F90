@@ -861,7 +861,7 @@ endif !scm_observed_aero
        have_u = .true.
 
        !!add by SZhang and HWan to limit the errors in iop file
-       if(l_fixiop_u)then
+       if(l_fixiop_u) then
          
          klev_find = .false.
          do i= PLEV-1, 1,-1
@@ -872,15 +872,9 @@ endif !scm_observed_aero
            endif
          end do
          
-         if(klev_find)then
+         if(klev_find) then
            
            SELECT CASE (iop_fixer_opt)
-           CASE (0) !! no change
-            do i= klev_crit, 1,-1
-              uobs(i) = uobs(i)
-              write(iulog,*),'replace u in the level: ',modlev,dplevs(1),uobs(i),uobs(i)
-            end do
-           
            CASE (1) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
             do i= klev_crit, 1,-1
               uobs(i) = uobs(klev_crit+1)
@@ -892,6 +886,10 @@ endif !scm_observed_aero
               uobs(i) = uobs(klev_crit+1)*sin(0.5*pi*i/klev_crit)
               write(iulog,*),'replace u in the level: ',modlev,dplevs(1),uobs(i),uobs(klev_crit+1)
             end do
+           CASE DEFAULT
+            write(iulog,*) "Unrecognized value of iop_fixer_opt:",iop_fixer_opt,". Abort."
+            call endrun
+           END SELECT
 
          endif
 
@@ -935,12 +933,6 @@ endif !scm_observed_aero
          if(klev_find)then
 
            SELECT CASE (iop_fixer_opt)
-           CASE (0) !! no change
-            do i= klev_crit, 1,-1
-              vobs(i) = vobs(i)
-              write(iulog,*),'replace v in the level: ',modlev,dplevs(1),vobs(i),vobs(i)
-            end do
-
            CASE (1) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
             do i= klev_crit, 1,-1
               vobs(i) = vobs(klev_crit+1)
@@ -952,6 +944,10 @@ endif !scm_observed_aero
               vobs(i) = vobs(klev_crit+1)*sin(0.5*pi*i/klev_crit)
               write(iulog,*),'replace v in the level: ',modlev,dplevs(1),vobs(i),vobs(klev_crit+1)
             end do
+           CASE DEFAULT
+            write(iulog,*) "Unrecognized value of iop_fixer_opt:",iop_fixer_opt,". Abort."
+            call endrun
+           END SELECT
 
          endif
 

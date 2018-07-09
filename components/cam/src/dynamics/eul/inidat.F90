@@ -22,7 +22,7 @@ module inidat
    use cam_control_mod,     only: ideal_phys, aqua_planet, moist_physics, adiabatic
    use cam_initfiles,       only: initial_file_get_id, topo_file_get_id
    use scamMod,             only: single_column, use_camiop, have_u, have_v, &
-                                  have_cldliq, have_cldice,loniop,latiop,scmlat,scmlon,
+                                  have_cldliq, have_cldice,loniop,latiop,scmlat,scmlon,&
                                   l_fixiop_u,l_fixiop_v,iop_fixer_opt 
    use cam_logfile,         only: iulog
    use pio,                 only: file_desc_t, pio_noerr, pio_inq_varid, pio_get_att, &
