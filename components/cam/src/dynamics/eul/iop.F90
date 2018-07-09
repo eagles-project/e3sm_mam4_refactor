@@ -157,6 +157,12 @@ subroutine readiopdata( iop_update_surface )
    integer strt4(4),cnt4(4)
    character(len=16) :: lowername
 
+  ! add by SZhang and HWan for scm test
+   real(r8),parameter :: pi = 3.141592653589793
+   real(r8) modlev      ! model level pressure
+   integer  klev_crit    ! critical level when model top above iop file
+   logical  klev_find    ! switch for searching the top iop level
+
    fill_ends= .false.
 
 !     
@@ -853,11 +859,49 @@ endif !scm_observed_aero
        have_u = .false.
      else
        have_u = .true.
+
+       !!add by SZhang and HWan to limit the errors in iop file
+       if(l_fixiop_u)then
+         
+         klev_find = .false.
+         do i= PLEV-1, 1,-1
+           modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+           if((modlev.LE.dplevs(1)).and.(.not. klev_find))then
+            klev_crit = i
+            klev_find = .true.
+           endif
+         end do
+         
+         if(klev_find)then
+           
+           SELECT CASE (iop_fixer_opt)
+           CASE (0) !! no change
+            do i= klev_crit, 1,-1
+              uobs(i) = uobs(i)
+              write(iulog,*),'replace u in the level: ',modlev,dplevs(1),uobs(i),uobs(i)
+            end do
+           
+           CASE (1) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
+            do i= klev_crit, 1,-1
+              uobs(i) = uobs(klev_crit+1)
+              write(iulog,*),'replace u in the level: ',modlev,dplevs(1),uobs(i),uobs(klev_crit+1)
+            end do
+
+           CASE (2) !!when model level exceeed the top level in iop file, use a sinusoidal function to parametrize wind above this level
+            do i = klev_crit,1,-1
+              uobs(i) = uobs(klev_crit+1)*sin(0.5*pi*i/klev_crit)
+              write(iulog,*),'replace u in the level: ',modlev,dplevs(1),uobs(i),uobs(klev_crit+1)
+            end do
+
+         endif
+
+       endif
+
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i=1, PLEV
            u3(1,i,1,n3) = uobs(i)  !     set u to uobs at first time step
          end do
-        endif
+       endif
      endif
 
      status = nf90_inq_varid( ncid, 'vsrf', varid   )
@@ -875,6 +919,44 @@ endif !scm_observed_aero
        have_v = .false.
      else
        have_v = .true.
+
+       !!add by SZhang and HWan to limit the errors in iop file
+       if(l_fixiop_v)then
+
+         klev_find = .false.
+         do i= PLEV-1, 1,-1
+           modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+           if((modlev.LE.dplevs(1)).and.(.not. klev_find))then
+            klev_crit = i
+            klev_find = .true.
+           endif
+         end do
+  
+         if(klev_find)then
+
+           SELECT CASE (iop_fixer_opt)
+           CASE (0) !! no change
+            do i= klev_crit, 1,-1
+              vobs(i) = vobs(i)
+              write(iulog,*),'replace v in the level: ',modlev,dplevs(1),vobs(i),vobs(i)
+            end do
+
+           CASE (1) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
+            do i= klev_crit, 1,-1
+              vobs(i) = vobs(klev_crit+1)
+              write(iulog,*),'replace v in the level: ',modlev,dplevs(1),vobs(i),vobs(klev_crit+1)
+            end do
+
+           CASE (2) !!when model level exceeed the top level in iop file, use a sinusoidal function to parametrize wind above this level
+            do i = klev_crit,1,-1
+              vobs(i) = vobs(klev_crit+1)*sin(0.5*pi*i/klev_crit)
+              write(iulog,*),'replace v in the level: ',modlev,dplevs(1),vobs(i),vobs(klev_crit+1)
+            end do
+
+         endif
+
+       endif
+
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i=1, PLEV
            v3(1,i,1,n3) = vobs(i)  !     set u to uobs at first time step

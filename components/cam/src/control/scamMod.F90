@@ -55,6 +55,9 @@ module scamMod
   logical, public ::  l_conv                ! use flux divergence terms for T and q?     
   logical, public ::  l_divtr               ! use flux divergence terms for constituents?
   logical, public ::  l_diag                ! do we want available diagnostics?
+  logical, public ::  l_fixiop_u            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+  logical, public ::  l_fixiop_v            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+  integer, public ::  iop_fixer_opt         ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm
 
   integer, public ::  error_code            ! Error code from netCDF reads
   integer, public ::  initTimeIdx
@@ -190,7 +193,8 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
 	single_column_out,scm_iop_srf_prop_out, scm_relaxation_out, &
 	scm_relaxation_low_out, scm_relaxation_high_out, &
         scm_diurnal_avg_out, scm_crm_mode_out, scm_observed_aero_out, &
-	swrad_off_out, lwrad_off_out, precip_off_out, scm_clubb_iop_name_out)
+	swrad_off_out, lwrad_off_out, precip_off_out, scm_clubb_iop_name_out, &
+        l_fixiop_u_out, l_fixiop_v_out,iop_fixer_opt_out)
 !-----------------------------------------------------------------------
    real(r8), intent(out), optional :: scmlat_out,scmlon_out
    character*(max_path_len), intent(out), optional ::  iopfile_out
@@ -203,6 +207,9 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
    logical, intent(out), optional ::  swrad_off_out
    logical, intent(out), optional ::  lwrad_off_out
    logical, intent(out), optional ::  precip_off_out
+   logical, intent(out), optional ::  l_fixiop_u_out
+   logical, intent(out), optional ::  l_fixiop_v_out
+   integer, intent(out), optional ::  iop_fixer_opt_out
    real(r8), intent(out), optional ::  scm_relaxation_low_out
    real(r8), intent(out), optional ::  scm_relaxation_high_out   
    character(len=*), intent(out), optional ::  scm_clubb_iop_name_out
@@ -221,6 +228,9 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
    if ( present(swrad_off_out))         swrad_off_out = .false.
    if ( present(lwrad_off_out))         lwrad_off_out = .false.
    if ( present(precip_off_out))        precip_off_out = .false.
+   if ( present(l_fixiop_u_out))        l_fixiop_u_out = .false.
+   if ( present(l_fixiop_v_out))        l_fixiop_v_out = .false.
+   if ( present(iop_fixer_opt_out))     iop_fixer_opt_out = 0
    if ( present(scm_clubb_iop_name_out) ) scm_clubb_iop_name_out  = ' '
 
 end subroutine scam_default_opts
@@ -242,9 +252,13 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
   logical, intent(in), optional        :: swrad_off_in
   logical, intent(in), optional        :: lwrad_off_in
   logical, intent(in), optional        :: precip_off_in
+  logical, intent(in), optional        :: l_fixiop_u_in
+  logical, intent(in), optional        :: l_fixiop_v_in
+  integer, intent(in), optional        :: iop_fixer_opt_in
   character(len=*), intent(in), optional :: scm_clubb_iop_name_in
   real(r8), intent(in), optional       :: scm_relaxation_low_in
-  real(r8), intent(in), optional       :: scm_relaxation_high_in  
+  real(r8), intent(in), optional       :: scm_relaxation_high_in 
+ 
   integer ncid,latdimid,londimid,latsiz,lonsiz,latid,lonid,ret,i
   integer latidx,lonidx
   real(r8) ioplat,ioplon
@@ -291,6 +305,18 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
   
   if (present (precip_off_in)) then
      precip_off=precip_off_in
+  endif
+
+  if (present (l_fixiop_u_in)) then
+     l_fixiop_u=l_fixiop_u_in
+  endif
+
+  if (present (l_fixiop_v_in)) then
+     l_fixiop_v=l_fixiop_v_in
+  endif
+
+  if (present (iop_fixer_opt_in)) then
+     iop_fixer_opt=iop_fixer_opt_in
   endif
 
   if (present (scm_clubb_iop_name_in)) then
