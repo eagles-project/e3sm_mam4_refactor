@@ -490,6 +490,37 @@ endif !scm_observed_aero
 !     
      else
         have_t = .true.
+
+       !!add by SZhang and HWan to limit the errors in iop file
+       if(l_fixiop_t) then
+
+         klev_find = .false.
+         do i= PLEV-1, 1,-1
+           modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+           if((modlev.LE.dplevs(1)).and.(.not. klev_find))then
+            klev_crit = i
+            klev_find = .true.
+           endif
+         end do
+
+         if(klev_find) then
+
+           SELECT CASE (iop_fixer_opt)
+           CASE (1,2) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
+            do i= klev_crit, 1,-1
+              tobs(i) = tobs(klev_crit+1)
+              write(iulog,*),'replace T in the level: ',modlev,dplevs(1),tobs(i),tobs(klev_crit+1)
+            end do
+
+           CASE DEFAULT
+            write(iulog,*) "Unrecognized value of iop_fixer_opt:",iop_fixer_opt,". Abort."
+            call endrun
+           END SELECT
+
+         endif
+
+       endif
+
         if (.not.use_camiop .and. get_nstep() .eq. 0) then
            do i=1, PLEV
               t3(1,i,1,n3)=tobs(i)  !     set t to tobs at first time step
@@ -524,6 +555,36 @@ endif !scm_observed_aero
            write(iulog,*) 'Using values from Analysis Dataset'
         endif
      else
+       !!add by SZhang and HWan to limit the errors in iop file
+       if(l_fixiop_q) then
+
+         klev_find = .false.
+         do i= PLEV-1, 1,-1
+           modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+           if((modlev.LE.dplevs(1)).and.(.not. klev_find))then
+            klev_crit = i
+            klev_find = .true.
+           endif
+         end do
+
+         if(klev_find) then
+
+           SELECT CASE (iop_fixer_opt)
+           CASE (1,2) !!when model level exceeed the top level in iop file, set wind as a constant above this level     
+            do i= klev_crit, 1,-1
+              qobs(i) = qobs(klev_crit+1)
+              write(iulog,*),'replace Q in the level: ',modlev,dplevs(1),qobs(i),qobs(klev_crit+1)
+            end do
+
+           CASE DEFAULT
+            write(iulog,*) "Unrecognized value of iop_fixer_opt:",iop_fixer_opt,". Abort."
+            call endrun
+           END SELECT
+
+         endif
+
+       endif
+
         if (.not. use_camiop .and. get_nstep() .eq. 0) then
            do i=1, PLEV
               q3(1,i,1,1,n3)=qobs(i)

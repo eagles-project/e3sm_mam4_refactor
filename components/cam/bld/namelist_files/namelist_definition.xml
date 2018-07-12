@@ -4269,6 +4269,18 @@ Set to TRUE to turn on adjustement of v wind in ic for scm.
 Default: FALSE
 </entry>
 
+<entry id="l_fixiop_t" type="logical" category="scam"
+       group="cam_inparm" valid_values="">
+Set to TRUE to turn on adjustement of temperature in ic for scm.
+Default: FALSE
+</entry>
+
+<entry id="l_fixiop_q" type="logical" category="scam"
+       group="cam_inparm" valid_values="">
+Set to TRUE to turn on adjustement of humidity in ic for scm.
+Default: FALSE
+</entry>
+
 <entry id="iop_fixer_opt" type="integer" category="scam"
        group="cam_inparm" valid_values="">
 Set to option 1 or 2 to turn on adjustement of u,v winds in ic for scm.

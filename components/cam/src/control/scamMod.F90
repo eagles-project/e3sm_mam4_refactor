@@ -57,6 +57,8 @@ module scamMod
   logical, public ::  l_diag                ! do we want available diagnostics?
   logical, public ::  l_fixiop_u            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
   logical, public ::  l_fixiop_v            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+  logical, public ::  l_fixiop_t            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+  logical, public ::  l_fixiop_q            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
   integer, public ::  iop_fixer_opt         ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm
 
   integer, public ::  error_code            ! Error code from netCDF reads
@@ -194,7 +196,7 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
 	scm_relaxation_low_out, scm_relaxation_high_out, &
         scm_diurnal_avg_out, scm_crm_mode_out, scm_observed_aero_out, &
 	swrad_off_out, lwrad_off_out, precip_off_out, scm_clubb_iop_name_out, &
-        l_fixiop_u_out, l_fixiop_v_out,iop_fixer_opt_out)
+        l_fixiop_u_out, l_fixiop_v_out,l_fixiop_t_out,l_fixiop_q_out,iop_fixer_opt_out)
 !-----------------------------------------------------------------------
    real(r8), intent(out), optional :: scmlat_out,scmlon_out
    character*(max_path_len), intent(out), optional ::  iopfile_out
@@ -209,6 +211,8 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
    logical, intent(out), optional ::  precip_off_out
    logical, intent(out), optional ::  l_fixiop_u_out
    logical, intent(out), optional ::  l_fixiop_v_out
+   logical, intent(out), optional ::  l_fixiop_t_out
+   logical, intent(out), optional ::  l_fixiop_q_out
    integer, intent(out), optional ::  iop_fixer_opt_out
    real(r8), intent(out), optional ::  scm_relaxation_low_out
    real(r8), intent(out), optional ::  scm_relaxation_high_out   
@@ -230,6 +234,8 @@ subroutine scam_default_opts( scmlat_out,scmlon_out,iopfile_out, &
    if ( present(precip_off_out))        precip_off_out = .false.
    if ( present(l_fixiop_u_out))        l_fixiop_u_out = .false.
    if ( present(l_fixiop_v_out))        l_fixiop_v_out = .false.
+   if ( present(l_fixiop_t_out))        l_fixiop_t_out = .false.
+   if ( present(l_fixiop_q_out))        l_fixiop_q_out = .false.
    if ( present(iop_fixer_opt_out))     iop_fixer_opt_out = 0
    if ( present(scm_clubb_iop_name_out) ) scm_clubb_iop_name_out  = ' '
 
@@ -240,7 +246,7 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
 			 scm_relaxation_low_in, scm_relaxation_high_in, &
                          scm_diurnal_avg_in, scm_crm_mode_in, scm_observed_aero_in, &
 			 swrad_off_in, lwrad_off_in, precip_off_in, scm_clubb_iop_name_in,&
-                         l_fixiop_u_in,l_fixiop_v_in,iop_fixer_opt_in)
+                         l_fixiop_u_in,l_fixiop_v_in,l_fixiop_t_in,l_fixiop_q_in,iop_fixer_opt_in)
 !-----------------------------------------------------------------------
   real(r8), intent(in), optional       :: scmlon_in, scmlat_in
   character*(max_path_len), intent(in), optional :: iopfile_in
@@ -255,6 +261,8 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
   logical, intent(in), optional        :: precip_off_in
   logical, intent(in), optional        :: l_fixiop_u_in
   logical, intent(in), optional        :: l_fixiop_v_in
+  logical, intent(in), optional        :: l_fixiop_t_in
+  logical, intent(in), optional        :: l_fixiop_q_in
   integer, intent(in), optional        :: iop_fixer_opt_in
   character(len=*), intent(in), optional :: scm_clubb_iop_name_in
   real(r8), intent(in), optional       :: scm_relaxation_low_in
@@ -314,6 +322,14 @@ subroutine scam_setopts( scmlat_in, scmlon_in,iopfile_in,single_column_in, &
 
   if (present (l_fixiop_v_in)) then
      l_fixiop_v=l_fixiop_v_in
+  endif
+
+  if (present (l_fixiop_t_in)) then
+     l_fixiop_t=l_fixiop_t_in
+  endif
+
+  if (present (l_fixiop_q_in)) then
+     l_fixiop_q=l_fixiop_q_in
   endif
 
   if (present (iop_fixer_opt_in)) then

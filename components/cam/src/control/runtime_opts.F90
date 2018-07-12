@@ -178,6 +178,8 @@ logical  :: lwrad_off
 logical  :: precip_off
 logical  :: l_fixiop_u            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
 logical  :: l_fixiop_v            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+logical  :: l_fixiop_t            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
+logical  :: l_fixiop_q            ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm 
 integer  :: iop_fixer_opt         ! SZhang and HWan (2018/06): added for adjusting the initial conditions for scm
 
 contains
@@ -334,7 +336,7 @@ contains
                         scm_relaxation_low, scm_relaxation_high, &
                         scm_diurnal_avg,scm_crm_mode,scm_clubb_iop_name, &
 			scm_observed_aero,swrad_off,lwrad_off, precip_off, &
-                        l_fixiop_u, l_fixiop_v, iop_fixer_opt
+                        l_fixiop_u, l_fixiop_v, l_fixiop_t, l_fixiop_q, iop_fixer_opt
 
 ! 
 !-----------------------------------------------------------------------
@@ -389,6 +391,8 @@ contains
 	precip_off_out=precip_off, &
         l_fixiop_u_out=l_fixiop_u, &
         l_fixiop_v_out=l_fixiop_v,&
+        l_fixiop_t_out=l_fixiop_t,&
+        l_fixiop_q_out=l_fixiop_q,&
         iop_fixer_opt_out=iop_fixer_opt,&
         scm_clubb_iop_name_out=scm_clubb_iop_name)
    end if
@@ -478,6 +482,8 @@ contains
 			    precip_off_in=precip_off, &
                             l_fixiop_u_in=l_fixiop_u, &
                             l_fixiop_v_in=l_fixiop_v,&
+                            l_fixiop_t_in=l_fixiop_t,&
+                            l_fixiop_q_in=l_fixiop_q,&
                             iop_fixer_opt_in=iop_fixer_opt,&
                             scm_clubb_iop_name_in=scm_clubb_iop_name)
       end if
