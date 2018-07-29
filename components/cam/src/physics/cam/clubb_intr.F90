@@ -1412,6 +1412,8 @@ end subroutine clubb_init_cnst
    !  host time step divided by CLUBB time step  
    nadv = max(hdtime/dtime,1._r8)
   
+   write(iulog,*)'  dthost =, dtclubb=, nadv=,',hdtime,dtime,nadv
+
    !  Initialize forcings for transported scalars to zero
    
    sclrm_forcing(:,:)   = 0._r8
