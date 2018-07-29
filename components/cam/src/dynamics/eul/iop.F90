@@ -872,7 +872,7 @@ endif !scm_observed_aero
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i= PLEV-1, 1,-1
           modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-          if(modlev.LE.dplevs(1)then
+          if(modlev.LE.dplevs(1))then
           uobs(i) = uobs(i+1)
           write(iulog,*),'replace the u3 in the level: ',modlev,dplevs(1),uobs(i),uobs(i+1)
           endif
