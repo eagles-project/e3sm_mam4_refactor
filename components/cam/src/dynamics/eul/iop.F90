@@ -157,7 +157,7 @@ subroutine readiopdata( iop_update_surface )
    integer strt4(4),cnt4(4)
    character(len=16) :: lowername
 
-   fill_ends= .false.
+   fill_ends= .true.
 
 !     
 !     Open IOP dataset
