@@ -485,17 +485,16 @@ endif !scm_observed_aero
 !     
      else
         have_t = .true.
-        do i= PLEV-1, 1,-1
-          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-          if(modlev.LE.dplevs(1))then
-            tobs(i) = tobs(i+1)
-            write(iulog,*),'replace the t3 in the level: ',modlev,dplevs(1),tobs(i),tobs(i+1)
-          endif
-        end do
-
         if (.not.use_camiop .and. get_nstep() .eq. 0) then
            do i=1, PLEV
               t3(1,i,1,n3)=tobs(i)  !     set t to tobs at first time step
+           end do
+           do i= PLEV-1, 1,-1
+             modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+             if(modlev.LE.dplevs(1))then
+               t3(1,i,1,n3) = t3(1,i+1,1,n3)
+               write(iulog,*),'replace the t3 in the level: ',modlev,dplevs(1),t3(1,i,1,n3),t3(1,i+1,1,n3)
+             endif
            end do
         endif
      endif
@@ -527,17 +526,16 @@ endif !scm_observed_aero
            write(iulog,*) 'Using values from Analysis Dataset'
         endif
      else
-        do i= PLEV-1, 1,-1
-          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-          if(modlev.LE.dplevs(1))then
-            qobs(i) = qobs(i+1)
-            write(iulog,*),'replace the q3 in the level: ',modlev,dplevs(1),qobs(i),qobs(i+1)
-          endif
-        end do
-
         if (.not. use_camiop .and. get_nstep() .eq. 0) then
            do i=1, PLEV
               q3(1,i,1,1,n3)=qobs(i)
+           end do
+           do i= PLEV-1, 1,-1
+             modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+             if(modlev.LE.dplevs(1))then
+               q3(1,i,1,1,n3)=q3(1,i+1,1,1,n3)
+               write(iulog,*),'replace the q3 in the level: ',modlev,dplevs(1),q3(1,i,1,1,n3),q3(1,i+1,1,1,n3)
+             endif
            end do
            have_q = .true.
         endif
@@ -870,16 +868,16 @@ endif !scm_observed_aero
        have_u = .false.
      else
        have_u = .true.
-       do i= PLEV-1, 1,-1
-        modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-        if(modlev.LE.dplevs(1))then
-          uobs(i) = uobs(i+1)
-          write(iulog,*),'replace the u3 in the level: ',modlev,dplevs(1),uobs(i),uobs(i+1)
-        endif
-       end do
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i=1, PLEV
            u3(1,i,1,n3) = uobs(i)  !     set u to uobs at first time step
+         end do
+         do i= PLEV-1, 1,-1
+          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+          if(modlev.LE.dplevs(1))then
+            u3(1,i,1,n3) = u3(1,i+1,1,n3)
+            write(iulog,*),'replace the u3 in the level: ',modlev,dplevs(1),u3(1,i,1,n3),u3(1,i+1,1,n3)
+          endif
          end do
        endif
      endif
@@ -899,17 +897,16 @@ endif !scm_observed_aero
        have_v = .false.
      else
        have_v = .true.
-       do i= PLEV-1, 1,-1
-        modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-        if(modlev.LE.dplevs(1))then
-          vobs(i) = vobs(i+1)
-          write(iulog,*),'replace the v3 in the level: ',modlev,dplevs(1),vobs(i),vobs(i+1)
-        endif
-       end do
-
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i=1, PLEV
            v3(1,i,1,n3) = vobs(i)  !     set u to uobs at first time step
+         end do
+         do i= PLEV-1, 1,-1
+          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+          if(modlev.LE.dplevs(1))then
+            v3(1,i,1,n3) = v3(1,i+1,1,n3)
+            write(iulog,*),'replace the v3 in the level: ',modlev,dplevs(1),v3(1,i,1,n3),v3(1,i+1,1,n3)
+          endif
          end do
        endif
      endif
