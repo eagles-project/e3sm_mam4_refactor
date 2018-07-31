@@ -156,7 +156,6 @@ subroutine readiopdata( iop_update_surface )
    real(r8) coldata(plev)
    integer strt4(4),cnt4(4)
    character(len=16) :: lowername
-   real(r8) modlev
 
    fill_ends= .false.
 
@@ -461,14 +460,15 @@ endif !scm_observed_aero
      else
        tobs(:)= t3(1,:,1,n3)
      endif
-
+ 
+     !!mandatorily  turn on the fill_ends = .true. for temperature (SZhang and HWan July 2018)
      if ( use_camiop ) then
        call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'t', have_tsair, &
-          tsair(1), fill_ends, &
+          tsair(1), .true. , &
           dplevs, nlev,ps(1,1,n3),tobs, status )
      else
        call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'T', have_tsair, &
-          tsair(1), fill_ends, &
+          tsair(1), .true. , &
           dplevs, nlev,ps(1,1,n3), tobs, status )
      endif
      if ( status .ne. nf90_noerr ) then
@@ -489,13 +489,6 @@ endif !scm_observed_aero
            do i=1, PLEV
               t3(1,i,1,n3)=tobs(i)  !     set t to tobs at first time step
            end do
-           do i= PLEV-1, 1,-1
-             modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-             if(modlev.LE.dplevs(1))then
-               t3(1,i,1,n3) = t3(1,i+1,1,n3)
-               write(iulog,*),'replace the t3 in the level: ',modlev,dplevs(1),t3(1,i,1,n3),t3(1,i+1,1,n3)
-             endif
-           end do
         endif
      endif
 
@@ -513,8 +506,9 @@ endif !scm_observed_aero
        qobs(:)= q3(1,:,1,1,n3)
      endif
 
+     !!mandatorily  turn on the fill_ends = .true. for humidity (SZhang and HWan July 2018)
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,  'q', have_srf, &
-        srf(1), fill_ends, &
+        srf(1), .true. , &
         dplevs, nlev,ps(1,1,n3), qobs, status )
      if ( status .ne. nf90_noerr ) then
         have_q = .false.
@@ -529,13 +523,6 @@ endif !scm_observed_aero
         if (.not. use_camiop .and. get_nstep() .eq. 0) then
            do i=1, PLEV
               q3(1,i,1,1,n3)=qobs(i)
-           end do
-           do i= PLEV-1, 1,-1
-             modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-             if(modlev.LE.dplevs(1))then
-               q3(1,i,1,1,n3)=q3(1,i+1,1,1,n3)
-               write(iulog,*),'replace the q3 in the level: ',modlev,dplevs(1),q3(1,i,1,1,n3),q3(1,i+1,1,1,n3)
-             endif
            end do
            have_q = .true.
         endif
@@ -861,8 +848,9 @@ endif !scm_observed_aero
        have_srf = .true.
      endif
 
+     !!mandatorily  turn on the fill_ends = .true. for u-wind (SZhang and HWan July 2018)
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
-       'u', have_srf, srf(1), fill_ends, &
+       'u', have_srf, srf(1), .true. , &
        dplevs, nlev,ps(1,1,n3), uobs, status )
      if ( status .ne. nf90_noerr ) then
        have_u = .false.
@@ -872,14 +860,7 @@ endif !scm_observed_aero
          do i=1, PLEV
            u3(1,i,1,n3) = uobs(i)  !     set u to uobs at first time step
          end do
-         do i= PLEV-1, 1,-1
-          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-          if(modlev.LE.dplevs(1))then
-            u3(1,i,1,n3) = u3(1,i+1,1,n3)
-            write(iulog,*),'replace the u3 in the level: ',modlev,dplevs(1),u3(1,i,1,n3),u3(1,i+1,1,n3)
-          endif
-         end do
-       endif
+        endif
      endif
 
      status = nf90_inq_varid( ncid, 'vsrf', varid   )
@@ -890,8 +871,9 @@ endif !scm_observed_aero
        have_srf = .true.
      endif
 
+     !!mandatorily  turn on the fill_ends = .true. for v-wind (SZhang and HWan July 2018)
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
-       'v', have_srf, srf(1), fill_ends, &
+       'v', have_srf, srf(1), .true. , &
        dplevs, nlev,ps(1,1,n3), vobs, status )
      if ( status .ne. nf90_noerr ) then
        have_v = .false.
@@ -900,13 +882,6 @@ endif !scm_observed_aero
        if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
          do i=1, PLEV
            v3(1,i,1,n3) = vobs(i)  !     set u to uobs at first time step
-         end do
-         do i= PLEV-1, 1,-1
-          modlev = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
-          if(modlev.LE.dplevs(1))then
-            v3(1,i,1,n3) = v3(1,i+1,1,n3)
-            write(iulog,*),'replace the v3 in the level: ',modlev,dplevs(1),v3(1,i,1,n3),v3(1,i+1,1,n3)
-          endif
          end do
        endif
      endif
