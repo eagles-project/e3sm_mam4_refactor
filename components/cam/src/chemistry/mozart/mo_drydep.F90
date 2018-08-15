@@ -1931,13 +1931,20 @@ contains
        call get_horiz_grid_d(plon, clat_d_out=clat)
        jl = 1
        ju = plon
+       !write(*,'(a,i8,a,es20.10,a)') "ndk ju=", ju, " r2d=", r2d, " UNSTRUCTURED" !ndk we are unstructured
     else
        allocate(clat(plat))
        call get_horiz_grid_d(plat, clat_d_out=clat)
        jl = 1
        ju = plat
+       !write(*,'(a,i8,a,es20.10)') "ndk ju=", ju, " r2d=", r2d 
     end if
     imin = 1
+    do j = 1,ju
+       if (clat(j) .ne. clat(j)) then
+          write(*,'(a,i10)') "ndk clat(j)=nan  j=", j, " ju=", ju 
+       endif
+    enddo
     do j = 1,ju
        diff_min = 10._r8
        pos_min  = -99
@@ -1947,6 +1954,7 @@ contains
              diff_min = abs(lat_lai(i) - target_lat)
              pos_min  = i
           end if
+          !write(*,'(a,i5,a,es20.10,a,es20.10,a,i6)') " ndk i=", i, " lat_lai(i)=", lat_lai(i), " abs()=", abs(lat_lai(i) - target_lat), " pos_min=", pos_min
        end do
        if( pos_min < 0 ) then
           write(iulog,*) 'dvel_inti: cannot find ',target_lat,' at j,pos_min,diff_min = ',j,pos_min,diff_min
