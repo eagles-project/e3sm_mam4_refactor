@@ -48,6 +48,8 @@ module perf_mod
    public t_stampf
    public t_startf
    public t_stopf
+   public t_startfw !ndk
+   public t_stopfw !ndk
    public t_startstop_valsf
    public t_enablef
    public t_disablef
@@ -774,6 +776,50 @@ contains
 
    return
    end subroutine t_startf
+
+
+   subroutine t_startfw(event, wtime) !ndk
+
+   character(len=*), intent(in) :: event
+   real(shr_kind_r8), intent(inout) :: wtime
+   integer  ierr                          ! GPTL error return
+   integer  str_length, i                 ! support for adding detail prefix
+   character(len=2) cdetail               ! char variable for detail
+
+   if (.not. timing_initialized) return
+   if (timing_disable_depth > 0) return
+
+   if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
+
+      write(cdetail,'(i2.2)') cur_timing_detail
+      if (prefix_len > 0) then
+         str_length = min(SHR_KIND_CM-prefix_len-5,len_trim(event))
+         wtime = GPTLstartw( &
+            '"'//cdetail//"_"//event_prefix(1:prefix_len)// &
+            event(1:str_length)//'"')
+      else
+         str_length = min(SHR_KIND_CM-5,len_trim(event))
+         wtime = GPTLstartw('"'//cdetail//"_"//event(1:str_length)//'"')
+      endif
+
+   else
+
+      if (prefix_len > 0) then
+         str_length = min(SHR_KIND_CM-prefix_len-2,len_trim(event))
+         wtime = GPTLstartw('"'//event_prefix(1:prefix_len)// &
+              event(1:str_length)//'"')
+      else
+         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         wtime = GPTLstartw('"'//trim(event)//'"')
+      endif
+
+   endif
+
+   write(*,'(a,1x,es20.10,1x,a)') 'a', wtime, event 
+
+   return
+   end subroutine t_startfw
+
 !
 !========================================================================
 !
@@ -838,6 +884,47 @@ contains
 
    return
    end subroutine t_stopf
+
+   subroutine t_stopfw(event, wtime) ! ndk
+
+   character(len=*), intent(in) :: event
+   real(shr_kind_r8), intent(inout) :: wtime
+   integer  ierr                          ! GPTL error return
+   integer  str_length, i                 ! support for adding detail prefix
+   character(len=2) cdetail               ! char variable for detail
+!
+   if (.not. timing_initialized) return
+   if (timing_disable_depth > 0) return
+
+   if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
+
+      write(cdetail,'(i2.2)') cur_timing_detail
+      if (prefix_len > 0) then
+         str_length = min(SHR_KIND_CM-prefix_len-5,len_trim(event))
+         wtime = GPTLstopw( &
+              '"'//cdetail//"_"//event_prefix(1:prefix_len)// &
+              event(1:str_length)//'"')
+      else
+         str_length = min(SHR_KIND_CM-5,len_trim(event))
+         wtime = GPTLstopw('"'//cdetail//"_"//event(1:str_length)//'"')
+      endif
+
+   else
+
+      if (prefix_len > 0) then
+         str_length = min(SHR_KIND_CM-prefix_len-2,len_trim(event))
+         wtime = GPTLstopw('"'//event_prefix(1:prefix_len)// &
+              event(1:str_length)//'"')
+     else
+         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         wtime = GPTLstopw('"'//trim(event)//'"')
+     endif
+   endif
+
+   write(*,'(a,1x,es20.10,1x,a)') 'b', wtime, event 
+
+   return
+   end subroutine t_stopfw
 !
 !========================================================================
 !

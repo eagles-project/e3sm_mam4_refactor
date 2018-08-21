@@ -394,7 +394,7 @@ CONTAINS
     use pmgrid,          only: plev, plevp
     use constituents,    only: pcnst
     use shr_sys_mod,     only: shr_sys_flush
-
+    use perf_mod,        only: t_startf, t_stopf, t_startfw, t_stopfw  !ndk
     ! 
     ! Arguments
     !
@@ -433,6 +433,7 @@ CONTAINS
     logical :: nlend_sync      ! Flag signaling last time-step
     logical :: first_time = .true.
     integer :: lbnum
+    real(r8):: ws0,ws1 ! ndk
     character(len=*), parameter :: subname="atm_run_mct"
     !-----------------------------------------------------------------------
 
@@ -519,9 +520,12 @@ CONTAINS
        ! Run cam radiation/clouds (run1)
           
        call t_startf ('CAM_run1')
+       call t_startfw ('CAM_run1', ws0)
        call cam_run1 ( cam_in, cam_out ) 
        call t_stopf  ('CAM_run1')
-       
+       call t_stopfw  ('CAM_run1', ws1)
+       write(*,'(a,es20.10,es20.10)') "ndk CAM_run1 ws0,ws1=", ws0,ws1
+
        ! Map output from cam to mct data structures
        
        call t_startf ('CAM_export')

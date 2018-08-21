@@ -119,11 +119,15 @@ extern "C" {
 extern int GPTLsetoption (const int, const int);
 extern int GPTLinitialize (void);
 extern int GPTLstart (const char *);
+extern double GPTLstartw (const char *); // ndk
 extern int GPTLstart_handle (const char *, void **);
 extern int GPTLstartf (const char *, const int);
+extern double GPTLstartfw (const char *, const int); // ndk
 extern int GPTLstartf_handle (const char *, const int, void **);
 extern int GPTLstop (const char *);
+extern double GPTLstopw (const char *); // ndk
 extern int GPTLstopf (const char *, const int);
+extern double GPTLstopfw (const char *, const int); // ndk
 extern int GPTLstop_handle (const char *, void **);
 extern int GPTLstopf_handle (const char *, const int, void **);
 extern int GPTLstartstop_vals (const char *, double, int);
