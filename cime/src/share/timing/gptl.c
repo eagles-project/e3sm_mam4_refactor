@@ -48,7 +48,7 @@ static volatile bool pr_has_been_called = false; /* GPTLpr_file has been called 
 static Entry eventlist[MAX_AUX];    /* list of PAPI-based events to be counted */
 static int nevents = 0;             /* number of PAPI events (init to 0) */
 static bool dousepapi = false;      /* saves a function call if stays false */
-static bool verbose = false;        /* output verbosity */
+static bool verbose = true;        /* output verbosity */
 static bool percent = false;        /* print wallclock also as percent of 1st timers[0] */
 static bool dopr_preamble = true;   /* whether to print preamble info */
 static bool dopr_threadsort = true; /* whether to print sorted thread stats */
@@ -210,11 +210,10 @@ typedef struct {
 } Funcentry;
 
 static Funcentry funclist[] = {
-  //{GPTLgettimeofday,   utr_gettimeofday,   init_gettimeofday,  "gettimeofday"},
+  {GPTLgettimeofday,   utr_gettimeofday,   init_gettimeofday,  "gettimeofday"},
   //{GPTLnanotime,       utr_nanotime,       init_nanotime,      "nanotime"},
   //{GPTLmpiwtime,       utr_mpiwtime,       init_mpiwtime,      "MPI_Wtime"},
-  {GPTLmpiwtime,       utr_mpiwtime,       init_mpiwtime,      "MPI_Wtime"}
-  //{GPTLclockgettime,   utr_clock_gettime,  init_clock_gettime, "clock_gettime"},
+  {GPTLclockgettime,   utr_clock_gettime,  init_clock_gettime, "clock_gettime"}
   //{GPTLpapitime,       utr_papitime,       init_papitime,      "PAPI_get_real_usec"},
   //{GPTLread_real_time, utr_read_real_time, init_read_real_time,"read_real_time"}     /* AIX only */
 };
