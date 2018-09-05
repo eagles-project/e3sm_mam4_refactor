@@ -346,7 +346,6 @@
   <TESTS>e3sm_developer</TESTS>
   <COMPILERS>intel,gnu,gnu7</COMPILERS>
   <MPILIBS>mpt,impi</MPILIBS>
-  <!--CIME_OUTPUT_ROOT>$ENV{SCRATCH}/acme_scratch/cori-knl/nnofpe0</CIME_OUTPUT_ROOT-->
   <CIME_OUTPUT_ROOT>$ENV{SCRATCH}/acme_scratch/cori-knl</CIME_OUTPUT_ROOT>
   <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
   <EXEROOT>$CIME_OUTPUT_ROOT/$CASE/bld</EXEROOT>
