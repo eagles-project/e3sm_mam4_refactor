@@ -568,8 +568,9 @@ end subroutine check_energy_get_integrals
   subroutine check_energy_gmean(state, pbuf2d, dtime, nstep)
 
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_chunk
-    use perf_mod ! ndk
-    use parallel_mod ! ndk
+    !use perf_mod ! ndk
+    !use parallel_mod ! ndk
+    !use mpishorthand,  only : mpicom ! ndk
 
 !-----------------------------------------------------------------------
 ! Compute global mean total energy of physics input and output states
@@ -591,9 +592,9 @@ end subroutine check_energy_get_integrals
     real(r8) :: te_glob(3)               ! global means of total energy
     real(r8), pointer :: teout(:)
 
-    integer :: nprocs, ierr
-    real(r8),save :: last_wtavg=0.0d0
-    real(r8) :: wt,wtsum,wtavg,dum1,dum2
+    !integer :: nprocs, ierr
+    !real(r8),save :: last_wtavg=0.0d0
+    !real(r8) :: wt,wtsum,wtavg,dum1,dum2
 !-----------------------------------------------------------------------
 
     ! Copy total energy out of input and output states
@@ -614,11 +615,12 @@ end subroutine check_energy_get_integrals
     ! surface pressure for heating rate (assume uniform ptop)
     call gmean(te, te_glob, 3)
 
-    call t_stampf(wt,dum1,dum2)
+    !call t_stampf(wt,dum1,dum2)
 
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ierr)    
-    call MPI_reduce(wt, wtsum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-    wtavg=wtsum/real(nprocs)
+    !call MPI_COMM_SIZE(mpicom, nprocs, ierr)
+    !call MPI_reduce(wt, wtsum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+    !call mpisum(wt, wtsum, 1, MPI_DOUBLE_PRECISION, 0, mpicom)
+    !wtavg=wtsum/real(nprocs)
 
 
     if (begchunk .le. endchunk) then
@@ -632,11 +634,11 @@ end subroutine check_energy_get_integrals
        heat_glob  = -tedif_glob/dtime * gravit / (psurf_glob - ptopb_glob)
 
        if (masterproc) then
-          !ndk write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob
-          if (wtavg-last_wtavg > 1.0e5) last_wtavg=wtavg ! weird one on the first time
-          write(iulog,'(1x,a9,1x,i8,4(1x,e25.17),1x,f12.4)') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob, wtavg-last_wtavg
+          write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob
+          !if (wtavg-last_wtavg > 1.0e5) last_wtavg=wtavg ! weird one on the first time
+          !write(iulog,'(1x,a9,1x,i8,4(1x,e25.17),1x,f12.4)') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob, wtavg-last_wtavg
 
-          last_wtavg=wtavg
+          !last_wtavg=wtavg
        end if
     else
        heat_glob = 0._r8
