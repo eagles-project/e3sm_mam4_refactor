@@ -37,6 +37,7 @@ module stepon
   public stepon_run1    ! run method phase 1
   public stepon_run2    ! run method phase 2
   public stepon_run3    ! run method phase 3
+  public stepon_run4    ! run method phase 4
   public stepon_final  ! Finalization
 
 !----------------------------------------------------------------------
@@ -410,6 +411,30 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
             end do
          end do
       endif
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! ftype=3:  scale tendencies to dynamics by timestep
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      if (ftype==3) then
+
+         do ic=1,pcnst
+            ! Q  =  data used for forcing, at timelevel nm1   t
+            ! FQ =  adjusted Q returned by forcing,  at time  t+dt
+            ! tendency = (FQ*dp - Q*dp) / dt 
+            ! Convert this to a tendency on Qdp:  CAM physics does not change ps
+            ! so use ps_v at t.  (or, if physics worked with Qdp
+            ! and returned FQdp, tendency = (FQdp-Qdp)/2dt and since physics
+            ! did not change dp, dp would be the same in both terms)
+!$omp parallel do private(k, j, i, dp_tmp)
+            do k=1,nlev
+               do j=1,np
+                  do i=1,np
+                     dyn_in%elem(ie)%derived%FQ(i,j,k,ic)=&
+                          dyn_in%elem(ie)%derived%FQ(i,j,k,ic)*rec2dt
+                  end do
+               end do
+            end do
+         end do
+      endif
    end do
    call t_stopf('stepon_bndry_exch')
 
@@ -515,6 +540,24 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    call t_stopf  ('dyn_run')
 
 end subroutine stepon_run3
+
+subroutine stepon_run4(dtime, cam_out, phys_state, dyn_in, dyn_out)
+   use camsrfexch,  only: cam_out_t     
+   use dyn_comp,    only: dyn_run_finish
+   use time_mod,    only: tstep
+   real(r8), intent(in) :: dtime   ! Time-step
+   type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
+   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
+   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   integer :: rc
+
+   call t_barrierf('sync_dyn_run', mpicom)
+   call t_startf ('dyn_run')
+   call dyn_run_finish(dyn_out,rc)	
+   call t_stopf  ('dyn_run')
+
+end subroutine stepon_run4
 
 
 !----------------------------------------------------------------------- 

@@ -2119,6 +2119,7 @@ subroutine tphysbc (ztodt,               &
     tend %dTdt(:ncol,:pver)  = 0._r8
     tend %dudt(:ncol,:pver)  = 0._r8
     tend %dvdt(:ncol,:pver)  = 0._r8
+    tend %dqdt(:ncol,:pver,:pcnst)  = state %q(:ncol,:pver,:pcnst)
 
 !!== KZ_WCON
     call check_qflx (state, tend, "PHYBC01", nstep, ztodt, cam_in%cflx(:,1))

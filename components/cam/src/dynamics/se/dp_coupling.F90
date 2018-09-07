@@ -302,6 +302,8 @@ CONTAINS
   subroutine p_d_coupling(phys_state, phys_tend,  dyn_in)
     use shr_vmath_mod, only: shr_vmath_log
     use cam_control_mod, only : adiabatic
+    use control_mod, only: ftype
+    use hycoef,   only : hyai, hybi, ps0
     implicit none
 
 ! !INPUT PARAMETERS:
@@ -330,6 +332,8 @@ CONTAINS
     integer :: bpter(npsq,0:pver)    ! offsets into block buffer for unpacking data
 
     real (kind=real_kind), allocatable, dimension(:) :: bbuffer, cbuffer ! transpose buffers
+
+    real (kind=real_kind) :: dp
 
     if (par%dynproc) then
        elem => dyn_in%elem
@@ -361,8 +365,14 @@ CONTAINS
                 uv_tmp(ioff,1,ilyr,ie)   = phys_tend(lchnk)%dudt(icol,ilyr)
                 uv_tmp(ioff,2,ilyr,ie)   = phys_tend(lchnk)%dvdt(icol,ilyr)
 
+                dp = ( hyai(ilyr+1) - hyai(ilyr) )*ps0 + &
+                     ( hybi(ilyr+1) - hybi(ilyr) )*phys_state(lchnk)%ps(icol) 
                 do m=1,pcnst
-                   q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
+                   if (ftype==3) then
+                      q_tmp(ioff,ilyr,m,ie) = (phys_state(lchnk)%q(icol,ilyr,m)-phys_tend(lchnk)%dqdt(icol,ilyr,m))*dp
+                   else
+                      q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
+                   end if
                 end do
              end do
 
@@ -394,8 +404,14 @@ CONTAINS
                 cbuffer   (cpter(icol,ilyr)+1)   = phys_tend(lchnk)%dudt(icol,ilyr)
                 cbuffer   (cpter(icol,ilyr)+2)   = phys_tend(lchnk)%dvdt(icol,ilyr)
 
+                dp = ( hyai(ilyr+1) - hyai(ilyr) )*ps0 + &
+                     ( hybi(ilyr+1) - hybi(ilyr) )*phys_state(lchnk)%ps(icol) 
                 do m=1,pcnst
-                   cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
+                   if (ftype==3) then
+                      cbuffer(cpter(icol,ilyr)+2+m) = (phys_state(lchnk)%q(icol,ilyr,m)-phys_tend(lchnk)%dqdt(icol,ilyr,m))*dp
+                   else
+                      cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
+                   end if
                 end do
              end do
 

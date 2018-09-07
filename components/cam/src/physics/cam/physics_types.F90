@@ -117,6 +117,7 @@ module physics_types
      integer   ::   psetcols=0 ! max number of columns set- if subcols = pcols*psubcols, else = pcols
 
      real(r8), dimension(:,:),allocatable        :: dtdt, dudt, dvdt
+     real(r8), dimension(:,:,:),allocatable      :: dqdt
      real(r8), dimension(:),  allocatable        :: flx_net
      real(r8), dimension(:),  allocatable        :: &
           te_tnd,  &! cumulative boundary flux of total energy
@@ -1381,6 +1382,7 @@ end subroutine physics_ptend_copy
     tend%dtdt    = 0._r8
     tend%dudt    = 0._r8
     tend%dvdt    = 0._r8
+    tend%dqdt    = 0._r8
     tend%flx_net = 0._r8
     tend%te_tnd  = 0._r8
     tend%tw_tnd  = 0._r8
@@ -1779,6 +1781,9 @@ subroutine physics_tend_alloc(tend,psetcols)
   allocate(tend%dvdt(psetcols,pver), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%dvdt')
 
+  allocate(tend%dqdt(psetcols,pver,pcnst), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%dqdt')
+
   allocate(tend%flx_net(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%flx_net')
 
@@ -1791,6 +1796,7 @@ subroutine physics_tend_alloc(tend,psetcols)
   tend%dtdt(:,:) = inf
   tend%dudt(:,:) = inf
   tend%dvdt(:,:) = inf
+  tend%dqdt(:,:,:) = inf
   tend%flx_net(:) = inf
   tend%te_tnd(:) = inf
   tend%tw_tnd(:) = inf
@@ -1815,6 +1821,9 @@ subroutine physics_tend_dealloc(tend)
 
   deallocate(tend%dvdt, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%dvdt')
+
+  deallocate(tend%dqdt, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%dqdt')
 
   deallocate(tend%flx_net, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%flx_net')

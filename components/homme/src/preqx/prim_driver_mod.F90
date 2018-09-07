@@ -5,6 +5,7 @@ module prim_driver_mod
     prim_init1,&
     prim_init2,&
     prim_run_subcycle,&
+    prim_run_remap,&
     prim_finalize,&
     smooth_topo_datasets
 

@@ -1,0 +1,934 @@
+diff --git a/cime/config/e3sm/machines/config_compilers.xml b/cime/config/e3sm/machines/config_compilers.xml
+index 838b646..be23faa 100644
+--- a/cime/config/e3sm/machines/config_compilers.xml
++++ b/cime/config/e3sm/machines/config_compilers.xml
+@@ -858,13 +858,13 @@ for mct, etc.
+ <compiler COMPILER="intel" MACH="quartz">
+   <ADD_CFLAGS DEBUG="FALSE"> -O2 </ADD_CFLAGS>
+   <ADD_FFLAGS DEBUG="FALSE"> -O2 </ADD_FFLAGS>
+-  <NETCDF_PATH>/usr/workspace/wsa/climdat/spack/opt/spack/linux-rhel7-x86_64/intel-17.0.0/netcdf-fortran-4.4.4-4naprkre2m7kriadyxwboauil7nc3jtc/</NETCDF_PATH>
++  <NETCDF_PATH>/usr/tce/packages/netcdf-fortran/netcdf-fortran-4.4.4-intel-18.0.1/</NETCDF_PATH>
+   <CONFIG_ARGS> --host=Linux </CONFIG_ARGS>
+-  <MPI_PATH>/usr/tce/modulefiles/MPI/intel/17.0.0/mvapich2/2.2/</MPI_PATH>
++  <MPI_PATH>/usr/tce/packages/mvapich2/mvapich2-2.2-intel-18.0.1/</MPI_PATH>
+   <MPI_LIB_NAME MPILIB="mvapich">mpi</MPI_LIB_NAME>
+   <ADD_CPPDEFS> -DNO_SHR_VMATH -DCNL </ADD_CPPDEFS>
+   <ADD_FFLAGS DEBUG="TRUE"> -g -traceback  -O0 -fpe0 -check  all -check noarg_temp_created -ftrapuv </ADD_FFLAGS>
+-  <ADD_SLIBS>$(shell /usr/workspace/wsa/climdat/spack/opt/spack/linux-rhel7-x86_64/intel-17.0.0/netcdf-fortran-4.4.4-4naprkre2m7kriadyxwboauil7nc3jtc/bin/nf-config --flibs)</ADD_SLIBS>
++  <ADD_SLIBS>$(shell /usr/tce/packages/netcdf-fortran/netcdf-fortran-4.4.4-intel-18.0.1/bin/nf-config --flibs)</ADD_SLIBS>
+   <ADD_LDFLAGS> -llapack -lblas</ADD_LDFLAGS>
+ </compiler>
+ 
+diff --git a/cime/config/e3sm/machines/config_machines.xml b/cime/config/e3sm/machines/config_machines.xml
+index 42f41bb..11e6f3b 100644
+--- a/cime/config/e3sm/machines/config_machines.xml
++++ b/cime/config/e3sm/machines/config_machines.xml
+@@ -1310,62 +1310,6 @@
+     </environment_variables>
+ </machine>
+ 
+-<machine MACH="cab">
+-         <DESC>LLNL Linux Cluster, Linux (pgi), 16 pes/node, batch system is Slurm</DESC>
+-         <COMPILERS>intel, pgi</COMPILERS>
+-         <MPILIBS>mpich</MPILIBS>
+-         <RUNDIR>/p/lscratche/$CCSMUSER/ACME/$CASE/run</RUNDIR>
+-         <EXEROOT>/p/lscratche/$CCSMUSER/$CASE/bld</EXEROOT>
+-         <CIME_OUTPUT_ROOT>/p/lscratche/$USER</CIME_OUTPUT_ROOT>
+-         <DIN_LOC_ROOT>/usr/gdata/climdat/ccsm3data/inputdata</DIN_LOC_ROOT>
+-         <DIN_LOC_ROOT_CLMFORC>/usr/gdata/climdat/ccsm3data/inputdata/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+-         <DOUT_S_ROOT>/p/lscratche/$CCSMUSER/archive/$CASE</DOUT_S_ROOT>
+-         <DOUT_L_HTAR>FALSE</DOUT_L_HTAR>
+-         <DOUT_L_MSROOT>UNSET</DOUT_L_MSROOT>
+-         <BASELINE_ROOT>/p/lscratchd/$CCSMUSER/ccsm_baselines/$COMPILER</BASELINE_ROOT>
+-         <CCSM_CPRNC>/p/lscratchd/ma21/ccsm3data/tools/cprnc/cprnc</CCSM_CPRNC>
+-         <OS>LINUX</OS>
+-         <SUPPORTED_BY>bogenschutz1 -at- llnl.gov</SUPPORTED_BY>
+-         <GMAKE_J>8</GMAKE_J>
+-         <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+-	 <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
+-	 <BATCH_SYSTEM>lc_slurm</BATCH_SYSTEM>
+-	 <mpirun mpilib="mpi-serial">
+-	   <executable></executable>
+-	 </mpirun>
+-         <mpirun mpilib="default">
+-           <executable>srun</executable>
+-         </mpirun>
+-	 <module_system type="generic">
+-           <init_path lang="csh">/usr/global/tools/dotkit/init.csh</init_path>
+-           <init_path lang="sh">/usr/global/tools/dotkit/init.sh</init_path>
+-	   <cmd_path lang="sh">use</cmd_path>
+-	   <cmd_path lang="csh">use</cmd_path>
+-	   <modules compiler="pgi">
+-	     <command name="-q">pgi-14.3</command>
+-	     <command name="-q">mvapich2-pgi-1.7</command>
+-	     <command name="-q">netcdf-pgi-4.1.3</command>
+-	   </modules>
+-	   <modules compiler="intel">
+-	     <command name="-q">ic-17.0.174</command>
+-	     <command name="-q">mvapich2-intel-2.1</command>
+-	     <command name="-q">netcdf-intel-4.1.3</command>
+-	   </modules>
+-	 </module_system>
+-	 <environment_variables compiler="pgi">
+-	   <env name="NETCDF">/usr/local/tools/netcdf-pgi-4.1.3/</env>
+-	 </environment_variables>
+-	 <environment_variables compiler="pgi" mpilib="!mpi-serial">
+-	   <env name="PNETCDF_PATH">/usr/local/tools/parallel-netcdf-pgi-1.6.1/</env>
+-	 </environment_variables>
+-	 <environment_variables compiler="intel">
+-	   <env name="NETCDF">/usr/local/tools/netcdf-intel-4.1.3/</env>
+-	 </environment_variables>
+-	 <environment_variables compiler="intel" mpilib="!mpi-serial">
+-	   <env name="PNETCDF_PATH">/usr/local/tools/parallel-netcdf-intel-1.6.1/</env>
+-	 </environment_variables>
+-</machine>
+-
+ <machine MACH="syrah">
+          <DESC>LLNL Linux Cluster, Linux (pgi), 16 pes/node, batch system is Slurm</DESC>
+          <COMPILERS>intel, pgi</COMPILERS>
+@@ -1422,11 +1366,6 @@
+ 	 </environment_variables>
+ </machine>
+ 
+-   <!-- All users must setup the appropriate environment on quartz before they can compile the code,
+-        Issue the following command:
+-            . /usr/workspace/wsa/climdat/spack/share/spack/setup-env.sh
+-        note there is 1-space between . and / in the beginning.  This should mount all the needed modules.
+-        In order to have access you must be a member of the 'climdat' group.  -->
+ <machine MACH="quartz">
+          <DESC>LLNL Linux Cluster, Linux (pgi), 36 pes/node, batch system is Slurm</DESC>
+          <COMPILERS>intel</COMPILERS>
+@@ -1453,32 +1392,30 @@
+          <mpirun mpilib="default">
+            <executable>srun</executable>
+          </mpirun>
+-	 <module_system type="module">
+-	      <init_path lang="python">/usr/share/lmod/lmod/init/env_modules_python.py</init_path>
+- 	      <init_path lang="perl">/usr/share/lmod/lmod/init/perl</init_path>
+-	      <init_path lang="sh">/usr/share/lmod/lmod/init/sh</init_path>
+-	      <init_path lang="csh">/usr/share/lmod/lmod/init/csh</init_path>
+-	      <cmd_path lang="csh">module</cmd_path>
+-	      <cmd_path lang="sh">module</cmd_path>
+-	      <cmd_path lang="python">/usr/share/lmod/lmod/libexec/lmod python</cmd_path>
+- 	      <cmd_path lang="perl">/usr/share/lmod/lmod/libexec/lmod perl</cmd_path>
+-	   <modules compiler="intel">
+-             <command name="unload">mvapich2</command>
+-             <command name="unload">intel</command>
+-	     <command name="load">python/3.5.1</command>
+-	     <command name="load">git/2.8.3</command>
+-	     <command name="load">intel/17.0.0</command>
+-	     <command name="load">mvapich2/2.2</command>
+-	     <command name="load">netcdf-fortran-4.4.4-intel-17.0.0-4naprkr</command>
+-	     <command name="load">parallel-netcdf-1.8.0-intel-17.0.0-gy2hic6</command>
+-	   </modules>
+-	 </module_system>
+-	 <environment_variables compiler="intel">
+-	   <env name="NETCDFROOT">/usr/workspace/wsa/climdat/spack/opt/spack/linux-rhel7-x86_64/intel-17.0.0/netcdf-fortran-4.4.4-4naprkre2m7kriadyxwboauil7nc3jtc/</env>
+-	 </environment_variables>
+-	 <environment_variables compiler="intel" mpilib="!mpi-serial">
+-           <env name="PNETCDFROOT">/usr/workspace/wsa/climdat/spack/opt/spack/linux-rhel7-x86_64/intel-17.0.0/parallel-netcdf-1.8.0-gy2hic6n3hkygcczpumkcqmzw5sam7hn/</env>
+-	 </environment_variables>
++         <module_system type="module">
++              <init_path lang="python">/usr/share/lmod/lmod/init/env_modules_python.py</init_path>
++              <init_path lang="perl">/usr/share/lmod/lmod/init/perl</init_path>
++              <init_path lang="sh">/usr/share/lmod/lmod/init/sh</init_path>
++              <init_path lang="csh">/usr/share/lmod/lmod/init/csh</init_path>
++              <cmd_path lang="csh">module</cmd_path>
++              <cmd_path lang="sh">module</cmd_path>
++              <cmd_path lang="python">/usr/share/lmod/lmod/libexec/lmod python</cmd_path>
++              <cmd_path lang="perl">/usr/share/lmod/lmod/libexec/lmod perl</cmd_path>
++           <modules compiler="intel">
++             <command name="load">python</command>
++             <command name="load">git</command>
++             <command name="load">intel</command>
++             <command name="load">mvapich2</command>
++             <command name="load">netcdf-fortran/4.4.4</command>
++             <command name="load">pnetcdf/1.9.0</command>
++           </modules>
++         </module_system>
++         <environment_variables compiler="intel">
++           <env name="NETCDFROOT">/usr/tce/packages/netcdf-fortran/netcdf-fortran-4.4.4-intel-18.0.1/</env>
++         </environment_variables>
++         <environment_variables compiler="intel" mpilib="!mpi-serial">
++           <env name="PNETCDFROOT">/usr/tce/packages/pnetcdf/pnetcdf-1.9.0-intel-18.0.1-mvapich2-2.2/</env>
++         </environment_variables>
+ </machine>
+ 
+ <machine MACH="mira">
+diff --git a/components/cam/bld/namelist_files/namelist_definition.xml b/components/cam/bld/namelist_files/namelist_definition.xml
+index bf4f460..a40a4dc 100644
+--- a/components/cam/bld/namelist_files/namelist_definition.xml
++++ b/components/cam/bld/namelist_files/namelist_definition.xml
+@@ -5742,7 +5742,7 @@ Default: Set by build-namelist.
+ </entry>
+ 
+ <entry id="se_ftype" type="integer" category="se"
+-       group="ctl_nl" valid_values="0,1,2" >
++       group="ctl_nl" valid_values="0,1,2,3" >
+ CAM physics forcing option:
+ 0: tendencies
+ 1: adjustments
+diff --git a/components/cam/src/control/cam_comp.F90 b/components/cam/src/control/cam_comp.F90
+index bd0fe99..0989fd4 100644
+--- a/components/cam/src/control/cam_comp.F90
++++ b/components/cam/src/control/cam_comp.F90
+@@ -210,11 +210,12 @@ subroutine cam_run1(cam_in, cam_out)
+ !-----------------------------------------------------------------------
+    
+    use physpkg,          only: phys_run1
+-   use stepon,           only: stepon_run1
++   use stepon,           only: stepon_run1, stepon_run3
+ #if ( defined SPMD )
+    use mpishorthand,     only: mpicom
+ #endif
+    use time_manager,     only: get_nstep
++   use control_mod,      only: ftype
+ 
+    type(cam_in_t)  :: cam_in(begchunk:endchunk)
+    type(cam_out_t) :: cam_out(begchunk:endchunk)
+@@ -250,6 +251,16 @@ subroutine cam_run1(cam_in, cam_out)
+    call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out)
+    call t_stopf  ('phys_run1')
+ 
++   if (ftype.eq.3) then
++   !
++   ! Third phase of dynamics
++   !
++   call t_barrierf ('sync_stepon_run3', mpicom)
++   call t_startf ('stepon_run3')
++   call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
++
++   call t_stopf  ('stepon_run3')
++   end if
+ end subroutine cam_run1
+ 
+ !
+@@ -313,14 +324,16 @@ subroutine cam_run3( cam_out )
+ !           dynamics happens before physics in phase 1.
+ !
+ !-----------------------------------------------------------------------
+-   use stepon,           only: stepon_run3
++   use stepon,           only: stepon_run3, stepon_run4
+    use time_manager,     only: is_first_step, is_first_restart_step
+ #if ( defined SPMD )
+    use mpishorthand,     only: mpicom
+ #endif
++   use control_mod,      only: ftype
+ 
+    type(cam_out_t), intent(inout) :: cam_out(begchunk:endchunk)
+ !-----------------------------------------------------------------------
++   if (ftype.ne.3) then
+    !
+    ! Third phase of dynamics
+    !
+@@ -329,6 +342,16 @@ subroutine cam_run3( cam_out )
+    call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
+ 
+    call t_stopf  ('stepon_run3')
++   end if
++
++   !
++   ! Third phase of dynamics
++   !
++   call t_barrierf ('sync_stepon_run4', mpicom)
++   call t_startf ('stepon_run4')
++   call stepon_run4( dtime, cam_out, phys_state, dyn_in, dyn_out )
++
++   call t_stopf  ('stepon_run4')
+ 
+    if (is_first_step() .or. is_first_restart_step()) then
+       call t_startf ('cam_run3_memusage')
+diff --git a/components/cam/src/dynamics/se/dp_coupling.F90 b/components/cam/src/dynamics/se/dp_coupling.F90
+index bed4f56..b1c9941 100644
+--- a/components/cam/src/dynamics/se/dp_coupling.F90
++++ b/components/cam/src/dynamics/se/dp_coupling.F90
+@@ -302,6 +302,8 @@ CONTAINS
+   subroutine p_d_coupling(phys_state, phys_tend,  dyn_in)
+     use shr_vmath_mod, only: shr_vmath_log
+     use cam_control_mod, only : adiabatic
++    use control_mod, only: ftype
++    use hycoef,   only : hyai, hybi, ps0
+     implicit none
+ 
+ ! !INPUT PARAMETERS:
+@@ -331,6 +333,8 @@ CONTAINS
+ 
+     real (kind=real_kind), allocatable, dimension(:) :: bbuffer, cbuffer ! transpose buffers
+ 
++    real (kind=real_kind) :: dp
++
+     if (par%dynproc) then
+        elem => dyn_in%elem
+     else
+@@ -361,8 +365,14 @@ CONTAINS
+                 uv_tmp(ioff,1,ilyr,ie)   = phys_tend(lchnk)%dudt(icol,ilyr)
+                 uv_tmp(ioff,2,ilyr,ie)   = phys_tend(lchnk)%dvdt(icol,ilyr)
+ 
++                dp = ( hyai(ilyr+1) - hyai(ilyr) )*ps0 + &
++                     ( hybi(ilyr+1) - hybi(ilyr) )*phys_state(lchnk)%ps(icol) 
+                 do m=1,pcnst
+-                   q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
++                   if (ftype==3) then
++                      q_tmp(ioff,ilyr,m,ie) = (phys_state(lchnk)%q(icol,ilyr,m)-phys_tend(lchnk)%dqdt(icol,ilyr,m))*dp
++                   else
++                      q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
++                   end if
+                 end do
+              end do
+ 
+@@ -394,8 +404,14 @@ CONTAINS
+                 cbuffer   (cpter(icol,ilyr)+1)   = phys_tend(lchnk)%dudt(icol,ilyr)
+                 cbuffer   (cpter(icol,ilyr)+2)   = phys_tend(lchnk)%dvdt(icol,ilyr)
+ 
++                dp = ( hyai(ilyr+1) - hyai(ilyr) )*ps0 + &
++                     ( hybi(ilyr+1) - hybi(ilyr) )*phys_state(lchnk)%ps(icol) 
+                 do m=1,pcnst
+-                   cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
++                   if (ftype==3) then
++                      cbuffer(cpter(icol,ilyr)+2+m) = (phys_state(lchnk)%q(icol,ilyr,m)-phys_tend(lchnk)%dqdt(icol,ilyr,m))*dp
++                   else
++                      cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
++                   end if
+                 end do
+              end do
+ 
+diff --git a/components/cam/src/dynamics/se/dyn_comp.F90 b/components/cam/src/dynamics/se/dyn_comp.F90
+index eaccd4e..f466d03 100644
+--- a/components/cam/src/dynamics/se/dyn_comp.F90
++++ b/components/cam/src/dynamics/se/dyn_comp.F90
+@@ -19,7 +19,7 @@ Module dyn_comp
+ 
+ 
+   ! PUBLIC MEMBER FUNCTIONS:
+-  public dyn_init1, dyn_init2, dyn_run
++  public dyn_init1, dyn_init2, dyn_run, dyn_run_finish
+ 
+   ! PUBLIC DATA MEMBERS:
+   public dyn_import_t, dyn_export_t
+@@ -332,9 +332,9 @@ CONTAINS
+   subroutine dyn_run( dyn_state, rc )
+ 
+     ! !USES:
+-    use parallel_mod,     only : par
+-    use prim_driver_mod,  only: prim_run_subcycle
+-    use dimensions_mod,   only : nlev
++    use parallel_mod,     only: par
++    use prim_driver_mod,  only: prim_run_subcycle, prim_run_remap
++    use dimensions_mod,   only: nlev
+     use time_mod,         only: tstep
+     use hybrid_mod,       only: hybrid_create
+ !    use perf_mod, only : t_startf, t_stopf
+@@ -371,6 +371,7 @@ CONTAINS
+           call t_startf("prim_run_sybcycle")
+           call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+                tstep, TimeLevel, hvcoord, n)
++          if (n<se_nsplit) call prim_run_remap(dyn_state%elem,hybrid,nets,nete,tstep, TimeLevel, hvcoord, n)
+           call t_stopf("prim_run_sybcycle")
+        end do
+ 
+@@ -384,6 +385,64 @@ CONTAINS
+     !EOC
+   end subroutine dyn_run
+   !-----------------------------------------------------------------------
++!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++  !-----------------------------------------------------------------------
++  !BOP
++  ! !ROUTINE:  RUN --- Driver for the 
++  !
++  ! !INTERFACE:
++  subroutine dyn_run_finish( dyn_state, rc )
++
++    ! !USES:
++    use parallel_mod,     only: par
++    use prim_driver_mod,  only: prim_run_subcycle, prim_run_remap
++    use dimensions_mod,   only: nlev
++    use time_mod,         only: tstep
++    use hybrid_mod,       only: hybrid_create
++!    use perf_mod, only : t_startf, t_stopf
++    implicit none
++
++
++    type (dyn_export_t), intent(inout)       :: dyn_state   !  container
++    type(hybrid_t) :: hybrid
++
++    integer, intent(out)               :: rc      ! Return code
++    integer ::  n
++    integer :: nets, nete, ithr
++    integer :: ie
++
++    ! !DESCRIPTION:
++    !
++    if(par%dynproc) then
++#ifdef HORIZ_OPENMP
++       !if (iam==0) write (iulog,*) "dyn_run: hthreads=",hthreads,&
++       !                            "max_threads=",omp_get_max_threads()
++       !$OMP PARALLEL NUM_THREADS(hthreads), DEFAULT(SHARED), PRIVATE(ithr,nets,nete,hybrid,n)
++#endif
++#ifdef COLUMN_OPENMP
++       ! nested threads
++       call omp_set_num_threads(vthreads)
++#endif
++       ithr=omp_get_thread_num()
++       nets=dom_mt(ithr)%start
++       nete=dom_mt(ithr)%end
++       hybrid = hybrid_create(par,ithr,hthreads)
++
++       call t_startf("prim_run_sybcycle_finish")
++       call prim_run_remap(dyn_state%elem,hybrid,nets,nete,&
++               tstep, TimeLevel, hvcoord, se_nsplit)
++       call t_stopf("prim_run_sybcycle_finish")
++
++
++#ifdef HORIZ_OPENMP
++       !$OMP END PARALLEL
++#endif
++    end if
++    rc = DYN_RUN_SUCCESS
++
++    !EOC
++  end subroutine dyn_run_finish
++  !-----------------------------------------------------------------------
+ 
+ 
+ 
+diff --git a/components/cam/src/dynamics/se/stepon.F90 b/components/cam/src/dynamics/se/stepon.F90
+index eca17b6..add9084 100644
+--- a/components/cam/src/dynamics/se/stepon.F90
++++ b/components/cam/src/dynamics/se/stepon.F90
+@@ -37,6 +37,7 @@ module stepon
+   public stepon_run1    ! run method phase 1
+   public stepon_run2    ! run method phase 2
+   public stepon_run3    ! run method phase 3
++  public stepon_run4    ! run method phase 4
+   public stepon_final  ! Finalization
+ 
+ !----------------------------------------------------------------------
+@@ -410,6 +411,30 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
+             end do
+          end do
+       endif
++      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++      ! ftype=3:  scale tendencies to dynamics by timestep
++      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++      if (ftype==3) then
++
++         do ic=1,pcnst
++            ! Q  =  data used for forcing, at timelevel nm1   t
++            ! FQ =  adjusted Q returned by forcing,  at time  t+dt
++            ! tendency = (FQ*dp - Q*dp) / dt 
++            ! Convert this to a tendency on Qdp:  CAM physics does not change ps
++            ! so use ps_v at t.  (or, if physics worked with Qdp
++            ! and returned FQdp, tendency = (FQdp-Qdp)/2dt and since physics
++            ! did not change dp, dp would be the same in both terms)
++!$omp parallel do private(k, j, i, dp_tmp)
++            do k=1,nlev
++               do j=1,np
++                  do i=1,np
++                     dyn_in%elem(ie)%derived%FQ(i,j,k,ic)=&
++                          dyn_in%elem(ie)%derived%FQ(i,j,k,ic)*rec2dt
++                  end do
++               end do
++            end do
++         end do
++      endif
+    end do
+    call t_stopf('stepon_bndry_exch')
+ 
+@@ -516,6 +541,24 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
+ 
+ end subroutine stepon_run3
+ 
++subroutine stepon_run4(dtime, cam_out, phys_state, dyn_in, dyn_out)
++   use camsrfexch,  only: cam_out_t     
++   use dyn_comp,    only: dyn_run_finish
++   use time_mod,    only: tstep
++   real(r8), intent(in) :: dtime   ! Time-step
++   type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
++   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
++   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
++   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
++   integer :: rc
++
++   call t_barrierf('sync_dyn_run', mpicom)
++   call t_startf ('dyn_run')
++   call dyn_run_finish(dyn_out,rc)	
++   call t_stopf  ('dyn_run')
++
++end subroutine stepon_run4
++
+ 
+ !----------------------------------------------------------------------- 
+ !BOP
+diff --git a/components/cam/src/physics/cam/physics_types.F90 b/components/cam/src/physics/cam/physics_types.F90
+index 7b5d1ef..d43f696 100644
+--- a/components/cam/src/physics/cam/physics_types.F90
++++ b/components/cam/src/physics/cam/physics_types.F90
+@@ -117,6 +117,7 @@ module physics_types
+      integer   ::   psetcols=0 ! max number of columns set- if subcols = pcols*psubcols, else = pcols
+ 
+      real(r8), dimension(:,:),allocatable        :: dtdt, dudt, dvdt
++     real(r8), dimension(:,:,:),allocatable      :: dqdt
+      real(r8), dimension(:),  allocatable        :: flx_net
+      real(r8), dimension(:),  allocatable        :: &
+           te_tnd,  &! cumulative boundary flux of total energy
+@@ -1381,6 +1382,7 @@ end subroutine physics_ptend_copy
+     tend%dtdt    = 0._r8
+     tend%dudt    = 0._r8
+     tend%dvdt    = 0._r8
++    tend%dqdt    = 0._r8
+     tend%flx_net = 0._r8
+     tend%te_tnd  = 0._r8
+     tend%tw_tnd  = 0._r8
+@@ -1779,6 +1781,9 @@ subroutine physics_tend_alloc(tend,psetcols)
+   allocate(tend%dvdt(psetcols,pver), stat=ierr)
+   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%dvdt')
+ 
++  allocate(tend%dqdt(psetcols,pver,pcnst), stat=ierr)
++  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%dqdt')
++
+   allocate(tend%flx_net(psetcols), stat=ierr)
+   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%flx_net')
+ 
+@@ -1791,6 +1796,7 @@ subroutine physics_tend_alloc(tend,psetcols)
+   tend%dtdt(:,:) = inf
+   tend%dudt(:,:) = inf
+   tend%dvdt(:,:) = inf
++  tend%dqdt(:,:,:) = inf
+   tend%flx_net(:) = inf
+   tend%te_tnd(:) = inf
+   tend%tw_tnd(:) = inf
+@@ -1816,6 +1822,9 @@ subroutine physics_tend_dealloc(tend)
+   deallocate(tend%dvdt, stat=ierr)
+   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%dvdt')
+ 
++  deallocate(tend%dqdt, stat=ierr)
++  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%dqdt')
++
+   deallocate(tend%flx_net, stat=ierr)
+   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%flx_net')
+ 
+diff --git a/components/cam/src/physics/cam/physpkg.F90 b/components/cam/src/physics/cam/physpkg.F90
+index 4aa90bc..0cd70ed 100644
+--- a/components/cam/src/physics/cam/physpkg.F90
++++ b/components/cam/src/physics/cam/physpkg.F90
+@@ -2119,6 +2119,7 @@ subroutine tphysbc (ztodt,               &
+     tend %dTdt(:ncol,:pver)  = 0._r8
+     tend %dudt(:ncol,:pver)  = 0._r8
+     tend %dvdt(:ncol,:pver)  = 0._r8
++    tend %dqdt(:ncol,:pver,:pcnst)  = state %q(:ncol,:pver,:pcnst)
+ 
+ !!== KZ_WCON
+     call check_qflx (state, tend, "PHYBC01", nstep, ztodt, cam_in%cflx(:,1))
+diff --git a/components/homme/src/preqx/prim_advection_mod.F90 b/components/homme/src/preqx/prim_advection_mod.F90
+index 58f89cd..42312bf 100644
+--- a/components/homme/src/preqx/prim_advection_mod.F90
++++ b/components/homme/src/preqx/prim_advection_mod.F90
+@@ -15,7 +15,7 @@ module prim_advection_mod
+   use control_mod, only     : use_semi_lagrange_transport
+   use sl_advection, only    : prim_advec_tracers_remap_ALE, sl_init1
+   use prim_advection_base, only: prim_advec_init1_rk2, prim_advec_tracers_remap_rk2,&
+-       prim_advec_init2
++       prim_advec_init2, prim_advec_tracers_finish
+ 
+   implicit none
+ 
+diff --git a/components/homme/src/preqx/prim_driver_mod.F90 b/components/homme/src/preqx/prim_driver_mod.F90
+index 0cc1834..5325339 100644
+--- a/components/homme/src/preqx/prim_driver_mod.F90
++++ b/components/homme/src/preqx/prim_driver_mod.F90
+@@ -5,6 +5,7 @@ module prim_driver_mod
+     prim_init1,&
+     prim_init2,&
+     prim_run_subcycle,&
++    prim_run_remap,&
+     prim_finalize,&
+     smooth_topo_datasets
+ 
+diff --git a/components/homme/src/preqx/share/prim_advance_mod.F90 b/components/homme/src/preqx/share/prim_advance_mod.F90
+index 506e157..486edc9 100644
+--- a/components/homme/src/preqx/share/prim_advance_mod.F90
++++ b/components/homme/src/preqx/share/prim_advance_mod.F90
+@@ -25,6 +25,7 @@ module prim_advance_mod
+   save
+   public :: prim_advance_exp, prim_advance_init1, &
+        applyCAMforcing_dynamics, applyCAMforcing, vertical_mesh_init2
++  public :: prim_advance_exp_finish
+ 
+   type (EdgeBuffer_t) :: edge3p1
+   real (kind=real_kind), allocatable :: ur_weights(:)
+@@ -521,7 +522,7 @@ contains
+     endif
+ 
+ !    call prim_printstate(elem,tl,hybrid,hvcoord,nets,nete)
+-
++#if 0
+     ! ==============================================
+     ! Time-split Horizontal diffusion: nu.del^2 or nu.del^4
+     ! U(*) = U(t+1)  + dt2 * HYPER_DIFF_TERM(t+1)
+@@ -557,7 +558,7 @@ contains
+        enddo
+     endif
+ #endif
+-
++#endif
+     call t_stopf('prim_advance_exp')
+ !pw call t_adj_detailf(-1)
+     end subroutine prim_advance_exp
+@@ -605,6 +606,7 @@ contains
+                  elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%state%Qdp(i,j,k,q,np1_qdp)+v1
+                  if (q==1) then
+                     elem(ie)%derived%FQps(i,j)=elem(ie)%derived%FQps(i,j)+v1/dt
++                    elem(ie)%state%dp3d(i,j,k,np1) = elem(ie)%state%dp3d(i,j,k,np1) + v1
+                  endif
+               enddo
+            enddo
+@@ -1543,6 +1545,77 @@ contains
+ 
+   end subroutine compute_and_apply_rhs
+ 
++  subroutine prim_advance_exp_finish(elem,hvcoord,hybrid,deriv,tl,nets,nete,dt,compute_diagnostics,compute_viscosity)
++
++    use control_mod,  only: tstep_type, qsplit
++    implicit none
++
++    type (element_t),      intent(inout), target :: elem(:)
++    type (hvcoord_t)                             :: hvcoord
++    type (hybrid_t),       intent(in)            :: hybrid
++    type (derivative_t),   intent(in)            :: deriv
++    type (TimeLevel_t)   , intent(in)            :: tl
++    integer              , intent(in)            :: nets
++    integer              , intent(in)            :: nete
++    real (kind=real_kind), intent(in)            :: dt
++    logical,               intent(in)            :: compute_diagnostics
++    logical,               intent(in)            :: compute_viscosity
++
++    !local
++    integer :: np1, nstep, method, qsplit_stage
++    integer :: ie, k
++    real (kind=real_kind) :: eta_ave_w, dt_vis
++
++    np1   = tl%np1
++    nstep = tl%nstep
++    eta_ave_w = 1d0/qsplit
++    if (tstep_type==1) then
++       method=0                           ! LF
++       qsplit_stage = mod(nstep,qsplit)
++       if (qsplit_stage==0) method=1      ! RK2 on first of qsplit steps
++       ! RK2 + LF scheme has tricky weights:
++       eta_ave_w=ur_weights(qsplit_stage+1)
++    else
++       method = tstep_type                ! other RK variants
++    endif
++    dt_vis = dt
++    if (method==0) dt_vis = 2*dt
++    ! ==============================================
++    ! Time-split Horizontal diffusion: nu.del^2 or nu.del^4
++    ! U(*) = U(t+1)  + dt2 * HYPER_DIFF_TERM(t+1)
++    ! ==============================================
++#ifdef ENERGY_DIAGNOSTICS
++    if (compute_diagnostics) then
++       do ie = nets,nete
++          elem(ie)%accum%DIFF(:,:,:,:)=elem(ie)%state%v(:,:,:,:,np1)
++          elem(ie)%accum%DIFFT(:,:,:)=elem(ie)%state%T(:,:,:,np1)
++       enddo
++    endif
++#endif
++
++    ! note:time step computes u(t+1)= u(t*) + RHS.
++    ! for consistency, dt_vis = t-1 - t*, so this is timestep method dependent
++    if (method<=10 .and. compute_viscosity) then ! not implicit
++       ! forward-in-time, hypervis applied to dp3d
++       call advance_hypervis_dp(edge3p1,elem,hvcoord,hybrid,deriv,np1,nets,nete,dt_vis,eta_ave_w)
++    endif
++
++#ifdef ENERGY_DIAGNOSTICS
++    if (compute_diagnostics) then
++       do ie = nets,nete
++#if (defined COLUMN_OPENMP)
++!$omp parallel do private(k)
++#endif
++         do k=1,nlev  !  Loop index added (AAM)
++          elem(ie)%accum%DIFF(:,:,:,k)=( elem(ie)%state%v(:,:,:,k,np1) -&
++               elem(ie)%accum%DIFF(:,:,:,k) ) / dt_vis
++          elem(ie)%accum%DIFFT(:,:,k)=( elem(ie)%state%T(:,:,k,np1) -&
++               elem(ie)%accum%DIFFT(:,:,k) ) / dt_vis
++         enddo
++       enddo
++    endif
++#endif
++  end subroutine prim_advance_exp_finish
+ 
+ end module prim_advance_mod
+ 
+diff --git a/components/homme/src/share/prim_advection_base.F90 b/components/homme/src/share/prim_advection_base.F90
+index ba4b88e..b5ef936 100644
+--- a/components/homme/src/share/prim_advection_base.F90
++++ b/components/homme/src/share/prim_advection_base.F90
+@@ -72,7 +72,8 @@ module prim_advection_base
+   public :: Prim_Advec_Init1
+   public :: Prim_Advec_Init1_rk2
+   public :: Prim_Advec_Tracers_remap
+-  public :: Prim_Advec_Tracers_remap_rk2   
++  public :: Prim_Advec_Tracers_remap_rk2  
++  public :: prim_advec_tracers_finish 
+ 
+ 
+   type (EdgeBuffer_t)      :: edgeAdv, edgeAdvp1, edgeAdvQminmax
+@@ -215,6 +216,7 @@ contains
+     call qdp_time_avg( elem , rkstage , n0_qdp , np1_qdp , limiter_option , nu_p , nets , nete )
+     call t_stopf('qdp_tavg')
+ 
++#if 0
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     !  Dissipation
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+@@ -231,13 +233,52 @@ contains
+     if (dcmip16_mu_s>0) then
+         call advance_physical_vis(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt,dcmip16_mu_s)
+      endif
+-
++#endif
+     call t_stopf('prim_advec_tracers_remap_rk2')
+ 
+   end subroutine prim_advec_tracers_remap_rk2
+ 
+ !-----------------------------------------------------------------------------
+ !-----------------------------------------------------------------------------
++  subroutine prim_advec_tracers_finish( elem , deriv , hvcoord , hybrid , dt ,tl , nets , nete, compute_viscosity )
++
++    use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
++    use control_mod   , only : qsplit, dcmip16_mu_s
++    implicit none
++    type (element_t)     , intent(inout) :: elem(:)
++    type (derivative_t)  , intent(in   ) :: deriv
++    type (hvcoord_t)     , intent(in   ) :: hvcoord
++    type (hybrid_t)      , intent(in   ) :: hybrid
++    real(kind=real_kind) , intent(in   ) :: dt
++    type (TimeLevel_t)   , intent(inout) :: tl
++    integer              , intent(in   ) :: nets
++    integer              , intent(in   ) :: nete
++    logical              , intent(in   ) :: compute_viscosity
++
++    integer                              :: n0_qdp, np1_qdp
++
++    call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp) !time levels for qdp are not the same
++
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    !  Dissipation
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    if (.not.compute_viscosity) return
++    if ( limiter_option == 8 .or. limiter_option == 9 ) then
++      ! dissipation was applied in RHS.
++    else
++      call t_startf('ah_scalar')
++      call advance_hypervis_scalar(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt)
++      call t_stopf('ah_scalar')
++    endif
++!    call extrae_user_function(0)
++
++    ! physical viscosity for supercell test case
++    if (dcmip16_mu_s>0) then
++        call advance_physical_vis(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt,dcmip16_mu_s)
++     endif
++  end subroutine prim_advec_tracers_finish
++!-----------------------------------------------------------------------------
++!-----------------------------------------------------------------------------
+ 
+   subroutine precompute_divdp( elem , hybrid , deriv , dt , nets , nete , n0_qdp )
+     implicit none
+diff --git a/components/homme/src/share/prim_driver_base.F90 b/components/homme/src/share/prim_driver_base.F90
+index 3af46ef..78ba8eb 100644
+--- a/components/homme/src/share/prim_driver_base.F90
++++ b/components/homme/src/share/prim_driver_base.F90
+@@ -29,7 +29,7 @@ module prim_driver_base
+   implicit none
+ 
+   private
+-  public :: prim_init1, prim_init2 , prim_run_subcycle, prim_finalize
++  public :: prim_init1, prim_init2 , prim_run_subcycle, prim_finalize, prim_run_remap
+   public :: smooth_topo_datasets, deriv1
+ 
+   type (quadrature_t)   :: gp                     ! element GLL points
+@@ -977,7 +977,7 @@ contains
+     call copy_qdp_d2h( elem , np1_qdp )
+     call t_stopf("copy_qdp_h2d")
+ #endif
+-
++#if 0
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     !  apply vertical remap
+     !  always for tracers
+@@ -1038,9 +1038,126 @@ contains
+     if (compute_diagnostics) then
+        call prim_printstate(elem, tl, hybrid,hvcoord,nets,nete)
+     end if
++#endif
+   end subroutine prim_run_subcycle
+ 
++  subroutine prim_run_remap(elem, hybrid,nets,nete,dt, tl, hvcoord,nsubstep)
++
++    use control_mod,        only: statefreq, ftype, qsplit, rsplit,disable_diagnostics
++    use hybvcoord_mod,      only: hvcoord_t
++    use prim_advance_mod,   only: applycamforcing, prim_advance_exp_finish
++    use prim_advection_mod, only: prim_advec_tracers_finish
++    use prim_state_mod,     only: prim_printstate, prim_diag_scalars,prim_energy_halftimes
++    use vertremap_mod,      only: vertical_remap
++    use time_mod,           only: TimeLevel_t, timelevel_update, timelevel_qdp
++#if USE_OPENACC
++    use openacc_utils_mod,  only: copy_qdp_h2d, copy_qdp_d2h
++#endif
++    type (element_t) ,    intent(inout) :: elem(:)
++    type (hybrid_t),      intent(in)    :: hybrid                       ! distributed parallel structure (shared)
++    type (hvcoord_t),     intent(in)    :: hvcoord                      ! hybrid vertical coordinate struct
++    integer,              intent(in)    :: nets                         ! starting thread element number (private)
++    integer,              intent(in)    :: nete                         ! ending thread element number   (private)
++    real(kind=real_kind), intent(in)    :: dt                           ! "timestep dependent" timestep
++    type (TimeLevel_t),   intent(inout) :: tl
++    integer,              intent(in)    :: nsubstep                     ! nsubstep = 1 .. nsplit
++
++    real(kind=real_kind) :: dp, dt_q, dt_remap
++    real(kind=real_kind) :: dp_np1(np,np)
++    integer :: ie,i,j,k,n,q,t
++    integer :: n0_qdp,np1_qdp,nstep_end,nets_in,nete_in
++    logical :: compute_diagnostics
++
++    ! PREAMBLE STUFF
++    dt_q      = dt*qsplit
++    dt_remap  = dt_q
++    nstep_end = tl%nstep + qsplit
++    if (rsplit>0) then
++       dt_remap  = dt_q*rsplit   ! rsplit=0 means use eulerian code, not vert. lagrange
++       nstep_end = tl%nstep + qsplit*rsplit  ! nstep at end of this routine
++    endif
++
++    ! activate diagnostics periodically for display to stdout and on first 2
++    ! timesteps
++    compute_diagnostics   = .false.
++    if (MODULO(nstep_end,statefreq)==0 .or. (tl%nstep <= tl%nstep0+(nstep_end-tl%nstep) )) then
++       compute_diagnostics= .true.
++    endif
++    if(disable_diagnostics) compute_diagnostics= .false.
++    !!!!
++    call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    ! If parallel-split is used apply physics tendencies and last round
++    ! of horizontal hyperviscosity here
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    if (ftype.eq.3) then
++      call t_startf("ApplyCAMForcing")
++      call ApplyCAMForcing(elem, hvcoord,tl%np1,np1_qdp, dt_remap,nets,nete)
++      call t_stopf("ApplyCAMForcing")
++      call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.,.true.)
++      call prim_advec_tracers_finish(elem,deriv1,hvcoord,hybrid,dt_q,tl,nets,nete,.true.)
++    end if 
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    !  apply vertical remap
++    !  always for tracers
++    !  if rsplit>0:  also remap dynamics and compute reference level ps_v
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    call vertical_remap(hybrid,elem,hvcoord,dt_remap,tl%np1,np1_qdp,nets,nete)
++
+ 
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    ! time step is complete.  update some diagnostic variables:
++    ! Q    (mixing ratio)
++    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
++    call t_startf("prim_run_subcyle_diags")
++    do ie=nets,nete
++#if (defined COLUMN_OPENMP)
++       !$omp parallel do default(shared), private(k,q,dp_np1)
++#endif
++       do k=1,nlev    !  Loop inversion (AAM)
++          dp_np1(:,:) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
++               ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*elem(ie)%state%ps_v(:,:,tl%np1)
++          !dir$ simd
++          do q=1,qsize
++             elem(ie)%state%Q(:,:,k,q)=elem(ie)%state%Qdp(:,:,k,q,np1_qdp)/dp_np1(:,:)
++          enddo
++       enddo
++    enddo
++    call t_stopf("prim_run_subcyle_diags")
++
++    ! now we have:
++    !   u(nm1)   dynamics at  t+dt_remap - 2*dt
++    !   u(n0)    dynamics at  t+dt_remap - dt
++    !   u(np1)   dynamics at  t+dt_remap
++    !
++    !   Q(1)   Q at t+dt_remap
++    if (compute_diagnostics) then
++      call t_startf("prim_diag_scalars")
++      call prim_diag_scalars(elem,hvcoord,tl,2,.false.,nets,nete)
++      call t_stopf("prim_diag_scalars")
++
++      call t_startf("prim_energy_halftimes")
++      call prim_energy_halftimes(elem,hvcoord,tl,2,.false.,nets,nete)
++      call t_stopf("prim_energy_halftimes")
++    endif
++
++
++    ! =================================
++    ! update dynamics time level pointers
++    ! =================================
++    call TimeLevel_update(tl,"leapfrog")
++    ! now we have:
++    !   u(nm1)   dynamics at  t+dt_remap - dt       
++    !   u(n0)    dynamics at  t+dt_remap
++    !   u(np1)   undefined
++
++    ! ============================================================
++    ! Print some diagnostic information
++    ! ============================================================
++    if (compute_diagnostics) then
++       call prim_printstate(elem, tl, hybrid,hvcoord,nets,nete)
++    end if
++  end subroutine prim_run_remap
+ 
+   subroutine prim_step(elem, hybrid,nets,nete, dt, tl, hvcoord, compute_diagnostics,rstep)
+   !
+@@ -1064,8 +1181,8 @@ contains
+     use control_mod,        only: use_semi_lagrange_transport
+     use hybvcoord_mod,      only : hvcoord_t
+     use parallel_mod,       only: abortmp
+-    use prim_advance_mod,   only: prim_advance_exp
+-    use prim_advection_mod, only: prim_advec_tracers_remap
++    use prim_advance_mod,   only: prim_advance_exp, prim_advance_exp_finish
++    use prim_advection_mod, only: prim_advec_tracers_remap, prim_advec_tracers_finish
+     use reduction_mod,      only: parallelmax
+     use time_mod,           only: time_at,TimeLevel_t, timelevel_update, nsplit
+ 
+@@ -1083,6 +1200,7 @@ contains
+     real (kind=real_kind)                          :: maxcflx, maxcfly
+     real (kind=real_kind) :: dp_np1(np,np)
+     logical :: compute_diagnostics
++    logical :: compute_viscosity
+ 
+     dt_q = dt*qsplit
+  
+@@ -1104,15 +1222,19 @@ contains
+       elem(ie)%derived%dp(:,:,:)=elem(ie)%state%dp3d(:,:,:,tl%n0)
+     enddo
+ 
++    compute_viscosity = .true.
++    if (rstep.eq.rsplit .and. ftype.eq.3) compute_viscosity = .false.
+     ! ===============
+     ! Dynamical Step
+     ! ===============
+     call t_startf("prim_step_dyn")
+     call prim_advance_exp(elem, deriv1, hvcoord,   &
+          hybrid, dt, tl, nets, nete, compute_diagnostics)
++    call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,compute_diagnostics,compute_viscosity)
+     do n=2,qsplit
+        call TimeLevel_update(tl,"leapfrog")
+        call prim_advance_exp(elem, deriv1, hvcoord,hybrid, dt, tl, nets, nete, .false.)
++       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.,compute_viscosity)
+        ! defer final timelevel update until after Q update.
+     enddo
+     call t_stopf("prim_step_dyn")
+@@ -1139,6 +1261,7 @@ contains
+     if (qsize > 0) then
+       call t_startf("PAT_remap")
+       call Prim_Advec_Tracers_remap(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
++      call prim_advec_tracers_finish(elem,deriv1,hvcoord,hybrid,dt_q,tl,nets,nete,compute_viscosity)
+       call t_stopf("PAT_remap")
+     end if
+     call t_stopf("prim_step_advec")

@@ -29,7 +29,7 @@ module prim_driver_base
   implicit none
 
   private
-  public :: prim_init1, prim_init2 , prim_run_subcycle, prim_finalize
+  public :: prim_init1, prim_init2 , prim_run_subcycle, prim_finalize, prim_run_remap
   public :: smooth_topo_datasets, deriv1
 
   type (quadrature_t)   :: gp                     ! element GLL points
@@ -977,7 +977,7 @@ contains
     call copy_qdp_d2h( elem , np1_qdp )
     call t_stopf("copy_qdp_h2d")
 #endif
-
+#if 0
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !  apply vertical remap
     !  always for tracers
@@ -1038,9 +1038,126 @@ contains
     if (compute_diagnostics) then
        call prim_printstate(elem, tl, hybrid,hvcoord,nets,nete)
     end if
+#endif
   end subroutine prim_run_subcycle
 
+  subroutine prim_run_remap(elem, hybrid,nets,nete,dt, tl, hvcoord,nsubstep)
 
+    use control_mod,        only: statefreq, ftype, qsplit, rsplit,disable_diagnostics
+    use hybvcoord_mod,      only: hvcoord_t
+    use prim_advance_mod,   only: applycamforcing, prim_advance_exp_finish
+    use prim_advection_mod, only: prim_advec_tracers_finish
+    use prim_state_mod,     only: prim_printstate, prim_diag_scalars,prim_energy_halftimes
+    use vertremap_mod,      only: vertical_remap
+    use time_mod,           only: TimeLevel_t, timelevel_update, timelevel_qdp
+#if USE_OPENACC
+    use openacc_utils_mod,  only: copy_qdp_h2d, copy_qdp_d2h
+#endif
+    type (element_t) ,    intent(inout) :: elem(:)
+    type (hybrid_t),      intent(in)    :: hybrid                       ! distributed parallel structure (shared)
+    type (hvcoord_t),     intent(in)    :: hvcoord                      ! hybrid vertical coordinate struct
+    integer,              intent(in)    :: nets                         ! starting thread element number (private)
+    integer,              intent(in)    :: nete                         ! ending thread element number   (private)
+    real(kind=real_kind), intent(in)    :: dt                           ! "timestep dependent" timestep
+    type (TimeLevel_t),   intent(inout) :: tl
+    integer,              intent(in)    :: nsubstep                     ! nsubstep = 1 .. nsplit
+
+    real(kind=real_kind) :: dp, dt_q, dt_remap
+    real(kind=real_kind) :: dp_np1(np,np)
+    integer :: ie,i,j,k,n,q,t
+    integer :: n0_qdp,np1_qdp,nstep_end,nets_in,nete_in
+    logical :: compute_diagnostics
+
+    ! PREAMBLE STUFF
+    dt_q      = dt*qsplit
+    dt_remap  = dt_q
+    nstep_end = tl%nstep + qsplit
+    if (rsplit>0) then
+       dt_remap  = dt_q*rsplit   ! rsplit=0 means use eulerian code, not vert. lagrange
+       nstep_end = tl%nstep + qsplit*rsplit  ! nstep at end of this routine
+    endif
+
+    ! activate diagnostics periodically for display to stdout and on first 2
+    ! timesteps
+    compute_diagnostics   = .false.
+    if (MODULO(nstep_end,statefreq)==0 .or. (tl%nstep <= tl%nstep0+(nstep_end-tl%nstep) )) then
+       compute_diagnostics= .true.
+    endif
+    if(disable_diagnostics) compute_diagnostics= .false.
+    !!!!
+    call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! If parallel-split is used apply physics tendencies and last round
+    ! of horizontal hyperviscosity here
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if (ftype.eq.3) then
+      call t_startf("ApplyCAMForcing")
+      call ApplyCAMForcing(elem, hvcoord,tl%np1,np1_qdp, dt_remap,nets,nete)
+      call t_stopf("ApplyCAMForcing")
+      call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.,.true.)
+      call prim_advec_tracers_finish(elem,deriv1,hvcoord,hybrid,dt_q,tl,nets,nete,.true.)
+    end if 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !  apply vertical remap
+    !  always for tracers
+    !  if rsplit>0:  also remap dynamics and compute reference level ps_v
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    call vertical_remap(hybrid,elem,hvcoord,dt_remap,tl%np1,np1_qdp,nets,nete)
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! time step is complete.  update some diagnostic variables:
+    ! Q    (mixing ratio)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    call t_startf("prim_run_subcyle_diags")
+    do ie=nets,nete
+#if (defined COLUMN_OPENMP)
+       !$omp parallel do default(shared), private(k,q,dp_np1)
+#endif
+       do k=1,nlev    !  Loop inversion (AAM)
+          dp_np1(:,:) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
+               ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*elem(ie)%state%ps_v(:,:,tl%np1)
+          !dir$ simd
+          do q=1,qsize
+             elem(ie)%state%Q(:,:,k,q)=elem(ie)%state%Qdp(:,:,k,q,np1_qdp)/dp_np1(:,:)
+          enddo
+       enddo
+    enddo
+    call t_stopf("prim_run_subcyle_diags")
+
+    ! now we have:
+    !   u(nm1)   dynamics at  t+dt_remap - 2*dt
+    !   u(n0)    dynamics at  t+dt_remap - dt
+    !   u(np1)   dynamics at  t+dt_remap
+    !
+    !   Q(1)   Q at t+dt_remap
+    if (compute_diagnostics) then
+      call t_startf("prim_diag_scalars")
+      call prim_diag_scalars(elem,hvcoord,tl,2,.false.,nets,nete)
+      call t_stopf("prim_diag_scalars")
+
+      call t_startf("prim_energy_halftimes")
+      call prim_energy_halftimes(elem,hvcoord,tl,2,.false.,nets,nete)
+      call t_stopf("prim_energy_halftimes")
+    endif
+
+
+    ! =================================
+    ! update dynamics time level pointers
+    ! =================================
+    call TimeLevel_update(tl,"leapfrog")
+    ! now we have:
+    !   u(nm1)   dynamics at  t+dt_remap - dt       
+    !   u(n0)    dynamics at  t+dt_remap
+    !   u(np1)   undefined
+
+    ! ============================================================
+    ! Print some diagnostic information
+    ! ============================================================
+    if (compute_diagnostics) then
+       call prim_printstate(elem, tl, hybrid,hvcoord,nets,nete)
+    end if
+  end subroutine prim_run_remap
 
   subroutine prim_step(elem, hybrid,nets,nete, dt, tl, hvcoord, compute_diagnostics,rstep)
   !
@@ -1064,8 +1181,8 @@ contains
     use control_mod,        only: use_semi_lagrange_transport
     use hybvcoord_mod,      only : hvcoord_t
     use parallel_mod,       only: abortmp
-    use prim_advance_mod,   only: prim_advance_exp
-    use prim_advection_mod, only: prim_advec_tracers_remap
+    use prim_advance_mod,   only: prim_advance_exp, prim_advance_exp_finish
+    use prim_advection_mod, only: prim_advec_tracers_remap, prim_advec_tracers_finish
     use reduction_mod,      only: parallelmax
     use time_mod,           only: time_at,TimeLevel_t, timelevel_update, nsplit
 
@@ -1083,6 +1200,7 @@ contains
     real (kind=real_kind)                          :: maxcflx, maxcfly
     real (kind=real_kind) :: dp_np1(np,np)
     logical :: compute_diagnostics
+    logical :: compute_viscosity
 
     dt_q = dt*qsplit
  
@@ -1104,15 +1222,19 @@ contains
       elem(ie)%derived%dp(:,:,:)=elem(ie)%state%dp3d(:,:,:,tl%n0)
     enddo
 
+    compute_viscosity = .true.
+    if (rstep.eq.rsplit .and. ftype.eq.3) compute_viscosity = .false.
     ! ===============
     ! Dynamical Step
     ! ===============
     call t_startf("prim_step_dyn")
     call prim_advance_exp(elem, deriv1, hvcoord,   &
          hybrid, dt, tl, nets, nete, compute_diagnostics)
+    call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,compute_diagnostics,compute_viscosity)
     do n=2,qsplit
        call TimeLevel_update(tl,"leapfrog")
        call prim_advance_exp(elem, deriv1, hvcoord,hybrid, dt, tl, nets, nete, .false.)
+       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.,compute_viscosity)
        ! defer final timelevel update until after Q update.
     enddo
     call t_stopf("prim_step_dyn")
@@ -1139,6 +1261,7 @@ contains
     if (qsize > 0) then
       call t_startf("PAT_remap")
       call Prim_Advec_Tracers_remap(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
+      call prim_advec_tracers_finish(elem,deriv1,hvcoord,hybrid,dt_q,tl,nets,nete,compute_viscosity)
       call t_stopf("PAT_remap")
     end if
     call t_stopf("prim_step_advec")

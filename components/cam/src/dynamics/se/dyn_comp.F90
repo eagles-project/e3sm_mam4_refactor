@@ -19,7 +19,7 @@ Module dyn_comp
 
 
   ! PUBLIC MEMBER FUNCTIONS:
-  public dyn_init1, dyn_init2, dyn_run
+  public dyn_init1, dyn_init2, dyn_run, dyn_run_finish
 
   ! PUBLIC DATA MEMBERS:
   public dyn_import_t, dyn_export_t
@@ -332,9 +332,9 @@ CONTAINS
   subroutine dyn_run( dyn_state, rc )
 
     ! !USES:
-    use parallel_mod,     only : par
-    use prim_driver_mod,  only: prim_run_subcycle
-    use dimensions_mod,   only : nlev
+    use parallel_mod,     only: par
+    use prim_driver_mod,  only: prim_run_subcycle, prim_run_remap
+    use dimensions_mod,   only: nlev
     use time_mod,         only: tstep
     use hybrid_mod,       only: hybrid_create
 !    use perf_mod, only : t_startf, t_stopf
@@ -371,6 +371,7 @@ CONTAINS
           call t_startf("prim_run_sybcycle")
           call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
                tstep, TimeLevel, hvcoord, n)
+          if (n<se_nsplit) call prim_run_remap(dyn_state%elem,hybrid,nets,nete,tstep, TimeLevel, hvcoord, n)
           call t_stopf("prim_run_sybcycle")
        end do
 
@@ -383,6 +384,64 @@ CONTAINS
 
     !EOC
   end subroutine dyn_run
+  !-----------------------------------------------------------------------
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !-----------------------------------------------------------------------
+  !BOP
+  ! !ROUTINE:  RUN --- Driver for the 
+  !
+  ! !INTERFACE:
+  subroutine dyn_run_finish( dyn_state, rc )
+
+    ! !USES:
+    use parallel_mod,     only: par
+    use prim_driver_mod,  only: prim_run_subcycle, prim_run_remap
+    use dimensions_mod,   only: nlev
+    use time_mod,         only: tstep
+    use hybrid_mod,       only: hybrid_create
+!    use perf_mod, only : t_startf, t_stopf
+    implicit none
+
+
+    type (dyn_export_t), intent(inout)       :: dyn_state   !  container
+    type(hybrid_t) :: hybrid
+
+    integer, intent(out)               :: rc      ! Return code
+    integer ::  n
+    integer :: nets, nete, ithr
+    integer :: ie
+
+    ! !DESCRIPTION:
+    !
+    if(par%dynproc) then
+#ifdef HORIZ_OPENMP
+       !if (iam==0) write (iulog,*) "dyn_run: hthreads=",hthreads,&
+       !                            "max_threads=",omp_get_max_threads()
+       !$OMP PARALLEL NUM_THREADS(hthreads), DEFAULT(SHARED), PRIVATE(ithr,nets,nete,hybrid,n)
+#endif
+#ifdef COLUMN_OPENMP
+       ! nested threads
+       call omp_set_num_threads(vthreads)
+#endif
+       ithr=omp_get_thread_num()
+       nets=dom_mt(ithr)%start
+       nete=dom_mt(ithr)%end
+       hybrid = hybrid_create(par,ithr,hthreads)
+
+       call t_startf("prim_run_sybcycle_finish")
+       call prim_run_remap(dyn_state%elem,hybrid,nets,nete,&
+               tstep, TimeLevel, hvcoord, se_nsplit)
+       call t_stopf("prim_run_sybcycle_finish")
+
+
+#ifdef HORIZ_OPENMP
+       !$OMP END PARALLEL
+#endif
+    end if
+    rc = DYN_RUN_SUCCESS
+
+    !EOC
+  end subroutine dyn_run_finish
   !-----------------------------------------------------------------------
 
 
