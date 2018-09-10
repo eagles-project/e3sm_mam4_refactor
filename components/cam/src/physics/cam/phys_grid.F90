@@ -528,12 +528,6 @@ contains
        end_dex = end_dex + clat_p_cnt(j)
        call IndexSort(cdex(beg_dex:end_dex),clon_d,descend=.false.)
     enddo
-!+++ Aaron Donahue
-    split_dyn_phys_PE = .false.
-    if (lbal_opt==-2) then
-       lbal_opt = 2
-       split_dyn_phys_PE = .true.
-    end if
     ! Early clean-up, to minimize memory high water mark
     ! (not executing find_partner or find_twin)
     if (((twin_alg .ne. 1) .and. (lbal_opt .ne. 3)) .or. &
@@ -1094,6 +1088,7 @@ contains
     if (masterproc) then
        write(iulog,*) 'PHYS_GRID_INIT:  Using PCOLS=',pcols,     &
             '  phys_loadbalance=',lbal_opt,            &
+            '  split_dyn_phys_PE=',split_dyn_phys_PE,   & 
             '  phys_twin_algorithm=',twin_alg,         &
             '  phys_alltoall=',phys_alltoall,          &
             '  chunks_per_thread=',chunks_per_thread
@@ -1364,6 +1359,13 @@ logical function phys_grid_initialized ()
 !-----------------------------------------------------------------------
      if ( present(phys_loadbalance_in) ) then
         lbal_opt = phys_loadbalance_in
+!+++ Aaron Donahue
+       split_dyn_phys_PE = .false.
+       if (lbal_opt==-2) then
+          lbal_opt = 2
+          split_dyn_phys_PE = .true.
+       end if
+!--- Aaron Donahue
         if ((lbal_opt < min_lbal_opt).or.(lbal_opt > max_lbal_opt)) then
            if (masterproc) then
               write(iulog,*)                                          &
