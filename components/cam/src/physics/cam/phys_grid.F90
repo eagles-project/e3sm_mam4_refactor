@@ -821,7 +821,6 @@ contains
        endif
     enddo
 
-    deallocate( pchunkid )
     !deallocate( npchunks ) !do not deallocate as it is being used in RRTMG radiation.F90
     !
     !-----------------------------------------------------------------------
@@ -1114,6 +1113,7 @@ contains
        write(iulog,*) '=================================================='
     endif
     !
+    deallocate( pchunkid )
 
     call t_stopf("phys_grid_init")
     call t_adj_detailf(+2)
