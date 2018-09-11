@@ -139,6 +139,36 @@ contains
 
     rhu00 = rhlim
 
+  case (4) ! like the slingo formula, but with a different functional form that is C0-continuous and C1-continuous and C2-continuous.
+
+    rhpert = 0._r8
+    gbmrh(:ncol,:pver) = q(:ncol,:pver) /qsat(:ncol,:pver) *(1.0_r8+real(0,r8)*rhpert)
+
+    rhlim = 0.8_r8
+    rhdif(:ncol,:pver) = (gbmrh(:ncol,:pver) - rhlim)
+
+    ! Cloud fraction f
+    ast (:ncol,:pver)  = 5.0_r8*(rhdif(:ncol,:pver) + (0.1_r8/pi)*sin(pi*(rhdif(:ncol,:pver) -0.1_r8)/0.1_r8))
+    ast(:ncol,:pver)   =  max( min(ast(:ncol,:pver),1.0_r8), 0._r8)
+
+    ! Limiters on cloud fraction f
+    ast (:ncol,:pver) = min(fmax, ast (:ncol,:pver) )
+
+    ! df/dRH
+    dastdrh(:ncol,:pver) = 0._r8
+    dastdrh(:ncol,:pver) = 5.0_r8*(1.0_r8 + cos(pi*(rhdif(:ncol,:pver) -0.1_r8)/0.1_r8))
+    where( (ast(:ncol,:pver).le. 0._r8) .or. (ast(:ncol,:pver).ge.fmax) )
+      dastdrh(:ncol,:pver) = 0._r8
+    end where
+
+    ! dln(f)/dRH
+    dlnastdrh(:ncol,:pver) = 0._r8
+    where( (ast(:ncol,:pver).gt. 0._r8) .and. (ast(:ncol,:pver).lt.fmax) )
+      dlnastdrh(:ncol,:pver) = 1._r8/ast(:ncol,:pver) * dastdrh(:ncol,:pver)
+    end where
+
+    rhu00 = rhlim
+
   case default
     write(iulog,*) "Unrecognized value of smpl_frc_schm:",smpl_frc_schm,". Abort."
     call endrun
