@@ -608,22 +608,22 @@ end subroutine check_energy_get_integrals
     ! surface pressure for heating rate (assume uniform ptop)
     call gmean(te, te_glob, 3)
 
+    teinp_glob = te_glob(1)
+    teout_glob = te_glob(2)
+    psurf_glob = te_glob(3)
+
+    ! Global mean total energy difference
+    tedif_glob =  teinp_glob - teout_glob
     if (begchunk .le. endchunk) then
-       teinp_glob = te_glob(1)
-       teout_glob = te_glob(2)
-       psurf_glob = te_glob(3)
        ptopb_glob = state(begchunk)%pint(1,1)
-
-       ! Global mean total energy difference
-       tedif_glob =  teinp_glob - teout_glob
        heat_glob  = -tedif_glob/dtime * gravit / (psurf_glob - ptopb_glob)
-
-       if (masterproc) then
-          write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob
-       end if
     else
        heat_glob = 0._r8
     end if  !  (begchunk .le. endchunk)
+
+    if (masterproc) then
+       write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob
+    end if
     
   end subroutine check_energy_gmean
 

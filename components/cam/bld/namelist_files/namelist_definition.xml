@@ -518,6 +518,7 @@ Default: 1
 <entry id="phys_loadbalance" type="integer"  category="perf_dp_coup"
        group="cam_inparm" valid_values="">
 Physics grid decomposition options.
+-2: like 2 except dyn and phys blocks on separate PE's
 -1: each chunk is a dynamics block.
  0: chunk definitions and assignments do not require interprocess comm.
  1: chunk definitions and assignments do not require internode comm.
