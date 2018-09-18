@@ -98,12 +98,16 @@
       integer gptlsetoption
       integer gptlinitialize
       integer gptlstart
+      real(kind=8) gptlstartw
       integer gptlstart_handle
       integer gptlstartf
+      real(kind=8) gptlstartfw
       integer gptlstartf_handle
       integer gptlstop
+      real(kind=8) gptlstopw
       integer gptlstop_handle
       integer gptlstopf
+      real(kind=8) gptlstopfw
       integer gptlstopf_handle
       integer gptlstartstop_vals
       integer gptlstartstop_valsf
@@ -137,12 +141,16 @@
       external gptlsetoption
       external gptlinitialize
       external gptlstart
+      external gptlstartw
       external gptlstart_handle
       external gptlstartf
+      external gptlstartfw
       external gptlstartf_handle
       external gptlstop
+      external gptlstopw
       external gptlstop_handle
       external gptlstopf
+      external gptlstopfw
       external gptlstopf_handle
       external gptlstartstop_vals
       external gptlstartstop_valsf

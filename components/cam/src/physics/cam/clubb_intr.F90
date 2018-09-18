@@ -1581,6 +1581,9 @@ end subroutine clubb_init_cnst
          thv_ds_zt(k+1)       = thv(i,pver-k+1)                                      ! thetav on thermo
          rfrzm(k+1)           = state1%q(i,pver-k+1,ixcldice)   
          radf(k+1)            = radf_clubb(i,pver-k+1)
+!#ifndef NDEBUG
+!         write(*,'(a,i10,a,i10,a,i10,a,es20.10,a,es20.10)') "ndk: k=", k, " i=", i, " pver-k+1=", pver-k+1, " dem=", cpair*state1%pdel(i,pver-k+1), " qrl=", qrl(i,pver-k+1)
+!#endif
          qrl_clubb(k+1)       = qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1))
       enddo
 

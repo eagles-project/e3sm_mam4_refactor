@@ -4244,6 +4244,9 @@ logical function phys_grid_initialized ()
          if (nsmpchunks(smp) < chunks_per_thread*nsmpthreads(smp)) then
             nsmpchunks(smp) = chunks_per_thread*nsmpthreads(smp)
          endif
+         !write(*,'(4(a,i10))') "ndk smp=", smp, " nsmpx=", nsmpx, " nchunks=", nchunks, " pcols=", pcols
+         !write(*,'(4(a,i10))') "ndk smp=", smp, " nsmpthreads(smp)=", nsmpthreads(smp), &
+         !     " nsmpcolumns(smp)=", nsmpcolumns(smp), " nsmpchunks(smp)=", nsmpchunks(smp)
          do while (mod(nsmpchunks(smp), nsmpthreads(smp)) .ne. 0)
             nsmpchunks(smp) = nsmpchunks(smp) + 1
          enddo

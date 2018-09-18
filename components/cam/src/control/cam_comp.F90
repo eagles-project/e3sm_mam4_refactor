@@ -237,9 +237,9 @@ subroutine cam_run1(cam_in, cam_out)
    ! Return time-step for physics from dynamics.
    !----------------------------------------------------------
    call t_barrierf ('sync_stepon_run1', mpicom)
-   call t_startf ('stepon_run1')
+   call t_startfw ('stepon_run1', 14) !ndk
    call stepon_run1( dtime, phys_state, phys_tend, pbuf2d, dyn_in, dyn_out )
-   call t_stopf  ('stepon_run1')
+   call t_stopfw  ('stepon_run1', 14)
 
    !
    !----------------------------------------------------------
@@ -247,19 +247,19 @@ subroutine cam_run1(cam_in, cam_out)
    !----------------------------------------------------------
    !
    call t_barrierf ('sync_phys_run1', mpicom)
-   call t_startf ('phys_run1')
+   call t_startfw ('phys_run1', 15) !ndk
    call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out)
-   call t_stopf  ('phys_run1')
+   call t_stopfw  ('phys_run1', 15)
 
    if (ftype.eq.3) then
    !
    ! Third phase of dynamics
    !
    call t_barrierf ('sync_stepon_run3', mpicom)
-   call t_startf ('stepon_run3')
+   call t_startfw ('stepon_run3', 18) !ndk
    call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run3')
+   call t_stopfw  ('stepon_run3', 18)
    end if
 end subroutine cam_run1
 
@@ -292,18 +292,18 @@ subroutine cam_run2( cam_out, cam_in )
    ! Second phase of physics (after surface model update)
    !
    call t_barrierf ('sync_phys_run2', mpicom)
-   call t_startf ('phys_run2')
+   call t_startfw ('phys_run2', 16) !ndk
    call phys_run2(phys_state, dtime, phys_tend, pbuf2d,  cam_out, cam_in )
-   call t_stopf  ('phys_run2')
+   call t_stopfw  ('phys_run2', 16)
 
    !
    ! Second phase of dynamics (at least couple from physics to dynamics)
    !
    call t_barrierf ('sync_stepon_run2', mpicom)
-   call t_startf ('stepon_run2')
+   call t_startfw ('stepon_run2', 17) !ndk 
    call stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run2')
+   call t_stopfw  ('stepon_run2', 17)
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run2_memusage')
@@ -338,20 +338,20 @@ subroutine cam_run3( cam_out )
    ! Third phase of dynamics
    !
    call t_barrierf ('sync_stepon_run3', mpicom)
-   call t_startf ('stepon_run3')
+   call t_startfw ('stepon_run3', 18) !ndk
    call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run3')
+   call t_stopfw  ('stepon_run3', 18)
    end if
 
    !
    ! Third phase of dynamics
    !
    call t_barrierf ('sync_stepon_run4', mpicom)
-   call t_startf ('stepon_run4')
+   call t_startfw ('stepon_run4', 19) !ndk
    call stepon_run4( dtime, cam_out, phys_state, dyn_in, dyn_out )
 
-   call t_stopf  ('stepon_run4')
+   call t_stopfw  ('stepon_run4', 19)
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run3_memusage')
