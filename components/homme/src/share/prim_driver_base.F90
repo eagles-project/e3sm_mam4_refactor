@@ -835,7 +835,7 @@ contains
 
 
 
-  subroutine prim_run_subcycle(elem, hybrid,nets,nete, dt, tl, hvcoord,nsubstep)
+  subroutine prim_run_subcycle(elem, hybrid,nets,nete, dt, tl, hvcoord,nsubstep, mode)
 
     !   advance dynamic variables and tracers (u,v,T,ps,Q,C) from time t to t + dt_q
     !
@@ -871,13 +871,29 @@ contains
     real(kind=real_kind), intent(in)    :: dt                           ! "timestep dependent" timestep
     type (TimeLevel_t),   intent(inout) :: tl
     integer,              intent(in)    :: nsubstep                     ! nsubstep = 1 .. nsplit
+    integer, optional,    intent(in)    :: mode
 
     real(kind=real_kind) :: dp, dt_q, dt_remap
     real(kind=real_kind) :: dp_np1(np,np)
     integer :: ie,i,j,k,n,q,t
     integer :: n0_qdp,np1_qdp,r,nstep_end
     logical :: compute_diagnostics
+    logical :: run_prim, run_remap
     ! compute timesteps for tracer transport and vertical remap
+
+    ! Determine which parts of the prim_run_subcycle to be taken
+    run_prim = .true.
+    run_remap = .true.
+    if (present(mode)) then
+       select case (mode)
+          case (1) ! Just run the prim step, but not the final remapping step
+             run_remap = .false.
+          case (2) ! Skip the prim step and go right to the remapping step
+             run_prim = .false.
+          case default
+             ! do nothing leave flags as is
+       end select
+    end if
 
     dt_q      = dt*qsplit
     dt_remap  = dt_q
@@ -894,6 +910,7 @@ contains
     endif
     if(disable_diagnostics) compute_diagnostics= .false.
 
+    if (run_prim) then ! +++AaronDonahue
     ! compute scalar diagnostics if currently active
     if (compute_diagnostics) then
       call t_startf("prim_diag_scalars")
@@ -968,6 +985,8 @@ contains
        call prim_step(elem, hybrid,nets,nete, dt, tl, hvcoord,.false.,r)
        call t_stopf("prim_step_rX")
     enddo
+    end if ! run_prim   ---AaronDonahue
+    if (run_remap) then ! +++AaronDonahue
     ! defer final timelevel update until after remap and diagnostics
     !compute timelevels for tracers (no longer the same as dynamics)
     call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
@@ -1038,6 +1057,7 @@ contains
     if (compute_diagnostics) then
        call prim_printstate(elem, tl, hybrid,hvcoord,nets,nete)
     end if
+    end if ! run_remap  ---AaronDonahue
   end subroutine prim_run_subcycle
 
 
@@ -1064,8 +1084,8 @@ contains
     use control_mod,        only: use_semi_lagrange_transport
     use hybvcoord_mod,      only : hvcoord_t
     use parallel_mod,       only: abortmp
-    use prim_advance_mod,   only: prim_advance_exp
-    use prim_advection_mod, only: prim_advec_tracers_remap
+    use prim_advance_mod,   only: prim_advance_exp, prim_advance_exp_finish
+    use prim_advection_mod, only: prim_advec_tracers_remap, prim_advec_tracers_finish
     use reduction_mod,      only: parallelmax
     use time_mod,           only: time_at,TimeLevel_t, timelevel_update, nsplit
 
@@ -1110,9 +1130,11 @@ contains
     call t_startf("prim_step_dyn")
     call prim_advance_exp(elem, deriv1, hvcoord,   &
          hybrid, dt, tl, nets, nete, compute_diagnostics)
+    call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,compute_diagnostics)
     do n=2,qsplit
        call TimeLevel_update(tl,"leapfrog")
        call prim_advance_exp(elem, deriv1, hvcoord,hybrid, dt, tl, nets, nete, .false.)
+       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.)
        ! defer final timelevel update until after Q update.
     enddo
     call t_stopf("prim_step_dyn")
@@ -1139,6 +1161,7 @@ contains
     if (qsize > 0) then
       call t_startf("PAT_remap")
       call Prim_Advec_Tracers_remap(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
+      call prim_advec_tracers_finish(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
       call t_stopf("PAT_remap")
     end if
     call t_stopf("prim_step_advec")

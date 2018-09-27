@@ -24,7 +24,8 @@ module prim_advance_mod
   private
   save
   public :: prim_advance_exp, prim_advance_init1, &
-       applyCAMforcing_dynamics, applyCAMforcing, vertical_mesh_init2
+       applyCAMforcing_dynamics, applyCAMforcing, vertical_mesh_init2, &
+       prim_advance_exp_finish
 
   type (EdgeBuffer_t) :: edge3p1
   real (kind=real_kind), allocatable :: ur_weights(:)
@@ -521,7 +522,7 @@ contains
     endif
 
 !    call prim_printstate(elem,tl,hybrid,hvcoord,nets,nete)
-
+#if 0
     ! ==============================================
     ! Time-split Horizontal diffusion: nu.del^2 or nu.del^4
     ! U(*) = U(t+1)  + dt2 * HYPER_DIFF_TERM(t+1)
@@ -558,6 +559,7 @@ contains
     endif
 #endif
 
+#endif
     call t_stopf('prim_advance_exp')
 !pw call t_adj_detailf(-1)
     end subroutine prim_advance_exp
@@ -1543,6 +1545,76 @@ contains
 
   end subroutine compute_and_apply_rhs
 
+  subroutine prim_advance_exp_finish(elem,hvcoord,hybrid,deriv,tl,nets,nete,dt,compute_diagnostics)
+
+    use control_mod,  only: tstep_type, qsplit
+    implicit none
+
+    type (element_t),      intent(inout), target :: elem(:)
+    type (hvcoord_t)                             :: hvcoord
+    type (hybrid_t),       intent(in)            :: hybrid
+    type (derivative_t),   intent(in)            :: deriv
+    type (TimeLevel_t)   , intent(in)            :: tl
+    integer              , intent(in)            :: nets
+    integer              , intent(in)            :: nete
+    real (kind=real_kind), intent(in)            :: dt
+    logical,               intent(in)            :: compute_diagnostics
+
+    !local
+    integer :: np1, nstep, method, qsplit_stage
+    integer :: ie, k
+    real (kind=real_kind) :: eta_ave_w, dt_vis
+
+    np1   = tl%np1
+    nstep = tl%nstep
+    eta_ave_w = 1d0/qsplit
+    if (tstep_type==1) then
+       method=0                           ! LF
+       qsplit_stage = mod(nstep,qsplit)
+       if (qsplit_stage==0) method=1      ! RK2 on first of qsplit steps
+       ! RK2 + LF scheme has tricky weights:
+       eta_ave_w=ur_weights(qsplit_stage+1)
+    else
+       method = tstep_type                ! other RK variants
+    endif
+    dt_vis = dt
+    if (method==0) dt_vis = 2*dt
+    ! ==============================================
+    ! Time-split Horizontal diffusion: nu.del^2 or nu.del^4
+    ! U(*) = U(t+1)  + dt2 * HYPER_DIFF_TERM(t+1)
+    ! ==============================================
+#ifdef ENERGY_DIAGNOSTICS
+    if (compute_diagnostics) then
+       do ie = nets,nete
+          elem(ie)%accum%DIFF(:,:,:,:)=elem(ie)%state%v(:,:,:,:,np1)
+          elem(ie)%accum%DIFFT(:,:,:)=elem(ie)%state%T(:,:,:,np1)
+       enddo
+    endif
+#endif
+
+    ! note:time step computes u(t+1)= u(t*) + RHS.
+    ! for consistency, dt_vis = t-1 - t*, so this is timestep method dependent
+    if (method<=10) then ! not implicit
+       ! forward-in-time, hypervis applied to dp3d
+       call advance_hypervis_dp(edge3p1,elem,hvcoord,hybrid,deriv,np1,nets,nete,dt_vis,eta_ave_w)
+    endif
+
+#ifdef ENERGY_DIAGNOSTICS
+    if (compute_diagnostics) then
+       do ie = nets,nete
+#if (defined COLUMN_OPENMP)
+!$omp parallel do private(k)
+#endif
+         do k=1,nlev  !  Loop index added (AAM)
+          elem(ie)%accum%DIFF(:,:,:,k)=( elem(ie)%state%v(:,:,:,k,np1) -&
+               elem(ie)%accum%DIFF(:,:,:,k) ) / dt_vis
+          elem(ie)%accum%DIFFT(:,:,k)=( elem(ie)%state%T(:,:,k,np1) -&
+               elem(ie)%accum%DIFFT(:,:,k) ) / dt_vis
+         enddo
+       enddo
+    endif
+#endif
+  end subroutine prim_advance_exp_finish
 
 end module prim_advance_mod
 

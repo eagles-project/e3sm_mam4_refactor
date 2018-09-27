@@ -348,6 +348,7 @@ CONTAINS
     integer ::  n
     integer :: nets, nete, ithr
     integer :: ie
+    integer :: remap_mode
 
     ! !DESCRIPTION:
     !
@@ -366,13 +367,17 @@ CONTAINS
        nete=dom_mt(ithr)%end
        hybrid = hybrid_create(par,ithr,hthreads)
 
+       remap_mode = 0
        do n=1,se_nsplit
+          if (n.eq.se_nsplit) remap_mode = 1
           ! forward-in-time RK, with subcycling
           call t_startf("prim_run_sybcycle")
           call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-               tstep, TimeLevel, hvcoord, n)
+               tstep, TimeLevel, hvcoord, n, mode=remap_mode)
           call t_stopf("prim_run_sybcycle")
        end do
+       call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+            tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
 
 
 #ifdef HORIZ_OPENMP

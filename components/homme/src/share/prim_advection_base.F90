@@ -72,7 +72,8 @@ module prim_advection_base
   public :: Prim_Advec_Init1
   public :: Prim_Advec_Init1_rk2
   public :: Prim_Advec_Tracers_remap
-  public :: Prim_Advec_Tracers_remap_rk2   
+  public :: Prim_Advec_Tracers_remap_rk2  
+  public :: prim_advec_tracers_finish 
 
 
   type (EdgeBuffer_t)      :: edgeAdv, edgeAdvp1, edgeAdvQminmax
@@ -214,6 +215,47 @@ contains
     call t_startf('qdp_tavg')
     call qdp_time_avg( elem , rkstage , n0_qdp , np1_qdp , limiter_option , nu_p , nets , nete )
     call t_stopf('qdp_tavg')
+#if 0
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !  Dissipation
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if ( limiter_option == 8 .or. limiter_option == 9 ) then
+      ! dissipation was applied in RHS.
+    else
+      call t_startf('ah_scalar')
+      call advance_hypervis_scalar(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt)
+      call t_stopf('ah_scalar')
+    endif
+!    call extrae_user_function(0)
+
+    ! physical viscosity for supercell test case
+    if (dcmip16_mu_s>0) then
+        call advance_physical_vis(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt,dcmip16_mu_s)
+     endif
+#endif
+    call t_stopf('prim_advec_tracers_remap_rk2')
+
+  end subroutine prim_advec_tracers_remap_rk2
+
+!-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
+  subroutine prim_advec_tracers_finish( elem , deriv , hvcoord , hybrid , dt ,tl , nets , nete )
+
+    use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
+    use control_mod   , only : qsplit, dcmip16_mu_s
+    implicit none
+    type (element_t)     , intent(inout) :: elem(:)
+    type (derivative_t)  , intent(in   ) :: deriv
+    type (hvcoord_t)     , intent(in   ) :: hvcoord
+    type (hybrid_t)      , intent(in   ) :: hybrid
+    real(kind=real_kind) , intent(in   ) :: dt
+    type (TimeLevel_t)   , intent(inout) :: tl
+    integer              , intent(in   ) :: nets
+    integer              , intent(in   ) :: nete
+
+    integer                              :: n0_qdp, np1_qdp
+
+    call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp) !time levels for qdp are not the same
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !  Dissipation
@@ -231,11 +273,7 @@ contains
     if (dcmip16_mu_s>0) then
         call advance_physical_vis(edgeadv,elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt,dcmip16_mu_s)
      endif
-
-    call t_stopf('prim_advec_tracers_remap_rk2')
-
-  end subroutine prim_advec_tracers_remap_rk2
-
+  end subroutine prim_advec_tracers_finish
 !-----------------------------------------------------------------------------
 !-----------------------------------------------------------------------------
 
