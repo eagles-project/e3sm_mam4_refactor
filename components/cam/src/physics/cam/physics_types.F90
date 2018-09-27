@@ -87,7 +87,8 @@ module physics_types
           zm        ! geopotential height above surface at midpoints (m)
 
      real(r8), dimension(:,:,:),allocatable      :: &
-          q         ! constituent mixing ratio (kg/kg moist or dry air depending on type)
+          q, &      ! constituent mixing ratio (kg/kg moist or dry air depending on type)
+          q0        ! constituent mixing ratio (kg/kg moist or dry air depending on type)
 
      real(r8), dimension(:,:),allocatable        :: &
           pint,    &! interface pressure (Pa)
@@ -604,6 +605,8 @@ contains
     ! 3-D variables
     call shr_assert_in_domain(state%q(:ncol,:,:),       is_nan=.false., &
          varname="state%q",         msg=msg)
+    call shr_assert_in_domain(state%q0(:ncol,:,:),      is_nan=.false., &
+         varname="state%q0",        msg=msg)
 
     ! Now run other checks (i.e. values are finite and within a range that
     ! is physically meaningful).
@@ -679,6 +682,8 @@ contains
     do m = 1,pcnst
        call shr_assert_in_domain(state%q(:ncol,:,m),    lt=posinf_r8, ge=qmin(m), &
             varname="state%q ("//trim(cnst_name(m))//")", msg=msg)
+       call shr_assert_in_domain(state%q0(:ncol,:,m),   lt=posinf_r8, ge=qmin(m), &
+            varname="state%q0("//trim(cnst_name(m))//")", msg=msg)
     end do
 
   end subroutine physics_state_check
@@ -1354,6 +1359,7 @@ end subroutine physics_ptend_copy
        do k = 1, pver
           do i = 1, ncol
              state_out%q(i,k,m) = state_in%q(i,k,m) 
+             state_out%q0(i,k,m) = state_in%q0(i,k,m) 
           end do
        end do
     end do
@@ -1566,6 +1572,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%q(psetcols,pver,pcnst), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%q')
   
+  allocate(state%q0(psetcols,pver,pcnst), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%q0')
+  
   allocate(state%pint(psetcols,pver+1), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%pint')
   
@@ -1625,6 +1634,7 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%exner(:,:) = inf
   state%zm(:,:) = inf
   state%q(:,:,:) = inf
+  state%q0(:,:,:) = inf
       
   state%pint(:,:) = inf
   state%pintdry(:,:) = inf
@@ -1716,6 +1726,9 @@ subroutine physics_state_dealloc(state)
   
   deallocate(state%q, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%q')
+  
+  deallocate(state%q0, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%q0')
   
   deallocate(state%pint, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%pint')

@@ -255,6 +255,7 @@ CONTAINS
 
                 do m=1,pcnst
                    phys_state(lchnk)%q  (icol,ilyr,m) = cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m)
+                   phys_state(lchnk)%q0 (icol,ilyr,m) = cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m)
                 end do
 
              end do
@@ -302,6 +303,7 @@ CONTAINS
   subroutine p_d_coupling(phys_state, phys_tend,  dyn_in)
     use shr_vmath_mod, only: shr_vmath_log
     use cam_control_mod, only : adiabatic
+    use control_mod,    only: ftype
     implicit none
 
 ! !INPUT PARAMETERS:
@@ -330,6 +332,7 @@ CONTAINS
     integer :: bpter(npsq,0:pver)    ! offsets into block buffer for unpacking data
 
     real (kind=real_kind), allocatable, dimension(:) :: bbuffer, cbuffer ! transpose buffers
+    real (kind=real_kind) :: dtime
 
     if (par%dynproc) then
        elem => dyn_in%elem
@@ -362,7 +365,12 @@ CONTAINS
                 uv_tmp(ioff,2,ilyr,ie)   = phys_tend(lchnk)%dvdt(icol,ilyr)
 
                 do m=1,pcnst
-                   q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
+                   if (ftype.ge.0) then
+                      q_tmp(ioff,ilyr,m,ie) = phys_state(lchnk)%q(icol,ilyr,m)
+                   else
+                      q_tmp(ioff,ilyr,m,ie) = (phys_state(lchnk)%q(icol,ilyr,m) - &
+                          phys_state(lchnk)%q0(icol,ilyr,m))*phys_state(lchnk)%pdel(icol,ilyr)
+                   end if
                 end do
              end do
 
@@ -395,7 +403,12 @@ CONTAINS
                 cbuffer   (cpter(icol,ilyr)+2)   = phys_tend(lchnk)%dvdt(icol,ilyr)
 
                 do m=1,pcnst
-                   cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
+                   if (ftype.ge.0) then
+                      cbuffer(cpter(icol,ilyr)+2+m) = phys_state(lchnk)%q(icol,ilyr,m)
+                   else
+                      cbuffer(cpter(icol,ilyr)+2+m) = (phys_state(lchnk)%q(icol,ilyr,m) - &
+                             phys_state(lchnk)%q0(icol,ilyr,m))*phys_state(lchnk)%pdel(icol,ilyr)
+                   end if
                 end do
              end do
 

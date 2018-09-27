@@ -199,13 +199,14 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
    use dimensions_mod, only: nlev, nelemd, np, npsq
    use dp_coupling,    only: p_d_coupling
    use parallel_mod,   only: par
-   use dyn_comp,       only: TimeLevel
+   use dyn_comp,       only: TimeLevel, hvcoord
    
    use time_mod,        only: tstep, phys_tscale, TimeLevel_Qdp   !  dynamics typestep
    use control_mod,     only: ftype, qsplit, smooth_phis_numcycle
    use hycoef,          only: hyai, hybi, ps0
    use cam_history,     only: outfld, hist_fld_active
    use nctopo_util_mod, only: phisdyn,sghdyn,sgh30dyn
+   use prim_advance_mod,only: applycamforcing, applycamforcing_dynamics, applycamforcing_tracers
 
 
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
@@ -385,7 +386,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0) then
+      if (ftype==0) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -410,7 +411,41 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
             end do
          end do
       endif
+
    end do
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! ftype<0 (consistent tendencies):  just return tendencies to dynamics
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   if (ftype<0) then
+      ! Since the tendencies are consistent then the only step is to apply
+      ! cam forcing appropriately:
+      ! ftype = -2, hybrid approach, update Q but dribble in T,U,V
+      ! ftype = -1, sequential update, update Q,T,U and V
+      ! ftype = -10, similar to ftype=0 but adopt consistent tendencies (so do nothing)
+      do ie = 1,nelemd
+         do ic=1,pcnst
+            do k=1,nlev
+               do j=1,np
+                  do i=1,np
+                     dyn_in%elem(ie)%derived%FQ(i,j,k,ic)=&
+                          (  dyn_in%elem(ie)%derived%FQ(i,j,k,ic) )*rec2dt
+                  end do
+               end do
+            end do
+         end do
+      end do
+
+      if (ftype==-1) then
+         call t_startf("ApplyCAMForcing")
+         call ApplyCAMForcing(dyn_in%elem, hvcoord,tl_f,tl_fqdp, dtime,1,nelemd)
+         call t_stopf("ApplyCAMForcing")
+      elseif (ftype==-2) then
+         call t_startf("ApplyCAMForcing_tracers")
+         call ApplyCAMForcing_tracers(dyn_in%elem, hvcoord,tl_f,tl_fqdp, dtime,1,nelemd)
+         call t_stopf("ApplyCAMForcing_tracers")
+      end if
+   endif
+
    call t_stopf('stepon_bndry_exch')
 
 

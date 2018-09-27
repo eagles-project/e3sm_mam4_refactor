@@ -935,12 +935,12 @@ contains
     !   ftype= 1: forcing was applied time-split in CAM coupling layer
     !   ftype= 0: apply all forcing here
     !   ftype=-1: do not apply forcing
-    if (ftype==0) then
+    if (ftype==0.or.ftype==-10) then
       call t_startf("ApplyCAMForcing")
       call ApplyCAMForcing(elem, hvcoord,tl%n0,n0_qdp, dt_remap,nets,nete)
       call t_stopf("ApplyCAMForcing")
 
-    elseif (ftype==2) then
+    elseif (abs(ftype)==2) then
       call t_startf("ApplyCAMForcing_dynamics")
       call ApplyCAMForcing_dynamics(elem, hvcoord,tl%n0,n0_qdp,dt_remap,nets,nete)
       call t_stopf("ApplyCAMForcing_dynamics")

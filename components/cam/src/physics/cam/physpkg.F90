@@ -2131,12 +2131,15 @@ subroutine tphysbc (ztodt,               &
       !!.................................................................
        call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
             1, pcnst, qmin  ,state%q, .False.)
+       call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
+            1, pcnst, qmin  ,state%q0, .False.)
 
       !! tracer borrower for mass conservation 
       !!.................................................................
 
        do m = 1, pcnst 
           call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q(1,1,m),state%pdel)
+          call massborrow("PHYBC01",lchnk,ncol,state%psetcols,m,m,qmin(m),state%q0(1,1,m),state%pdel)
        end do
 
 !!      call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
@@ -2148,6 +2151,8 @@ subroutine tphysbc (ztodt,               &
 
       call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
            1, pcnst, qmin  ,state%q, .True. )
+      call qneg3('TPHYSBCb',lchnk  ,ncol    ,pcols   ,pver    , &
+           1, pcnst, qmin  ,state%q0, .True. )
 
     end if 
 
