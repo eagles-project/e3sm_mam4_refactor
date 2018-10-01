@@ -5742,11 +5742,12 @@ Default: Set by build-namelist.
 </entry>
 
 <entry id="se_ftype" type="integer" category="se"
-       group="ctl_nl" valid_values="0,1,2,-1,-2,-10" >
+       group="ctl_nl" valid_values="0,1,2,3,-1,-2,-3,-10" >
 CAM physics forcing option:
 0: tendencies
 1: adjustments
 2: hybrid
+3: parallel-split
 negative version applies consistent Q tendencies (-10 corresponds to 0)
 Default: Set by build-namelist.
 </entry>

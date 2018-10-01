@@ -997,6 +997,12 @@ contains
     call t_stopf("copy_qdp_h2d")
 #endif
 
+    ! Apply physics tendencies if Parallel-Split turned on
+    if (abs(ftype)==3) then
+      call t_startf("ApplyCAMForcing")
+      call ApplyCAMForcing(elem, hvcoord,tl%np1,np1_qdp, dt_remap,nets,nete)
+      call t_stopf("ApplyCAMForcing")
+    end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !  apply vertical remap
     !  always for tracers

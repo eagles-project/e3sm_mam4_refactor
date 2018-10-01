@@ -386,7 +386,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype==0) then
+      if (ftype==0.or.ftype==3) then
 
          do ic=1,pcnst
             ! Q  =  data used for forcing, at timelevel nm1   t
@@ -421,7 +421,8 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       ! cam forcing appropriately:
       ! ftype = -2, hybrid approach, update Q but dribble in T,U,V
       ! ftype = -1, sequential update, update Q,T,U and V
-      ! ftype = -10, similar to ftype=0 but adopt consistent tendencies (so do nothing)
+      ! ftype = -10, similar to ftype=0 but adopt consistent tendencies
+      ! ftype = -3, parallel-split algorithm
       do ie = 1,nelemd
          do ic=1,pcnst
             do k=1,nlev
