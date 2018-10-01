@@ -17,7 +17,7 @@ module prim_driver_base
   use element_ops,      only: copy_state
   use hybrid_mod,       only: hybrid_t
   use kinds,            only: real_kind, iulog
-  use perf_mod,         only: t_startf, t_stopf
+  use perf_mod!,         only: t_startf, t_stopf
   use quadrature_mod,   only: quadrature_t, test_gauss, test_gausslobatto, gausslobatto
   use reduction_mod,    only: reductionbuffer_ordered_1d_t, red_min, red_max, red_max_int, &
                               red_sum, red_sum_int, red_flops, initreductionbuffer
@@ -977,15 +977,15 @@ contains
 #endif
 
     ! Loop over rsplit vertically lagrangian timesteps
-    call t_startf("prim_step_rX")
+    call t_startfw("prim_step_rX",31)
     call prim_step(elem, hybrid,nets,nete, dt, tl, hvcoord,compute_diagnostics,single_column,1)
-    call t_stopf("prim_step_rX")
+    call t_stopfw("prim_step_rX",31)
 
     do r=2,rsplit
        call TimeLevel_update(tl,"leapfrog")
-       call t_startf("prim_step_rX")
+       call t_startfw("prim_step_rX",32)
        call prim_step(elem, hybrid,nets,nete, dt, tl, hvcoord,.false.,single_column,r)
-       call t_stopf("prim_step_rX")
+       call t_stopfw("prim_step_rX",32)
     enddo
     ! defer final timelevel update until after remap and diagnostics
     !compute timelevels for tracers (no longer the same as dynamics)

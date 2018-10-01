@@ -1116,6 +1116,7 @@ for mct, etc.
   <FFLAGS>
     <base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -fp-model consistent -fimf-use-svml </base>
     <append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align</append>
+    <!--append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align -qopt-zmm-usage=high</append-->
     <append MPILIB="impi"> -xMIC-AVX512 </append>
   </FFLAGS>
   <MPICC MPILIB="impi"> mpiicc </MPICC>
@@ -1131,6 +1132,253 @@ for mct, etc.
     <append> -L$ENV{NETCDF_DIR} -lnetcdff -Wl,--as-needed,-L$ENV{NETCDF_DIR}/lib -lnetcdff -lnetcdf </append>
     <append> -mkl -lpthread </append>
   </SLIBS>
+</compiler>
+
+<compiler MACH="cori-knl" COMPILER="intel-craypat">
+  <CONFIG_ARGS>
+    <base> --host=Linux </base>
+  </CONFIG_ARGS>
+  <CFLAGS>
+    <base> -O2 -fp-model precise -std=gnu99 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append DEBUG="FALSE"> -O2 -debug minimal </append>
+    <append DEBUG="TRUE"> -O0 -g </append>
+    <append MPILIB="impi"> -axMIC-AVX512 -xCORE-AVX2 </append>
+  </CFLAGS>
+  <CPPDEFS>
+    <append> -DLINUX -DFORTRANUNDERSCORE -DNO_R16 -DCPRINTEL -DARCH_MIC_KNL -DCRAYPAT </append>
+  </CPPDEFS>
+  <CXX_LDFLAGS>
+    <base> -cxxlib </base>
+  </CXX_LDFLAGS>
+  <CXX_LINKER>FORTRAN</CXX_LINKER>
+  <FC_AUTO_R8>
+    <base> -r8 </base>
+  </FC_AUTO_R8>
+  <FFLAGS>
+    <base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -fp-model consistent -fimf-use-svml -qopt-report=5 -g -DCRAYPAT </base>
+    <!--base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -fimf-use-svml -qopt-report=5 -g -DCRAYPAT </base-->
+    <!--base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -qopt-report=5 -g -DCRAYPAT </base-->
+    <append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align</append>
+    <append DEBUG="TRUE"> -O0 -g -check uninit -check bounds -check pointers -fpe0 -check noarg_temp_created </append>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append MPILIB="impi"> -xMIC-AVX512 </append>
+  </FFLAGS>
+  <FFLAGS_NOOPT>
+    <base> -O0 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+  </FFLAGS_NOOPT>
+  <FIXEDFLAGS>
+    <base> -fixed -132 </base>
+  </FIXEDFLAGS>
+  <FREEFLAGS>
+    <base> -free </base>
+  </FREEFLAGS>
+  <HAS_F2008_CONTIGUOUS>TRUE</HAS_F2008_CONTIGUOUS>
+  <LDFLAGS>
+    <append compile_threaded="true"> -qopenmp </append>
+  </LDFLAGS>
+  <MPICC> cc </MPICC>
+  <MPICXX> CC </MPICXX>
+  <MPIFC> ftn </MPIFC>
+  <SCC> icc </SCC>
+  <SCXX> icpc </SCXX>
+  <SFC> ifort </SFC>
+  <MPICC MPILIB="impi"> mpiicc </MPICC>
+  <MPICXX MPILIB="impi"> mpiicpc </MPICXX>
+  <MPIFC MPILIB="impi"> mpiifort </MPIFC>
+  <!-- When using Intel MPI, can't use the Cray compiler wrappers. Must also set environment variables in config_machines.xml -->
+  <MPI_LIB_NAME MPILIB="impi">impi</MPI_LIB_NAME>
+  <PETSC_PATH>$ENV{PETSC_DIR}</PETSC_PATH>
+  <SLIBS>
+    <append> -L$ENV{NETCDF_DIR} -lnetcdff -Wl,--as-needed,-L$ENV{NETCDF_DIR}/lib -lnetcdff -lnetcdf </append>
+    <append> -mkl -lpthread </append>
+  </SLIBS>
+  <SUPPORTS_CXX>TRUE</SUPPORTS_CXX>
+</compiler>
+
+<compiler MACH="cori-knl" COMPILER="intel-craypat-nosvml">
+  <CONFIG_ARGS>
+    <base> --host=Linux </base>
+  </CONFIG_ARGS>
+  <CFLAGS>
+    <base> -O2 -fp-model precise -std=gnu99 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append DEBUG="FALSE"> -O2 -debug minimal </append>
+    <append DEBUG="TRUE"> -O0 -g </append>
+    <append MPILIB="impi"> -axMIC-AVX512 -xCORE-AVX2 </append>
+  </CFLAGS>
+  <CPPDEFS>
+    <append> -DLINUX -DFORTRANUNDERSCORE -DNO_R16 -DCPRINTEL -DARCH_MIC_KNL -DCRAYPAT </append>
+  </CPPDEFS>
+  <CXX_LDFLAGS>
+    <base> -cxxlib </base>
+  </CXX_LDFLAGS>
+  <CXX_LINKER>FORTRAN</CXX_LINKER>
+  <FC_AUTO_R8>
+    <base> -r8 </base>
+  </FC_AUTO_R8>
+  <FFLAGS>
+    <base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -fp-model consistent -qopt-report=5 -g -DCRAYPAT </base>
+    <append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align</append>
+    <append DEBUG="TRUE"> -O0 -g -check uninit -check bounds -check pointers -fpe0 -check noarg_temp_created </append>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append MPILIB="impi"> -xMIC-AVX512 </append>
+  </FFLAGS>
+  <FFLAGS_NOOPT>
+    <base> -O0 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+  </FFLAGS_NOOPT>
+  <FIXEDFLAGS>
+    <base> -fixed -132 </base>
+  </FIXEDFLAGS>
+  <FREEFLAGS>
+    <base> -free </base>
+  </FREEFLAGS>
+  <HAS_F2008_CONTIGUOUS>TRUE</HAS_F2008_CONTIGUOUS>
+  <LDFLAGS>
+    <append compile_threaded="true"> -qopenmp </append>
+  </LDFLAGS>
+  <MPICC> cc </MPICC>
+  <MPICXX> CC </MPICXX>
+  <MPIFC> ftn </MPIFC>
+  <SCC> icc </SCC>
+  <SCXX> icpc </SCXX>
+  <SFC> ifort </SFC>
+  <MPICC MPILIB="impi"> mpiicc </MPICC>
+  <MPICXX MPILIB="impi"> mpiicpc </MPICXX>
+  <MPIFC MPILIB="impi"> mpiifort </MPIFC>
+  <!-- When using Intel MPI, can't use the Cray compiler wrappers. Must also set environment variables in config_machines.xml -->
+  <MPI_LIB_NAME MPILIB="impi">impi</MPI_LIB_NAME>
+  <PETSC_PATH>$ENV{PETSC_DIR}</PETSC_PATH>
+  <SLIBS>
+    <append> -L$ENV{NETCDF_DIR} -lnetcdff -Wl,--as-needed,-L$ENV{NETCDF_DIR}/lib -lnetcdff -lnetcdf </append>
+    <append> -mkl -lpthread </append>
+  </SLIBS>
+  <SUPPORTS_CXX>TRUE</SUPPORTS_CXX>
+</compiler>
+
+<compiler MACH="cori-knl" COMPILER="intel-craypat-fast">
+  <CONFIG_ARGS>
+    <base> --host=Linux </base>
+  </CONFIG_ARGS>
+  <CFLAGS>
+    <base> -O2 -fp-model precise -std=gnu99 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append DEBUG="FALSE"> -O2 -debug minimal </append>
+    <append DEBUG="TRUE"> -O0 -g </append>
+    <append MPILIB="impi"> -axMIC-AVX512 -xCORE-AVX2 </append>
+  </CFLAGS>
+  <CPPDEFS>
+    <append> -DLINUX -DFORTRANUNDERSCORE -DNO_R16 -DCPRINTEL -DARCH_MIC_KNL -DCRAYPAT </append>
+  </CPPDEFS>
+  <CXX_LDFLAGS>
+    <base> -cxxlib </base>
+  </CXX_LDFLAGS>
+  <CXX_LINKER>FORTRAN</CXX_LINKER>
+  <FC_AUTO_R8>
+    <base> -r8 </base>
+  </FC_AUTO_R8>
+  <FFLAGS>
+    <base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -qopt-report=5 -g -DCRAYPAT </base>
+    <append DEBUG="FALSE"> -O2 </append>
+    <append DEBUG="TRUE"> -O0 -g -check uninit -check bounds -check pointers -fpe0 -check noarg_temp_created </append>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append MPILIB="impi"> -xMIC-AVX512 </append>
+  </FFLAGS>
+  <FFLAGS_NOOPT>
+    <base> -O0 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+  </FFLAGS_NOOPT>
+  <FIXEDFLAGS>
+    <base> -fixed -132 </base>
+  </FIXEDFLAGS>
+  <FREEFLAGS>
+    <base> -free </base>
+  </FREEFLAGS>
+  <HAS_F2008_CONTIGUOUS>TRUE</HAS_F2008_CONTIGUOUS>
+  <LDFLAGS>
+    <append compile_threaded="true"> -qopenmp </append>
+  </LDFLAGS>
+  <MPICC> cc </MPICC>
+  <MPICXX> CC </MPICXX>
+  <MPIFC> ftn </MPIFC>
+  <SCC> icc </SCC>
+  <SCXX> icpc </SCXX>
+  <SFC> ifort </SFC>
+  <MPICC MPILIB="impi"> mpiicc </MPICC>
+  <MPICXX MPILIB="impi"> mpiicpc </MPICXX>
+  <MPIFC MPILIB="impi"> mpiifort </MPIFC>
+  <!-- When using Intel MPI, can't use the Cray compiler wrappers. Must also set environment variables in config_machines.xml -->
+  <MPI_LIB_NAME MPILIB="impi">impi</MPI_LIB_NAME>
+  <PETSC_PATH>$ENV{PETSC_DIR}</PETSC_PATH>
+  <SLIBS>
+    <append> -L$ENV{NETCDF_DIR} -lnetcdff -Wl,--as-needed,-L$ENV{NETCDF_DIR}/lib -lnetcdff -lnetcdf </append>
+    <append> -mkl -lpthread </append>
+  </SLIBS>
+  <SUPPORTS_CXX>TRUE</SUPPORTS_CXX>
+</compiler>
+
+<compiler MACH="cori-knl" COMPILER="intel-ipm">
+  <CONFIG_ARGS>
+    <base> --host=Linux </base>
+  </CONFIG_ARGS>
+  <CFLAGS>
+    <base> -O2 -fp-model precise -std=gnu99 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append DEBUG="FALSE"> -O2 -debug minimal </append>
+    <append DEBUG="TRUE"> -O0 -g </append>
+    <append MPILIB="impi"> -axMIC-AVX512 -xCORE-AVX2 </append>
+  </CFLAGS>
+  <CPPDEFS>
+    <append> -DLINUX -DFORTRANUNDERSCORE -DNO_R16 -DCPRINTEL -DARCH_MIC_KNL </append>
+  </CPPDEFS>
+  <CXX_LDFLAGS>
+    <base> -cxxlib </base>
+  </CXX_LDFLAGS>
+  <CXX_LINKER>FORTRAN</CXX_LINKER>
+  <FC_AUTO_R8>
+    <base> -r8 </base>
+  </FC_AUTO_R8>
+  <FFLAGS>
+    <base> -convert big_endian -assume byterecl -ftz -traceback -assume realloc_lhs -fp-model consistent -fimf-use-svml </base>
+    <append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align</append>
+    <append DEBUG="TRUE"> -O0 -g -check uninit -check bounds -check pointers -fpe0 -check noarg_temp_created </append>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append MPILIB="impi"> -xMIC-AVX512 </append>
+  </FFLAGS>
+  <FFLAGS_NOOPT>
+    <base> -O0 </base>
+    <append compile_threaded="true"> -qopenmp </append>
+  </FFLAGS_NOOPT>
+  <FIXEDFLAGS>
+    <base> -fixed -132 </base>
+  </FIXEDFLAGS>
+  <FREEFLAGS>
+    <base> -free </base>
+  </FREEFLAGS>
+  <HAS_F2008_CONTIGUOUS>TRUE</HAS_F2008_CONTIGUOUS>
+  <LDFLAGS>
+    <append compile_threaded="true"> -qopenmp </append>
+    <append> $ENV{IPM} -L/global/common/cori/software/ipm/2.0.5/intel/lib -lipmf -lipm </append>
+  </LDFLAGS>
+  <MPICC> cc </MPICC>
+  <MPICXX> CC </MPICXX>
+  <MPIFC> ftn </MPIFC>
+  <SCC> icc </SCC>
+  <SCXX> icpc </SCXX>
+  <SFC> ifort </SFC>
+  <MPICC MPILIB="impi"> mpiicc </MPICC>
+  <MPICXX MPILIB="impi"> mpiicpc </MPICXX>
+  <MPIFC MPILIB="impi"> mpiifort </MPIFC>
+  <!-- When using Intel MPI, can't use the Cray compiler wrappers. Must also set environment variables in config_machines.xml -->
+  <MPI_LIB_NAME MPILIB="impi">impi</MPI_LIB_NAME>
+  <PETSC_PATH>$ENV{PETSC_DIR}</PETSC_PATH>
+  <SLIBS>
+    <append> -L$ENV{NETCDF_DIR} -lnetcdff -Wl,--as-needed,-L$ENV{NETCDF_DIR}/lib -lnetcdff -lnetcdf </append>
+    <append> -mkl -lpthread </append>
+  </SLIBS>
+  <SUPPORTS_CXX>TRUE</SUPPORTS_CXX>
 </compiler>
 
 <compiler MACH="eastwind" COMPILER="pgi">
@@ -1170,6 +1418,11 @@ for mct, etc.
   <FFLAGS>
     <append DEBUG="FALSE"> -O2 -debug minimal -qno-opt-dynamic-align </append>
   </FFLAGS>
+  <MPICC MPILIB="impi"> mpiicc </MPICC>
+  <MPICXX MPILIB="impi"> mpiicpc </MPICXX>
+  <MPIFC MPILIB="impi"> mpiifort </MPIFC>
+  <!-- When using Intel MPI, can't use the Cray compiler wrappers. Must also set environment variables in config_machines.xml -->
+  <MPI_LIB_NAME MPILIB="impi">impi</MPI_LIB_NAME>
   <PETSC_PATH>$ENV{PETSC_DIR}</PETSC_PATH>
   <SCC> icc </SCC>
   <SCXX> icpc </SCXX>

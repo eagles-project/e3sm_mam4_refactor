@@ -17,7 +17,7 @@ module stepon
    use physconst,      only: zvir, cappa
    use physics_types,  only: physics_state, physics_tend
    use dyn_comp,       only: dyn_import_t, dyn_export_t
-   use perf_mod,       only: t_startf, t_stopf, t_barrierf
+   use perf_mod,       only: t_startf, t_stopf, t_barrierf, t_startfw, t_stopfw
    use time_manager,   only: get_step_size
 ! from SE
    use derivative_mod, only: derivinit, derivative_t
@@ -240,13 +240,13 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
    ! copy from phys structures -> dynamics structures
    call t_barrierf('sync_p_d_coupling', mpicom)
-   call t_startf('p_d_coupling')
+   call t_startfw('p_d_coupling', 42) !ndk
    call p_d_coupling(phys_state, phys_tend,  dyn_in)
-   call t_stopf('p_d_coupling')
+   call t_stopfw('p_d_coupling',42)
 
    if(.not.par%dynproc) return
 
-   call t_startf('stepon_bndry_exch')
+   call t_startfw('stepon_bndry_exch', 43) !ndk
    ! do boundary exchange
    if (.not. single_column) then 
      do ie=1,nelemd
@@ -434,7 +434,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
          end do
       endif
    end do
-   call t_stopf('stepon_bndry_exch')
+   call t_stopfw('stepon_bndry_exch', 43)
 
 
 

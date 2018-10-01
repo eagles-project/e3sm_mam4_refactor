@@ -98,16 +98,16 @@
       integer gptlsetoption
       integer gptlinitialize
       integer gptlstart
-      integer gptlstartw
+      real(kind=8) gptlstartw
       integer gptlstart_handle
       integer gptlstartf
-      integer gptlstartfw
+      real(kind=8) gptlstartfw
       integer gptlstartf_handle
       integer gptlstop
-      integer gptlstopw
+      real(kind=8) gptlstopw
       integer gptlstop_handle
       integer gptlstopf
-      integer gptlstopfw
+      real(kind=8) gptlstopfw
       integer gptlstopf_handle
       integer gptlstartstop_vals
       integer gptlstartstop_valsf

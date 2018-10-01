@@ -183,6 +183,9 @@ module cime_comp_mod
   public timing_dir, mpicom_GLOID
 
 #include <mpif.h>
+#if defined(CRAYPAT)
+#include <pat_apif.h>
+#endif
 
   !----------------------------------------------------------------------------
   ! temporary variables
@@ -559,7 +562,9 @@ module cime_comp_mod
   integer, parameter :: ens1=1         ! use first instance of ensemble only
   integer, parameter :: fix1=1         ! temporary hard-coding to first ensemble, needs to be fixed
   integer :: eai, eli, eoi, eii, egi, eri, ewi, eei, exi, efi  ! component instance counters
-
+#if defined(CRAYPAT)
+   integer :: istat_craypat
+#endif
   !----------------------------------------------------------------------------
   ! formats
   !----------------------------------------------------------------------------
@@ -594,8 +599,16 @@ contains
     integer :: driver_id
     integer :: driver_comm
 
+#if defined(CRAYPAT)
+    call PAT_record(PAT_STATE_OFF, istat_craypat)  ! asap, start with craypat off ndk
+#endif
+
     call mpi_init(ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_init')
+#if defined(CRAYPAT)
+    call PAT_record(PAT_STATE_OFF, istat_craypat)  ! after MPI init, start with craypat off
+#endif
+
     call mpi_comm_dup(MPI_COMM_WORLD, global_comm, ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_comm_dup')
 
@@ -1151,7 +1164,7 @@ contains
   !  components will set them to true for the purposes of symmetry
   !-----------------------------------------------------------------------------
 
-    call t_startf('CPL:cime_init')
+    call t_startfw('CPL:cime_init',20) !ndk
     call t_adj_detailf(+1)
 
     call t_startf('CPL:init_comps')
@@ -2077,7 +2090,7 @@ contains
     endif
 
     call t_adj_detailf(-1)
-    call t_stopf('CPL:cime_init')
+    call t_stopfw('CPL:cime_init',20)
 
   end subroutine cime_init
 
@@ -2273,6 +2286,7 @@ contains
        !----------------------------------------------------------
 
        if (iamin_CPLID .and. (atm_c2_ocn .or. atm_c2_ice)) then
+          call t_startfw('NDK:OCNPRE1',37) ! ndk
           call cime_comp_barriers(mpicom=mpicom_CPLID, timer='CPL:OCNPRE1_BARRIER')
           call t_drvstartf ('CPL:OCNPRE1',cplrun=.true.,barrier=mpicom_CPLID,hashint=hashint(3))
           if (drv_threading) call seq_comm_setnthreads(nthreads_CPLID)
@@ -2281,6 +2295,7 @@ contains
 
           if (drv_threading) call seq_comm_setnthreads(nthreads_GLOID)
           call t_drvstopf  ('CPL:OCNPRE1',cplrun=.true.,hashint=hashint(3))
+          call t_stopfw('NDK:OCNPRE1',37)
        endif
 
        !----------------------------------------------------------
@@ -2441,11 +2456,13 @@ contains
           !----------------------------------------------------
 
           if (iamin_CPLALLOCNID .and. ocn_prognostic) then
+             call t_startfw('NDK:C2O',35)
              call component_exch(ocn, flow='x2c', &
                   infodata=infodata, infodata_string='cpl2ocn_run', &
                   mpicom_barrier=mpicom_CPLALLOCNID, run_barriers=run_barriers, &
                   timer_barrier='CPL:C2O_BARRIER', timer_comp_exch='CPL:C2O', &
                   timer_map_exch='CPL:c2o_ocnx2ocno', timer_infodata_exch='CPL:c2o_infoexch')
+             call t_stopfw('NDK:C2O',35)
           endif
 
        endif ! end of OCN SETUP
@@ -2485,11 +2502,13 @@ contains
           !----------------------------------------------------
 
           if (iamin_CPLALLLNDID) then
+             call t_startfw('NDK:C2L',23)
              call component_exch(lnd, flow='x2c', &
                   infodata=infodata, infodata_string='cpl2lnd_run', &
                   mpicom_barrier=mpicom_CPLALLLNDID, run_barriers=run_barriers, &
                   timer_barrier='CPL:C2L_BARRIER', timer_comp_exch='CPL:C2L', &
                   timer_map_exch='CPL:c2l_lndx2lndl', timer_infodata_exch='CPL:c2l_infoexch')
+             call t_stopfw('NDK:C2L',23)
           endif
 
        endif
@@ -2540,11 +2559,13 @@ contains
           !----------------------------------------------------
 
           if (iamin_CPLALLICEID .and. ice_prognostic) then
+             call t_startfw('NDK:C2I',33)
              call component_exch(ice, flow='x2c', &
                   infodata=infodata, infodata_string='cpl2ice_run', &
                   mpicom_barrier=mpicom_CPLALLICEID, run_barriers=run_barriers, &
                   timer_barrier='CPL:C2I_BARRIER', timer_comp_exch='CPL:C2I', &
                   timer_map_exch='CPL:c2i_icex2icei', timer_infodata_exch='CPL:ice_infoexch')
+             call t_stopfw('NDK:C2I',33)
           endif
 
        endif
@@ -2635,11 +2656,13 @@ contains
           !----------------------------------------------------
 
           if (iamin_CPLALLROFID .and. rof_prognostic) then
+             call t_startfw('NDK:C2R',25)
              call component_exch(rof, flow='x2c', &
                   infodata=infodata, infodata_string='cpl2rof_run', &
                   mpicom_barrier=mpicom_CPLALLLNDID, run_barriers=run_barriers, &
                   timer_barrier='CPL:C2R_BARRIER', timer_comp_exch='CPL:C2R', &
                   timer_map_exch='CPL:c2r_rofx2rofr', timer_infodata_exch='CPL:c2r_infoexch')
+             call t_stopfw('NDK:C2R',25)
           endif
 
        endif
@@ -2649,12 +2672,14 @@ contains
        !----------------------------------------------------------
 
        if (ice_present .and. icerun_alarm) then
+          call t_startfw('NDK:ICE_RUN',7)
           call component_run(Eclock_i, ice, ice_run, infodata, &
                seq_flds_x2c_fluxes=seq_flds_x2i_fluxes, &
                seq_flds_c2x_fluxes=seq_flds_i2x_fluxes, &
                comp_prognostic=ice_prognostic, comp_num=comp_num_ice, &
                timer_barrier= 'CPL:ICE_RUN_BARRIER', timer_comp_run='CPL:ICE_RUN', &
                run_barriers=run_barriers, ymd=ymd, tod=tod,comp_layout=ice_layout)
+          call t_stopfw('NDK:ICE_RUN',7)
        endif
 
        !----------------------------------------------------------
@@ -2662,12 +2687,14 @@ contains
        !----------------------------------------------------------
 
        if (lnd_present .and. lndrun_alarm) then
+          call t_startfw('NDK:LND_RUN',6)
           call component_run(Eclock_l, lnd, lnd_run, infodata, &
                seq_flds_x2c_fluxes=seq_flds_x2l_fluxes, &
                seq_flds_c2x_fluxes=seq_flds_l2x_fluxes, &
                comp_prognostic=lnd_prognostic, comp_num=comp_num_lnd, &
                timer_barrier= 'CPL:LND_RUN_BARRIER', timer_comp_run='CPL:LND_RUN', &
                run_barriers=run_barriers, ymd=ymd, tod=tod,comp_layout=lnd_layout)
+          call t_stopfw('NDK:LND_RUN',6)
        endif
 
        !----------------------------------------------------------
@@ -2675,12 +2702,14 @@ contains
        !----------------------------------------------------------
 
        if (rof_present .and. rofrun_alarm) then
+          call t_startfw('NDK:ROF_RUN',9)
           call component_run(Eclock_r, rof, rof_run, infodata, &
                seq_flds_x2c_fluxes=seq_flds_x2r_fluxes, &
                seq_flds_c2x_fluxes=seq_flds_r2x_fluxes, &
                comp_prognostic=rof_prognostic, comp_num=comp_num_rof, &
                timer_barrier= 'CPL:ROF_RUN_BARRIER', timer_comp_run='CPL:ROF_RUN', &
                run_barriers=run_barriers, ymd=ymd, tod=tod,comp_layout=rof_layout)
+          call t_stopfw('NDK:ROF_RUN',9)
        endif
 
        !----------------------------------------------------------
@@ -2895,10 +2924,12 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLLNDID) then
+             call t_startfw('NDK:L2C',24)
              call component_exch(lnd, flow='c2x', infodata=infodata, infodata_string='lnd2cpl_run', &
                   mpicom_barrier=mpicom_CPLALLLNDID, run_barriers=run_barriers, &
                   timer_barrier='CPL:L2C_BARRIER', timer_comp_exch='CPL:L2C', &
                   timer_map_exch='CPL:l2c_lndl2lndx', timer_infodata_exch='lnd2cpl_run')
+             call t_stopfw('NDK:L2C',24)
           endif
 
           !----------------------------------------------------------
@@ -2999,11 +3030,13 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLROFID) then
+             call t_startfw('NDK:R2C',26)
              call component_exch(rof, flow='c2x', &
                   infodata=infodata, infodata_string='rof2cpl_run', &
                   mpicom_barrier=mpicom_CPLALLROFID, run_barriers=run_barriers, &
                   timer_barrier='CPL:R2C_BARRIER', timer_comp_exch='CPL:R2C', &
                   timer_map_exch='CPL:r2c_rofr2rofx', timer_infodata_exch='CPL:r2c_infoexch')
+             call t_stopfw('NDK:R2C',26)
           endif
 
           !----------------------------------------------------------
@@ -3011,6 +3044,7 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLID) then
+             call t_startfw('NDK:ROFPOST',49)
              call cime_comp_barriers(mpicom=mpicom_CPLID, timer='CPL:ROFPOST_BARRIER')
              call t_drvstartf  ('CPL:ROFPOST',cplrun=.true.,barrier=mpicom_CPLID)
              if (drv_threading) call seq_comm_setnthreads(nthreads_CPLID)
@@ -3031,6 +3065,7 @@ contains
              endif
 
              call t_drvstopf  ('CPL:ROFPOST', cplrun=.true.)
+             call t_stopfw('NDK:ROFPOST',49)
           endif
        endif
 
@@ -3093,11 +3128,13 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLICEID) then
+             call t_startfw('NDK:I2C',34)
              call component_exch(ice, flow='c2x', &
                   infodata=infodata, infodata_string='ice2cpl_run', &
                   mpicom_barrier=mpicom_CPLALLICEID, run_barriers=run_barriers, &
                   timer_barrier='CPL:I2C_BARRIER', timer_comp_exch='CPL:I2C', &
                   timer_map_exch='CPL:i2c_icei2icex', timer_infodata_exch='CPL:i2c_infoexch')
+             call t_stopfw('NDK:I2C',34)
           endif
 
           !----------------------------------------------------------
@@ -3122,6 +3159,7 @@ contains
        !----------------------------------------------------------
 
        if (iamin_CPLID) then
+          call t_startfw('NDK:FRACSET',50) ! ndk
           call cime_comp_barriers(mpicom=mpicom_CPLID, timer='CPL:FRACSET_BARRIER')
           call t_drvstartf ('CPL:FRACSET',cplrun=.true.,barrier=mpicom_CPLID)
           if (drv_threading) call seq_comm_setnthreads(nthreads_CPLID)
@@ -3137,6 +3175,7 @@ contains
 
           if (drv_threading) call seq_comm_setnthreads(nthreads_GLOID)
           call t_drvstopf  ('CPL:FRACSET',cplrun=.true.)
+          call t_stopfw('NDK:FRACSET',50)
        endif
 
        !----------------------------------------------------------
@@ -3313,6 +3352,7 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLID .and. atm_prognostic) then
+             call t_startfw('NDK:ATMPREP',38) ! ndk
              call cime_comp_barriers(mpicom=mpicom_CPLID, timer='CPL:ATMPREP_BARRIER')
              call t_drvstartf ('CPL:ATMPREP',cplrun=.true.,barrier=mpicom_CPLID)
              if (drv_threading) call seq_comm_setnthreads(nthreads_CPLID)
@@ -3348,6 +3388,7 @@ contains
 
              call t_drvstopf  ('CPL:ATMPREP',cplrun=.true.)
              if (drv_threading) call seq_comm_setnthreads(nthreads_GLOID)
+             call t_stopfw('NDK:ATMPREP',38)
           endif
 
           !----------------------------------------------------------
@@ -3355,10 +3396,12 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLATMID .and. atm_prognostic) then
+             call t_startfw('NDK:C2A',21)
              call component_exch(atm, flow='x2c', infodata=infodata, infodata_string='cpl2atm_run', &
                   mpicom_barrier=mpicom_CPLALLATMID, run_barriers=run_barriers, &
                   timer_barrier='CPL:C2A_BARRIER', timer_comp_exch='CPL:C2A', &
                   timer_map_exch='CPL:c2a_atmx2atmg', timer_infodata_exch='CPL:c2a_infoexch')
+             call t_stopfw('NDK:C2A',21)
           endif
 
        endif
@@ -3370,12 +3413,14 @@ contains
        if ((trim(cpl_seq_option) /= 'CESM1_ORIG_TIGHT' .and. &
             trim(cpl_seq_option) /= 'CESM1_MOD_TIGHT'   ) .and. &
             ocn_present .and. ocnrun_alarm) then
+          call t_startfw('NDK:OCN_RUN',8)
           call component_run(Eclock_o, ocn, ocn_run, infodata, &
                seq_flds_x2c_fluxes=seq_flds_x2o_fluxes, &
                seq_flds_c2x_fluxes=seq_flds_o2x_fluxes, &
                comp_prognostic=ocn_prognostic, comp_num=comp_num_ocn, &
                timer_barrier= 'CPL:OCN_RUN_BARRIER', timer_comp_run='CPL:OCN_RUN', &
                run_barriers=run_barriers, ymd=ymd, tod=tod,comp_layout=ocn_layout)
+          call t_stopfw('NDK:OCN_RUN',8)
        endif
 
        !----------------------------------------------------------
@@ -3383,12 +3428,20 @@ contains
        !----------------------------------------------------------
 
        if (atm_present .and. atmrun_alarm) then
+#if defined(CRAYPAT)
+          !call PAT_record(PAT_STATE_ON, istat_craypat) ! ndk
+#endif
+          call t_startfw('NDK:ATM_RUN',5)
           call component_run(Eclock_a, atm, atm_run, infodata, &
                seq_flds_x2c_fluxes=seq_flds_x2a_fluxes, &
                seq_flds_c2x_fluxes=seq_flds_a2x_fluxes, &
                comp_prognostic=atm_prognostic, comp_num=comp_num_atm, &
                timer_barrier= 'CPL:ATM_RUN_BARRIER', timer_comp_run='CPL:ATM_RUN', &
                run_barriers=run_barriers, ymd=ymd, tod=tod, comp_layout=atm_layout)
+          call t_stopfw('NDK:ATM_RUN',5)
+#if defined(CRAYPAT)
+          !call PAT_record(PAT_STATE_OFF, istat_craypat)
+#endif
        endif
 
        !----------------------------------------------------------
@@ -3495,10 +3548,12 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLATMID) then
+             call t_startfw('NDK:A2C',22)
              call component_exch(atm, flow='c2x', infodata=infodata, infodata_string='atm2cpl_run', &
                   mpicom_barrier=mpicom_CPLALLATMID, run_barriers=run_barriers, &
                   timer_barrier='CPL:A2C_BARRIER', timer_comp_exch='CPL:A2C', &
                   timer_map_exch='CPL:a2c_atma2atmx', timer_infodata_exch='CPL:a2c_infoexch')
+             call t_stopfw('NDK:A2C',22)
           endif
 
           !----------------------------------------------------------
@@ -3564,11 +3619,13 @@ contains
           !----------------------------------------------------------
 
           if (iamin_CPLALLOCNID) then
+             call t_startfw('NDK:O2C',36)
              call component_exch(ocn, flow='c2x', &
                   infodata=infodata, infodata_string='ocn2cpl_run', &
                   mpicom_barrier=mpicom_CPLALLOCNID, run_barriers=run_barriers, &
                   timer_barrier='CPL:O2C_BARRIER', timer_comp_exch='CPL:O2C', &
                   timer_map_exch='CPL:o2c_ocno2ocnx', timer_infodata_exch='CPL:o2c_infoexch')
+             call t_stopfw('NDK:O2C',36)
           endif
 
           !----------------------------------------------------------

@@ -1,3 +1,49 @@
+subroutine write_pkey_stuff(rank)
+
+  implicit none
+  integer, intent(in) :: rank
+  integer :: pid, status
+  integer, external :: getpid, hostnm
+  character*32 :: hostname
+  character*32 :: SLURM_NNODES, SLURM_NODEID, SLURM_JOB_ID, SLURM_LOCALID, SLURM_TASK_PID, SLURM_JOB_USER, SLURM_NTASKS
+  character*32 :: SLURMD_NODENAME
+  character*192 :: SLURM_JOB_NAME
+  character*192 :: SLURM_JOB_NODELIST  !-- was looking for the compute nodename
+
+  !#open (unit=94,file="pkey.txt",status='unknown')
+  pid=getpid()
+  status = hostnm(hostname)
+  !write(*,'(a,i10,a,a)') "pkey: getpid=", pid, " hostname=", hostname
+
+
+  call get_environment_variable("SLURM_NNODES", SLURM_NNODES)
+  !write(*,*) "SLURM_NNODES=", trim(SLURM_NNODES)
+  call get_environment_variable("SLURM_NTASKS", SLURM_NTASKS)
+  !write(*,*) "SLURM_NTASKS=", trim(SLURM_NTASKS)
+  call get_environment_variable("SLURM_NODEID", SLURM_NODEID)
+  !write(*,*) "SLURM_NODEID=", trim(SLURM_NODEID)
+  call get_environment_variable("SLURM_JOB_ID", SLURM_JOB_ID)
+  !write(*,*) "SLURM_JOB_ID=", trim(SLURM_JOB_ID)
+  call get_environment_variable("SLURM_JOB_NAME", SLURM_JOB_NAME)
+  !write(*,*) "SLURM_JOB_NAME=", trim(SLURM_JOB_NAME)
+  call get_environment_variable("SLURM_LOCALID", SLURM_LOCALID)
+  !write(*,*) "SLURM_LOCALID=", trim(SLURM_LOCALID)
+  call get_environment_variable("SLURM_TASK_PID", SLURM_TASK_PID)
+  !write(*,*) "SLURM_TASK_PID=", trim(SLURM_TASK_PID)
+  call get_environment_variable("SLURM_JOB_USER", SLURM_JOB_USER)
+  !write(*,*) "SLURM_JOB_USER=", trim(SLURM_JOB_USER)
+  call get_environment_variable("SLURMD_NODENAME", SLURMD_NODENAME)
+  !write(*,*) "SLURMD_NODENAME=", trim(SLURMD_NODENAME)
+
+  if (rank==0) then
+     write(*,'(7(1x,a))') "pkey rank0:", trim(SLURM_NNODES), trim(SLURM_NTASKS), trim(SLURM_JOB_ID), trim(SLURM_JOB_USER), trim(SLURM_JOB_NAME)
+  endif
+  write(*,'(a,i10,7(1x,a))') "pkey:", pid, hostname, trim(SLURM_NODEID), trim(SLURM_LOCALID), trim(SLURM_TASK_PID), trim(SLURMD_NODENAME)
+
+
+end subroutine write_pkey_stuff
+
+
 program cime_driver
 
   !-------------------------------------------------------------------------------
@@ -31,6 +77,7 @@ program cime_driver
   use cime_comp_mod, only : cime_init
   use cime_comp_mod, only : cime_run
   use cime_comp_mod, only : cime_final
+  use mpi ! for call to  write_pkey_stuff(rank)
 
   implicit none
 
@@ -40,6 +87,7 @@ program cime_driver
   integer(i8) :: beg_count, end_count, irtc_rate
   real(r8)    :: cime_pre_init1_time, ESMF_Initialize_time, &
        cime_pre_init2_time, cime_init_time_adjustment
+  integer :: rank, ierr
 
   !--------------------------------------------------------------------------
   ! Setup and initialize the communications and logging.
@@ -50,6 +98,10 @@ program cime_driver
 
   end_count = shr_sys_irtc(irtc_rate)
   cime_pre_init1_time = real( (end_count-beg_count), r8)/real(irtc_rate, r8)
+
+  call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+  call write_pkey_stuff(rank) ! ndk
+  !print*, "ndk in cime_driver.F90"
 
   !--------------------------------------------------------------------------
   ! Initialize ESMF.  This is done outside of the ESMF_INTERFACE ifdef

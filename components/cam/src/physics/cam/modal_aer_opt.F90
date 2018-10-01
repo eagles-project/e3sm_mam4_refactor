@@ -1532,6 +1532,10 @@ end subroutine modal_size_parameters
       integer im,jm,km,ncol
       real(r8) table(km,im,jm),xtab(im),ytab(jm),out(pcols,km)
       integer i,ix(pcols),ip1,j,jy(pcols),jp1,k,ic
+#define LOOP_REORDER
+#ifdef LOOP_REORDER
+      integer jp1a(pcols),ip1a(pcols)
+#endif
       real(r8) x(pcols),dx,t(pcols),y(pcols),dy,u(pcols), &
              tu(pcols),tuc(pcols),tcu(pcols),tcuc(pcols)
 
@@ -1576,6 +1580,23 @@ end subroutine modal_size_parameters
         u(:ncol)=0._r8
       endif
    30 continue
+#ifdef LOOP_REORDER
+      do ic=1,ncol
+         tu(ic)=t(ic)*u(ic)
+         tuc(ic)=t(ic)-tu(ic)
+         tcuc(ic)=1._r8-tuc(ic)-u(ic)
+         tcu(ic)=u(ic)-tu(ic)
+         jp1a(ic)=min(jy(ic)+1,jm)
+         ip1a(ic)=min(ix(ic)+1,im)
+      enddo
+
+      do k=1,km
+         do ic=1,ncol
+            out(ic,k)=tcuc(ic)*table(k,ix(ic),jy(ic))+tuc(ic)*table(k,ip1a(ic),jy(ic))   &
+                 +tu(ic)*table(k,ip1a(ic),jp1a(ic))+tcu(ic)*table(k,ix(ic),jp1a(ic))
+	 end do
+      enddo
+#else
       do ic=1,ncol
          tu(ic)=t(ic)*u(ic)
          tuc(ic)=t(ic)-tu(ic)
@@ -1588,6 +1609,7 @@ end subroutine modal_size_parameters
                +tu(ic)*table(k,ip1,jp1)+tcu(ic)*table(k,ix(ic),jp1)
 	 end do
       enddo
+#endif
       return
       end subroutine binterp
 

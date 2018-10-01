@@ -50,6 +50,7 @@ module perf_mod
    public t_stopf
    public t_startfw !ndk
    public t_stopfw !ndk
+   public t_wtout !ndk
    public t_startstop_valsf
    public t_enablef
    public t_disablef
@@ -200,6 +201,12 @@ module perf_mod
 
    integer, parameter :: def_papi_ctr4 = PAPI_NULL           ! default
    integer, private   :: papi_ctr4 = def_papi_ctr4
+
+   integer, parameter :: max_wtnames=63 !ndk
+   integer, parameter :: max_ss=64000
+   character(len=128) :: wtnames(0:max_wtnames)
+   integer :: wtix(0:max_wtnames) ! counter per wtimer indexing to end of data
+   real(shr_kind_r8) :: wtdata(0:max_wtnames, 0:max_ss) ! stream of start/stops per wtimer
 
 !=======================================================================
 contains
@@ -762,7 +769,7 @@ contains
          ierr = GPTLstart('"'//event_prefix(1:prefix_len)// &
               event(1:str_length)//'"')
       else
-         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         !ndk str_length = min(SHR_KIND_CM-2,len_trim(event)) ! not needed?
          ierr = GPTLstart('"'//trim(event)//'"')
       endif
 
@@ -778,10 +785,12 @@ contains
    end subroutine t_startf
 
 
-   subroutine t_startfw(event, wtime) !ndk
+   subroutine t_startfw(event, iwt) !ndk
 
    character(len=*), intent(in) :: event
-   real(shr_kind_r8), intent(inout) :: wtime
+   integer, intent(in) :: iwt
+   !real(shr_kind_r8), intent(inout) :: wtime
+   real(shr_kind_r8) :: wtime
    integer  ierr                          ! GPTL error return
    integer  str_length, i                 ! support for adding detail prefix
    character(len=2) cdetail               ! char variable for detail
@@ -809,13 +818,16 @@ contains
          wtime = GPTLstartw('"'//event_prefix(1:prefix_len)// &
               event(1:str_length)//'"')
       else
-         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         !str_length = min(SHR_KIND_CM-2,len_trim(event))
          wtime = GPTLstartw('"'//trim(event)//'"')
       endif
 
    endif
 
-   write(*,'(a,1x,es20.10,1x,a)') 'a', wtime, event 
+!$OMP MASTER
+   wtdata(iwt,wtix(iwt)) = wtime
+   wtix(iwt)=wtix(iwt)+1
+!$OMP END MASTER
 
    return
    end subroutine t_startfw
@@ -870,7 +882,7 @@ contains
          ierr = GPTLstop('"'//event_prefix(1:prefix_len)// &
               event(1:str_length)//'"')
      else
-         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         !ndk str_length = min(SHR_KIND_CM-2,len_trim(event)) ! not needed?
          ierr = GPTLstop('"'//trim(event)//'"')
      endif
 
@@ -885,16 +897,18 @@ contains
    return
    end subroutine t_stopf
 
-   subroutine t_stopfw(event, wtime) ! ndk
+   subroutine t_stopfw(event, iwt) ! ndk
 
    character(len=*), intent(in) :: event
-   real(shr_kind_r8), intent(inout) :: wtime
+   integer, intent(in) :: iwt
+   !real(shr_kind_r8), intent(inout) :: wtime
+   real(shr_kind_r8) :: wtime
    integer  ierr                          ! GPTL error return
    integer  str_length, i                 ! support for adding detail prefix
    character(len=2) cdetail               ! char variable for detail
-!
-   if (.not. timing_initialized) return
-   if (timing_disable_depth > 0) return
+
+   !if (.not. timing_initialized) return
+   !if (timing_disable_depth > 0) return
 
    if ((perf_add_detail) .AND. (cur_timing_detail < 100)) then
 
@@ -916,12 +930,15 @@ contains
          wtime = GPTLstopw('"'//event_prefix(1:prefix_len)// &
               event(1:str_length)//'"')
      else
-         str_length = min(SHR_KIND_CM-2,len_trim(event))
+         !str_length = min(SHR_KIND_CM-2,len_trim(event))
          wtime = GPTLstopw('"'//trim(event)//'"')
      endif
    endif
 
-   write(*,'(a,1x,es20.10,1x,a)') 'b', wtime, event 
+!$OMP MASTER
+   wtdata(iwt,wtix(iwt)) = wtime
+   wtix(iwt)=wtix(iwt)+1
+!$OMP END MASTER
 
    return
    end subroutine t_stopfw
@@ -1457,11 +1474,75 @@ contains
      ierr = GPTLpr_set_write()
    endif
 
+   call t_wtout(npes, gme) !ndk
+
 !$OMP END MASTER
    call t_stopf("t_prf")
 
    return
    end subroutine t_prf
+
+
+   ! called at end of run -- after other timing/profile output
+   subroutine t_wtout(nprocs, rank) !ndk
+
+     implicit none
+     integer, intent(in) :: nprocs, rank
+
+     integer :: i,j, ierr
+     character(len=10) :: char_rank
+     character(len=328) :: filename, dirname
+     character*32 :: SLURM_NNODES, SLURM_NODEID, SLURM_JOB_ID, SLURM_LOCALID, SLURM_TASK_PID, SLURM_JOB_USER, SLURM_NTASKS
+
+     call get_environment_variable("SLURM_NNODES", SLURM_NNODES)
+     !write(*,*) "SLURM_NNODES=", trim(SLURM_NNODES)
+     call get_environment_variable("SLURM_NTASKS", SLURM_NTASKS)
+     !write(*,*) "SLURM_NTASKS=", trim(SLURM_NTASKS)
+     call get_environment_variable("SLURM_JOB_ID", SLURM_JOB_ID)
+     !write(*,*) "SLURM_JOB_ID=", trim(SLURM_JOB_ID)
+     
+     write(dirname, '(a,a,a,a,a,a)') 'wtout.', adjustl(trim(SLURM_JOB_ID)), '.n', adjustl(trim(SLURM_NNODES)), '.p', &
+          adjustl(trim(SLURM_NTASKS))
+
+     if (rank==0) then
+        call system("mkdir -p "//adjustl(trim(dirname)))
+     endif
+     
+     call get_environment_variable("SLURM_NODEID", SLURM_NODEID)
+     !write(*,*) "SLURM_NODEID=", trim(SLURM_NODEID)
+
+     call mpi_barrier(MPI_COMM_WORLD, ierr)
+
+     write(char_rank, '(i0.8)') rank
+     !write(filename, '(a,a,a)') 'wtout', adjustl(trim(char_rank)), '.txt'
+     write(filename, '(a,a,a,a)') adjustl(trim(dirname)), '/wtout', adjustl(trim(char_rank)), '.txt'
+
+     open (unit=2018, file=adjustl(trim(filename)), status='unknown')
+     
+        do i=0, max_wtnames-1
+           if (adjustl(trim(wtnames(i))) .eq. "") cycle
+
+           do j=0, wtix(i)-1 ! all others should be 0.0
+              write(2018,*) i, j, wtdata(i,j)
+           enddo
+        enddo
+
+     close(2018)
+
+
+     if (rank==0) then
+        write(filename, '(a,a)') adjustl(trim(dirname)), '/wtkey.txt'
+        open (unit=2018, file=filename, status='unknown')
+        do i=0, max_wtnames-1 !ndk
+           if (adjustl(trim(wtnames(i))) .eq. "") cycle
+           write(2018,*) i, adjustl(trim(wtnames(i)))
+        enddo
+        close(2018)
+     endif
+
+
+   end subroutine t_wtout
+
 !
 !========================================================================
 !
@@ -1497,6 +1578,7 @@ contains
    integer  papi_ctr2_id          ! PAPI counter id
    integer  papi_ctr3_id          ! PAPI counter id
    integer  papi_ctr4_id          ! PAPI counter id
+   integer :: i
 !
 !---------------------------Namelists ----------------------------------
 !
@@ -1773,6 +1855,99 @@ contains
    !
    if (gptlinitialize () < 0) call shr_sys_abort (subname//':: gptlinitialize')
    timing_initialized = .true.
+
+   wtnames=""
+   wtix=0
+   wtdata=0.0
+
+   !greenlist=['CPL:OCNT_RUN', ' CPL:LND_RUN', 'CPL:ATM_RUN', 'CPL:ICE_RUN', 'CPL:I2C', 'CPL:C2A', 'CPL:C2L', 'CPL:C2I', 'CPL:L2C', 'CPL:I2C', 'CPL:A2C', 'CPL:C2L', 'CPL:HITORY', 'CPL:ATMPREP', 'CPL:LNDPREP', 'CPL:LNDPOST', 'CPL:ATMPOST', 'CPL:ICEPOST', 'CPL:TSTAMP_WRITE']
+
+   !wtnames(1) = "CPL:ATM_RUN"
+   !wtnames(2) = "CPL:ICE_RUN"
+   !wtnames(3) = "CPL:LND_RUN"
+
+   !wtnames(0) = "CAM_run1"
+   !wtnames(1) = "CAM_run2"
+   !wtnames(2) = "CAM_run3"
+   !wtnames(3) = "CAM_run4"
+
+   !wtnames(0) = "comp_init" ! cime/src/drivers/mct/main/component_mod.F90
+   !wtnames(1) = "" ! cime/src/drivers/mct/main/cime_driver.F90:88:  call t_startstop_valsf('CPL:cime_pre_init1',  walltime=cime_pre_init1_time)
+
+   !wtnames(2) = "CAM_run2"  ! components/cam/src/cpl/atm_comp_mct.F90
+   !wtnames(3) = "prim_step_rX"    ! CAM_run3 components/homme/src/share/prim_driver_base.F90   1st one
+   !wtnames(4) = "microp_aero_run" ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   !wtnames(5) = "macrop_tend"     ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   !wtnames(6) = "microp_aero_run" ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   !wtnames(7) = "microp_tend"     ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   !wtnames(8) = "radiation"       ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   !wtnames(9) = "PIO:swapm_box_rear_comp2io_TYPE" !  CAM_run4 cime/src/externals/pio1/pio/box_rearrange.F90.in
+   !wtnames(32) = "prim_step_rX"    ! CAM_run3 components/homme/src/share/prim_driver_base.F90 2nd one
+
+   wtnames(20) = "CPL:cime_init"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   wtnames(1) = "CAM_run1"  ! components/cam/src/cpl/atm_comp_mct.F90
+   wtnames(10) = "microp_aero_run" ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   wtnames(11) = "macrop_tend"     ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   wtnames(12) = "microp_tend"     ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+   wtnames(13) = "radiation"       ! CAM_run1 components/cam/src/physics/cam/physpkg.F90
+
+   wtnames(2) = "CAM_run2"  ! components/cam/src/cpl/atm_comp_mct.F90
+
+   wtnames(3) = "CAM_run3"  ! components/cam/src/cpl/atm_comp_mct.F90
+   wtnames(31) = "prim_step_rX"    ! CAM_run3 components/homme/src/share/prim_driver_base.F90   1st one
+   wtnames(32) = "prim_step_rX"    ! CAM_run3 components/homme/src/share/prim_driver_base.F90 2nd one
+
+   wtnames(4) = "CAM_run4"  ! components/cam/src/cpl/atm_comp_mct.F90
+   wtnames(40) = "PIO:swapm_box_rear_comp2io_TYPE" !  CAM_run4 cime/src/externals/pio1/pio/box_rearrange.F90.in
+   wtnames(41) = "PIO:swapm_box_rear_io2comp_TYPE" !  CAM_run4 cime/src/externals/pio1/pio/box_rearrange.F90.in
+
+
+   wtnames(5) = "NDK:ATM_RUN"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(6) = "NDK:LND_RUN"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(7) = "NDK:ICE_RUN"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(8) = "NDK:OCN_RUN"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(9) = "NDK:ROF_RUN"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   wtnames(21) = "NDK:C2A"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(22) = "NDK:A2C"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(23) = "NDK:C2L"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(24) = "NDK:L2C"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(25) = "NDK:C2R"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(26) = "NDK:R2C"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   wtnames(33) = "NDK:C2I"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(34) = "NDK:I2C"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(35) = "NDK:C2O"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(36) = "NDK:O2C"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   wtnames(37) = "NDK:OCNPRE1"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(38) = "NDK:ATMPREP"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   wtnames(14) = "stepon_run1"  ! cam/src/control/cam_comp.F90
+   wtnames(15) = "phys_run1"
+   wtnames(16) = "phys_run2"
+   wtnames(17) = "stepon_run2"
+   wtnames(18) = "stepon_run3"
+   wtnames(19) = "stepon_run4"
+
+   wtnames(42) = "p_d_coupling"       ! in stepon_run2 cam/src/dynamics/se/stepon.F90
+   wtnames(43) = "stepon_bndry_exch"  ! in stepon_run2 cam/src/dynamics/se/stepon.F90
+
+   wtnames(49) = "NDK:ROFPOST"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+   wtnames(50) = "NDK:FRACSET"  ! cime/src/drivers/mct/main/cime_comp_mod.F90
+
+   !#i:Velocity solver  ! most of ICE_RUN, but 2x calls
+   !o:time integration ! most of OCN_RUN, but 5x calls
+
+   !cam/src/physics/cam/physpkg.F90:917:subroutine phys_run1
+
+   do i=0,max_wtnames-1 ! really only need to get initial stamp for the names being used, but OK to set all
+      wtdata(i,0) = mpi_wtime()  ! get initial timsetamp 
+      wtix(i)=wtix(i)+1
+   enddo
+
+
 !$OMP END MASTER
 !$OMP BARRIER
 

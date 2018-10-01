@@ -263,7 +263,7 @@ contains
              call mct_avect_vecmult(comp(eci)%x2c_cc, comp(eci)%drv2mdl, seq_flds_x2c_fluxes, mask_spval=.true.)
           end if
 
-          call t_startf('comp_init')
+          call t_startf('comp_init') !ndk
           call comp_init( EClock, comp(eci)%cdata_cc, comp(eci)%x2c_cc, comp(eci)%c2x_cc, &
                NLFilename=NLFilename )
           call t_stopf('comp_init')

@@ -394,7 +394,11 @@ CONTAINS
     use pmgrid,          only: plev, plevp
     use constituents,    only: pcnst
     use shr_sys_mod,     only: shr_sys_flush
-    use perf_mod,        only: t_startf, t_stopf, t_startfw, t_stopfw  !ndk
+    !use perf_mod,        only: t_startf, t_stopf, t_startfw, t_stopfw  !ndk
+#if defined(CRAYPAT)
+#include <pat_apif.h>
+   integer :: istat_craypat
+#endif
     ! 
     ! Arguments
     !
@@ -433,7 +437,6 @@ CONTAINS
     logical :: nlend_sync      ! Flag signaling last time-step
     logical :: first_time = .true.
     integer :: lbnum
-    real(r8):: ws0,ws1 ! ndk
     character(len=*), parameter :: subname="atm_run_mct"
     !-----------------------------------------------------------------------
 
@@ -442,6 +445,10 @@ CONTAINS
       lbnum=1
       call memmon_dump_fort('memmon.out',SubName //':start::',lbnum)
     endif
+#endif
+
+#if defined(CRAYPAT)
+    !call PAT_record(PAT_STATE_ON, istat_craypat) ! ndk
 #endif
 
     ! Redirect share output to cam log
@@ -498,19 +505,24 @@ CONTAINS
 
        ! Run CAM (run2, run3, run4)
        
-       call t_startf ('CAM_run2')
+       call t_startfw ('CAM_run2', 2) ! ndk
        call cam_run2( cam_out, cam_in )
-       call t_stopf  ('CAM_run2')
+       call t_stopfw  ('CAM_run2', 2)
 
-       call t_startf ('CAM_run3')
+#if defined(CRAYPAT)
+   !call PAT_record(PAT_STATE_OFF, istat_craypat) ! ndk
+#endif
+       call t_startfw ('CAM_run3',3)
        call cam_run3( cam_out )
-       call t_stopf  ('CAM_run3')
-       
-       call t_startf ('CAM_run4')
+       call t_stopfw  ('CAM_run3',3)
+#if defined(CRAYPAT)
+   !call PAT_record(PAT_STATE_OFF, istat_craypat) ! ndk
+#endif
+
+       call t_startfw ('CAM_run4',4)
        call cam_run4( cam_out, cam_in, rstwr, nlend, &
             yr_spec=yr_sync, mon_spec=mon_sync, day_spec=day_sync, sec_spec=tod_sync)
-       call t_stopf  ('CAM_run4')
-       
+       call t_stopfw  ('CAM_run4',4)
        ! Advance cam time step 
        
        call t_startf ('CAM_adv_timestep')
@@ -518,14 +530,15 @@ CONTAINS
        call t_stopf  ('CAM_adv_timestep')
        
        ! Run cam radiation/clouds (run1)
-          
-       call t_startf ('CAM_run1')
-       call t_startfw ('CAM_run1', ws0)
+#if defined(CRAYPAT)
+       !call PAT_record(PAT_STATE_ON, istat_craypat) ! ndk
+#endif          
+       call t_startfw ('CAM_run1',1)
        call cam_run1 ( cam_in, cam_out ) 
-       call t_stopf  ('CAM_run1')
-       call t_stopfw  ('CAM_run1', ws1)
-       write(*,'(a,es20.10,es20.10)') "ndk CAM_run1 ws0,ws1=", ws0,ws1
-
+       call t_stopfw  ('CAM_run1',1)
+#if defined(CRAYPAT)
+       !call PAT_record(PAT_STATE_OFF, istat_craypat) ! ndk
+#endif
        ! Map output from cam to mct data structures
        
        call t_startf ('CAM_export')
@@ -575,6 +588,10 @@ CONTAINS
 
     call shr_file_setLogUnit (shrlogunit)
     call shr_file_setLogLevel(shrloglev)
+
+#if defined(CRAYPAT)
+    !call PAT_record(PAT_STATE_OFF, istat_craypat) ! ndk
+#endif
 
 #if (defined _MEMTRACE)
     if(masterproc) then

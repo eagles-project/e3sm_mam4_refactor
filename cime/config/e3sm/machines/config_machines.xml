@@ -60,8 +60,8 @@
   <NODENAME_REGEX>edison</NODENAME_REGEX>
   <TESTS>e3sm_developer</TESTS>
   <COMPILERS>intel,intel18,gnu,gnu7</COMPILERS>
-  <MPILIBS>mpt</MPILIBS>
-  <CIME_OUTPUT_ROOT>$ENV{CSCRATCH}/acme_scratch/edison</CIME_OUTPUT_ROOT>
+  <MPILIBS>mpt,impi</MPILIBS>
+  <CIME_OUTPUT_ROOT>$ENV{CSCRATCH}/acme_scratch/edison/mprofaug21</CIME_OUTPUT_ROOT>
   <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
   <EXEROOT>$CIME_OUTPUT_ROOT/$CASE/bld</EXEROOT>
   <DOUT_S_ROOT>$CIME_OUTPUT_ROOT/archive/$CASE</DOUT_S_ROOT>
@@ -88,6 +88,7 @@
       <arg name="num_tasks" > -n {{ total_tasks }}</arg>
       <arg name="thread_count"> -c $SHELL{echo 48/`./xmlquery --value MAX_MPITASKS_PER_NODE`|bc}</arg>
       <arg name="binding"> $SHELL{if [ 24 -ge `./xmlquery --value MAX_MPITASKS_PER_NODE` ]; then echo "--cpu_bind=cores"; else echo "--cpu_bind=threads";fi;} </arg>
+      <arg name="placement"> -m plane=$SHELL{echo `./xmlquery --value MAX_MPITASKS_PER_NODE`}</arg>
     </arguments>
   </mpirun>
   <module_system type="module">
@@ -131,6 +132,10 @@
       <command name="load">pmi/5.0.12</command>
       <command name="rm">cray-mpich</command>
       <command name="load">cray-mpich/7.7.0</command>
+    </modules>
+
+    <modules mpilib="impi">
+      <command name="swap">cray-mpich impi/2018.up2</command>
     </modules>
 
     <modules compiler="intel">
@@ -198,7 +203,13 @@
   <environment_variables compiler="intel18">
     <env name="FORT_BUFFERED">yes</env>
   </environment_variables>
-
+  <environment_variables mpilib="impi">
+    <env name="I_MPI_FABRICS">ofi</env>
+    <env name="I_MPI_OFI_PROVIDER">gni</env>
+    <env name="I_MPI_PRINT_VERSION">yes</env>
+    <env name="I_MPI_OFI_LIBRARY">/global/common/cori/software/libfabric/1.6.1/gnu/lib/libfabric.so</env>
+    <env name="I_MPI_PMI_LIBRARY">/usr/lib64/slurmpmi/libpmi.so</env>
+  </environment_variables>
 </machine>
 
 <machine MACH="cori-haswell">
@@ -235,6 +246,7 @@
       <arg name="num_tasks" > -n {{ total_tasks }}</arg>
       <arg name="thread_count">-c $SHELL{echo 64/`./xmlquery --value MAX_MPITASKS_PER_NODE`|bc}</arg>
       <arg name="binding"> $SHELL{if [ 32 -ge `./xmlquery --value MAX_MPITASKS_PER_NODE` ]; then echo "--cpu_bind=cores"; else echo "--cpu_bind=threads";fi;} </arg>
+      <arg name="placement"> -m plane=$SHELL{echo `./xmlquery --value MAX_MPITASKS_PER_NODE`}</arg>
     </arguments>
   </mpirun>
   <module_system type="module">
@@ -344,7 +356,7 @@
   <DESC>Cori. XC40 Cray system at NERSC. KNL partition. os is CNL, 68 pes/node (for now only use 64), batch system is SLURM</DESC>
   <NODENAME_REGEX>cori</NODENAME_REGEX>
   <TESTS>e3sm_developer</TESTS>
-  <COMPILERS>intel,gnu,gnu7</COMPILERS>
+  <COMPILERS>intel,gnu,gnu7,intel-craypat,intel-craypat-nosvml,intel-craypat-fast,intel-ipm</COMPILERS>
   <MPILIBS>mpt,impi</MPILIBS>
   <CIME_OUTPUT_ROOT>$ENV{SCRATCH}/acme_scratch/cori-knl/mprofaug21</CIME_OUTPUT_ROOT>
   <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
@@ -374,6 +386,7 @@
       <arg name="num_tasks" > -n {{ total_tasks }}</arg>
       <arg name="thread_count">-c $SHELL{echo 272/`./xmlquery --value MAX_MPITASKS_PER_NODE`|bc}</arg>
       <arg name="binding"> $SHELL{if [ 68 -ge `./xmlquery --value MAX_MPITASKS_PER_NODE` ]; then echo "--cpu_bind=cores"; else echo "--cpu_bind=threads";fi;} </arg>
+      <arg name="placement"> -m plane=$SHELL{echo `./xmlquery --value MAX_MPITASKS_PER_NODE`}</arg>
     </arguments>
   </mpirun>
   <module_system type="module">
@@ -432,6 +445,27 @@
       <command name="load">intel/18.0.1.163</command>
     </modules>
 
+    <modules compiler="intel-craypat">
+      <command name="load">PrgEnv-intel/6.0.4</command>
+      <command name="rm">intel</command>
+      <command name="load">intel/18.0.1.163</command>
+    </modules>
+    <modules compiler="intel-craypat-nosvml">
+      <command name="load">PrgEnv-intel/6.0.4</command>
+      <command name="rm">intel</command>
+      <command name="load">intel/18.0.1.163</command>
+    </modules>
+    <modules compiler="intel-craypat-fast">
+      <command name="load">PrgEnv-intel/6.0.4</command>
+      <command name="rm">intel</command>
+      <command name="load">intel/18.0.1.163</command>
+    </modules>
+    <modules compiler="intel-ipm">
+      <command name="load">PrgEnv-intel/6.0.4</command>
+      <command name="rm">intel</command>
+      <command name="load">intel/18.0.1.163</command>
+    </modules>
+
     <modules compiler="gnu">
       <command name="swap">PrgEnv-intel PrgEnv-gnu/6.0.4</command>
       <command name="rm">gcc</command>
@@ -474,6 +508,26 @@
       <command name="load">git</command>
       <command name="rm">cmake</command>
       <command name="load">cmake/3.3.2</command>
+
+      <command name="rm">perftools-base</command>
+      <command name="rm">perftools</command>
+
+    </modules>
+
+    <modules compiler="intel-craypat">
+      <command name="load">perftools-base/7.0.3</command>
+      <command name="load">perftools/7.0.3</command>
+    </modules>
+    <modules compiler="intel-craypat-nosvml">
+      <command name="load">perftools-base/7.0.3</command>
+      <command name="load">perftools/7.0.3</command>
+    </modules>
+    <modules compiler="intel-craypat-fast">
+      <command name="load">perftools-base/7.0.3</command>
+      <command name="load">perftools/7.0.3</command>
+    </modules>
+    <modules compiler="intel-ipm">
+      <command name="load">ipm</command>
     </modules>
 
     <!--command name="list">&gt;&amp; ml.txt</command-->
@@ -504,6 +558,31 @@
   <environment_variables compiler="intel">
     <env name="FORT_BUFFERED">yes</env>
     <env name="MPICH_MEMORY_REPORT">1</env>
+  </environment_variables>
+  <environment_variables compiler="intel-craypat">
+    <env name="FORT_BUFFERED">yes</env>
+    <env name="MPICH_MEMORY_REPORT">1</env>
+    <env name="PAT_RT_SUMMARY">0</env>
+    <!--env name="PAT_RT_SAMPLING_INTERVAL">100000</env-->
+    <env name="PAT_RT_SAMPLING_INTERVAL">10000</env>
+    <!--#setenv PAT_RT_EXPFILE_PES 0,1,9600-->
+  </environment_variables>
+  <environment_variables compiler="intel-craypat-nosvml">
+    <env name="FORT_BUFFERED">yes</env>
+    <env name="MPICH_MEMORY_REPORT">1</env>
+    <env name="PAT_RT_SUMMARY">0</env>
+    <env name="PAT_RT_SAMPLING_INTERVAL">10000</env>
+  </environment_variables>
+  <environment_variables compiler="intel-craypat-fast">
+    <env name="FORT_BUFFERED">yes</env>
+    <env name="MPICH_MEMORY_REPORT">1</env>
+    <env name="PAT_RT_SUMMARY">0</env>
+    <env name="PAT_RT_SAMPLING_INTERVAL">10000</env>
+  </environment_variables>
+  <environment_variables compiler="intel-ipm">
+    <env name="FORT_BUFFERED">yes</env>
+    <env name="MPICH_MEMORY_REPORT">1</env>
+    <env name="IPM_REPORT">full</env>
   </environment_variables>
 </machine>
 
@@ -3013,7 +3092,8 @@
 </machine>
 
 <default_run_suffix>
-  <default_run_exe>${EXEROOT}/e3sm.exe </default_run_exe>
+  <!--default_run_exe>${EXEROOT}/e3sm.exe </default_run_exe-->
+  <default_run_exe>/global/homes/n/ndk/stingray/simpleTests/blob.sh ${EXEROOT}/e3sm.exe </default_run_exe>
   <default_run_misc_suffix> >> e3sm.log.$LID 2>&amp;1 </default_run_misc_suffix>
 </default_run_suffix>
 

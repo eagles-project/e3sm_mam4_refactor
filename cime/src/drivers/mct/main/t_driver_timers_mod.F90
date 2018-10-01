@@ -24,6 +24,7 @@ contains
     character(len=128) :: strbar
 
     logical :: lcplrun,lcplcom,lbudget
+    real(kind=8):: ws ! ndk
     !-------------------------------------------------------------------------------
 
     lcplrun  = .false.
@@ -60,6 +61,7 @@ contains
     endif
 
     call t_startf   (trim(string),hashint)
+    !call t_startfw   (trim(string), ws) !ndk
     call t_adj_detailf(+1)
 
   end subroutine t_drvstartf
@@ -76,7 +78,7 @@ contains
     logical,intent(in),optional :: budget
     integer, intent(in), optional :: hashint
     logical :: lcplrun,lcplcom,lbudget
-
+    real(kind=8):: ws ! ndk
     !-------------------------------------------------------------------------------
 
     lcplrun = .false.
@@ -94,6 +96,7 @@ contains
 
     call t_adj_detailf(-1)
     call t_stopf   (trim(string), hashint)
+    !call t_stopfw   (trim(string), ws) ! ndk
 
     if (lbudget) then
        call t_adj_detailf(-1)

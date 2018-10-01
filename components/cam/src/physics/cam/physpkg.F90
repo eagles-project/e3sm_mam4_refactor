@@ -2017,6 +2017,10 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
+#if defined(CRAYPAT)
+#include <pat_apif.h>
+   integer :: istat_craypat
+#endif
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
@@ -2415,9 +2419,9 @@ end if
             !===================================================
             ! Aerosol Activation
             !===================================================
-            call t_startf('microp_aero_run')
+            call t_startfw('microp_aero_run',10)
             call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo)
-            call t_stopf('microp_aero_run')
+            call t_stopfw('microp_aero_run',10)
 
             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
 
@@ -2429,7 +2433,7 @@ end if
           ! Calculate macrophysical tendency (sedimentation, detrain, cloud fraction)
           !===================================================
 
-          call t_startf('macrop_tend')
+          call t_startfw('macrop_tend',11)
 
           ! don't call Park macrophysics if CLUBB is called
           if (macrop_scheme .ne. 'CLUBB_SGS') then
@@ -2504,7 +2508,7 @@ end if
  
           endif
 
-          call t_stopf('macrop_tend')
+          call t_stopfw('macrop_tend',11)
         end if ! l_st_mac
 
           !===================================================
@@ -2526,13 +2530,13 @@ end if
 
           if (.not. micro_do_icesupersat) then 
 
-            call t_startf('microp_aero_run')
+            call t_startfw('microp_aero_run',10) ! ndk, not hit?
             call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo)
-            call t_stopf('microp_aero_run')
+            call t_stopfw('microp_aero_run',10)
 
           endif
 
-          call t_startf('microp_tend')
+          call t_startfw('microp_tend',12)
 
 
           if (use_subcol_microp) then
@@ -2576,7 +2580,7 @@ end if
                zero, prec_str(:ncol)/cld_macmic_num_steps, &
                snow_str(:ncol)/cld_macmic_num_steps, zero)
 
-          call t_stopf('microp_tend')
+          call t_stopfw('microp_tend',10)
 
         else 
         ! If microphysics is off, set surface cloud liquid/ice and rain/snow fluxes to zero
@@ -2703,7 +2707,10 @@ if (l_rad) then
     !===================================================
     ! Radiation computations
     !===================================================
-    call t_startf('radiation')
+#if defined(CRAYPAT)
+   call PAT_record(PAT_STATE_ON, istat_craypat) ! ndk
+#endif          
+    call t_startfw('radiation',13)
 
 
     call radiation_tend(state,ptend, pbuf, &
@@ -2719,7 +2726,10 @@ if (l_rad) then
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
-    call t_stopf('radiation')
+    call t_stopfw('radiation',13)
+#if defined(CRAYPAT)
+   call PAT_record(PAT_STATE_OFF, istat_craypat) ! ndk
+#endif          
 
 end if ! l_rad
 
