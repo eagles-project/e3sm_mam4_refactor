@@ -854,7 +854,8 @@ contains
     use control_mod,        only: statefreq, ftype, qsplit, rsplit, disable_diagnostics
     use hybvcoord_mod,      only: hvcoord_t
     use parallel_mod,       only: abortmp
-    use prim_advance_mod,   only: applycamforcing, applycamforcing_dynamics
+    use prim_advance_mod,   only: applycamforcing, applycamforcing_dynamics, prim_advance_exp_finish
+    use prim_advection_mod, only: prim_advec_tracers_finish
     use prim_state_mod,     only: prim_printstate, prim_diag_scalars, prim_energy_halftimes
     use vertremap_mod,      only: vertical_remap
     use reduction_mod,      only: parallelmax
@@ -997,12 +998,19 @@ contains
     call t_stopf("copy_qdp_h2d")
 #endif
 
+    ! Apply hypervisc as last step 
     ! Apply physics tendencies if Parallel-Split turned on
     if (abs(ftype)==3) then
       call t_startf("ApplyCAMForcing")
       call ApplyCAMForcing(elem, hvcoord,tl%np1,np1_qdp, dt_remap,nets,nete)
       call t_stopf("ApplyCAMForcing")
     end if
+    if (rsplit.eq.1) then
+       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt*qsplit,compute_diagnostics)
+    else
+       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt*qsplit,.false.)
+    end if
+    call prim_advec_tracers_finish(elem,deriv1,hvcoord,hybrid,dt*qsplit,tl,nets,nete)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !  apply vertical remap
     !  always for tracers
@@ -1136,11 +1144,11 @@ contains
     call t_startf("prim_step_dyn")
     call prim_advance_exp(elem, deriv1, hvcoord,   &
          hybrid, dt, tl, nets, nete, compute_diagnostics)
-    call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,compute_diagnostics)
+    if (rstep.lt.rsplit.or.qsplit.gt.1) call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,compute_diagnostics)
     do n=2,qsplit
        call TimeLevel_update(tl,"leapfrog")
        call prim_advance_exp(elem, deriv1, hvcoord,hybrid, dt, tl, nets, nete, .false.)
-       call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.)
+       if (rstep.lt.rsplit.or.n.lt.qsplit) call prim_advance_exp_finish(elem,hvcoord,hybrid,deriv1,tl,nets,nete,dt,.false.)
        ! defer final timelevel update until after Q update.
     enddo
     call t_stopf("prim_step_dyn")
@@ -1167,7 +1175,7 @@ contains
     if (qsize > 0) then
       call t_startf("PAT_remap")
       call Prim_Advec_Tracers_remap(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
-      call prim_advec_tracers_finish(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
+      if (rstep.lt.rsplit) call prim_advec_tracers_finish(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
       call t_stopf("PAT_remap")
     end if
     call t_stopf("prim_step_advec")
