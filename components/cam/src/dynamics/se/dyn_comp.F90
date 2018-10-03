@@ -329,7 +329,7 @@ CONTAINS
   ! !ROUTINE:  RUN --- Driver for the 
   !
   ! !INTERFACE:
-  subroutine dyn_run( dyn_state, rc )
+  subroutine dyn_run( dyn_state, rc, mode )
 
     ! !USES:
     use parallel_mod,     only : par
@@ -345,6 +345,7 @@ CONTAINS
     type(hybrid_t) :: hybrid
 
     integer, intent(out)               :: rc      ! Return code
+    integer, intent(in)                :: mode
     integer ::  n
     integer :: nets, nete, ithr
     integer :: ie
@@ -367,6 +368,21 @@ CONTAINS
        nete=dom_mt(ithr)%end
        hybrid = hybrid_create(par,ithr,hthreads)
 
+       select case (mode)
+          case(1) ! Run the dynamics
+       remap_mode = 0
+       do n=1,se_nsplit
+          if (n.eq.se_nsplit) remap_mode = 1
+          ! forward-in-time RK, with subcycling
+          call t_startf("prim_run_sybcycle")
+          call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+               tstep, TimeLevel, hvcoord, n, mode=remap_mode)
+          call t_stopf("prim_run_sybcycle")
+       end do
+          case(2) ! Finish dynamics
+       call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+            tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+          case default
        remap_mode = 0
        do n=1,se_nsplit
           if (n.eq.se_nsplit) remap_mode = 1
@@ -378,6 +394,7 @@ CONTAINS
        end do
        call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
             tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+       end select
 
 
 #ifdef HORIZ_OPENMP

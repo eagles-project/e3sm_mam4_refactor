@@ -534,7 +534,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
    end subroutine stepon_run2
    
 
-subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
+subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out,mode)
    use camsrfexch,  only: cam_out_t     
    use dyn_comp,    only: dyn_run
    use time_mod,    only: tstep
@@ -543,11 +543,12 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   integer,             intent(in)    :: mode
    integer :: rc
 
    call t_barrierf('sync_dyn_run', mpicom)
    call t_startf ('dyn_run')
-   call dyn_run(dyn_out,rc)	
+   call dyn_run(dyn_out,rc,mode)	
    call t_stopf  ('dyn_run')
 
 end subroutine stepon_run3

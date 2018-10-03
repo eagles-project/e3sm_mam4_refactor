@@ -210,11 +210,12 @@ subroutine cam_run1(cam_in, cam_out)
 !-----------------------------------------------------------------------
    
    use physpkg,          only: phys_run1
-   use stepon,           only: stepon_run1
+   use stepon,           only: stepon_run1, stepon_run3
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
    use time_manager,     only: get_nstep
+   use control_mod, only: ftype
 
    type(cam_in_t)  :: cam_in(begchunk:endchunk)
    type(cam_out_t) :: cam_out(begchunk:endchunk)
@@ -249,6 +250,12 @@ subroutine cam_run1(cam_in, cam_out)
    call t_startf ('phys_run1')
    call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out)
    call t_stopf  ('phys_run1')
+
+   if (ftype.eq.-3) then
+      call t_startf ('stepon_run3')
+      call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out, 1 )
+      call t_stopf ('stepon_run3')
+   end if
 
 end subroutine cam_run1
 
@@ -315,6 +322,7 @@ subroutine cam_run3( cam_out )
 !-----------------------------------------------------------------------
    use stepon,           only: stepon_run3
    use time_manager,     only: is_first_step, is_first_restart_step
+   use control_mod, only: ftype
 #if ( defined SPMD )
    use mpishorthand,     only: mpicom
 #endif
@@ -326,7 +334,11 @@ subroutine cam_run3( cam_out )
    !
    call t_barrierf ('sync_stepon_run3', mpicom)
    call t_startf ('stepon_run3')
-   call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
+   if (ftype.ne.-3) then
+      call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out, 0 )
+   else
+      call stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out, 2 )
+   end if
 
    call t_stopf  ('stepon_run3')
 
