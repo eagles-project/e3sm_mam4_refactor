@@ -99,6 +99,8 @@ module phys_grid
    use cam_abortutils,   only: endrun
    use perf_mod
    use cam_logfile,      only: iulog
+   use parallel_mod,     only: par
+   use dimensions_mod,   only: nelemd
 
    implicit none
    save
@@ -304,6 +306,7 @@ module phys_grid
    integer, private, parameter :: def_alltoall = 1                ! default
    integer, private :: phys_alltoall = def_alltoall
 
+   logical :: split_dyn_phys_PE
 contains
 !========================================================================
   integer function get_nlcols_p()
@@ -405,6 +408,7 @@ contains
     character(len=max_hcoordname_len)   :: copy_gridname
     logical                             :: unstructured
     real(r8)                            :: lonmin, latmin
+    integer                             :: dyn_elem(0:npes-1)
 
     nullify(lonvals)
     nullify(latvals)
@@ -810,7 +814,7 @@ contains
        endif
     enddo
 
-    deallocate( pchunkid )
+    !deallocate( pchunkid )
     !deallocate( npchunks ) !do not deallocate as it is being used in RRTMG radiation.F90
     !
     !-----------------------------------------------------------------------
@@ -1078,13 +1082,30 @@ contains
     !
     physgrid_set = .true.   ! Set flag indicating physics grid is now set
     !
+    call mpigather(nelemd,1,mpiint,dyn_elem,1,mpiint,0,mpicom)
     if (masterproc) then
        write(iulog,*) 'PHYS_GRID_INIT:  Using PCOLS=',pcols,     &
             '  phys_loadbalance=',lbal_opt,            &
+            '  split_dyn_phys_PE=',split_dyn_phys_PE,   & 
             '  phys_twin_algorithm=',twin_alg,         &
             '  phys_alltoall=',phys_alltoall,          &
             '  chunks_per_thread=',chunks_per_thread
+       write(iulog,*) '============ Physics Processor Config ============'
+       write(iulog,'(A16,1x,5(A12,1x))') 'Proc', 'begchunk', 'endchunk', '# chunks', '# cols', '# elem'
+       do p = 0,npes-1
+          write(iulog,'(I16,1x,5(I12,1x))') p+1, pchunkid(p)+lastblock, pchunkid(p+1)+lastblock-1, &
+               npchunks(p), gs_col_num(p), dyn_elem(p)
+       end do
+       write(iulog,'(A16,1x,5(i12,1x))') 'PHYS_GRID Total:', pchunkid(0)+lastblock, pchunkid(npes)+lastblock-1,&
+            sum(npchunks), sum(gs_col_num), sum(dyn_elem)
+       write(iulog,'(A16,1x,26x,3(i12,1x))') 'PHYS_GRID Min:', &
+            minval(npchunks), minval(gs_col_num), minval(dyn_elem)
+       write(iulog,'(A16,1x,26x,3(i12,1x))') 'PHYS_GRID Max:', &
+            maxval(npchunks), maxval(gs_col_num), maxval(dyn_elem)
+       write(iulog,*) '=================================================='
+       write(iulog,*) '=================================================='
     endif
+    deallocate( pchunkid ) ! moved from above to facilitate chunk output
     !
 
     call t_stopf("phys_grid_init")
@@ -1336,6 +1357,12 @@ logical function phys_grid_initialized ()
 !-----------------------------------------------------------------------
      if ( present(phys_loadbalance_in) ) then
         lbal_opt = phys_loadbalance_in
+        ! Determine if physics and dynamics are solved on separate cores
+        split_dyn_phys_PE = .false.
+        if (lbal_opt==-2) then
+           lbal_opt = 2
+           split_dyn_phys_PE = .true.
+        end if
         if ((lbal_opt < min_lbal_opt).or.(lbal_opt > max_lbal_opt)) then
            if (masterproc) then
               write(iulog,*)                                          &
@@ -3946,6 +3973,10 @@ logical function phys_grid_initialized ()
    external omp_get_max_threads
 #endif
 
+   integer :: ier
+   logical :: dynonly(0:npes-1)
+   logical :: dynonly_chk
+
 !-----------------------------------------------------------------------
 !
 ! Determine number of threads per process
@@ -3962,6 +3993,20 @@ logical function phys_grid_initialized ()
    proc_smp_map(0) = 0
 #endif
 
+   if (split_dyn_phys_PE) then
+      dynonly_chk = .false.
+      call mpi_allgather(par%dynproc,1,mpilog,dynonly,1,mpilog,mpicom,ier)
+      do p = 0,npes-1
+         if (not(dynonly(p))) dynonly_chk = .true.
+      end do
+      if (dynonly_chk) then
+         do p = 0,npes-1
+            if (dynonly(p)) npthreads(p) = 0
+         end do !p
+      else
+         if (masterproc) write(iulog,*) 'WARNING: dyn_npes = npes, switching to dynamics and physics on same cores'   
+      end if
+   end if
 !
 ! Determine index range for dynamics blocks
 !
@@ -4210,6 +4255,9 @@ logical function phys_grid_initialized ()
          endif
          nchunks = nchunks + nsmpchunks(smp)
       enddo
+      do p = 0,npes-1
+         if (npthreads(p).eq.0) nchunks = nchunks+1
+      end do
 !
 ! Determine maximum number of columns to assign to chunks
 ! in a given SMP
@@ -4974,6 +5022,14 @@ logical function phys_grid_initialized ()
 !
    enddo
 !
+   cid = cid_offset(nsmpx)
+   do p = 0,npes-1
+      if (npchunks(p).eq.0) then
+         chunks(cid)%owner = p
+         cid = cid + 1
+         npchunks(p) = 1
+      end if
+   end do !p
    return
    end subroutine assign_chunks
 !

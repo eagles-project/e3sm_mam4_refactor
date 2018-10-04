@@ -1087,9 +1087,11 @@ end subroutine physics_ptend_copy
 
     ncol = get_ncols_p(lchnk)
 
-    if(ncol<=0) then
+    if(ncol<0) then
        write(iulog,*) lchnk, ncol
        call endrun('physics_state_set_grid')
+    elseif (ncol.eq.0) then
+       write(iulog,*) lchnk, ncol
     end if
 
     call get_rlon_all_p(lchnk, ncol, rlon)
