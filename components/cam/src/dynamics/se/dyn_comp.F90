@@ -7,7 +7,7 @@ Module dyn_comp
   use hybvcoord_mod, only : hvcoord_t, set_layer_locations
   use hybrid_mod, only : hybrid_t
   use thread_mod, only: nthreads, hthreads, vthreads, omp_get_max_threads, omp_get_thread_num
-  use perf_mod, only: t_startf, t_stopf
+  use perf_mod, only: t_startf, t_stopf, t_startfw, t_stopfw
   use cam_logfile, only : iulog
   use time_manager, only: is_first_step
   use spmd_utils,  only : iam, npes_cam => npes
@@ -370,30 +370,34 @@ CONTAINS
 
        select case (mode)
           case(1) ! Run the dynamics
-       remap_mode = 0
-       do n=1,se_nsplit
-          if (n.eq.se_nsplit) remap_mode = 1
-          ! forward-in-time RK, with subcycling
-          call t_startf("prim_run_sybcycle")
-          call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-               tstep, TimeLevel, hvcoord, n, mode=remap_mode)
-          call t_stopf("prim_run_sybcycle")
-       end do
+             remap_mode = 0
+             do n=1,se_nsplit
+                if (n.eq.se_nsplit) remap_mode = 1
+                ! forward-in-time RK, with subcycling
+                call t_startfw("prim_run_subcycle", 32)
+                call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+                     tstep, TimeLevel, hvcoord, n, mode=remap_mode)
+                call t_stopfw("prim_run_subcycle", 32)
+             end do
           case(2) ! Finish dynamics
-       call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-            tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+             call t_startfw("prim_run_subcycle_finish", 33)
+             call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+                  tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+             call t_stopfw("prim_run_subcycle_finish", 33)
           case default
-       remap_mode = 0
-       do n=1,se_nsplit
-          if (n.eq.se_nsplit) remap_mode = 1
-          ! forward-in-time RK, with subcycling
-          call t_startf("prim_run_sybcycle")
-          call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-               tstep, TimeLevel, hvcoord, n, mode=remap_mode)
-          call t_stopf("prim_run_sybcycle")
-       end do
-       call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-            tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+             remap_mode = 0
+             do n=1,se_nsplit
+                if (n.eq.se_nsplit) remap_mode = 1
+                ! forward-in-time RK, with subcycling
+                call t_startfw("prim_run_subcycle", 32)
+                call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+                     tstep, TimeLevel, hvcoord, n, mode=remap_mode)
+                call t_stopfw("prim_run_subcycle", 32)
+             end do
+             call t_startfw("prim_run_subcycle_finish", 33)
+             call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+                  tstep, TimeLevel, hvcoord, se_nsplit, mode=2)
+             call t_stopfw("prim_run_subcycle_finish", 33)
        end select
 
 

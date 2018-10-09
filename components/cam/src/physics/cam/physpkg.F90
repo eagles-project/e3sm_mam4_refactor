@@ -978,9 +978,9 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     if (nstep == 0 .and. phys_do_flux_avg()) call flux_avg_init(cam_in,  pbuf2d)
 
     ! Compute total energy of input state and previous output state
-    call t_startf ('chk_en_gmean')
+    call t_startfw ('chk_en_gmean', 14)
     call check_energy_gmean(phys_state, pbuf2d, ztodt, nstep)
-    call t_stopf ('chk_en_gmean')
+    call t_stopfw ('chk_en_gmean', 14)
 
     call t_stopf ('physpkg_st1')
 
@@ -1024,6 +1024,8 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
 
 !$OMP PARALLEL DO PRIVATE (C, phys_buffer_chunk)
        do c=begchunk, endchunk
+          ncol = get_ncols_p(c)
+          if (ncol.gt.0) then  ! Check for dynamics only processor
           !
           ! Output physics terms to IC file
           !
@@ -1036,6 +1038,7 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
           call tphysbc (ztodt, fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c), phys_state(c),        &
                        phys_tend(c), phys_buffer_chunk,  fsds(1,c), landm(1,c),          &
                        sgh(1,c), sgh30(1,c), cam_out(c), cam_in(c) )
+          end if
 
        end do
 
@@ -1223,6 +1226,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     do c=begchunk,endchunk
        ncol = get_ncols_p(c)
+       if (ncol.gt.0) then  ! Check for dynamics only processor
        phys_buffer_chunk => pbuf_get_chunk(pbuf2d, c)
 
        !! 
@@ -1244,6 +1248,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
             phys_state(c), phys_tend(c), phys_buffer_chunk,&
             fsds(1,c))
+       endif
     end do                    ! Chunk loop
 
     !call t_adj_detailf(-1)
@@ -2416,9 +2421,9 @@ end if
             !===================================================
             ! Aerosol Activation
             !===================================================
-            call t_startf('microp_aero_run')
+            call t_startfw('microp_aero_run', 10)
             call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo)
-            call t_stopf('microp_aero_run')
+            call t_stopfw('microp_aero_run', 10)
 
             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
 
@@ -2430,7 +2435,7 @@ end if
           ! Calculate macrophysical tendency (sedimentation, detrain, cloud fraction)
           !===================================================
 
-          call t_startf('macrop_tend')
+          call t_startfw('macrop_tend', 11)
 
           ! don't call Park macrophysics if CLUBB is called
           if (macrop_scheme .ne. 'CLUBB_SGS') then
@@ -2505,7 +2510,7 @@ end if
  
           endif
 
-          call t_stopf('macrop_tend')
+          call t_stopfw('macrop_tend', 11)
 
           !===================================================
           ! Calculate cloud microphysics 
@@ -2531,7 +2536,7 @@ end if
 
           endif
 
-          call t_startf('microp_tend')
+          call t_startfw('microp_tend', 12)
 
 
           if (use_subcol_microp) then
@@ -2575,7 +2580,7 @@ end if
                zero, prec_str(:ncol)/cld_macmic_num_steps, &
                snow_str(:ncol)/cld_macmic_num_steps, zero)
 
-          call t_stopf('microp_tend')
+          call t_stopfw('microp_tend', 12)
           prec_sed_macmic(:ncol) = prec_sed_macmic(:ncol) + prec_sed(:ncol)
           snow_sed_macmic(:ncol) = snow_sed_macmic(:ncol) + snow_sed(:ncol)
           prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
@@ -2611,7 +2616,7 @@ if (l_tracer_aero) then
        !     to determine the interstitial fraction) 
        !===================================================
 
-       call t_startf('bc_aerosols')
+       call t_startfw('bc_aerosols', 18)
        if (clim_modal_aero .and. .not. prog_modal_aero) then
           call modal_aero_calcsize_diag(state, pbuf)
           call modal_aero_wateruptake_dr(state, pbuf)
@@ -2652,7 +2657,7 @@ if (l_tracer_aero) then
        ! check tracer integrals
        call check_tracers_chng(state, tracerint, "cmfmca", nstep, ztodt,  zero_tracers)
 
-       call t_stopf('bc_aerosols')
+       call t_stopf('bc_aerosols', 18)
 
    endif
 end if ! l_tracer_aero
@@ -2691,7 +2696,7 @@ if (l_rad) then
     !===================================================
     ! Radiation computations
     !===================================================
-    call t_startf('radiation')
+    call t_startfw('radiation', 13)
 
 
     call radiation_tend(state,ptend, pbuf, &
@@ -2707,7 +2712,7 @@ if (l_rad) then
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
-    call t_stopf('radiation')
+    call t_stopfw('radiation', 13)
 
 end if ! l_rad
 

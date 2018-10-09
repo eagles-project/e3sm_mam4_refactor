@@ -27,8 +27,10 @@
 #define gptlreset GPTLRESET
 #define gptlstamp GPTLSTAMP
 #define gptlstart GPTLSTART
+#define gptlstartw GPTLSTARTW
 #define gptlstart_handle GPTLSTART_HANDLE
 #define gptlstop GPTLSTOP
+#define gptlstopw GPTLSTOPW
 #define gptlstop_handle GPTLSTOP_HANDLE
 #define gptlstartstop_vals GPTLSTARTSTOP_VALS
 #define gptlsetoption GPTLSETOPTION
@@ -99,8 +101,10 @@
 #define gptlreset gptlreset_
 #define gptlstamp gptlstamp_
 #define gptlstart gptlstart_
+#define gptlstartw gptlstartw_
 #define gptlstart_handle gptlstart_handle_
 #define gptlstop gptlstop_
+#define gptlstopw gptlstopw_
 #define gptlstop_handle gptlstop_handle_
 #define gptlstartstop_vals gptlstartstop_vals_
 #define gptlsetoption gptlsetoption_
@@ -135,8 +139,10 @@
 #define gptlreset gptlreset__
 #define gptlstamp gptlstamp__
 #define gptlstart gptlstart__
+#define gptlstartw gptlstartw__
 #define gptlstart_handle gptlstart_handle__
 #define gptlstop gptlstop__
+#define gptlstopw gptlstopw__
 #define gptlstop_handle gptlstop_handle__
 #define gptlstartstop_vals gptlstartstop_vals__
 #define gptlsetoption gptlsetoption__
@@ -175,8 +181,10 @@ int gptlbarrier (int *fcomm, char *name, int nc1);
 int gptlreset (void);
 int gptlstamp (double *wall, double *usr, double *sys);
 int gptlstart (char *name, int nc1);
+double gptlstartw (char *name, int nc1);
 int gptlstart_handle (char *name, void **, int nc1);
 int gptlstop (char *name, int nc1);
+double gptlstopw (char *name, int nc1);
 int gptlstop_handle (char *name, void **, int nc1);
 int gptlstartstop_vals (char *name, double *val, int *cnt, int nc1);
 int gptlsetoption (int *option, int *val);
@@ -356,6 +364,11 @@ int gptlstart (char *name, int nc1)
   return GPTLstartf (name, nc1);
 }
 
+double gptlstartw (char *name, int nc1)
+{
+  return GPTLstartfw (name, nc1);
+}
+
 int gptlstart_handle (char *name, void **handle, int nc1)
 {
   /*  char cname[MAX_CHARS+1];*/
@@ -382,6 +395,11 @@ int gptlstop (char *name, int nc1)
   /*  cname[numchars] = '\0';*/
   /*  return GPTLstop (cname);*/
   return GPTLstopf (name, nc1);
+}
+
+double gptlstopw (char *name, int nc1)
+{
+  return GPTLstopfw (name, nc1);
 }
 
 int gptlstop_handle (char *name, void **handle, int nc1)

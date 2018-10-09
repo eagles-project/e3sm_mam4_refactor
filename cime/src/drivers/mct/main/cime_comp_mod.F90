@@ -1147,7 +1147,7 @@ contains
   !  components will set them to true for the purposes of symmetry
   !-----------------------------------------------------------------------------
 
-    call t_startf('CPL:cime_init')
+    call t_startfw('CPL:cime_init', 5)
     call t_adj_detailf(+1)
 
     call t_startf('CPL:init_comps')
@@ -2073,7 +2073,7 @@ contains
     endif
 
     call t_adj_detailf(-1)
-    call t_stopf('CPL:cime_init')
+    call t_stopfw('CPL:cime_init', 5)
 
   end subroutine cime_init
 

@@ -17,7 +17,7 @@ module stepon
    use physconst,      only: zvir, cappa
    use physics_types,  only: physics_state, physics_tend
    use dyn_comp,       only: dyn_import_t, dyn_export_t
-   use perf_mod,       only: t_startf, t_stopf, t_barrierf
+   use perf_mod,       only: t_startf, t_stopf, t_barrierf, t_startfw, t_stopfw
    use time_manager,   only: get_step_size
 ! from SE
    use derivative_mod, only: derivinit, derivative_t
@@ -188,9 +188,9 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend,               &
    !----------------------------------------------------------
    
    call t_barrierf('sync_d_p_coupling', mpicom)
-   call t_startf('d_p_coupling')
+   call t_startfw('d_p_coupling', 17)
    call d_p_coupling (phys_state, phys_tend,  pbuf2d, dyn_out )
-   call t_stopf('d_p_coupling')
+   call t_stopfw('d_p_coupling', 17)
    
 end subroutine stepon_run1
 
@@ -222,9 +222,9 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
    ! copy from phys structures -> dynamics structures
    call t_barrierf('sync_p_d_coupling', mpicom)
-   call t_startf('p_d_coupling')
+   call t_startfw('p_d_coupling', 22)
    call p_d_coupling(phys_state, phys_tend,  dyn_in)
-   call t_stopf('p_d_coupling')
+   call t_stopfw('p_d_coupling', 22)
 
    if(.not.par%dynproc) return
 
