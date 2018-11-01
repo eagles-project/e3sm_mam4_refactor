@@ -149,8 +149,9 @@ class TSC(SystemTestsCommon):
 
         # Run simulations with 2-s time step
         self._run_with_specified_dtime(dtime=2)
+        self._run_with_specified_dtime(dtime=1)
 
         # Run simulations with 1-s time step. This is NOT needed
         # for testing new code or new computing environment.
-        if self._case.get_value("GENERATE_BASELINE"):
-           self._run_with_specified_dtime(dtime=1)
+        #if self._case.get_value("GENERATE_BASELINE"):
+        #   self._run_with_specified_dtime(dtime=1)
