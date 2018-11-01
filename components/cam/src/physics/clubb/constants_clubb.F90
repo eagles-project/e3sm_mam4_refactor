@@ -114,6 +114,9 @@ module constants_clubb
   real( kind = core_rknd ), parameter, public :: &
     gamma_over_implicit_ts = 1.50_core_rknd
 
+  real( kind = core_rknd ), parameter, public :: &
+    gamma_over_implicit_uv = 0.50_core_rknd
+
   !-----------------------------------------------------------------------------
   ! Mathematical Constants
   !-----------------------------------------------------------------------------

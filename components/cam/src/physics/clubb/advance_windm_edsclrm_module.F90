@@ -254,12 +254,12 @@ module advance_windm_edsclrm_module
     ! Solve for x'w' at all intermediate model levels.
     ! A Crank-Nicholson timestep is used.
 
-    upwp(2:gr%nz-1) = - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1)+ & 
+    upwp(2:gr%nz-1) = - (1.0_core_rknd - gamma_over_implicit_uv) * xpwp_fnc( Km_zm(2:gr%nz-1)+ & 
                                           nu10_vert_res_dep(2:gr%nz-1),  & ! in
                                           um(2:gr%nz-1), um(3:gr%nz), & ! in
                                           gr%invrs_dzm(2:gr%nz-1) )
 
-    vpwp(2:gr%nz-1) = - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1)+ &
+    vpwp(2:gr%nz-1) = - (1.0_core_rknd - gamma_over_implicit_uv) * xpwp_fnc( Km_zm(2:gr%nz-1)+ &
                                           nu10_vert_res_dep(2:gr%nz-1),  & ! in
                                           vm(2:gr%nz-1), vm(3:gr%nz), & ! in
                                           gr%invrs_dzm(2:gr%nz-1) )
@@ -336,11 +336,11 @@ module advance_windm_edsclrm_module
     ! A Crank-Nicholson timestep is used.
 
     upwp(2:gr%nz-1) = upwp(2:gr%nz-1)  &
-      - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1)+nu10_vert_res_dep(2:gr%nz-1), &
+      - gamma_over_implicit_uv * xpwp_fnc( Km_zm(2:gr%nz-1)+nu10_vert_res_dep(2:gr%nz-1), &
       um(2:gr%nz-1), um(3:gr%nz), gr%invrs_dzm(2:gr%nz-1) ) !in
 
     vpwp(2:gr%nz-1) = vpwp(2:gr%nz-1)  &
-      - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1)+nu10_vert_res_dep(2:gr%nz-1), &
+      - gamma_over_implicit_uv * xpwp_fnc( Km_zm(2:gr%nz-1)+nu10_vert_res_dep(2:gr%nz-1), &
       vm(2:gr%nz-1), vm(3:gr%nz), gr%invrs_dzm(2:gr%nz-1) ) !in
 
 
@@ -465,7 +465,8 @@ module advance_windm_edsclrm_module
 !HPF$ INDEPENDENT, REDUCTION(wpedsclrp)
       forall( i = 1:edsclr_dim )
         wpedsclrp(2:gr%nz-1,i) = &
-          - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1), edsclrm(2:gr%nz-1,i), & ! in
+          - (1.0_core_rknd - gamma_over_implicit_uv ) &
+                         * xpwp_fnc( Km_zm(2:gr%nz-1), edsclrm(2:gr%nz-1,i), & ! in
                             edsclrm(3:gr%nz,i), gr%invrs_dzm(2:gr%nz-1) )   ! in
       end forall
 
@@ -506,7 +507,7 @@ module advance_windm_edsclrm_module
 !HPF$ INDEPENDENT, REDUCTION(wpedsclrp)
       forall( i = 1:edsclr_dim )
         wpedsclrp(2:gr%nz-1,i) = wpedsclrp(2:gr%nz-1,i) &
-          - 0.5_core_rknd * xpwp_fnc( Km_zm(2:gr%nz-1), edsclrm(2:gr%nz-1,i), & ! in
+          - gamma_over_implicit_uv * xpwp_fnc( Km_zm(2:gr%nz-1), edsclrm(2:gr%nz-1,i), & ! in
                             edsclrm(3:gr%nz,i), gr%invrs_dzm(2:gr%nz-1) )   ! in
       end forall
 
@@ -1523,7 +1524,7 @@ module advance_windm_edsclrm_module
       endif
       lhs(kp1_tdiag:km1_tdiag,k)  &
       = lhs(kp1_tdiag:km1_tdiag,k)  &
-      + 0.5_core_rknd * invrs_rho_ds_zt(k)  &
+      + gamma_over_implicit_uv * invrs_rho_ds_zt(k)  &
       * diffusion_zt_lhs( rho_ds_zm(k) * Km_zm(k),  &
                           rho_ds_zm(km1) * Km_zm(km1), nu,  &
                           gr%invrs_dzm(km1), gr%invrs_dzm(k),  &
@@ -1554,7 +1555,7 @@ module advance_windm_edsclrm_module
 
         if ( ium_ta + ivm_ta > 0 ) then
           tmp(1:3)  &
-          = 0.5_core_rknd * invrs_rho_ds_zt(k)  &
+          = gamma_over_implicit_uv * invrs_rho_ds_zt(k)  &
           * diffusion_zt_lhs( rho_ds_zm(k) * Km_zm(k),  &
                               rho_ds_zm(km1) * Km_zm(km1), nu,  &
                               gr%invrs_dzm(km1), gr%invrs_dzm(k),  &
@@ -1730,7 +1731,7 @@ module advance_windm_edsclrm_module
         diff_k_in = k
       endif
       rhs_diff(1:3)  & 
-      = 0.5_core_rknd * invrs_rho_ds_zt(k)  &
+      = (1.0_core_rknd - gamma_over_implicit_uv ) * invrs_rho_ds_zt(k)  &
       * diffusion_zt_lhs( rho_ds_zm(k) * Km_zm(k),  &
                           rho_ds_zm(km1) * Km_zm(km1), nu,  &
                           gr%invrs_dzm(km1), gr%invrs_dzm(k),  &
@@ -1823,7 +1824,7 @@ module advance_windm_edsclrm_module
     ! RHS turbulent advection term (solved as an eddy-diffusion term) at the
     ! upper boundary.
     rhs_diff(1:3)  &
-    = 0.5_core_rknd * invrs_rho_ds_zt(k)  &
+    = (1.0_core_rknd - gamma_over_implicit_uv) * invrs_rho_ds_zt(k)  &
     * diffusion_zt_lhs( rho_ds_zm(k) * Km_zm(k),  &
                         rho_ds_zm(km1) * Km_zm(km1), nu,  &
                         gr%invrs_dzm(km1), gr%invrs_dzm(k),  &
