@@ -99,6 +99,7 @@ module advance_windm_edsclrm_module
 
     use constants_clubb, only:  & 
         fstderr, &  ! Constant(s)
+        gamma_over_implicit_uv,& 
         eps
 
     use sponge_layer_damping, only: &
