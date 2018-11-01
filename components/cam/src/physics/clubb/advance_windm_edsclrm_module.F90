@@ -1445,6 +1445,9 @@ module advance_windm_edsclrm_module
         ztscr06, &
         l_stats_samp
 
+    use constants_clubb, only:  &
+        gamma_over_implicit_uv
+
     implicit none
 
     ! Constant parameters
@@ -1653,6 +1656,9 @@ module advance_windm_edsclrm_module
 
     use grid_class, only:  & 
         gr  ! Variable(s)
+
+    use constants_clubb, only:  &
+        gamma_over_implicit_uv
 
     implicit none
 
