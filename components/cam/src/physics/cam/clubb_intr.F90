@@ -333,15 +333,15 @@ subroutine clubb_init_cnst(name, q, gcid)
 
 #ifdef CLUBB_SGS
    if (clubb_do_adv) then
-      if (trim(name) == trim(cnst_names(1))) q = thl_tol**2
-      if (trim(name) == trim(cnst_names(2))) q = rt_tol**2
+      if (trim(name) == trim(cnst_names(1))) q = real(thl_tol**2,kind=r8)
+      if (trim(name) == trim(cnst_names(2))) q = real(rt_tol**2,kind=r8)
       if (trim(name) == trim(cnst_names(3))) q = 0.0_r8
       if (trim(name) == trim(cnst_names(4))) q = 0.0_r8
       if (trim(name) == trim(cnst_names(5))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(6))) q = w_tol_sqd
+      if (trim(name) == trim(cnst_names(6))) q = real(w_tol_sqd,kind=r8)
       if (trim(name) == trim(cnst_names(7))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(8))) q = w_tol_sqd
-      if (trim(name) == trim(cnst_names(9))) q = w_tol_sqd
+      if (trim(name) == trim(cnst_names(8))) q = real(w_tol_sqd,kind=r8)
+      if (trim(name) == trim(cnst_names(9))) q = real(w_tol_sqd,kind=r8)
    end if
 #endif
 
@@ -489,7 +489,7 @@ end subroutine clubb_init_cnst
 
     !  From the CLUBB libraries
     use advance_clubb_core_module, only: setup_clubb_core
-    use clubb_precision,           only: time_precision
+    use clubb_precision,           only: time_precision, core_rknd
     use error_code,                only: set_clubb_debug_level ! Subroutines
     use parameter_indices,         only: nparams ! Constant
     use parameters_tunable,        only: read_parameters ! Subroutine
@@ -499,7 +499,6 @@ end subroutine clubb_init_cnst
     use error_messages,            only: handle_errmsg
     use time_manager,              only: is_first_step
     use constants_clubb,           only: w_tol_sqd, rt_tol, thl_tol  
-
 
     !  These are only needed if we're using a passive scalar
     use array_index,            only: iisclr_rt, iisclr_thl, iisclr_CO2, &    ! [kg/kg]/[K]/[1e6 mol/mol]
@@ -522,6 +521,9 @@ end subroutine clubb_init_cnst
     
     real(r8), dimension(nparams)  :: clubb_params    ! These adjustable CLUBB parameters (C1, C2 ...)
 
+    !!SZhang and HWan, CLUBB reduce precision test 
+    real(kind=core_rknd), dimension(nparams)  :: clubb_params_r4    ! These adjustable CLUBB parameters (C1, C2 ...)
+
     logical :: clubb_history, clubb_rad_history, clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff ! Stats enabled (T/F)
 
     ! The similar name to clubb_history is unfortunate...
@@ -540,6 +542,10 @@ end subroutine clubb_init_cnst
 
     real(r8)  :: zt_g(pverp)                        ! Height dummy array
     real(r8)  :: zi_g(pverp)                        ! Height dummy array
+
+    !!SZhang and HWan, CLUBB reduce precision test 
+    real(kind=core_rknd) :: zt_g_r4(pverp)     
+    real(kind=core_rknd) :: zi_g_r4(pverp)     
 
 
     !----- Begin Code -----
@@ -646,7 +652,8 @@ end subroutine clubb_init_cnst
     
     !  Read in parameters for CLUBB.  Just read in default values 
 !$OMP PARALLEL
-    call read_parameters( -99, "", clubb_params )
+    call read_parameters( -99, "", clubb_params_r4 )
+    clubb_params    = real(clubb_params_r4, kind = core_rknd)
 !$OMP END PARALLEL
       
     !  Fill in dummy arrays for height.  Note that these are overwrote
@@ -661,14 +668,19 @@ end subroutine clubb_init_cnst
     !  at each time step, which is why dummy arrays are read in here for heights
     !  as they are immediately overwrote.     
 !$OMP PARALLEL
+
+     !SZhang and HWan CLUBB reduced precision test
+      zt_g_r4     = real(zt_g,    kind = core_rknd)
+      zi_g_r4     = real(zi_g,    kind = core_rknd)
+
     call setup_clubb_core     &
-         ( pverp, theta0, ts_nudge, &                                 ! In
-           hydromet_dim,  sclr_dim, &                                 ! In
-           sclr_tol, edsclr_dim, clubb_params, &                      ! In
-           l_host_applies_sfc_fluxes, &                               ! In
-           l_uv_nudge, saturation_equation,  &                        ! In
-           l_implemented, grid_type, zi_g(2), zi_g(1), zi_g(pverp), & ! In
-           zi_g(1:pverp), zt_g(1:pverp), zi_g(1), &                   ! In
+         ( pverp, real(theta0,  kind = core_rknd), real(ts_nudge,kind = core_rknd), &        ! In
+           hydromet_dim,  sclr_dim, &                                                        ! In
+           real(sclr_tol,kind = core_rknd), edsclr_dim, clubb_params_r4, &                   ! In
+           l_host_applies_sfc_fluxes, &                                        ! In
+           l_uv_nudge, saturation_equation,  &                                 ! In
+           l_implemented, grid_type, zi_g_r4(2), zi_g_r4(1), zi_g_r4(pverp), & ! In
+           zi_g_r4(1:pverp), zt_g_r4(1:pverp), zi_g_r4(1), &                   ! In
            err_code )
 !$OMP END PARALLEL
 
@@ -852,15 +864,15 @@ end subroutine clubb_init_cnst
     !  Is this the first time step?  If so then initialize CLUBB variables as follows
     if (is_first_step()) then
 
-       call pbuf_set_field(pbuf2d, wp2_idx,     w_tol_sqd)
+       call pbuf_set_field(pbuf2d, wp2_idx,     real(w_tol_sqd,kind=r8))
        call pbuf_set_field(pbuf2d, wp3_idx,     0.0_r8)
        call pbuf_set_field(pbuf2d, wpthlp_idx,  0.0_r8)
        call pbuf_set_field(pbuf2d, wprtp_idx,   0.0_r8)
        call pbuf_set_field(pbuf2d, rtpthlp_idx, 0.0_r8)
-       call pbuf_set_field(pbuf2d, rtp2_idx,    rt_tol**2)
-       call pbuf_set_field(pbuf2d, thlp2_idx,   thl_tol**2)
-       call pbuf_set_field(pbuf2d, up2_idx,     w_tol_sqd)
-       call pbuf_set_field(pbuf2d, vp2_idx,     w_tol_sqd)
+       call pbuf_set_field(pbuf2d, rtp2_idx,    real(rt_tol**2,kind=r8))
+       call pbuf_set_field(pbuf2d, thlp2_idx,   real(thl_tol**2,kind=r8))
+       call pbuf_set_field(pbuf2d, up2_idx,     real(w_tol_sqd,kind=r8))
+       call pbuf_set_field(pbuf2d, vp2_idx,     real(w_tol_sqd,kind=r8))
       
        call pbuf_set_field(pbuf2d, upwp_idx,    0.0_r8)
        call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
@@ -926,11 +938,11 @@ end subroutine clubb_init_cnst
    use parameter_indices,         only: nparams     
    use parameters_tunable,        only: read_parameters, setup_parameters ! Subroutine
    use cldfrc2m,                  only: aist_vector
-   use clubb_precision,           only: time_precision
+   use clubb_precision,           only: time_precision, core_rknd
    use cam_history,               only: outfld
    use advance_clubb_core_module, only: advance_clubb_core, calculate_thlp2_rad
    use grid_class,                only: zt2zm, zm2zt, gr, setup_grid, cleanup_grid 
-   use constants_clubb,           only: w_tol_sqd, rt_tol, thl_tol  
+   use constants_clubb,           only: w_tol_sqd, rt_tol, thl_tol, zero
    use model_flags,               only: l_use_boussinesq 
    use stats_variables,           only: l_stats, stats_tsamp, stats_tout, stats_zt, &
                                       stats_sfc, stats_zm, stats_rad_zt, stats_rad_zm, l_output_rad_files
@@ -941,7 +953,8 @@ end subroutine clubb_init_cnst
    use stats_clubb_utilities,     only: stats_begin_timestep
    use advance_xp2_xpyp_module,   only: update_xp2_mc
    use macrop_driver,             only: ice_macro_tend
-    
+   use clubb_r82r4_mod,           only: clubb_r82r4_core 
+
 #endif
 
    implicit none
@@ -1095,6 +1108,96 @@ end subroutine clubb_init_cnst
    real(r8) :: qmin
    real(r8) :: varmu(pcols)
    real(r8) :: varmu2
+
+   ! variables below are defined for the reduced precicion in advance_clubb_core subroutine 
+   real( kind = core_rknd ) :: host_dx_r4
+   real( kind = core_rknd ) :: host_dy_r4
+   real( kind = core_rknd ) :: dtime_r4                           ! CLUBB time step                              [s]   
+   real( kind = core_rknd ) :: fcor_r4                             ! Coriolis forcing                              [s^-1]
+   real( kind = core_rknd ) :: sfc_elevation_r4                    ! Elevation of ground                           [m AMSL]
+   real( kind = core_rknd ) :: thlm_forcing_r4(pverp)              ! theta_l forcing (thermodynamic levels)        [K/s]
+   real( kind = core_rknd ) :: rtm_forcing_r4(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]                              
+   real( kind = core_rknd ) :: um_forcing_r4(pverp)                ! u wind forcing (thermodynamic levels)         [m/s/s]
+   real( kind = core_rknd ) :: vm_forcing_r4(pverp)                ! v wind forcing (thermodynamic levels)         [m/s/s]
+   real( kind = core_rknd ) :: sclrm_forcing_r4(pverp,sclr_dim)    ! Passive scalar forcing                        [{units vary}/s]
+   real( kind = core_rknd ) :: edsclrm_forcing_r4(pverp,edsclr_dim)! Eddy passive scalar forcing                   [{units vary}/s]
+   real( kind = core_rknd ) :: wprtp_forcing_r4(pverp)
+   real( kind = core_rknd ) :: wpthlp_forcing_r4(pverp)
+   real( kind = core_rknd ) :: rtp2_forcing_r4(pverp)
+   real( kind = core_rknd ) :: thlp2_forcing_r4(pverp)
+   real( kind = core_rknd ) :: rtpthlp_forcing_r4(pverp)
+   real( kind = core_rknd ) :: wm_zm_r4(pverp)                     ! w mean wind component on momentum levels      [m/s]
+   real( kind = core_rknd ) :: wm_zt_r4(pverp)                     ! w mean wind component on thermo. levels       [m/s]
+   real( kind = core_rknd ) :: wpthlp_sfc_r4                       ! w' theta_l' at surface                        [(m K)/s]
+   real( kind = core_rknd ) :: wprtp_sfc_r4                        ! w' r_t' at surface                            [(kg m)/( kg s)]
+   real( kind = core_rknd ) :: upwp_sfc_r4                         ! u'w' at surface                               [m^2/s^2]
+   real( kind = core_rknd ) :: vpwp_sfc_r4                         ! v'w' at surface                               [m^2/s^2]   
+   real( kind = core_rknd ) :: wpsclrp_sfc_r4(sclr_dim)            ! Scalar flux at surface                        [{units vary} m/s]
+   real( kind = core_rknd ) :: wpedsclrp_sfc_r4(edsclr_dim)        ! Eddy-scalar flux at surface                   [{units vary} m/s]
+   real( kind = core_rknd ) :: p_in_Pa_r4(pverp)                   ! Air pressure (thermodynamic levels)           [Pa]
+   real( kind = core_rknd ) :: rho_in_r4(pverp)                    ! Air density on thermo levels                  [kt/m^3]
+   real( kind = core_rknd ) :: rho_zm_r4(pverp)                    ! Air density on momentum levels                [kg/m^3]
+   real( kind = core_rknd ) :: rho_zt_r4(pverp)                    ! Air density on momentum levels                [kg/m^3]
+   real( kind = core_rknd ) :: exner_r4(pverp)                     ! Exner function (thermodynamic levels)         [-]
+   real( kind = core_rknd ) :: rho_ds_zm_r4(pverp)                 ! Dry, static density on momentum levels        [kg/m^3]
+   real( kind = core_rknd ) :: rho_ds_zt_r4(pverp)                 ! Dry, static density on thermodynamic levels   [kg/m^3]
+   real( kind = core_rknd ) :: invrs_rho_ds_zm_r4(pverp)           ! Inv. dry, static density on momentum levels   [m^3/kg]
+   real( kind = core_rknd ) :: invrs_rho_ds_zt_r4(pverp)           ! Inv. dry, static density on thermo. levels    [m^3/kg]
+   real( kind = core_rknd ) :: thv_ds_zm_r4(pverp)                 ! Dry, base-state theta_v on momentum levels    [K]
+   real( kind = core_rknd ) :: thv_ds_zt_r4(pverp)                 ! Dry, base-state theta_v on thermo. levels     [K]
+   real( kind = core_rknd ) :: hydromet_r4(pverp,hydromet_dim)
+   real( kind = core_rknd ) :: rfrzm_r4(pverp)
+   real( kind = core_rknd ) :: radf_r4(pverp)
+   real( kind = core_rknd ) :: varmu2_r4
+   real( kind = core_rknd ) :: wphydrometp_r4(pverp,hydromet_dim)
+   real( kind = core_rknd ) :: wp2hmp_r4(pverp,hydromet_dim)
+   real( kind = core_rknd ) :: rtphmp_zt_r4(pverp,hydromet_dim)
+   real( kind = core_rknd ) :: thlphmp_zt_r4 (pverp,hydromet_dim)
+   real( kind = core_rknd ) :: um_in_r4(pverp)                     ! meridional wind                              [m/s]
+   real( kind = core_rknd ) :: vm_in_r4(pverp)                     ! zonal wind        
+   real( kind = core_rknd ) :: up2_in_r4(pverp)                    ! meridional wind variance                     [m^2/s^2]
+   real( kind = core_rknd ) :: vp2_in_r4(pverp)                    ! zonal wind variance                          [m^2/s^2]
+   real( kind = core_rknd ) :: upwp_in_r4(pverp)                   ! meridional wind flux                         [m^2/s^2]
+   real( kind = core_rknd ) :: vpwp_in_r4(pverp)                   ! zonal wind flux                              [m^2/s^2]
+   real( kind = core_rknd ) :: thlm_in_r4(pverp)                   ! liquid water potential temperature (thetal)  [K]
+   real( kind = core_rknd ) :: rtm_in_r4(pverp)                    ! total water mixing ratio                     [kg/kg]
+   real( kind = core_rknd ) :: rvm_in_r4(pverp)                    ! total water mixing ratio                     [kg/kg]
+   real( kind = core_rknd ) :: wprtp_in_r4(pverp)                  ! turbulent flux of total water                [kg/kg m/s]
+   real( kind = core_rknd ) :: wpthlp_in_r4(pverp)                 ! turbulent flux of thetal                     [K m/s]
+   real( kind = core_rknd ) :: wp2_in_r4(pverp)                    ! vertical velocity variance (CLUBB)           [m^2/s^2]
+   real( kind = core_rknd ) :: wp3_in_r4(pverp)                    ! third moment vertical velocity               [m^3/s^3]
+   real( kind = core_rknd ) :: rtp2_in_r4(pverp)                   ! total water variance                         [kg^2/k^2]
+   real( kind = core_rknd ) :: thlp2_in_r4(pverp)                  ! thetal variance                              [K^2]
+   real( kind = core_rknd ) :: rtpthlp_in_r4(pverp)                ! covariance of thetal and qt                  [kg/kg K]
+   real( kind = core_rknd ) :: sclrm_r4(pverp,sclr_dim)            ! Passive scalar mean (thermo. levels)          [units vary]
+   real( kind = core_rknd ) :: sclrp2_r4(pverp,sclr_dim)           ! sclr'^2 (momentum levels)                     [{units vary}^2]
+   real( kind = core_rknd ) :: sclrprtp_r4(pverp,sclr_dim)         ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
+   real( kind = core_rknd ) :: sclrpthlp_r4(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
+   real( kind = core_rknd ) :: wpsclrp_r4(pverp,sclr_dim)          ! w'sclr' (momentum levels)                     [{units vary} m/s]
+   real( kind = core_rknd ) :: edsclr_in_r4(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
+   real( kind = core_rknd ) :: rcm_out_r4(pverp)                   ! CLUBB output of liquid water mixing ratio     [kg/kg]
+   real( kind = core_rknd ) :: rcm_out_zm_r4(pverp)                   ! CLUBB output of liquid water mixing ratio     [kg/kg]
+   real( kind = core_rknd ) :: wprcp_out_r4(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
+   real( kind = core_rknd ) :: cloud_frac_out_r4(pverp)            ! CLUBB output of cloud fraction                [fraction]
+   real( kind = core_rknd ) :: ice_supersat_frac_r4(pverp)
+   real( kind = core_rknd ) :: rcm_in_layer_out_r4(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
+   real( kind = core_rknd ) :: cloud_cover_out_r4(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
+   real( kind = core_rknd ) :: khzm_out_r4(pverp)                  ! eddy diffusivity on momentum grids            [m^2/s]
+   real( kind = core_rknd ) :: khzt_out_r4(pverp)                  ! eddy diffusivity on thermo grids              [m^2/s]
+   real( kind = core_rknd ) :: qclvar_out_r4(pverp)                ! cloud water variance                          [kg^2/kg^2]
+   real( kind = core_rknd ) :: thlprcp_out_r4(pverp)
+   real( kind = core_rknd ) :: pre_in_r4(pverp)                    ! input for precip evaporation
+   real( kind = core_rknd ) :: rtp2_mc_out_r4(pverp)               ! total water tendency from rain evap  
+   real( kind = core_rknd ) :: thlp2_mc_out_r4(pverp)              ! thetal tendency from rain evap
+   real( kind = core_rknd ) :: wprtp_mc_out_r4(pverp)
+   real( kind = core_rknd ) :: wpthlp_mc_out_r4(pverp)
+   real( kind = core_rknd ) :: rtpthlp_mc_out_r4(pverp)
+   real( kind = core_rknd ) :: qrl_clubb_r4(pverp)
+   real( kind = core_rknd ) :: qrl_zm_r4(pverp)
+   real( kind = core_rknd ) :: thlp2_rad_out_r4(pverp)
+   real( kind = core_rknd ) :: zt_g_r4(pverp)                      ! Thermodynamic grid of CLUBB                   [m]
+   real( kind = core_rknd ) :: zi_g_r4(pverp)                      ! Momentum grid of CLUBB                        [m]
+   real( kind = core_rknd ), dimension(nparams) :: clubb_params_r4
 
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: ke_a(pcols), ke_b(pcols), te_a(pcols), te_b(pcols)
@@ -1684,23 +1787,42 @@ end subroutine clubb_init_cnst
       !  setup_grid and setup_parameters for this.  
      
       !  Read in parameters for CLUBB.  Just read in default values 
-      call read_parameters( -99, "", clubb_params )
- 
+      !  add the converters to change the precision 
+      call read_parameters( -99, "", clubb_params_r4 )
+      clubb_params = real(clubb_params_r4, kind = r8)
+
       !  Set-up CLUBB core at each CLUBB call because heights can change 
-      call setup_grid(pverp, sfc_elevation, l_implemented, grid_type, &
-        zi_g(2), zi_g(1), zi_g(pverp), zi_g(1:pverp), zt_g(1:pverp), &
+      !SZhang and HWan, CLUBB reduced precision test
+      zi_g_r4 = real(zi_g, kind = core_rknd)
+      zt_g_r4 = real(zt_g, kind = core_rknd) 
+      sfc_elevation_r4 = real(sfc_elevation, kind = core_rknd)
+      
+      call setup_grid(pverp, sfc_elevation_r4, l_implemented, grid_type, &
+        zi_g_r4(2), zi_g_r4(1), zi_g_r4(pverp), zi_g_r4(1:pverp), zt_g_r4(1:pverp), &
         begin_height, end_height)
  
-      call setup_parameters(zi_g(2), clubb_params, pverp, grid_type, &
-        zi_g(begin_height:end_height), zt_g(begin_height:end_height), err_code)
+      call setup_parameters(zi_g_r4(2), clubb_params_r4, pverp, grid_type, &
+        zi_g_r4(begin_height:end_height), zt_g_r4(begin_height:end_height), err_code)
  
       !  Compute some inputs from the thermodynamic grid
       !  to the momentum grid
-      rho_ds_zm       = zt2zm(rho_ds_zt)
-      rho_zm          = zt2zm(rho_zt)
-      invrs_rho_ds_zm = zt2zm(invrs_rho_ds_zt)
-      thv_ds_zm       = zt2zm(thv_ds_zt)
-      wm_zm           = zt2zm(wm_zt)
+      rho_zt_r4          = real(rho_zt,    kind = core_rknd)
+      rho_ds_zt_r4       = real(rho_ds_zt, kind = core_rknd)
+      wm_zt_r4           = real(wm_zt,     kind = core_rknd)
+      invrs_rho_ds_zt_r4 = real(invrs_rho_ds_zt, kind = core_rknd)
+      thv_ds_zt_r4       = real(thv_ds_zt, kind = core_rknd)
+
+      rho_ds_zm_r4       = zt2zm(rho_ds_zt_r4)
+      rho_zm_r4          = zt2zm(rho_zt_r4)
+      invrs_rho_ds_zm_r4 = zt2zm(invrs_rho_ds_zt_r4)
+      thv_ds_zm_r4       = zt2zm(thv_ds_zt_r4)
+      wm_zm_r4           = zt2zm(wm_zt_r4)
+        
+      rho_ds_zm          = real(rho_ds_zm_r4,       kind = r8)
+      rho_zm             = real(rho_zm_r4,          kind = r8)
+      invrs_rho_ds_zm    = real(invrs_rho_ds_zm_r4, kind = r8)
+      thv_ds_zm          = real(thv_ds_zm_r4,       kind = r8)
+      wm_zm              = real(wm_zm_r4,           kind = r8)
       
       !  Surface fluxes provided by host model
       wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
@@ -1769,21 +1891,39 @@ end subroutine clubb_init_cnst
      
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
-          wp2_in=zt2zm(wp2_in)    
-          wpthlp_in=zt2zm(wpthlp_in)
-          wprtp_in=zt2zm(wprtp_in)
-          up2_in=zt2zm(up2_in)
-          vp2_in=zt2zm(vp2_in)
-          thlp2_in=zt2zm(thlp2_in)
-          rtp2_in=zt2zm(rtp2_in)
-          rtpthlp_in=zt2zm(rtpthlp_in)
- 
+          wp2_in_r4     = real(wp2_in,     kind = core_rknd)
+          wpthlp_in_r4  = real(wpthlp_in,  kind = core_rknd)
+          wprtp_in_r4   = real(wprtp_in,   kind = core_rknd)
+          up2_in_r4     = real(up2_in,     kind = core_rknd)
+          vp2_in_r4     = real(vp2_in,     kind = core_rknd)
+          thlp2_in_r4   = real(thlp2_in,   kind = core_rknd)
+          rtp2_in_r4    = real(rtp2_in,    kind = core_rknd)
+          rtpthlp_in_r4 = real(rtpthlp_in, kind = core_rknd)
+
+          wp2_in_r4     = zt2zm(wp2_in_r4)
+          wpthlp_in_r4  = zt2zm(wpthlp_in_r4)
+          wprtp_in_r4   = zt2zm(wprtp_in_r4)
+          up2_in_r4     = zt2zm(up2_in_r4)
+          vp2_in_r4     = zt2zm(vp2_in_r4)
+          thlp2_in_r4   = zt2zm(thlp2_in_r4)
+          rtp2_in_r4    = zt2zm(rtp2_in_r4)
+          rtpthlp_in_r4 = zt2zm(rtpthlp_in_r4)
+
+          wp2_in     = real(wp2_in_r4,     kind = r8)    
+          wpthlp_in  = real(wpthlp_in_r4,  kind = r8)
+          wprtp_in   = real(wprtp_in_r4,   kind = r8)
+          up2_in     = real(up2_in_r4,     kind = r8)
+          vp2_in     = real(vp2_in_r4,     kind = r8)
+          thlp2_in   = real(thlp2_in_r4,   kind = r8)
+          rtp2_in    = real(rtp2_in_r4,    kind = r8)
+          rtpthlp_in = real(rtpthlp_in_r4, kind = r8)
+
           do k=1,pverp
-            thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
-            rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-            wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-            up2_in(k)=max(w_tol_sqd,up2_in(k))
-            vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+             thlp2_in(k) = max(real(thl_tol**2,kind = r8), thlp2_in(k))
+             rtp2_in(k)  = max(real(rt_tol**2,kind = r8) , rtp2_in(k))
+             wp2_in(k)   = max(real(w_tol_sqd,kind = r8) , wp2_in(k))
+             up2_in(k)   = max(real(w_tol_sqd,kind = r8) , up2_in(k))
+             vp2_in(k)   = max(real(w_tol_sqd,kind = r8) , vp2_in(k))
           enddo
         endif
       endif
@@ -1849,49 +1989,157 @@ end subroutine clubb_init_cnst
          !  Increment the statistics then being stats timestep
          if (l_stats) then
             time_elapsed = time_elapsed+dtime
+            !!SZhang and HWan: stats_begin_timestep uses stat_rknd for time_elapsed which is not changed
+            !!at current test thus, do not change the precision for time_elapsed
             call stats_begin_timestep(time_elapsed, 1, 1)
          endif 
 
          !  Advance CLUBB CORE one timestep in the future
          call t_startf('advance_clubb_core')
-         call advance_clubb_core &
-            ( l_implemented, dtime, fcor, sfc_elevation, hydromet_dim, &
-            thlm_forcing, rtm_forcing, um_forcing, vm_forcing, &
-            sclrm_forcing, edsclrm_forcing, wprtp_forcing, &  
-            wpthlp_forcing, rtp2_forcing, thlp2_forcing, &
-            rtpthlp_forcing, wm_zm, wm_zt, &      
-            wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
-            wpsclrp_sfc, wpedsclrp_sfc, &       
-            p_in_Pa, rho_zm, rho_in, exner, &
-            rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
-            invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, &
-            rfrzm, radf, do_expldiff, &
+
+         !!! SZhang and HWan, reduce precision for the CLUBB call, convert the r8 variables to r4 precision
+         call clubb_r82r4_core &
+             ( hydromet_dim, dtime, fcor, sfc_elevation, &                        
+               thlm_forcing, rtm_forcing, um_forcing, vm_forcing, & 
+               sclrm_forcing, edsclrm_forcing, wprtp_forcing, &     
+               wpthlp_forcing, rtp2_forcing, thlp2_forcing, &       
+               rtpthlp_forcing, wm_zm, wm_zt, &                     
+               wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &         
+               wpsclrp_sfc, wpedsclrp_sfc, &                        
+               p_in_Pa, rho_zm, rho_in, exner, &                       
+               rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &             
+               invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, &   
+               rfrzm, radf, &                                       
+               wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &        
+               host_dx, host_dy, &                                  
+               um_in, vm_in, upwp_in, vpwp_in, up2_in, vp2_in, &    
+               thlm_in, rtm_in, rvm_in, wprtp_in, wpthlp_in, &              
+               wp2_in, wp3_in, rtp2_in, thlp2_in, rtpthlp_in, &     
+               sclrm,   &                                            
+               sclrp2, sclrprtp, sclrpthlp, &                       
+               wpsclrp, edsclr_in,  &                                 
+               rcm_out, wprcp_out, cloud_frac_out, ice_supersat_frac, &         
+               rcm_in_layer_out, cloud_cover_out, &                         
+               khzm_out, khzt_out, &                                        
+               qclvar_out, thlprcp_out, &                               
+               dtime_r4, fcor_r4, sfc_elevation_r4, &                           
+               thlm_forcing_r4, rtm_forcing_r4, um_forcing_r4, vm_forcing_r4, & 
+               sclrm_forcing_r4, edsclrm_forcing_r4, wprtp_forcing_r4, &        
+               wpthlp_forcing_r4, rtp2_forcing_r4, thlp2_forcing_r4, &          
+               rtpthlp_forcing_r4, wm_zm_r4, wm_zt_r4, &                           
+               wpthlp_sfc_r4, wprtp_sfc_r4, upwp_sfc_r4, vpwp_sfc_r4, &         
+               wpsclrp_sfc_r4, wpedsclrp_sfc_r4, &                              
+               p_in_Pa_r4, rho_zm_r4, rho_in_r4, exner_r4, &                       
+               rho_ds_zm_r4, rho_ds_zt_r4, invrs_rho_ds_zm_r4, &                
+               invrs_rho_ds_zt_r4, thv_ds_zm_r4, thv_ds_zt_r4, hydromet_r4, &   
+               rfrzm_r4, radf_r4, &                                             
+               wphydrometp_r4, wp2hmp_r4, rtphmp_zt_r4, thlphmp_zt_r4, &        
+               host_dx_r4, host_dy_r4, &                                  ! intent(in)
+               um_in_r4, vm_in_r4, upwp_in_r4, vpwp_in_r4, up2_in_r4, vp2_in_r4, &          
+               thlm_in_r4, rtm_in_r4, rvm_in_r4, wprtp_in_r4, wpthlp_in_r4, &                          
+               wp2_in_r4, wp3_in_r4, rtp2_in_r4, thlp2_in_r4, rtpthlp_in_r4, &              
+               sclrm_r4,   &
+               sclrp2_r4, sclrprtp_r4, sclrpthlp_r4, &                             
+               wpsclrp_r4, edsclr_in_r4, &                                         
+               rcm_out_r4, wprcp_out_r4, cloud_frac_out_r4, ice_supersat_frac_r4, &         
+               rcm_in_layer_out_r4, cloud_cover_out_r4, &                               
+               khzm_out_r4, khzt_out_r4, &                                              
+               qclvar_out_r4, thlprcp_out_r4 )
+
 #ifdef CLUBBND_CAM
-            varmu2, &
+               varmu2_r4 = real(varmu2, kind = core_rknd)
 #endif
-            wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &
-            host_dx, host_dy, &
-            um_in, vm_in, upwp_in, &
-            vpwp_in, up2_in, vp2_in, &
-            thlm_in, rtm_in, wprtp_in, wpthlp_in, &
-            wp2_in, wp3_in, rtp2_in, &
-            thlp2_in, rtpthlp_in, &
-            sclrm, sclrp2, sclrprtp, sclrpthlp, &        
-            wpsclrp, edsclr_in, err_code, &
-            rcm_out, wprcp_out, cloud_frac_out, ice_supersat_frac, &
-            rcm_in_layer_out, cloud_cover_out, &
-            khzm_out, khzt_out, qclvar_out, thlprcp_out, &
+
+         !! start to advance clubb core 
+         call advance_clubb_core &
+            ( l_implemented, dtime_r4, fcor_r4, sfc_elevation_r4, hydromet_dim, &
+            thlm_forcing_r4, rtm_forcing_r4, um_forcing_r4, vm_forcing_r4, &
+            sclrm_forcing_r4, edsclrm_forcing_r4, wprtp_forcing_r4, &  
+            wpthlp_forcing_r4, rtp2_forcing_r4, thlp2_forcing_r4, &
+            rtpthlp_forcing_r4, wm_zm_r4, wm_zt_r4, &      
+            wpthlp_sfc_r4, wprtp_sfc_r4, upwp_sfc_r4, vpwp_sfc_r4, &
+            wpsclrp_sfc_r4, wpedsclrp_sfc_r4, &       
+            p_in_Pa_r4, rho_zm_r4, rho_in_r4, exner_r4, &
+            rho_ds_zm_r4, rho_ds_zt_r4, invrs_rho_ds_zm_r4, &
+            invrs_rho_ds_zt_r4, thv_ds_zm_r4, thv_ds_zt_r4, hydromet_r4, &
+            rfrzm_r4, radf_r4, do_expldiff, &
+#ifdef CLUBBND_CAM
+            varmu2_r4, &
+#endif
+            wphydrometp_r4, wp2hmp_r4, rtphmp_zt_r4, thlphmp_zt_r4, &
+            host_dx_r4, host_dy_r4, &
+            um_in_r4, vm_in_r4, upwp_in_r4, &
+            vpwp_in_r4, up2_in_r4, vp2_in_r4, &
+            thlm_in_r4, rtm_in_r4, wprtp_in_r4, wpthlp_in_r4, &
+            wp2_in_r4, wp3_in_r4, rtp2_in_r4, &
+            thlp2_in_r4, rtpthlp_in_r4, &
+            sclrm_r4, sclrp2_r4, sclrprtp_r4, sclrpthlp_r4, &        
+            wpsclrp_r4, edsclr_in_r4, err_code, &
+            rcm_out_r4, wprcp_out_r4, cloud_frac_out_r4, ice_supersat_frac_r4, &
+            rcm_in_layer_out_r4, cloud_cover_out_r4, &
+            khzm_out_r4, khzt_out_r4, qclvar_out_r4, thlprcp_out_r4, &
             pdf_params)
          call t_stopf('advance_clubb_core')
 
-         if (do_rainturb) then
-            rvm_in = rtm_in - rcm_out 
-            call update_xp2_mc(pverp, dtime, cloud_frac_out, &
-            rcm_out, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params, &
-            rtp2_mc_out, thlp2_mc_out, &
-            wprtp_mc_out, wpthlp_mc_out, &
-            rtpthlp_mc_out)
+         !! convert the variable required by the following subroutines back to the r8 precision 
+         um_in          = real(um_in_r4,       kind = r8 )
+         vm_in          = real(vm_in_r4,       kind = r8 )
+         upwp_in        = real(upwp_in_r4,     kind = r8 )
+         vpwp_in        = real(vpwp_in_r4,     kind = r8 )
+         up2_in         = real(up2_in_r4,      kind = r8 ) 
+         vp2_in         = real(vp2_in_r4,      kind = r8 )
+         thlm_in        = real(thlm_in_r4,     kind = r8 )
+         rtm_in         = real(rtm_in_r4,      kind = r8 )
+         wprtp_in       = real(wprtp_in_r4,    kind = r8 )
+         wpthlp_in      = real(wpthlp_in_r4,   kind = r8 )
+         wp2_in         = real(wp2_in_r4,      kind = r8 )
+         wp3_in         = real(wp3_in_r4,      kind = r8 )
+         rtp2_in        = real(rtp2_in_r4,     kind = r8 )
+         thlp2_in       = real(thlp2_in_r4,    kind = r8 )
+         rtpthlp_in     = real(rtpthlp_in_r4,  kind = r8 )
+         sclrm          = real(sclrm_r4,    kind = r8)
+         sclrp2         = real(sclrp2_r4,   kind = r8)
+         sclrprtp       = real(sclrprtp_r4, kind = r8)
+         sclrpthlp      = real(sclrpthlp_r4,kind = r8)
+         wpsclrp        = real(wpsclrp_r4,  kind = r8)
+         edsclr_in      = real(edsclr_in_r4,  kind = r8)
+         rcm_out        = real(rcm_out_r4,  kind = r8 )
+         wprcp_out      = real(wprcp_out_r4,kind = r8 )
 
+         cloud_frac_out     = real(cloud_frac_out_r4,    kind = r8 )
+         ice_supersat_frac  = real(ice_supersat_frac_r4, kind = r8 ) 
+         rcm_in_layer_out   = real(rcm_in_layer_out_r4,  kind = r8 )
+         cloud_cover_out    = real(cloud_cover_out_r4,   kind = r8 )
+         khzm_out           = real(khzm_out_r4,          kind = r8 )
+         khzt_out           = real(khzt_out_r4,          kind = r8 )
+         qclvar_out         = real(qclvar_out_r4,        kind = r8 )
+         thlprcp_out        = real(thlprcp_out_r4,       kind = r8 )
+         
+
+         if (do_rainturb) then
+
+            !SZhang and HWan for reduced precision
+            rvm_in_r4 = rtm_in_r4 - rcm_out_r4 
+            pre_in_r4         = real(pre_in,         kind = core_rknd)
+            rtp2_mc_out_r4    = real(rtp2_mc_out,    kind = core_rknd) 
+            thlp2_mc_out_r4   = real(thlp2_mc_out,   kind = core_rknd)
+            wprtp_mc_out_r4   = real(wprtp_mc_out,   kind = core_rknd)
+            wpthlp_mc_out_r4  = real(wpthlp_mc_out,  kind = core_rknd)
+            rtpthlp_mc_out_r4 = real(rtpthlp_mc_out, kind = core_rknd)
+
+            call update_xp2_mc(pverp, dtime_r4, cloud_frac_out_r4, &
+            rcm_out_r4, rvm_in_r4, thlm_in_r4, wm_zt_r4, exner_r4, pre_in_r4, pdf_params, &
+            rtp2_mc_out_r4, thlp2_mc_out_r4, &
+            wprtp_mc_out_r4, wpthlp_mc_out_r4, &
+            rtpthlp_mc_out_r4)
+
+            !SZhang and HWan for reduced precision
+            rtp2_mc_out         = real(rtp2_mc_out_r4,    kind = r8 )
+            thlp2_mc_out        = real(thlp2_mc_out_r4,   kind = r8 )
+            wprtp_mc_out        = real(wprtp_mc_out_r4,   kind = r8 )
+            wpthlp_mc_out       = real(wpthlp_mc_out_r4,  kind = r8 )
+            rtpthlp_mc_out      = real(rtpthlp_mc_out_r4, kind = r8 )
+ 
             if (clubb_do_deep) then
                dum1 = 1._r8
             else
@@ -1909,13 +2157,17 @@ end subroutine clubb_init_cnst
          endif     
 
          if (do_cldcool) then
-         
-            rcm_out_zm = zt2zm(rcm_out)
-            qrl_zm = zt2zm(qrl_clubb)
-            thlp2_rad_out(:) = 0._r8
-            call calculate_thlp2_rad(pverp, rcm_out_zm, thlprcp_out, qrl_zm, thlp2_rad_out)
+
+            !SZhang and HWan for reduced precision
+            qrl_clubb_r4  = real(qrl_clubb, kind = core_rknd)
+            rcm_out_zm_r4 = zt2zm(rcm_out_r4)
+            qrl_zm_r4     = zt2zm(qrl_clubb_r4)
+            thlp2_rad_out_r4(:) = zero
+            call calculate_thlp2_rad(pverp, rcm_out_zm_r4, thlprcp_out_r4, qrl_zm_r4, thlp2_rad_out_r4)
+            !SZhang and HWan for reduced precision
+            thlp2_rad_out = real(thlp2_rad_out_r4, kind = r8) 
             thlp2_in = thlp2_in + thlp2_rad_out * dtime
-            thlp2_in = max(thl_tol**2,thlp2_in)
+            thlp2_in = max(real(thl_tol**2, kind = r8),thlp2_in)
           endif
 
           !  Check to see if stats should be output, here stats are read into
@@ -1928,21 +2180,39 @@ end subroutine clubb_init_cnst
      
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then 
-            wp2_in=zm2zt(wp2_in)   
-            wpthlp_in=zm2zt(wpthlp_in)
-            wprtp_in=zm2zt(wprtp_in)
-            up2_in=zm2zt(up2_in)
-            vp2_in=zm2zt(vp2_in)
-            thlp2_in=zm2zt(thlp2_in)
-            rtp2_in=zm2zt(rtp2_in)
-            rtpthlp_in=zm2zt(rtpthlp_in) 
+            wp2_in_r4     = real(wp2_in,     kind = core_rknd)
+            wpthlp_in_r4  = real(wpthlp_in,  kind = core_rknd)
+            wprtp_in_r4   = real(wprtp_in,   kind = core_rknd)
+            up2_in_r4     = real(up2_in,     kind = core_rknd)
+            vp2_in_r4     = real(vp2_in,     kind = core_rknd)
+            thlp2_in_r4   = real(thlp2_in,   kind = core_rknd)
+            rtp2_in_r4    = real(rtp2_in,    kind = core_rknd)
+            rtpthlp_in_r4 = real(rtpthlp_in, kind = core_rknd)
+            
+            wp2_in_r4     = zm2zt(wp2_in_r4)
+            wpthlp_in_r4  = zm2zt(wpthlp_in_r4)
+            wprtp_in_r4   = zm2zt(wprtp_in_r4)
+            up2_in_r4     = zm2zt(up2_in_r4)
+            vp2_in_r4     = zm2zt(vp2_in_r4)
+            thlp2_in_r4   = zm2zt(thlp2_in_r4)
+            rtp2_in_r4    = zm2zt(rtp2_in_r4)
+            rtpthlp_in_r4 = zm2zt(rtpthlp_in_r4)
+
+            wp2_in     = real(wp2_in_r4,     kind = r8)   
+            wpthlp_in  = real(wpthlp_in_r4,  kind = r8)
+            wprtp_in   = real(wprtp_in_r4,   kind = r8)
+            up2_in     = real(up2_in_r4,     kind = r8)
+            vp2_in     = real(vp2_in_r4,     kind = r8)
+            thlp2_in   = real(thlp2_in_r4,   kind = r8)
+            rtp2_in    = real(rtp2_in_r4,    kind = r8)
+            rtpthlp_in = real(rtpthlp_in_r4, kind = r8)
 
             do k=1,pverp
-               thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
-               rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-               wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-               up2_in(k)=max(w_tol_sqd,up2_in(k))
-               vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+               thlp2_in(k) = max(real(thl_tol**2,kind = r8), thlp2_in(k))
+               rtp2_in(k)  = max(real(rt_tol**2,kind = r8) , rtp2_in(k))
+               wp2_in(k)   = max(real(w_tol_sqd,kind = r8) , wp2_in(k))
+               up2_in(k)   = max(real(w_tol_sqd,kind = r8) , up2_in(k))
+               vp2_in(k)   = max(real(w_tol_sqd,kind = r8) , vp2_in(k))
             enddo
          endif
       endif

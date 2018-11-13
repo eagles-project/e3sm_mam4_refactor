@@ -14,7 +14,7 @@ module clubb_precision
   ! accurate. Otherwise, LAPACK must be recompiled, or some other trickery must
   ! be done.
   integer, parameter :: &
-    dp = selected_real_kind( p=12 )    ! double precision
+    dp = selected_real_kind( p=6 )    ! double precision
 
   ! The precisions below are arbitrary, and could be adjusted as
   ! needed for long simulations or time averaging.  Note that on
