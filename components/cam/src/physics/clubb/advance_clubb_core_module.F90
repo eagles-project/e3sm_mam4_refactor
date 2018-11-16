@@ -355,10 +355,10 @@ module advance_clubb_core_module
       fill_holes_vertical
 
     use sigma_sqd_w_module, only: &
-      compute_sigma_sqd_w  ! Procedure(s)
-      compute_sigma_sqd_w1 ! Procedure(s)
-      compute_sigma_sqd_w2 ! Procedure(s)
-      compute_sigma_sqd_w3 ! Procedure(s)
+      compute_sigma_sqd_w,  & ! Procedure(s)
+      compute_a1wp3_on_wp2, & ! Procedure(s)
+      compute_a2wp3_on_wp2, & ! Procedure(s)
+      compute_a3p3_wp2_sqd
 
     use array_index, only: &
       iirrm            ! Variable

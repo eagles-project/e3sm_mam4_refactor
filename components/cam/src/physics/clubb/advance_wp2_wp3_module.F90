@@ -27,7 +27,7 @@ module advance_wp2_wp3_module
              wp3_term_pr1_rhs, &
              wp3_term_bp2_rhs
 
-! private :: wp3_terms_ta_tp_rhs
+  private :: wp3_terms_ta_tp_rhs
 
   ! Private named constants to avoid string comparisons
   integer, parameter, private :: &
@@ -543,7 +543,7 @@ module advance_wp2_wp3_module
 
     ! Compute the explicit portion of the w'^2 and w'^3 equations.
     ! Build the right-hand side vector.
-    call wp23_rhs( dt, wp2, wp3, a1, a1_zt, &
+    call wp23_rhs( dt, wp2, wp3, wp3_zm, a1, a1_zt, &
                    a1wp3_on_wp2, a3p3_wp2_sqd, & 
                    a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                    upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt,  & 
@@ -1498,6 +1498,8 @@ module advance_wp2_wp3_module
                                  0.0_core_rknd-3.0_core_rknd, 0.0_core_rknd-3.0_core_rknd, &
                                  0.0_core_rknd-3.0_core_rknd,  &
                                  0.0_core_rknd, 0.0_core_rknd, &
+                                 0.0_core_rknd, 0.0_core_rknd, &
+                                 0.0_core_rknd, 0.0_core_rknd, & 
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
                                  invrs_rho_ds_zt(k),  &
                                  three_halves,  &
@@ -2174,6 +2176,8 @@ module advance_wp2_wp3_module
                                  0.0_core_rknd-3.0_core_rknd, 0.0_core_rknd-3.0_core_rknd, &
                                  0.0_core_rknd-3.0_core_rknd,  &
                                  0.0_core_rknd, 0.0_core_rknd, &
+                                 0.0_core_rknd, 0.0_core_rknd, &
+                                 0.0_core_rknd, 0.0_core_rknd, &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
                                  invrs_rho_ds_zt(k),  &
                                  three_halves,  &
@@ -2310,7 +2314,7 @@ module advance_wp2_wp3_module
 #endif /* MKL */
 
   !=============================================================================
-  subroutine wp23_rhs( dt, wp2, wp3, a1, a1_zt, &
+  subroutine wp23_rhs( dt, wp2, wp3, wp3_zm, a1, a1_zt, &
                        a1wp3_on_wp2, a3p3_wp2_sqd, &
                        a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                        upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt, & 
@@ -2384,6 +2388,7 @@ module advance_wp2_wp3_module
     real( kind = core_rknd ), dimension(gr%nz), intent(in) ::  & 
       wp2,             & ! w'^2 (momentum levels)                    [m^2/s^2]
       wp3,             & ! w'^3 (thermodynamic levels)               [m^3/s^3]
+      wp3_zm,          & ! w'^3 (momentum levels)                    [m^3/s^3]
       a1,              & ! sigma_sqd_w term a_1 (momentum levels)    [-]
       a1_zt,           & ! a_1 interpolated to thermodynamic levels  [-]
       a3,              & ! sigma_sqd_w term a_3 (momentum levels)    [-]
@@ -2632,17 +2637,18 @@ module advance_wp2_wp3_module
       + ( 1.0_core_rknd / dt * wp3(k) )
 
       ! RHS turbulent advection (ta) and turbulent production (tp) terms.
-!     rhs(k_wp3)  & 
-!     = rhs(k_wp3)  & 
-!     + wp3_terms_ta_tp_rhs( wp3_zm(k), wp3_zm(km1),  &
-!                            wp2(k), wp2(km1),  &
-!                            a1(k), a1_zt(k), a1(km1),  &
-!                            a3(k), a3_zt(k), a3(km1),  &
-!                            wp3_on_wp2(k), wp3_on_wp2(km1), &
-!                            rho_ds_zm(k), rho_ds_zm(km1),  &
-!                            invrs_rho_ds_zt(k),  &
-!                            three_halves,  &
-!                            gr%invrs_dzt(k) )
+     rhs(k_wp3)  & 
+     = rhs(k_wp3)  & 
+     + wp3_terms_ta_tp_rhs( wp3_zm(k), wp3_zm(km1),  &
+                            wp2(k), wp2(km1),  &
+                            a1(k), a1_zt(k), a1(km1),  &
+                            a3(k), a3_zt(k), a3(km1),  &
+                            a3p3_wp2_sqd(k),a3p3_wp2_sqd(km1),&
+                            wp3_on_wp2(k), wp3_on_wp2(km1), &
+                            rho_ds_zm(k), rho_ds_zm(km1),  &
+                            invrs_rho_ds_zt(k),  &
+                            three_halves,  &
+                            gr%invrs_dzt(k) )
 
       ! RHS contribution from "over-implicit" weighted time step
       ! for LHS turbulent advection (ta) and turbulent production (tp) terms.
@@ -2738,16 +2744,16 @@ module advance_wp2_wp3_module
          -wp3_terms_ta_tp_rhs( wp3_zm(k), wp3_zm(km1),  &
                                wp2(k), wp2(km1),  &
                                a1(k), a1_zt(k), a1(km1),  &
-                               a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, 
+                               a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, & 
                                a3(km1)+3.0_core_rknd,  &
-                               a3p3_wp2_sqd(k),a3p3_wp2_sqd(km1),& 
+                               a3p3_wp2_sqd(k),a3p3_wp2_sqd(km1), & 
                                wp3_on_wp2(k), wp3_on_wp2(km1), &
                                rho_ds_zm(k), rho_ds_zm(km1),  &
                                invrs_rho_ds_zt(k),  &
                                0.0_core_rknd,  &
                                gr%invrs_dzt(k) ),  &
                                   stats_zt )
-        call stat_begin_update_pt( iwp3_ta, k, 0.0_core_rknd, stats_zt )
+        !call stat_begin_update_pt( iwp3_ta, k, 0.0_core_rknd, stats_zt )
 
         ! Note:  An "over-implicit" weighted time step is applied to this term.
         !        A weighting factor of greater than 1 may be used to make the
@@ -2802,6 +2808,8 @@ module advance_wp2_wp3_module
                                0.0_core_rknd, 0.0_core_rknd, 0.0_core_rknd,  &
                                0.0_core_rknd-3.0_core_rknd, 0.0_core_rknd-3.0_core_rknd, &
                                0.0_core_rknd-3.0_core_rknd,  &
+                               0.0_core_rknd, 0.0_core_rknd, &
+                               0.0_core_rknd, 0.0_core_rknd, &
                                0.0_core_rknd, 0.0_core_rknd, &
                                rho_ds_zm(k), rho_ds_zm(km1), &
                                invrs_rho_ds_zt(k), &
@@ -3549,7 +3557,7 @@ module advance_wp2_wp3_module
         gr ! Variable gr%weights_zt2zm
 
     use model_flags, only:  &
-        l_standard_term_ta,
+        l_standard_term_ta, &
         l_reform_term_ta
       
     implicit none
@@ -3579,9 +3587,9 @@ module advance_wp2_wp3_module
       wp3_on_wp2,         & ! wp3 / wp2 (k)                            [m/s]
       wp3_on_wp2_m1,      & ! wp3 / wp2 (k-1)                          [m/s]
       a1wp3_on_wp2,       & !
-      a1wp3_on_wp2,       & !
+      a1wp3_on_wp2_m1,    & !  
       a3p3_wp2_sqd,       & !
-      a3p3_wp2_sqd,       & !
+      a3p3_wp2_sqd_m1,    & !
       rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
       rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
       invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
@@ -4037,17 +4045,20 @@ module advance_wp2_wp3_module
     ! References:
     !-----------------------------------------------------------------------
 
+   use clubb_precision, only:  &
+        core_rknd ! Variable
+
    use constants_clubb, only:  &
        w_tol_sqd
 
    use model_flags, only:  &
-       l_standard_term_ta,
+       l_standard_term_ta, &
        l_reform_term_ta
        
    implicit none
 
     ! Input Variables
-   real, intent(in) ::  & 
+   real( kind = core_rknd ), intent(in) ::  & 
      wp3_zm,             & ! w'^3 interpolated to momentum lev. (k)   [m^3/s^3]
      wp3_zmm1,           & ! w'^3 interpolated to momentum lev. (k-1) [m^3/s^3]
      wp2,                & ! w'^2(k)                                  [m^2/s^2]
@@ -4061,14 +4072,14 @@ module advance_wp2_wp3_module
      wp3_on_wp2,         & ! (k) [m/s]
      wp3_on_wp2_m1,      & ! (k-1)                  [m/s]
      a3p3_wp2_sqd,       & !
-     a3p3_wp2_sqd_m1     & !
+     a3p3_wp2_sqd_m1,    & !
      rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
      rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
      invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
      const_three_halves, & ! "3/2" ("0" is sent in for wp3_ta budget) [-]
      invrs_dzt             ! Inverse of grid spacing (k)              [1/m]
     ! Return Variable
-   real :: rhs
+   real( kind = core_rknd ) :: rhs
 
    if ( l_reform_term_ta ) then
 

@@ -94,7 +94,7 @@ module sigma_sqd_w_module
       wpthlp,        & ! Flux of liquid pot. temp.         [m/s K]
       wprtp,         & ! Flux of total water               [m/s kg/kg]
       sigma_sqd_wthl,& ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2] 
-      sigma_sqd_wrt, & ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
+      sigma_sqd_wrt    ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
             
     ! Output Variable
     real( kind = core_rknd ) :: a1wp3_on_wp2   ! PDF width parameter      [-]
@@ -112,33 +112,33 @@ module sigma_sqd_w_module
 
     a1wp3_on_wp2 = 0.0_core_rknd
 
-    where ( ( (wp2 .ne. 0.0_core_rknd) .and. (rtp2 .ne. 0.0_core_rknd) ) .or. (wprtp .ne. 0.0_core_rknd) )
+    if ( ( (wp2 .ne. 0.0_core_rknd) .and. (rtp2 .ne. 0.0_core_rknd) ) .or. (wprtp .ne. 0.0_core_rknd) ) then
        a1wp3_on_wp2 = ( wp3 * rtp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * rtp2 + &
                          gamma_Skw_fnc * wprtp * wprtp &
                       )
-    endwhere
+    endif
 
-    where( ( (wp2 .eq. 0.0_core_rknd) .or. (rtp2 .eq. 0.0_core_rknd) ) .and. (wprtp .eq. 0.0_core_rknd) )
+    if( ( (wp2 .eq. 0.0_core_rknd) .or. (rtp2 .eq. 0.0_core_rknd) ) .and. (wprtp .eq. 0.0_core_rknd) ) then
        a1wp3_on_wp2 = ( wp3 * rtp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (rtp2 + 0.01_core_rknd * rt_tol * rt_tol)+ &
                          gamma_Skw_fnc * (wprtp + 0.01_core_rknd * w_tol * rt_tol) * (wprtp + 0.01_core_rknd * w_tol * rt_tol) &
                       )
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .ne. 0.0_core_rknd) .and. (thlp2 .ne. 0.0_core_rknd) ) .or. (wpthlp .ne. 0.0_core_rknd) ) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .ne. 0.0_core_rknd) .and. (thlp2 .ne. 0.0_core_rknd) ) .or. (wpthlp .ne. 0.0_core_rknd) ) ) then
        a1wp3_on_wp2 = ( wp3 * thlp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * thlp2 + &
                          gamma_Skw_fnc * wpthlp * wpthlp &
                       )
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .eq. 0.0_core_rknd) .or. (thlp2 .eq. 0.0_core_rknd) ) .and. (wpthlp .eq. 0.0_core_rknd) ) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .eq. 0.0_core_rknd) .or. (thlp2 .eq. 0.0_core_rknd) ) .and. (wpthlp .eq. 0.0_core_rknd) ) ) then
        a1wp3_on_wp2 = ( wp3 * thlp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) + &
                          gamma_Skw_fnc * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) &
                       )
-    endwhere
+    endif
 
     return
   end function compute_a1wp3_on_wp2
@@ -174,7 +174,7 @@ module sigma_sqd_w_module
       wpthlp,        & ! Flux of liquid pot. temp.         [m/s K]
       wprtp,         & ! Flux of total water               [m/s kg/kg]
       sigma_sqd_wthl,& ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2] 
-      sigma_sqd_wrt, & ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
+      sigma_sqd_wrt    ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
 
     ! Output Variable
     real( kind = core_rknd ) :: a2wp3_on_wp2   ! PDF width parameter      [-]
@@ -193,17 +193,17 @@ module sigma_sqd_w_module
 
     a2wp3_on_wp2 = 0.0_core_rknd
 
-    where ( ((wp2 .ne. 0.0_core_rknd) .and. (rtp2 .ne. 0.0_core_rknd)) .or. (wprtp .ne. 0.0_core_rknd) )
+    if ( ((wp2 .ne. 0.0_core_rknd) .and. (rtp2 .ne. 0.0_core_rknd)) .or. (wprtp .ne. 0.0_core_rknd) ) then
        a2wp3_on_wp2 = ( wp3 * rtp2 * rtp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * rtp2 + &
                          gamma_Skw_fnc * wprtp * wprtp &
                       ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * rtp2 + &
                          gamma_Skw_fnc * wprtp * wprtp &
- 
-    endwhere
+                      )
+    endif
 
-    where ( ((wp2 .eq. 0.0_core_rknd) .or. (rtp2 .eq. 0.0_core_rknd)) .and. (wprtp .eq. 0.0_core_rknd) )
+    if ( ((wp2 .eq. 0.0_core_rknd) .or. (rtp2 .eq. 0.0_core_rknd)) .and. (wprtp .eq. 0.0_core_rknd) ) then
        a2wp3_on_wp2 = ( wp3 * rtp2 * rtp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (rtp2 + 0.01_core_rknd * rt_tol * rt_tol)+ &
                          gamma_Skw_fnc * (wprtp + 0.01_core_rknd * w_tol * rt_tol) * (wprtp + 0.01_core_rknd * w_tol * rt_tol) &
@@ -211,9 +211,9 @@ module sigma_sqd_w_module
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (rtp2 + 0.01_core_rknd * rt_tol * rt_tol)+ &
                          gamma_Skw_fnc * (wprtp + 0.01_core_rknd * w_tol * rt_tol) * (wprtp + 0.01_core_rknd * w_tol * rt_tol) &
                       )
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .ne. 0.0_core_rknd) .and. (thlp2 .ne. 0.0_core_rknd) ) .or. (wpthlp .ne. 0.0_core_rknd) ) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .ne. 0.0_core_rknd) .and. (thlp2 .ne. 0.0_core_rknd) ) .or. (wpthlp .ne. 0.0_core_rknd) ) ) then
        a2wp3_on_wp2 = ( wp3 * thlp2 * thlp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * thlp2 + &
                          gamma_Skw_fnc * wpthlp * wpthlp &
@@ -221,9 +221,9 @@ module sigma_sqd_w_module
                       ( (1.0_core_rknd - gamma_Skw_fnc) * wp2 * thlp2 + &
                          gamma_Skw_fnc * wpthlp * wpthlp &
                       )
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .eq. 0.0_core_rknd) .or. (thlp2 .eq. 0.0_core_rknd) ) .and. (wpthlp .eq. 0.0_core_rknd) ) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( ( (wp2 .eq. 0.0_core_rknd) .or. (thlp2 .eq. 0.0_core_rknd) ) .and. (wpthlp .eq. 0.0_core_rknd) ) ) then
        a2wp3_on_wp2 = ( wp3 * thlp2  * thlp2 ) / &
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) + &
                          gamma_Skw_fnc * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) &
@@ -231,7 +231,7 @@ module sigma_sqd_w_module
                       ( (1.0_core_rknd - gamma_Skw_fnc) * (wp2 + 0.01_core_rknd * w_tol * w_tol) * (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) + &
                          gamma_Skw_fnc * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) * (wpthlp + 0.01_core_rknd * w_tol * thl_tol) &
                       ) 
-    endwhere
+    endif
 
     return
   end function compute_a2wp3_on_wp2
@@ -267,7 +267,7 @@ module sigma_sqd_w_module
       wpthlp,        & ! Flux of liquid pot. temp.         [m/s K]
       wprtp,         & ! Flux of total water               [m/s kg/kg]
       sigma_sqd_wthl,& ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2] 
-      sigma_sqd_wrt, & ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
+      sigma_sqd_wrt    ! parameters for the contional statement [m^2/s^2 K^2 kg^2/kg^2]
 
     ! Output Variable
     real( kind = core_rknd ) :: a3p3_wp2_sqd   ! PDF width parameter      [-]
@@ -285,35 +285,35 @@ module sigma_sqd_w_module
     
     a3p3_wp2_sqd = 0.0_core_rknd
     
-    where ( rtp2 .ne. 0.0_core_rknd )
+    if ( rtp2 .ne. 0.0_core_rknd ) then
        a3p3_wp2_sqd = ( - 2.0_core_rknd * gamma_Skw_fnc * gamma_Skw_fnc &
-                          * ( wp2 - wprtp * wprtp / rtp2 ) * ( wp2 - wprtp * wprtp / rtp2 )
-                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wprtp * wprtp / rtp2 )
+                          * ( wp2 - wprtp * wprtp / rtp2 ) * ( wp2 - wprtp * wprtp / rtp2 ) &
+                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wprtp * wprtp / rtp2 )&
                         - wp2 * wp2 ) 
-    endwhere
+    endif
    
-    where ( rtp2 .eq. 0.0_core_rknd)
+    if ( rtp2 .eq. 0.0_core_rknd) then
        a3p3_wp2_sqd = ( - 2.0_core_rknd * gamma_Skw_fnc * gamma_Skw_fnc &
                           * ( wp2 - wprtp * wprtp / ( rtp2 + 0.01_core_rknd * rt_tol * rt_tol ) ) &
-                          * ( wp2 - wprtp * wprtp / ( rtp2 + 0.01_core_rknd * rt_tol * rt_tol) ) 
-                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wprtp * wprtp / (rtp2 + 0.01_core_rknd * rt_tol * rt_tol) )
+                          * ( wp2 - wprtp * wprtp / ( rtp2 + 0.01_core_rknd * rt_tol * rt_tol) ) &
+                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wprtp * wprtp / (rtp2 + 0.01_core_rknd * rt_tol * rt_tol) ) &
                         - wp2 * wp2 ) 
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( thlp2 .ne. 0.0_core_rknd) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. ( thlp2 .ne. 0.0_core_rknd) ) then
        a3p3_wp2_sqd = ( - 2.0_core_rknd * gamma_Skw_fnc * gamma_Skw_fnc &
-                          * ( wp2 - wpthlp * wpthlp / thlp2 ) * ( wp2 - wpthlp * wpthlp / thlp2 )
-                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wpthlp * wpthlp / thlp2 )
+                          * ( wp2 - wpthlp * wpthlp / thlp2 ) * ( wp2 - wpthlp * wpthlp / thlp2 ) &
+                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wpthlp * wpthlp / thlp2 ) &
                         - wp2 * wp2 )
-    endwhere
+    endif
 
-    where ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. (thlp2 .eq. 0.0_core_rknd) )
+    if ( (sigma_sqd_wthl > sigma_sqd_wrt) .and. (thlp2 .eq. 0.0_core_rknd) ) then
        a3p3_wp2_sqd = ( - 2.0_core_rknd * gamma_Skw_fnc * gamma_Skw_fnc &
                           * ( wp2 - wpthlp * wpthlp / (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) ) &
-                          * ( wp2 - wpthlp * wpthlp / (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) )
-                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wpthlp * wpthlp / (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) )
+                          * ( wp2 - wpthlp * wpthlp / (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) ) &
+                        + 4.0_core_rknd * gamma_Skw_fnc * ( wp2 * wp2 - wp2 * wpthlp * wpthlp / (thlp2 + 0.01_core_rknd * thl_tol * thl_tol) ) &
                         - wp2 * wp2 ) 
-    endwhere
+    endif
 
     return
   end function compute_a3p3_wp2_sqd
