@@ -39,6 +39,7 @@ module advance_wp2_wp3_module
 
   !=============================================================================
   subroutine advance_wp2_wp3( dt, sfc_elevation, sigma_sqd_w, wm_zm, wm_zt, &
+                              a1wp3_on_wp2, a3p3_wp2_sqd, & 
                               a3, a3_zt, wp3_on_wp2, &
                               wpthvp, wp2thvp, um, vm, upwp, vpwp, &
                               up2, vp2, Kh_zm, Kh_zt, tau_zm, tau_zt, tau_C1_zm, &
@@ -117,6 +118,8 @@ module advance_wp2_wp3_module
       a3,              & ! a_3 (momentum levels); See eqn. 25 in `Equations for CLUBB' [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels  [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2             [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & !
       wpthvp,          & ! w'th_v' (momentum levels)                 [K m/s]
       wp2thvp,         & ! w'^2th_v' (thermodynamic levels)          [K m^2/s^2]
       um,              & ! u wind component (thermodynamic levels)   [m/s]
@@ -266,6 +269,7 @@ module advance_wp2_wp3_module
 
     ! Solve semi-implicitly
     call wp23_solve( dt, sfc_elevation, sigma_sqd_w, wm_zm, wm_zt, & ! Intent(in)
+                     a1wp3_on_wp2, a3p3_wp2_sqd, & ! intent(in)
                      a3, a3_zt, wp3_on_wp2, &  ! Intent(in)
                      wpthvp, wp2thvp, um, vm, upwp, vpwp,    & ! Intent(in)
                      up2, vp2, Kw1, Kw8, Kh_zt, Skw_zt, tau_zm, tauw3t, tau_C1_zm,   & ! Intent(in)
@@ -321,6 +325,7 @@ module advance_wp2_wp3_module
 
   !=============================================================================
   subroutine wp23_solve( dt, sfc_elevation, sigma_sqd_w, wm_zm, wm_zt, &
+                         a1wp3_on_wp2, a3p3_wp2_sqd, & 
                          a3, a3_zt, wp3_on_wp2, &
                          wpthvp, wp2thvp, um, vm, upwp, vpwp, &
                          up2, vp2, Kw1, Kw8, Kh_zt, Skw_zt, tau1m, tauw3t, tau_C1_zm, &
@@ -450,6 +455,8 @@ module advance_wp2_wp3_module
       a3,              & ! a_3 (momentum levels); See eqn. 25 in `Equations for CLUBB' [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels  [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2             [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & ! 
       wpthvp,          & ! w'th_v' (momentum levels)                 [K m/s]
       wp2thvp,         & ! w'^2th_v' (thermodynamic levels)          [K m^2/s^2]
       um,              & ! u wind component (thermodynamic levels)   [m/s]
@@ -537,6 +544,7 @@ module advance_wp2_wp3_module
     ! Compute the explicit portion of the w'^2 and w'^3 equations.
     ! Build the right-hand side vector.
     call wp23_rhs( dt, wp2, wp3, a1, a1_zt, &
+                   a1wp3_on_wp2, a3p3_wp2_sqd, & 
                    a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                    upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt,  & 
                    Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
@@ -546,6 +554,7 @@ module advance_wp2_wp3_module
 
     if (l_gmres) then
       call wp23_gmres( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt, &
+                       a1wp3_on_wp2, a3p3_wp2_sqd, &
                        wp3_on_wp2, &
                        Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                        C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -556,6 +565,7 @@ module advance_wp2_wp3_module
       ! Compute the implicit portion of the w'^2 and w'^3 equations.
       ! Build the left-hand side matrix.
       call wp23_lhs( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                     a1wp3_on_wp2, a3p3_wp2_sqd, & 
                      wp3_on_wp2, &
                      Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                      C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -764,6 +774,7 @@ module advance_wp2_wp3_module
   end subroutine wp23_solve
 
   subroutine wp23_gmres( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt, &
+                         a1wp3_on_wp2, a3p3_wp2_sqd, & 
                          wp3_on_wp2, &
                          Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                          C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -838,6 +849,8 @@ module advance_wp2_wp3_module
       a3,              & ! a_3 (momentum levels); See eqn. 25 in `Equations for CLUBB' [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels  [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2             [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & ! 
       Kw1,             & ! Coefficient of eddy diffusivity for w'^2  [m^2/s]
       Kw8,             & ! Coefficient of eddy diffusivity for w'^3  [m^2/s]
       Skw_zt,          & ! Skewness of w on thermodynamic levels     [-]
@@ -888,6 +901,7 @@ module advance_wp2_wp3_module
     ! Begin code
 
     call wp23_lhs_csr( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                       a1wp3_on_wp2, a3p3_wp2_sqd, &
                        wp3_on_wp2, &
                        Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                        C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -896,6 +910,7 @@ module advance_wp2_wp3_module
 
     if ( .not. l_gmres_soln_ok(gmres_idx_wp2wp3) ) then
       call wp23_lhs( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                     a1wp3_on_wp2, a3p3_wp2_sqd, & 
                      wp3_on_wp2, &
                      Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                      C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -928,6 +943,7 @@ module advance_wp2_wp3_module
 
       ! Generate the LHS in LAPACK format
       call wp23_lhs( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                     a1wp3_on_wp2, a3p3_wp2_sqd, & 
                      wp3_on_wp2, &
                      Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                      C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -992,6 +1008,7 @@ module advance_wp2_wp3_module
 
   !=============================================================================
   subroutine wp23_lhs( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                       a1wp3_on_wp2, a3p3_wp2_sqd, & 
                        wp3_on_wp2, &
                        Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                        C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -1129,6 +1146,8 @@ module advance_wp2_wp3_module
       a3,              & ! sigma_sqd_w term a_3 (momentum levels)     [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels   [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2              [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & ! 
       Kw1,             & ! Coefficient of eddy diffusivity for w'^2   [m^2/s]
       Kw8,             & ! Coefficient of eddy diffusivity for w'^3   [m^2/s]
       Skw_zt,          & ! Skewness of w on thermodynamic levels      [-]
@@ -1390,6 +1409,8 @@ module advance_wp2_wp3_module
       * wp3_terms_ta_tp_lhs( wp2(k), wp2(km1),  &
                              a1(k), a1_zt(k), a1(km1),  &
                              a3(k), a3_zt(k), a3(km1),  &
+                             a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &
+                             a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), & 
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
                              invrs_rho_ds_zt(k),  &
@@ -1448,6 +1469,8 @@ module advance_wp2_wp3_module
                                  a1(k), a1_zt(k), a1(km1),  &
                                  a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, &
                                  a3(km1)+3.0_core_rknd,  &
+                                 a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &
+                                 a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), &
                                  wp3_on_wp2(k), wp3_on_wp2(km1), &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
                                  invrs_rho_ds_zt(k),  &
@@ -1584,6 +1607,7 @@ module advance_wp2_wp3_module
 #ifdef MKL
   !=============================================================================
   subroutine wp23_lhs_csr( dt, wp2, wm_zm, wm_zt, a1, a1_zt, a3, a3_zt,  &
+                           a1wp3_on_wp2, a3p3_wp2_sqd, &
                            wp3_on_wp2, &
                            Kw1, Kw8, Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
                            C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
@@ -1732,6 +1756,8 @@ module advance_wp2_wp3_module
       a3,              & ! sigma_sqd_w term a_3 (momentum levels)     [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels   [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2              [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & !
       Kw1,             & ! Coefficient of eddy diffusivity for w'^2   [m^2/s]
       Kw8,             & ! Coefficient of eddy diffusivity for w'^3   [m^2/s]
       Skw_zt,          & ! Skewness of w on thermodynamic levels      [-]
@@ -2058,6 +2084,8 @@ module advance_wp2_wp3_module
       * wp3_terms_ta_tp_lhs( wp2(k), wp2(km1),  &
                              a1(k), a1_zt(k), a1(km1),  &
                              a3(k), a3_zt(k), a3(km1),  &
+                             a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &
+                             a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), &
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
                              invrs_rho_ds_zt(k),  &
@@ -2117,6 +2145,8 @@ module advance_wp2_wp3_module
                                  a1(k), a1_zt(k), a1(km1),  &
                                  a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, &
                                  a3(km1)+3.0_core_rknd,  &
+                                 a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
+                                 a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), &
                                  wp3_on_wp2(k), wp3_on_wp2(km1), &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
                                  invrs_rho_ds_zt(k),  &
@@ -2281,6 +2311,7 @@ module advance_wp2_wp3_module
 
   !=============================================================================
   subroutine wp23_rhs( dt, wp2, wp3, a1, a1_zt, &
+                       a1wp3_on_wp2, a3p3_wp2_sqd, &
                        a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                        upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt, & 
                        Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
@@ -2358,6 +2389,8 @@ module advance_wp2_wp3_module
       a3,              & ! sigma_sqd_w term a_3 (momentum levels)    [-]
       a3_zt,           & ! a_3 interpolated to thermodynamic levels  [-]
       wp3_on_wp2,      & ! Smoothed version of wp3 / wp2             [m/s]
+      a1wp3_on_wp2,    & !
+      a3p3_wp2_sqd,    & !
       wpthvp,          & ! w'th_v' (momentum levels)                 [K m/s]
       wp2thvp,         & ! w'^2th_v' (thermodynamic levels)          [K m^2/s^2]
       um,              & ! u wind component (thermodynamic levels)   [m/s]
@@ -2630,6 +2663,8 @@ module advance_wp2_wp3_module
       = wp3_terms_ta_tp_lhs( wp2(k), wp2(km1),  &
                              a1(k), a1_zt(k), a1(km1),  &
                              a3(k), a3_zt(k), a3(km1),  &
+                             a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
+                             a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), &
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
                              invrs_rho_ds_zt(k),  &
@@ -2699,18 +2734,19 @@ module advance_wp2_wp3_module
         ! Note:  To find the contribution of w'^3 term ta, add 3 to all of the
         !        a_3 inputs and substitute 0 for the three_halves input to
         !        function wp3_terms_ta_tp_rhs.
-!       call stat_begin_update_pt( iwp3_ta, k, &
-!         -wp3_terms_ta_tp_rhs( wp3_zm(k), wp3_zm(km1),  &
-!                               wp2(k), wp2(km1),  &
-!                               a1(k), a1_zt(k), a1(km1),  &
-!                               a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, 
-!                               a3(km1)+3.0_core_rknd,  &
-!                               wp3_on_wp2(k), wp3_on_wp2(km1), &
-!                               rho_ds_zm(k), rho_ds_zm(km1),  &
-!                               invrs_rho_ds_zt(k),  &
-!                               0.0_core_rknd,  &
-!                               gr%invrs_dzt(k) ),  &
-!                                  stats_zt )
+       call stat_begin_update_pt( iwp3_ta, k, &
+         -wp3_terms_ta_tp_rhs( wp3_zm(k), wp3_zm(km1),  &
+                               wp2(k), wp2(km1),  &
+                               a1(k), a1_zt(k), a1(km1),  &
+                               a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, 
+                               a3(km1)+3.0_core_rknd,  &
+                               a3p3_wp2_sqd(k),a3p3_wp2_sqd(km1),& 
+                               wp3_on_wp2(k), wp3_on_wp2(km1), &
+                               rho_ds_zm(k), rho_ds_zm(km1),  &
+                               invrs_rho_ds_zt(k),  &
+                               0.0_core_rknd,  &
+                               gr%invrs_dzt(k) ),  &
+                                  stats_zt )
         call stat_begin_update_pt( iwp3_ta, k, 0.0_core_rknd, stats_zt )
 
         ! Note:  An "over-implicit" weighted time step is applied to this term.
@@ -2722,6 +2758,8 @@ module advance_wp2_wp3_module
                                a1(k), a1_zt(k), a1(km1),  &
                                a3(k)+3.0_core_rknd, a3_zt(k)+3.0_core_rknd, &
                                a3(km1)+3.0_core_rknd,  &
+                               a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
+                               a3p3_wp2_sqd(k), a3p3_wp2_sqd(km1), &
                                wp3_on_wp2(k), wp3_on_wp2(km1), &
                                rho_ds_zm(k), rho_ds_zm(km1),  &
                                invrs_rho_ds_zt(k),  &
@@ -3387,6 +3425,8 @@ module advance_wp2_wp3_module
   pure function wp3_terms_ta_tp_lhs( wp2, wp2m1,  &
                                      a1, a1_zt, a1m1,  &
                                      a3, a3_zt, a3m1,  &
+                                     a1wp3_on_wp2, a1wp3_on_wp2_m1, &
+                                     a3p3_wp2_sqd, a3p3_wp2_sqd_m1, &
                                      wp3_on_wp2, wp3_on_wp2_m1, &
                                      rho_ds_zm, rho_ds_zmm1,  &
                                      invrs_rho_ds_zt,  &
@@ -3509,8 +3549,9 @@ module advance_wp2_wp3_module
         gr ! Variable gr%weights_zt2zm
 
     use model_flags, only:  &
-        l_standard_term_ta
-
+        l_standard_term_ta,
+        l_reform_term_ta
+      
     implicit none
 
     ! Constant parameters
@@ -3537,6 +3578,10 @@ module advance_wp2_wp3_module
       a3m1,               & ! a_3(k-1)                                 [-]
       wp3_on_wp2,         & ! wp3 / wp2 (k)                            [m/s]
       wp3_on_wp2_m1,      & ! wp3 / wp2 (k-1)                          [m/s]
+      a1wp3_on_wp2,       & !
+      a1wp3_on_wp2,       & !
+      a3p3_wp2_sqd,       & !
+      a3p3_wp2_sqd,       & !
       rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
       rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
       invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
@@ -3562,6 +3607,53 @@ module advance_wp2_wp3_module
     ! Momentum level (k-1) is between thermodynamic level (k)
     ! and thermodynamic level (k-1).
     mkm1 = level - 1
+
+   if ( l_reform_term_ta )then
+
+       ! SZhang and HWan, reformulation of a1*wp3/wp2 and (a3+3)*wp2*wp2
+       ! The related terms are replaced with the reformulated ones
+       ! a1*wp3/wp2 = a1wp3_on_wp2
+       ! (a3+3)*wp2*wp2 = a3p3_wp2_sqd
+
+       ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+       lhs(kp1_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zm &
+             * a1wp3_on_wp2 &
+             * gr%weights_zt2zm(t_above,mk)
+
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + const_three_halves &
+           * invrs_dzt * wp2
+
+       ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+       lhs(k_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * (   rho_ds_zm &
+                   * a1wp3_on_wp2 &
+                   * gr%weights_zt2zm(t_below,mk) &
+                 - rho_ds_zmm1 &
+                   * a1wp3_on_wp2_m1 &
+                   * gr%weights_zt2zm(t_above,mkm1) &
+               )
+
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - const_three_halves &
+           * invrs_dzt * wp2m1
+
+       ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+       lhs(km1_tdiag) &
+       = - invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zmm1 &
+             * a1wp3_on_wp2_m1 &
+             * gr%weights_zt2zm(t_below,mkm1)
+   
+   else 
 
     if ( l_standard_term_ta ) then
 
@@ -3676,6 +3768,7 @@ module advance_wp2_wp3_module
 
     end if ! l_standard_term_ta
 
+   endif ! l_reform_term_ta
 
     return
   end function wp3_terms_ta_tp_lhs
@@ -3829,16 +3922,17 @@ module advance_wp2_wp3_module
   end function wp3_term_pr1_lhs
 
   !=============================================================================
-! pure function wp3_terms_ta_tp_rhs( wp3_zm, wp3_zmm1,  &
-!                                    wp2, wp2m1,  &
-!                                    a1, a1_zt, a1m1,  &
-!                                    a3, a3_zt, a3m1,  &
-!                                    wp3_on_wp2, wp3_on_wp2_m1, &
-!                                    rho_ds_zm, rho_ds_zmm1,  &
-!                                    invrs_rho_ds_zt,  &
-!                                    const_three_halves,  &
-!                                    invrs_dzt )  &
-! result( rhs )
+ pure function wp3_terms_ta_tp_rhs( wp3_zm, wp3_zmm1,  &
+                                    wp2, wp2m1,  &
+                                    a1, a1_zt, a1m1,  &
+                                    a3, a3_zt, a3m1,  &
+                                    a3p3_wp2_sqd, a3p3_wp2_sqd_m1, &
+                                    wp3_on_wp2, wp3_on_wp2_m1, &
+                                    rho_ds_zm, rho_ds_zmm1,  &
+                                    invrs_rho_ds_zt,  &
+                                    const_three_halves,  &
+                                    invrs_dzt )  &
+ result( rhs )
 
     ! Description:
     ! Turbulent advection and turbulent production of wp3:  explicit portion of 
@@ -3943,38 +4037,56 @@ module advance_wp2_wp3_module
     ! References:
     !-----------------------------------------------------------------------
 
-!   use constants_clubb, only:  &
-!       w_tol_sqd
+   use constants_clubb, only:  &
+       w_tol_sqd
 
-!   use model_flags, only:  &
-!       l_standard_term_ta
-
-!   implicit none
+   use model_flags, only:  &
+       l_standard_term_ta,
+       l_reform_term_ta
+       
+   implicit none
 
     ! Input Variables
-!   real, intent(in) ::  & 
-!     wp3_zm,             & ! w'^3 interpolated to momentum lev. (k)   [m^3/s^3]
-!     wp3_zmm1,           & ! w'^3 interpolated to momentum lev. (k-1) [m^3/s^3]
-!     wp2,                & ! w'^2(k)                                  [m^2/s^2]
-!     wp2m1,              & ! w'^2(k-1)                                [m^2/s^2]
-!     a1,                 & ! a_1(k)                                   [-]
-!     a1_zt,              & ! a_1 interpolated to thermo. level (k)    [-]
-!     a1m1,               & ! a_1(k-1)                                 [-]
-!     a3,                 & ! a_3(k)                                   [-]
-!     a3_zt,              & ! a_3 interpolated to thermo. level (k)    [-]
-!     a3m1,               & ! a_3(k-1)                                 [-]
-!     wp3_on_wp2,         & ! (k) [m/s]
-!     wp3_on_wp2_m1,      & ! (k-1)                  [m/s]
-!     rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
-!     rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
-!     invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
-!     const_three_halves, & ! "3/2" ("0" is sent in for wp3_ta budget) [-]
-!     invrs_dzt             ! Inverse of grid spacing (k)              [1/m]
-
+   real, intent(in) ::  & 
+     wp3_zm,             & ! w'^3 interpolated to momentum lev. (k)   [m^3/s^3]
+     wp3_zmm1,           & ! w'^3 interpolated to momentum lev. (k-1) [m^3/s^3]
+     wp2,                & ! w'^2(k)                                  [m^2/s^2]
+     wp2m1,              & ! w'^2(k-1)                                [m^2/s^2]
+     a1,                 & ! a_1(k)                                   [-]
+     a1_zt,              & ! a_1 interpolated to thermo. level (k)    [-]
+     a1m1,               & ! a_1(k-1)                                 [-]
+     a3,                 & ! a_3(k)                                   [-]
+     a3_zt,              & ! a_3 interpolated to thermo. level (k)    [-]
+     a3m1,               & ! a_3(k-1)                                 [-]
+     wp3_on_wp2,         & ! (k) [m/s]
+     wp3_on_wp2_m1,      & ! (k-1)                  [m/s]
+     a3p3_wp2_sqd,       & !
+     a3p3_wp2_sqd_m1     & !
+     rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
+     rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
+     invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
+     const_three_halves, & ! "3/2" ("0" is sent in for wp3_ta budget) [-]
+     invrs_dzt             ! Inverse of grid spacing (k)              [1/m]
     ! Return Variable
-!   real :: rhs
+   real :: rhs
 
+   if ( l_reform_term_ta ) then
 
+    !SZhang and HWan, reformulation of a1*wp3/wp2 and a3*wp2*wp2
+    !The reformulation will produce an explicit term on the right hands of wp3
+    ! -1/rho_s * d(rho_s*a3p3_wp2_sqd)/dz 
+      rhs & 
+      = + invrs_rho_ds_zt &
+          * invrs_dzt &
+            * (   rho_ds_zm * a3p3_wp2_sqd &
+                - rho_ds_zmm1 * a3p3_wp2_sqd_m1 &
+              )
+   else
+   
+   rhs = 0.0_core_rknd
+
+   endif ! l_reform_term_ta 
+ 
 !   if ( l_standard_term_ta ) then
 
        ! The turbulent advection term is discretized normally, in accordance
@@ -4034,8 +4146,8 @@ module advance_wp2_wp3_module
 !   endif ! l_standard_term_ta
 
 
-!   return
-! end function wp3_terms_ta_tp_rhs
+   return
+ end function wp3_terms_ta_tp_rhs
 
   !=============================================================================
   pure function wp3_terms_bp1_pr2_rhs( C11_Skw_fnc, thv_ds_zt, wp2thvp ) & 

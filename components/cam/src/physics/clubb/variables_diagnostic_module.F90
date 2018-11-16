@@ -30,6 +30,9 @@ module variables_diagnostic_module
 
   real( kind = core_rknd ), target, allocatable, dimension(:), public :: &
     sigma_sqd_w_zt, & ! PDF width parameter interpolated to t-levs.  [-]
+    a1wp3_on_wp2_zt, & ! a1*wp3/wp2      interpolated to t-levs.     [m/s] 
+    a2wp3_on_wp2_zt, & ! a2*wp3/wp2      interpolated to t-levs.     [m/s]
+    a3p3_wp2_sqd_zt, & ! (a3+3)*wp2*wp2  interpolated to t-levs.     [m2/s2] 
     Skw_zm,         & ! Skewness of w on momentum levels             [-]
     Skw_zt,         & ! Skewness of w on thermodynamic levels        [-]
     ug,             & ! u geostrophic wind                           [m/s]
@@ -43,7 +46,8 @@ module variables_diagnostic_module
 !!! Important Note !!!
 ! Do not indent the omp comments, they need to be in the first 4 columns
 !!! End Important Note !!!
-!$omp threadprivate(sigma_sqd_w_zt, Skw_zm, Skw_zt, ug, vg, &
+!$omp threadprivate(sigma_sqd_w_zt, a1wp3_on_wp2_zt, a2wp3_on_wp2_zt, a3p3_wp2_sqd_zt, &
+!$omp   Skw_zm, Skw_zt, ug, vg, &
 !$omp   um_ref, vm_ref, thlm_ref, rtm_ref, thvm )
 
   real( kind = core_rknd ), target, allocatable, dimension(:), public :: & 
@@ -246,7 +250,11 @@ module variables_diagnostic_module
 
     ! Diagnostic variables
 
-    allocate( sigma_sqd_w_zt(1:nz) ) ! PDF width parameter interp. to t-levs.
+    allocate( sigma_sqd_w_zt(1:nz) )  ! PDF width parameter interp. to t-levs.
+    allocate( a1wp3_on_wp2_zt(1:nz) ) ! a1*wp3/wp2
+    allocate( a2wp3_on_wp2_zt(1:nz) ) ! a2*wp3/wp2
+    allocate( a3p3_wp2_sqd_zt(1:nz) ) ! (a3+3)*wp2*wp2
+
     allocate( Skw_zm(1:nz) )         ! Skewness of w on momentum levels
     allocate( Skw_zt(1:nz) )         ! Skewness of w on thermodynamic levels
     allocate( ug(1:nz) )             ! u geostrophic wind
@@ -368,6 +376,10 @@ module variables_diagnostic_module
     ! Diagnostic variables
 
     sigma_sqd_w_zt = 0.0_core_rknd ! PDF width parameter interp. to t-levs.
+    a1wp3_on_wp2_zt = 0.0_core_rknd ! a1*wp3/wp2     interp. to t-levs
+    a2wp3_on_wp2_zt = 0.0_core_rknd ! a2*wp3/wp2     interp. to t-levs.
+    a3p3_wp2_sqd_zt = 0.0_core_rknd ! (a3+3)*wp2*wp2 interp. to t-levs.
+
     Skw_zm         = 0.0_core_rknd ! Skewness of w on momentum levels
     Skw_zt         = 0.0_core_rknd ! Skewness of w on thermodynamic levels
     ug             = 0.0_core_rknd ! u geostrophic wind
@@ -570,6 +582,10 @@ module variables_diagnostic_module
     ! --- Deallocate ---
 
     deallocate( sigma_sqd_w_zt ) ! PDF width parameter interp. to t-levs.
+    deallocate( a1wp3_on_wp2_zt ) ! a1*wp3/wp2 interp. to t-levs.
+    deallocate( a2wp3_on_wp2_zt ) ! a2*wp3/wp2 interp. to t-levs.
+    deallocate( a3p3_wp2_sqd_zt ) ! (a3+3)*wp2*wp2 interp. to t-levs.
+
     deallocate( Skw_zm )         ! Skewness of w on momentum levels
     deallocate( Skw_zt )         ! Skewness of w on thermodynamic levels
     deallocate( ug )             ! u geostrophic wind

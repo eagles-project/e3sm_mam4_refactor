@@ -47,6 +47,8 @@ module advance_xp2_xpyp_module
   subroutine advance_xp2_xpyp( tau_zm, wm_zm, rtm, wprtp, thlm, &
                                wpthlp, wpthvp, um, vm, wp2, wp2_zt, &
                                wp3, upwp, vpwp, sigma_sqd_w, Skw_zm, &
+                               a1wp3_on_wp2, a1wp3_on_wp2_zt, & 
+                               a2wp3_on_wp2, a2wp3_on_wp2_zt, & 
                                Kh_zt, rtp2_forcing, thlp2_forcing, &
                                rtpthlp_forcing, rho_ds_zm, rho_ds_zt, &
                                invrs_rho_ds_zm, thv_ds_zm, &
@@ -183,6 +185,10 @@ module advance_xp2_xpyp_module
       invrs_rho_ds_zm, & ! Inv. dry, static density @ mom. levs. [m^3/kg]
       thv_ds_zm,       & ! Dry, base-state theta_v on mom. levs. [K]
       Lscale,          & ! Mixing length                         [m]
+      a1wp3_on_wp2,    & ! a1*wp3/wp2 (momentum levels)
+      a1wp3_on_wp2_zt, & ! a1*wp3/wp2 (thermodynamic levels)
+      a2wp3_on_wp2,    & ! a2*wp3/wp2 (momentum levels)
+      a2wp3_on_wp2_zt, & ! a2*wp3/wp2 (thermodynamic levels)
       wp3_on_wp2,      & ! Smoothed version of <w'^3>/<w'^2> zm  [m/s]
       wp3_on_wp2_zt      ! Smoothed version of <w'^3>/<w'^2> zt  [m/s]
 
@@ -353,6 +359,8 @@ module advance_xp2_xpyp_module
 
     ! Implicit contributions to term rtp2
     call xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, &  ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! Intent(in)
                        a1, a1_zt, tau_zm, wm_zm, Kw2, &          ! Intent(in)
                        rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm, &  ! Intent(in)
                        C2rt_1d, nu2_vert_res_dep, beta, &        ! Intent(in)
@@ -360,6 +368,8 @@ module advance_xp2_xpyp_module
 
 
     call xp2_xpyp_rhs( xp2_xpyp_rtp2, dt, l_iter, a1, a1_zt, &  ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &         ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &         ! Intent(in)
                        wp2_zt, wprtp, wprtp_zt, wp3_on_wp2, &   ! Intent(in)
                        wp3_on_wp2_zt, wprtp, wprtp_zt, &        ! Intent(in)
                        rtm, rtm, rtp2, rtp2_forcing, &          ! Intent(in)
@@ -380,6 +390,8 @@ module advance_xp2_xpyp_module
 
     ! Implicit contributions to term thlp2
     call xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, & ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! Intent(in)
                        a1, a1_zt, tau_zm, wm_zm, Kw2, &         ! Intent(in)
                        rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm, & ! Intent(in)
                        C2thl_1d, nu2_vert_res_dep, beta, &      ! Intent(in)
@@ -387,6 +399,8 @@ module advance_xp2_xpyp_module
 
     ! Explicit contributions to thlp2
     call xp2_xpyp_rhs( xp2_xpyp_thlp2, dt, l_iter, a1, a1_zt, & ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &         ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &         ! Intent(in)
                        wp2_zt, wpthlp, wpthlp_zt, wp3_on_wp2, & ! Intent(in)
                        wp3_on_wp2_zt, wpthlp, wpthlp_zt, &      ! Intent(in)
                        thlm, thlm, thlp2, thlp2_forcing, &      ! Intent(in)
@@ -408,6 +422,8 @@ module advance_xp2_xpyp_module
 
     ! Implicit contributions to term rtpthlp
     call xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, & ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &         ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &         ! Intent(in)
                        a1, a1_zt, tau_zm, wm_zm, Kw2, &         ! Intent(in)
                        rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm, & ! Intent(in)
                        C2rtthl_1d, nu2_vert_res_dep, beta, &    ! Intent(in)
@@ -415,6 +431,8 @@ module advance_xp2_xpyp_module
 
     ! Explicit contributions to rtpthlp
     call xp2_xpyp_rhs( xp2_xpyp_rtpthlp, dt, l_iter, a1, a1_zt, &  ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &            ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &            ! Intent(in)
                        wp2_zt, wprtp, wprtp_zt, wp3_on_wp2, &      ! Intent(in)
                        wp3_on_wp2_zt, wpthlp, wpthlp_zt, &         ! Intent(in)
                        rtm, thlm, rtpthlp, rtpthlp_forcing, &      ! Intent(in)
@@ -436,6 +454,8 @@ module advance_xp2_xpyp_module
 
     ! Implicit contributions to term up2/vp2
     call xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, & ! Intent(in)
+                       a1wp3_on_wp2, a1wp3_on_wp2_zt, &         ! Intent(in)    
+                       a2wp3_on_wp2, a2wp3_on_wp2_zt, &         ! Intent(in)
                        a1, a1_zt, tau_zm, wm_zm, Kw9,  &        ! Intent(in)
                        rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm, & ! Intent(in)
                        C4_C14_1d, nu9_vert_res_dep, beta, &     ! Intent(in)
@@ -443,6 +463,8 @@ module advance_xp2_xpyp_module
 
     ! Explicit contributions to up2
     call xp2_xpyp_uv_rhs( xp2_xpyp_up2, dt, l_iter, a1, a1_zt, wp2, & ! Intent(in)
+                          a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! Intent(in)    
+                          a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! Intent(in)
                           wp2_zt, wpthvp, Lscale, wp3_on_wp2_zt, &  ! Intent(in)
                           wp3_on_wp2, C4_C14_1d, tau_zm, &          ! Intent(in)
                           um, vm, upwp, upwp_zt, vpwp, vpwp_zt, &   ! Intent(in)
@@ -453,6 +475,8 @@ module advance_xp2_xpyp_module
 
     ! Explicit contributions to vp2
     call xp2_xpyp_uv_rhs( xp2_xpyp_vp2, dt, l_iter, a1, a1_zt, wp2, & ! Intent(in)
+                          a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! Intent(in)    
+                          a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! Intent(in)
                           wp2_zt, wpthvp, Lscale, wp3_on_wp2_zt, &  ! Intent(in)
                           wp3_on_wp2, C4_C14_1d, tau_zm, &          ! Intent(in)
                           vm, um, vpwp, vpwp_zt, upwp, upwp_zt, &   ! Intent(in)
@@ -582,6 +606,8 @@ module advance_xp2_xpyp_module
       !!!!!***** sclr'^2, sclr'r_t', sclr'th_l' *****!!!!!
 
       call xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, & ! Intent(in)
+                         a1wp3_on_wp2, a1wp3_on_wp2_zt, &         ! Intent(in)    
+                         a2wp3_on_wp2, a2wp3_on_wp2_zt, &         ! Intent(in)
                          a1, a1_zt, tau_zm, wm_zm, Kw2,         & ! Intent(in)
                          rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm, & ! Intent(in)
                          C2sclr_1d, nu2_vert_res_dep, beta,     & ! Intent(in)
@@ -603,6 +629,8 @@ module advance_xp2_xpyp_module
         !!!!!***** sclr'^2 *****!!!!!
 
         call xp2_xpyp_rhs( xp2_xpyp_sclrp2, dt, l_iter, a1, a1_zt, & ! In
+                           a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! In    
+                           a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! In
                            wp2_zt, wpsclrp(:,i), wpsclrp_zt, wp3_on_wp2, & ! In
                            wp3_on_wp2_zt, wpsclrp(:,i), wpsclrp_zt, & ! In
                            sclrm(:,i), sclrm(:,i), sclrp2(:,i), sclrp2_forcing, & ! In
@@ -624,6 +652,8 @@ module advance_xp2_xpyp_module
         endif
 
         call xp2_xpyp_rhs( xp2_xpyp_sclrprtp, dt, l_iter, a1, a1_zt, & ! In
+                           a1wp3_on_wp2, a1wp3_on_wp2_zt, &          ! In    
+                           a2wp3_on_wp2, a2wp3_on_wp2_zt, &          ! In
                            wp2_zt, wpsclrp(:,i), wpsclrp_zt, wp3_on_wp2, & ! In
                            wp3_on_wp2_zt, wprtp, wprtp_zt, & ! In
                            sclrm(:,i), rtm, sclrprtp(:,i), sclrprtp_forcing, & ! In
@@ -645,6 +675,8 @@ module advance_xp2_xpyp_module
         endif
 
         call xp2_xpyp_rhs( xp2_xpyp_sclrpthlp, dt, l_iter, a1, a1_zt, & ! In
+                           a1wp3_on_wp2, a1wp3_on_wp2_zt, &             ! In    
+                           a2wp3_on_wp2, a2wp3_on_wp2_zt, &             ! In
                            wp2_zt, wpsclrp(:,i), wpsclrp_zt, wp3_on_wp2, & ! In
                            wp3_on_wp2_zt, wpthlp, wpthlp_zt, & ! In
                            sclrm(:,i), thlm, sclrpthlp(:,i), sclrpthlp_forcing, & ! In
@@ -819,6 +851,8 @@ module advance_xp2_xpyp_module
 
   !=============================================================================
   subroutine xp2_xpyp_lhs( dt, l_iter, wp3_on_wp2_zt, wp3_on_wp2, &
+                           a1wp3_on_wp2, a1wp3_on_wp2_zt, &         
+                           a2wp3_on_wp2, a2wp3_on_wp2_zt, &     
                            a1, a1_zt, tau_zm, wm_zm, Kw,  &
                            rho_ds_zt, rho_ds_zm, invrs_rho_ds_zm,  &
                            Cn, nu, beta, lhs )
@@ -902,6 +936,10 @@ module advance_xp2_xpyp_module
     real( kind = core_rknd ), dimension(gr%nz), intent(in) :: & 
       wp3_on_wp2,      & ! Smoothed w'^3 / w'^2 (moment. levels)       [m/s]
       wp3_on_wp2_zt,   & ! Smoothed w'^3 / w'^2 (thermo. levels)       [m/s]
+      a1wp3_on_wp2,    & !
+      a1wp3_on_wp2_zt, & ! 
+      a2wp3_on_wp2,    & !
+      a2wp3_on_wp2_zt, & !
       a1,              & ! sigma_sqd_w term a_1 (momentum levels)      [-]
       a1_zt,           & ! a_1 interpolated to thermodynamic levels    [-]
       tau_zm,          & ! Time-scale tau on momentum levels           [s]
@@ -962,6 +1000,7 @@ module advance_xp2_xpyp_module
         = lhs(kp1_mdiag:km1_mdiag,k)  &
         + gamma_over_implicit_ts  &
         * term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                       a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), & 
                        rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                        a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
       else
@@ -970,6 +1009,7 @@ module advance_xp2_xpyp_module
         + gamma_over_implicit_ts  &
         * term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                               wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                              a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &  
                               gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                               invrs_rho_ds_zm(k), &
                               rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -1037,6 +1077,7 @@ module advance_xp2_xpyp_module
             tmp(1:3)  &
             = gamma_over_implicit_ts  &
             * term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                           a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), &          
                            rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                            a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
           else
@@ -1044,6 +1085,7 @@ module advance_xp2_xpyp_module
               = gamma_over_implicit_ts  &
               * term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                                     wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                                    a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &          ! Intent(in)    
                                     gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                                     invrs_rho_ds_zm(k), &
                                     rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -1381,6 +1423,8 @@ module advance_xp2_xpyp_module
 
   !=============================================================================
   subroutine xp2_xpyp_uv_rhs( solve_type, dt, l_iter, a1, a1_zt, wp2, &
+                              a1wp3_on_wp2, a1wp3_on_wp2_zt, &  
+                              a2wp3_on_wp2, a2wp3_on_wp2_zt, & 
                               wp2_zt, wpthvp, Lscale, wp3_on_wp2_zt, &
                               wp3_on_wp2, C4_C14_1d, tau_zm,  & 
                               xam, xbm, wpxap, wpxap_zt, wpxbp, wpxbp_zt, &
@@ -1451,6 +1495,10 @@ module advance_xp2_xpyp_module
       Lscale,          & ! Mixing Length                               [m]
       wp3_on_wp2,      & ! Smoothed w'^3 / w'^2 on momentum levels     [m/s]
       wp3_on_wp2_zt,   & ! Smoothed w'^3 / w'^2 on thermo. levels      [m/s]
+      a1wp3_on_wp2,    & !
+      a1wp3_on_wp2_zt, & ! 
+      a2wp3_on_wp2,    & !
+      a2wp3_on_wp2_zt, & ! 
       C4_C14_1d,       & ! Combination of model params. C_4 and C_14   [-]
       tau_zm,          & ! Time-scale tau on momentum levels           [s]
       xam,             & ! x_am (thermodynamic levels)                 [m/s]
@@ -1536,6 +1584,7 @@ module advance_xp2_xpyp_module
       = rhs(k,1)  & 
       + term_ta_rhs( wp2_zt(kp1), wp2_zt(k),  &
                      wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                     a2wp3_on_wp2_zt(kp1), a2wp3_on_wp2_zt(k), &    
                      rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                      a1_zt(kp1), a1(k), a1_zt(k), wpxbp_zt(kp1), wpxbp_zt(k),  &
                      wpxap_zt(kp1), wpxap_zt(k), gr%invrs_dzm(k), beta )
@@ -1559,12 +1608,14 @@ module advance_xp2_xpyp_module
       if ( .not. l_upwind_xpyp_ta ) then
         lhs_fnc_output(1:3)  &
         = term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                       a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), &  
                        rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                        a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
       else
         lhs_fnc_output(1:3)  &
         = term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                               wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                              a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), &          ! Intent(in)    
                               gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                               invrs_rho_ds_zm(k), &
                               rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -1622,6 +1673,7 @@ module advance_xp2_xpyp_module
         call stat_begin_update_pt( ixapxbp_ta, k, &                 ! Intent(in) 
         -term_ta_rhs( wp2_zt(kp1), wp2_zt(k), &   ! Intent(in)
                       wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                      a2wp3_on_wp2_zt(kp1), a2wp3_on_wp2_zt(k), &    
                       rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k), &
                       a1_zt(kp1), a1(k), a1_zt(k), wpxbp_zt(kp1), wpxbp_zt(k), &
                       wpxap_zt(kp1), wpxap_zt(k), gr%invrs_dzm(k), beta ), &
@@ -1634,12 +1686,14 @@ module advance_xp2_xpyp_module
         if ( .not. l_upwind_xpyp_ta ) then
           lhs_fnc_output(1:3)  &
           = term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                         a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), &
                          rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                          a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
         else ! turbulent advection is using an upwind discretization
           lhs_fnc_output(1:3)  &
           = term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                                 wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                                a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
                                 gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                                 invrs_rho_ds_zm(k), &
                                 rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -1766,6 +1820,8 @@ module advance_xp2_xpyp_module
 
   !=============================================================================
   subroutine xp2_xpyp_rhs( solve_type, dt, l_iter, a1, a1_zt, &
+                           a1wp3_on_wp2, a1wp3_on_wp2_zt, &     
+                           a2wp3_on_wp2, a2wp3_on_wp2_zt, &     
                            wp2_zt, wpxap, wpxap_zt, wp3_on_wp2, &
                            wp3_on_wp2_zt, wpxbp, wpxbp_zt, &
                            xam, xbm, xapxbp, xapxbp_forcing, &
@@ -1835,6 +1891,10 @@ module advance_xp2_xpyp_module
       wpxap_zt,        & ! w'x_a' interpolated to thermodynamic levels [m/s {x_am units}]
       wp3_on_wp2,      & ! w'^3 / w'^2 on momentum levels              [m/s]
       wp3_on_wp2_zt,   & ! w'^3 / w'^2 on thermodynamic levels         [m/s]
+      a1wp3_on_wp2,    & !
+      a1wp3_on_wp2_zt, & !
+      a2wp3_on_wp2,    & !
+      a2wp3_on_wp2_zt, & ! 
       wpxbp,           & ! w'x_b' (momentum levels)                    [m/s {x_bm units}]
       wpxbp_zt,        & ! w'x_b' interpolated to thermodynamic levels [m/s {x_bm units}]
       xam,             & ! x_am (thermodynamic levels)                 [{x_am units}]
@@ -1925,6 +1985,7 @@ module advance_xp2_xpyp_module
       = rhs(k,1)  & 
       + term_ta_rhs( wp2_zt(kp1), wp2_zt(k),  &
                      wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                     a2wp3_on_wp2_zt(kp1), a2wp3_on_wp2_zt(k), &
                      rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                      a1_zt(kp1), a1(k), a1_zt(k), wpxbp_zt(kp1), wpxbp_zt(k),  &
                      wpxap_zt(kp1), wpxap_zt(k), gr%invrs_dzm(k), beta )
@@ -1948,12 +2009,14 @@ module advance_xp2_xpyp_module
       if ( .not. l_upwind_xpyp_ta ) then
         lhs_fnc_output(1:3)  &
         = term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                       a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), & 
                        rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                        a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
       else
         lhs_fnc_output(1:3)  &
         = term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                               wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                              a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
                               gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                               invrs_rho_ds_zm(k), &
                               rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -2007,6 +2070,7 @@ module advance_xp2_xpyp_module
         call stat_begin_update_pt( ixapxbp_ta, k, &                ! Intent(in) 
         -term_ta_rhs( wp2_zt(kp1), wp2_zt(k), &  ! Intent(in)
                       wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                      a2wp3_on_wp2_zt(kp1), a2wp3_on_wp2_zt(k), &
                       rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k), &
                       a1_zt(kp1), a1(k), a1_zt(k), wpxbp_zt(kp1), wpxbp_zt(k), &
                       wpxap_zt(kp1), wpxap_zt(k), gr%invrs_dzm(k), beta ), &
@@ -2019,12 +2083,14 @@ module advance_xp2_xpyp_module
         if ( .not. l_upwind_xpyp_ta ) then
           lhs_fnc_output(1:3)  &
           = term_ta_lhs( wp3_on_wp2_zt(kp1), wp3_on_wp2_zt(k), &
+                         a1wp3_on_wp2_zt(kp1), a1wp3_on_wp2_zt(k), & 
                          rho_ds_zt(kp1), rho_ds_zt(k), invrs_rho_ds_zm(k),  &
                          a1_zt(kp1), a1(k), a1_zt(k), gr%invrs_dzm(k), beta, k )
         else
           lhs_fnc_output(1:3)  &
           = term_ta_lhs_upwind( a1(k), a1(kp1), a1(km1), &
                                 wp3_on_wp2(kp1), wp3_on_wp2(k), wp3_on_wp2(km1), &
+                                a1wp3_on_wp2(kp1), a1wp3_on_wp2(k), a1wp3_on_wp2(km1), & 
                                 gr%invrs_dzt(k), gr%invrs_dzt(kp1), &
                                 invrs_rho_ds_zm(k), &
                                 rho_ds_zm(kp1), rho_ds_zm(k), rho_ds_zm(km1), beta )
@@ -2108,6 +2174,7 @@ module advance_xp2_xpyp_module
 
   !=============================================================================
   pure function term_ta_lhs( wp3_on_wp2_ztp1, wp3_on_wp2_zt, &
+                             a1wp3_on_wp2_ztp1, a1wp3_on_wp2_zt, & 
                              rho_ds_ztp1, rho_ds_zt, invrs_rho_ds_zm,  &
                              a1_ztp1, a1, a1_zt, invrs_dzm, beta, level )  & 
   result( lhs )
@@ -2202,7 +2269,8 @@ module advance_xp2_xpyp_module
         one_third  ! Constant(s)
 
     use model_flags, only:  &
-        l_standard_term_ta
+        l_standard_term_ta, &
+        l_reform_term_ta
 
     use clubb_precision, only: &
         core_rknd ! Variable(s)
@@ -2226,6 +2294,8 @@ module advance_xp2_xpyp_module
     real( kind = core_rknd ), intent(in) :: &
       wp3_on_wp2_ztp1, & ! w'^3 / w'^2 (k+1)                           [m/s]
       wp3_on_wp2_zt,   & ! w'^3 / w'^2 (k)                             [m/s]
+      a1wp3_on_wp2_ztp1, &
+      a1wp3_on_wp2_zt,   & 
       rho_ds_ztp1,     & ! Dry, static density at thermo. level (k+1)  [kg/m^3]
       rho_ds_zt,       & ! Dry, static density at thermo. level (k)    [kg/m^3]
       invrs_rho_ds_zm, & ! Inv. dry, static density @ momentum lev (k) [m^3/kg]
@@ -2254,6 +2324,43 @@ module advance_xp2_xpyp_module
     ! Thermodynamic level (k) is between momentum level (k)
     ! and momentum level (k-1).
     tk = level
+
+   if ( l_reform_term_ta ) then
+      !SZhang and HWan, reformulated ta terms  
+      !a1 * wp3/wp2 = a1_wp3_on_wp2
+
+      ! Momentum superdiagonal: [ x xapxbp(k+1,<t+1>) ]
+      lhs(kp1_mdiag)  &
+      = + one_third * beta  &
+          * invrs_rho_ds_zm  &
+            * invrs_dzm  &
+              * rho_ds_ztp1 &
+              * a1wp3_on_wp2_ztp1 &
+              * gr%weights_zm2zt(m_above,tkp1)
+
+      ! Momentum main diagonal: [ x xapxbp(k,<t+1>) ]
+      lhs(k_mdiag)  &
+      = + one_third * beta  &
+          * invrs_rho_ds_zm  &
+            * invrs_dzm  &
+              * (   rho_ds_ztp1 &
+                    * a1wp3_on_wp2_ztp1 &
+                    * gr%weights_zm2zt(m_below,tkp1)  &
+                  - rho_ds_zt &
+                    * a1wp3_on_wp2_zt &
+                    * gr%weights_zm2zt(m_above,tk)  &
+                )
+
+      ! Momentum subdiagonal: [ x xapxbp(k-1,<t+1>) ]
+      lhs(km1_mdiag)  &
+      = - one_third * beta  &
+          * invrs_rho_ds_zm  &
+            * invrs_dzm  &
+              * rho_ds_zt &
+              * a1wp3_on_wp2_zt &
+              * gr%weights_zm2zt(m_below,tk)
+  
+   else
 
     if ( l_standard_term_ta ) then
 
@@ -2336,6 +2443,7 @@ module advance_xp2_xpyp_module
 
     endif
 
+   endif ! l_reform_term_ta
 
     return
   end function term_ta_lhs
@@ -2343,6 +2451,7 @@ module advance_xp2_xpyp_module
   !-----------------------------------------------------------------------------
   pure function term_ta_lhs_upwind( a1_zm, a1_zm_p1, a1_zm_m1, &
                                     wp3_on_wp2_p1, wp3_on_wp2, wp3_on_wp2_m1, &
+                                    a1wp3_on_wp2_p1, a1wp3_on_wp2, a1wp3_on_wp2_m1, & 
                                     invrs_dzt, invrs_dzt_p1, &
                                     invrs_rho_ds_zm, & 
                                     rho_ds_zm_p1, rho_ds_zm, rho_ds_zm_m1, beta ) &
@@ -2358,6 +2467,9 @@ module advance_xp2_xpyp_module
     use constants_clubb, only: &
         one_third, & ! Constant(s)
         zero
+
+    use model_flags, only:  &
+        l_reform_term_ta
 
     use clubb_precision, only: &
         core_rknd ! Variable(s)
@@ -2378,6 +2490,9 @@ module advance_xp2_xpyp_module
       wp3_on_wp2_p1,     & ! Smoothed wp3 / wp2 on moment. levels (k+1)    [m/s]
       wp3_on_wp2,        & ! Smoothed wp3 / wp2 on moment. levels (k)      [m/s]
       wp3_on_wp2_m1,     & ! Smoothed wp3 / wp2 on moment. levels (k-1)    [m/s]
+      a1wp3_on_wp2_p1,   & ! level (k+1) 
+      a1wp3_on_wp2,      & ! level (k)
+      a1wp3_on_wp2_m1,   & ! level (k-1)
       invrs_dzt,         & ! Inverse of grid spacing (k)                   [1/m]
       invrs_dzt_p1,      & ! Inverse of grid spacing (k+1)                 [1/m]
       invrs_rho_ds_zm,   & ! Inv. dry, static density @ momentum lev (k)   [m^3/kg]
@@ -2389,6 +2504,46 @@ module advance_xp2_xpyp_module
     ! Return Variable
     real( kind = core_rknd ), dimension(3) :: lhs
 
+   if (l_reform_term_ta) then
+
+    if ( a1wp3_on_wp2 > zero ) then
+
+      ! Momentum main diagonal: [ x xapxbp(k+1,<t+1>) ]
+      lhs(kp1_mdiag) = zero
+
+      ! Momentum main diagonal: [ x xapxbp(k,<t+1>) ]
+      lhs(k_mdiag)  &
+      = + one_third * beta  &
+          * invrs_dzt * invrs_rho_ds_zm  &
+          * rho_ds_zm * a1wp3_on_wp2
+
+      ! Momentum subdiagonal: [ x xapxbp(k-1,<t+1>) ]
+      lhs(km1_mdiag)  &
+      = - one_third * beta &
+          * invrs_dzt * invrs_rho_ds_zm  &
+          * rho_ds_zm_m1 * a1wp3_on_wp2_m1
+
+    else ! "Wind" is blowing downward
+
+      ! Momentum main diagonal: [ x xapxbp(k+1,<t+1>) ]
+      lhs(kp1_mdiag) &
+      = + one_third * beta &
+        * invrs_dzt_p1 * invrs_rho_ds_zm &
+        * rho_ds_zm_p1 * a1wp3_on_wp2_p1
+
+      ! Momentum main diagonal: [ x xapxbp(k,<t+1>) ]
+      lhs(k_mdiag) &
+      = - one_third * beta &
+        * invrs_dzt_p1 * invrs_rho_ds_zm &
+        * rho_ds_zm * a1wp3_on_wp2
+
+      ! Momentum subdiagonal: [ x xapxbp(k-1,<t+1>) ]
+      lhs(km1_mdiag) = zero
+
+    end if
+
+  
+   else
 
     if ( wp3_on_wp2 > zero ) then
 
@@ -2426,12 +2581,15 @@ module advance_xp2_xpyp_module
 
     end if
 
+   endif ! l_reform_term_ta
+
     return
   end function term_ta_lhs_upwind
 
   !=============================================================================
   pure function term_ta_rhs( wp2_ztp1, wp2_zt, &
                              wp3_on_wp2_ztp1, wp3_on_wp2_zt,  &
+                             a2wp3_on_wp2_ztp1, a2wp3_on_wp2_zt, &
                              rho_ds_ztp1, rho_ds_zt, invrs_rho_ds_zm,  &
                              a1_ztp1, a1, a1_zt, wpxbp_ztp1, wpxbp_zt,  &
                              wpxap_ztp1, wpxap_zt, invrs_dzm, beta )  &
@@ -2518,7 +2676,8 @@ module advance_xp2_xpyp_module
         one_third
 
     use model_flags, only:  &
-        l_standard_term_ta
+        l_standard_term_ta, &
+        l_reform_term_ta
 
     use clubb_precision, only: &
         core_rknd ! Variable(s)
@@ -2534,6 +2693,8 @@ module advance_xp2_xpyp_module
       wp2_zt,          & ! w'^2 interpolated to thermo. level (k)     [m^2/s^2]
       wp3_on_wp2_ztp1, & ! Smoothed w'^3 / w'^2 on thermo. level (k+1)[m^2/s^2]
       wp3_on_wp2_zt,   & ! Smoothed w'^3 / w'^2 on thermo. level (k)  [m^2/s^2]
+      a2wp3_on_wp2_ztp1, & !
+      a2wp3_on_wp2_zt,   & !
       rho_ds_ztp1,     & ! Dry, static density at thermo. level (k+1) [kg/m^3]
       rho_ds_zt,       & ! Dry, static density at thermo. level (k)   [kg/m^3]
       invrs_rho_ds_zm, & ! Inv. dry, static density @ mome. lev (k)   [m^3/kg]
@@ -2550,6 +2711,29 @@ module advance_xp2_xpyp_module
     ! Return Variable
     real( kind = core_rknd ) :: rhs
 
+   if (l_reform_term_ta) then
+
+      !SZhang and HWan, reformulated ta terms  
+      !a1 * wp3/wp2     = a1wp3_on_wp2
+      !a2 * wp3/wp2/wp2 = a2wp3_on_wp2
+
+      ! The turbulent advection term is discretized normally, in accordance
+      ! with the model equations found in the documentation and the description
+      ! listed above.
+
+      rhs  &
+      = - ( one - one_third * beta )  &
+          * invrs_rho_ds_zm  &
+            * invrs_dzm  &
+              * (   rho_ds_ztp1 &
+                    * a2wp3_on_wp2_ztp1 &
+                    * wpxap_ztp1 * wpxbp_ztp1  &
+                  - rho_ds_zt &
+                    * a2wp3_on_wp2_zt &
+                    * wpxap_zt * wpxbp_zt  &
+                )
+
+   else
 
     if ( l_standard_term_ta ) then
 
@@ -2595,6 +2779,8 @@ module advance_xp2_xpyp_module
 
     endif
 
+
+  endif ! l_reform_term_ta
 
     return
   end function term_ta_rhs

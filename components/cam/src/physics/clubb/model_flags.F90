@@ -151,6 +151,13 @@ module model_flags
   ! and in advance_xp2_xpyp_module.F90.
 !$omp threadprivate(l_standard_term_ta)
 
+!!!SZhang and HWan, reformulate the ta terms in CLUBB equations
+  logical, public :: &
+    l_reform_term_ta  = .true.    ! Use the reformulated discretization for the
+  ! turbulent advection terms.  Setting to
+  ! .false. means restore back to the origional design in CLUBB
+!$omp threadprivate(l_reform_term_ta)
+
   ! Use to determine whether a host model has already applied the surface flux,
   ! to avoid double counting.
   logical, public :: &

@@ -162,6 +162,9 @@ module advance_clubb_core_module
       Skw_zt,  & ! Variable(s)
       Skw_zm, &
       sigma_sqd_w_zt, &
+      a1wp3_on_wp2_zt, &
+      a2wp3_on_wp2_zt, &
+      a3p3_wp2_sqd_zt, &
       wp4, &
       thlpthvp, &
       rtpthvp, &
@@ -352,7 +355,10 @@ module advance_clubb_core_module
       fill_holes_vertical
 
     use sigma_sqd_w_module, only: &
-      compute_sigma_sqd_w ! Procedure(s)
+      compute_sigma_sqd_w  ! Procedure(s)
+      compute_sigma_sqd_w1 ! Procedure(s)
+      compute_sigma_sqd_w2 ! Procedure(s)
+      compute_sigma_sqd_w3 ! Procedure(s)
 
     use array_index, only: &
       iirrm            ! Variable
@@ -587,6 +593,11 @@ module advance_clubb_core_module
 
     real( kind = core_rknd ), dimension(gr%nz) :: &
       sigma_sqd_w,   & ! PDF width parameter (momentum levels)    [-]
+      sigma_sqd_wthl, & ! correlation parameter w and thl (thermal levels)    [-]
+      sigma_sqd_wrt,  & ! correlation parameter w and rt  (thermal levels)    [-]
+      a1wp3_on_wp2,   & ! a1*wp3/wp2     (thermal levels)    [-]
+      a2wp3_on_wp2,   & ! a1*wp3/wp2     (thermal levels)    [-]
+      a3p3_wp2_sqd,   & ! (a3+3)*wp2*wp2 (thermal levels)    [-] 
       sqrt_em_zt,    & ! sqrt( em ) on zt levels; where em is TKE [m/s] 
       gamma_Skw_fnc, & ! Gamma as a function of skewness          [???]
       Lscale_pert_1, Lscale_pert_2, & ! For avg. calculation of Lscale  [m]
@@ -962,7 +973,24 @@ module advance_clubb_core_module
     end if
 
     ! Compute sigma_sqd_w (dimensionless PDF width parameter)
-    sigma_sqd_w = compute_sigma_sqd_w( gamma_Skw_fnc, wp2, thlp2, rtp2, wpthlp, wprtp )
+    sigma_sqd_w  = compute_sigma_sqd_w( gamma_Skw_fnc, wp2, thlp2, rtp2, wpthlp, wprtp )
+
+    ! SZhang and HWan reformulate the terms associated with a_n * wp3/wp2 
+    ! CLUBB uses the following two correlation variables to determine the PDF width 
+    !           cwthl^2 = wpthlp/(wp2*thlp2)
+    !           cwrt^2 = wprtp/(wp2*rtp2)
+    !cwthl^2 > cwrt^2 means wpthlp/(wp2*thlp2) > wprtp/(wp2*rtp2)
+    !which is equivalent to wpthlp * wpthlp * rtp2 > wprtp * wprtp * thlp2
+    !assume that sigma_sqd_wthl = wpthlp * wpthlp * rtp2
+    !            sigma_sqd_wrt  = wprtp * wprtp * thlp2
+    !cwthl^2 > cwrt^2 is equivalent to sigma_sqd_wthl > sigma_sqd_wrt
+    !cwthl^2 < cwrt^2 is equivalent to sigma_sqd_wthl < sigma_sqd_wrt
+    !cwthl^2 = cwrt^2 is equivalent to sigma_sqd_wthl = sigma_sqd_wrt
+    sigma_sqd_wthl = wpthlp * wpthlp * rtp2
+    sigma_sqd_wrt  = wprtp  * wprtp  * thlp2
+    a1wp3_on_wp2   = compute_a1wp3_on_wp2( gamma_Skw_fnc, wp2, wp3, thlp2, rtp2, wpthlp, wprtp, sigma_sqd_wthl, sigma_sqd_wrt )
+    a2wp3_on_wp2   = compute_a2wp3_on_wp2( gamma_Skw_fnc, wp2, wp3, thlp2, rtp2, wpthlp, wprtp, sigma_sqd_wthl, sigma_sqd_wrt )
+    a3p3_wp2_sqd   = compute_a3p3_wp2_sqd( gamma_Skw_fnc, wp2, wp3, thlp2, rtp2, wpthlp, wprtp, sigma_sqd_wthl, sigma_sqd_wrt )
 
     if ( l_stats_samp ) then
       call stat_update_var( igamma_Skw_fnc, gamma_Skw_fnc, & ! intent(in)
@@ -972,8 +1000,16 @@ module advance_clubb_core_module
     ! Smooth in the vertical using interpolation
     sigma_sqd_w = zt2zm( zm2zt( sigma_sqd_w ) )
 
+    !SZhang and HWan, do not smooth in the vertical for the reformulated a_n*wp3/wp2
+!   a1wp3_on_wp2 = zt2zm( zm2zt( a1wp3_on_wp2 ) )
+!   a2wp3_on_wp2 = zt2zm( zm2zt( a2wp3_on_wp2 ) )
+!   a3p3_wp2_sqd = zt2zm( zm2zt( a3p3_wp2_sqd ) )
+
     ! Interpolate the the stats_zt grid
-    sigma_sqd_w_zt = max( zm2zt( sigma_sqd_w ), zero_threshold )  ! Pos. def. quantity
+    sigma_sqd_w_zt  = max( zm2zt( sigma_sqd_w ), zero_threshold )  ! Pos. def. quantity
+    a1wp3_on_wp2_zt = zm2zt( a1wp3_on_wp2 )  !no-longer positive-definite 
+    a2wp3_on_wp2_zt = zm2zt( a2wp3_on_wp2 )  !no-longer positive-definite 
+    a3p3_wp2_sqd_zt = zm2zt( a3p3_wp2_sqd )  !no-longer positive-definite 
 
     ! Compute the a3 coefficient (formula 25 in `Equations for CLUBB')
 !   a3_coef = 3.0_core_rknd * sigma_sqd_w*sigma_sqd_w  &
@@ -1903,7 +1939,8 @@ module advance_clubb_core_module
 
       end if ! l_stability_correction
 
-      call advance_xm_wpxp( dt, sigma_sqd_w, wm_zm, wm_zt, wp2,     & ! intent(in)
+      call advance_xm_wpxp( dt, sigma_sqd_w, wm_zm, wm_zt, wp2,       & ! intent(in)
+                            a1wp3_on_wp2, a1wp3_on_wp2_zt,            & ! intent(in)
                             Lscale, wp3_on_wp2, wp3_on_wp2_zt, Kh_zt, Kh_zm, & ! intent(in)
                             tau_C6_zm, Skw_zm, rtpthvp, rtm_forcing,  & ! intent(in)
                             wprtp_forcing, rtm_ref, thlpthvp,         & ! intent(in)
@@ -1944,7 +1981,9 @@ module advance_clubb_core_module
       ! We found that if we call advance_xp2_xpyp first, we can use a longer timestep.
       call advance_xp2_xpyp( tau_zm, wm_zm, rtm, wprtp, thlm,       & ! intent(in)
                              wpthlp, wpthvp, um, vm, wp2, wp2_zt,     & ! intent(in)
-                             wp3, upwp, vpwp, sigma_sqd_w, Skw_zm,    & ! intent(in)
+                             wp3, upwp, vpwp, sigma_sqd_w,Skw_zm,     & ! intent(in) 
+                             a1wp3_on_wp2, a1wp3_on_wp2_zt,           & ! intent(in) 
+                             a2wp3_on_wp2, a2wp3_on_wp2_zt,           & ! intent(in)
                              Kh_zt, rtp2_forcing, thlp2_forcing,      & ! intent(in)
                              rtpthlp_forcing, rho_ds_zm, rho_ds_zt,   & ! intent(in)
                              invrs_rho_ds_zm, thv_ds_zm,              & ! intent(in)
@@ -1979,6 +2018,7 @@ module advance_clubb_core_module
 
       call advance_wp2_wp3 &
            ( dt, sfc_elevation, sigma_sqd_w, wm_zm, wm_zt,      & ! intent(in)
+             a1wp3_on_wp2, a3p3_wp2_sqd,                        & ! intent(in)
              a3_coef, a3_coef_zt, wp3_on_wp2,                   & ! intent(in)
              wpthvp, wp2thvp, um, vm, upwp, vpwp,               & ! intent(in)
              up2, vp2, Kh_zm, Kh_zt, tau_zm, tau_zt, tau_C1_zm, & ! intent(in)
