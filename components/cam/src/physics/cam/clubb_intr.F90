@@ -16,7 +16,7 @@ module clubb_intr
   !                                                                                                      ! 
   !----------------------------------------------------------------------------------------------------- !
 
-  use shr_kind_mod,  only: r8=>shr_kind_r8
+  use shr_kind_mod,  only: r8=>shr_kind_r8, r4=>shr_kind_r8
   use ppgrid,        only: pver, pverp
   use phys_control,  only: phys_getopts
   use physconst,     only: rair, cpair, gravit, latvap, latice, zvir, rh2o, karman, &
@@ -75,7 +75,7 @@ module clubb_intr
       ts_nudge = 86400._r8, &           ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._r8
       
-  real(r8), parameter :: &
+  real(r4), parameter :: &
       host_dx = 100000._r8, &           ! Host model deltax [m]
       host_dy = 100000._r8              ! Host model deltay [m]
       
@@ -489,7 +489,7 @@ end subroutine clubb_init_cnst
 
     !  From the CLUBB libraries
     use advance_clubb_core_module, only: setup_clubb_core
-    use clubb_precision,           only: time_precision
+    use clubb_precision,           only: time_precision, core_rknd
     use error_code,                only: set_clubb_debug_level ! Subroutines
     use parameter_indices,         only: nparams ! Constant
     use parameters_tunable,        only: read_parameters ! Subroutine
@@ -520,7 +520,7 @@ end subroutine clubb_init_cnst
 
     real(kind=time_precision) :: dum1, dum2, dum3
     
-    real(r8), dimension(nparams)  :: clubb_params    ! These adjustable CLUBB parameters (C1, C2 ...)
+    real(core_rknd), dimension(nparams)  :: clubb_params    ! These adjustable CLUBB parameters (C1, C2 ...)
 
     logical :: clubb_history, clubb_rad_history, clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff ! Stats enabled (T/F)
 
@@ -538,8 +538,8 @@ end subroutine clubb_init_cnst
     integer :: ixnumliq
     integer :: lptr
 
-    real(r8)  :: zt_g(pverp)                        ! Height dummy array
-    real(r8)  :: zi_g(pverp)                        ! Height dummy array
+    real(core_rknd)  :: zt_g(pverp)                        ! Height dummy array
+    real(core_rknd)  :: zi_g(pverp)                        ! Height dummy array
 
 
     !----- Begin Code -----
@@ -652,8 +652,8 @@ end subroutine clubb_init_cnst
     !  Fill in dummy arrays for height.  Note that these are overwrote
     !  at every CLUBB step to physical values.    
     do k=1,pverp
-       zt_g(k) = ((k-1)*1000._r8)-500._r8  !  this is dummy garbage
-       zi_g(k) = (k-1)*1000._r8            !  this is dummy garbage
+       zt_g(k) = ((k-1)*1000._core_rknd)-500._core_rknd  !  this is dummy garbage
+       zi_g(k) = (k-1)*1000._core_rknd            !  this is dummy garbage
     enddo
    
     !  Set up CLUBB core.  Note that some of these inputs are overwrote
@@ -926,7 +926,7 @@ end subroutine clubb_init_cnst
    use parameter_indices,         only: nparams     
    use parameters_tunable,        only: read_parameters, setup_parameters ! Subroutine
    use cldfrc2m,                  only: aist_vector
-   use clubb_precision,           only: time_precision
+   use clubb_precision,           only: time_precision, core_rknd
    use cam_history,               only: outfld
    use advance_clubb_core_module, only: advance_clubb_core, calculate_thlp2_rad
    use grid_class,                only: zt2zm, zm2zt, gr, setup_grid, cleanup_grid 
@@ -997,70 +997,70 @@ end subroutine clubb_init_cnst
    real(r8) :: frac_limit, ic_limit
 
    real(r8) :: dtime                            ! CLUBB time step                              [s]   
-   real(r8) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
-   real(r8) :: wp2_in(pverp)                    ! vertical velocity variance (CLUBB)           [m^2/s^2]
-   real(r8) :: wp3_in(pverp)                    ! third moment vertical velocity               [m^3/s^3]
-   real(r8) :: wpthlp_in(pverp)                 ! turbulent flux of thetal                     [K m/s]
-   real(r8) :: wprtp_in(pverp)                  ! turbulent flux of total water                [kg/kg m/s]
-   real(r8) :: rtpthlp_in(pverp)                ! covariance of thetal and qt                  [kg/kg K]
-   real(r8) :: rtp2_in(pverp)                   ! total water variance                         [kg^2/k^2]
-   real(r8) :: thlp2_in(pverp)                  ! thetal variance                              [K^2]
-   real(r8) :: up2_in(pverp)                    ! meridional wind variance                     [m^2/s^2]
-   real(r8) :: vp2_in(pverp)                    ! zonal wind variance                          [m^2/s^2]
-   real(r8) :: upwp_in(pverp)                   ! meridional wind flux                         [m^2/s^2]
-   real(r8) :: vpwp_in(pverp)                   ! zonal wind flux                              [m^2/s^2]
-   real(r8) :: thlm_in(pverp)                   ! liquid water potential temperature (thetal)  [K]
-   real(r8) :: rtm_in(pverp)                    ! total water mixing ratio                     [kg/kg]
-   real(r8) :: rvm_in(pverp)                    ! water vapor mixing ratio                     [kg/kg]
-   real(r8) :: um_in(pverp)                     ! meridional wind                              [m/s]
-   real(r8) :: vm_in(pverp)                     ! zonal wind                                   [m/s]
-   real(r8) :: rho_in(pverp)                    ! mid-point density                            [kg/m^3]
-   real(r8) :: pre_in(pverp)                    ! input for precip evaporation
-   real(r8) :: rtp2_mc_out(pverp)               ! total water tendency from rain evap  
-   real(r8) :: thlp2_mc_out(pverp)              ! thetal tendency from rain evap
-   real(r8) :: wprtp_mc_out(pverp)
-   real(r8) :: wpthlp_mc_out(pverp)
-   real(r8) :: rtpthlp_mc_out(pverp)
-   real(r8) :: rcm_out(pverp)                   ! CLUBB output of liquid water mixing ratio     [kg/kg]
-   real(r8) :: rcm_out_zm(pverp)
-   real(r8) :: wprcp_out(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
-   real(r8) :: cloud_frac_out(pverp)            ! CLUBB output of cloud fraction                [fraction]
-   real(r8) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
-   real(r8) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
-   real(r8) :: thlprcp_out(pverp)
-   real(r8) :: rho_ds_zm(pverp)                 ! Dry, static density on momentum levels        [kg/m^3]
-   real(r8) :: rho_ds_zt(pverp)                 ! Dry, static density on thermodynamic levels   [kg/m^3]
-   real(r8) :: invrs_rho_ds_zm(pverp)           ! Inv. dry, static density on momentum levels   [m^3/kg]
-   real(r8) :: invrs_rho_ds_zt(pverp)           ! Inv. dry, static density on thermo. levels    [m^3/kg]
-   real(r8) :: thv_ds_zm(pverp)                 ! Dry, base-state theta_v on momentum levels    [K]
-   real(r8) :: thv_ds_zt(pverp)                 ! Dry, base-state theta_v on thermo. levels     [K]
-   real(r8) :: rfrzm(pverp)
-   real(r8) :: radf(pverp)
-   real(r8) :: wprtp_forcing(pverp)
-   real(r8) :: wpthlp_forcing(pverp)
-   real(r8) :: rtp2_forcing(pverp)
-   real(r8) :: thlp2_forcing(pverp)
-   real(r8) :: rtpthlp_forcing(pverp)
-   real(r8) :: ice_supersat_frac(pverp)
-   real(r8) :: zt_g(pverp)                      ! Thermodynamic grid of CLUBB                   [m]
-   real(r8) :: zi_g(pverp)                      ! Momentum grid of CLUBB                        [m]
+   real(core_rknd) :: edsclr_in(pverp,edsclr_dim)      ! Scalars to be diffused through CLUBB         [units vary]
+   real(core_rknd) :: wp2_in(pverp)             ! vertical velocity variance (CLUBB)           [m^2/s^2]
+   real(core_rknd) :: wp3_in(pverp)             ! third moment vertical velocity               [m^3/s^3]
+   real(core_rknd) :: wpthlp_in(pverp)          ! turbulent flux of thetal                     [K m/s]
+   real(core_rknd) :: wprtp_in(pverp)           ! turbulent flux of total water                [kg/kg m/s]
+   real(core_rknd) :: rtpthlp_in(pverp)         ! covariance of thetal and qt                  [kg/kg K]
+   real(core_rknd) :: rtp2_in(pverp)            ! total water variance                         [kg^2/k^2]
+   real(core_rknd) :: thlp2_in(pverp)           ! thetal variance                              [K^2]
+   real(core_rknd) :: up2_in(pverp)             ! meridional wind variance                     [m^2/s^2]
+   real(core_rknd) :: vp2_in(pverp)             ! zonal wind variance                          [m^2/s^2]
+   real(core_rknd) :: upwp_in(pverp)            ! meridional wind flux                         [m^2/s^2]
+   real(core_rknd) :: vpwp_in(pverp)            ! zonal wind flux                              [m^2/s^2]
+   real(core_rknd) :: thlm_in(pverp)            ! liquid water potential temperature (thetal)  [K]
+   real(core_rknd) :: rtm_in(pverp)             ! total water mixing ratio                     [kg/kg]
+   real(core_rknd) :: rvm_in(pverp)             ! water vapor mixing ratio                     [kg/kg]
+   real(core_rknd) :: um_in(pverp)              ! meridional wind                              [m/s]
+   real(core_rknd) :: vm_in(pverp)              ! zonal wind                                   [m/s]
+   real(core_rknd) :: rho_in(pverp)             ! mid-point density                            [kg/m^3]
+   real(core_rknd) :: pre_in(pverp)             ! input for precip evaporation
+   real(core_rknd) :: rtp2_mc_out(pverp)               ! total water tendency from rain evap  
+   real(core_rknd) :: thlp2_mc_out(pverp)              ! thetal tendency from rain evap
+   real(core_rknd) :: wprtp_mc_out(pverp)
+   real(core_rknd) :: wpthlp_mc_out(pverp)
+   real(core_rknd) :: rtpthlp_mc_out(pverp)
+   real(core_rknd) :: rcm_out(pverp)                   ! CLUBB output of liquid water mixing ratio     [kg/kg]
+   real(core_rknd) :: rcm_out_zm(pverp)
+   real(core_rknd) :: wprcp_out(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
+   real(core_rknd) :: cloud_frac_out(pverp)            ! CLUBB output of cloud fraction                [fraction]
+   real(core_rknd) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
+   real(core_rknd) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
+   real(core_rknd) :: thlprcp_out(pverp)
+   real(core_rknd) :: rho_ds_zm(pverp)                 ! Dry, static density on momentum levels        [kg/m^3]
+   real(core_rknd) :: rho_ds_zt(pverp)                 ! Dry, static density on thermodynamic levels   [kg/m^3]
+   real(core_rknd) :: invrs_rho_ds_zm(pverp)           ! Inv. dry, static density on momentum levels   [m^3/kg]
+   real(core_rknd) :: invrs_rho_ds_zt(pverp)           ! Inv. dry, static density on thermo. levels    [m^3/kg]
+   real(core_rknd) :: thv_ds_zm(pverp)                 ! Dry, base-state theta_v on momentum levels    [K]
+   real(core_rknd) :: thv_ds_zt(pverp)                 ! Dry, base-state theta_v on thermo. levels     [K]
+   real(core_rknd) :: rfrzm(pverp)
+   real(core_rknd) :: radf(pverp)
+   real(core_rknd) :: wprtp_forcing(pverp)
+   real(core_rknd) :: wpthlp_forcing(pverp)
+   real(core_rknd) :: rtp2_forcing(pverp)
+   real(core_rknd) :: thlp2_forcing(pverp)
+   real(core_rknd) :: rtpthlp_forcing(pverp)
+   real(core_rknd) :: ice_supersat_frac(pverp)
+   real(core_rknd) :: zt_g(pverp)               ! Thermodynamic grid of CLUBB                   [m]
+   real(core_rknd) :: zi_g(pverp)               ! Momentum grid of CLUBB                        [m]
+   real(core_rknd) :: fcor                      ! Coriolis forcing                              [s^-1]
+   real(core_rknd) :: sfc_elevation             ! Elevation of ground                           [m AMSL]
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m] 
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
-   real(r8) :: fcor                             ! Coriolis forcing                              [s^-1]
-   real(r8) :: sfc_elevation                    ! Elevation of ground                           [m AMSL]
    real(r8) :: ubar                             ! surface wind                                  [m/s]
    real(r8) :: ustar                            ! surface stress                                [m/s]                              
    real(r8) :: z0                               ! roughness height                              [m]
-   real(r8) :: thlm_forcing(pverp)              ! theta_l forcing (thermodynamic levels)        [K/s]
-   real(r8) :: rtm_forcing(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]                              
-   real(r8) :: um_forcing(pverp)                ! u wind forcing (thermodynamic levels)         [m/s/s]
-   real(r8) :: vm_forcing(pverp)                ! v wind forcing (thermodynamic levels)         [m/s/s]
-   real(r8) :: wm_zm(pverp)                     ! w mean wind component on momentum levels      [m/s]
-   real(r8) :: wm_zt(pverp)                     ! w mean wind component on thermo. levels       [m/s]
-   real(r8) :: p_in_Pa(pverp)                   ! Air pressure (thermodynamic levels)           [Pa]
-   real(r8) :: rho_zt(pverp)                    ! Air density on thermo levels                  [kt/m^3]
-   real(r8) :: rho_zm(pverp)                    ! Air density on momentum levels                [kg/m^3]
-   real(r8) :: exner(pverp)                     ! Exner function (thermodynamic levels)         [-]
+   real(core_rknd) :: thlm_forcing(pverp)       ! theta_l forcing (thermodynamic levels)        [K/s]
+   real(core_rknd) :: rtm_forcing(pverp)        ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]                              
+   real(core_rknd) :: um_forcing(pverp)         ! u wind forcing (thermodynamic levels)         [m/s/s]
+   real(core_rknd) :: vm_forcing(pverp)         ! v wind forcing (thermodynamic levels)         [m/s/s]
+   real(core_rknd) :: wm_zm(pverp)              ! w mean wind component on momentum levels      [m/s]
+   real(core_rknd) :: wm_zt(pverp)              ! w mean wind component on thermo. levels       [m/s]
+   real(core_rknd) :: p_in_Pa(pverp)            ! Air pressure (thermodynamic levels)           [Pa]
+   real(core_rknd) :: rho_zt(pverp)             ! Air density on thermo levels                  [kt/m^3]
+   real(core_rknd) :: rho_zm(pverp)             ! Air density on momentum levels                [kg/m^3]
+   real(core_rknd) :: exner(pverp)                     ! Exner function (thermodynamic levels)         [-]
    real(r8) :: wpthlp_sfc                       ! w' theta_l' at surface                        [(m K)/s]
    real(r8) :: wprtp_sfc                        ! w' r_t' at surface                            [(kg m)/( kg s)]
    real(r8) :: upwp_sfc                         ! u'w' at surface                               [m^2/s^2]
@@ -1156,8 +1156,8 @@ end subroutine clubb_init_cnst
    character(len=6) :: choice_radf
    
    integer                               :: time_elapsed                ! time keep track of stats          [s]
-   real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
-   real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
+   real(core_rknd), dimension(nparams)   :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
+   real(core_rknd), dimension(sclr_dim)  :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
    type(pdf_parameter), dimension(pverp) :: pdf_params                  ! PDF parameters                    [units vary]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    logical                               :: l_Lscale_plume_centered, l_use_ice_latent
@@ -1551,32 +1551,32 @@ end subroutine clubb_init_cnst
       !  Determine Coriolis force at given latitude.  This is never used
       !  when CLUBB is implemented in a host model, therefore just set
       !  to zero.
-      fcor = 0._r8 
+      fcor = 0._core_rknd
 
       !  Define the CLUBB momentum grid (in height, units of m)
       do k=1,pverp
-         zi_g(k) = state1%zi(i,pverp-k+1)-state1%zi(i,pver+1)
+         zi_g(k) = real(state1%zi(i,pverp-k+1)-state1%zi(i,pver+1), kind = core_rknd)
       enddo 
 
       !  Define the CLUBB thermodynamic grid (in units of m)
       do k=1,pver
-         zt_g(k+1) = state1%zm(i,pver-k+1)-state1%zi(i,pver+1)
-         dz_g(k) = state1%zi(i,k)-state1%zi(i,k+1)  ! compute thickness
+         zt_g(k+1) = real( state1%zm(i,pver-k+1)-state1%zi(i,pver+1), kind = core_rknd)
+         dz_g(k) =  state1%zi(i,k)-state1%zi(i,k+1)  ! compute thickness
       enddo
  
       !  Thermodynamic ghost point is below surface 
-      zt_g(1) = -1._r8*zt_g(2)
+      zt_g(1) = -1._core_rknd*zt_g(2)
 
       !  Set the elevation of the surface
-      sfc_elevation = state1%zi(i,pver+1)
+      sfc_elevation = real(state1%zi(i,pver+1), kind = core_rknd)
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.  
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
-         p_in_Pa(k+1)         = state1%pmid(i,pver-k+1)                              ! Pressure profile
-         exner(k+1)           = 1._r8/exner_clubb(i,pver-k+1)
-         rho_ds_zt(k+1)       = (1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1))
-         invrs_rho_ds_zt(k+1) = 1._r8/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
+         p_in_Pa(k+1)         = real(state1%pmid(i,pver-k+1), kind = core_rknd)                              ! Pressure profile
+         exner(k+1)           = real(1._r8/exner_clubb(i,pver-k+1)
+         rho_ds_zt(k+1)       = real((1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1)), kind = core_rknd)
+         invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
          rho(i,k+1)           = rho_ds_zt(k+1)                                       ! rho on thermo 
          thv_ds_zt(k+1)       = thv(i,pver-k+1)                                      ! thetav on thermo
          rfrzm(k+1)           = state1%q(i,pver-k+1,ixcldice)   
