@@ -16,7 +16,7 @@ module clubb_intr
   !                                                                                                      ! 
   !----------------------------------------------------------------------------------------------------- !
 
-  use shr_kind_mod,  only: r8=>shr_kind_r8, r4=>shr_kind_r8
+  use shr_kind_mod,  only: r8=>shr_kind_r8, r4=>shr_kind_r4
   use ppgrid,        only: pver, pverp
   use phys_control,  only: phys_getopts
   use physconst,     only: rair, cpair, gravit, latvap, latice, zvir, rh2o, karman, &
@@ -1087,6 +1087,7 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: qrl_zm(pverp)
    real(core_rknd) :: thlp2_rad_out(pverp)
    real(core_rknd) :: varmu2
+
    real(r8) :: zt_out(pcols,pverp)              ! output for the thermo CLUBB grid              [m] 
    real(r8) :: zi_out(pcols,pverp)              ! output for momentum CLUBB grid                [m]
    real(r8) :: ubar                             ! surface wind                                  [m/s]
@@ -1142,6 +1143,7 @@ end subroutine clubb_init_cnst
    real(r8) :: kinwat(pcols)                    ! Kinematic water vapor flux                    [m/s]
    real(r8) :: latsub
    real(r8) :: apply_const
+   real(r8) :: dum1                             ! dummy variable                                [units vary]
 
    integer  :: ktop(pcols,pver)
    integer  :: ncvfin(pcols)
@@ -1577,10 +1579,10 @@ end subroutine clubb_init_cnst
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
          p_in_Pa(k+1)         = real(state1%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
-         exner(k+1)           = real(1._r8/exner_clubb(i,pver-k+1)
+         exner(k+1)           = real(1._r8/exner_clubb(i,pver-k+1), kind = core_rknd)
          rho_ds_zt(k+1)       = real((1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1)), kind = core_rknd)
          invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
-         rho(i,k+1)           = rho_ds_zt(k+1)                                              ! rho on thermo 
+         rho(i,k+1)           = real(rho_ds_zt(k+1), kind = r8)                             ! rho on thermo 
          thv_ds_zt(k+1)       = real(thv(i,pver-k+1), kind = core_rknd)                     ! thetav on thermo
          rfrzm(k+1)           = real(state1%q(i,pver-k+1,ixcldice), kind = core_rknd)    
          radf(k+1)            = real(radf_clubb(i,pver-k+1), kind = core_rknd) 
@@ -1591,9 +1593,9 @@ end subroutine clubb_init_cnst
       !  not be needed, just to be safe to avoid NaN's
       rho_ds_zt(1)       = rho_ds_zt(2)
       invrs_rho_ds_zt(1) = invrs_rho_ds_zt(2)
-      rho(i,1)           = rho_ds_zt(2)
+      rho(i,1)           = real(rho_ds_zt(2), kind = r8)
       thv_ds_zt(1)       = thv_ds_zt(2)
-      rho_zt(:)          = rho(i,:)
+      rho_zt(:)          = real(rho(i,:), kind = core_rknd)
       p_in_Pa(1)         = p_in_Pa(2)
       exner(1)           = exner(2)
       rfrzm(1)           = rfrzm(2)
@@ -1601,9 +1603,9 @@ end subroutine clubb_init_cnst
       qrl_clubb(1)       = qrl_clubb(2)
 
       !  Compute mean w wind on thermo grid, convert from omega to w 
-      wm_zt(1) = 0._r8
+      wm_zt(1) = 0._core_rknd
       do k=1,pver
-         wm_zt(k+1) = -1._r8*state1%omega(i,pver-k+1)/(rho(i,k+1)*gravit)
+         wm_zt(k+1) = real(-1._r8*state1%omega(i,pver-k+1)/(rho(i,k+1)*gravit), kind = core_rknd)
       enddo
     
       ! ------------------------------------------------- !
@@ -1649,7 +1651,7 @@ end subroutine clubb_init_cnst
            trim(scm_clubb_iop_name) .eq. 'ARM_CC') then
        
              bflx22 = (gravit/theta0)*real(wpthlp_sfc, kind = r8)
-             ustar  = diag_ustar(real(zt_g(2), kind = core_rknd),bflx22,ubar,zo)      
+             ustar  = diag_ustar(real(zt_g(2), kind = r8),bflx22,ubar,zo)      
         endif
     
         !  Compute the surface momentum fluxes, if this is a SCAM simulation       
@@ -1813,7 +1815,7 @@ end subroutine clubb_init_cnst
         edsclr_in(1,icnt+2) = edsclr_in(2,icnt+2)  
       endif    
 
-      rho_in(:) = rho(i,:)
+      rho_in(:) = real(rho(i,:), kind = core_rknd)
      
       ! --------------------------------------------------------- !
       ! Compute cloud-top radiative cooling contribution to CLUBB !
