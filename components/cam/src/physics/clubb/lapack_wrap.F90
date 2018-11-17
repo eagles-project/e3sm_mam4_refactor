@@ -21,8 +21,9 @@ module lapack_wrap
     clubb_no_error
 
   use clubb_precision, only: &
-    core_rknd !, & ! Variable(s)
-
+    core_rknd , & ! Variable(s)
+      dp
+  
   use cam_abortutils, only: endrun
 
   implicit none
@@ -39,7 +40,6 @@ module lapack_wrap
   ! precision float is in LAPACK.  Hopefully this will work more portably on
   ! architectures like Itanium than the old code -dschanen 11 Aug 2011
   integer, parameter, private :: &
-    dp = selected_real_kind( p=12 )
     sp = selected_real_kind( p=6 )
 
   private ! Set Default Scope
@@ -67,6 +67,8 @@ module lapack_wrap
 
     use clubb_precision, only: &
       core_rknd ! Variable(s)
+
+    use cam_logfile,   only: iulog
 
     implicit none
 
@@ -136,15 +138,19 @@ module lapack_wrap
 !    $                   DU2, IPIV, B, LDB, X, LDX, RCOND, FERR, BERR,
 !    $                   WORK, IWORK, INFO )
 !-----------------------------------------------------------------------
+    write(iulog,*)'band_solve input:'
+    write(iulog,*)'  kind   = ',selected_real_kind(12)
+    write(iulog,*)'  kind   = ',selected_real_kind(6)
+    write(iulog,*)'  kind   = ',kind( diag(1))
 
-    if ( kind( diag(1) ) == dp ) then
+    if ( kind( diag(1) ) == selected_real_kind(12) ) then
       call dgtsvx( "Not Factored", "No Transpose lhs", ndim, nrhs,  & 
                    subd(2:ndim), diag, supd(1:ndim-1),  & 
                    dlf, df, duf, du2, ipivot,  & 
                    rhs, ndim, solution, ndim, rcond, & 
                    ferr, berr, work, iwork, info )
 
-    else if ( kind( diag(1) ) == sp ) then
+    else if ( kind( diag(1) ) == selected_real_kind(6) ) then
       call sgtsvx( "Not Factored", "No Transpose lhs", ndim, nrhs,  & 
                    subd(2:ndim), diag, supd(1:ndim-1),  & 
                    dlf, df, duf, du2, ipivot,  & 
@@ -218,6 +224,9 @@ module lapack_wrap
 
     use clubb_precision, only: &
       core_rknd ! Variable(s)
+
+    use cam_logfile,   only: iulog
+
 #ifndef NDEBUG
 #if defined(ARCH_MIC_KNL) && defined(CPRINTEL)
     use, intrinsic :: ieee_exceptions
@@ -270,8 +279,12 @@ module lapack_wrap
 !       *** The LAPACK Routine ***
 !       SUBROUTINE DGTSV( N, NRHS, DL, D, DU, B, LDB, INFO )
 !-----------------------------------------------------------------------
+    write(iulog,*)'band_solve input:'
+    write(iulog,*)'  kind   = ',selected_real_kind(12)
+    write(iulog,*)'  kind   = ',selected_real_kind(6)
+    write(iulog,*)'  kind   = ',kind(diag(1))
 
-    if ( kind( diag(1) ) == dp ) then
+    if ( kind( diag(1) ) == selected_real_kind(12) ) then
 #ifndef NDEBUG
 #if defined(ARCH_MIC_KNL) && defined(CPRINTEL)
       ! when floating-point exceptions are turned on, this call was failing with a div-by-zero on KNL with Intel/MKL. Solution 
@@ -287,7 +300,7 @@ module lapack_wrap
 #endif
 #endif
 
-    else if ( kind( diag(1) ) == sp ) then
+    else if ( kind( diag(1) ) == selected_real_kind(6) ) then
       call sgtsv( ndim, nrhs, subd(2:ndim), diag, supd(1:ndim-1),  & 
                   rhs, ndim, info )
 
@@ -298,7 +311,7 @@ module lapack_wrap
       diag_dp = real( diag, kind=dp )
       supd_dp = real( supd, kind=dp )
       rhs_dp = real( rhs, kind=dp )
-      call dgtsv( ndim, nrhs, subd_dp(2:ndim), diag_dp, supd_dp(1:ndim-1),  &
+      call sgtsv( ndim, nrhs, subd_dp(2:ndim), diag_dp, supd_dp(1:ndim-1),  &
                   rhs_dp, ndim, info )
       subd = real( subd_dp, kind=core_rknd )
       diag = real( diag_dp, kind=core_rknd )
@@ -360,12 +373,14 @@ module lapack_wrap
     use clubb_precision, only: &
       core_rknd ! Variable(s)
 
+    use cam_logfile,   only: iulog
+
     implicit none
 
     ! External
     external ::  & 
-      sgbsvx,  & ! Single-prec. General Band Solver eXpert
-      dgbsvx  ! Double-prec. General Band Solver eXpert
+      dgbsvx,  & ! Single-prec. General Band Solver eXpert
+      sgbsvx  ! Double-prec. General Band Solver eXpert
 
     intrinsic :: eoshift, kind, trim
 
@@ -462,7 +477,13 @@ module lapack_wrap
 !    $                   RCOND, FERR, BERR, WORK, IWORK, INFO )
 !-----------------------------------------------------------------------
 
-    if ( kind( lhs(1,1) ) == dp ) then
+    write(iulog,*)'band_solve input:'
+    write(iulog,*)'  kind   = ',selected_real_kind(12)
+    write(iulog,*)'  kind   = ',selected_real_kind(6)
+    write(iulog,*)'  kind   = ',kind(lhs(1,1))
+    write(iulog,*)'  kind   = ',kind(rhs(1,1))
+
+    if ( kind( lhs(1,1) ) == selected_real_kind(12) ) then
       call dgbsvx( 'Equilibrate lhs', 'No Transpose lhs', & 
                    ndim, nsub, nsup, nrhs, & 
                    lhs, nsup+nsub+1, lulhs, 2*nsub+nsup+1,  & 
@@ -470,7 +491,7 @@ module lapack_wrap
                    rhs, ndim, solution, ndim, & 
                    rcond, ferr, berr, work, iwork, info )
 
-    else if ( kind( lhs(1,1) ) == sp ) then
+    else if ( kind( lhs(1,1) ) == selected_real_kind(6) ) then
       call sgbsvx( 'Equilibrate lhs', 'No Transpose lhs', & 
                    ndim, nsub, nsup, nrhs, & 
                    lhs, nsup+nsub+1, lulhs, 2*nsub+nsup+1, & 
@@ -566,6 +587,8 @@ module lapack_wrap
 
     use clubb_precision, only: &
       core_rknd ! Variable(s)
+
+    use cam_logfile,   only: iulog
 
     implicit none
 
@@ -667,11 +690,11 @@ module lapack_wrap
 !       SUBROUTINE DGBSV( N, KL, KU, NRHS, AB, LDAB, IPIV, B, LDB, INFO )
 !-----------------------------------------------------------------------
 
-    if ( kind( lhs(1,1) ) == dp ) then
+    if ( kind( lhs(1,1) ) == selected_real_kind(12) ) then
       call dgbsv( ndim, nsub, nsup, nrhs, lulhs, nsub*2+nsup+1,  & 
                   ipivot, rhs, ndim, info )
 
-    else if ( kind( lhs(1,1) ) == sp ) then
+    else if ( kind( lhs(1,1) ) == selected_real_kind(6) ) then
       call sgbsv( ndim, nsub, nsup, nrhs, lulhs, nsub*2+nsup+1,  & 
                   ipivot, rhs, ndim, info )
 
@@ -680,9 +703,14 @@ module lapack_wrap
       ! One implication of this is that CLUBB cannot be used with quad
       ! precision variables without a quad precision band diagonal solver
       ! Eric Raut Aug 2013: force double precision
+      write(iulog,*)'band_solve input:'
+      write(iulog,*)'  kind   = ',selected_real_kind(12)
+      write(iulog,*)'  kind   = ',selected_real_kind(6)
+      write(iulog,*)'  kind   = ',kind(lhs(1,1))
+      write(iulog,*)'  kind   = ',kind(rhs(1,1))
       lulhs_dp = real( lulhs, kind=dp )
       rhs_dp = real( rhs, kind=dp )
-      call dgbsv( ndim, nsub, nsup, nrhs, lulhs_dp, nsub*2+nsup+1,  &
+      call sgbsv( ndim, nsub, nsup, nrhs, lulhs_dp, nsub*2+nsup+1,  &
                   ipivot, rhs_dp, ndim, info )
       rhs = real( rhs_dp, kind=core_rknd )
     end if
@@ -732,6 +760,8 @@ module lapack_wrap
     use clubb_precision, only: &
       core_rknd ! Variable(s)
 
+    use cam_logfile,   only: iulog
+
     implicit none
 #ifdef NO_LAPACK_ISNAN /* Used for older LAPACK libraries that don't have sisnan/disnan */
 
@@ -759,9 +789,14 @@ module lapack_wrap
 
     ! ---- Begin Code ----
 
+    write(iulog,*)'band_solve input:'
+    write(iulog,*)'  kind   = ',selected_real_kind(12)
+    write(iulog,*)'  kind   = ',selected_real_kind(6)
+    write(iulog,*)'  kind   = ',kind(variable)
+
     lapack_isnan = .false.
 
-    if ( kind( variable ) == dp ) then
+    if ( kind( variable ) == selected_real_kind(12) ) then
       do k = 1, ndim
         do j = 1, nrhs
           lapack_isnan = disnan( variable(k,j) )
@@ -769,7 +804,7 @@ module lapack_wrap
         end do
         if ( lapack_isnan ) exit
       end do
-    else if ( kind( variable ) == sp ) then
+    else if ( kind( variable ) == selected_real_kind(6) ) then
       do k = 1, ndim
         do j = 1, nrhs
           lapack_isnan = sisnan( variable(k,j) )

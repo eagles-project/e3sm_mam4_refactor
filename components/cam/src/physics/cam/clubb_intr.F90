@@ -333,15 +333,15 @@ subroutine clubb_init_cnst(name, q, gcid)
 
 #ifdef CLUBB_SGS
    if (clubb_do_adv) then
-      if (trim(name) == trim(cnst_names(1))) q = thl_tol**2
-      if (trim(name) == trim(cnst_names(2))) q = rt_tol**2
+      if (trim(name) == trim(cnst_names(1))) q = real(thl_tol**2, kind = r8)
+      if (trim(name) == trim(cnst_names(2))) q = real(rt_tol**2, kind = r8)
       if (trim(name) == trim(cnst_names(3))) q = 0.0_r8
       if (trim(name) == trim(cnst_names(4))) q = 0.0_r8
       if (trim(name) == trim(cnst_names(5))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(6))) q = w_tol_sqd
+      if (trim(name) == trim(cnst_names(6))) q = real(w_tol_sqd, kind = r8)
       if (trim(name) == trim(cnst_names(7))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(8))) q = w_tol_sqd
-      if (trim(name) == trim(cnst_names(9))) q = w_tol_sqd
+      if (trim(name) == trim(cnst_names(8))) q = real(w_tol_sqd, kind = r8)
+      if (trim(name) == trim(cnst_names(9))) q = real(w_tol_sqd, kind = r8)
    end if
 #endif
 
@@ -856,15 +856,15 @@ end subroutine clubb_init_cnst
     !  Is this the first time step?  If so then initialize CLUBB variables as follows
     if (is_first_step()) then
 
-       call pbuf_set_field(pbuf2d, wp2_idx,     w_tol_sqd)
+       call pbuf_set_field(pbuf2d, wp2_idx,     real(w_tol_sqd, kind = r8))
        call pbuf_set_field(pbuf2d, wp3_idx,     0.0_r8)
        call pbuf_set_field(pbuf2d, wpthlp_idx,  0.0_r8)
        call pbuf_set_field(pbuf2d, wprtp_idx,   0.0_r8)
        call pbuf_set_field(pbuf2d, rtpthlp_idx, 0.0_r8)
-       call pbuf_set_field(pbuf2d, rtp2_idx,    rt_tol**2)
-       call pbuf_set_field(pbuf2d, thlp2_idx,   thl_tol**2)
-       call pbuf_set_field(pbuf2d, up2_idx,     w_tol_sqd)
-       call pbuf_set_field(pbuf2d, vp2_idx,     w_tol_sqd)
+       call pbuf_set_field(pbuf2d, rtp2_idx,    real(rt_tol**2, kind = r8))
+       call pbuf_set_field(pbuf2d, thlp2_idx,   real(thl_tol**2, kind = r8))
+       call pbuf_set_field(pbuf2d, up2_idx,     real(w_tol_sqd, kind = r8))
+       call pbuf_set_field(pbuf2d, vp2_idx,     real(w_tol_sqd, kind = r8))
       
        call pbuf_set_field(pbuf2d, upwp_idx,    0.0_r8)
        call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
@@ -1783,21 +1783,21 @@ end subroutine clubb_init_cnst
      
       if (clubb_do_adv) then
         if (macmic_it .eq. 1) then
-          wp2_in=zt2zm(wp2_in)    
-          wpthlp_in=zt2zm(wpthlp_in)
-          wprtp_in=zt2zm(wprtp_in)
-          up2_in=zt2zm(up2_in)
-          vp2_in=zt2zm(vp2_in)
-          thlp2_in=zt2zm(thlp2_in)
-          rtp2_in=zt2zm(rtp2_in)
-          rtpthlp_in=zt2zm(rtpthlp_in)
+          wp2_in    = zt2zm(wp2_in)    
+          wpthlp_in = zt2zm(wpthlp_in)
+          wprtp_in  = zt2zm(wprtp_in)
+          up2_in    = zt2zm(up2_in)
+          vp2_in    = zt2zm(vp2_in)
+          thlp2_in  = zt2zm(thlp2_in)
+          rtp2_in   = zt2zm(rtp2_in)
+          rtpthlp_in= zt2zm(rtpthlp_in)
  
           do k=1,pverp
-            thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
-            rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-            wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-            up2_in(k)=max(w_tol_sqd,up2_in(k))
-            vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+            thlp2_in(k) = max(thl_tol**2, thlp2_in(k))
+            rtp2_in(k)  = max(rt_tol**2,  rtp2_in(k))
+            wp2_in(k)   = max(w_tol_sqd,  wp2_in(k))
+            up2_in(k)   = max(w_tol_sqd,  up2_in(k))
+            vp2_in(k)   = max(w_tol_sqd,  vp2_in(k))
           enddo
         endif
       endif
@@ -1942,21 +1942,21 @@ end subroutine clubb_init_cnst
      
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then 
-            wp2_in=zm2zt(wp2_in)   
-            wpthlp_in=zm2zt(wpthlp_in)
-            wprtp_in=zm2zt(wprtp_in)
-            up2_in=zm2zt(up2_in)
-            vp2_in=zm2zt(vp2_in)
-            thlp2_in=zm2zt(thlp2_in)
-            rtp2_in=zm2zt(rtp2_in)
-            rtpthlp_in=zm2zt(rtpthlp_in) 
+            wp2_in    = zm2zt(wp2_in)   
+            wpthlp_in = zm2zt(wpthlp_in)
+            wprtp_in  = zm2zt(wprtp_in)
+            up2_in    = zm2zt(up2_in)
+            vp2_in    = zm2zt(vp2_in)
+            thlp2_in  = zm2zt(thlp2_in)
+            rtp2_in   = zm2zt(rtp2_in)
+            rtpthlp_in= zm2zt(rtpthlp_in) 
 
             do k=1,pverp
-               thlp2_in(k)=max(thl_tol**2,thlp2_in(k))
-               rtp2_in(k)=max(rt_tol**2,rtp2_in(k))
-               wp2_in(k)=max(w_tol_sqd,wp2_in(k))
-               up2_in(k)=max(w_tol_sqd,up2_in(k))
-               vp2_in(k)=max(w_tol_sqd,vp2_in(k))
+               thlp2_in(k)= max(thl_tol**2,thlp2_in(k))
+               rtp2_in(k) = max(rt_tol**2,rtp2_in(k))
+               wp2_in(k)  = max(w_tol_sqd,wp2_in(k))
+               up2_in(k)  = max(w_tol_sqd,up2_in(k))
+               vp2_in(k)  = max(w_tol_sqd,vp2_in(k))
             enddo
          endif
       endif
