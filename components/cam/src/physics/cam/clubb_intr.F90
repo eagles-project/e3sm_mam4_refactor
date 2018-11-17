@@ -1926,7 +1926,7 @@ end subroutine clubb_init_cnst
          
             rcm_out_zm = zt2zm(rcm_out)
             qrl_zm = zt2zm(qrl_clubb)
-            thlp2_rad_out(:) = 0._r8
+            thlp2_rad_out(:) = 0._core_rknd
             call calculate_thlp2_rad(pverp, rcm_out_zm, thlprcp_out, qrl_zm, thlp2_rad_out)
             thlp2_in = thlp2_in + thlp2_rad_out * dtime
             thlp2_in = max(thl_tol**2,thlp2_in)
