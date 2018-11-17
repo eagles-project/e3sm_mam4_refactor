@@ -314,13 +314,17 @@ module parameters_tunable
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
     use cam_abortutils,  only: endrun
-    use mpishorthand
+    use mpishorthand,    only: mpir8, mpir4
 
     implicit none
 
     ! Input variables
 
     character(len=*), intent(in) :: filename
+
+    ! Local variables
+
+    integer :: mpireal
 
     namelist /clubb_param_nl/      &
     clubb_C1,                      &
@@ -386,25 +390,35 @@ module parameters_tunable
     end if
 #ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(clubb_C1,         1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C2rt,       1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C2thl,      1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C2rtthl,    1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C6rt,       1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C6rtb,      1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C7,         1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C7b,        1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C8,         1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C11,        1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C11b,       1, mpir8,  0, mpicom)
-   call mpibcast(clubb_C14,        1, mpir8,  0, mpicom)
-   call mpibcast(clubb_beta,       1, mpir8,  0, mpicom)
-   call mpibcast(clubb_gamma_coef, 1, mpir8,  0, mpicom)
-   call mpibcast(clubb_gamma_coefb,1, mpir8,  0, mpicom)
-   call mpibcast(clubb_mu,         1, mpir8,  0, mpicom)
-   call mpibcast(clubb_nu1,        1, mpir8,  0, mpicom)
-   call mpibcast(clubb_c_K10,      1, mpir8,  0, mpicom)
-   call mpibcast(clubb_wpxp_L_thresh, 1, mpir8,  0, mpicom)
+
+   select case (core_rknd)
+   case (selected_real_kind(6))
+     mpireal = mpir4
+   case (selected_real_kind(12))
+     mpireal = mpir8
+   case default
+     call endrun('clubb_param_readnl: unexpected value of core_rknd')
+   end select
+
+   call mpibcast(clubb_C1,         1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C2rt,       1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C2thl,      1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C2rtthl,    1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C6rt,       1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C6rtb,      1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C7,         1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C7b,        1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C8,         1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C11,        1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C11b,       1, mpireal,  0, mpicom)
+   call mpibcast(clubb_C14,        1, mpireal,  0, mpicom)
+   call mpibcast(clubb_beta,       1, mpireal,  0, mpicom)
+   call mpibcast(clubb_gamma_coef, 1, mpireal,  0, mpicom)
+   call mpibcast(clubb_gamma_coefb,1, mpireal,  0, mpicom)
+   call mpibcast(clubb_mu,         1, mpireal,  0, mpicom)
+   call mpibcast(clubb_nu1,        1, mpireal,  0, mpicom)
+   call mpibcast(clubb_c_K10,      1, mpireal,  0, mpicom)
+   call mpibcast(clubb_wpxp_L_thresh, 1, mpireal,  0, mpicom)
 #endif
 
 
