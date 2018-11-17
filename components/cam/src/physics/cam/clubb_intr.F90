@@ -1740,6 +1740,15 @@ end subroutine clubb_init_cnst
          wpthlp_in(k)  = real(wpthlp(i,pverp-k+1), kind = core_rknd)
          rtpthlp_in(k) = real(rtpthlp(i,pverp-k+1), kind = core_rknd)
  
+         !add a check point here
+         if(k .eq. 1) then
+          write(iulog,*)'convert from r8 to r4'
+          write(iulog,*)'  um     = ',um(i,pverp-k+1),um_in(k)
+          write(iulog,*)'  wp2    = ',wp2(i,pverp-k+1),wp2_in(k)
+          write(iulog,*)'  wp3    = ',wp3(i,pverp-k+1),wp3_in(k)
+          write(iulog,*)'  wpthlp = ',wpthlp(i,pverp-k+1),wpthlp_in(k)
+         end if 
+
          if (k .ne. 1) then
             pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
          endif
@@ -1986,6 +1995,15 @@ end subroutine clubb_init_cnst
           do ixind=1,edsclr_dim
               edsclr_out(k,ixind) = real(edsclr_in(pverp-k+1,ixind), kind = r8)
           enddo
+
+         !add a check point here
+         if(k .eq. 1) then
+          write(iulog,*)'convert from r4 to r8'
+          write(iulog,*)'  um     = ',um_in(pverp-k+1),um(i,k)
+          write(iulog,*)'  wp2    = ',wp2_in(pverp-k+1),wp2(i,k)
+          write(iulog,*)'  wp3    = ',wp3_in(pverp-k+1),wp3(i,k)
+          write(iulog,*)'  wpthlp = ',wpthlp_in(pverp-k+1),wpthlp(i,k)
+         end if
 
       enddo 
      
