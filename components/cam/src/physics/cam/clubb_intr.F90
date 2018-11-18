@@ -106,7 +106,7 @@ module clubb_intr
     
   real(r8) :: clubb_timestep = unset_r8  ! Default CLUBB timestep, unless overwriten by namelist
   real(r8) :: clubb_rnevap_effic = unset_r8
-  real(core_rkind) :: clubb_rnevap_effic_core_rknd
+  real(core_rknd) :: clubb_rnevap_effic_core_rknd
 
   !namelist variables used for patitioning detrained water between liquid and ice phase and
   !for calculating the detrained condensate number
@@ -1605,7 +1605,7 @@ end subroutine clubb_init_cnst
       zt_g(1) = -1._core_rknd*zt_g(2)
 
       !  Set the elevation of the surface
-      sfc_elevation = real( state1%zi(i,pver+1) ,kind=rknd )
+      sfc_elevation = real( state1%zi(i,pver+1) ,kind=core_rknd )
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.  
       !  Inputs for the momentum levels are set below setup_clubb core
@@ -1618,7 +1618,7 @@ end subroutine clubb_init_cnst
          thv_ds_zt(k+1)       = real( thv(i,pver-k+1) ,kind=core_rknd )              ! thetav on thermo
          rfrzm(k+1)           = real( state1%q(i,pver-k+1,ixcldice) ,kind=core_rknd )
          radf(k+1)            = real( radf_clubb(i,pver-k+1) ,kind=core_rknd )
-         qrl_clubb(k+1)       = real( qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1)) ,kind=rknd )
+         qrl_clubb(k+1)       = real( qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1)) ,kind=core_rknd )
       enddo
 
       !  Below computes the same stuff for the ghost point.  May or may
@@ -1637,7 +1637,7 @@ end subroutine clubb_init_cnst
       !  Compute mean w wind on thermo grid, convert from omega to w 
       wm_zt(1) = 0._core_rknd
       do k=1,pver
-         wm_zt(k+1) = -1._core_rknd*real( state1%omega(i,pver-k+1) ,kind=core_rknd )
+         wm_zt(k+1) = -1._core_rknd*real( state1%omega(i,pver-k+1) ,kind=core_rknd ) &
                        /( rho_tmp(i,k+1)* real( gravit ,kind=core_rknd ) )
       enddo
     
@@ -1777,7 +1777,7 @@ end subroutine clubb_init_cnst
          rtpthlp_in(k) = real( rtpthlp(i,pverp-k+1) ,kind=core_rknd )
  
          if (k .ne. 1) then
-            pre_in(k)    = real( prer_evap(i,pverp-k+1) ,kind=core_rkind )
+            pre_in(k)    = real( prer_evap(i,pverp-k+1) ,kind=core_rknd )
          endif
 
          !  Initialize these to prevent crashing behavior
@@ -1941,7 +1941,7 @@ end subroutine clubb_init_cnst
             if (clubb_do_deep) then
                dum_core_rknd = 1._core_rknd
             else
-               dum_core_rknd = (1._core_rknd - real( cam_in%landfrac(i) ,kind=core_rknd )
+               dum_core_rknd = 1._core_rknd - real( cam_in%landfrac(i) ,kind=core_rknd )
             end if
 
             ! update turbulent moments based on rain evaporation  
