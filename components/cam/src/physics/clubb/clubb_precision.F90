@@ -16,6 +16,9 @@ module clubb_precision
   integer, parameter :: &
     dp = selected_real_kind( p=12 )    ! double precision
 
+  integer, parameter :: &
+    sp = selected_real_kind( p=6 )     ! single precision
+
   ! The precisions below are arbitrary, and could be adjusted as
   ! needed for long simulations or time averaging.  Note that on
   ! most machines 12 digits of precision will use a data type
@@ -24,7 +27,7 @@ module clubb_precision
     stat_nknd = selected_int_kind( 8 ), & 
     stat_rknd = selected_real_kind( p=12 ), & 
     time_precision = selected_real_kind( p=12 ), &
-    core_rknd = CLUBB_REAL_TYPE ! Value from the preprocessor directive
+    core_rknd = sp 
 
 end module clubb_precision
 !-------------------------------------------------------------------------------
