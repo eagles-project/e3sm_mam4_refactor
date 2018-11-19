@@ -1069,8 +1069,6 @@ end subroutine clubb_init_cnst
 
    real(r8) :: ubar                             ! surface wind                                  [m/s]
    real(r8) :: ustar                            ! surface stress                                [m/s]                              
-   real(r8) :: z0                               ! roughness height                              [m]
-
    real(core_rknd) :: thlm_forcing(pverp)              ! theta_l forcing (thermodynamic levels)        [K/s]
    real(core_rknd) :: rtm_forcing(pverp)               ! r_t forcing (thermodynamic levels)            [(kg/kg)/s]                              
    real(core_rknd) :: um_forcing(pverp)                ! u wind forcing (thermodynamic levels)         [m/s/s]
@@ -1102,12 +1100,7 @@ end subroutine clubb_init_cnst
    real(core_rknd) :: rtphmp_zt(pverp,hydromet_dim)
    real(core_rknd) :: thlphmp_zt (pverp,hydromet_dim)
 
-   ! SCM only +++
-
-   real(r8) :: bflx22                           ! Variable for buoyancy flux for pbl            [K m/s]
-   real(r8) :: C_10                             ! transfer coefficient                          [-]
-
-   ! SCM only ===
+   real(r8) :: bflx22     ! SCM only: Variable for buoyancy flux for pbl [K m/s]
 
    real(core_rknd) :: khzm_out(pverp)                  ! eddy diffusivity on momentum grids            [m^2/s]
    real(core_rknd) :: khzt_out(pverp)                  ! eddy diffusivity on thermo grids              [m^2/s]
@@ -1715,8 +1708,8 @@ end subroutine clubb_init_cnst
       ice_supersat_frac(1:pverp) = 0._core_rknd
  
       !  Set stats output and increment equal to CLUBB and host dt
-      stats_tsamp = dtime
-      stats_tout  = hdtime
+      stats_tsamp = real( dtime  ,kind=core_rknd)
+      stats_tout  = real( hdtime ,kind=core_rknd)
  
       !  Heights need to be set at each timestep.  Therefore, recall 
       !  setup_grid and setup_parameters for this.  
@@ -3020,27 +3013,27 @@ end function diag_ustar
     allocate( ztscr20(stats_zt%kk) )
     allocate( ztscr21(stats_zt%kk) )
 
-    ztscr01 = 0.0_r8
-    ztscr02 = 0.0_r8
-    ztscr03 = 0.0_r8
-    ztscr04 = 0.0_r8
-    ztscr05 = 0.0_r8
-    ztscr06 = 0.0_r8
-    ztscr07 = 0.0_r8
-    ztscr08 = 0.0_r8
-    ztscr09 = 0.0_r8
-    ztscr10 = 0.0_r8
-    ztscr11 = 0.0_r8
-    ztscr12 = 0.0_r8
-    ztscr13 = 0.0_r8
-    ztscr14 = 0.0_r8
-    ztscr15 = 0.0_r8
-    ztscr16 = 0.0_r8
-    ztscr17 = 0.0_r8
-    ztscr18 = 0.0_r8
-    ztscr19 = 0.0_r8
-    ztscr20 = 0.0_r8
-    ztscr21 = 0.0_r8
+    ztscr01 = 0.0_core_rknd
+    ztscr02 = 0.0_core_rknd
+    ztscr03 = 0.0_core_rknd
+    ztscr04 = 0.0_core_rknd
+    ztscr05 = 0.0_core_rknd
+    ztscr06 = 0.0_core_rknd
+    ztscr07 = 0.0_core_rknd
+    ztscr08 = 0.0_core_rknd
+    ztscr09 = 0.0_core_rknd
+    ztscr10 = 0.0_core_rknd
+    ztscr11 = 0.0_core_rknd
+    ztscr12 = 0.0_core_rknd
+    ztscr13 = 0.0_core_rknd
+    ztscr14 = 0.0_core_rknd
+    ztscr15 = 0.0_core_rknd
+    ztscr16 = 0.0_core_rknd
+    ztscr17 = 0.0_core_rknd
+    ztscr18 = 0.0_core_rknd
+    ztscr19 = 0.0_core_rknd
+    ztscr20 = 0.0_core_rknd
+    ztscr21 = 0.0_core_rknd
 
     !  Default initialization for array indices for zt
 
@@ -3098,23 +3091,23 @@ end function diag_ustar
     allocate( zmscr16(stats_zm%kk) )
     allocate( zmscr17(stats_zm%kk) )
 
-    zmscr01 = 0.0_r8
-    zmscr02 = 0.0_r8
-    zmscr03 = 0.0_r8
-    zmscr04 = 0.0_r8
-    zmscr05 = 0.0_r8
-    zmscr06 = 0.0_r8
-    zmscr07 = 0.0_r8
-    zmscr08 = 0.0_r8
-    zmscr09 = 0.0_r8
-    zmscr10 = 0.0_r8
-    zmscr11 = 0.0_r8
-    zmscr12 = 0.0_r8
-    zmscr13 = 0.0_r8
-    zmscr14 = 0.0_r8
-    zmscr15 = 0.0_r8
-    zmscr16 = 0.0_r8
-    zmscr17 = 0.0_r8
+    zmscr01 = 0.0_core_rknd
+    zmscr02 = 0.0_core_rknd
+    zmscr03 = 0.0_core_rknd
+    zmscr04 = 0.0_core_rknd
+    zmscr05 = 0.0_core_rknd
+    zmscr06 = 0.0_core_rknd
+    zmscr07 = 0.0_core_rknd
+    zmscr08 = 0.0_core_rknd
+    zmscr09 = 0.0_core_rknd
+    zmscr10 = 0.0_core_rknd
+    zmscr11 = 0.0_core_rknd
+    zmscr12 = 0.0_core_rknd
+    zmscr13 = 0.0_core_rknd
+    zmscr14 = 0.0_core_rknd
+    zmscr15 = 0.0_core_rknd
+    zmscr16 = 0.0_core_rknd
+    zmscr17 = 0.0_core_rknd
 
     call stats_init_zm( clubb_vars_zm, l_error )
 

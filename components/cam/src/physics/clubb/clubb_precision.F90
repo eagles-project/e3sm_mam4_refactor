@@ -5,7 +5,7 @@ module clubb_precision
 
   implicit none
 
-  public :: stat_nknd, stat_rknd, time_precision, dp, core_rknd
+  public :: stat_nknd, stat_rknd, time_precision, dp, sp, core_rknd
 
   private ! Default scope
 
