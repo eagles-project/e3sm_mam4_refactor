@@ -138,7 +138,7 @@ module lapack_wrap
 !-----------------------------------------------------------------------
 
     if ( kind( diag(1) ) == dp ) then
-      call sgtsvx( "Not Factored", "No Transpose lhs", ndim, nrhs,  & 
+      call dgtsvx( "Not Factored", "No Transpose lhs", ndim, nrhs,  & 
                    subd(2:ndim), diag, supd(1:ndim-1),  & 
                    dlf, df, duf, du2, ipivot,  & 
                    rhs, ndim, solution, ndim, rcond, & 
@@ -279,7 +279,7 @@ module lapack_wrap
       call ieee_set_halting_mode(IEEE_DIVIDE_BY_ZERO, .false.) ! Turn off stopping on div-by-zero only
 #endif
 #endif
-      call sgtsv( ndim, nrhs, subd(2:ndim), diag, supd(1:ndim-1),  &
+      call dgtsv( ndim, nrhs, subd(2:ndim), diag, supd(1:ndim-1),  &
                   rhs, ndim, info )
 #ifndef NDEBUG
 #if defined(ARCH_MIC_KNL) && defined(CPRINTEL)
@@ -298,7 +298,7 @@ module lapack_wrap
       diag_dp = real( diag, kind=dp )
       supd_dp = real( supd, kind=dp )
       rhs_dp = real( rhs, kind=dp )
-      call sgtsv( ndim, nrhs, subd_dp(2:ndim), diag_dp, supd_dp(1:ndim-1),  &
+      call dgtsv( ndim, nrhs, subd_dp(2:ndim), diag_dp, supd_dp(1:ndim-1),  &
                   rhs_dp, ndim, info )
       subd = real( subd_dp, kind=core_rknd )
       diag = real( diag_dp, kind=core_rknd )
@@ -463,7 +463,7 @@ module lapack_wrap
 !-----------------------------------------------------------------------
 
     if ( kind( lhs(1,1) ) == dp ) then
-      call sgbsvx( 'Equilibrate lhs', 'No Transpose lhs', & 
+      call dgbsvx( 'Equilibrate lhs', 'No Transpose lhs', & 
                    ndim, nsub, nsup, nrhs, & 
                    lhs, nsup+nsub+1, lulhs, 2*nsub+nsup+1,  & 
                    ipivot, equed, rscale, cscale, & 
@@ -668,7 +668,7 @@ module lapack_wrap
 !-----------------------------------------------------------------------
 
     if ( kind( lhs(1,1) ) == dp ) then
-      call sgbsv( ndim, nsub, nsup, nrhs, lulhs, nsub*2+nsup+1,  & 
+      call dgbsv( ndim, nsub, nsup, nrhs, lulhs, nsub*2+nsup+1,  & 
                   ipivot, rhs, ndim, info )
 
     else if ( kind( lhs(1,1) ) == sp ) then
@@ -682,7 +682,7 @@ module lapack_wrap
       ! Eric Raut Aug 2013: force double precision
       lulhs_dp = real( lulhs, kind=dp )
       rhs_dp = real( rhs, kind=dp )
-      call sgbsv( ndim, nsub, nsup, nrhs, lulhs_dp, nsub*2+nsup+1,  &
+      call dgbsv( ndim, nsub, nsup, nrhs, lulhs_dp, nsub*2+nsup+1,  &
                   ipivot, rhs_dp, ndim, info )
       rhs = real( rhs_dp, kind=core_rknd )
     end if
