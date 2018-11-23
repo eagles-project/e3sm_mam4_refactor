@@ -627,4 +627,12 @@ NODEFAIL          Tests restart upon detected node failure. Generates fake failu
     <HIST_N>$STOP_N</HIST_N>
   </test>
 
+  <test NAME="TSC">
+    <DESC>solution reproducibility test based on time-step convergence</DESC>
+    <INFO_DBUG>1</INFO_DBUG>
+    <DOUT_S>FALSE</DOUT_S>
+    <CONTINUE_RUN>FALSE</CONTINUE_RUN>
+    <REST_OPTION>none</REST_OPTION>
+  </test>
+
 </config_test>
