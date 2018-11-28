@@ -12,7 +12,7 @@ module dp_coupling
   use pmgrid,         only: plev
   use element_mod,    only: element_t
   use kinds,          only: real_kind, int_kind
-  use shr_kind_mod,   only: r8=>shr_kind_r8
+  use shr_kind_mod,   only: r8=>shr_kind_r8, r4=>shr_kind_r4
   use physics_types,  only: physics_state, physics_tend
   
   use phys_grid,      only: get_ncols_p, get_gcol_all_p, block_to_chunk_send_pters, transpose_block_to_chunk, &
@@ -155,13 +155,13 @@ CONTAINS
              ie = idmb3(1)
              ioff=idmb2(1)
 
-             phys_state(lchnk)%ps(icol)=ps_tmp(ioff,ie)
+             phys_state(lchnk)%ps(icol)=real(real(ps_tmp(ioff,ie),  kind = r4),  kind=r8)
              phys_state(lchnk)%phis(icol)=phis_tmp(ioff,ie)
              do ilyr=1,pver
-                phys_state(lchnk)%t(icol,ilyr)=T_tmp(ioff,ilyr,ie)	   
-                phys_state(lchnk)%u(icol,ilyr)=uv_tmp(ioff,1,ilyr,ie)
-                phys_state(lchnk)%v(icol,ilyr)=uv_tmp(ioff,2,ilyr,ie)
-                phys_state(lchnk)%omega(icol,ilyr)=omega_tmp(ioff,ilyr,ie)
+                phys_state(lchnk)%t(icol,ilyr)=real(real(T_tmp(ioff,ilyr,ie),  kind = r4),  kind=r8)   
+                phys_state(lchnk)%u(icol,ilyr)=real(real(uv_tmp(ioff,1,ilyr,ie),  kind = r4),  kind=r8) 
+                phys_state(lchnk)%v(icol,ilyr)=real(real(uv_tmp(ioff,2,ilyr,ie),  kind = r4),  kind=r8)
+                phys_state(lchnk)%omega(icol,ilyr)=real(real(omega_tmp(ioff,ilyr,ie),  kind = r4),  kind=r8)
 
                 if (use_gw_front) then
                    pbuf_frontgf(icol,ilyr) = frontgf(ioff,ilyr,ie)
@@ -171,7 +171,8 @@ CONTAINS
 
              do m=1,pcnst
                 do ilyr=1,pver
-                   phys_state(lchnk)%q(icol,ilyr,m)=Q_tmp(ioff,ilyr,m,ie)
+                   phys_state(lchnk)%q(icol,ilyr,m)=real(real(Q_tmp(ioff,ilyr,m,ie),  kind = r4),  kind=r8)
+
                 end do
              end do
           end do
@@ -194,14 +195,15 @@ CONTAINS
                 
                 bbuffer(bpter(icol,0)+2:bpter(icol,0)+tsize-1) = 0.0_r8
                 
-                bbuffer(bpter(icol,0))   = ps_tmp(icol,ie)
+                bbuffer(bpter(icol,0))   = real(real(ps_tmp(icol,ie),  kind = r4),  kind=r8)
+
                 bbuffer(bpter(icol,0)+1) = phis_tmp(icol,ie)
 
                 do ilyr=1,pver
-                   bbuffer(bpter(icol,ilyr))   = T_tmp(icol,ilyr,ie)
-                   bbuffer(bpter(icol,ilyr)+1) = uv_tmp(icol,1,ilyr,ie)
-                   bbuffer(bpter(icol,ilyr)+2) = uv_tmp(icol,2,ilyr,ie)
-                   bbuffer(bpter(icol,ilyr)+3) = omega_tmp(icol,ilyr,ie)
+                   bbuffer(bpter(icol,ilyr))   = real(real(T_tmp(icol,ilyr,ie),  kind = r4),  kind=r8)
+                   bbuffer(bpter(icol,ilyr)+1) = real(real(uv_tmp(icol,1,ilyr,ie),  kind = r4),  kind=r8)
+                   bbuffer(bpter(icol,ilyr)+2) = real(real(uv_tmp(icol,2,ilyr,ie),  kind = r4),  kind=r8)
+                   bbuffer(bpter(icol,ilyr)+3) = real(real(omega_tmp(icol,ilyr,ie),  kind = r4),  kind=r8)
 
                    if (use_gw_front) then
                       bbuffer(bpter(icol,ilyr)+4) = frontgf(icol,ilyr,ie)
@@ -209,7 +211,7 @@ CONTAINS
                    end if
 
                    do m=1,pcnst
-                      bbuffer(bpter(icol,ilyr)+tsize-pcnst-1+m) = Q_tmp(icol,ilyr,m,ie)
+                      bbuffer(bpter(icol,ilyr)+tsize-pcnst-1+m) = real(real(Q_tmp(icol,ilyr,m,ie),  kind = r4),  kind=r8)
                    end do
                 end do
 
@@ -240,15 +242,15 @@ CONTAINS
 
           do icol=1,ncols
 
-             phys_state(lchnk)%ps   (icol)     = cbuffer(cpter(icol,0))
+             phys_state(lchnk)%ps   (icol)     = real(real(cbuffer(cpter(icol,0)),  kind = r4),  kind=r8)
              phys_state(lchnk)%phis (icol)     = cbuffer(cpter(icol,0)+1)
 
              do ilyr=1,pver
 
-                phys_state(lchnk)%t     (icol,ilyr)   = cbuffer(cpter(icol,ilyr))
-                phys_state(lchnk)%u     (icol,ilyr)   = cbuffer(cpter(icol,ilyr)+1)
-                phys_state(lchnk)%v     (icol,ilyr)   = cbuffer(cpter(icol,ilyr)+2)
-                phys_state(lchnk)%omega (icol,ilyr)   = cbuffer(cpter(icol,ilyr)+3)
+                phys_state(lchnk)%t     (icol,ilyr)   = real(real(cbuffer(cpter(icol,ilyr)),  kind = r4),  kind=r8)
+                phys_state(lchnk)%u     (icol,ilyr)   = real(real(cbuffer(cpter(icol,ilyr)+1),  kind = r4),  kind=r8)
+                phys_state(lchnk)%v     (icol,ilyr)   = real(real(cbuffer(cpter(icol,ilyr)+2),  kind = r4),  kind=r8)
+                phys_state(lchnk)%omega (icol,ilyr)   = real(real(cbuffer(cpter(icol,ilyr)+3),  kind = r4),  kind=r8)
 
                 if (use_gw_front) then
                    pbuf_frontgf(icol,ilyr) = cbuffer(cpter(icol,ilyr)+4)
@@ -256,7 +258,7 @@ CONTAINS
                 endif
 
                 do m=1,pcnst
-                   phys_state(lchnk)%q  (icol,ilyr,m) = cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m)
+                   phys_state(lchnk)%q  (icol,ilyr,m) = real(real(cbuffer(cpter(icol,ilyr)+tsize-pcnst-1+m),  kind = r4),  kind=r8)
                 end do
 
              end do
@@ -280,7 +282,7 @@ CONTAINS
       ncols=get_ncols_p(lchnk)
       do ilyr=1,pver
         do icol=1,ncols
-          if (.not. single_column) phys_state(lchnk)%omega(icol,ilyr)=phys_state(lchnk)%omega(icol,ilyr)*phys_state(lchnk)%pmid(icol,ilyr)
+          if (.not. single_column) phys_state(lchnk)%omega(icol,ilyr)=real(real(phys_state(lchnk)%omega(icol,ilyr)*phys_state(lchnk)%pmid(icol,ilyr),  kind = r4),  kind=r8)
         end do
       end do
    end do
