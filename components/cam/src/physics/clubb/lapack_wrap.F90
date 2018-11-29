@@ -21,8 +21,7 @@ module lapack_wrap
     clubb_no_error
 
   use clubb_precision, only: &
-    core_rknd, & ! Variable(s)
-    dp
+    core_rknd !, & ! Variable(s)
 
   use cam_abortutils, only: endrun
 
@@ -40,7 +39,8 @@ module lapack_wrap
   ! precision float is in LAPACK.  Hopefully this will work more portably on
   ! architectures like Itanium than the old code -dschanen 11 Aug 2011
   integer, parameter, private :: &
-    sp = kind ( 0.0 )
+    sp = selected_real_kind( p=6 )
+    dp = selected_real_kind( p=12 )
 
   private ! Set Default Scope
 
