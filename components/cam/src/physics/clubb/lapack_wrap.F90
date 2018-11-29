@@ -39,7 +39,7 @@ module lapack_wrap
   ! precision float is in LAPACK.  Hopefully this will work more portably on
   ! architectures like Itanium than the old code -dschanen 11 Aug 2011
   integer, parameter, private :: &
-    sp = selected_real_kind( p=6 )
+    sp = selected_real_kind( p=6 ), &
     dp = selected_real_kind( p=12 )
 
   private ! Set Default Scope
