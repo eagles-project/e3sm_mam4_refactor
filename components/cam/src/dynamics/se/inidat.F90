@@ -18,7 +18,7 @@ module inidat
   use element_mod, only : element_t
   use shr_kind_mod, only: r8 => shr_kind_r8
   use spmd_utils,   only: iam, masterproc
-  use cam_control_mod, only : ideal_phys, aqua_planet, pertlim, seed_custom, seed_clock, new_random
+  use cam_control_mod, only: ideal_phys, aqua_planet, pertlim, seed_custom, seed_clock, new_random, l_jw_baroclinic
   use random_xgc, only: init_ranx, ranx
   use scamMod, only: single_column, precip_off, scmlat, scmlon
   implicit none
@@ -61,6 +61,8 @@ contains
     use shr_const_mod,       only: SHR_CONST_PI
     use scamMod,             only: setiopupdate, readiopdata
     use se_single_column_mod, only: scm_setinitial
+    use jw_baroclinic,        only: init_jw_baroclinic
+
     implicit none
     type(file_desc_t),intent(inout) :: ncid_ini, ncid_topo
     type (dyn_import_t), target, intent(inout) :: dyn_in   ! dynamics import
@@ -439,6 +441,11 @@ contains
       call setiopupdate()
       call readiopdata(iop_update_surface,hyam,hybm)
       call scm_setinitial(elem)
+    endif
+
+!!! initialize jw baroclinic dycore test case!!
+    if (l_jw_baroclinic) then
+     call  init_jw_baroclinic(elem)
     endif
 
     if (.not. single_column) then    
