@@ -29,7 +29,7 @@ module jw_baroclinic
 
 contains
 
-  subroutine init_jw_baroclinic(elem)
+  subroutine init_jw_baroclinic(elem,tl)
 
     use dimensions_mod,      only : nelemd, nlev, np, npsq
     use hycoef,              only : ps0, hyam, hybm
@@ -37,14 +37,17 @@ contains
     use hycoef,              only : hyam, hybm
 
     implicit none
+
     type(element_t), intent(inout) :: elem(:)
+
     integer :: i, j, ie, k
+    integer :: tl  ! time level to initialize
+
 !=======================================================================================================!
     real (kind=real_kind)  :: tbar(nlev)
     real (kind=real_kind) ::  eta(nlev), etv(nlev)
     real (kind=real_kind) ::  latc, lonc, rr,rc,  aa, lat,lon, snlat, cslat , v1,v2
     real (kind=real_kind) ::  trm1,trm2,trm3,trm4, term
-    integer :: tl,i,j,k,ie, idex
 !=======================================================================================================!
     real (kind=real_kind),  parameter  :: u0        = 35.0_real_kind      ! Zonal Mean wind 
     real (kind=real_kind),  parameter  :: t0        = 288.0_real_kind     ! Mean temp
@@ -59,6 +62,10 @@ contains
 
     real(kind=real_kind), allocatable :: var3d(:,:,:,:)
     real(kind=real_kind) :: temperature(np,np,nlev)
+    real(kind=real_kind) :: pmin, pmax
+
+    pmin = ps0
+    pmax = 0._real_kind
 
     r_d = Rgas
     omg=omega
@@ -119,7 +126,7 @@ contains
              trm3 =  2.0_real_kind * u0* (cos(etv(k)))**1.5_real_kind
              trm4 = (1.60_real_kind *cslat**3 *(snlat**2 + 2.0_real_kind/3.0_real_kind) - DD_PI *0.25_real_kind)* erad*omg
         
-             elem(ie)%state%T(i,j,k,1) = tbar(k) + trm1 *(trm2 * trm3 + trm4 )
+             elem(ie)%state%T(i,j,k,:) = tbar(k) + trm1 *(trm2 * trm3 + trm4 )
 
              end do
           end do
@@ -144,8 +151,12 @@ contains
               elem(ie)%state%ps_v(i,j,:) = p0
            end do
         end do
+        pmin = min(minval(elem(ie)%state%ps_v(:,:,:)),pmin)
+        pmax = max(maxval(elem(ie)%state%ps_v(:,:,:)),pmin)
 
     enddo !element loop
+
+    write(iulog,'(a,e20.8,e20.8)')  "jw_baroclinic initiaization: Ps MinMax = ", pmin, pmax
 
 !=======================================================================================================!
   end subroutine init_jw_baroclinic

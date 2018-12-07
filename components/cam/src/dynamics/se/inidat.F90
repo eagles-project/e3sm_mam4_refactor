@@ -445,7 +445,7 @@ contains
 
 !!! initialize jw baroclinic dycore test case!!
     if (l_jw_baroclinic) then
-     call  init_jw_baroclinic(elem)
+     call  init_jw_baroclinic(elem,1)
     endif
 
     if (.not. single_column) then    
