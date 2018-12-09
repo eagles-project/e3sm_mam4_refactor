@@ -21,6 +21,7 @@ module jw_baroclinic
   use element_mod,    only : element_t
   use kinds,          only : real_kind, int_kind
   use control_mod,    only : u_perturb
+  use hycoef,         only : ps0, hyam, hybm
 
   implicit none
   private
@@ -32,9 +33,7 @@ contains
   subroutine init_jw_baroclinic(elem,tl)
 
     use dimensions_mod,      only : nelemd, nlev, np, npsq
-    use hycoef,              only : ps0, hyam, hybm
-    use physconst,           only : omega, DD_PI=>pi, p0=>pstd, rearth, rgas =>rair, Cp =>cpair, g=>gravit
-    use hycoef,              only : hyam, hybm
+    use physconst,           only : omega, DD_PI=>pi, rearth, rgas =>rair, Cp =>cpair, g=>gravit
 
     implicit none
 
@@ -56,13 +55,10 @@ contains
     real (kind=real_kind),  parameter  :: eta_t     = 0.2_real_kind       ! eta level 
     real (kind=real_kind),  parameter  :: eta_s     = 1.0_real_kind       ! eta level 
     real (kind=real_kind),  parameter  :: eta_0     = 0.252_real_kind     ! eta level 
-    real (kind=real_kind),  parameter  :: u_perturb = 0._real_kind     ! eta level 
+    real (kind=real_kind),  parameter  :: u_perturb = 1.0_real_kind       ! wind perturbation
 
     real (kind=real_kind) :: r_d,omg,grv,erad
-
-    real(kind=real_kind), allocatable :: var3d(:,:,:,:)
-    real(kind=real_kind) :: temperature(np,np,nlev)
-    real(kind=real_kind) :: pmin, pmax
+    real (kind=real_kind) :: pmin, pmax
 
     pmin = ps0
     pmax = 0._real_kind
@@ -81,8 +77,7 @@ contains
     lonc = DD_PI * (1.0_real_kind/9.0_real_kind)
 
     do ie=1,nelemd
-
-! initial velocity   
+        ! initial velocity   
         elem(ie)%state%v = 0.0_real_kind
         do k=1, nlev
            do j=1,np
@@ -95,14 +90,14 @@ contains
               aa = SIN(latc)*snlat + COS(latc)*cslat*COS(lon - lonc)
               rc =  10.0_real_kind  * ACOS(aa)
               v1 = u0 * (cos(etv(k)))**1.5_real_kind * (sin(2.0_real_kind * lat))**2  +  u_perturb*exp(-rc*rc)
-              elem(ie)%state%v(i,j,1,k,:)=v1
-              elem(ie)%state%v(i,j,2,k,:)=0
+              elem(ie)%state%v(i,j,1,k,tl)=v1
+              elem(ie)%state%v(i,j,2,k,tl)=0
               end do
            end do
         end do
 
 
- ! Layer-mean Temperature fields 
+        ! Layer-mean Temperature fields 
         elem(ie)%state%T = 0.0_real_kind
         do k = 1, nlev
          if (eta(k) <= eta_t) then
@@ -126,13 +121,13 @@ contains
              trm3 =  2.0_real_kind * u0* (cos(etv(k)))**1.5_real_kind
              trm4 = (1.60_real_kind *cslat**3 *(snlat**2 + 2.0_real_kind/3.0_real_kind) - DD_PI *0.25_real_kind)* erad*omg
         
-             elem(ie)%state%T(i,j,k,:) = tbar(k) + trm1 *(trm2 * trm3 + trm4 )
+             elem(ie)%state%T(i,j,k,tl) = tbar(k) + trm1 *(trm2 * trm3 + trm4 )
 
              end do
           end do
         end do
 
- !Surface geopotential
+        !Surface geopotential
         elem(ie)%state%phis = 0.0_real_kind
         elem(ie)%state%ps_v = 0.0_real_kind
         do j=1,np
@@ -144,15 +139,15 @@ contains
 
               trm1 =  u0* ( cos((eta_s - eta_0)*DD_PI*0.5_real_kind) )**1.5_real_kind
 
-              trm2 = -2.0_real_kind *snlat**6 *(cslat**2 + 1.0_real_kind/3.0_real_kind) + 10.0D0/63.0_real_kind
+              trm2 = -2.0_real_kind *snlat**6 *(cslat**2 + 1.0_real_kind/3.0_real_kind) + 10.0_real_kind/63.0_real_kind
               trm3 = (1.60_real_kind *cslat**3 *(snlat**2 + 2.0_real_kind/3.0_real_kind) - DD_PI *0.25_real_kind)* erad*omg
 
-              elem(ie)%state%phis(i,j) = trm1 *(trm2 * trm1 + trm3)
-              elem(ie)%state%ps_v(i,j,:) = p0
+              elem(ie)%state%phis(i,j)      = trm1 *(trm2 * trm1 + trm3)
+              elem(ie)%state%ps_v(i,j,tl)   = ps0
            end do
         end do
-        pmin = min(minval(elem(ie)%state%ps_v(:,:,:)),pmin)
-        pmax = max(maxval(elem(ie)%state%ps_v(:,:,:)),pmin)
+        pmin = min(minval(elem(ie)%state%ps_v(:,:,tl)),pmin)
+        pmax = max(maxval(elem(ie)%state%ps_v(:,:,tl)),pmin)
 
     enddo !element loop
 

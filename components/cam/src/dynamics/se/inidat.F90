@@ -444,9 +444,9 @@ contains
     endif
 
 !!! initialize jw baroclinic dycore test case!!
-    if (l_jw_baroclinic) then
-     call  init_jw_baroclinic(elem,1)
-    endif
+!    if (l_jw_baroclinic) then
+!     call  init_jw_baroclinic(elem,1)
+!    endif
 
     if (.not. single_column) then    
 
@@ -483,6 +483,11 @@ contains
         call edgeVunpack(edge, elem(ie)%state%Q(:,:,:,:),nlev*pcnst,kptr,ie)
       end do
     
+    endif
+
+!!! initialize jw baroclinic dycore test case!!
+    if (l_jw_baroclinic) then
+     call  init_jw_baroclinic(elem,1)
     endif
 
 !$omp parallel do private(ie, t, m_cnst)
