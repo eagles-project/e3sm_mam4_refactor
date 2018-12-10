@@ -111,8 +111,11 @@ CONTAINS
        call t_startf('UniquePoints')
        do ie=1,nelemd
           ncols = elem(ie)%idxP%NumUniquePts
+          elem(ie)%state%ps_v(:,:,tl_f)  = real(real(elem(ie)%state%ps_v(:,:,tl_f),  kind = r4), kind = r8)
           elem(ie)%state%T(:,:,:,tl_f)   = real(real(elem(ie)%state%T(:,:,:,tl_f),   kind = r4), kind = r8)
           elem(ie)%state%V(:,:,:,:,tl_f) = real(real(elem(ie)%state%V(:,:,:,:,tl_f), kind = r4), kind = r8)
+          elem(ie)%derived%omega_p       = real(real(elem(ie)%derived%omega_p,       kind = r4), kind = r8)
+          elem(ie)%state%Q(:,:,:,:)      = real(real(elem(ie)%state%Q(:,:,:,:),      kind = r4), kind = r8)
 
           call UniquePoints(elem(ie)%idxP, elem(ie)%state%ps_v(:,:,tl_f), ps_tmp(1:ncols,ie))
           call UniquePoints(elem(ie)%idxP, nlev, elem(ie)%state%T(:,:,:,tl_f), T_tmp(1:ncols,:,ie))
