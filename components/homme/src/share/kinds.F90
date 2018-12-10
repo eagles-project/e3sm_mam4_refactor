@@ -4,7 +4,7 @@
 
 module kinds
 #ifdef CAM
-      use shr_kind_mod, only : SHR_KIND_I4, SHR_KIND_R8, SHR_KIND_I8, SHR_KIND_CL
+      use shr_kind_mod, only : SHR_KIND_I4, SHR_KIND_R8, SHR_KIND_R4, SHR_KIND_I8, SHR_KIND_CL
       use cam_logfile, only : iulog ! _EXTERNAL
 #endif
 implicit none
@@ -20,6 +20,8 @@ private
   log_kind     = kind(.true.),           &
   long_kind    = SHR_KIND_I8,            &
   real_kind    = SHR_KIND_R8,            &
+  r4           = SHR_KIND_R4,            &
+  r8           = SHR_KIND_R8,            &
   longdouble_kind    = 8
   public :: shr_kind_cl, iulog
 

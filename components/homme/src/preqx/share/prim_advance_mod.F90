@@ -1054,7 +1054,7 @@ contains
   !
   !
   ! ===================================
-  use kinds,          only : real_kind
+  use kinds,          only : real_kind, r4, r8
   use derivative_mod, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere
   use derivative_mod, only : subcell_div_fluxes, subcell_dss_fluxes
   use edgetype_mod,   only : edgedescriptor_t
@@ -1507,12 +1507,12 @@ contains
 !$omp parallel do private(k)
 #endif
      do k=1,nlev
-        elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
-        elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
-        elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
+        elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + real(real(dt2*vtens1(:,:,k), kind = r4), kind = r8) )
+        elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + real(real(dt2*vtens2(:,:,k), kind = r4), kind = r8) )
+        elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + real(real(dt2*ttens(:,:,k), kind = r4), kind = r8))
         elem(ie)%state%dp3d(:,:,k,np1) = &
-             elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
-             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+             real(real(elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
+             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k))), kind=r4), kind=r8)
         
      enddo
 
