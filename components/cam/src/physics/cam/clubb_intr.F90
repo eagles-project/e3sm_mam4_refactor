@@ -510,6 +510,7 @@ end subroutine clubb_init_cnst
 #endif
 
     use physics_buffer,         only: pbuf_get_index, pbuf_set_field, physics_buffer_desc
+
     implicit none
     !  Input Variables
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -945,7 +946,8 @@ end subroutine clubb_init_cnst
    use stats_clubb_utilities,     only: stats_begin_timestep
    use advance_xp2_xpyp_module,   only: update_xp2_mc
    use macrop_driver,             only: ice_macro_tend
-    
+   use rp_emulator
+   
 #endif
 
    implicit none
@@ -1222,6 +1224,15 @@ end subroutine clubb_init_cnst
    integer :: ixorg
 
    intrinsic :: selected_real_kind, max
+
+ ! define temperary array for rp_emulator
+   type(rpe_var) :: rpe1d(pverp)           ! temporary array to hold variables
+   type(rpe_var) :: rpe2d(pcols,pverp)     ! temporary array to hold variables
+   type(rpe_var) :: rpecnt                ! temporary array to hold variables
+   integer, parameter :: sigbits = 23     ! significant digts for single precision
+   rpe1d%sbits      = sigbits
+   rpe2d%sbits      = sigbits
+   rpecnt%sbits     = sigbits
 
 #endif
    det_s(:)   = 0.0_r8
@@ -1578,15 +1589,22 @@ end subroutine clubb_init_cnst
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.  
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
-         p_in_Pa(k+1)         = real(state1%pmid(i,pver-k+1), kind = core_rknd)             ! Pressure profile
-         exner(k+1)           = real(1._r8/exner_clubb(i,pver-k+1), kind = core_rknd)
-         rho_ds_zt(k+1)       = real((1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1)), kind = core_rknd)
+         rpecnt               = state1%pmid(i,pver-k+1)
+         p_in_Pa(k+1)         = real(rpecnt, kind = core_rknd)             ! Pressure profile
+         rpecnt               = 1._r8/exner_clubb(i,pver-k+1)
+         exner(k+1)           = real(rpecnt, kind = core_rknd)
+         rpecnt               = (1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1))
+         rho_ds_zt(k+1)       = real(rpecnt, kind = core_rknd)
          invrs_rho_ds_zt(k+1) = 1._core_rknd/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
          rho(i,k+1)           = real(rho_ds_zt(k+1), kind = r8)                             ! rho on thermo 
-         thv_ds_zt(k+1)       = real(thv(i,pver-k+1), kind = core_rknd)                     ! thetav on thermo
-         rfrzm(k+1)           = real(state1%q(i,pver-k+1,ixcldice), kind = core_rknd)    
-         radf(k+1)            = real(radf_clubb(i,pver-k+1), kind = core_rknd) 
-         qrl_clubb(k+1)       = real(qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1)), kind = core_rknd)
+         rpecnt               = thv(i,pver-k+1)
+         thv_ds_zt(k+1)       = real(rpecnt, kind = core_rknd)                     ! thetav on thermo
+         rpecnt               = state1%q(i,pver-k+1,ixcldice)
+         rfrzm(k+1)           = real(rpecnt, kind = core_rknd)    
+         rpecnt               = radf_clubb(i,pver-k+1)
+         radf(k+1)            = real(rpecnt, kind = core_rknd) 
+         rpecnt               = qrl(i,pver-k+1)/(cpair*state1%pdel(i,pver-k+1))
+         qrl_clubb(k+1)       = real(rpecnt, kind = core_rknd)
       enddo
 
       !  Below computes the same stuff for the ghost point.  May or may
@@ -1605,7 +1623,8 @@ end subroutine clubb_init_cnst
       !  Compute mean w wind on thermo grid, convert from omega to w 
       wm_zt(1) = 0._core_rknd
       do k=1,pver
-         wm_zt(k+1) = real(-1._r8*state1%omega(i,pver-k+1)/(rho(i,k+1)*gravit), kind = core_rknd)
+         rpecnt     = -1._r8*state1%omega(i,pver-k+1)/(rho(i,k+1)*gravit)
+         wm_zt(k+1) = real(rpecnt, kind = core_rknd)
       enddo
     
       ! ------------------------------------------------- !
@@ -1701,44 +1720,71 @@ end subroutine clubb_init_cnst
  
       !  Compute some inputs from the thermodynamic grid
       !  to the momentum grid
-      rho_ds_zm       = zt2zm(rho_ds_zt)
-      rho_zm          = zt2zm(rho_zt)
-      invrs_rho_ds_zm = zt2zm(invrs_rho_ds_zt)
-      thv_ds_zm       = zt2zm(thv_ds_zt)
-      wm_zm           = zt2zm(wm_zt)
+      rpe1d           = zt2zm(rho_ds_zt)
+      rho_ds_zm       = real(rpe1d,kind = core_rknd)
+      rpe1d           = zt2zm(rho_zt) 
+      rho_zm          = real(rpe1d,kind = core_rknd)
+      rpe1d           = zt2zm(invrs_rho_ds_zt)
+      invrs_rho_ds_zm = real(rpe1d,kind = core_rknd)
+      rpe1d           = zt2zm(thv_ds_zt)
+      thv_ds_zm       = real(rpe1d,kind = core_rknd)
+      rpe1d           = zt2zm(wm_zt)
+      wm_zm           = real(rpe1d,kind = core_rknd)
       
       !  Surface fluxes provided by host model
-      wpthlp_sfc = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)*rho_ds_zm(1))       ! Sensible heat flux
-      wprtp_sfc  = real(cam_in%cflx(i,1), kind = core_rknd)/(rho_ds_zm(1))      ! Latent heat flux
-      upwp_sfc   = real(cam_in%wsx(i), kind = core_rknd)/rho_ds_zm(1)               ! Surface meridional momentum flux
-      vpwp_sfc   = real(cam_in%wsy(i), kind = core_rknd)/rho_ds_zm(1)               ! Surface zonal momentum flux  
+      rpe1d      = real(cam_in%shf(i), kind = core_rknd)/(real(cpair, kind = core_rknd)*rho_ds_zm(1))
+      wpthlp_sfc = real(rpe1d, kind = core_rknd)
+      rpe1d      = real(cam_in%cflx(i,1), kind = core_rknd)/(rho_ds_zm(1))
+      wprtp_sfc  = real(rpe1d, kind = core_rknd)                ! Latent heat flux
+      rpe1d      = real(cam_in%wsx(i), kind = core_rknd)/rho_ds_zm(1)
+      upwp_sfc   = real(rpe1d, kind = core_rknd)                ! Surface meridional momentum flux
+      rpe1d      = real(cam_in%wsy(i), kind = core_rknd)/rho_ds_zm(1) 
+      vpwp_sfc   = real(rpe1d, kind = core_rknd)                ! Surface zonal momentum flux  
       
       ! ------------------------------------------------- !
       ! Apply TMS                                         !
       ! ------------------------------------------------- !    
        if ( do_tms) then
-          upwp_sfc = upwp_sfc-(real(ksrftms(i)*state1%u(i,pver), kind = core_rknd)/rho_ds_zm(1))
-          vpwp_sfc = vpwp_sfc-(real(ksrftms(i)*state1%v(i,pver), kind = core_rknd)/rho_ds_zm(1))           
+          rpe1d    = (real(ksrftms(i)*state1%u(i,pver), kind = core_rknd)/rho_ds_zm(1))
+          upwp_sfc = upwp_sfc-rpe1d
+          rpe1d    = (real(ksrftms(i)*state1%v(i,pver), kind = core_rknd)/rho_ds_zm(1))
+          vpwp_sfc = vpwp_sfc-rpe1d
        endif
   
       !  Need to flip arrays around for CLUBB core
       do k=1,pverp
-         um_in(k)      = real(um(i,pverp-k+1), kind = core_rknd)
-         vm_in(k)      = real(vm(i,pverp-k+1), kind = core_rknd)
-         upwp_in(k)    = real(upwp(i,pverp-k+1), kind = core_rknd)
-         vpwp_in(k)    = real(vpwp(i,pverp-k+1), kind = core_rknd)
-         up2_in(k)     = real(up2(i,pverp-k+1), kind = core_rknd)
-         vp2_in(k)     = real(vp2(i,pverp-k+1), kind = core_rknd)
-         wp2_in(k)     = real(wp2(i,pverp-k+1), kind = core_rknd)
-         wp3_in(k)     = real(wp3(i,pverp-k+1), kind = core_rknd)
-         rtp2_in(k)    = real(rtp2(i,pverp-k+1), kind = core_rknd)
-         thlp2_in(k)   = real(thlp2(i,pverp-k+1), kind = core_rknd)
-         thlm_in(k)    = real(thlm(i,pverp-k+1), kind = core_rknd)
-         rtm_in(k)     = real(rtm(i,pverp-k+1), kind = core_rknd)
-         rvm_in(k)     = real(rvm(i,pverp-k+1), kind = core_rknd)
-         wprtp_in(k)   = real(wprtp(i,pverp-k+1), kind = core_rknd)
-         wpthlp_in(k)  = real(wpthlp(i,pverp-k+1), kind = core_rknd)
-         rtpthlp_in(k) = real(rtpthlp(i,pverp-k+1), kind = core_rknd)
+         rpecnt        = um(i,pverp-k+1)
+         um_in(k)      = real(rpecnt, kind = core_rknd)
+         rpecnt        = vm(i,pverp-k+1)
+         vm_in(k)      = real(rpecnt, kind = core_rknd)
+         rpecnt        = upwp(i,pverp-k+1)
+         upwp_in(k)    = real(rpecnt, kind = core_rknd)
+         rpecnt        = vpwp(i,pverp-k+1)
+         vpwp_in(k)    = real(rpecnt, kind = core_rknd)
+         rpecnt        = up2(i,pverp-k+1)
+         up2_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = vp2(i,pverp-k+1)
+         vp2_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = wp2(i,pverp-k+1)
+         wp2_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = wp3(i,pverp-k+1)
+         wp3_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = rtp2(i,pverp-k+1)
+         rtp2_in(k)    = real(rpecnt, kind = core_rknd)
+         rpecnt        = thlp2(i,pverp-k+1)
+         thlp2_in(k)   = real(rpecnt, kind = core_rknd)
+         rpecnt        = thlm(i,pverp-k+1)
+         thlm_in(k)    = real(rpecnt, kind = core_rknd)
+         rpecnt        = rtm(i,pverp-k+1)
+         rtm_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = rvm(i,pverp-k+1)
+         rvm_in(k)     = real(rpecnt, kind = core_rknd)
+         rpecnt        = wprtp(i,pverp-k+1)
+         wprtp_in(k)   = real(rpecnt, kind = core_rknd)
+         rpecnt        = wpthlp(i,pverp-k+1)
+         wpthlp_in(k)  = real(rpecnt, kind = core_rknd)
+         rpecnt        = rtpthlp(i,pverp-k+1)
+         rtpthlp_in(k) = real(rpecnt, kind = core_rknd)
  
          !add a check point here
          !if(k .eq. 1) then
@@ -1750,7 +1796,8 @@ end subroutine clubb_init_cnst
          !end if 
 
          if (k .ne. 1) then
-            pre_in(k)    = real(prer_evap(i,pverp-k+1), kind = core_rknd)
+            rpecnt       = prer_evap(i,pverp-k+1)
+            pre_in(k)    = real(rpecnt, kind = core_rknd)
          endif
 
          !  Initialize these to prevent crashing behavior
@@ -1808,7 +1855,8 @@ end subroutine clubb_init_cnst
          if (lq(ixind))  then 
             icnt=icnt+1
             do k=1,pver
-               edsclr_in(k+1,icnt) = real(state1%q(i,pver-k+1,ixind), kind = core_rknd)
+               rpecnt              = state1%q(i,pver-k+1,ixind)
+               edsclr_in(k+1,icnt) = real(rpecnt, kind = core_rknd)
             enddo
             edsclr_in(1,icnt) = edsclr_in(2,icnt)
          end if
@@ -1816,15 +1864,18 @@ end subroutine clubb_init_cnst
       
       if (do_expldiff) then 
         do k=1,pver
-          edsclr_in(k+1,icnt+1) = real(thlm(i,pver-k+1), kind = core_rknd)
-          edsclr_in(k+1,icnt+2) = real(rtm(i,pver-k+1), kind = core_rknd)
+          rpecnt                = thlm(i,pver-k+1)
+          edsclr_in(k+1,icnt+1) = real(rpecnt, kind = core_rknd)
+          rpecnt                = rtm(i,pver-k+1)
+          edsclr_in(k+1,icnt+2) = real(rpecnt, kind = core_rknd)
         enddo
         
         edsclr_in(1,icnt+1) = edsclr_in(2,icnt+1)
         edsclr_in(1,icnt+2) = edsclr_in(2,icnt+2)  
       endif    
-
-      rho_in(:) = real(rho(i,:), kind = core_rknd)
+      
+      rpecnt    = rho(i,:)
+      rho_in(:) = real(rpecnt, kind = core_rknd)
      
       ! --------------------------------------------------------- !
       ! Compute cloud-top radiative cooling contribution to CLUBB !
@@ -1849,7 +1900,8 @@ end subroutine clubb_init_cnst
        
          ! Now compute new entrainment rate based on organization
          varmu(i) = mu / (1._r8 + orgparam * 100._r8)
-         varmu2 = real(varmu(i), kind = core_rknd)
+         rpecnt = varmu(i)
+         varmu2 = real(rpecnt, kind = core_rknd)
      
       endif
 
