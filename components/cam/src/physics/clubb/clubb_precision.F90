@@ -25,7 +25,7 @@ module clubb_precision
     stat_nknd = selected_int_kind( 8 ), & 
     stat_rknd = selected_real_kind( p=12 ), & 
     time_precision = selected_real_kind( p=12 ), &
-    core_rknd = dp ! Value from the preprocessor directive 
+    core_rknd = sp ! Value from the preprocessor directive 
   
 end module clubb_precision
 !-------------------------------------------------------------------------------
