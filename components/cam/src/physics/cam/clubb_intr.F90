@@ -1825,7 +1825,7 @@ end subroutine clubb_init_cnst
         edsclr_in(1,icnt+2) = edsclr_in(2,icnt+2)  
       endif    
 
-      rpe_1d(:) = rho(i,:) ;  rho_in(:) = rpe_1d(:)
+      rho_in(:) = rho(i,:) 
      
       ! --------------------------------------------------------- !
       ! Compute cloud-top radiative cooling contribution to CLUBB !
