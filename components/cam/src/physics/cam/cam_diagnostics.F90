@@ -641,6 +641,16 @@ subroutine diag_init()
    call addfld ('RTPTHLP_nadv&IC',(/ 'ilev' /), 'I', 'K g/kg', 'Temp. Moist. Covariance')
    call addfld ('UP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Zonal Velocity Variance')
    call addfld ('VP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Meridional Velocity Variance')
+   !add default for clubb initialization
+   call add_default('WP2_nadv&IC     ',0, 'I')
+   call add_default('WP3_nadv&IC     ',0, 'I')
+   call add_default('WPTHLP_nadv&IC  ',0, 'I')
+   call add_default('WPRTP_nadv&IC   ',0, 'I')
+   call add_default('RTP2_nadv&IC    ',0, 'I')
+   call add_default('THLP2_nadv&IC   ',0, 'I')
+   call add_default('RTPTHLP_nadv&IC ',0, 'I')
+   call add_default('UP2_nadv&IC     ',0, 'I')
+   call add_default('VP2_nadv&IC     ',0, 'I')
    end if 
 
    ! Initial file - Optional fields
@@ -659,20 +669,6 @@ subroutine diag_init()
       call add_default ('KVH&IC     ',0, 'I')
       call add_default ('KVM&IC     ',0, 'I')
       call add_default ('TBOT&IC    ',0, 'I')
-
-      !add default for clubb initialization
-      if (do_output_clubb_int) then
-      call add_default('WP2_nadv&IC     ',0, 'I')
-      call add_default('WP3_nadv&IC     ',0, 'I')
-      call add_default('WPTHLP_nadv&IC  ',0, 'I')
-      call add_default('WPRTP_nadv&IC   ',0, 'I')
-      call add_default('RTP2_nadv&IC    ',0, 'I')
-      call add_default('THLP2_nadv&IC   ',0, 'I')
-      call add_default('RTPTHLP_nadv&IC ',0, 'I')
-      call add_default('UP2_nadv&IC     ',0, 'I')
-      call add_default('VP2_nadv&IC     ',0, 'I')
-      end if 
-
    end if
 
    ! CAM export state 
