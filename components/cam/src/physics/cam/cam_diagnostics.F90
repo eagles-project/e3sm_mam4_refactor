@@ -630,29 +630,6 @@ subroutine diag_init()
    call addfld ('QPERT&IC',horiz_only,    'I','kg/kg','Perturbation specific humidity (eddies in PBL)'  )
    call addfld ('TBOT&IC',horiz_only,    'I','K','Lowest model level temperature'                  )
 
-   !add field for clubb initialization 
-   if (do_output_clubb_int) then
-   call addfld ('WP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Vertical Velocity Variance')
-   call addfld ('WP3_nadv&IC',(/ 'ilev' /),     'I', 'm3/s3', 'Third Moment Vertical Velocity')
-   call addfld ('WPTHLP_nadv&IC',(/ 'ilev' /),  'I', 'W/m2', 'Heat Flux')
-   call addfld ('WPRTP_nadv&IC',(/ 'ilev' /),   'I', 'W/m2', 'Moisture Flux')
-   call addfld ('RTP2_nadv&IC',(/ 'ilev' /),    'I', 'g^2/kg^2', 'Moisture Variance')
-   call addfld ('THLP2_nadv&IC',(/ 'ilev' /),   'I', 'K^2', 'Temperature Variance')
-   call addfld ('RTPTHLP_nadv&IC',(/ 'ilev' /), 'I', 'K g/kg', 'Temp. Moist. Covariance')
-   call addfld ('UP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Zonal Velocity Variance')
-   call addfld ('VP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Meridional Velocity Variance')
-   !add default for clubb initialization
-   call add_default('WP2_nadv&IC     ',0, 'I')
-   call add_default('WP3_nadv&IC     ',0, 'I')
-   call add_default('WPTHLP_nadv&IC  ',0, 'I')
-   call add_default('WPRTP_nadv&IC   ',0, 'I')
-   call add_default('RTP2_nadv&IC    ',0, 'I')
-   call add_default('THLP2_nadv&IC   ',0, 'I')
-   call add_default('RTPTHLP_nadv&IC ',0, 'I')
-   call add_default('UP2_nadv&IC     ',0, 'I')
-   call add_default('VP2_nadv&IC     ',0, 'I')
-   end if 
-
    ! Initial file - Optional fields
 
    if (inithist_all) then
@@ -669,6 +646,29 @@ subroutine diag_init()
       call add_default ('KVH&IC     ',0, 'I')
       call add_default ('KVM&IC     ',0, 'I')
       call add_default ('TBOT&IC    ',0, 'I')
+   end if
+
+   !add field for clubb initialization 
+   if (do_output_clubb_int) then
+     call addfld ('WP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Vertical Velocity Variance')
+     call addfld ('WP3_nadv&IC',(/ 'ilev' /),     'I', 'm3/s3', 'Third Moment Vertical Velocity')
+     call addfld ('WPTHLP_nadv&IC',(/ 'ilev' /),  'I', 'W/m2', 'Heat Flux')
+     call addfld ('WPRTP_nadv&IC',(/ 'ilev' /),   'I', 'W/m2', 'Moisture Flux')
+     call addfld ('RTP2_nadv&IC',(/ 'ilev' /),    'I', 'g^2/kg^2', 'Moisture Variance')
+     call addfld ('THLP2_nadv&IC',(/ 'ilev' /),   'I', 'K^2', 'Temperature Variance')
+     call addfld ('RTPTHLP_nadv&IC',(/ 'ilev' /), 'I', 'K g/kg', 'Temp. Moist. Covariance')
+     call addfld ('UP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Zonal Velocity Variance')
+     call addfld ('VP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Meridional Velocity Variance')
+     !add default for clubb initialization
+     call add_default('WP2_nadv&IC     ',0, 'I')
+     call add_default('WP3_nadv&IC     ',0, 'I')
+     call add_default('WPTHLP_nadv&IC  ',0, 'I')
+     call add_default('WPRTP_nadv&IC   ',0, 'I')
+     call add_default('RTP2_nadv&IC    ',0, 'I')
+     call add_default('THLP2_nadv&IC   ',0, 'I')
+     call add_default('RTPTHLP_nadv&IC ',0, 'I')
+     call add_default('UP2_nadv&IC     ',0, 'I')
+     call add_default('VP2_nadv&IC     ',0, 'I')
    end if
 
    ! CAM export state 
