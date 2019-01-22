@@ -856,8 +856,16 @@ end subroutine clubb_init_cnst
     !  Is this the first time step?  If so then initialize CLUBB variables as follows
     if (is_first_step()) then
 
-       if (.not.do_clubb_int)then
+       if (do_clubb_int)then
+        ! other variables will be read from initial files     
+        call pbuf_set_field(pbuf2d, upwp_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, tke_idx,     0.0_r8)
+        call pbuf_set_field(pbuf2d, kvh_idx,     0.0_r8)
+        call pbuf_set_field(pbuf2d, fice_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, radf_idx,    0.0_r8)
 
+       else
         call pbuf_set_field(pbuf2d, wp2_idx,     w_tol_sqd)
         call pbuf_set_field(pbuf2d, wp3_idx,     0.0_r8)
         call pbuf_set_field(pbuf2d, wpthlp_idx,  0.0_r8)
