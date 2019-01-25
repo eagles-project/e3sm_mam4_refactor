@@ -1224,7 +1224,7 @@ end subroutine clubb_init_cnst
    type(rpe_var) :: rpe_1d(pverp)          ! temporary array to hold variables
    type(rpe_var) :: rpe_sclr               ! temporary array to hold variables
 
-   integer, parameter :: sigbits = 18      ! significant digts for reduced precision
+   integer, parameter :: sigbits = 15      ! significant digts for reduced precision
    rpe_1d%sbits   = sigbits
    rpe_sclr%sbits = sigbits
 
