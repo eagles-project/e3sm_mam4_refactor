@@ -870,7 +870,12 @@ contains
 
 
      ! preset values
+
+#if (defined HUM_HOL)
+     origflag = 1    
+#else
      origflag = 0
+#endif
      h2osfcflag = 1
 
      if ( masterproc )then
