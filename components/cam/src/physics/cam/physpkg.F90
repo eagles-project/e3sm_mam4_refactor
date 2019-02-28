@@ -656,6 +656,38 @@ subroutine phys_inidat( cam_out, pbuf2d )
     if (do_clubb_int) then 
 
       allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='UPWP'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='VPWP'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
       fieldname='WP2_nadv'
       m = pbuf_get_index(fieldname,ierr)
       if (m > 0) then
@@ -793,6 +825,20 @@ subroutine phys_inidat( cam_out, pbuf2d )
             do n = 1, dyn_time_lvls
                call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
             end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pver,begchunk:endchunk))
+      fieldname='RAD_CLUBB'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'lev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            call pbuf_set_field(pbuf2d, m, tptr3d)
          else
             do_clubb_int = .false.
          end if

@@ -97,6 +97,9 @@ integer  ::      prec_pcw_idx = 0
 integer  ::      snow_pcw_idx = 0
 
 !clubb initial variable index  
+integer  ::      upwp_idx     = 0
+integer  ::      vpwp_idx     = 0
+integer  ::      radf_idx     = 0
 integer  ::      wp2_idx      = 0
 integer  ::      wp3_idx      = 0
 integer  ::      wpthlp_idx   = 0
@@ -650,6 +653,8 @@ subroutine diag_init()
 
    !add field for clubb initialization 
    if (do_output_clubb_int) then
+     call addfld ('UPWP&IC',    (/ 'ilev' /),     'I', 'm2/s2', 'Zonal Momentum Flux')
+     call addfld ('VPWP&IC',    (/ 'ilev' /),     'I', 'm2/s2', 'Meridional Momentum Flux')
      call addfld ('WP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Vertical Velocity Variance')
      call addfld ('WP3_nadv&IC',(/ 'ilev' /),     'I', 'm3/s3', 'Third Moment Vertical Velocity')
      call addfld ('WPTHLP_nadv&IC',(/ 'ilev' /),  'I', 'W/m2', 'Heat Flux')
@@ -659,7 +664,10 @@ subroutine diag_init()
      call addfld ('RTPTHLP_nadv&IC',(/ 'ilev' /), 'I', 'K g/kg', 'Temp. Moist. Covariance')
      call addfld ('UP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Zonal Velocity Variance')
      call addfld ('VP2_nadv&IC',(/ 'ilev' /),     'I', 'm2/s2', 'Meridional Velocity Variance')
+     call addfld ('RAD_CLUBB&IC',(/ 'lev' /),     'I', 'm^2/s^3', 'Buoyancy production at the CL top due to LW radiative cooling')
      !add default for clubb initialization
+     call add_default('UPWP&IC         ',0, 'I')
+     call add_default('VPWP&IC         ',0, 'I')
      call add_default('WP2_nadv&IC     ',0, 'I')
      call add_default('WP3_nadv&IC     ',0, 'I')
      call add_default('WPTHLP_nadv&IC  ',0, 'I')
@@ -669,6 +677,7 @@ subroutine diag_init()
      call add_default('RTPTHLP_nadv&IC ',0, 'I')
      call add_default('UP2_nadv&IC     ',0, 'I')
      call add_default('VP2_nadv&IC     ',0, 'I')
+     call add_default('RAD_CLUBB&IC    ',0, 'I')
    end if
 
    ! CAM export state 
@@ -752,6 +761,8 @@ subroutine diag_init()
   qpert_idx = pbuf_get_index('qpert',ierr)
 
   if (do_output_clubb_int) then
+   upwp_idx     = pbuf_get_index('UPWP',ierr)
+   vpwp_idx     = pbuf_get_index('VPWP',ierr)
    wp2_idx      = pbuf_get_index('WP2_nadv',ierr)
    wp3_idx      = pbuf_get_index('WP3_nadv',ierr)
    wpthlp_idx   = pbuf_get_index('WPTHLP_nadv',ierr)
@@ -761,6 +772,7 @@ subroutine diag_init()
    rtpthlp_idx  = pbuf_get_index('RTPTHLP_nadv',ierr)
    up2_idx      = pbuf_get_index('UP2_nadv',ierr)
    vp2_idx      = pbuf_get_index('VP2_nadv',ierr)
+   radf_idx     = pbuf_get_index('RAD_CLUBB',ierr)
   end if 
 
   prec_dp_idx  = pbuf_get_index('PREC_DP') 
@@ -1784,6 +1796,10 @@ end subroutine diag_export
 
       ! output IC for clubb variables
       if (do_output_clubb_int) then
+         call pbuf_get_field(pbuf, upwp_idx, clubb_var, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+         call outfld('UPWP&IC   ', clubb_var, pcols,lchnk)
+         call pbuf_get_field(pbuf, vpwp_idx, clubb_var, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
+         call outfld('VPWP&IC   ', clubb_var, pcols,lchnk)
          call pbuf_get_field(pbuf, wp2_idx, clubb_var, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
          call outfld('WP2_nadv&IC   ', clubb_var, pcols,lchnk)
          call pbuf_get_field(pbuf, wp3_idx, clubb_var, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
@@ -1802,6 +1818,8 @@ end subroutine diag_export
          call outfld('UP2_nadv&IC   ', clubb_var, pcols,lchnk)
          call pbuf_get_field(pbuf, vp2_idx, clubb_var, start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
          call outfld('VP2_nadv&IC   ', clubb_var, pcols,lchnk)
+         call pbuf_get_field(pbuf, radf_idx, clubb_var)
+         call outfld('RAD_CLUBB&IC  ', clubb_var, pcols,lchnk)
       end if    !end of IC output for clubb
    
       call pbuf_get_field(pbuf, cld_idx,    cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
