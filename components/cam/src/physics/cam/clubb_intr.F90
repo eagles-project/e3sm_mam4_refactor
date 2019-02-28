@@ -208,6 +208,18 @@ module clubb_intr
   
   real(r8) :: micro_mg_accre_enhan_fac = huge(1.0_r8) !Accretion enhancement factor from namelist
 
+! add output fields for each clubb substepping. Here, we only output selected variables. 
+  integer :: ivsub,isub
+  character(len=200) :: filnum, sub1
+  logical   :: l_sub_out = .true. ! initialize as .true. 
+  integer, parameter :: nzmvsub    = 21
+  integer, parameter :: nztvsub    = 5
+  character(len=200),dimension(nzmvsub) :: clubb_zmvars_sub=(/'up2_ta', 'vp2_ta', 'wp2_ta', 'wp3_zm', 'rtp2_ta', 'thlp2_ta', 'rtpthlp_ta', &
+                                                              'wprtp_ta', 'wpthlp_ta', 'wp2', 'wpthlp', 'wprtp', 'up2', 'vp2', &
+                                                              'rtp2', 'thlp2', 'rtpthlp', 'upwp', 'vpwp', 'tau_zm', 'sigma_sqd_w'/)
+  character(len=200),dimension(nztvsub) :: clubb_ztvars_sub=(/'wp3', 'wp2_zt', 'cloud_frac', 'Kh_zt', 'rcm'/)
+
+
   contains
   
   ! =============================================================================== !
@@ -472,7 +484,7 @@ end subroutine clubb_init_cnst
   !                                                                                 !
   ! =============================================================================== !
 
-  subroutine clubb_ini_cam(pbuf2d, dp1_in)
+  subroutine clubb_ini_cam(pbuf2d, dp1_in, cld_macmic_num_steps)
 !-------------------------------------------------------------------------------
 ! Description:
 !   Initialize UWM CLUBB.
@@ -549,7 +561,7 @@ end subroutine clubb_init_cnst
 
     real(r8)  :: zt_g(pverp)                        ! Height dummy array
     real(r8)  :: zi_g(pverp)                        ! Height dummy array
-
+    integer, intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
 
     !----- Begin Code -----
 
@@ -785,7 +797,7 @@ end subroutine clubb_init_cnst
     if (l_stats) then 
       
        call stats_init_clubb( .true., dum1, dum2, &
-                         pverp, pverp, pverp, dum3 )
+                         pverp, pverp, pverp, dum3, cld_macmic_num_steps)
 
        allocate(out_zt(pcols,pverp,stats_zt%num_output_fields))
        allocate(out_zm(pcols,pverp,stats_zm%num_output_fields))
@@ -1261,7 +1273,7 @@ end subroutine clubb_init_cnst
 ! numbers are coefficients of the empirical equation
 
    ugust(gprec,gfac) = gfac*log(1._R8+57801.6_R8*gprec-3.55332096e7_R8*(gprec**2.0_R8))
-  
+
 #endif
    det_s(:)   = 0.0_r8
    det_ice(:) = 0.0_r8
@@ -2592,6 +2604,18 @@ end subroutine clubb_init_cnst
          if (len(temp1) .gt. 16) sub = temp1(1:16)
    
          call outfld(trim(sub), out_zt(:,:,i), pcols, lchnk )
+         
+         !CLUBB substep output 
+         if(l_sub_out) then
+          do ivsub = 1, nztvsub
+           if(sub.eq.trim(clubb_ztvars_sub(ivsub))) then
+             write (filnum, "(A1,I2.2)") "_", macmic_it
+             sub1= trim(clubb_ztvars_sub(ivsub))//trim(filnum)
+             call outfld(trim(sub1), out_zt(:,:,i), pcols, lchnk)
+           end if
+          end do
+         end if 
+ 
       enddo
    
       do i=1,stats_zm%num_output_fields
@@ -2601,6 +2625,18 @@ end subroutine clubb_init_cnst
          if (len(temp1) .gt. 16) sub = temp1(1:16)
       
          call outfld(trim(sub),out_zm(:,:,i), pcols, lchnk)
+
+        !CLUBB substep output 
+        if(l_sub_out) then
+         do ivsub = 1, nzmvsub
+          if(sub.eq.trim(clubb_zmvars_sub(ivsub))) then
+             write (filnum, "(A1,I2.2)") "_", macmic_it
+             sub1= trim(clubb_zmvars_sub(ivsub))//trim(filnum)
+             call outfld(trim(sub1), out_zm(:,:,i), pcols, lchnk)
+          end if
+         end do
+        end if
+
       enddo
 
       if (l_output_rad_files) then  
@@ -2830,7 +2866,7 @@ end function diag_ustar
 #ifdef CLUBB_SGS
 
   subroutine stats_init_clubb( l_stats_in, stats_tsamp_in, stats_tout_in, &
-                         nnzp, nnrad_zt,nnrad_zm, delt )
+                         nnzp, nnrad_zt,nnrad_zm, delt, cld_macmic_num_steps )
     !
     ! Description: Initializes the statistics saving functionality of
     !   the CLUBB model.  This is for purpose of CAM-CLUBB interface.  Here
@@ -2926,6 +2962,7 @@ end function diag_ustar
     integer, intent(in) :: nnrad_zm ! Grid points in the radiation grid [count]
 
     real(kind=time_precision), intent(in) ::   delt         ! Timestep (dtmain in CLUBB)         [s]
+    integer, intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
 
 
     !  Local Variables
@@ -2953,6 +2990,7 @@ end function diag_ustar
 
     integer :: i, ntot, read_status
     integer :: iunit
+
 
     !  Initialize
     l_error = .false.
@@ -3302,6 +3340,20 @@ end function diag_ustar
      
        call addfld(trim(sub),(/ 'ilev' /),&
             'A',trim(stats_zt%file%var(i)%units),trim(stats_zt%file%var(i)%description))
+
+      if(l_sub_out) then
+        do ivsub = 1, nztvsub
+         if(sub.eq.trim(clubb_ztvars_sub(ivsub))) then 
+          do isub = 1, cld_macmic_num_steps
+            write (filnum, "(A1,I2.2)") "_", isub
+            sub1= trim(clubb_ztvars_sub(ivsub))//trim(filnum)
+            call addfld(trim(sub1),(/ 'ilev' /),&
+                 'I',trim(stats_zt%file%var(i)%units),trim(stats_zt%file%var(i)%description))
+          end do 
+         end if
+        end do 
+      end if
+
     enddo
     
     do i = 1, stats_zm%num_output_fields
@@ -3312,6 +3364,19 @@ end function diag_ustar
     
       call addfld(trim(sub),(/ 'ilev' /),&
            'A',trim(stats_zm%file%var(i)%units),trim(stats_zm%file%var(i)%description))
+      if(l_sub_out) then
+        do ivsub = 1, nzmvsub
+         if(sub.eq.trim(clubb_zmvars_sub(ivsub))) then
+          do isub = 1, cld_macmic_num_steps
+            write (filnum, "(A1,I2.2)") "_", isub
+            sub1= trim(clubb_zmvars_sub(ivsub))//trim(filnum)
+            call addfld(trim(sub1),(/ 'ilev' /),&
+                 'I',trim(stats_zm%file%var(i)%units),trim(stats_zm%file%var(i)%description))
+          end do
+         end if
+        end do
+      end if
+
     enddo
 
     if (l_output_rad_files) then     
