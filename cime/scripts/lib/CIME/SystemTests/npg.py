@@ -1,5 +1,5 @@
 """
-Perturbation Growth New (PGN) - The CESM/ACME model's
+Perturbation Growth New (NPG) - The CESM/ACME model's
 multi-instance capability is used to conduct an ensemble
 of simulations starting from different initial conditions.
 
@@ -26,7 +26,7 @@ from CIME.build import post_build
 from CIME.hist_utils import rename_all_hist_files
 from CIME.utils import expect
 
-#Logic for PGN ensemble runs:
+#Logic for NPG ensemble runs:
 # We need two inputs:
 # A. Number of inic cond files
 # B. perturbations (e.g. currently we have: without prt, pos prt and neg prt)
@@ -78,11 +78,11 @@ INDEX = False
 # generate a plot
 DOPLOT = False  #It impacts performance!
 
-class PGN(SystemTestsCommon):
+class NPG(SystemTestsCommon):
 
     def __init__(self, case):
         """
-        initialize an object interface to the PGN test
+        initialize an object interface to the NPG test
         """
 
         #perturbation values and number of perturbation strings should be same
@@ -108,7 +108,7 @@ class PGN(SystemTestsCommon):
         nprt       = len(PRT)
         ninst      = NINIT_COND * nprt
 
-        logger.debug('PGN_INFO: number of instance: '+str(ninst))
+        logger.debug('NPG_INFO: number of instance: '+str(ninst))
         
         #------------------------------------------------------
         #Fake Build:
@@ -136,7 +136,7 @@ class PGN(SystemTestsCommon):
         #NINST > 1 (e.g. rebuilding an old case) the following 
         #loop will increase the ntasks to a multiple of ninst 
         #(requiring a clean build again). We hit this issue if 
-        #we launch ./case.build in the case directory of PGN 
+        #we launch ./case.build in the case directory of NPG 
         #test
         #------------------------------------------------------
 
@@ -145,7 +145,7 @@ class PGN(SystemTestsCommon):
             # so it has to happen here.
             if not model_only:
                 # Lay all of the components out concurrently
-                logger.debug("PGN_INFO: Updating NINST for multi-instance in env_mach_pes.xml")
+                logger.debug("NPG_INFO: Updating NINST for multi-instance in env_mach_pes.xml")
                 for comp in ['ATM','OCN','WAV','GLC','ICE','ROF','LND']:
                     ntasks = self._case.get_value("NTASKS_%s"%comp)
                     self._case.set_value("ROOTPE_%s"%comp, 0)
@@ -160,7 +160,7 @@ class PGN(SystemTestsCommon):
 
         #Faking a bld can save the time code spend in building the model components
         if fake_bld:
-            logger.debug("PGN_INFO: FAKE Build")
+            logger.debug("NPG_INFO: FAKE Build")
             if (not sharedlib_only):
                 post_build(self._case, [])
         else:
@@ -174,7 +174,7 @@ class PGN(SystemTestsCommon):
         # Do this already in build_phase so that we can check the xml and
         # namelist files before job starts running.
         #----------------------------------------------------------------
-        logger.debug("PGN_INFO: Updating user_nl_* files")
+        logger.debug("NPG_INFO: Updating user_nl_* files")
 
         csmdata_root = self._case.get_value("DIN_LOC_ROOT")
         csmdata_atm  = csmdata_root+"/atm/cam/inic/homme/ne4_v1_init/"
@@ -373,7 +373,7 @@ class PGN(SystemTestsCommon):
         compare PGE from the test simulation with the baseline 
         cloud
         """
-        logger.debug("PGN_INFO:BASELINE COMPARISON STARTS")
+        logger.debug("NPG_INFO:BASELINE COMPARISON STARTS")
 
         rundir    = self._case.get_value("RUNDIR")
         casename  = self._case.get_value("CASE") 
@@ -390,7 +390,7 @@ class PGN(SystemTestsCommon):
         base_dir = os.path.join(base_root,base_comp)
 
         #for test cases (new environment etc.)        
-        logger.debug("PGN_INFO: Test case comparison...")
+        logger.debug("NPG_INFO: Test case comparison...")
 
         #---------------------------------------------
         # Write netcdf file for comparison
@@ -403,14 +403,14 @@ class PGN(SystemTestsCommon):
             iinst += 1;  iprt = 0
             ifile_cntl = os.path.join(base_dir,self.get_fname_wo_ext('','',iinst)+'_woprt.nc')
             expect(os.path.isfile(ifile_cntl), "ERROR: File "+ifile_cntl+" does not exist")
-            logger.debug("PGN_INFO:CNTL_TST:"+ifile_cntl)
+            logger.debug("NPG_INFO:CNTL_TST:"+ifile_cntl)
 
             for aprt in PRTSTR[1:]:
                 iinst += 1;                
                 ifile_test = os.path.join(rundir,self.get_fname_wo_ext(rundir,casename,iinst)+'_'+aprt+'.nc')
                 expect(os.path.isfile(ifile_test), "ERROR: File "+ifile_test+" does not exist")
                 comp_rmse_nc[icond,iprt,0:len_var_list] = self.rmse_var(ifile_test, ifile_cntl,  var_list, 't_' )
-                logger.debug("PGN_INFO:Compared to TEST_TST:"+ifile_test)
+                logger.debug("NPG_INFO:Compared to TEST_TST:"+ifile_test)
 
                 iprt += 1
         
@@ -462,8 +462,8 @@ class PGN(SystemTestsCommon):
 
         t_stat = abs(t_stat) #only value of t_stat matters, not the sign
 
-        print("PGN_INFO: T value:"+str(t_stat))
-        print("PGN_INFO: P value:"+str(p_val))
+        print("NPG_INFO: T value:"+str(t_stat))
+        print("NPG_INFO: P value:"+str(p_val))
 
         logger.warn(" T value:"+str(t_stat))
         logger.warn(" P value:"+str(p_val))
@@ -475,15 +475,15 @@ class PGN(SystemTestsCommon):
         if (t_stat > 3):
             with self._test_status:
                 self._test_status.set_status(BASELINE_PHASE, TEST_FAIL_STATUS)
-            print('PGN_INFO:TEST FAIL')
+            print('NPG_INFO:TEST FAIL')
         else:
             with self._test_status:
                 self._test_status.set_status(BASELINE_PHASE, TEST_PASS_STATUS)
-            print('PGN_INFO:TEST PASS')
+            print('NPG_INFO:TEST PASS')
                     
         #Close this file after you access "comp_rmse_nc" variable
         fcomp_cld.close()
-        logger.debug("PGN_INFO: POST PROCESSING PHASE ENDS")
+        logger.debug("NPG_INFO: POST PROCESSING PHASE ENDS")
         
         #t1 = time.time()
         #print('time: '+str(t1-t0))
@@ -491,7 +491,7 @@ class PGN(SystemTestsCommon):
     # run_phase
     #=================================================================
     def run_phase(self):
-        logger.debug("PGN_INFO: RUN PHASE")
+        logger.debug("NPG_INFO: RUN PHASE")
         
         self.run_indv()
 
@@ -500,7 +500,7 @@ class PGN(SystemTestsCommon):
         #Here were are in case directory, we need to go to the run directory and rename files
         rundir   = self._case.get_value("RUNDIR")
         casename = self._case.get_value("CASE") 
-        logger.debug("PGN_INFO: Case name is:"+casename )
+        logger.debug("NPG_INFO: Case name is:"+casename )
 
         iinst = 1
         for icond in range(NINIT_COND):
@@ -522,11 +522,11 @@ class PGN(SystemTestsCommon):
                             found = True
                             prtval = float(line.split('=')[1])
                             expect(prtval == PRT[iprt], "ERROR: prtval doesn't match, prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
-                            logger.debug("PGN_INFO:prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
+                            logger.debug("NPG_INFO:prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
                 
                 if(not found):
                     expect(prtval == PRT[iprt], "ERROR: default prtval doesn't match, prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
-                    logger.debug("PGN_INFO:def prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
+                    logger.debug("NPG_INFO:def prtval:"+str(prtval)+"; prt["+str(iprt)+"]:"+str(PRT[iprt]))
                   
                 #---------------------------------------------------------
                 #Rename file
@@ -534,7 +534,7 @@ class PGN(SystemTestsCommon):
 
                 #form file name
                 fname = self.get_fname_wo_ext(rundir,casename,iinst) #NOTE:without extension
-                logger.debug("PGN_INFO: fname to rename:"+fname )
+                logger.debug("NPG_INFO: fname to rename:"+fname )
                 
                 renamed_fname = fname +'_'+PRTSTR[iprt]+'.nc'
                 fname_w_ext   = fname + '.nc' #add extention
@@ -543,23 +543,23 @@ class PGN(SystemTestsCommon):
                 if (os.path.isfile(fname_w_ext)):
                     #rename file
                     shutil.move(fname_w_ext,renamed_fname)
-                    logger.debug("PGN_INFO: Renamed file:"+renamed_fname)
+                    logger.debug("NPG_INFO: Renamed file:"+renamed_fname)
                 else:
                     expect(os.path.isfile(renamed_fname), "ERROR: File "+renamed_fname+" does not exist")
-                    logger.debug("PGN_INFO: Renamed file already exists:"+renamed_fname)
+                    logger.debug("NPG_INFO: Renamed file already exists:"+renamed_fname)
                 
                 iinst += 1
 
         #cloud generation
 
-        logger.debug("PGN_INFO: cloud generation-gen base")
+        logger.debug("NPG_INFO: cloud generation-gen base")
             
         var_list     = self.get_var_list()
         len_var_list = len(var_list)
         nprt         = len(PRT)
         
         #for trusted cloud sims
-        logger.debug("PGN_INFO: Computing cloud")
+        logger.debug("NPG_INFO: Computing cloud")
             
         cld_res = np.empty([len_var_list])
             
@@ -574,7 +574,7 @@ class PGN(SystemTestsCommon):
             iinst += 1;  iprt = 0
             ifile_cntl = os.path.join(rundir,self.get_fname_wo_ext('',casename,iinst)+'_'+PRTSTR[iprt]+'.nc')
             expect(os.path.isfile(ifile_cntl), "ERROR: File "+ifile_cntl+" does not exist")
-            logger.debug("PGN_INFO:CNTL_CLD:"+ifile_cntl)            
+            logger.debug("NPG_INFO:CNTL_CLD:"+ifile_cntl)            
             
             for aprt in PRTSTR[1:]:
                 iinst += 1;
@@ -582,7 +582,7 @@ class PGN(SystemTestsCommon):
                 ifile_test = os.path.join(rundir,self.get_fname_wo_ext('',casename,iinst)+'_'+aprt+'.nc')
                 expect(os.path.isfile(ifile_test), "ERROR: File "+ifile_test+" does not exist")
                 cld_rmse_nc[icond,iprt,0:len_var_list] = self.rmse_var(ifile_test, ifile_cntl,  var_list, 't_' )
-                logger.debug("PGN_INFO:Compared to CLD:"+ifile_test)
+                logger.debug("NPG_INFO:Compared to CLD:"+ifile_test)
 
         fcld.close()
 
@@ -599,10 +599,10 @@ class PGN(SystemTestsCommon):
             self._generate_baseline()#BALLI-CHECK IF THIS IS OKAY
 
             #copy cloud.nc file to baseline directory
-            logger.debug("PGN_INFO:copy:"+FCLD_NC+" to "+base_dir)
+            logger.debug("NPG_INFO:copy:"+FCLD_NC+" to "+base_dir)
             shutil.copy(FCLD_NC,base_dir)
 
-        logger.debug("PGN_INFO: RUN PHASE ENDS" )
+        logger.debug("NPG_INFO: RUN PHASE ENDS" )
 
 
 #=====================================================

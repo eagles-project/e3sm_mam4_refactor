@@ -621,7 +621,7 @@ NODEFAIL          Tests restart upon detected node failure. Generates fake failu
     <REST_OPTION>none</REST_OPTION>
   </test>
 
-  <test NAME="PGN">
+  <test NAME="NPG">
     <DESC>solution reproducibility test</DESC>
     <INFO_DBUG>1</INFO_DBUG>
     <DOUT_S>FALSE</DOUT_S>
