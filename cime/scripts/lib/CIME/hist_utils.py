@@ -110,7 +110,7 @@ def rename_all_hist_files(case, suffix):
     num_renamed = 0
     for model in _iter_model_file_substrs(case):
         comments += "  Renaming hist files for model '{}'\n".format(model)
-        test_hists = _get_latest_hist_files(testcase, model, rundir)
+        test_hists = _get_all_hist_files(testcase, model, rundir)
         num_renamed += len(test_hists)
         for test_hist in test_hists:
             new_file = "{}.{}".format(test_hist, suffix)
