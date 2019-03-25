@@ -168,6 +168,14 @@ logical :: l_rkz_lmt_2       = .false.
 logical :: l_rkz_lmt_3       = .false.
 logical :: l_rkz_lmt_4       = .true.
 logical :: l_rkz_lmt_5       = .false.
+
+! options for Chris Vogal's reconstruction 
+integer :: rkz_sgr_qv_deg  = -1
+integer :: rkz_sgr_ql_deg  = -1
+integer :: rkz_sgr_Al_deg  = -1
+logical :: l_rkz_use_sgr   = .false.
+logical :: l_sgr_fextrap   = .false.
+
 !!!!!!!Options for configuring a simple microphysics scheme 
 integer :: simple_microp_opt = -1   ! -1 = NOT using simple microphysics schemes 
 real(r8):: kessler_autoconv_tau     = 1000.0  ! autoconversion time scale (seconds) in Kessler scheme
@@ -211,6 +219,7 @@ subroutine phys_ctl_readnl(nlfile)
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, &
       simple_macrop_opt, rkz_cldfrc_opt, rkz_term_A_opt, rkz_term_B_opt, rkz_term_C_opt, &
       rkz_term_C_ql_opt, rkz_term_C_fmin, rkz_zsmall_opt, rkz_lmt5_opt, l_rkz_qme_check, &
+      l_rkz_use_sgr, l_sgr_fextrap, rkz_sgr_qv_deg, rkz_sgr_ql_deg, rkz_sgr_Al_deg, &
       l_rkz_lmt_2, l_rkz_lmt_3, l_rkz_lmt_4, l_rkz_lmt_5, &
       simple_microp_opt, kessler_autoconv_tau, kessler_autoconv_ql_crit, &
       prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
@@ -308,6 +317,12 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_rkz_lmt_3,                     1 , mpilog,  0, mpicom)
    call mpibcast(l_rkz_lmt_4,                     1 , mpilog,  0, mpicom)
    call mpibcast(l_rkz_lmt_5,                     1 , mpilog,  0, mpicom)
+
+   call mpibcast(l_rkz_use_sgr,                   1 , mpilog,  0, mpicom)
+   call mpibcast(l_sgr_fextrap,                   1 , mpilog,  0, mpicom)
+   call mpibcast(rkz_sgr_qv_deg,                  1 , mpiint,  0, mpicom)
+   call mpibcast(rkz_sgr_ql_deg,                  1 , mpiint,  0, mpicom)
+   call mpibcast(rkz_sgr_Al_deg,                  1 , mpiint,  0, mpicom)
 
    call mpibcast(simple_microp_opt,               1 , mpiint,  0, mpicom)
    call mpibcast(kessler_autoconv_tau,            1 , mpir8,   0, mpicom)
@@ -465,7 +480,9 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
                        ,simple_macrop_opt_out, rkz_cldfrc_opt_out, rkz_term_A_opt_out, rkz_term_B_opt_out &
                        ,rkz_term_C_opt_out, rkz_term_C_ql_opt_out, rkz_term_C_fmin_out, rkz_zsmall_opt_out &
-                       ,rkz_lmt5_opt_out, l_rkz_qme_check_out, l_rkz_lmt_2_out, l_rkz_lmt_3_out, l_rkz_lmt_4_out &
+                       ,rkz_lmt5_opt_out, l_rkz_qme_check_out,  l_rkz_use_sgr_out, l_sgr_fextrap_out &
+                       ,rkz_sgr_qv_deg_out, rkz_sgr_ql_deg_out, rkz_sgr_Al_deg_out &
+                       ,l_rkz_lmt_2_out, l_rkz_lmt_3_out, l_rkz_lmt_4_out &
                        ,l_rkz_lmt_5_out, simple_microp_opt_out, kessler_autoconv_tau_out, kessler_autoconv_ql_crit_out &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
@@ -549,6 +566,12 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    logical,           intent(out), optional :: l_rkz_lmt_4_out
    logical,           intent(out), optional :: l_rkz_lmt_5_out
 
+   logical,           intent(out), optional :: l_rkz_use_sgr_out
+   logical,           intent(out), optional :: l_sgr_fextrap_out
+   integer,           intent(out), optional :: rkz_sgr_qv_deg_out
+   integer,           intent(out), optional :: rkz_sgr_ql_deg_out
+   integer,           intent(out), optional :: rkz_sgr_Al_deg_out
+
    integer,           intent(out), optional :: simple_microp_opt_out
    real(r8),          intent(out), optional :: kessler_autoconv_tau_out
    real(r8),          intent(out), optional :: kessler_autoconv_ql_crit_out
@@ -629,6 +652,12 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(l_rkz_lmt_3_out         ) ) l_rkz_lmt_3_out       = l_rkz_lmt_3
    if ( present(l_rkz_lmt_4_out         ) ) l_rkz_lmt_4_out       = l_rkz_lmt_4
    if ( present(l_rkz_lmt_5_out         ) ) l_rkz_lmt_5_out       = l_rkz_lmt_5
+
+   if ( present(rkz_use_sgr_out         ) ) l_rkz_use_sgr_out     = l_rkz_use_sgr
+   if ( present(rkz_sgr_extrap_f_out    ) ) l_sgr_fextrap_out     = l_sgr_fextrap
+   if ( present(rkz_sgr_qv_deg_out      ) ) rkz_sgr_qv_deg_out    = rkz_sgr_qv_deg
+   if ( present(rkz_sgr_ql_deg_out      ) ) rkz_sgr_ql_deg_out    = rkz_sgr_ql_deg
+   if ( present(rkz_sgr_Al_deg_out      ) ) rkz_sgr_Al_deg_out    = rkz_sgr_Al_deg
 
    if ( present(simple_microp_opt_out   ) ) simple_microp_opt_out = simple_microp_opt
    if ( present(kessler_autoconv_tau_out) ) kessler_autoconv_tau_out = kessler_autoconv_tau

@@ -60,6 +60,8 @@ contains
     call addfld ('RKZ_RH',   (/'lev'/), 'I','1','grid-box mean relative humidity')
     call addfld ('RKZ_f',    (/'lev'/), 'I','1','cloud fraction')
     call addfld ('RKZ_fac',  (/'lev'/), 'I','1','cloud fraction after macro- and microphysics calculation in the previous time step')
+    call addfld ('RKZ_facm2', (/'lev'/), 'I','1','cloud fraction after macro- and microphysics calculation in the t-2 time step')
+
     call addfld ('RKZ_dfacdRH',  (/'lev'/), 'I','1','derivative of cloud fraction wrt relative humidity after macro- and microphysics calculation in the previous time step')
 
     call addfld ('RKZ_dfdRH',(/'lev'/), 'I','1','derivative of cloud fraction wrt relative humidity')
@@ -105,7 +107,7 @@ contains
   ! Calculate condensation rate and the resulting tendencies of the model 
   ! state variables
   !------------------------------------------------------------------------
-  subroutine simple_RKZ_tend(state, ptend, tcwat, qcwat, lcwat, ast, qmeold, astwat, dfacdRH,&
+  subroutine simple_RKZ_tend(state, ptend, tcwat, qcwat, lcwat, ast, qmeold, astwat, astnm2, dfacdRH,&
                              dtime, ixcldliq, &
                              rkz_cldfrc_opt, &
                              rkz_term_A_opt, &
@@ -115,6 +117,11 @@ contains
                              rkz_term_C_fmin, & 
                              rkz_zsmall_opt, &
                              rkz_lmt5_opt, &
+                             rkz_sgr_qv_deg, &
+                             rkz_sgr_ql_deg, &
+                             rkz_sgr_Al_deg, &
+                             l_rkz_use_sgr, &
+                             l_sgr_fextrap, &
                              l_rkz_qme_check, &
                              l_rkz_lmt_2, &
                              l_rkz_lmt_3, &
@@ -142,6 +149,8 @@ contains
   real(r8), intent(inout) :: qcwat(:,:)       ! qv          after macro- and microphysics calculation in the previous time step
   real(r8), intent(inout) :: lcwat(:,:)       ! ql          after macro- and microphysics calculation in the previous time step
   real(r8), intent(inout) :: astwat(:,:)      ! f           after macro- and microphysics calculation in the previous time step 
+  real(r8), intent(inout) :: astnm2(:,:)      ! f           after macro- and microphysics calculation in the t-2 time step 
+
   real(r8), intent(inout) :: dfacdRH(:,:)     ! df/dRH      after macro- and microphysics calculation in the previous time step 
                                               !             where f is the cloud fraction and RH the relative humidity
 
@@ -160,6 +169,13 @@ contains
 
   integer,  intent(in) :: rkz_zsmall_opt       
   integer,  intent(in) :: rkz_lmt5_opt
+
+  integer,  intent(in) :: rkz_sgr_qv_deg
+  integer,  intent(in) :: rkz_sgr_ql_deg
+  integer,  intent(in) :: rkz_sgr_Al_deg
+
+  logical,  intent(in) :: l_rkz_use_sgr
+  logical,  intent(in) :: l_sgr_fextrap 
 
   logical,  intent(in) :: l_rkz_lmt_2
   logical,  intent(in) :: l_rkz_lmt_3
@@ -184,6 +200,13 @@ contains
   real(r8) :: esl(pcols,pver)        ! saturation vapor pressure (output from subroutine qsat_water, not used)
   real(r8) :: dqsatdT(pcols,pver)    ! dqsat/dT
   real(r8) :: gam(pcols,pver)        ! L/cpair * dqsat/dT
+
+  !!variables used for Chris Vogal's reconstruction 
+  real(r8) :: ast_np1(pcols,pver)    ! f(t+dt)
+  real(r8) :: ast_n(pcols,pver)      ! f(t)
+  real(r8) :: qsatwat(pcols,pver)    ! saturation specific humidity using temperature in previous step
+  real(r8) :: dqsatdTwat(pcols,pver) ! dqsat/dT using temperature in previous step
+  real(r8) :: gamwat(pcols,pver)     ! L/cpair * dqsat/dT using temperature in previous step
 
   real(r8) :: rhu00                  ! threshold grid-box-mean RH used in the diagnostic cldfrc scheme
   real(r8) :: rhgbm(pcols,pver)      ! grid box mean relative humidity
@@ -240,6 +263,7 @@ contains
   lchnk = state%lchnk  ! needed by "call outfld" for model output
 
   call outfld('RKZ_fac',     astwat,    pcols, lchnk)
+  call outfld('RKZ_facm2',    astnm2,    pcols, lchnk)
   call outfld('RKZ_dfacdRH', dfacdRH,   pcols, lchnk)
 
   ! Calculate saturation specific humidity (qsat) and its derivative wrt temperature (dqsatdT)
@@ -247,6 +271,9 @@ contains
   do k=1,pver
   do i=1,ncol
      call qsat_water( state%t(i,k), state%pmid(i,k), esl(i,k), qsat(i,k), gam(i,k), dqsatdT(i,k) )
+     if(l_rkz_use_sgr) then
+       call qsat_water( tcwat(i,k), state%pmid(i,k), esl(i,k), qsatwat(i,k), gamwat(i,k), dqsatdTwat(i,k) )
+     end if 
   end do
   end do
   call outfld('RKZ_qsat',    qsat,    pcols, lchnk)
@@ -268,6 +295,7 @@ contains
                   rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in
  
  !!!add bounded condition for dln(f)/dt (case1)!!!
+ if ( rkz_term_C_opt.eq.4) then
  ! where ( ast(:ncol,:pver) .le. rkz_term_C_fmin )
  !   dlnastdRH(:ncol,:pver) = 300._r8
  ! end where
@@ -275,6 +303,7 @@ contains
   where ( ast(:ncol,:pver) .le. rkz_term_C_fmin )
     dlnastdRH(:ncol,:pver) = 100._r8
   end where
+ end if 
 
  !Output the grid-box-mean relative humidity (rhgbm)
   call outfld('RKZ_RH', rhgbm, pcols, lchnk)
@@ -303,6 +332,48 @@ contains
      call outfld('RKZ_Av', qtend, pcols, lchnk)
      call outfld('RKZ_Al', ltend, pcols, lchnk)
      call outfld('RKZ_AT', ttend, pcols, lchnk)
+   
+     !prepare variables for Chris Vogal's reconstruction 
+     if (l_rkz_use_sgr) then
+      ! determine values for f(t) and f(t+dt)
+      if (l_sgr_fextrap) then
+        ! f(t) = astwat, f(t+dt) = 2*astwat - astwatold
+        ast_n(:ncol,:pver) = astwat(:ncol,:pver)
+        if (nstep == 1) then
+          ast_np1(:ncol,:pver) = astwat(:ncol,:pver)
+        else
+          ast_np1(:ncol,:pver) = 2._r8*astwat(:ncol,:pver) - astnm2(:ncol,:pver)
+        end if
+      else
+        ! f(t) = astwatold, f(t+dt) = astwat
+        ast_n(:ncol,:pver)   = astnm2(:ncol,:pver)
+        ast_np1(:ncol,:pver) = astwat(:ncol,:pver)
+      end if
+
+      ! bound f(t_np1) to physical values while ensuring undershoot in previous
+      ! timestep is accounted for
+      do k=1,pver
+      do i=1,ncol
+        if (ast_np1(i,k) > 1._r8) then
+          ast_np1(i,k) = 1._r8
+          if (ast_n(i,k) == 1._r8) then
+            ast_n(i,k) = astnm2(i,k)
+          end if
+        else if(ast_np1(i,k) < 0._r8) then
+          ast_np1(i,k) = 0._r8
+          if (ast_n(i,k) == 0._r8) then
+            ast_n(i,k) = astnm2(i,k)
+          end if
+        end if
+      end do
+      end do
+      !where (ast_np1(:ncol,:pver) > 1._r8)
+      !  ast_np1 = 1._r8
+      !end where
+      !where (ast_np1(:ncol,:pver) < 0._r8)
+      !  ast_np1 = 0._r8
+      !end where
+     end if ! end l_sgr_fextrap
      
      !------------------------------------------------------------------------------------
      ! Term A: condensation in cloudy portion of a grid box, weighted by cloud fraction
@@ -321,6 +392,14 @@ contains
         term_A(:ncol,:pver) = ast(:ncol,:pver)     &
                            *( qtend(:ncol,:pver) - dqsatdT(:ncol,:pver)*ast(:ncol,:pver)*ttend(:ncol,:pver) ) &
                            /( 1._r8 + ast(:ncol,:pver)*gam(:ncol,:pver))
+
+     case(88)
+      ! use Chis Vogal's reconstruction formula 
+      ! add condensation term that maintains water saturation in cloudy
+      ! portion of cell at t+dt
+      term_A(:ncol,:pver) = ast_np1(:ncol, :pver) * &
+                           (qtend(:ncol,:pver) - dqsatdTwat(:ncol,:pver)*ttend(:ncol,:pver) ) &
+                             /( 1._r8 + gamwat(:ncol,:pver) )
 
      case default
          write(iulog,*) "Unrecognized value of rkz_term_A_opt:",rkz_term_A_opt,". Abort."
@@ -376,6 +455,12 @@ contains
      !!Origionally, there are only two terms on the right side of RK98 formula, 
      !!thus, term B should be always zero at any time
         term_B(:ncol,:pver) = 0._r8
+
+     case(88)
+      ! use Chis Vogal's reconstruction formula 
+      ! add condensation term that maintains no cloud liquid water in cloud-free
+      ! portion of cell
+        term_B(:ncol,:pver) = -(1._r8 - ast_np1(:ncol,:pver))**(1+rkz_sgr_Al_deg)*ltend(:ncol,:pver)
 
      case default
          write(iulog,*) "Unrecognized value of rkz_term_B_opt:",rkz_term_B_opt,". Abort."
@@ -550,6 +635,25 @@ contains
         term_C(:ncol,:pver) = term_C(:ncol,:pver)*rdenom(:ncol,:pver)
         term_A(:ncol,:pver) = term_A(:ncol,:pver)*rdenom(:ncol,:pver)
         term_B(:ncol,:pver) = term_B(:ncol,:pver)*rdenom(:ncol,:pver)
+
+     case(88)
+      ! use Chis Vogal's reconstruction formula 
+        term_C(:ncol,:pver) = 0._r8
+      where (ast_np1(:ncol,:pver) > ast_n(:ncol,:pver))
+        ! note that because ast_np1 is bounded by 1.0, entering this block means
+        ! astwat < 1.0 so that (1.0-astwat) > 0.0
+        term_C = -rdtime * &
+                (1._r8 - (1._r8-ast_np1)/(1._r8-ast_n))**(1+rkz_sgr_qv_deg) * (qsatwat-qcwat)
+      end where
+      ! where cloud annihilation scenario, add condensation term that ensures
+      ! the clear region at t+dt that was cloudy at t (transition region)
+      ! no longer has cloud liquid
+      where (ast_np1(:ncol,:pver) < ast_n(:ncol,:pver))
+        ! note that because ast_np1 is bounded by 0.0, entering this block means
+        ! astwat > 0.0
+        term_C = -rdtime * &
+                (1._r8 - ast_np1/ast_n)**(1+rkz_sgr_ql_deg) * lcwat
+      end where
 
      case default
          write(iulog,*) "Unrecognized value of rkz_term_C_opt:",rkz_term_C_opt,". Abort."

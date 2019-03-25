@@ -2051,12 +2051,21 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rkz_lmt_5
     logical :: l_rkz_qme_check
 
+    ! options for Chris Vogal's reconstruction 
+    integer :: rkz_sgr_qv_deg
+    integer :: rkz_sgr_ql_deg
+    integer :: rkz_sgr_Al_deg
+    logical :: l_rkz_use_sgr
+    logical :: l_sgr_fextrap
+
     integer :: simple_microp_opt = -1   ! -1 = NOT using simple macrophysics schemes
     real(r8):: kessler_autoconv_tau, kessler_autoconv_ql_crit
     
     !Shixuan Zhang (2018/03): added for simple condensation model convergence test 
     real(r8), pointer, dimension(:,:) :: qmeold     ! total condensation rate in previous step 
     real(r8), pointer, dimension(:,:) :: astwat     ! cloud fraction after condensation      
+    real(r8), pointer, dimension(:,:) :: astnm2     ! cloud fraction after condensation in t-2 time step
+    real(r8), pointer, dimension(:,:) :: astmic     ! cloud fraction used for microphysics
     real(r8), pointer, dimension(:,:) :: dfacdRH    ! df/dRH where f is the cloud fraction and RH the relative humidity
 
     real(r8) :: qsat(pcols,pver)       ! saturation specific humidity
@@ -2087,6 +2096,11 @@ subroutine tphysbc (ztodt,               &
                       ,rkz_term_C_fmin_out    = rkz_term_C_fmin &
                       ,rkz_zsmall_opt_out     = rkz_zsmall_opt &
                       ,rkz_lmt5_opt_out       = rkz_lmt5_opt &
+                      ,rkz_sgr_qv_deg_out     = rkz_sgr_qv_deg &
+                      ,rkz_sgr_ql_deg_out     = rkz_sgr_ql_deg &
+                      ,rkz_sgr_Al_deg_out     = rkz_sgr_Al_deg &
+                      ,l_rkz_use_sgr_out      = l_rkz_use_sgr &
+                      ,l_sgr_fextrap_out      = l_sgr_fextrap &
                       ,l_rkz_qme_check_out    = l_rkz_qme_check &
                       ,l_rkz_lmt_2_out        = l_rkz_lmt_2 &
                       ,l_rkz_lmt_3_out        = l_rkz_lmt_3 &
@@ -2526,10 +2540,13 @@ end if
                ifld = pbuf_get_index('ASTWAT')
                call pbuf_get_field(pbuf, ifld, astwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
+               ifld = pbuf_get_index('ASTNM2')
+               call pbuf_get_field(pbuf, ifld, astnm2, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
                ifld = pbuf_get_index('DASTDRH')
                call pbuf_get_field(pbuf, ifld, dfacdRH, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
-               call simple_RKZ_tend( state, ptend, tcwat, qcwat, lcwat, ast, qmeold, astwat, dfacdRH, &
+               call simple_RKZ_tend( state, ptend, tcwat, qcwat, lcwat, ast, qmeold, astwat, astnm2, dfacdRH, &
                                      cld_macmic_ztodt, ixcldliq, &
                                      rkz_cldfrc_opt, &
                                      rkz_term_A_opt, &
@@ -2539,6 +2556,11 @@ end if
                                      rkz_term_C_fmin, &
                                      rkz_zsmall_opt, &
                                      rkz_lmt5_opt, &
+                                     rkz_sgr_qv_deg, &
+                                     rkz_sgr_ql_deg, &
+                                     rkz_sgr_Al_deg, &
+                                     l_rkz_use_sgr, &
+                                     l_sgr_fextrap, &
                                      l_rkz_qme_check, &
                                      l_rkz_lmt_2, &
                                      l_rkz_lmt_3, &
@@ -2649,13 +2671,13 @@ end if
              end do
              end do
 
-             ! Calculate the cloud fraction (astwat) 
+             ! Calculate the cloud fraction (astmic) 
              call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
-                             astwat, rhu00, rhgbm, dfacdRH, dlnastdRH,         &! inout, out, out
+                             astmic, rhu00, rhgbm, dfacdRH, dlnastdRH,         &! inout, out, out
                              rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in
 
              ! Call the autoconversion scheme, then update model state
-             call kessler_autoconv_tend(state, ptend, cld_macmic_ztodt, ixcldliq, astwat, &
+             call kessler_autoconv_tend(state, ptend, cld_macmic_ztodt, ixcldliq, astmic, &
                                         kessler_autoconv_tau, kessler_autoconv_ql_crit)
 
              call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)          
@@ -2760,6 +2782,9 @@ end if
              ifld = pbuf_get_index('ASTWAT')
              call pbuf_get_field(pbuf, ifld, astwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
+             ifld = pbuf_get_index('ASTPM2')
+             call pbuf_get_field(pbuf, ifld, astnm2, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
              ifld = pbuf_get_index('DASTDRH')
              call pbuf_get_field(pbuf, ifld, dfacdRH, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
@@ -2776,6 +2801,7 @@ end if
              end do
              end do
              ! Calculate the cloud fraction (astwat) 
+             astnm2(:ncol,:pver) = astwat(:ncol,:pver)
              call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
                              astwat, rhu00, rhgbm, dfacdRH, dlnastdRH,         &! inout, out, out
                              rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in

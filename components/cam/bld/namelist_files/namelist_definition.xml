@@ -2723,6 +2723,36 @@ Turn on limiter 5 for condensation
 Default: FALSE
 </entry>
 
+<entry id="l_rkz_use_sgr" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Use the sub-grid reconstruction condensation rate
+Default: FALSE
+</entry>
+
+<entry id="l_sgr_fextrap" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Use extrapolation to determine cloud fraction at t+dt
+Default: FALSE
+</entry>
+
+<entry id="rkz_sgr_qv_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of water vapor profile in cloud-free region of grid cell
+Default: -1
+</entry>
+
+<entry id="rkz_sgr_ql_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of cloud liquid profile in cloudy region of grid cell
+Default: -1
+</entry>
+
+<entry id="rkz_sgr_Al_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of cloud liquid tendency in grid cell
+Default: -1
+</entry>
+
 <entry id="reset_init_ql" type="logical"  category="initial_conditions"
        group="cam_inparm" valid_values="" >
 Reset initial ql in inidat.f90 in se dynamical core
