@@ -290,6 +290,12 @@ contains
      call endrun
   end if
 
+  if ( l_rkz_use_sgr .and. ((rkz_term_C_opt.ne.88).or.(rkz_term_B_opt.ne.88).or.(rkz_term_A_opt.ne.88)) ) then
+     write(iulog,*) "Reconstruction code must be combined with rkz_term_C_opt = rkz_term_B_opt = rkz_term_A_opt=88"
+     write(iulog,*) "Your choice was: rkz_term_C_opt = ",rkz_term_C_opt, ", rkz_term_B_opt = ", rkz_term_B_opt, "rkz_term_A_opt = ", rkz_term_A_opt, ".Abort."
+     call endrun
+  end if
+
   call  smpl_frc( state%q(:,:,1), state%q(:,:,ixcldliq), qsat,      &! all in
                   ast, rhu00, rhgbm, dastdRH, dlnastdRH,            &! inout, out, out
                   rkz_cldfrc_opt, 0.5_r8, 0.5_r8, pcols, pver, ncol )! all in

@@ -653,8 +653,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(l_rkz_lmt_4_out         ) ) l_rkz_lmt_4_out       = l_rkz_lmt_4
    if ( present(l_rkz_lmt_5_out         ) ) l_rkz_lmt_5_out       = l_rkz_lmt_5
 
-   if ( present(rkz_use_sgr_out         ) ) l_rkz_use_sgr_out     = l_rkz_use_sgr
-   if ( present(rkz_sgr_extrap_f_out    ) ) l_sgr_fextrap_out     = l_sgr_fextrap
+   if ( present(l_rkz_use_sgr_out       ) ) l_rkz_use_sgr_out     = l_rkz_use_sgr
+   if ( present(l_sgr_fextrap_out       ) ) l_sgr_fextrap_out     = l_sgr_fextrap
    if ( present(rkz_sgr_qv_deg_out      ) ) rkz_sgr_qv_deg_out    = rkz_sgr_qv_deg
    if ( present(rkz_sgr_ql_deg_out      ) ) rkz_sgr_ql_deg_out    = rkz_sgr_ql_deg
    if ( present(rkz_sgr_Al_deg_out      ) ) rkz_sgr_Al_deg_out    = rkz_sgr_Al_deg
