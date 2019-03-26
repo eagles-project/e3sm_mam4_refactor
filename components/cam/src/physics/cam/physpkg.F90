@@ -2782,7 +2782,7 @@ end if
              ifld = pbuf_get_index('ASTWAT')
              call pbuf_get_field(pbuf, ifld, astwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
-             ifld = pbuf_get_index('ASTPM2')
+             ifld = pbuf_get_index('ASTNM2')
              call pbuf_get_field(pbuf, ifld, astnm2, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
              ifld = pbuf_get_index('DASTDRH')
