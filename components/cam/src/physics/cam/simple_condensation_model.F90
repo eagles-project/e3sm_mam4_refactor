@@ -718,6 +718,9 @@ contains
      case(22)
          dfdt(:ncol,:pver) = dastdRH(:ncol,:pver) *( zforcing(:ncol,:pver) - zc3(:ncol,:pver)*qme(:ncol,:pver) )
 
+     case(88)
+         dfdt(:ncol,:pver) = rdtime*( ast_np1(:ncol,:pver) - ast_n(:ncol,:pver) )
+
      case default
          write(iulog,*) "Unrecognized value of rkz_term_C_opt:",rkz_term_C_opt,". Abort."
          call endrun
