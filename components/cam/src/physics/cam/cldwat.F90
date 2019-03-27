@@ -264,8 +264,8 @@ subroutine pcond (lchnk   ,ncol    , &
                   fsaut   ,fracw   ,fsacw   ,fsaci   ,lctend  , &
                   rhdfda  ,rhu00   ,seaicef, zi      ,ice2pr, liq2pr, &
                   liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio, &
-                  fmin, tcwat, pcwat, qcwat, lcwat, cldnwat, cldnnm2, icwat, &
-                  icnm2, ql_incld_opt, lc_tend_opt, & 
+                  fmin, tcwat, pcwat, qcwat, lcwat, cldwat, cldnm2, icwat, &
+                  icnm2, ql_incld_opt, lc_tend_opt, rdtime, & 
                   l_use_sgr, l_sgr_fextrap, qv_sgr_deg, ql_sgr_deg, ltend_sgr_deg)
 !----------------------------------------------------------------------- 
 ! 
@@ -540,8 +540,8 @@ subroutine pcond (lchnk   ,ncol    , &
               end if
             else if(ast_np1(i) < 0._r8) then
               ast_np1(i) = 0._r8
-              if (ast_n(i,k) == 0._r8) then
-                ast_n(i,k) = cldnm2(i,k)
+              if (ast_n(i) == 0._r8) then
+                ast_n(i) = cldnm2(i,k)
               end if
             end if
           end do
@@ -633,11 +633,11 @@ subroutine pcond (lchnk   ,ncol    , &
 
                if(l_use_sgr)then
                 !method 1: Chris Vogl's reconstruction
-                csigma(i) = 1.0_r8/(rhdfda(i,k)+cgamma(i)*icwat(i))
+                csigma(i) = 1.0_r8/(rhdfda(i,k)+cgamma(i)*icwat(i,k))
                 cmec1(i)  = ast_np1(i) * &
                            (qtend(i,k) - dqsdtwat(i)*ttend(i,k)) &
                              /(1.0_r8 + gamwat(i))
-                cmec2(i)  = -(1.0_r8 -ast_np1(i))**(1+ql_sgr_deg)*ltend(i,k)
+                cmec2(i)  = -(1.0_r8 -ast_np1(i))**(1+ql_sgr_deg)*lctend(i,k)
                 cmec3(i)  = 0._r8 
                 if(ast_np1(i) > ast_n(i)) then 
                   cmec3(i)  = -rdtime * &

@@ -437,7 +437,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out      &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out, fmin_out, ql_incld_opt_out, lc_tend_opt_out &
-                       ,l_use_sgr_out, l_sgr_fextrap_out, qv_sgr_deg_out,   ql_sgr_deg_out, ltend_sgr_deg_out, &
+                       ,l_use_sgr_out, l_sgr_fextrap_out, qv_sgr_deg_out,   ql_sgr_deg_out, ltend_sgr_deg_out &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
 !-----------------------------------------------------------------------
