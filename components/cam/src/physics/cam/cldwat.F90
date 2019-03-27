@@ -264,7 +264,7 @@ subroutine pcond (lchnk   ,ncol    , &
                   fsaut   ,fracw   ,fsacw   ,fsaci   ,lctend  , &
                   rhdfda  ,rhu00   ,seaicef, zi      ,ice2pr, liq2pr, &
                   liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio, &
-                  fmin, tcwat, pcwat, qcwat, lcwat, cldwat, cldnm2, icwat, &
+                  fmin, tcwat, pcwat, qcwat, lcwat, astwat, astnm2, icwat, &
                   icnm2, ql_incld_opt, lc_tend_opt, rdtime, & 
                   l_use_sgr, l_sgr_fextrap, qv_sgr_deg, ql_sgr_deg, ltend_sgr_deg)
 !----------------------------------------------------------------------- 
@@ -330,8 +330,8 @@ subroutine pcond (lchnk   ,ncol    , &
    real(r8), intent(in) :: fmin                 ! safe guard value for cloud fraction to aviod devided by zer0
    real(r8), intent(in) :: icwat(pcols,pver)    ! In-cloud cloud water (kg/kg) from previous(t-1) step
    real(r8), intent(in) :: icnm2(pcols,pver)    ! In-cloud cloud water (kg/kg) from t-2 step
-   real(r8), intent(in) :: cldwat(pcols,pver)   ! cloud fraction from previous(t-1) step
-   real(r8), intent(in) :: cldnm2(pcols,pver)   ! cloud fraction from t-2 step
+   real(r8), intent(in) :: astwat(pcols,pver)   ! cloud fraction from previous(t-1) step
+   real(r8), intent(in) :: astnm2(pcols,pver)   ! cloud fraction from t-2 step
    real(r8), intent(in) :: tcwat(pcols,pver)    ! temperature (K) from previous(t-1) step)
    real(r8), intent(in) :: pcwat(pcols,pver)    ! pressure (Pa) from previous(t-1) step
    real(r8), intent(in) :: qcwat(pcols,pver)    ! water vapor  (kg/kg) from previous(t-1) step
@@ -522,12 +522,12 @@ subroutine pcond (lchnk   ,ncol    , &
         ! determine values for f(t) and f(t+dt)
           if (l_sgr_fextrap) then
             ! f(t) = astwat, f(t+dt) = 2*astwat - astnm2
-              ast_n(:ncol) = cldwat(:ncol,k)
-              ast_np1(:ncol) = 2._r8*cldwat(:ncol,k) - cldnm2(:ncol,k)
+              ast_n(:ncol) = astwat(:ncol,k)
+              ast_np1(:ncol) = 2._r8*astwat(:ncol,k) - astnm2(:ncol,k)
           else
             ! f(t) = astnm2, f(t+dt) = astwat
-              ast_n(:ncol)   = cldnm2(:ncol,k)
-              ast_np1(:ncol) = cldwat(:ncol,k)
+              ast_n(:ncol)   = astnm2(:ncol,k)
+              ast_np1(:ncol) = astwat(:ncol,k)
           end if
 
          ! bound f(t+dt) to physical values while ensuring undershoot in previous
@@ -536,12 +536,12 @@ subroutine pcond (lchnk   ,ncol    , &
             if (ast_np1(i) > 1._r8) then
               ast_np1(i) = 1._r8
               if (ast_n(i) == 1._r8) then
-                ast_n(i) = cldnm2(i,k)
+                ast_n(i) = astnm2(i,k)
               end if
             else if(ast_np1(i) < 0._r8) then
               ast_np1(i) = 0._r8
               if (ast_n(i) == 0._r8) then
-                ast_n(i) = cldnm2(i,k)
+                ast_n(i) = astnm2(i,k)
               end if
             end if
           end do

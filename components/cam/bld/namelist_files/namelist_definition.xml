@@ -2627,6 +2627,36 @@ Options for liquid water tendency used for condensation.
 Default: 0
 </entry>
 
+<entry id="l_use_sgr" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Use the sub-grid reconstruction condensation rate
+Default: FALSE
+</entry>
+
+<entry id="l_sgr_fextrap" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Use extrapolation to determine cloud fraction at t+dt
+Default: FALSE
+</entry>
+
+<entry id="qv_sgr_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of water vapor profile in cloud-free region of grid cell
+Default: -1
+</entry>
+
+<entry id="ql_sgr_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of cloud liquid profile in cloudy region of grid cell
+Default: -1
+</entry>
+
+<entry id="ltend_sgr_deg" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Polynomial degree of cloud liquid tendency in grid cell
+Default: -1
+</entry>
+
 <entry id="fmin" type="real" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
 Safe guard value for cloud fraction to avoid devided by zero

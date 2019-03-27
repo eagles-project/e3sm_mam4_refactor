@@ -33,8 +33,8 @@ integer  ::  tcwat_idx          = 0
 integer  ::  pcwat_idx          = 0 
 integer  ::  icwat_idx          = 0
 integer  ::  icnm2_idx          = 0
-integer  ::  cldwat_idx         = 0
-integer  ::  cldnm2_idx         = 0
+integer  ::  astwat_idx         = 0
+integer  ::  astnm2_idx         = 0
 
 integer  ::  cld_idx            = 0 
 integer  ::  ast_idx            = 0 
@@ -108,8 +108,8 @@ subroutine stratiform_register
    call pbuf_add_field('PCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), pcwat_idx)
    call pbuf_add_field('ICWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), icwat_idx)
    call pbuf_add_field('ICNM2',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), icnm2_idx)
-   call pbuf_add_field('CLDWAT', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cldwat_idx)
-   call pbuf_add_field('CLDNM2', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cldnm2_idx)
+   call pbuf_add_field('ASTWAT', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), astwat_idx)
+   call pbuf_add_field('ASTNM2', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), astnm2_idx)
 
    call pbuf_add_field('CLD',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cld_idx)
    call pbuf_add_field('AST',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), ast_idx)
@@ -436,8 +436,8 @@ subroutine stratiform_tend( &
    real(r8), pointer, dimension(:,:) :: lcwat        ! Cloud liquid water old q
    real(r8), pointer, dimension(:,:) :: icwat        ! In-cloud liquid + ice water old q
    real(r8), pointer, dimension(:,:) :: icnm2        ! In-cloud liquid + ice water old q
-   real(r8), pointer, dimension(:,:) :: cldwat       ! cloud fraction in previous step (t-1)
-   real(r8), pointer, dimension(:,:) :: cldnm2       ! cloud fraction in t-2 step
+   real(r8), pointer, dimension(:,:) :: astwat       ! cloud fraction in previous step (t-1)
+   real(r8), pointer, dimension(:,:) :: astnm2       ! cloud fraction in t-2 step
 
 
    real(r8), pointer, dimension(:,:) :: cld          ! Total cloud fraction
@@ -542,8 +542,8 @@ subroutine stratiform_tend( &
    call pbuf_get_field(pbuf, lcwat_idx,   lcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, icwat_idx,   icwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, icnm2_idx,   icnm2,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-   call pbuf_get_field(pbuf, cldwat_idx,  cldwat,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-   call pbuf_get_field(pbuf, cldnm2_idx,  cldnm2,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, astwat_idx,  astwat,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, astnm2_idx,  astnm2,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
    call pbuf_get_field(pbuf, cld_idx,     cld,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, concld_idx,  concld,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -788,7 +788,7 @@ subroutine stratiform_tend( &
                fsaut, fracw, fsacw, fsaci, ltend,                          &
                rhdfda, rhu00, icefrac, state1%zi, ice2pr, liq2pr,          &
                liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio,&
-               fmin, tcwat, pcwat, qcwat, lcwat, cldwat, cldnm2, icwat,    &
+               fmin, tcwat, pcwat, qcwat, lcwat, astwat, astnm2, icwat,    &
                icnm2, ql_incld_opt, lc_tend_opt,rdtime,                    &
                l_use_sgr, l_sgr_fextrap, qv_sgr_deg, ql_sgr_deg, ltend_sgr_deg)
    call t_stopf('pcond')
@@ -939,12 +939,12 @@ subroutine stratiform_tend( &
       tcwat(:ncol,k)  = state1%t(:ncol,k)
       pcwat(:ncol,k)  = state1%pmid(:ncol,k)
       lcwat(:ncol,k)  = state1%q(:ncol,k,ixcldice) + state1%q(:ncol,k,ixcldliq)
-      if(is_first_step) then
-        cldnm2(:ncol,k) = cld(:ncol,k)
+      if(is_first_step()) then
+        astnm2(:ncol,k) = cld(:ncol,k)
       else
-        cldnm2(:ncol,k) = cldwat(:ncol,k)
+        astnm2(:ncol,k) = astwat(:ncol,k)
       end if 
-      cldwat(:ncol,k) = cld(:ncol,k)     
+      astwat(:ncol,k) = cld(:ncol,k)     
       icnm2(:ncol,k)  = icwat(:ncol,k)
       icwat(:ncol,k)  = lcwat(:ncol,k)/max(fmin,cld(:ncol,k))
    end do
