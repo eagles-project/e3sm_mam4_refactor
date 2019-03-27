@@ -520,7 +520,7 @@ subroutine pcond (lchnk   ,ncol    , &
              eswat(:ncol), qswat(:ncol), gam=gamwat(:ncol), dqsdt=dqsdtwat(:ncol))
 
         ! determine values for f(t) and f(t+dt)
-          if (rkz_sgr_extrap_f) then
+          if (l_sgr_fextrap) then
             ! f(t) = astwat, f(t+dt) = 2*astwat - astnm2
               ast_n(:ncol) = cldwat(:ncol,k)
               ast_np1(:ncol) = 2._r8*cldwat(:ncol,k) - cldnm2(:ncol,k)
