@@ -157,6 +157,13 @@ real(r8):: fmin            = 1e-4_r8 !default used by RK-ZM scheme
 integer :: ql_incld_opt    = 0       ! default used by RK-ZM scheme
 integer :: lc_tend_opt     = 0       ! default used by RK-ZM sheme
 
+! flag and parameters used by Chris Vogal's reconstrunction 
+logical :: l_use_sgr       = .false.
+logical :: l_sgr_fextrap   = .false. 
+integer :: qv_sgr_deg      = -1
+integer :: ql_sgr_deg      = -1
+integer :: ltend_sgr_deg   = -1
+
 !======================================================================= 
 contains
 !======================================================================= 
@@ -192,6 +199,7 @@ subroutine phys_ctl_readnl(nlfile)
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, fmin, ql_incld_opt,lc_tend_opt, &
+      l_use_sgr, l_sgr_fextrap, qv_sgr_deg,   ql_sgr_deg, ltend_sgr_deg, &
       prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
       rrtmg_temp_fix
    !-----------------------------------------------------------------------------
@@ -274,6 +282,11 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(fmin,                            1 , mpir8,   0, mpicom)
    call mpibcast(ql_incld_opt,                    1 , mpiint,  0, mpicom)
    call mpibcast(lc_tend_opt,                     1 , mpiint,  0, mpicom)
+   call mpibcast(l_use_sgr,                       1 , mpilog,  0, mpicom)
+   call mpibcast(l_sgr_fextrap,                   1 , mpilog,  0, mpicom)
+   call mpibcast(qv_sgr_deg,                      1 , mpiint,  0, mpicom)
+   call mpibcast(qv_sgr_deg,                      1 , mpiint,  0, mpicom)
+   call mpibcast(ltend_sgr_deg,                   1 , mpiint,  0, mpicom)
    call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
    call mpibcast(prc_coef1,                       1 , mpir8,   0, mpicom)
    call mpibcast(prc_exp,                         1 , mpir8,   0, mpicom)
@@ -424,6 +437,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out      &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out, fmin_out, ql_incld_opt_out, lc_tend_opt_out &
+                       ,l_use_sgr_out, l_sgr_fextrap_out, qv_sgr_deg_out,   ql_sgr_deg_out, ltend_sgr_deg_out, &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
 !-----------------------------------------------------------------------
@@ -495,6 +509,11 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    integer,           intent(out), optional :: cld_macmic_num_steps_out
    integer,           intent(out), optional :: ql_incld_opt_out
    integer,           intent(out), optional :: lc_tend_opt_out
+   logical,           intent(out), optional :: l_use_sgr_out
+   logical,           intent(out), optional :: l_sgr_fextrap_out
+   integer,           intent(out), optional :: qv_sgr_deg_out
+   integer,           intent(out), optional :: ql_sgr_deg_out
+   integer,           intent(out), optional :: ltend_sgr_deg_out
    real(r8),          intent(out), optional :: fmin_out
    real(r8),          intent(out), optional :: prc_coef1_out
    real(r8),          intent(out), optional :: prc_exp_out
@@ -558,6 +577,11 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(fmin_out                ) ) fmin_out              = fmin
    if ( present(ql_incld_opt_out        ) ) ql_incld_opt_out      = ql_incld_opt
    if ( present(lc_tend_opt_out         ) ) lc_tend_opt_out       = lc_tend_opt
+   if ( present(l_use_sgr_out           ) ) l_use_sgr_out         = l_use_sgr
+   if ( present(l_sgr_fextrap_out       ) ) l_sgr_fextrap_out     = l_sgr_fextrap
+   if ( present(qv_sgr_deg_out          ) ) qv_sgr_deg_out        = qv_sgr_deg
+   if ( present(ql_sgr_deg_out          ) ) ql_sgr_deg_out        = ql_sgr_deg
+   if ( present(ltend_sgr_deg_out       ) ) ltend_sgr_deg_out     = ltend_sgr_deg
    if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
    if ( present(prc_coef1_out           ) ) prc_coef1_out            = prc_coef1
    if ( present(prc_exp_out             ) ) prc_exp_out              = prc_exp

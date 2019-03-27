@@ -29,8 +29,12 @@ public :: stratiform_tend
 ! Physics buffer indices 
 integer  ::  qcwat_idx          = 0 
 integer  ::  lcwat_idx          = 0 
-integer  ::  tcwat_idx          = 0 
+integer  ::  tcwat_idx          = 0
+integer  ::  pcwat_idx          = 0 
 integer  ::  icwat_idx          = 0
+integer  ::  icnm2_idx          = 0
+integer  ::  cldwat_idx         = 0
+integer  ::  cldnm2_idx         = 0
 
 integer  ::  cld_idx            = 0 
 integer  ::  ast_idx            = 0 
@@ -101,7 +105,11 @@ subroutine stratiform_register
    call pbuf_add_field('QCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), qcwat_idx)
    call pbuf_add_field('LCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), lcwat_idx)
    call pbuf_add_field('TCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), tcwat_idx)
+   call pbuf_add_field('PCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), pcwat_idx)
    call pbuf_add_field('ICWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), icwat_idx)
+   call pbuf_add_field('ICNM2',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), icnm2_idx)
+   call pbuf_add_field('CLDWAT', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cldwat_idx)
+   call pbuf_add_field('CLDNM2', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cldnm2_idx)
 
    call pbuf_add_field('CLD',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cld_idx)
    call pbuf_add_field('AST',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), ast_idx)
@@ -350,7 +358,10 @@ subroutine stratiform_tend( &
    state, ptend_all, pbuf, dtime, icefrac, &
    landfrac, ocnfrac, landm, snowh, dlf,   &
    dlf2, rliq, cmfmc, cmfmc2, ts,          &
-   sst, zdu, fmin, ql_incld_opt,lc_tend_opt)
+   sst, zdu, fmin, ql_incld_opt,lc_tend_opt, & 
+   l_use_sgr, l_sgr_fextrap, qv_sgr_deg,     &
+   ql_sgr_deg, ltend_sgr_deg)
+
 
    !-------------------------------------------------------- !  
    !                                                         ! 
@@ -370,6 +381,7 @@ subroutine stratiform_tend( &
    use cldwat,           only: pcond
    use pkg_cldoptics,    only: cldefr
    use phys_control,     only: cam_physpkg_is
+   use time_manager,     only: is_first_step, get_nstep
 
    ! Arguments
    type(physics_state), intent(in)    :: state       ! State variables
@@ -395,8 +407,12 @@ subroutine stratiform_tend( &
    real(r8), intent(in)  :: fmin                     ! safe guard value for cloud fraction to aviod devided by zero
    integer,  intent(in)  :: ql_incld_opt             ! options for in-cloud liquid water calculation
    integer,  intent(in)  :: lc_tend_opt              ! options for liquid water tendency used for condensation
-
-  ! Local variables
+! flag and parameters used by Chris Vogal's reconstrunction 
+   logical,  intent(in) :: l_use_sgr
+   logical,  intent(in) :: l_sgr_fextrap
+   integer,  intent(in) :: qv_sgr_deg
+   integer,  intent(in) :: ql_sgr_deg
+   integer,  intent(in) :: ltend_sgr_deg
 
    type(physics_state)   :: state1                   ! Local copy of the state variable
    type(physics_ptend)   :: ptend_loc                ! Package tendencies
@@ -416,8 +432,14 @@ subroutine stratiform_tend( &
 
    real(r8), pointer, dimension(:,:) :: qcwat        ! Cloud water old q
    real(r8), pointer, dimension(:,:) :: tcwat        ! Cloud water old temperature
+   real(r8), pointer, dimension(:,:) :: pcwat        ! Cloud water old pressure
    real(r8), pointer, dimension(:,:) :: lcwat        ! Cloud liquid water old q
    real(r8), pointer, dimension(:,:) :: icwat        ! In-cloud liquid + ice water old q
+   real(r8), pointer, dimension(:,:) :: icnm2        ! In-cloud liquid + ice water old q
+   real(r8), pointer, dimension(:,:) :: cldwat       ! cloud fraction in previous step (t-1)
+   real(r8), pointer, dimension(:,:) :: cldnm2       ! cloud fraction in t-2 step
+
+
    real(r8), pointer, dimension(:,:) :: cld          ! Total cloud fraction
    real(r8), pointer, dimension(:,:) :: fice         ! Cloud ice/water partitioning ratio.
    real(r8), pointer, dimension(:,:) :: ast          ! Relative humidity cloud fraction
@@ -516,8 +538,12 @@ subroutine stratiform_tend( &
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, qcwat_idx,   qcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, tcwat_idx,   tcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, pcwat_idx,   pcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, lcwat_idx,   lcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, icwat_idx,   icwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, icnm2_idx,   icnm2,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cldwat_idx,  cldwat,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cldnm2_idx,  cldnm2,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
    call pbuf_get_field(pbuf, cld_idx,     cld,     start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, concld_idx,  concld,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -762,7 +788,9 @@ subroutine stratiform_tend( &
                fsaut, fracw, fsacw, fsaci, ltend,                          &
                rhdfda, rhu00, icefrac, state1%zi, ice2pr, liq2pr,          &
                liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio,&
-               fmin, icwat, ql_incld_opt,lc_tend_opt)
+               fmin, tcwat, pcwat, qcwat, lcwat, cldwat, cldnm2, icwat,    &
+               icnm2, ql_incld_opt, lc_tend_opt,rdtime,                    &
+               l_use_sgr, l_sgr_fextrap, qv_sgr_deg, ql_sgr_deg, ltend_sgr_deg)
    call t_stopf('pcond')
 
    lq(:)        = .FALSE.
@@ -907,10 +935,18 @@ subroutine stratiform_tend( &
    ! Save variables for use in the macrophysics at the next time step
 
    do k = 1, pver
-      qcwat(:ncol,k) = state1%q(:ncol,k,1)
-      tcwat(:ncol,k) = state1%t(:ncol,k)
-      lcwat(:ncol,k) = state1%q(:ncol,k,ixcldice) + state1%q(:ncol,k,ixcldliq)
-      icwat(:ncol,k) = lcwat(:ncol,k)/max(fmin,cld(:ncol,k))
+      qcwat(:ncol,k)  = state1%q(:ncol,k,1)
+      tcwat(:ncol,k)  = state1%t(:ncol,k)
+      pcwat(:ncol,k)  = state1%pmid(:ncol,k)
+      lcwat(:ncol,k)  = state1%q(:ncol,k,ixcldice) + state1%q(:ncol,k,ixcldliq)
+      if(is_first_step) then
+        cldnm2(:ncol,k) = cld(:ncol,k)
+      else
+        cldnm2(:ncol,k) = cldwat(:ncol,k)
+      end if 
+      cldwat(:ncol,k) = cld(:ncol,k)     
+      icnm2(:ncol,k)  = icwat(:ncol,k)
+      icwat(:ncol,k)  = lcwat(:ncol,k)/max(fmin,cld(:ncol,k))
    end do
   
    ! Cloud water and ice particle sizes, saved in physics buffer for radiation

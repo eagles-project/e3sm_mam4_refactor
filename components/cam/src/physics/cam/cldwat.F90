@@ -264,7 +264,9 @@ subroutine pcond (lchnk   ,ncol    , &
                   fsaut   ,fracw   ,fsacw   ,fsaci   ,lctend  , &
                   rhdfda  ,rhu00   ,seaicef, zi      ,ice2pr, liq2pr, &
                   liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio, &
-                  fmin, icwat, ql_incld_opt, lc_tend_opt)
+                  fmin, tcwat, pcwat, qcwat, lcwat, cldnwat, cldnnm2, icwat, &
+                  icnm2, ql_incld_opt, lc_tend_opt, & 
+                  l_use_sgr, l_sgr_fextrap, qv_sgr_deg, ql_sgr_deg, ltend_sgr_deg)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -298,11 +300,19 @@ subroutine pcond (lchnk   ,ncol    , &
    integer, intent(in) :: lc_tend_opt           ! options for the liquid water tendency in condensation calculation
                                                 ! lc_tend_opt > 1 then lc_tend related term = 0 
                                                 ! when lc_tend < 0 in condensation calculation
+! flag and parameters used by Chris Vogal's reconstrunction 
+   logical,  intent(in) :: l_use_sgr            ! namelist
+   logical,  intent(in) :: l_sgr_fextrap        ! 
+   integer,  intent(in) :: qv_sgr_deg
+   integer,  intent(in) :: ql_sgr_deg
+   integer,  intent(in) :: ltend_sgr_deg
 
+   real(r8), intent(in) :: rdtime               ! 1./dtime
    real(r8), intent(in) :: fice(pcols,pver)     ! fraction of cwat that is ice
    real(r8), intent(in) :: fsnow(pcols,pver)    ! fraction of rain that freezes to snow
    real(r8), intent(in) :: cldn(pcols,pver)     ! new value of cloud fraction    (fraction)
    real(r8), intent(in) :: cwat(pcols,pver)     ! cloud water (kg/kg)
+    
    real(r8), intent(in) :: omega(pcols,pver)    ! vert pressure vel (Pa/s)
    real(r8), intent(in) :: p(pcols,pver)        ! pressure          (K)
    real(r8), intent(in) :: pdel(pcols,pver)     ! pressure thickness (Pa)
@@ -318,7 +328,14 @@ subroutine pcond (lchnk   ,ncol    , &
    real(r8), intent(in) :: zi(pcols,pverp)      ! layer interfaces (m)
    real(r8), intent(in) :: snowh(pcols)         ! Snow depth over land, water equivalent (m)
    real(r8), intent(in) :: fmin                 ! safe guard value for cloud fraction to aviod devided by zer0
-   real(r8), intent(in) :: icwat(pcols,pver)    ! In-cloud cloud water (kg/kg) from previous step
+   real(r8), intent(in) :: icwat(pcols,pver)    ! In-cloud cloud water (kg/kg) from previous(t-1) step
+   real(r8), intent(in) :: icnm2(pcols,pver)    ! In-cloud cloud water (kg/kg) from t-2 step
+   real(r8), intent(in) :: cldwat(pcols,pver)   ! cloud fraction from previous(t-1) step
+   real(r8), intent(in) :: cldnm2(pcols,pver)   ! cloud fraction from t-2 step
+   real(r8), intent(in) :: tcwat(pcols,pver)    ! temperature (K) from previous(t-1) step)
+   real(r8), intent(in) :: pcwat(pcols,pver)    ! pressure (Pa) from previous(t-1) step
+   real(r8), intent(in) :: qcwat(pcols,pver)    ! water vapor  (kg/kg) from previous(t-1) step
+   real(r8), intent(in) :: lcwat(pcols,pver)    ! liquid water (kg/kg) from previous(t-1) step
 
 !
 ! Output Arguments
@@ -363,13 +380,19 @@ subroutine pcond (lchnk   ,ncol    , &
    real(r8) cwn(pcols)           ! cwat mixing ratio at end
    real(r8) denom                ! work variable
    real(r8) dqsdt                ! change in sat spec. hum. wrt temperature
+   real(r8) ast_np1(pcols)       ! cloud fraction at n+1 step 
+   real(r8) ast_n(pcols)         ! cloud fraction at n step   
+
    real(r8) es(pcols)            ! sat. vapor pressure
+   real(r8) eswat(pcols)         ! sat. vapor pressure in t-1 step 
    real(r8) fracw(pcols,pver)    ! relative importance of collection of liquid by rain
    real(r8) fsaci(pcols,pver)    ! relative importance of collection of ice by snow
    real(r8) fsacw(pcols,pver)    ! relative importance of collection of liquid by snow
    real(r8) fsaut(pcols,pver)    ! relative importance of ice auto conversion
    real(r8) fwaut(pcols,pver)    ! relative importance of warm cloud autoconversion
    real(r8) gamma(pcols)         ! d qs / dT
+   real(r8) gamwat(pcols)        ! d qs / dT in t-1 step 
+   real(r8) dqsdtwat(pcols)      ! change in sat spec. hum. wrt temperature in previous step
    real(r8) icwc(pcols)          ! in-cloud water content (kg/kg)
    real(r8) mincld               ! a small cloud fraction to avoid / zero
    real(r8),parameter ::omsm=0.99999_r8                 ! a number just less than unity (for rounding)
@@ -377,6 +400,7 @@ subroutine pcond (lchnk   ,ncol    , &
    real(r8) prtmp                ! work variable
    real(r8) q(pcols,pver)        ! mixing ratio before time step ignoring condensate
    real(r8) qs(pcols)            ! spec. hum. of water vapor
+   real(r8) qswat(pcols)         ! spec. hum. of water vapor in t-1 step
    real(r8) qsn, esn             ! work variable
    real(r8) qsp(pcols,pver)      ! sat pt mixing ratio
    real(r8) qtl(pcols)           ! tendency which would saturate the grid box in deltat
@@ -489,6 +513,41 @@ subroutine pcond (lchnk   ,ncol    , &
 
       call qsat(t(:ncol,k), p(:ncol,k), &
            es(:ncol), qs(:ncol), gam=gamma(:ncol))
+     
+      !subgrid reconstruction requires the calculation from previous step 
+      if(l_use_sgr) then
+        call qsat(tcwat(:ncol,k), pcwat(:ncol,k), &
+             eswat(:ncol), qswat(:ncol), gam=gamwat(:ncol), dqsdt=dqsdtwat(:ncol))
+
+        ! determine values for f(t) and f(t+dt)
+          if (rkz_sgr_extrap_f) then
+            ! f(t) = astwat, f(t+dt) = 2*astwat - astnm2
+              ast_n(:ncol) = cldwat(:ncol,k)
+              ast_np1(:ncol) = 2._r8*cldwat(:ncol,k) - cldnm2(:ncol,k)
+          else
+            ! f(t) = astnm2, f(t+dt) = astwat
+              ast_n(:ncol)   = cldnm2(:ncol,k)
+              ast_np1(:ncol) = cldwat(:ncol,k)
+          end if
+
+         ! bound f(t+dt) to physical values while ensuring undershoot in previous
+         ! timestep is accounted for
+          do i=1,ncol
+            if (ast_np1(i) > 1._r8) then
+              ast_np1(i) = 1._r8
+              if (ast_n(i) == 1._r8) then
+                ast_n(i) = cldnm2(i,k)
+              end if
+            else if(ast_np1(i) < 0._r8) then
+              ast_np1(i) = 0._r8
+              if (ast_n(i,k) == 0._r8) then
+                ast_n(i,k) = cldnm2(i,k)
+              end if
+            end if
+          end do
+
+      end if   
+
       do i = 1,ncol
          relhum(i) = q(i,k)/qs(i)
 !
@@ -571,6 +630,30 @@ subroutine pcond (lchnk   ,ncol    , &
            ! 2. fractional saturation
            ! ========================
               else
+
+               if(l_use_sgr)then
+                !method 1: Chris Vogl's reconstruction
+                csigma(i) = 1.0_r8/(rhdfda(i,k)+cgamma(i)*icwat(i))
+                cmec1(i)  = ast_np1(i) * &
+                           (qtend(i,k) - dqsdtwat(i)*ttend(i,k)) &
+                             /(1.0_r8 + gamwat(i))
+                cmec2(i)  = -(1.0_r8 -ast_np1(i))**(1+ql_sgr_deg)*ltend(i,k)
+                cmec3(i)  = 0._r8 
+                if(ast_np1(i) > ast_n(i)) then 
+                  cmec3(i)  = -rdtime * &
+                               (1._r8 - (1._r8-ast_np1(i))/(1._r8-ast_n(i)))**(1+qv_sgr_deg) * &
+                               (qswat(i)-qcwat(i,k))
+                end if 
+                if(ast_np1(i) < ast_n(i)) then
+                  cmec3(i)  = -rdtime * &
+                               (1._r8 - ast_np1(i)/ast_n(i))**(1+ltend_sgr_deg) * lcwat(i,k)
+                end if 
+                cmec4(i)  = csigma(i)*cgamma(i)*icwc(i)*evapprec(i,k)
+                cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)+cmec4(i)
+
+               else
+               
+                !method 2: Zhang (2003) method 
                  if (rhdfda(i,k) .eq. 0._r8 .and. icwc(i).eq.0._r8) then
                     write (iulog,*) ' cldwat.F90:  empty rh cloud ', i, k, lchnk
                     write (iulog,*) ' relhum, iter ', relhum(i), l, rhu00(i,k), cldm(i), cldn(i,k)
@@ -595,7 +678,9 @@ subroutine pcond (lchnk   ,ncol    , &
                               -cmec3(i)*ttend(i,k) + cmec4(i)*evapprec(i,k)
                   end if 
 
-               endif
+               end if ! end of l_use_sgr 
+
+              endif
 
            ! 3. when rh < rhu00, evaporate existing cloud water
            ! ================================================== 

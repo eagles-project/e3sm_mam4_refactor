@@ -2008,6 +2008,14 @@ subroutine tphysbc (ztodt,               &
     real(r8):: fmin         ! safe guard for the cloud fraction to aviod devided by zero
     integer :: ql_incld_opt ! options for in-cloud liquid water calculation
     integer :: lc_tend_opt  ! options for liquid water tendency for condensation
+
+! flag and parameters used by Chris Vogal's reconstrunction 
+    logical :: l_use_sgr
+    logical :: l_sgr_fextrap
+    integer :: qv_sgr_deg
+    integer :: ql_sgr_deg
+    integer :: ltend_sgr_deg
+
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
 
@@ -2025,6 +2033,11 @@ subroutine tphysbc (ztodt,               &
                       ,fmin_out               = fmin               &
                       ,ql_incld_opt_out       = ql_incld_opt       &
                       ,lc_tend_opt_out        = lc_tend_opt        &
+                      ,l_use_sgr_out          = l_use_sgr          &
+                      ,l_sgr_fextrap_out      = l_sgr_fextrap      &
+                      ,qv_sgr_deg_out         = qv_sgr_deg         &
+                      ,ql_sgr_deg_out         = ql_sgr_deg        &
+                      ,ltend_sgr_deg_out      = ltend_sgr_deg        &
                       )
     
     !-----------------------------------------------------------------------
@@ -2375,7 +2388,8 @@ end if
             dlf, dlf2, & ! detrain
             rliq  , & ! check energy after detrain
             cmfmc,   cmfmc2, &
-            cam_in%ts,      cam_in%sst,        zdu,  fmin,  ql_incld_opt,  lc_tend_opt)
+            cam_in%ts,      cam_in%sst,        zdu,  fmin,  ql_incld_opt,  lc_tend_opt, &
+            l_use_sgr, l_sgr_fextrap, qv_sgr_deg,   ql_sgr_deg, ltend_sgr_deg)
 
        call physics_update(state, ptend, ztodt, tend)
        call check_energy_chng(state, tend, "cldwat_tend", nstep, ztodt, zero, prec_str(:ncol), snow_str(:ncol), zero)
