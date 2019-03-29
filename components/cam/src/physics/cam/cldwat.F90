@@ -633,7 +633,6 @@ subroutine pcond (lchnk   ,ncol    , &
 
                if(l_use_sgr)then
                 !method 1: Chris Vogl's reconstruction
-                csigma(i) = 1.0_r8/(rhdfda(i,k)+cgamma(i)*icwat(i,k))
                 cmec1(i)  = ast_np1(i) * &
                            (qtend(i,k) - dqsdtwat(i)*ttend(i,k)) &
                              /(1.0_r8 + gamwat(i))
@@ -648,8 +647,7 @@ subroutine pcond (lchnk   ,ncol    , &
                   cmec3(i)  = -rdtime * &
                                (1._r8 - ast_np1(i)/ast_n(i))**(1+ltend_sgr_deg) * lcwat(i,k)
                 end if 
-                cmec4(i)  = csigma(i)*cgamma(i)*icwc(i)*evapprec(i,k)
-                cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)+cmec4(i)
+                cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)
 
                else
                
