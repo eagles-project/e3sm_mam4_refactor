@@ -405,7 +405,10 @@ subroutine pcond (lchnk   ,ncol    , &
    real(r8) qsp(pcols,pver)      ! sat pt mixing ratio
    real(r8) qtl(pcols)           ! tendency which would saturate the grid box in deltat
    real(r8) qtmp, ttmp           ! work variable
-   real(r8) relhum1(pcols)        ! relative humidity
+   real(r8) qcrt,tcrt            ! work variable
+   real(r8) escrt,qscrt,gamcrt,dqsdtcrt ! work variable
+   real(r8) rhcrt,rhdif          ! work variable 
+   real(r8) relhum1(pcols)       ! relative humidity
    real(r8) relhum(pcols)        ! relative humidity
 !!$   real(r8) tc                   ! crit temp of transition to ice
    real(r8) t(pcols,pver)        ! temp before time step ignoring condensate
@@ -535,14 +538,9 @@ subroutine pcond (lchnk   ,ncol    , &
           do i=1,ncol
             if (ast_np1(i) > 1._r8) then
               ast_np1(i) = 1._r8
-              if (ast_n(i) == 1._r8) then
-                ast_n(i) = astnm2(i,k)
-              end if
-            else if(ast_np1(i) < 0._r8) then
+            end if 
+            if(ast_np1(i) < 0._r8) then
               ast_np1(i) = 0._r8
-              if (ast_n(i) == 0._r8) then
-                ast_n(i) = astnm2(i,k)
-              end if
             end if
           end do
 
@@ -634,8 +632,7 @@ subroutine pcond (lchnk   ,ncol    , &
                if(l_use_sgr)then
                 !method 1: Chris Vogl's reconstruction
                 cmec1(i)  = ast_np1(i) * &
-                           (qtend(i,k) - dqsdtwat(i)*ttend(i,k)) &
-                             /(1.0_r8 + gamwat(i))
+                           (qtend(i,k) - dqsdtwat(i)*ttend(i,k))/(1.0_r8 + gamwat(i))
                 cmec2(i)  = -(1.0_r8 -ast_np1(i))**(1+ql_sgr_deg)*lctend(i,k)
                 cmec3(i)  = 0._r8 
                 if(ast_np1(i) > ast_n(i)) then 
@@ -647,7 +644,28 @@ subroutine pcond (lchnk   ,ncol    , &
                   cmec3(i)  = -rdtime * &
                                (1._r8 - ast_np1(i)/ast_n(i))**(1+ltend_sgr_deg) * lcwat(i,k)
                 end if 
+
                 cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)
+
+                ! correct extrapolation "undershoots" for sgr method 
+                ! first computing what f(t+dt) will be
+                 qcrt = q(i,k) - cme(i,k)*deltat
+                 tcrt = t(i,k) + deltat/cpair * (latvap*cme(i,k))
+                 call qsat(tcrt, p(i,k),escrt, qscrt, gam=gamcrt, dqsdt=dqsdtcrt)
+                 rhcrt = qcrt/qscrt
+                 rhdif = (rhcrt - rhu00(i,k))-(1.0_r8-rhu00(i,k))
+                 if((ast_np1(i) < 0.999_r8).and.(rhdif > 0._r8))then
+                   cmec1(i) = (qtend(i,k) - dqsdtwat(i)*ttend(i,k))/( 1.0_r8 + gamwat(i) )
+                   cmec2(i) = 0._r8
+                   cmec3(i) = -rdtime * (qswat(i) - qcwat(i,k))
+                   cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)
+                 endif 
+                 if((ast_np1(i) > 0._r8).and.(rhcrt < rhu00(i,k)))then
+                   cmec1(i) = 0._r8
+                   cmec2(i) = -lctend(i,k)
+                   cmec3(i) = -rdtime * lcwat(i,k)
+                   cme(i,k)  = cmec1(i) + cmec2(i)+cmec3(i)
+                 endif
 
                else
                
@@ -695,6 +713,7 @@ subroutine pcond (lchnk   ,ncol    , &
 
   
         end do    !end loop for cme update
+
 
 ! Because of the finite time step, 
 ! place a bound here not to exceed wet bulb point
