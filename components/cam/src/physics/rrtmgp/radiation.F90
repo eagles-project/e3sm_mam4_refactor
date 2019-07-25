@@ -1154,6 +1154,9 @@ contains
       integer :: nday, nnight     ! Number of daylight columns
       integer :: day_indices(pcols), night_indices(pcols)   ! Indicies of daylight coumns
 
+      ! Gas concentrations
+      type(ty_gas_concs) :: gas_concentrations
+
       ! Radiative fluxes
       type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
 
@@ -1227,6 +1230,14 @@ contains
          do icall = N_DIAG,0,-1
             if (active_calls(icall)) then
 
+               ! Set gas concentrations
+               call t_startf('rad_gas_concentrations_sw')
+               call set_gas_concentrations(               &
+                  icall, state, pbuf, gas_concentrations, &
+                  day_indices=day_indices(1:nday          &
+               ))
+               call t_stopf('rad_gas_concentrations_sw')
+
                ! Get shortwave cloud optics
                call t_startf('shortwave cloud optics')
                call set_cloud_optics_sw(   &
@@ -1247,13 +1258,17 @@ contains
 
                ! Call the shortwave radiation driver
                call radiation_driver_sw(        &
-                  icall, state, pbuf, cam_in,   &
+                  state, cam_in,                &
                   coszrs, day_indices,          &
                   alb_dir, alb_dif,             &
+                  gas_concentrations,           &
                   cld_optics_sw, aer_optics_sw, &
                   fluxes_allsky, fluxes_clrsky, &
                   qrs, qrsc                     &
                )
+
+               ! Send fluxes to history buffer
+               call output_fluxes_sw(icall, state, fluxes_allsky, fluxes_clrsky, qrs,  qrsc)
 
             end if
          end do
@@ -1305,6 +1320,13 @@ contains
          do icall = N_DIAG,0,-1
             if (active_calls(icall)) then
 
+               ! Set gas concentrations (I believe the active gases may change
+               ! for different values of icall, which is why we do this within
+               ! the loop).
+               call t_startf('rad_gas_concentrations_lw')
+               call set_gas_concentrations(icall, state, pbuf, gas_concentrations)
+               call t_stopf('rad_gas_concentrations_lw')
+
                ! Get longwave cloud optics
                call t_startf('longwave cloud optics')
                call set_cloud_optics_lw(state, pbuf, k_dist_lw, cld_optics_lw)
@@ -1316,11 +1338,16 @@ contains
                call t_stopf('rad_aerosol_optics_lw')
 
                ! Call the longwave radiation driver to calculate fluxes and heating rates
-               call radiation_driver_lw(                     &
-                  icall, state, pbuf, cam_in,                &
-                  cld_optics_lw, aer_optics_lw,              &
-                  fluxes_allsky, fluxes_clrsky, qrl, qrlc    &
+               call radiation_driver_lw(        &
+                  state, cam_in,                &
+                  gas_concentrations,           &
+                  cld_optics_lw, aer_optics_lw, &
+                  fluxes_allsky, fluxes_clrsky, &
+                  qrl, qrlc                     &
                )
+
+               ! Send fluxes to history buffer
+               call output_fluxes_lw(icall, state, fluxes_allsky, fluxes_clrsky, qrl, qrlc)
 
             end if
          end do
@@ -1364,15 +1391,15 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_sw(icall, state, pbuf, cam_in, coszrs, day_indices, &
+   subroutine radiation_driver_sw(state, cam_in, coszrs, day_indices, &
                                   alb_dir, alb_dif, &
+                                  gas_concentrations, &
                                   cld_optics, aer_optics, &
                                   fluxes_allsky, fluxes_clrsky, qrs, qrsc)
      
       use perf_mod, only: t_startf, t_stopf
       use cam_history, only: outfld
       use physics_types, only: physics_state
-      use physics_buffer, only: physics_buffer_desc
       use camsrfexch, only: cam_in_t
       use mo_rrtmgp_clr_all_sky, only: rte_sw
       use mo_fluxes_byband, only: ty_fluxes_byband
@@ -1382,13 +1409,12 @@ contains
       use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
-      integer, intent(in) :: icall
       type(physics_state), intent(in) :: state
-      type(physics_buffer_desc), pointer :: pbuf(:)
       type(cam_in_t), intent(in) :: cam_in
       real(r8), intent(in) :: coszrs(:)
       integer, intent(in) :: day_indices(pcols)
       real(r8), intent(in) :: alb_dir(nswbands,pcols), alb_dif(nswbands,pcols)
+      type(ty_gas_concs), intent(in) :: gas_concentrations
       type(ty_optical_props_2str), intent(in) :: aer_optics, cld_optics
       type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
       real(r8), intent(inout) :: qrs(:,:), qrsc(:,:)
@@ -1402,8 +1428,6 @@ contains
       ! Daytime-only albedo for shortwave calculations
       real(r8) :: alb_dir_day(nswbands,pcols), alb_dif_day(nswbands,pcols)
 
-      ! Gas concentrations
-      type(ty_gas_concs) :: gas_concentrations
 
       ! Gathered indicies of day and night columns 
       ! chunk_column_index = day_indices(daylight_column_index)
@@ -1480,15 +1504,6 @@ contains
       call initialize_rrtmgp_fluxes(nday, nlev_rad+1, nswbands, fluxes_allsky_day, do_direct=.true.)
       call initialize_rrtmgp_fluxes(nday, nlev_rad+1, nswbands, fluxes_clrsky_day, do_direct=.true.)
 
-      ! Set gas concentrations (I believe the gases may change for
-      ! different values of icall, which is why we do this within the
-      ! loop)
-      call t_startf('rad_gas_concentrations_sw')
-      call set_gas_concentrations(icall, state, pbuf, &
-                                  gas_concentrations, &
-                                  day_indices=day_indices(1:nday))
-      call t_stopf('rad_gas_concentrations_sw')
-
       ! Do shortwave radiative transfer calculations
       call t_startf('rad_calculations_sw')
       call handle_error(rte_sw( &
@@ -1526,9 +1541,6 @@ contains
       call expand_day_columns(qrsc_rad(1:nday,ktop:kbot), qrsc(1:ncol,1:pver), day_indices(1:nday))
       call t_stopf('rad_expand_heating_rate_sw')
 
-      ! Send fluxes to history buffer
-      call output_fluxes_sw(icall, state, fluxes_allsky, fluxes_clrsky, qrs,  qrsc)
-
       ! Free fluxes and optical properties
       call free_fluxes(fluxes_allsky_day)
       call free_fluxes(fluxes_clrsky_day)
@@ -1537,15 +1549,14 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_lw(icall, state, pbuf, cam_in, &
+   subroutine radiation_driver_lw(state, cam_in, &
+                                  gas_concentrations, &
                                   cld_optics, aer_optics, &
                                   fluxes_allsky, fluxes_clrsky, qrl, qrlc)
     
-      use rad_constituents, only: N_DIAG, rad_cnst_get_call_list
       use perf_mod, only: t_startf, t_stopf
       use cam_history, only: outfld
       use physics_types, only: physics_state
-      use physics_buffer, only: physics_buffer_desc
       use camsrfexch, only: cam_in_t
       use mo_rrtmgp_clr_all_sky, only: rte_lw
       use mo_fluxes_byband, only: ty_fluxes_byband
@@ -1555,11 +1566,10 @@ contains
       use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
-      integer, intent(in) :: icall
       type(physics_state), intent(in) :: state
-      type(physics_buffer_desc), pointer :: pbuf(:)
       type(cam_in_t), intent(in) :: cam_in
       type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
+      type(ty_gas_concs), intent(in) :: gas_concentrations
       type(ty_optical_props_1scl), intent(in) :: cld_optics, aer_optics
       real(r8), intent(inout) :: qrl(:,:), qrlc(:,:)
 
@@ -1577,8 +1587,6 @@ contains
 
       ! Temporary heating rates on radiation vertical grid
       real(r8), dimension(pcols,nlev_rad) :: qrl_rad, qrlc_rad
-
-      type(ty_gas_concs) :: gas_concentrations
 
       integer :: ncol
 
@@ -1600,13 +1608,6 @@ contains
       ! exists or is assumed in the model we should use it here as well.
       ! TODO: set this more intelligently?
       surface_emissivity(1:nlwbands,1:ncol) = 1.0_r8
-
-      ! Set gas concentrations (I believe the active gases may change
-      ! for different values of icall, which is why we do this within
-      ! the loop).
-      call t_startf('rad_gas_concentrations_lw')
-      call set_gas_concentrations(icall, state, pbuf, gas_concentrations)
-      call t_stopf('rad_gas_concentrations_lw')
 
       ! Do longwave radiative transfer calculations
       call t_startf('rad_calculations_lw')
@@ -1637,9 +1638,6 @@ contains
       qrl(1:ncol,1:pver) = qrl_rad(1:ncol,ktop:kbot)
       qrlc(1:ncol,1:pver) = qrlc_rad(1:ncol,ktop:kbot)
                   
-      ! Send fluxes to history buffer
-      call output_fluxes_lw(icall, state, fluxes_allsky, fluxes_clrsky, qrl, qrlc)
-
    end subroutine radiation_driver_lw
 
    !----------------------------------------------------------------------------
