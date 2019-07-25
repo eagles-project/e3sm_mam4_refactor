@@ -1423,9 +1423,6 @@ contains
       type(ty_gas_concs) :: gas_concentrations_day
       type(ty_optical_props_2str) :: cld_optics_day, aer_optics_day
 
-      ! Temporary heating rates on radiation vertical grid (and daytime only)
-      real(r8), dimension(pcols,nlev_rad) :: qrs_rad, qrsc_rad
-
       ! Daytime-only albedo for shortwave calculations
       real(r8) :: alb_dir_day(nswbands,pcols), alb_dif_day(nswbands,pcols)
 
@@ -1552,25 +1549,27 @@ contains
       ))
       call t_stopf('rad_calculations_sw')
 
-      ! Calculate heating rates on the DAYTIME columns
-      call t_startf('rad_heating_rate_sw')
-      call calculate_heating_rate(fluxes_allsky_day, pint_day(1:nday,1:nlev_rad+1), &
-                                  qrs_rad(1:nday,1:nlev_rad))
-      call calculate_heating_rate(fluxes_clrsky_day, pint_day(1:nday,1:nlev_rad+1), &
-                                  qrsc_rad(1:nday,1:nlev_rad))
-      call t_stopf('rad_heating_rate_sw')
-
       ! Expand fluxes from daytime-only arrays to full chunk arrays
       call t_startf('rad_expand_fluxes_sw')
       call expand_day_fluxes(fluxes_allsky_day, fluxes_allsky, day_indices(1:nday))
       call expand_day_fluxes(fluxes_clrsky_day, fluxes_clrsky, day_indices(1:nday))
       call t_stopf('rad_expand_fluxes_sw')
 
-      ! Expand heating rates to all columns and map back to CAM levels
-      call t_startf('rad_expand_heating_rate_sw')
-      call expand_day_columns(qrs_rad(1:nday,ktop:kbot), qrs(1:ncol,1:pver), day_indices(1:nday))
-      call expand_day_columns(qrsc_rad(1:nday,ktop:kbot), qrsc(1:ncol,1:pver), day_indices(1:nday))
-      call t_stopf('rad_expand_heating_rate_sw')
+      ! Calculate heating rates on the DAYTIME columns
+      call t_startf('rad_heating_rate_sw')
+      call calculate_heating_rate(                  &
+         fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
+         fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
+         pint(1:ncol,ktop:kbot+1),                  &
+         qrs(1:ncol,1:pver)                         &
+      )
+      call calculate_heating_rate(                  &
+         fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
+         fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
+         pint(1:ncol,ktop:kbot+1),                  &
+         qrsc(1:ncol,1:pver)                        &
+      )
+      call t_stopf('rad_heating_rate_sw')
 
       ! Free fluxes and optical properties
       call free_fluxes(fluxes_allsky_day)
@@ -1662,14 +1661,18 @@ contains
       call assert_valid(fluxes_allsky%flux_dn, 'flux_dn invalid')
 
       ! Calculate heating rates
-      call calculate_heating_rate(fluxes_allsky, pint(1:ncol,1:nlev_rad+1), &
-                                  qrl_rad(1:ncol,1:nlev_rad))
-      call calculate_heating_rate(fluxes_clrsky, pint(1:ncol,1:nlev_rad+1), &
-                                  qrlc_rad(1:ncol,1:nlev_rad))
-
-      ! Map heating rates to CAM columns and levels
-      qrl(1:ncol,1:pver) = qrl_rad(1:ncol,ktop:kbot)
-      qrlc(1:ncol,1:pver) = qrlc_rad(1:ncol,ktop:kbot)
+      call calculate_heating_rate(                  &
+         fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
+         fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
+         pint(1:ncol,ktop:kbot+1),                  &
+         qrl(1:ncol,1:pver)                         &
+      )
+      call calculate_heating_rate(                  &
+         fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
+         fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
+         pint(1:ncol,ktop:kbot+1),                  &
+         qrlc(1:ncol,1:pver)                        &
+      )
                   
    end subroutine radiation_driver_lw
 
