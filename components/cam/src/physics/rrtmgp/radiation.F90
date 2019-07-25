@@ -176,12 +176,12 @@ module radiation
 
 contains
 
-   !============================================================================
+   !----------------------------------------------------------------------------
 
    subroutine radiation_readnl(nlfile, dtime_in)
-   !-------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
    ! Purpose: Read radiation_nl namelist group.
-   !-------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
 
       use namelist_utils,  only: find_group_name
       use units,           only: getunit, freeunit
@@ -265,13 +265,13 @@ contains
 
    end subroutine radiation_readnl
 
-   !================================================================================================
+   !----------------------------------------------------------------------------
 
    subroutine radiation_register()
 
-      !----------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Register radiation fields in the physics buffer
-      !----------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
 
       use physics_buffer, only: pbuf_add_field, dtype_r8
 
@@ -303,15 +303,15 @@ contains
 
    end subroutine radiation_register
 
-   !===============================================================================
+   !----------------------------------------------------------------------------
 
    function radiation_do(op, timestep)
 
-      !---------------------------------------------------------------------------- 
+      !-------------------------------------------------------------------------
       ! Purpose: Returns true if the specified operation is done this timestep.
       !
       ! History: Copied from RRTMG implementation.
-      !----------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
 
       use time_manager, only: get_nstep
 
@@ -351,7 +351,7 @@ contains
       end select
    end function radiation_do
 
-   !================================================================================================
+   !----------------------------------------------------------------------------
 
    real(r8) function radiation_nextsw_cday()
         
@@ -390,15 +390,15 @@ contains
            
    end function radiation_nextsw_cday
 
-   !================================================================================================
+   !----------------------------------------------------------------------------
 
    subroutine radiation_init(state)
-   !-------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
    ! Purpose: Initialize the radiation parameterization and add fields to the 
    ! history buffer
    ! 
    ! History: Copied from RRTMG implemenation.
-   !-------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
       use physics_buffer,     only: pbuf_get_index
       use cam_history,        only: addfld, horiz_only, add_default
       use cam_history_support, only: add_hist_coord
@@ -856,6 +856,7 @@ contains
 
    end subroutine radiation_init
 
+   !----------------------------------------------------------------------------
 
    subroutine perturbation_growth_init()
 
@@ -982,6 +983,7 @@ contains
 
    end subroutine perturbation_growth_init
 
+   !----------------------------------------------------------------------------
 
    subroutine set_available_gases(gases, gas_concentrations)
 
@@ -1001,6 +1003,7 @@ contains
 
    end subroutine set_available_gases
 
+   !----------------------------------------------------------------------------
 
    ! Function to calculate band midpoints from kdist band limits
    function get_band_midpoints(nbands, kdist) result(band_midpoints)
@@ -1030,11 +1033,9 @@ contains
       call assert(all(band_midpoints > 0), subname // ': negative band_midpoints!')
 
    end function get_band_midpoints
-
-
-   !===============================================================================
         
    !----------------------------------------------------------------------------
+
    ! Main driver for radiation computation. Calls the shortwave and longwave
    ! drivers, and calculates the radiative heating from the resulting fluxes.
    ! Primary output from this routine is the heating tendency due to radiative
@@ -1795,6 +1796,7 @@ contains
 
    end subroutine reset_fluxes
 
+   !----------------------------------------------------------------------------
 
    subroutine set_daynight_indices(coszrs, day_indices, night_indices)
       ! Input: cosine of solar zenith angle
@@ -1843,6 +1845,7 @@ contains
 
    end subroutine set_daynight_indices
 
+   !----------------------------------------------------------------------------
 
    ! Subroutine to calculate the solar insolation, accounting for orbital
    ! eccentricity and solar variability
@@ -1864,6 +1867,7 @@ contains
 
    end function get_eccentricity_factor
 
+   !----------------------------------------------------------------------------
 
    ! Get and set cosine of the solar zenith angle for all columns in a physics chuck
    ! based on input physics_state object and timestep. This routine serves mainly
@@ -1912,6 +1916,7 @@ contains
                   coszrs(1:state%ncol), state%ncol, dt)
    end subroutine set_cosine_solar_zenith_angle
 
+   !----------------------------------------------------------------------------
 
    ! Set surface albedos from cam surface exchange object for direct and diffuse
    ! beam radiation. This code was copied from the RRTMG implementation, but moved
@@ -2075,6 +2080,7 @@ contains
 
    end subroutine output_fluxes_sw
 
+   !----------------------------------------------------------------------------
 
    ! Send longwave fluxes and heating rates to history buffer
    subroutine output_fluxes_lw(icall, state, flux_all, flux_clr, qrl, qrlc)
@@ -2144,6 +2150,7 @@ contains
 
    end subroutine output_fluxes_lw
 
+   !----------------------------------------------------------------------------
 
    ! For some reason the RRTMGP flux objects do not include initialization
    ! routines, but rather expect the user to associate the individual fluxes (which
@@ -2187,6 +2194,8 @@ contains
 
    end subroutine initialize_rrtmgp_fluxes
 
+   !----------------------------------------------------------------------------
+
    subroutine free_fluxes(fluxes)
       use mo_fluxes_byband, only: ty_fluxes_byband
       type(ty_fluxes_byband), intent(inout) :: fluxes
@@ -2200,6 +2209,8 @@ contains
       if (associated(fluxes%bnd_flux_dn_dir)) deallocate(fluxes%bnd_flux_dn_dir)
    end subroutine free_fluxes
 
+   !----------------------------------------------------------------------------
+
    subroutine free_optics_sw(optics)
       use mo_optical_props, only: ty_optical_props_2str
       type(ty_optical_props_2str), intent(inout) :: optics
@@ -2209,12 +2220,16 @@ contains
       call optics%finalize()
    end subroutine free_optics_sw
 
+   !----------------------------------------------------------------------------
+
    subroutine free_optics_lw(optics)
       use mo_optical_props, only: ty_optical_props_1scl
       type(ty_optical_props_1scl), intent(inout) :: optics
       if (allocated(optics%tau)) deallocate(optics%tau)
       call optics%finalize()
    end subroutine free_optics_lw
+
+   !----------------------------------------------------------------------------
 
    subroutine set_gas_concentrations(icall, state, pbuf, &
                                      gas_concentrations, &
@@ -2369,6 +2384,7 @@ contains
 
    end subroutine set_gas_concentrations
 
+   !----------------------------------------------------------------------------
 
    logical function string_in_list(string, list)
       character(len=*), intent(in) :: string
@@ -2388,6 +2404,7 @@ contains
       end do
    end function string_in_list
 
+   !----------------------------------------------------------------------------
 
    subroutine expand_day_fluxes(daytime_fluxes, expanded_fluxes, day_indices)
       use mo_rte_kind, only: wp
@@ -2430,5 +2447,6 @@ contains
 
    end subroutine expand_day_fluxes
 
+   !----------------------------------------------------------------------------
 
 end module radiation
