@@ -1215,11 +1215,11 @@ contains
 
          ! Allocate optics
          call handle_error(cld_optics_sw%alloc_2str( &
-            nday, nlev_rad, k_dist_sw,                 &
+            ncol, nlev_rad, k_dist_sw,                 &
             name='shortwave cloud optics'              &
          ))
          call handle_error(aer_optics_sw%alloc_2str(          &
-            nday, nlev_rad, k_dist_sw%get_band_lims_wavenumber(), &
+            ncol, nlev_rad, k_dist_sw%get_band_lims_wavenumber(), &
             name='shortwave aerosol optics'                       &
          ))
 
@@ -1233,16 +1233,14 @@ contains
                ! Set gas concentrations
                call t_startf('rad_gas_concentrations_sw')
                call set_gas_concentrations(               &
-                  icall, state, pbuf, gas_concentrations, &
-                  day_indices=day_indices(1:nday          &
-               ))
+                  icall, state, pbuf, gas_concentrations &
+               )
                call t_stopf('rad_gas_concentrations_sw')
 
                ! Get shortwave cloud optics
                call t_startf('shortwave cloud optics')
                call set_cloud_optics_sw(   &
                   state, pbuf,             &
-                  day_indices(1:nday),     &
                   k_dist_sw, cld_optics_sw &
                )
                call t_stopf('shortwave cloud optics')
@@ -1251,7 +1249,7 @@ contains
                call t_startf('rad_aerosol_optics_sw')
                call set_aerosol_optics_sw(                      &
                   icall, state, pbuf,                           &
-                  day_indices(1:nday), night_indices(1:nnight), &
+                  night_indices(1:nnight), &
                   is_cmip6_volc, aer_optics_sw                  &
                )
                call t_stopf('rad_aerosol_optics_sw')
@@ -1405,6 +1403,7 @@ contains
       use mo_fluxes_byband, only: ty_fluxes_byband
       use mo_optical_props, only: ty_optical_props_2str
       use mo_gas_concentrations, only: ty_gas_concs
+      use mo_util_string, only: lower_case
       use radiation_state, only: set_rad_state
       use radiation_utils, only: calculate_heating_rate
 
@@ -1421,13 +1420,14 @@ contains
 
       ! Temporary fluxes compressed to daytime only arrays
       type(ty_fluxes_byband) :: fluxes_allsky_day, fluxes_clrsky_day
+      type(ty_gas_concs) :: gas_concentrations_day
+      type(ty_optical_props_2str) :: cld_optics_day, aer_optics_day
 
       ! Temporary heating rates on radiation vertical grid (and daytime only)
       real(r8), dimension(pcols,nlev_rad) :: qrs_rad, qrsc_rad
 
       ! Daytime-only albedo for shortwave calculations
       real(r8) :: alb_dir_day(nswbands,pcols), alb_dif_day(nswbands,pcols)
-
 
       ! Gathered indicies of day and night columns 
       ! chunk_column_index = day_indices(daylight_column_index)
@@ -1445,13 +1445,12 @@ contains
       integer :: ncol
 
       ! Loop indices
-      integer :: iband
+      integer :: iday, icol, igas
 
-      ! State fields that are passed into RRTMGP. Some of these may need to
-      ! modified from what exist in the physics_state object, i.e. to clip
-      ! temperatures to make sure they are within the valid range.
-      real(r8), dimension(pcols,nlev_rad) :: tmid, pmid
-      real(r8), dimension(pcols,nlev_rad+1) :: pint, tint
+      ! State fields that are passed into RRTMGP
+      real(r8), dimension(pcols,nlev_rad) :: tmid, pmid, tmid_day, pmid_day
+      real(r8), dimension(pcols,nlev_rad+1) :: pint, tint, pint_day, tint_day
+      real(r8), dimension(size(active_gases),pcols,nlev_rad) :: gas_vmr, gas_vmr_day
 
       ! Everybody needs a name
       character(*), parameter :: subroutine_name = 'radiation_driver_sw'
@@ -1478,21 +1477,53 @@ contains
       ! shortwave and longwave, because we need to compress to just the daytime
       ! columns for the shortwave, but the longwave uses all columns
       call set_rad_state(state, cam_in, &
-                         tmid(1:nday,1:nlev_rad), & 
-                         tint(1:nday,1:nlev_rad+1), &
-                         pmid(1:nday,1:nlev_rad), &
-                         pint(1:nday,1:nlev_rad+1), &
-                         col_indices=day_indices(1:nday))
+                         tmid(1:ncol,1:nlev_rad), & 
+                         tint(1:ncol,1:nlev_rad+1), &
+                         pmid(1:ncol,1:nlev_rad), &
+                         pint(1:ncol,1:nlev_rad+1))
 
       ! Get orbital eccentricity factor to scale total sky irradiance
       tsi_scaling = get_eccentricity_factor()
 
+      ! Allocate daytime-only optics objects
+      call handle_error(cld_optics_day%alloc_2str(  &
+         nday, nlev_rad, k_dist_sw,                 &
+         name='sw_cld_optics_day'                   &
+      ))
+      call handle_error(aer_optics_day%alloc_2str(             &
+         nday, nlev_rad, k_dist_sw%get_band_lims_wavenumber(), &
+         name='sw_aer_optics_day'                              &
+      ))
+
       ! Compress to daytime-only arrays
-      do iband = 1,nswbands
-         call compress_day_columns(alb_dir(iband,1:ncol), alb_dir_day(iband,1:nday), day_indices(1:nday))
-         call compress_day_columns(alb_dif(iband,1:ncol), alb_dif_day(iband,1:nday), day_indices(1:nday))
+      do iday = 1,nday
+         icol = day_indices(iday)
+         coszrs_day(iday) = coszrs(icol)
+         pmid_day(iday,:) = pmid(icol,:)
+         pint_day(iday,:) = pint(icol,:)
+         tmid_day(iday,:) = tmid(icol,:)
+         tint_day(iday,:) = tint(icol,:)
+         alb_dir_day(:,iday) = alb_dir(:,icol)
+         alb_dif_day(:,iday) = alb_dif(:,icol)
+         cld_optics_day%tau(iday,:,:) = cld_optics%tau(icol,:,:)
+         cld_optics_day%ssa(iday,:,:) = cld_optics%ssa(icol,:,:)
+         cld_optics_day%g  (iday,:,:) = cld_optics%g  (icol,:,:)
+         aer_optics_day%tau(iday,:,:) = aer_optics%tau(icol,:,:)
+         aer_optics_day%ssa(iday,:,:) = aer_optics%ssa(icol,:,:)
+         aer_optics_day%g  (iday,:,:) = aer_optics%g  (icol,:,:)
       end do
-      call compress_day_columns(coszrs(1:ncol), coszrs_day(1:nday), day_indices(1:nday))
+      do igas = 1,size(active_gases)
+         call handle_error(gas_concentrations%get_vmr( &
+            trim(lower_case(active_gases(igas))), gas_vmr(igas,1:ncol,:) &
+         ))
+         do iday = 1,nday
+            icol = day_indices(iday)
+            gas_vmr_day(igas,iday,:) = gas_vmr(igas,icol,:)
+         end do
+         call handle_error(gas_concentrations_day%set_vmr( &
+            trim(lower_case(active_gases(igas))), gas_vmr_day(igas,1:nday,:) &
+         ))
+      end do
 
       ! Allocate shortwave fluxes (allsky and clearsky)
       ! TODO: why do I need to provide my own routines to do this? Why is 
@@ -1507,25 +1538,25 @@ contains
       ! Do shortwave radiative transfer calculations
       call t_startf('rad_calculations_sw')
       call handle_error(rte_sw( &
-         k_dist_sw, gas_concentrations, &
-         pmid(1:nday,1:nlev_rad), &
-         tmid(1:nday,1:nlev_rad), &
-         pint(1:nday,1:nlev_rad+1), &
+         k_dist_sw, gas_concentrations_day, &
+         pmid_day(1:nday,1:nlev_rad), &
+         tmid_day(1:nday,1:nlev_rad), &
+         pint_day(1:nday,1:nlev_rad+1), &
          coszrs_day(1:nday), &
          alb_dir_day(1:nswbands,1:nday), &
          alb_dif_day(1:nswbands,1:nday), &
-         cld_optics, &
+         cld_optics_day, &
          fluxes_allsky_day, fluxes_clrsky_day, &
-         aer_props=aer_optics, &
+         aer_props=aer_optics_day, &
          tsi_scaling=tsi_scaling &
       ))
       call t_stopf('rad_calculations_sw')
 
       ! Calculate heating rates on the DAYTIME columns
       call t_startf('rad_heating_rate_sw')
-      call calculate_heating_rate(fluxes_allsky_day, pint(1:nday,1:nlev_rad+1), &
+      call calculate_heating_rate(fluxes_allsky_day, pint_day(1:nday,1:nlev_rad+1), &
                                   qrs_rad(1:nday,1:nlev_rad))
-      call calculate_heating_rate(fluxes_clrsky_day, pint(1:nday,1:nlev_rad+1), &
+      call calculate_heating_rate(fluxes_clrsky_day, pint_day(1:nday,1:nlev_rad+1), &
                                   qrsc_rad(1:nday,1:nlev_rad))
       call t_stopf('rad_heating_rate_sw')
 
@@ -1544,6 +1575,8 @@ contains
       ! Free fluxes and optical properties
       call free_fluxes(fluxes_allsky_day)
       call free_fluxes(fluxes_clrsky_day)
+      call free_optics_sw(cld_optics_day)
+      call free_optics_sw(aer_optics_day)
 
    end subroutine radiation_driver_sw
 
