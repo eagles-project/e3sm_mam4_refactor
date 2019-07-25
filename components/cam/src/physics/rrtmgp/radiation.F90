@@ -1079,6 +1079,7 @@ contains
 
       use cam_optics, only: set_cloud_optics_lw, set_aerosol_optics_lw, &
                             set_cloud_optics_sw, set_aerosol_optics_sw
+      use radiation_state, only: set_rad_state
       use physconst, only: cpair, stebol
 
       ! ---------------------------------------------------------------------------
@@ -1154,6 +1155,10 @@ contains
       integer :: nday, nnight     ! Number of daylight columns
       integer :: day_indices(pcols), night_indices(pcols)   ! Indicies of daylight coumns
 
+      ! State fields that are passed into RRTMGP
+      real(r8), dimension(pcols,nlev_rad) :: tmid, pmid
+      real(r8), dimension(pcols,nlev_rad+1) :: pint, tint
+
       ! Gas concentrations
       type(ty_gas_concs) :: gas_concentrations
 
@@ -1182,6 +1187,15 @@ contains
       ! for columns beyond ncol or nday
       qrsc(:,:) = 0
       qrlc(:,:) = 0
+
+      ! Set rad state variables (variables with extra level above model top)
+      if (radiation_do('sw') .or. radiation_do('lw')) then
+         call set_rad_state(state, cam_in, &
+                            tmid(1:ncol,1:nlev_rad), &
+                            tint(1:ncol,1:nlev_rad+1), &
+                            pmid(1:ncol,1:nlev_rad), &
+                            pint(1:ncol,1:nlev_rad+1))
+      end if
      
       ! Do shortwave stuff...
       if (radiation_do('sw')) then
@@ -1256,7 +1270,7 @@ contains
 
                ! Call the shortwave radiation driver
                call radiation_driver_sw(        &
-                  state, cam_in,                &
+                  pmid, tmid, pint, tint,       &
                   coszrs, day_indices,          &
                   alb_dir, alb_dif,             &
                   gas_concentrations,           &
@@ -1334,10 +1348,10 @@ contains
                call t_startf('rad_aerosol_optics_lw')
                call set_aerosol_optics_lw(icall, state, pbuf, is_cmip6_volc, aer_optics_lw)
                call t_stopf('rad_aerosol_optics_lw')
-
+               
                ! Call the longwave radiation driver to calculate fluxes and heating rates
                call radiation_driver_lw(        &
-                  state, cam_in,                &
+                  pmid, tmid, pint, tint,       &
                   gas_concentrations,           &
                   cld_optics_lw, aer_optics_lw, &
                   fluxes_allsky, fluxes_clrsky, &
@@ -1389,27 +1403,23 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_sw(state, cam_in, coszrs, day_indices, &
+   subroutine radiation_driver_sw(pmid, tmid, pint, tint, &
+                                  coszrs, day_indices, &
                                   alb_dir, alb_dif, &
                                   gas_concentrations, &
                                   cld_optics, aer_optics, &
                                   fluxes_allsky, fluxes_clrsky, qrs, qrsc)
      
       use perf_mod, only: t_startf, t_stopf
-      use cam_history, only: outfld
-      use physics_types, only: physics_state
-      use camsrfexch, only: cam_in_t
       use mo_rrtmgp_clr_all_sky, only: rte_sw
       use mo_fluxes_byband, only: ty_fluxes_byband
       use mo_optical_props, only: ty_optical_props_2str
       use mo_gas_concentrations, only: ty_gas_concs
       use mo_util_string, only: lower_case
-      use radiation_state, only: set_rad_state
       use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
-      type(physics_state), intent(in) :: state
-      type(cam_in_t), intent(in) :: cam_in
+      real(r8), intent(in) :: pmid(:,:), tmid(:,:), pint(:,:), tint(:,:)
       real(r8), intent(in) :: coszrs(:)
       integer, intent(in) :: day_indices(pcols)
       real(r8), intent(in) :: alb_dir(nswbands,pcols), alb_dif(nswbands,pcols)
@@ -1445,8 +1455,8 @@ contains
       integer :: iday, icol, igas
 
       ! State fields that are passed into RRTMGP
-      real(r8), dimension(pcols,nlev_rad) :: tmid, pmid, tmid_day, pmid_day
-      real(r8), dimension(pcols,nlev_rad+1) :: pint, tint, pint_day, tint_day
+      real(r8), dimension(pcols,nlev_rad) :: pmid_day, tmid_day
+      real(r8), dimension(pcols,nlev_rad+1) :: pint_day, tint_day
       real(r8), dimension(size(active_gases),pcols,nlev_rad) :: gas_vmr, gas_vmr_day
 
       ! Everybody needs a name
@@ -1455,7 +1465,7 @@ contains
 
       ! Number of physics columns in this "chunk"; used in multiple places
       ! throughout this subroutine, so set once for convenience
-      ncol = state%ncol
+      ncol = size(cld_optics%tau,1)
 
       ! If no daytime columns in this chunk, then we return zeros
       nday = count(day_indices(1:ncol) > 0)
@@ -1466,18 +1476,6 @@ contains
          qrsc(1:ncol,1:pver) = 0
          return
       end if
-
-      ! Populate RRTMGP input variables. Use the day_indices index array to
-      ! map CAM variables on all columns to the daytime-only arrays, and take
-      ! only the ktop:kbot vertical levels (mapping CAM vertical grid to
-      ! RRTMGP vertical grid). Note that we populate the state separately for
-      ! shortwave and longwave, because we need to compress to just the daytime
-      ! columns for the shortwave, but the longwave uses all columns
-      call set_rad_state(state, cam_in, &
-                         tmid(1:ncol,1:nlev_rad), & 
-                         tint(1:ncol,1:nlev_rad+1), &
-                         pmid(1:ncol,1:nlev_rad), &
-                         pint(1:ncol,1:nlev_rad+1))
 
       ! Get orbital eccentricity factor to scale total sky irradiance
       tsi_scaling = get_eccentricity_factor()
@@ -1581,25 +1579,20 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_lw(state, cam_in, &
+   subroutine radiation_driver_lw(pmid, tmid, pint, tint, &
                                   gas_concentrations, &
                                   cld_optics, aer_optics, &
                                   fluxes_allsky, fluxes_clrsky, qrl, qrlc)
     
       use perf_mod, only: t_startf, t_stopf
-      use cam_history, only: outfld
-      use physics_types, only: physics_state
-      use camsrfexch, only: cam_in_t
       use mo_rrtmgp_clr_all_sky, only: rte_lw
       use mo_fluxes_byband, only: ty_fluxes_byband
       use mo_optical_props, only: ty_optical_props_1scl
       use mo_gas_concentrations, only: ty_gas_concs
-      use radiation_state, only: set_rad_state
       use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
-      type(physics_state), intent(in) :: state
-      type(cam_in_t), intent(in) :: cam_in
+      real(r8), intent(in) :: pmid(:,:), tmid(:,:), pint(:,:), tint(:,:)
       type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
       type(ty_gas_concs), intent(in) :: gas_concentrations
       type(ty_optical_props_1scl), intent(in) :: cld_optics, aer_optics
@@ -1607,12 +1600,6 @@ contains
 
       ! Everybody needs a name
       character(*), parameter :: subroutine_name = 'radiation_driver_lw'
-
-      ! State fields that are passed into RRTMGP. Some of these may need to
-      ! modified from what exist in the physics_state object, i.e. to clip
-      ! temperatures to make sure they are within the valid range.
-      real(r8), dimension(pcols,nlev_rad) :: tmid, pmid
-      real(r8), dimension(pcols,nlev_rad+1) :: pint, tint
 
       ! Surface emissivity needed for longwave
       real(r8) :: surface_emissivity(nlwbands,pcols)
@@ -1624,15 +1611,8 @@ contains
 
       ! Number of physics columns in this "chunk"; used in multiple places
       ! throughout this subroutine, so set once for convenience
-      ncol = state%ncol
+      ncol = size(cld_optics%tau,1)
 
-      ! Set rad state variables
-      call set_rad_state(state, cam_in, &
-                         tmid(1:ncol,1:nlev_rad), &
-                         tint(1:ncol,1:nlev_rad+1), &
-                         pmid(1:ncol,1:nlev_rad), &
-                         pint(1:ncol,1:nlev_rad+1))
-       
       ! Set surface emissivity to 1 here. There is a note in the RRTMG
       ! implementation that this is treated in the land model, but the old
       ! RRTMG implementation also sets this to 1. This probably does not make
