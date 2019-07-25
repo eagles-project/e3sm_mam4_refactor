@@ -1146,6 +1146,9 @@ contains
       ! Cosine solar zenith angle for all columns in chunk
       real(r8) :: coszrs(pcols)
 
+      ! Direct and diffuse albedos
+      real(r8) :: alb_dir(nswbands,pcols), alb_dif(nswbands,pcols)
+
       ! Gathered indicies of day and night columns 
       ! chunk_column_index = day_indices(daylight_column_index)
       integer :: nday, nnight     ! Number of daylight columns
@@ -1197,6 +1200,12 @@ contains
          nday = count(day_indices(1:ncol) > 0)
          nnight = count(night_indices(1:ncol) > 0)
 
+         ! Get albedo. This uses CAM routines internally and just provides a
+         ! wrapper to improve readability of the code here.
+         call set_albedo(cam_in, alb_dir(1:nswbands,1:ncol), alb_dif(1:nswbands,1:ncol))
+         call outfld('SW_ALBEDO_DIR', transpose(alb_dir(1:nswbands,1:ncol)), ncol, state%lchnk)
+         call outfld('SW_ALBEDO_DIF', transpose(alb_dif(1:nswbands,1:ncol)), ncol, state%lchnk)
+
          ! Allocate shortwave fluxes
          call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nswbands, fluxes_allsky, do_direct=.true.)
          call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nswbands, fluxes_clrsky, do_direct=.true.)
@@ -1240,6 +1249,7 @@ contains
                call radiation_driver_sw(        &
                   icall, state, pbuf, cam_in,   &
                   coszrs, day_indices,          &
+                  alb_dir, alb_dif,             &
                   cld_optics_sw, aer_optics_sw, &
                   fluxes_allsky, fluxes_clrsky, &
                   qrs, qrsc                     &
@@ -1355,6 +1365,7 @@ contains
    !----------------------------------------------------------------------------
 
    subroutine radiation_driver_sw(icall, state, pbuf, cam_in, coszrs, day_indices, &
+                                  alb_dir, alb_dif, &
                                   cld_optics, aer_optics, &
                                   fluxes_allsky, fluxes_clrsky, qrs, qrsc)
      
@@ -1377,6 +1388,7 @@ contains
       type(cam_in_t), intent(in) :: cam_in
       real(r8), intent(in) :: coszrs(:)
       integer, intent(in) :: day_indices(pcols)
+      real(r8), intent(in) :: alb_dir(nswbands,pcols), alb_dif(nswbands,pcols)
       type(ty_optical_props_2str), intent(in) :: aer_optics, cld_optics
       type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
       real(r8), intent(inout) :: qrs(:,:), qrsc(:,:)
@@ -1387,10 +1399,8 @@ contains
       ! Temporary heating rates on radiation vertical grid (and daytime only)
       real(r8), dimension(pcols,nlev_rad) :: qrs_rad, qrsc_rad
 
-      ! Albedo for shortwave calculations
-      real(r8) :: albedo_direct(nswbands,pcols), albedo_direct_day(nswbands,pcols)
-      real(r8) :: albedo_diffuse(nswbands,pcols), albedo_diffuse_day(nswbands,pcols)
-
+      ! Daytime-only albedo for shortwave calculations
+      real(r8) :: alb_dir_day(nswbands,pcols), alb_dif_day(nswbands,pcols)
 
       ! Gas concentrations
       type(ty_gas_concs) :: gas_concentrations
@@ -1453,18 +1463,10 @@ contains
       ! Get orbital eccentricity factor to scale total sky irradiance
       tsi_scaling = get_eccentricity_factor()
 
-      ! Get albedo. This uses CAM routines internally and just provides a
-      ! wrapper to improve readability of the code here.
-      call set_albedo(cam_in, albedo_direct(1:nswbands,1:ncol), albedo_diffuse(1:nswbands,1:ncol))
-
-      ! Send albedos to history buffer (useful for debugging)
-      call outfld('SW_ALBEDO_DIR', transpose(albedo_direct(1:nswbands,1:ncol)), ncol, state%lchnk)
-      call outfld('SW_ALBEDO_DIF', transpose(albedo_diffuse(1:nswbands,1:ncol)), ncol, state%lchnk)
-
       ! Compress to daytime-only arrays
       do iband = 1,nswbands
-         call compress_day_columns(albedo_direct(iband,1:ncol), albedo_direct_day(iband,1:nday), day_indices(1:nday))
-         call compress_day_columns(albedo_diffuse(iband,1:ncol), albedo_diffuse_day(iband,1:nday), day_indices(1:nday))
+         call compress_day_columns(alb_dir(iband,1:ncol), alb_dir_day(iband,1:nday), day_indices(1:nday))
+         call compress_day_columns(alb_dif(iband,1:ncol), alb_dif_day(iband,1:nday), day_indices(1:nday))
       end do
       call compress_day_columns(coszrs(1:ncol), coszrs_day(1:nday), day_indices(1:nday))
 
@@ -1495,8 +1497,8 @@ contains
          tmid(1:nday,1:nlev_rad), &
          pint(1:nday,1:nlev_rad+1), &
          coszrs_day(1:nday), &
-         albedo_direct_day(1:nswbands,1:nday), &
-         albedo_diffuse_day(1:nswbands,1:nday), &
+         alb_dir_day(1:nswbands,1:nday), &
+         alb_dif_day(1:nswbands,1:nday), &
          cld_optics, &
          fluxes_allsky_day, fluxes_clrsky_day, &
          aer_props=aer_optics, &
