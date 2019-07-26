@@ -171,7 +171,24 @@ contains
             end do
          end do
       end do
-                 
+
+      ! We need to fix band ordering because the old input files assume RRTMG band
+      ! ordering, but this has changed in RRTMGP.
+      ! TODO: fix the input files themselves!
+      do icol = 1,size(tau_out,1)
+         do ilev = 1,size(tau_out,2)
+            tau_out(icol,ilev,:) = reordered( &
+               tau_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+            )
+            ssa_out(icol,ilev,:) = reordered( &
+               ssa_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+            )
+            asm_out(icol,ilev,:) = reordered( &
+               asm_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+            )
+         end do
+      end do
+
    end subroutine get_cloud_optics_sw
 
    !----------------------------------------------------------------------------
@@ -352,23 +369,6 @@ contains
       ! properties by *band* -- these will be mapped to g-points when doing
       ! the subcolumn sampling to account for cloud overlap.
       call get_cloud_optics_sw(state, pbuf, tau_by_band, ssa_by_band, asm_by_band)
-
-      ! We need to fix band ordering because the old input files assume RRTMG band
-      ! ordering, but this has changed in RRTMGP.
-      ! TODO: fix the input files themselves!
-      do icol = 1,size(tau_by_band,1)
-         do ilev = 1,size(tau_by_band,2)
-            tau_by_band(icol,ilev,:) = reordered( &
-               tau_by_band(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
-            )
-            ssa_by_band(icol,ilev,:) = reordered( &
-               ssa_by_band(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
-            )
-            asm_by_band(icol,ilev,:) = reordered( &
-               asm_by_band(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
-            )
-         end do
-      end do
 
       ! Send in-cloud optical depth for visible band to history buffer
       !call output_cloud_optics_sw(state, optics_cam)
