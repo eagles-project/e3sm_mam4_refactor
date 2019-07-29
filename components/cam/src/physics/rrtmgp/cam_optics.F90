@@ -30,8 +30,8 @@ contains
       use ppgrid, only: pcols, pver
       use physics_types, only: physics_state
       use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
-      use cloud_rad_props, only: get_ice_optics_sw, &
-                                 get_liquid_optics_sw, &
+      use cloud_rad_props, only: mitchell_ice_optics_sw, &
+                                 conley_liquid_optics_sw, &
                                  get_snow_optics_sw
       use mo_optical_props, only: ty_optical_props_2str
 
@@ -89,14 +89,14 @@ contains
       !call pbuf_get_field(pbuf, pbuf_get_index('ICIWP'), iciwp)
       !call pbuf_get_field(pbuf, pbuf_get_index('DEI'), dei)
       ncol = state%ncol
-      call get_ice_optics_sw(state, pbuf, &
+      call mitchell_ice_optics_sw(state, pbuf, &
                              ice_tau, ice_tau_ssa, &
                              ice_tau_ssa_g, ice_tau_ssa_f)
       call assert_range(ice_tau(1:nswbands,1:ncol,1:pver), 0._r8, 1e20_r8, &
                         'get_cloud_optics_sw: ice_tau')
       
       ! Get liquid cloud optics
-      call get_liquid_optics_sw(state, pbuf, &
+      call conley_liquid_optics_sw(state, pbuf, &
                                 liquid_tau, liquid_tau_ssa, &
                                 liquid_tau_ssa_g, liquid_tau_ssa_f)
       call assert_range(liquid_tau(1:nswbands,1:ncol,1:pver), 0._r8, 1e20_r8, &
@@ -198,8 +198,8 @@ contains
       use physics_types, only: physics_state
       use physics_buffer, only: physics_buffer_desc, pbuf_get_field, &
                                 pbuf_get_index
-      use cloud_rad_props, only: get_liquid_optics_lw, &
-                                 get_ice_optics_lw, &
+      use cloud_rad_props, only: conley_liquid_optics_lw, &
+                                 mitchell_ice_optics_lw, &
                                  get_snow_optics_lw
       use radconstants, only: nlwbands
       use mo_optical_props, only: ty_optical_props_1scl
@@ -229,10 +229,10 @@ contains
       combined_tau(:,:,:) = 0.0
 
       ! Get ice optics
-      call get_ice_optics_lw(state, pbuf, ice_tau)
+      call mitchell_ice_optics_lw(state, pbuf, ice_tau)
 
       ! Get liquid optics
-      call get_liquid_optics_lw(state, pbuf, liq_tau)
+      call conley_liquid_optics_lw(state, pbuf, liq_tau)
 
       ! Combine cloud optics
       cloud_tau = liq_tau + ice_tau
