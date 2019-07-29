@@ -9,7 +9,9 @@ module cam_optics
    implicit none
    private
 
-   public set_cloud_optics_sw, & 
+   public get_cloud_optics_sw, &
+          get_cloud_optics_lw, &
+          set_cloud_optics_sw, & 
           set_cloud_optics_lw, &
           set_aerosol_optics_sw, &
           set_aerosol_optics_lw
@@ -23,7 +25,7 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine get_cloud_optics_sw(state, pbuf, tau_out, ssa_out, asm_out)
+   subroutine get_cloud_optics_sw(state, pbuf, optics_out)
 
       use ppgrid, only: pcols, pver
       use physics_types, only: physics_state
@@ -48,13 +50,10 @@ contains
       ! corresponding pbuf/state fields were defined for all indices of pver. This
       ! isn't the case right now I don't think, as cloud_rad_props makes explicit
       ! assumptions about array sizes.
-      real(r8), dimension(:,:,:), intent(out) :: tau_out, ssa_out, asm_out
+      type(ty_optical_props_2str), intent(inout) :: optics_out
 
       ! Temporary variables to hold cloud optical properties before combining into
       ! output arrays. Same shape as output arrays, so get shapes from output.
-      !real(r8), dimension(size(tau_out,1), &
-      !                    size(tau_out,2), &
-      !                    size(tau_out,3)) :: &
       real(r8), dimension(nswbands,pcols,pver) :: &
             liquid_tau, liquid_tau_ssa, liquid_tau_ssa_g, liquid_tau_ssa_f, &
             ice_tau, ice_tau_ssa, ice_tau_ssa_g, ice_tau_ssa_f, &
@@ -153,20 +152,20 @@ contains
       do ibnd = 1,nswbands
          do ilev = 1,pver
             do icol = 1,ncol
-               tau_out(icol,ilev,ibnd) = combined_tau(ibnd,icol,ilev)
+               optics_out%tau(icol,ilev,ibnd) = combined_tau(ibnd,icol,ilev)
                if (combined_tau(ibnd,icol,ilev) > 0) then
-                  ssa_out(icol,ilev,ibnd) &
+                  optics_out%ssa(icol,ilev,ibnd) &
                      = combined_tau_ssa(ibnd,icol,ilev) &
                      / combined_tau(ibnd,icol,ilev)
                else
-                  ssa_out(icol,ilev,ibnd) = 1
+                  optics_out%ssa(icol,ilev,ibnd) = 1
                end if
                if (combined_tau_ssa(ibnd,icol,ilev) > 0) then
-                  asm_out(icol,ilev,ibnd) &
+                  optics_out%g(icol,ilev,ibnd) &
                      = combined_tau_ssa_g(ibnd,icol,ilev) &
                      / combined_tau_ssa(ibnd,icol,ilev)
                else
-                  asm_out(icol,ilev,ibnd) = 0
+                  optics_out%g(icol,ilev,ibnd) = 0
                end if
             end do
          end do
@@ -175,16 +174,16 @@ contains
       ! We need to fix band ordering because the old input files assume RRTMG band
       ! ordering, but this has changed in RRTMGP.
       ! TODO: fix the input files themselves!
-      do icol = 1,size(tau_out,1)
-         do ilev = 1,size(tau_out,2)
-            tau_out(icol,ilev,:) = reordered( &
-               tau_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+      do icol = 1,size(optics_out%tau,1)
+         do ilev = 1,size(optics_out%tau,2)
+            optics_out%tau(icol,ilev,:) = reordered( &
+               optics_out%tau(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
             )
-            ssa_out(icol,ilev,:) = reordered( &
-               ssa_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+            optics_out%ssa(icol,ilev,:) = reordered( &
+               optics_out%ssa(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
             )
-            asm_out(icol,ilev,:) = reordered( &
-               asm_out(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
+            optics_out%g(icol,ilev,:) = reordered( &
+               optics_out%g(icol,ilev,:), map_rrtmg_to_rrtmgp_swbands &
             )
          end do
       end do
@@ -193,7 +192,7 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine get_cloud_optics_lw(state, pbuf, tau_out)
+   subroutine get_cloud_optics_lw(state, pbuf, optics_out)
 
       use ppgrid, only: pcols, pver
       use physics_types, only: physics_state
@@ -207,7 +206,7 @@ contains
 
       type(physics_state), intent(in) :: state
       type(physics_buffer_desc), pointer :: pbuf(:)
-      real(r8), intent(out) :: tau_out(:,:,:)
+      type(ty_optical_props_1scl), intent(inout) :: optics_out
 
       ! Cloud and snow fractions, used to weight optical properties by
       ! contributions due to cloud vs snow
@@ -259,7 +258,7 @@ contains
 
       ! Set output optical properties
       do ibnd = 1,nlwbands
-         tau_out(1:ncol,1:pver,ibnd) = combined_tau(ibnd,1:ncol,1:pver)
+         optics_out%tau(1:ncol,1:pver,ibnd) = combined_tau(ibnd,1:ncol,1:pver)
       end do
 
    end subroutine get_cloud_optics_lw
@@ -317,7 +316,7 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine set_cloud_optics_sw(state, pbuf, kdist, optics_out)
+   subroutine set_cloud_optics_sw(state, pbuf, optics_byband, optics_out)
       
       use ppgrid, only: pcols, pver, pverp
       use physics_types, only: physics_state
@@ -325,18 +324,13 @@ contains
                                 pbuf_get_field, &
                                 pbuf_get_index
       use mo_optical_props, only: ty_optical_props_2str
-      use mo_gas_optics_rrtmgp, only: ty_gas_optics_rrtmgp
       use mcica_subcol_gen, only: mcica_subcol_mask
 
       type(physics_state), intent(in) :: state
       type(physics_buffer_desc), pointer :: pbuf(:)
-      type(ty_gas_optics_rrtmgp), intent(in) :: kdist
+      type(ty_optical_props_2str), intent(in) :: optics_byband
       type(ty_optical_props_2str), intent(inout) :: optics_out
 
-      ! Type to hold optics by band
-      real(r8), dimension(pcols,pver,nswbands) :: &
-         tau_by_band, ssa_by_band, asm_by_band
-      
       ! Pointer to cloud fraction on physics buffer
       real(r8), pointer :: cloud_fraction(:,:), snow_fraction(:,:)
 
@@ -359,19 +353,10 @@ contains
       character(len=32) :: subname = 'set_cloud_optics_sw'
 
       ncol = state%ncol
-      ngpt = kdist%get_ngpt()
+      ngpt = optics_out%get_ngpt()
 
       ! Allocate array to hold subcolumn cloud flag
       allocate(iscloudy(ngpt,ncol,pver))
-
-      ! Retrieve the mean in-cloud optical properties via CAM cloud radiative
-      ! properties interface (cloud_rad_props). This retrieves cloud optical
-      ! properties by *band* -- these will be mapped to g-points when doing
-      ! the subcolumn sampling to account for cloud overlap.
-      call get_cloud_optics_sw(state, pbuf, tau_by_band, ssa_by_band, asm_by_band)
-
-      ! Send in-cloud optical depth for visible band to history buffer
-      !call output_cloud_optics_sw(state, optics_cam)
 
       ! Initialize (or reset) output cloud optics object
       optics_out%tau = 0.0
@@ -417,10 +402,10 @@ contains
             do igpt = 1,ngpt
                if (iscloudy(igpt,icol,ilev_cam) .and. &
                    combined_cloud_fraction(icol,ilev_cam) > 0._r8) then
-                  ibnd = kdist%convert_gpt2band(igpt)
-                  optics_out%tau(icol,ilev_rad,igpt) = tau_by_band(icol,ilev_cam,ibnd)
-                  optics_out%ssa(icol,ilev_rad,igpt) = ssa_by_band(icol,ilev_cam,ibnd)
-                  optics_out%g  (icol,ilev_rad,igpt) = asm_by_band(icol,ilev_cam,ibnd)
+                  ibnd = optics_out%convert_gpt2band(igpt)
+                  optics_out%tau(icol,ilev_rad,igpt) = optics_byband%tau(icol,ilev_cam,ibnd)
+                  optics_out%ssa(icol,ilev_rad,igpt) = optics_byband%ssa(icol,ilev_cam,ibnd)
+                  optics_out%g  (icol,ilev_rad,igpt) = optics_byband%g  (icol,ilev_cam,ibnd)
                else
                   optics_out%tau(icol,ilev_rad,igpt) = 0._r8
                   optics_out%ssa(icol,ilev_rad,igpt) = 1._r8
@@ -448,7 +433,7 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine set_cloud_optics_lw(state, pbuf, kdist, optics_out)
+   subroutine set_cloud_optics_lw(state, pbuf, optics_byband, optics_out)
       
       use ppgrid, only: pcols, pver
       use physics_types, only: physics_state
@@ -460,13 +445,12 @@ contains
 
       type(physics_state), intent(in) :: state
       type(physics_buffer_desc), pointer :: pbuf(:)
-      type(ty_gas_optics_rrtmgp), intent(in) :: kdist
+      type(ty_optical_props_1scl), intent(in) :: optics_byband
       type(ty_optical_props_1scl), intent(inout) :: optics_out
 
       real(r8), pointer :: cloud_fraction(:,:)
       real(r8), pointer :: snow_fraction(:,:)
       real(r8) :: combined_cloud_fraction(pcols,pver)
-      real(r8) :: tau_by_band(pcols,pver,nlwbands)
 
       ! For MCICA sampling routine
       integer, parameter :: changeseed = 1
@@ -484,24 +468,11 @@ contains
       optics_out%tau = 0.0
 
       ! Set dimension size working variables
-      ngpt = kdist%get_ngpt()
+      ngpt = optics_out%get_ngpt()
       ncol = state%ncol
 
       ! Allocate array to hold subcolumn cloudy flag
       allocate(iscloudy(ngpt,ncol,pver))
-
-      ! Initialize cloud optics object; cloud_optics_lw will be indexed by
-      ! g-point, rather than by band, and subcolumn routines will associate each
-      ! g-point with a stochastically-sampled cloud state
-      call handle_error(optics_out%alloc_1scl(ncol, nlev_rad, kdist))
-      call optics_out%set_name('longwave cloud optics')
-
-      ! Get cloud optics using CAM routines. This should combine cloud with snow
-      ! optics, if "snow clouds" are being considered
-      call get_cloud_optics_lw(state, pbuf, tau_by_band)
-
-      ! Send cloud optics to history buffer
-      !call output_cloud_optics_lw(state, optics_cam)
 
       ! Get cloud and snow fractions, and combine
       call pbuf_get_field(pbuf, pbuf_get_index('CLD'), cloud_fraction)
@@ -538,8 +509,8 @@ contains
          do icol = 1,ncol
             do igpt = 1,ngpt
                if (iscloudy(igpt,icol,ilev_cam) .and. (combined_cloud_fraction(icol,ilev_cam) > 0._r8) ) then
-                  ibnd = kdist%convert_gpt2band(igpt)
-                  optics_out%tau(icol,ilev_rad,igpt) = tau_by_band(icol,ilev_cam,ibnd)
+                  ibnd = optics_out%convert_gpt2band(igpt)
+                  optics_out%tau(icol,ilev_rad,igpt) = optics_byband%tau(icol,ilev_cam,ibnd)
                else
                   optics_out%tau(icol,ilev_rad,igpt) = 0._r8
                end if
@@ -722,63 +693,6 @@ contains
       end do
 
    end function reordered
-
-   !----------------------------------------------------------------------------
-
-   subroutine output_cloud_optics_sw(state, tau, ssa, asm)
-      use ppgrid, only: pver
-      use physics_types, only: physics_state
-      use cam_history, only: outfld
-      use radconstants, only: idx_sw_diag
-
-      type(physics_state), intent(in) :: state
-      real(r8), intent(in) :: tau(:,:,:), ssa(:,:,:), asm(:,:,:)
-      character(len=*), parameter :: subname = 'output_cloud_optics_sw'
-
-      ! Check values
-      call assert_valid(tau(1:state%ncol,1:pver,1:nswbands), &
-                        trim(subname) // ': optical_depth')
-      call assert_valid(ssa(1:state%ncol,1:pver,1:nswbands), &
-                        trim(subname) // ': single_scattering_albedo')
-      call assert_valid(asm(1:state%ncol,1:pver,1:nswbands), &
-                        trim(subname) // ': assymmetry_parameter')
-
-      ! Send outputs to history buffer
-      call outfld('CLOUD_TAU_SW', &
-                  tau(1:state%ncol,1:pver,1:nswbands), &
-                  state%ncol, state%lchnk)
-      call outfld('CLOUD_SSA_SW', &
-                  ssa(1:state%ncol,1:pver,1:nswbands), &
-                  state%ncol, state%lchnk)
-      call outfld('CLOUD_G_SW', &
-                  asm(1:state%ncol,1:pver,1:nswbands), &
-                  state%ncol, state%lchnk)
-      call outfld('TOT_ICLD_VISTAU', &
-                  tau(1:state%ncol,1:pver,idx_sw_diag), &
-                  state%ncol, state%lchnk)
-   end subroutine output_cloud_optics_sw
-
-   !----------------------------------------------------------------------------
-
-   subroutine output_cloud_optics_lw(state, tau)
-
-      use ppgrid, only: pver
-      use physics_types, only: physics_state
-      use cam_history, only: outfld
-      use mo_optical_props, only: ty_optical_props_2str
-
-      type(physics_state), intent(in) :: state
-      real(r8), intent(in) :: tau(:,:,:)
-
-      ! Check values
-      call assert_valid(tau(1:state%ncol,1:pver,1:nlwbands), 'cloud_tau_lw')
-
-      ! Output
-      call outfld('CLOUD_TAU_LW', &
-                  tau(1:state%ncol,1:pver,1:nlwbands), &
-                  state%ncol, state%lchnk)
-
-   end subroutine output_cloud_optics_lw
 
    !----------------------------------------------------------------------------
 

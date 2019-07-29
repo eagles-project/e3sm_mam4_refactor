@@ -1078,8 +1078,8 @@ contains
       ! buffer to be aggregated and written to disk
       use cam_history, only: outfld
 
-      use cam_optics, only: set_cloud_optics_lw, set_aerosol_optics_lw, &
-                            set_cloud_optics_sw, set_aerosol_optics_sw
+      use cam_optics, only: get_cloud_optics_lw, set_cloud_optics_lw, set_aerosol_optics_lw, &
+                            get_cloud_optics_sw, set_cloud_optics_sw, set_aerosol_optics_sw
       use radiation_state, only: set_rad_state
       use physconst, only: cpair, stebol
 
@@ -1167,8 +1167,8 @@ contains
       type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
 
       ! Optics
-      type(ty_optical_props_2str) :: cld_optics_sw, aer_optics_sw
-      type(ty_optical_props_1scl) :: cld_optics_lw, aer_optics_lw
+      type(ty_optical_props_2str) :: cld_optics_sw_byband, cld_optics_sw, aer_optics_sw
+      type(ty_optical_props_1scl) :: cld_optics_lw_byband, cld_optics_lw, aer_optics_lw
 
       ! For loops over diagnostic calls
       logical :: active_calls(0:N_DIAG)
@@ -1197,7 +1197,7 @@ contains
                             pmid(1:ncol,1:nlev_rad), &
                             pint(1:ncol,1:nlev_rad+1))
       end if
-     
+
       ! Do shortwave stuff...
       if (radiation_do('sw')) then
 
@@ -1229,13 +1229,17 @@ contains
          call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nswbands, fluxes_clrsky, do_direct=.true.)
 
          ! Allocate optics
-         call handle_error(cld_optics_sw%alloc_2str( &
-            ncol, nlev_rad, k_dist_sw,                 &
-            name='shortwave cloud optics'              &
+         call handle_error(cld_optics_sw_byband%alloc_2str(   &
+            ncol, pver, k_dist_sw%get_band_lims_wavenumber(), &
+            name='cld_optics_sw_byband'                       &
          ))
-         call handle_error(aer_optics_sw%alloc_2str(          &
+         call handle_error(cld_optics_sw%alloc_2str( &
+            ncol, nlev_rad, k_dist_sw,               &
+            name='cld_optics_sw'                     &
+         ))
+         call handle_error(aer_optics_sw%alloc_2str(              &
             ncol, nlev_rad, k_dist_sw%get_band_lims_wavenumber(), &
-            name='shortwave aerosol optics'                       &
+            name='aer_optics_sw'                                  &
          ))
 
          ! Loop over diagnostic calls 
@@ -1254,10 +1258,8 @@ contains
 
                ! Get shortwave cloud optics
                call t_startf('shortwave cloud optics')
-               call set_cloud_optics_sw(   &
-                  state, pbuf,             &
-                  k_dist_sw, cld_optics_sw &
-               )
+               call get_cloud_optics_sw(state, pbuf, cld_optics_sw_byband)
+               call set_cloud_optics_sw(state, pbuf, cld_optics_sw_byband, cld_optics_sw)
                call t_stopf('shortwave cloud optics')
 
                ! Get shortwave aerosol optics
@@ -1292,9 +1294,13 @@ contains
          ! Set surface fluxes that are used by the land model
          call export_surface_fluxes(fluxes_allsky, cam_out, 'shortwave')
          
+         ! Send in-cloud optical depth for visible band to history buffer
+         call output_cloud_optics_sw(state, cld_optics_sw_byband)
+
          ! Free memory
          call free_fluxes(fluxes_allsky)
          call free_fluxes(fluxes_clrsky)
+         call free_optics_sw(cld_optics_sw_byband)
          call free_optics_sw(cld_optics_sw)
          call free_optics_sw(aer_optics_sw)
 
@@ -1318,8 +1324,13 @@ contains
          call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_clrsky)
 
          ! Initialize optics
-         call handle_error(cld_optics_lw%alloc_1scl(        &
-            ncol, nlev_rad, k_dist_lw, name='cld_optics_lw' &
+         call handle_error(cld_optics_lw_byband%alloc_1scl(        &
+            ncol, nlev_rad, k_dist_lw%get_band_lims_wavenumber(),  &
+            name='cld_optics_lw_byband'                            &
+         ))
+         call handle_error(cld_optics_lw%alloc_1scl( &
+            ncol, nlev_rad, k_dist_lw,               &
+            name='cld_optics_lw'                     &
          ))
          call handle_error(aer_optics_lw%alloc_1scl(              &
             ncol, nlev_rad, k_dist_lw%get_band_lims_wavenumber(), &
@@ -1342,7 +1353,8 @@ contains
 
                ! Get longwave cloud optics
                call t_startf('longwave cloud optics')
-               call set_cloud_optics_lw(state, pbuf, k_dist_lw, cld_optics_lw)
+               call get_cloud_optics_lw(state, pbuf, cld_optics_lw_byband)
+               call set_cloud_optics_lw(state, pbuf, cld_optics_lw_byband, cld_optics_lw)
                call t_stopf('longwave cloud optics')
 
                ! Get longwave aerosol optics
@@ -1371,9 +1383,13 @@ contains
          ! Export surface fluxes that are used by the land model
          call export_surface_fluxes(fluxes_allsky, cam_out, 'longwave')
 
+         ! Send cloud optics to history buffer
+         call output_cloud_optics_lw(state, cld_optics_lw_byband)
+
          ! Free memory
          call free_fluxes(fluxes_allsky)
          call free_fluxes(fluxes_clrsky)
+         call free_optics_lw(cld_optics_lw_byband)
          call free_optics_lw(cld_optics_lw)
          call free_optics_lw(aer_optics_lw)
 
@@ -2149,6 +2165,64 @@ contains
       call outfld('QRLC'//diag(icall), qrlc(1:ncol,1:pver)/cpair, ncol, state%lchnk)
 
    end subroutine output_fluxes_lw
+
+   !----------------------------------------------------------------------------
+
+   subroutine output_cloud_optics_sw(state, optics)
+      use ppgrid, only: pver
+      use physics_types, only: physics_state
+      use cam_history, only: outfld
+      use radconstants, only: idx_sw_diag
+      use mo_optical_props, only: ty_optical_props_2str
+
+      type(physics_state), intent(in) :: state
+      type(ty_optical_props_2str), intent(in) :: optics
+      character(len=*), parameter :: subname = 'output_cloud_optics_sw'
+
+      ! Check values
+      call assert_valid(optics%tau(1:state%ncol,1:pver,1:nswbands), &
+                        trim(subname) // ': optical_depth')
+      call assert_valid(optics%ssa(1:state%ncol,1:pver,1:nswbands), &
+                        trim(subname) // ': single_scattering_albedo')
+      call assert_valid(optics%g  (1:state%ncol,1:pver,1:nswbands), &
+                        trim(subname) // ': assymmetry_parameter')
+
+      ! Send outputs to history buffer
+      call outfld('CLOUD_TAU_SW', &
+                  optics%tau(1:state%ncol,1:pver,1:nswbands), &
+                  state%ncol, state%lchnk)
+      call outfld('CLOUD_SSA_SW', &
+                  optics%ssa(1:state%ncol,1:pver,1:nswbands), &
+                  state%ncol, state%lchnk)
+      call outfld('CLOUD_G_SW', &
+                  optics%g  (1:state%ncol,1:pver,1:nswbands), &
+                  state%ncol, state%lchnk)
+      call outfld('TOT_ICLD_VISTAU', &
+                  optics%tau(1:state%ncol,1:pver,idx_sw_diag), &
+                  state%ncol, state%lchnk)
+   end subroutine output_cloud_optics_sw
+
+   !----------------------------------------------------------------------------
+
+   subroutine output_cloud_optics_lw(state, optics)
+
+      use ppgrid, only: pver
+      use physics_types, only: physics_state
+      use cam_history, only: outfld
+      use mo_optical_props, only: ty_optical_props_1scl
+
+      type(physics_state), intent(in) :: state
+      type(ty_optical_props_1scl), intent(in) :: optics
+
+      ! Check values
+      call assert_valid(optics%tau(1:state%ncol,1:pver,1:nlwbands), 'cloud_tau_lw')
+
+      ! Output
+      call outfld('CLOUD_TAU_LW', &
+                  optics%tau(1:state%ncol,1:pver,1:nlwbands), &
+                  state%ncol, state%lchnk)
+
+   end subroutine output_cloud_optics_lw
 
    !----------------------------------------------------------------------------
 
