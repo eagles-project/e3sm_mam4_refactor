@@ -1081,6 +1081,7 @@ contains
       use cam_optics, only: get_cloud_optics_lw, set_cloud_optics_lw, set_aerosol_optics_lw, &
                             get_cloud_optics_sw, set_cloud_optics_sw, set_aerosol_optics_sw
       use radiation_state, only: set_rad_state
+      use radiation_utils, only: calculate_heating_rate
       use physconst, only: cpair, stebol
 
       ! ---------------------------------------------------------------------------
@@ -1251,7 +1252,7 @@ contains
 
                ! Set gas concentrations
                call t_startf('rad_gas_concentrations_sw')
-               call set_gas_concentrations(               &
+               call set_gas_concentrations(              &
                   icall, state, pbuf, gas_concentrations &
                )
                call t_stopf('rad_gas_concentrations_sw')
@@ -1272,15 +1273,31 @@ contains
                call t_stopf('rad_aerosol_optics_sw')
 
                ! Call the shortwave radiation driver
-               call radiation_driver_sw(        &
+               call calculate_fluxes_sw(        &
                   pmid, tmid, pint, tint,       &
                   coszrs, day_indices,          &
                   alb_dir, alb_dif,             &
                   gas_concentrations,           &
                   cld_optics_sw, aer_optics_sw, &
-                  fluxes_allsky, fluxes_clrsky, &
-                  qrs, qrsc                     &
+                  fluxes_allsky, fluxes_clrsky  &
                )
+
+               ! Calculate heating rates
+               call t_startf('rad_heating_rate_sw')
+               call calculate_heating_rate(                  &
+                  fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
+                  fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
+                  pint(1:ncol,ktop:kbot+1),                  &
+                  qrs(1:ncol,1:pver)                         &
+               )
+               call calculate_heating_rate(                  &
+                  fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
+                  fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
+                  pint(1:ncol,ktop:kbot+1),                  &
+                  qrsc(1:ncol,1:pver)                        &
+               )
+               call t_stopf('rad_heating_rate_sw')
+
 
                ! Send fluxes to history buffer
                call output_fluxes_sw(icall, state, fluxes_allsky, fluxes_clrsky, qrs,  qrsc)
@@ -1363,14 +1380,27 @@ contains
                call t_stopf('rad_aerosol_optics_lw')
                
                ! Call the longwave radiation driver to calculate fluxes and heating rates
-               call radiation_driver_lw(        &
+               call calculate_fluxes_lw(        &
                   pmid, tmid, pint, tint,       &
                   gas_concentrations,           &
                   cld_optics_lw, aer_optics_lw, &
-                  fluxes_allsky, fluxes_clrsky, &
-                  qrl, qrlc                     &
+                  fluxes_allsky, fluxes_clrsky  &
                )
 
+               ! Calculate heating rates
+               call calculate_heating_rate(                  &
+                  fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
+                  fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
+                  pint(1:ncol,ktop:kbot+1),                  &
+                  qrl(1:ncol,1:pver)                         &
+               )
+               call calculate_heating_rate(                  &
+                  fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
+                  fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
+                  pint(1:ncol,ktop:kbot+1),                  &
+                  qrlc(1:ncol,1:pver)                        &
+               )
+ 
                ! Send fluxes to history buffer
                call output_fluxes_lw(icall, state, fluxes_allsky, fluxes_clrsky, qrl, qrlc)
 
@@ -1420,12 +1450,12 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_sw(pmid, tmid, pint, tint, &
+   subroutine calculate_fluxes_sw(pmid, tmid, pint, tint, &
                                   coszrs, day_indices, &
                                   alb_dir, alb_dif, &
                                   gas_concentrations, &
                                   cld_optics, aer_optics, &
-                                  fluxes_allsky, fluxes_clrsky, qrs, qrsc)
+                                  fluxes_allsky, fluxes_clrsky)
      
       use perf_mod, only: t_startf, t_stopf
       use mo_rrtmgp_clr_all_sky, only: rte_sw
@@ -1433,7 +1463,6 @@ contains
       use mo_optical_props, only: ty_optical_props_2str
       use mo_gas_concentrations, only: ty_gas_concs
       use mo_util_string, only: lower_case
-      use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
       real(r8), intent(in) :: pmid(:,:), tmid(:,:), pint(:,:), tint(:,:)
@@ -1443,7 +1472,6 @@ contains
       type(ty_gas_concs), intent(in) :: gas_concentrations
       type(ty_optical_props_2str), intent(in) :: aer_optics, cld_optics
       type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
-      real(r8), intent(inout) :: qrs(:,:), qrsc(:,:)
 
       ! Temporary fluxes compressed to daytime only arrays
       type(ty_fluxes_byband) :: fluxes_allsky_day, fluxes_clrsky_day
@@ -1477,7 +1505,7 @@ contains
       real(r8), dimension(size(active_gases),pcols,nlev_rad) :: gas_vmr, gas_vmr_day
 
       ! Everybody needs a name
-      character(*), parameter :: subroutine_name = 'radiation_driver_sw'
+      character(*), parameter :: subroutine_name = 'calculate_fluxes_sw'
 
 
       ! Number of physics columns in this "chunk"; used in multiple places
@@ -1489,8 +1517,6 @@ contains
       if (nday == 0) then
          call reset_fluxes(fluxes_allsky)
          call reset_fluxes(fluxes_clrsky)
-         qrs(1:ncol,1:pver) = 0
-         qrsc(1:ncol,1:pver) = 0
          return
       end if
 
@@ -1570,53 +1596,35 @@ contains
       call expand_day_fluxes(fluxes_clrsky_day, fluxes_clrsky, day_indices(1:nday))
       call t_stopf('rad_expand_fluxes_sw')
 
-      ! Calculate heating rates on the DAYTIME columns
-      call t_startf('rad_heating_rate_sw')
-      call calculate_heating_rate(                  &
-         fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
-         fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
-         pint(1:ncol,ktop:kbot+1),                  &
-         qrs(1:ncol,1:pver)                         &
-      )
-      call calculate_heating_rate(                  &
-         fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
-         fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
-         pint(1:ncol,ktop:kbot+1),                  &
-         qrsc(1:ncol,1:pver)                        &
-      )
-      call t_stopf('rad_heating_rate_sw')
-
       ! Free fluxes and optical properties
       call free_fluxes(fluxes_allsky_day)
       call free_fluxes(fluxes_clrsky_day)
       call free_optics_sw(cld_optics_day)
       call free_optics_sw(aer_optics_day)
 
-   end subroutine radiation_driver_sw
+   end subroutine calculate_fluxes_sw
 
    !----------------------------------------------------------------------------
 
-   subroutine radiation_driver_lw(pmid, tmid, pint, tint, &
+   subroutine calculate_fluxes_lw(pmid, tmid, pint, tint, &
                                   gas_concentrations, &
                                   cld_optics, aer_optics, &
-                                  fluxes_allsky, fluxes_clrsky, qrl, qrlc)
+                                  fluxes_allsky, fluxes_clrsky)
     
       use perf_mod, only: t_startf, t_stopf
       use mo_rrtmgp_clr_all_sky, only: rte_lw
       use mo_fluxes_byband, only: ty_fluxes_byband
       use mo_optical_props, only: ty_optical_props_1scl
       use mo_gas_concentrations, only: ty_gas_concs
-      use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
       real(r8), intent(in) :: pmid(:,:), tmid(:,:), pint(:,:), tint(:,:)
-      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
       type(ty_gas_concs), intent(in) :: gas_concentrations
       type(ty_optical_props_1scl), intent(in) :: cld_optics, aer_optics
-      real(r8), intent(inout) :: qrl(:,:), qrlc(:,:)
+      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
 
       ! Everybody needs a name
-      character(*), parameter :: subroutine_name = 'radiation_driver_lw'
+      character(*), parameter :: subroutine_name = 'calculate_fluxes_lw'
 
       ! Surface emissivity needed for longwave
       real(r8) :: surface_emissivity(nlwbands,pcols)
@@ -1657,21 +1665,7 @@ contains
       call assert_valid(fluxes_allsky%flux_up, 'flux_up invalid')
       call assert_valid(fluxes_allsky%flux_dn, 'flux_dn invalid')
 
-      ! Calculate heating rates
-      call calculate_heating_rate(                  &
-         fluxes_allsky%flux_up(1:ncol,ktop:kbot+1), &
-         fluxes_allsky%flux_dn(1:ncol,ktop:kbot+1), &
-         pint(1:ncol,ktop:kbot+1),                  &
-         qrl(1:ncol,1:pver)                         &
-      )
-      call calculate_heating_rate(                  &
-         fluxes_clrsky%flux_up(1:ncol,ktop:kbot+1), &
-         fluxes_clrsky%flux_dn(1:ncol,ktop:kbot+1), &
-         pint(1:ncol,ktop:kbot+1),                  &
-         qrlc(1:ncol,1:pver)                        &
-      )
-                  
-   end subroutine radiation_driver_lw
+   end subroutine calculate_fluxes_lw
 
    !----------------------------------------------------------------------------
 
