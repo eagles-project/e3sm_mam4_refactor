@@ -218,17 +218,15 @@ end subroutine cloud_rad_props_init
 
 !==============================================================================
 
-subroutine conley_liquid_optics_sw(ncol, nlev, lamc, pgam, iclwpth, tau, tau_w, tau_w_g, tau_w_f)
+subroutine conley_liquid_optics_sw(ncol, nlev, lamc, pgam, iclwpth, tau, ssa, asm)
    integer, intent(in) :: ncol, nlev
    real(r8), intent(in), dimension(ncol,nlev) :: lamc, pgam, iclwpth
-   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau     ! extinction optical depth
-   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w   ! single scattering albedo * tau
-   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w_g ! asymetry parameter * tau * w
-   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w_f ! forward scattered fraction * tau * w
+   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau  ! extinction optical depth
+   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: ssa  ! single scattering albedo * tau
+   real(r8), intent(out), dimension(nswbands,ncol,nlev) :: asm  ! asymetry parameter * tau * w
    integer :: i, k, swband
-  type(interp_type) :: mu_wgts
-  type(interp_type) :: lambda_wgts
-  real(r8) :: ext(nswbands), ssa(nswbands), asm(nswbands)
+   type(interp_type) :: mu_wgts
+   type(interp_type) :: lambda_wgts
 
    do k = 1,nlev
       do i = 1,ncol
@@ -236,24 +234,20 @@ subroutine conley_liquid_optics_sw(ncol, nlev, lamc, pgam, iclwpth, tau, tau_w, 
             call get_mu_lambda_weights(lamc(i,k), pgam(i,k), mu_wgts, lambda_wgts)
             do swband = 1,nswbands
                call lininterp(ext_sw_liq(:,:,swband), nmu, nlambda, &
-                    ext(swband:swband), 1, mu_wgts, lambda_wgts)
+                    tau(swband:swband,i,k), 1, mu_wgts, lambda_wgts)
                call lininterp(ssa_sw_liq(:,:,swband), nmu, nlambda, &
-                    ssa(swband:swband), 1, mu_wgts, lambda_wgts)
+                    ssa(swband:swband,i,k), 1, mu_wgts, lambda_wgts)
                call lininterp(asm_sw_liq(:,:,swband), nmu, nlambda, &
-                    asm(swband:swband), 1, mu_wgts, lambda_wgts)
+                    asm(swband:swband,i,k), 1, mu_wgts, lambda_wgts)
                ! compute radiative properties
-               tau(swband,i,k) = iclwpth(i,k) * ext(swband)
-               tau_w(swband,i,k) = tau(swband,i,k) * ssa(swband)
-               tau_w_g(swband,i,k) = tau_w(swband,i,k) * asm(swband)
-               tau_w_f(swband,i,k) = tau_w_g(swband,i,k) * asm(swband)
+               tau(swband,i,k) = iclwpth(i,k) * tau(swband,i,k)
             enddo
             call lininterp_finish(mu_wgts)
             call lininterp_finish(lambda_wgts)
          else
             tau(1:nswbands,i,k) = 0._r8
-            tau_w(1:nswbands,i,k) = 0._r8
-            tau_w_g(1:nswbands,i,k) = 0._r8
-            tau_w_f(1:nswbands,i,k) = 0._r8
+            ssa(1:nswbands,i,k) = 0._r8
+            asm(1:nswbands,i,k) = 0._r8
          endif
       enddo
    enddo
@@ -290,31 +284,25 @@ end subroutine conley_liquid_optics_lw
 
 !==============================================================================
 
-subroutine mitchell_ice_optics_sw(ncol, nlev, iciwpth, dei, tau, tau_w, &
-     tau_w_g, tau_w_f)
+subroutine mitchell_ice_optics_sw(ncol, nlev, iciwpth, dei, tau, ssa, asm)
 
   integer, intent(in) :: ncol, nlev
   real(r8), intent(in) :: iciwpth(ncol,nlev)
   real(r8), intent(in) :: dei(ncol,nlev)
-
-  real(r8),intent(out) :: tau    (nswbands,ncol,nlev) ! extinction optical depth
-  real(r8),intent(out) :: tau_w  (nswbands,ncol,nlev) ! single scattering albedo * tau
-  real(r8),intent(out) :: tau_w_g(nswbands,ncol,nlev) ! assymetry parameter * tau * w
-  real(r8),intent(out) :: tau_w_f(nswbands,ncol,nlev) ! forward scattered fraction * tau * w
+  real(r8),intent(out) :: tau(nswbands,ncol,nlev) ! extinction optical depth
+  real(r8),intent(out) :: ssa(nswbands,ncol,nlev) ! single scattering albedo
+  real(r8),intent(out) :: asm(nswbands,ncol,nlev) ! assymetry parameter
 
   type(interp_type) :: dei_wgts
-
   integer :: i, k, swband
-  real(r8) :: ext(nswbands), ssa(nswbands), asm(nswbands)
 
   do k = 1,nlev
      do i = 1,ncol
         if( iciwpth(i,k) < 1.e-80_r8 .or. dei(i,k) == 0._r8) then
            ! if ice water path is too small, OD := 0
-           tau    (:,i,k) = 0._r8
-           tau_w  (:,i,k) = 0._r8
-           tau_w_g(:,i,k) = 0._r8
-           tau_w_f(:,i,k) = 0._r8
+           tau(:,i,k) = 0._r8
+           ssa(:,i,k) = 0._r8
+           asm(:,i,k) = 0._r8
         else
            ! for each cell interpolate to find weights in g_d_eff grid.
            call lininterp_init(g_d_eff, n_g_d, dei(i:i,k), 1, &
@@ -322,16 +310,14 @@ subroutine mitchell_ice_optics_sw(ncol, nlev, iciwpth, dei, tau, tau_w, &
            ! interpolate into grid and extract radiative properties
            do swband = 1, nswbands
               call lininterp(ext_sw_ice(:,swband), n_g_d, &
-                   ext(swband:swband), 1, dei_wgts)
+                   tau(swband:swband,i,k), 1, dei_wgts)
               call lininterp(ssa_sw_ice(:,swband), n_g_d, &
-                   ssa(swband:swband), 1, dei_wgts)
+                   ssa(swband:swband,i,k), 1, dei_wgts)
               call lininterp(asm_sw_ice(:,swband), n_g_d, &
-                   asm(swband:swband), 1, dei_wgts)
+                   asm(swband:swband,i,k), 1, dei_wgts)
+              ! Convert extinction to optical depth
+              tau(swband,i,k) = iciwpth(i,k) * tau(swband,i,k)
            end do
-           tau    (:,i,k) = iciwpth(i,k) * ext
-           tau_w  (:,i,k) = tau(:,i,k) * ssa
-           tau_w_g(:,i,k) = tau_w(:,i,k) * asm
-           tau_w_f(:,i,k) = tau_w_g(:,i,k) * asm
            call lininterp_finish(dei_wgts)
         endif
      enddo
