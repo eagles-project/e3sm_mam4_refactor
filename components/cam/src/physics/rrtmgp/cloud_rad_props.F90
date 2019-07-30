@@ -225,13 +225,30 @@ subroutine conley_liquid_optics_sw(ncol, nlev, lamc, pgam, iclwpth, tau, tau_w, 
    real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w   ! single scattering albedo * tau
    real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w_g ! asymetry parameter * tau * w
    real(r8), intent(out), dimension(nswbands,ncol,nlev) :: tau_w_f ! forward scattered fraction * tau * w
-   integer :: i, k
+   integer :: i, k, swband
+  type(interp_type) :: mu_wgts
+  type(interp_type) :: lambda_wgts
+  real(r8) :: ext(nswbands), ssa(nswbands), asm(nswbands)
 
    do k = 1,nlev
       do i = 1,ncol
-         if(lamc(i,k) > 0._r8) then ! This seems to be clue from microphysics of no cloud
-            call gam_liquid_sw(iclwpth(i,k), lamc(i,k), pgam(i,k), &
-                tau(1:nswbands,i,k), tau_w(1:nswbands,i,k), tau_w_g(1:nswbands,i,k), tau_w_f(1:nswbands,i,k))
+         if (lamc(i,k) > 0._r8 .and. iclwpth(i,k) >= 1.e-80_r8) then
+            call get_mu_lambda_weights(lamc(i,k), pgam(i,k), mu_wgts, lambda_wgts)
+            do swband = 1,nswbands
+               call lininterp(ext_sw_liq(:,:,swband), nmu, nlambda, &
+                    ext(swband:swband), 1, mu_wgts, lambda_wgts)
+               call lininterp(ssa_sw_liq(:,:,swband), nmu, nlambda, &
+                    ssa(swband:swband), 1, mu_wgts, lambda_wgts)
+               call lininterp(asm_sw_liq(:,:,swband), nmu, nlambda, &
+                    asm(swband:swband), 1, mu_wgts, lambda_wgts)
+               ! compute radiative properties
+               tau(swband,i,k) = iclwpth(i,k) * ext(swband)
+               tau_w(swband,i,k) = tau(swband,i,k) * ssa(swband)
+               tau_w_g(swband,i,k) = tau_w(swband,i,k) * asm(swband)
+               tau_w_f(swband,i,k) = tau_w_g(swband,i,k) * asm(swband)
+            enddo
+            call lininterp_finish(mu_wgts)
+            call lininterp_finish(lambda_wgts)
          else
             tau(1:nswbands,i,k) = 0._r8
             tau_w(1:nswbands,i,k) = 0._r8
@@ -248,13 +265,22 @@ subroutine conley_liquid_optics_lw(ncol, nlev, lamc, pgam, iclwpth, abs_od)
    integer, intent(in) :: ncol, nlev
    real(r8), intent(in), dimension(ncol,nlev) :: lamc, pgam, iclwpth
    real(r8), intent(out), dimension(nlwbands,ncol,nlev) :: abs_od
-   integer i, k
+   integer i, k, lwband
+   type(interp_type) :: mu_wgts
+   type(interp_type) :: lambda_wgts
 
    abs_od = 0._r8
    do k = 1,nlev
       do i = 1,ncol
-         if(lamc(i,k) > 0._r8) then ! This seems to be the clue for no cloud from microphysics formulation
-            call gam_liquid_lw(iclwpth(i,k), lamc(i,k), pgam(i,k), abs_od(1:nlwbands,i,k))
+         if(lamc(i,k) > 0._r8 .and. iclwpth(i,k) >= 1.e-80_r8) then
+            call get_mu_lambda_weights(lamc(i,k), pgam(i,k), mu_wgts, lambda_wgts)
+            do lwband = 1,nlwbands
+               call lininterp(abs_lw_liq(:,:,lwband), nmu, nlambda, &
+                    abs_od(lwband:lwband,i,k), 1, mu_wgts, lambda_wgts)
+               abs_od(lwband,i,k) = iclwpth(i,k) * abs_od(lwband,i,k)
+            enddo
+            call lininterp_finish(mu_wgts)
+            call lininterp_finish(lambda_wgts)
          else
             abs_od(1:nlwbands,i,k) = 0._r8
          endif
@@ -347,83 +373,6 @@ subroutine mitchell_ice_optics_lw(ncol, nlev, iciwpth, dei, abs_od)
   enddo
 
 end subroutine mitchell_ice_optics_lw
-
-!==============================================================================
-
-subroutine gam_liquid_lw(clwptn, lamc, pgam, abs_od)
-  real(r8), intent(in) :: clwptn ! in-cloud liquid water path (in g/m^2)?
-  real(r8), intent(in) :: lamc   ! prognosed value of lambda for cloud
-  real(r8), intent(in) :: pgam   ! prognosed value of mu for cloud
-  real(r8), intent(out) :: abs_od(1:nlwbands)
-
-  integer :: lwband ! sw band index
-
-  type(interp_type) :: mu_wgts
-  type(interp_type) :: lambda_wgts
-
-  if (clwptn < 1.e-80_r8) then
-    abs_od = 0._r8
-    return
-  endif
-
-  call get_mu_lambda_weights(lamc, pgam, mu_wgts, lambda_wgts)
-
-  do lwband = 1, nlwbands
-     call lininterp(abs_lw_liq(:,:,lwband), nmu, nlambda, &
-          abs_od(lwband:lwband), 1, mu_wgts, lambda_wgts)
-  enddo
-
-  abs_od = clwptn * abs_od
-
-  call lininterp_finish(mu_wgts)
-  call lininterp_finish(lambda_wgts)
-
-end subroutine gam_liquid_lw
-
-!==============================================================================
-
-subroutine gam_liquid_sw(clwptn, lamc, pgam, tau, tau_w, tau_w_g, tau_w_f)
-  real(r8), intent(in) :: clwptn ! cloud water liquid path new (in cloud) (in g/m^2)?
-  real(r8), intent(in) :: lamc   ! prognosed value of lambda for cloud
-  real(r8), intent(in) :: pgam   ! prognosed value of mu for cloud
-  real(r8), intent(out) :: tau(1:nswbands), tau_w(1:nswbands), tau_w_f(1:nswbands), tau_w_g(1:nswbands)
-
-  integer :: swband ! sw band index
-
-  real(r8) :: ext(nswbands), ssa(nswbands), asm(nswbands)
-
-  type(interp_type) :: mu_wgts
-  type(interp_type) :: lambda_wgts
-
-  if (clwptn < 1.e-80_r8) then
-    tau = 0._r8
-    tau_w = 0._r8
-    tau_w_g = 0._r8
-    tau_w_f = 0._r8
-    return
-  endif
-
-  call get_mu_lambda_weights(lamc, pgam, mu_wgts, lambda_wgts)
-
-  do swband = 1, nswbands
-     call lininterp(ext_sw_liq(:,:,swband), nmu, nlambda, &
-          ext(swband:swband), 1, mu_wgts, lambda_wgts)
-     call lininterp(ssa_sw_liq(:,:,swband), nmu, nlambda, &
-          ssa(swband:swband), 1, mu_wgts, lambda_wgts)
-     call lininterp(asm_sw_liq(:,:,swband), nmu, nlambda, &
-          asm(swband:swband), 1, mu_wgts, lambda_wgts)
-  enddo
-
-  ! compute radiative properties
-  tau = clwptn * ext
-  tau_w = tau * ssa
-  tau_w_g = tau_w * asm
-  tau_w_f = tau_w_g * asm
-
-  call lininterp_finish(mu_wgts)
-  call lininterp_finish(lambda_wgts)
-
-end subroutine gam_liquid_sw
 
 !==============================================================================
 
