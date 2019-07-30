@@ -31,8 +31,7 @@ contains
       use physics_types, only: physics_state
       use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
       use cloud_rad_props, only: mitchell_ice_optics_sw, &
-                                 conley_liquid_optics_sw, &
-                                 get_snow_optics_sw
+                                 conley_liquid_optics_sw
       use mo_optical_props, only: ty_optical_props_2str
 
       ! Inputs. Right now, this uses state and pbuf, and passes these along to the
@@ -62,7 +61,7 @@ contains
             combined_tau, combined_tau_ssa, combined_tau_ssa_g, combined_tau_ssa_f
 
       ! Pointers to fields on the physics buffer
-      real(r8), pointer :: iciwp(:,:), dei(:,:)
+      real(r8), pointer, dimension(:,:) :: iclwp, iciwp, icswp, dei, des, lambdac, mu
       real(r8), pointer :: cloud_fraction(:,:), snow_fraction(:,:)
 
       integer :: ncol, ibnd, icol, ilev
@@ -85,20 +84,28 @@ contains
       combined_tau_ssa_g = 0
       combined_tau_ssa_f = 0
 
-      ! Get ice cloud optics
-      !call pbuf_get_field(pbuf, pbuf_get_index('ICIWP'), iciwp)
-      !call pbuf_get_field(pbuf, pbuf_get_index('DEI'), dei)
       ncol = state%ncol
-      call mitchell_ice_optics_sw(state, pbuf, &
-                             ice_tau, ice_tau_ssa, &
-                             ice_tau_ssa_g, ice_tau_ssa_f)
+
+      ! Get ice cloud optics
+      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP'), iciwp)
+      call pbuf_get_field(pbuf, pbuf_get_index('DEI'), dei)
+      call mitchell_ice_optics_sw( &
+         pcols, pver, iciwp, dei, &
+         ice_tau, ice_tau_ssa, &
+         ice_tau_ssa_g, ice_tau_ssa_f &
+      )
       call assert_range(ice_tau(1:nswbands,1:ncol,1:pver), 0._r8, 1e20_r8, &
                         'get_cloud_optics_sw: ice_tau')
       
       ! Get liquid cloud optics
-      call conley_liquid_optics_sw(state, pbuf, &
-                                liquid_tau, liquid_tau_ssa, &
-                                liquid_tau_ssa_g, liquid_tau_ssa_f)
+      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
+      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
+      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
+      call conley_liquid_optics_sw(         &
+         pcols, pver, lambdac, mu, iclwp,   &
+         liquid_tau, liquid_tau_ssa,        &
+         liquid_tau_ssa_g, liquid_tau_ssa_f &
+      )
       call assert_range(liquid_tau(1:nswbands,1:ncol,1:pver), 0._r8, 1e20_r8, &
                         'get_cloud_optics_sw: liquid_tau')
 
@@ -110,9 +117,13 @@ contains
       ! Get snow cloud optics
       if (do_snow_optics()) then
          ! Doing snow optics; call procedure to get these from CAM state and pbuf
-         call get_snow_optics_sw(state, pbuf, &
-                                 snow_tau, snow_tau_ssa, &
-                                 snow_tau_ssa_g, snow_tau_ssa_f)
+         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
+         call pbuf_get_field(pbuf, pbuf_get_index('DES'), des)
+         call mitchell_ice_optics_sw( &
+            pcols, pver, icswp, des, &
+            snow_tau, snow_tau_ssa, &
+            snow_tau_ssa_g, snow_tau_ssa_f &
+         )
 
          ! Get cloud and snow fractions. This is used to weight the contribution to
          ! the total lw absorption by the fraction of the column that contains
@@ -199,8 +210,7 @@ contains
       use physics_buffer, only: physics_buffer_desc, pbuf_get_field, &
                                 pbuf_get_index
       use cloud_rad_props, only: conley_liquid_optics_lw, &
-                                 mitchell_ice_optics_lw, &
-                                 get_snow_optics_lw
+                                 mitchell_ice_optics_lw
       use radconstants, only: nlwbands
       use mo_optical_props, only: ty_optical_props_1scl
 
@@ -211,6 +221,16 @@ contains
       ! Cloud and snow fractions, used to weight optical properties by
       ! contributions due to cloud vs snow
       real(r8), pointer :: cloud_fraction(:,:), snow_fraction(:,:)
+
+      ! Pointers to fields on physics buffer
+      real(r8), pointer, dimension(:,:) :: &
+         lambdac,  & ! slope parameter of drop distribution
+         mu     ,  & ! shape parameter of drop distribution
+         dei    ,  & ! effective ice diameter
+         des    ,  & ! effective snow diameter
+         iclwp  ,  & ! in-cloud liquid water path
+         iciwp  ,  & ! in-cloud ice water path
+         icswp       ! in-"cloud" snow water path
 
       ! Temporary variables to hold absorption optical depth
       real(r8), dimension(nlwbands,pcols,pver) :: &
@@ -229,17 +249,24 @@ contains
       combined_tau(:,:,:) = 0.0
 
       ! Get ice optics
-      call mitchell_ice_optics_lw(state, pbuf, ice_tau)
+      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP')  , iciwp  )
+      call pbuf_get_field(pbuf, pbuf_get_index('DEI')    , dei    )
+      call mitchell_ice_optics_lw(pcols, pver, iciwp, dei, ice_tau)
 
       ! Get liquid optics
-      call conley_liquid_optics_lw(state, pbuf, liq_tau)
+      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
+      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
+      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
+      call conley_liquid_optics_lw(pcols, pver, lambdac, mu, iclwp, liq_tau)
 
       ! Combine cloud optics
       cloud_tau = liq_tau + ice_tau
       if (do_snow_optics()) then
 
          ! Get snow optical properties
-         call get_snow_optics_lw(state, pbuf, snow_tau)
+         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP')  , icswp  )
+         call pbuf_get_field(pbuf, pbuf_get_index('DES')    , des    )
+         call mitchell_ice_optics_lw(pcols, pver, icswp, des, snow_tau)
 
          ! Get cloud and snow fractions. This is used to weight the contribution to
          ! the total lw absorption by the fraction of the column that contains
