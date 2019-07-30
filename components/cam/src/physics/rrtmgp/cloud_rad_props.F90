@@ -4,16 +4,10 @@ module cloud_rad_props
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
-use ppgrid,           only: pcols, pver, pverp
-use physics_types,    only: physics_state
-use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
-
-use radconstants,     only: nswbands, nlwbands, idx_sw_diag, ot_length, idx_lw_diag
+use radconstants,     only: nswbands, nlwbands
 use rad_constituents, only: iceopticsfile, liqopticsfile
-
 use interpolate_data, only: interp_type, lininterp_init, lininterp, &
                             extrap_method_bndry, lininterp_finish
-
 use cam_logfile,      only: iulog
 use cam_abortutils,   only: endrun
 
