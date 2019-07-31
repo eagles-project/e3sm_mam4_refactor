@@ -2205,8 +2205,7 @@ contains
    ! For some reason the RRTMGP flux objects do not include initialization
    ! routines, but rather expect the user to associate the individual fluxes (which
    ! are pointers) with appropriate targets. Instead, this routine treats those
-   ! pointers as allocatable members and allocates space for them. TODO: is this
-   ! appropriate use?
+   ! pointers as allocatable members and allocates space for them.
    subroutine initialize_rrtmgp_fluxes(ncol, nlevels, nbands, fluxes, do_direct)
 
       use mo_fluxes_byband, only: ty_fluxes_byband
