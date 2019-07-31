@@ -48,6 +48,8 @@ module radconstants
 
    ! Solar irradiance at 1 A.U. in W/m^2 assumed by radiation code
    ! Rescaled so that sum is precisely 1368.22 and fractional amounts sum to 1.0
+   ! TODO: this needs to be recomputed for RRTMGP, or else read in from the
+   ! k_dist_sw object
    real(r8), parameter :: solar_ref_band_irradiance(nswbands) = & 
       (/ &
        12.89_r8,  12.11_r8,  20.3600000000001_r8, 23.73_r8, &
@@ -56,7 +58,7 @@ module radconstants
       129.49_r8,  50.15_r8,   3.08_r8 &
       /)
 
-   ! These are indices to the band for diagnostic output
+   ! Indices to bands for diagnostic output
    integer, parameter, public :: idx_sw_diag = 11 ! index to sw visible band
    integer, parameter, public :: idx_lw_diag = 7 ! index to (H20 window) LW band
    integer, parameter, public :: idx_nir_diag = 9 ! index to sw near infrared (778-1240 nm) band
@@ -101,16 +103,15 @@ module radconstants
    character(len=gasnamelength), public, parameter :: gaslist(nradgas) &
       = (/'H2O  ','O3   ', 'O2   ', 'CO2  ', 'N2O  ', 'CH4  ', 'CFC11', 'CFC12'/)
 
-   ! what is the minimum mass mixing ratio that can be supported by radiation implementation?
-   real(r8), public, parameter :: minmmr(nradgas) &
-      = epsilon(1._r8)
+   ! Minimum mass mixing ratio that can be supported by radiation implementation
+   real(r8), public, parameter :: minmmr(nradgas) = epsilon(1._r8)
 
    ! Length of "optics type" string specified in optics files.
    integer, parameter, public :: ot_length = 32
 
-   public :: rad_gas_index
-
-   public :: get_number_sw_bands, &
+   ! Routines provided by module
+   public :: rad_gas_index, &
+             get_number_sw_bands, &
              get_sw_spectral_boundaries, &
              get_lw_spectral_boundaries, &
              get_ref_solar_band_irrad, &
@@ -118,131 +119,141 @@ module radconstants
              get_solar_band_fraction_irrad
 
 contains
-!------------------------------------------------------------------------------
-subroutine get_solar_band_fraction_irrad(fractional_irradiance)
-   ! provide Solar Irradiance for each band in RRTMG
 
-   ! fraction of solar irradiance in each band
-   real(r8), intent(out) :: fractional_irradiance(1:nswbands)
-   real(r8) :: tsi ! total solar irradiance
+   !----------------------------------------------------------------------------
 
-   tsi = sum(solar_ref_band_irradiance)
-   fractional_irradiance = solar_ref_band_irradiance / tsi
+   subroutine get_solar_band_fraction_irrad(fractional_irradiance)
+      ! provide Solar Irradiance for each band in RRTMG
 
-end subroutine get_solar_band_fraction_irrad
-!------------------------------------------------------------------------------
-subroutine get_ref_total_solar_irrad(tsi)
-   ! provide Total Solar Irradiance assumed by RRTMG
+      ! fraction of solar irradiance in each band
+      real(r8), intent(out) :: fractional_irradiance(1:nswbands)
+      real(r8) :: tsi ! total solar irradiance
 
-   real(r8), intent(out) :: tsi
+      tsi = sum(solar_ref_band_irradiance)
+      fractional_irradiance = solar_ref_band_irradiance / tsi
 
-   tsi = sum(solar_ref_band_irradiance)
+   end subroutine get_solar_band_fraction_irrad
 
-end subroutine get_ref_total_solar_irrad
-!------------------------------------------------------------------------------
-subroutine get_ref_solar_band_irrad( band_irrad )
+   !----------------------------------------------------------------------------
 
-   ! solar irradiance in each band (W/m^2)
-   real(r8), intent(out) :: band_irrad(nswbands)
- 
-   band_irrad = solar_ref_band_irradiance
+   subroutine get_ref_total_solar_irrad(tsi)
+      ! provide Total Solar Irradiance assumed by RRTMG
 
-end subroutine get_ref_solar_band_irrad
-!------------------------------------------------------------------------------
-subroutine get_number_sw_bands(number_of_bands)
+      real(r8), intent(out) :: tsi
 
-   ! number of solar (shortwave) bands in the rrtmg code
-   integer, intent(out) :: number_of_bands
+      tsi = sum(solar_ref_band_irradiance)
 
-   number_of_bands = nswbands
+   end subroutine get_ref_total_solar_irrad
 
-end subroutine get_number_sw_bands
+   !----------------------------------------------------------------------------
 
-!------------------------------------------------------------------------------
+   subroutine get_ref_solar_band_irrad( band_irrad )
 
-subroutine get_lw_spectral_boundaries(low_boundaries, high_boundaries, units)
+      ! solar irradiance in each band (W/m^2)
+      real(r8), intent(out) :: band_irrad(nswbands)
+    
+      band_irrad = solar_ref_band_irradiance
 
-   ! Provide spectral boundaries of each longwave band
+   end subroutine get_ref_solar_band_irrad
 
-   real(r8), intent(out) :: low_boundaries(nlwbands), high_boundaries(nlwbands)
-   character(*), intent(in) :: units ! requested units
-   real(r8) :: wavenumber_bounds(2,nlwbands)
+   !----------------------------------------------------------------------------
 
-   wavenumber_bounds = k_dist_lw%get_band_lims_wavenumber()
+   subroutine get_number_sw_bands(number_of_bands)
 
-   select case (units)
-   case ('inv_cm','cm^-1','cm-1')
-      low_boundaries  = wavenumber_bounds(1,:)
-      high_boundaries = wavenumber_bounds(2,:)
-   case('m','meter','meters')
-      low_boundaries  = 1.e-2_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e-2_r8/wavenumber_bounds(1,:)
-   case('nm','nanometer','nanometers')
-      low_boundaries  = 1.e7_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e7_r8/wavenumber_bounds(1,:)
-   case('um','micrometer','micrometers','micron','microns')
-      low_boundaries  = 1.e4_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e4_r8/wavenumber_bounds(1,:)
-   case('cm','centimeter','centimeters')
-      low_boundaries  = 1._r8/wavenumber_bounds(2,:)
-      high_boundaries = 1._r8/wavenumber_bounds(1,:)
-   case default
-      call endrun('get_lw_spectral_boundaries: spectral units not acceptable'//units)
-   end select
+      ! number of solar (shortwave) bands in the rrtmg code
+      integer, intent(out) :: number_of_bands
 
-end subroutine get_lw_spectral_boundaries
+      number_of_bands = nswbands
 
-!------------------------------------------------------------------------------
+   end subroutine get_number_sw_bands
 
-subroutine get_sw_spectral_boundaries(low_boundaries, high_boundaries, units)
+   !----------------------------------------------------------------------------
 
-   ! Provide spectral boundaries of each shortwave band
+   subroutine get_lw_spectral_boundaries(low_boundaries, high_boundaries, units)
 
-   real(r8), intent(out) :: low_boundaries(nswbands), high_boundaries(nswbands)
-   character(*), intent(in) :: units ! requested units
-   real(r8) :: wavenumber_bounds(2,nswbands)
+      ! Provide spectral boundaries of each longwave band
 
-   wavenumber_bounds = k_dist_sw%get_band_lims_wavenumber()
+      real(r8), intent(out) :: low_boundaries(nlwbands), high_boundaries(nlwbands)
+      character(*), intent(in) :: units ! requested units
+      real(r8) :: wavenumber_bounds(2,nlwbands)
 
-   select case (units)
-   case ('inv_cm','cm^-1','cm-1')
-      low_boundaries = wavenumber_bounds(1,:)
-      high_boundaries = wavenumber_bounds(2,:)
-   case('m','meter','meters')
-      low_boundaries = 1.e-2_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e-2_r8/wavenumber_bounds(1,:)
-   case('nm','nanometer','nanometers')
-      low_boundaries = 1.e7_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e7_r8/wavenumber_bounds(1,:)
-   case('um','micrometer','micrometers','micron','microns')
-      low_boundaries = 1.e4_r8/wavenumber_bounds(2,:)
-      high_boundaries = 1.e4_r8/wavenumber_bounds(1,:)
-   case('cm','centimeter','centimeters')
-      low_boundaries  = 1._r8/wavenumber_bounds(2,:)
-      high_boundaries = 1._r8/wavenumber_bounds(1,:)
-   case default
-      call endrun('radconstants.F90: spectral units not acceptable'//units)
-   end select
+      wavenumber_bounds = k_dist_lw%get_band_lims_wavenumber()
 
-end subroutine get_sw_spectral_boundaries
+      select case (units)
+      case ('inv_cm','cm^-1','cm-1')
+         low_boundaries  = wavenumber_bounds(1,:)
+         high_boundaries = wavenumber_bounds(2,:)
+      case('m','meter','meters')
+         low_boundaries  = 1.e-2_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e-2_r8/wavenumber_bounds(1,:)
+      case('nm','nanometer','nanometers')
+         low_boundaries  = 1.e7_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e7_r8/wavenumber_bounds(1,:)
+      case('um','micrometer','micrometers','micron','microns')
+         low_boundaries  = 1.e4_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e4_r8/wavenumber_bounds(1,:)
+      case('cm','centimeter','centimeters')
+         low_boundaries  = 1._r8/wavenumber_bounds(2,:)
+         high_boundaries = 1._r8/wavenumber_bounds(1,:)
+      case default
+         call endrun('get_lw_spectral_boundaries: spectral units not acceptable'//units)
+      end select
 
-!------------------------------------------------------------------------------
+   end subroutine get_lw_spectral_boundaries
 
-integer function rad_gas_index(gasname)
+   !----------------------------------------------------------------------------
 
-   ! return the index in the gaslist array of the specified gasname
+   subroutine get_sw_spectral_boundaries(low_boundaries, high_boundaries, units)
 
-   character(len=*),intent(in) :: gasname
-   integer :: igas
+      ! Provide spectral boundaries of each shortwave band
 
-   rad_gas_index = -1
-   do igas = 1, nradgas
-      if (trim(gaslist(igas)).eq.trim(gasname)) then
-         rad_gas_index = igas
-         return
-      endif
-   enddo
-   call endrun ("rad_gas_index: can not find gas with name "//gasname)
-end function rad_gas_index
+      real(r8), intent(out) :: low_boundaries(nswbands), high_boundaries(nswbands)
+      character(*), intent(in) :: units ! requested units
+      real(r8) :: wavenumber_bounds(2,nswbands)
+
+      wavenumber_bounds = k_dist_sw%get_band_lims_wavenumber()
+
+      select case (units)
+      case ('inv_cm','cm^-1','cm-1')
+         low_boundaries = wavenumber_bounds(1,:)
+         high_boundaries = wavenumber_bounds(2,:)
+      case('m','meter','meters')
+         low_boundaries = 1.e-2_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e-2_r8/wavenumber_bounds(1,:)
+      case('nm','nanometer','nanometers')
+         low_boundaries = 1.e7_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e7_r8/wavenumber_bounds(1,:)
+      case('um','micrometer','micrometers','micron','microns')
+         low_boundaries = 1.e4_r8/wavenumber_bounds(2,:)
+         high_boundaries = 1.e4_r8/wavenumber_bounds(1,:)
+      case('cm','centimeter','centimeters')
+         low_boundaries  = 1._r8/wavenumber_bounds(2,:)
+         high_boundaries = 1._r8/wavenumber_bounds(1,:)
+      case default
+         call endrun('radconstants.F90: spectral units not acceptable'//units)
+      end select
+
+   end subroutine get_sw_spectral_boundaries
+
+   !------------------------------------------------------------------------------
+
+   integer function rad_gas_index(gasname)
+
+      ! return the index in the gaslist array of the specified gasname
+
+      character(len=*),intent(in) :: gasname
+      integer :: igas
+
+      rad_gas_index = -1
+      do igas = 1, nradgas
+         if (trim(gaslist(igas)).eq.trim(gasname)) then
+            rad_gas_index = igas
+            return
+         endif
+      enddo
+      call endrun ("rad_gas_index: can not find gas with name "//gasname)
+   end function rad_gas_index
+
+   !------------------------------------------------------------------------------
 
 end module radconstants
