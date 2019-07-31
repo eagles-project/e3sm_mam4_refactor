@@ -35,18 +35,6 @@ module radiation
    save
 
    ! Public routines provided by this module.
-   ! TODO: radiation_defaultopts, radiation_setops, and radiation_printops exist
-   ! only because the radiation namelist has traditionally been read at the driver
-   ! level by runtime_opts. I am not sure this is the best solution, and in fact
-   ! CESM seems to have gone away from this practice altogether, opting instead for
-   ! individual modules to be responsible for reading their own namelists. This
-   ! might be a better practice going forward, and would simplify the logic here
-   ! somewhat. To do this, we would need to use the radiation_readnl routine
-   ! (copied below), and add a line in runtime_opts that calls this routine, and
-   ! then remove the code in runtime_opts that reads the radiation namelist
-   ! variables from the CAM namelist. The calls to radiation_defaultopts,
-   ! radiation_setops, and radiation_printops would also then need to be removed
-   ! from runtime_ops.
    public :: &
       radiation_register,    &! registers radiation physics buffer fields
       radiation_nextsw_cday, &! calendar day of next radiation calculation
@@ -60,7 +48,6 @@ module radiation
    ! COSP, and it might make more sense to implement a more elegant routine to call
    ! that determines whether or not to run COSP at a given timestep (similar to the
    ! radiation_do routine in this module).
-   ! TODO: move these to COSP interface instead
    integer, public, allocatable :: cosp_cnt(:)       ! counter for cosp
    integer, public              :: cosp_cnt_init = 0 ! initial value for cosp counter
 
@@ -91,18 +78,13 @@ module radiation
    ! Flag to indicate whether or not to use the radiation timestep for solar zenith
    ! angle calculations. If true, use the radiation timestep for all solar zenith 
    ! angle (cosz) calculations.
-   ! TODO: How does this differ if value is .false.?
    logical :: use_rad_dt_cosz  = .false. 
 
-   ! Model data that is not controlled by namelist fields specifically follows
-   ! below.
-
-   ! TODO: it seems CAM allows for multiple passes through the radiation (and other
-   ! physics?) for different diagnostic purposes, but this does not seem to be well
-   ! documented anywhere. We should add some documentation here on this if we are
-   ! going to keep this functionality.
-   character(len=4) :: diag(0:N_DIAG) =(/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 ', &
-                                         '_d6 ','_d7 ','_d8 ','_d9 ','_d10'/)
+   ! Postfixes for various "diagnostic" calls to the radiative transfer. This
+   ! allows for different combinations of gases to be used for diagnostic
+   ! purposes; only the 0-th call affects the climate.
+   character(len=4) :: diag(0:N_DIAG) = (/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 ', &
+                                          '_d6 ','_d7 ','_d8 ','_d9 ','_d10'/)
 
    ! Output diagnostic brightness temperatures at the top of the
    ! atmosphere for 7 TOVS/HIRS channels (2,4,6,8,10,11,12) and 4 TOVS/MSU 
