@@ -134,11 +134,6 @@ module radiation
    ! this mean?)
    integer, public, allocatable :: tot_chnk_till_this_prc(:,:,:)
 
-   ! Mapping from old RRTMG sw bands to new band ordering in RRTMGP
-   integer, dimension(14) :: map_rrtmg_to_rrtmgp_swbands = (/ &
-      14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 &
-   /)
-
    !============================================================================
 
 contains
@@ -2509,6 +2504,7 @@ contains
       use cloud_rad_props, only: mitchell_ice_optics_sw, &
                                  conley_liquid_optics_sw
       use mo_optical_props, only: ty_optical_props_2str
+      use radconstants, only: map_rrtmg_to_rrtmgp_swbands
 
       ! Inputs. Right now, this uses state and pbuf, and passes these along to the
       ! individual get_*_optics routines from cloud_rad_props. This is not very
@@ -3068,7 +3064,7 @@ contains
       use physics_types, only: physics_state
       use physics_buffer, only: physics_buffer_desc
       use aer_rad_props, only: aer_rad_props_sw
-      use radconstants, only: nswbands
+      use radconstants, only: nswbands, map_rrtmg_to_rrtmgp_swbands
       use mo_optical_props, only: ty_optical_props_2str
       integer, intent(in) :: icall
       type(physics_state), intent(in) :: state

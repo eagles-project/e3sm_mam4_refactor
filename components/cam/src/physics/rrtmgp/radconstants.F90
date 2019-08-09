@@ -46,6 +46,11 @@ module radconstants
    ! Also, save number of g-points as private module data
    integer, public :: nswgpts, nlwgpts
 
+   ! Mapping from old RRTMG sw bands to new band ordering in RRTMGP
+   integer, public, dimension(14) :: map_rrtmg_to_rrtmgp_swbands = (/ &
+      14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 &
+   /)
+
    ! Solar irradiance at 1 A.U. in W/m^2 assumed by radiation code
    ! Rescaled so that sum is precisely 1368.22 and fractional amounts sum to 1.0
    ! TODO: this needs to be recomputed for RRTMGP, or else read in from the
