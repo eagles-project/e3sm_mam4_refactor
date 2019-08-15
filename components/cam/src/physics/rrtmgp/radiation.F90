@@ -2882,8 +2882,7 @@ contains
             ! McICA assumptions: simultaneously sampling over cloud state and
             ! g-point.
             do igpt = 1,ngpt
-               if (iscloudy(igpt,icol,ilev_cam) .and. &
-                   cloud_fraction(icol,ilev_cam) > 0._r8) then
+               if (iscloudy(igpt,icol,ilev_cam)) then
                   ibnd = optics_out%convert_gpt2band(igpt)
                   optics_out%tau(icol,ilev_rad,igpt) = optics_byband%tau(icol,ilev_cam,ibnd)
                   optics_out%ssa(icol,ilev_rad,igpt) = optics_byband%ssa(icol,ilev_cam,ibnd)
@@ -2974,7 +2973,7 @@ contains
 
          do icol = 1,ncol
             do igpt = 1,ngpt
-               if (iscloudy(igpt,icol,ilev_cam) .and. (cloud_fraction(icol,ilev_cam) > 0._r8) ) then
+               if (iscloudy(igpt,icol,ilev_cam)) then
                   ibnd = optics_out%convert_gpt2band(igpt)
                   optics_out%tau(icol,ilev_rad,igpt) = optics_byband%tau(icol,ilev_cam,ibnd)
                else
