@@ -2540,7 +2540,6 @@ contains
             liq_tau_ssa, liq_tau_ssa_asm, ice_tau_ssa, ice_tau_ssa_asm, &
             snw_tau_ssa, snw_tau_ssa_asm, &
             cld_tau, cld_tau_ssa, cld_tau_ssa_asm
-            
 
       ! Pointers to fields on the physics buffer
       real(r8), pointer, dimension(:,:) :: iclwp, iciwp, icswp, dei, des, lambdac, mu
@@ -2569,20 +2568,24 @@ contains
          liq_tau, liq_ssa, liq_asm          &
       )
 
-      ! Combine into products
-      cld_tau = ice_tau + liq_tau
-      cld_tau_ssa = ice_tau * ice_ssa + liq_tau * liq_ssa
-      cld_tau_ssa_asm = ice_tau * ice_ssa * ice_asm + liq_tau * liq_ssa * liq_asm
-
-      ! Get snow cloud optics and combine
+      ! Get snow optics
       if (do_snow_optics()) then
-         ! Doing snow optics; call procedure to get these from CAM state and pbuf
          call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
          call pbuf_get_field(pbuf, pbuf_get_index('DES'), des)
          call mitchell_ice_optics_sw( &
             pcols, pver, icswp, des, &
             snw_tau, snw_ssa, snw_asm &
          )
+      end if
+
+      ! Combine into products
+      cld_tau = ice_tau + liq_tau
+      cld_tau_ssa = ice_tau * ice_ssa + liq_tau * liq_ssa
+      cld_tau_ssa_asm = ice_tau * ice_ssa * ice_asm + liq_tau * liq_ssa * liq_asm
+
+      ! Merge in snow optics
+      if (do_snow_optics()) then
+
          snw_tau_ssa = snw_tau * snw_ssa
          snw_tau_ssa_asm = snw_tau * snw_ssa * snw_asm
          
@@ -3018,8 +3021,6 @@ contains
 
       ! Check cloud optics
       call handle_error(optics_out%validate())
-
-      !call optics_cam%finalize()
 
       deallocate(iscloudy)
 
