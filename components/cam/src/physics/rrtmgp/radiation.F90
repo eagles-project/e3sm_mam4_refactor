@@ -1144,6 +1144,7 @@ contains
       logical :: active_calls(0:N_DIAG)
       integer :: icall
 
+      real(r8), pointer, dimension(:,:) :: iclwp, iciwp, icswp, dei, des, lambdac, mu
       real(r8), pointer, dimension(:,:) :: cloud_fraction, snow_fraction
       real(r8), dimension(pcols,pver) :: combined_cloud_fraction
 
@@ -1163,6 +1164,16 @@ contains
          call pbuf_get_field(pbuf, pbuf_get_index('CLDFSNOW'), snow_fraction)
          combined_cloud_fraction(1:ncol,1:pver) = max(cloud_fraction(1:ncol,1:pver), &
                                                       snow_fraction(1:ncol,1:pver))
+      end if
+
+      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP')  , iciwp  )
+      call pbuf_get_field(pbuf, pbuf_get_index('DEI')    , dei    )
+      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
+      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
+      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
+      if (do_snow_optics()) then
+         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
+         call pbuf_get_field(pbuf, pbuf_get_index('DES')  , des  )
       end if
 
       ! Initialize clearsky-heating rates to make sure we do not get garbage
@@ -1247,7 +1258,12 @@ contains
 
                ! Get shortwave cloud optics
                call t_startf('rad_cloud_optics_sw')
-               call get_cloud_optics_sw(state, pbuf, cld_optics_sw_byband)
+               call get_cloud_optics_sw( &
+                  cloud_fraction, iclwp, iciwp, &
+                  mu, lambdac, dei, &
+                  cld_optics_sw_byband, &
+                  snow_fraction, icswp, des &
+               )
                call set_cloud_optics_sw( &
                   state%pmid(1:ncol,1:pver), combined_cloud_fraction(1:ncol,1:pver), &
                   cld_optics_sw_byband, cld_optics_sw &
@@ -1366,7 +1382,12 @@ contains
 
                ! Get longwave cloud optics
                call t_startf('rad_cloud_optics_lw')
-               call get_cloud_optics_lw(state, pbuf, cld_optics_lw_byband)
+               call get_cloud_optics_lw( &
+                  cloud_fraction, iclwp, iciwp, &
+                  mu, lambdac, dei, &
+                  cld_optics_lw_byband, &
+                  snow_fraction, icswp, des &
+               )
                call set_cloud_optics_lw( &
                   state%pmid(1:ncol,1:pver), combined_cloud_fraction(1:ncol,1:pver), &
                   cld_optics_lw_byband, cld_optics_lw &
@@ -2522,25 +2543,23 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine get_cloud_optics_sw(state, pbuf, optics_out)
+   subroutine get_cloud_optics_sw( &
+         cloud_fraction, iclwp, iciwp, &
+         mu, lambdac, dei, &
+         optics_out, &
+         snow_fraction, icswp, des &
+         )
 
-      use ppgrid, only: pcols, pver
-      use physics_types, only: physics_state
-      use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
       use cloud_rad_props, only: mitchell_ice_optics_sw, &
                                  conley_liquid_optics_sw
       use mo_optical_props, only: ty_optical_props_2str
       use radconstants, only: map_rrtmg_to_rrtmgp_swbands
 
-      ! Inputs. Right now, this uses state and pbuf, and passes these along to the
-      ! individual get_*_optics routines from cloud_rad_props. This is not very
-      ! flexible, in that it would be difficult to use this to get optical
-      ! properties from an SP configuration if wanted. So rather, it might be
-      ! better to adapt this to pass in things like liquid/ice water paths,
-      ! effective drop sizes, etc.
-      type(physics_state), intent(in) :: state
-      type(physics_buffer_desc), pointer :: pbuf(:)
-
+      real(r8), intent(in), dimension(:,:) :: &
+         cloud_fraction, iclwp, iciwp, mu, lambdac, dei
+      real(r8), intent(in), dimension(:,:), optional :: &
+         snow_fraction, icswp, des
+     
       ! Outputs are shortwave cloud optical properties *by band*. Dimensions should
       ! be nswbands,ncol,pver. Generally, this should be able to handle cases were
       ! ncol might be something like nday, and pver could be arbitrary so long as
@@ -2551,7 +2570,7 @@ contains
 
       ! Temporary variables to hold cloud optical properties before combining into
       ! output arrays.
-      real(r8), dimension(nswbands,pcols,pver) :: &
+      real(r8), dimension(nswbands,size(iclwp,1),size(iclwp,2)) :: &
             liq_tau, liq_ssa, liq_asm, ice_tau, ice_ssa, ice_asm, &
             snw_tau, snw_ssa, snw_asm, &
             liq_tau_ssa, liq_tau_ssa_asm, ice_tau_ssa, ice_tau_ssa_asm, &
@@ -2559,38 +2578,29 @@ contains
             cld_tau, cld_tau_ssa, cld_tau_ssa_asm
 
       ! Pointers to fields on the physics buffer
-      real(r8), pointer, dimension(:,:) :: iclwp, iciwp, icswp, dei, des, lambdac, mu
-      real(r8), pointer :: cloud_fraction(:,:), snow_fraction(:,:)
-      real(r8), dimension(nswbands,pcols,pver) :: cld_wgt, snw_wgt
-      real(r8) :: combined_fraction(pcols,pver)
+      real(r8) :: combined_fraction(size(iclwp,1),size(iclwp,2))
 
-      integer :: ncol, ibnd, icol, ilev
+      integer :: ncol, nlev, ibnd, icol, ilev
 
-      ncol = state%ncol
+      ncol = size(cloud_fraction, 1)
+      nlev = size(cloud_fraction, 2)
 
       ! Get ice cloud optics
-      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP'), iciwp)
-      call pbuf_get_field(pbuf, pbuf_get_index('DEI'), dei)
       call mitchell_ice_optics_sw( &
-         pcols, pver, iciwp, dei, &
+         ncol, nlev, iciwp, dei, &
          ice_tau, ice_ssa, ice_asm &
       )
       
       ! Get liquid cloud optics
-      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
-      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
-      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
       call conley_liquid_optics_sw(         &
-         pcols, pver, lambdac, mu, iclwp,   &
+         ncol, nlev, lambdac, mu, iclwp,   &
          liq_tau, liq_ssa, liq_asm          &
       )
 
       ! Get snow optics
-      if (do_snow_optics()) then
-         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
-         call pbuf_get_field(pbuf, pbuf_get_index('DES'), des)
+      if (present(icswp) .and. present(des)) then
          call mitchell_ice_optics_sw( &
-            pcols, pver, icswp, des, &
+            ncol, nlev, icswp, des, &
             snw_tau, snw_ssa, snw_asm &
          )
       end if
@@ -2601,14 +2611,12 @@ contains
       cld_tau_ssa_asm = ice_tau * ice_ssa * ice_asm + liq_tau * liq_ssa * liq_asm
 
       ! Merge in snow optics
-      if (do_snow_optics()) then
+      if (present(snow_fraction)) then
 
          snw_tau_ssa = snw_tau * snw_ssa
          snw_tau_ssa_asm = snw_tau * snw_ssa * snw_asm
          
          ! Combine optical properties, weighting by cloud/snow fraction
-         call pbuf_get_field(pbuf, pbuf_get_index('CLD'), cloud_fraction)
-         call pbuf_get_field(pbuf, pbuf_get_index('CLDFSNOW'), snow_fraction)
          combined_fraction = max(cloud_fraction, snow_fraction)
          do ilev = 1,pver
             do icol = 1,ncol
@@ -2638,7 +2646,6 @@ contains
       
       ! Copy to output arrays, converting to optical depth, single scattering
       ! albedo, and assymmetry parameter.
-      ncol = state%ncol
       do ibnd = 1,nswbands
          do ilev = 1,pver
             do icol = 1,ncol
@@ -2682,69 +2689,57 @@ contains
 
    !----------------------------------------------------------------------------
 
-   subroutine get_cloud_optics_lw(state, pbuf, optics_out)
+   subroutine get_cloud_optics_lw( &
+         cloud_fraction, iclwp, iciwp, &
+         mu, lambdac, dei, &
+         optics_out, &
+         snow_fraction, icswp, des &
+         )
 
-      use ppgrid, only: pcols, pver
-      use physics_types, only: physics_state
-      use physics_buffer, only: physics_buffer_desc, pbuf_get_field, &
-                                pbuf_get_index
       use cloud_rad_props, only: conley_liquid_optics_lw, &
                                  mitchell_ice_optics_lw
       use radconstants, only: nlwbands
       use mo_optical_props, only: ty_optical_props_1scl
 
-      type(physics_state), intent(in) :: state
-      type(physics_buffer_desc), pointer :: pbuf(:)
       type(ty_optical_props_1scl), intent(inout) :: optics_out
 
-      ! Cloud and snow fractions, used to weight optical properties by
-      ! contributions due to cloud vs snow
-      real(r8), pointer :: cloud_fraction(:,:), snow_fraction(:,:)
-      real(r8) :: combined_fraction(pcols,pver)
-
-      ! Pointers to fields on physics buffer
-      real(r8), pointer, dimension(:,:) :: &
+      real(r8), intent(in), dimension(:,:) :: &
+         cloud_fraction, &
          lambdac,  & ! slope parameter of drop distribution
          mu     ,  & ! shape parameter of drop distribution
          dei    ,  & ! effective ice diameter
-         des    ,  & ! effective snow diameter
          iclwp  ,  & ! in-cloud liquid water path
-         iciwp  ,  & ! in-cloud ice water path
-         icswp       ! in-"cloud" snow water path
+         iciwp       ! in-cloud ice water path
+      real(r8), intent(in), dimension(:,:), optional :: &
+         snow_fraction, &
+         icswp  ,  & ! in-"cloud" snow water path
+         des         ! effective snow diameter
+
+      ! Cloud and snow fractions, used to weight optical properties by
+      ! contributions due to cloud vs snow
+      real(r8), dimension(size(iclwp,1), size(iclwp,2)) :: combined_fraction
 
       ! Temporary variables to hold absorption optical depth
-      real(r8), dimension(nlwbands,pcols,pver) :: &
+      real(r8), dimension(nlwbands,size(iclwp,1),size(iclwp,2)) :: &
             ice_tau, liq_tau, snw_tau, cld_tau
 
-      integer :: ilev, icol, ibnd, ncol
+      integer :: ilev, icol, ibnd, ncol, nlev
 
       ! Number of columns in this chunk
-      ncol = state%ncol
+      ncol = size(cloud_fraction, 1)
+      nlev = size(cloud_fraction, 2)
 
       ! Get ice optics
-      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP')  , iciwp  )
-      call pbuf_get_field(pbuf, pbuf_get_index('DEI')    , dei    )
-      call mitchell_ice_optics_lw(pcols, pver, iciwp, dei, ice_tau)
+      call mitchell_ice_optics_lw(ncol, nlev, iciwp, dei, ice_tau)
 
       ! Get liquid optics
-      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
-      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
-      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
-      call conley_liquid_optics_lw(pcols, pver, lambdac, mu, iclwp, liq_tau)
+      call conley_liquid_optics_lw(ncol, nlev, lambdac, mu, iclwp, liq_tau)
 
       ! Get snow optics
       if (do_snow_optics()) then
-         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP')  , icswp  )
-         call pbuf_get_field(pbuf, pbuf_get_index('DES')    , des    )
-         call mitchell_ice_optics_lw(pcols, pver, icswp, des, snw_tau)
+         call mitchell_ice_optics_lw(ncol, nlev, icswp, des, snw_tau)
       end if
 
-!     ! Combine optics
-!     call merge_optics_lw(liq_tau, ice_tau, cld_tau)
-!     if (do_snow_optics()) then
-!        call merge_optics_lw(cld_tau, snw_tau, cld_tau, cloud_fraction, snow_fraction)
-!     end if
-        
       ! Combine cloud optics
       cld_tau = liq_tau + ice_tau
       if (do_snow_optics()) then
@@ -2752,11 +2747,9 @@ contains
          ! Get cloud and snow fractions. This is used to weight the contribution to
          ! the total lw absorption by the fraction of the column that contains
          ! cloud vs snow. TODO: is this the right thing to do here?
-         call pbuf_get_field(pbuf, pbuf_get_index('CLD'), cloud_fraction)
-         call pbuf_get_field(pbuf, pbuf_get_index('CLDFSNOW'), snow_fraction)
          combined_fraction = max(cloud_fraction, snow_fraction)
 
-         do ilev = 1,pver
+         do ilev = 1,nlev
             do icol = 1,ncol
                do ibnd = 1,nlwbands
                   if (combined_fraction(icol,ilev) > 0) then
@@ -2773,7 +2766,7 @@ contains
       end if
 
       ! Set output optical properties
-      do ilev = 1,pver
+      do ilev = 1,nlev
          do icol = 1,ncol
             do ibnd = 1,nlwbands
                optics_out%tau(icol,ilev,ibnd) = cld_tau(ibnd,icol,ilev)
@@ -2917,7 +2910,6 @@ contains
    subroutine set_cloud_optics_lw(pmid, cloud_fraction, optics_byband, optics_out)
       
       use mo_optical_props, only: ty_optical_props_1scl
-      use mo_gas_optics_rrtmgp, only: ty_gas_optics_rrtmgp
       use mcica_subcol_gen, only: mcica_subcol_mask
 
       real(r8), intent(in), dimension(:,:) :: pmid, cloud_fraction
