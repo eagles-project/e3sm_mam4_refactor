@@ -1158,22 +1158,23 @@ contains
       call pbuf_get_field(pbuf, pbuf_get_index('QRS'), qrs)
       call pbuf_get_field(pbuf, pbuf_get_index('QRL'), qrl)
 
-      ! Get cloud and snow fractions, and combine
+      ! Get cloud properties needed for optics routines
       if (radiation_do('sw') .or. radiation_do('lw')) then
          call pbuf_get_field(pbuf, pbuf_get_index('CLD'), cloud_fraction)
-         call pbuf_get_field(pbuf, pbuf_get_index('CLDFSNOW'), snow_fraction)
-         combined_cloud_fraction(1:ncol,1:pver) = max(cloud_fraction(1:ncol,1:pver), &
-                                                      snow_fraction(1:ncol,1:pver))
-      end if
-
-      call pbuf_get_field(pbuf, pbuf_get_index('ICIWP')  , iciwp  )
-      call pbuf_get_field(pbuf, pbuf_get_index('DEI')    , dei    )
-      call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
-      call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
-      call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
-      if (do_snow_optics()) then
-         call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
-         call pbuf_get_field(pbuf, pbuf_get_index('DES')  , des  )
+         call pbuf_get_field(pbuf, pbuf_get_index('ICIWP')  , iciwp  )
+         call pbuf_get_field(pbuf, pbuf_get_index('DEI')    , dei    )
+         call pbuf_get_field(pbuf, pbuf_get_index('ICLWP')  , iclwp  )
+         call pbuf_get_field(pbuf, pbuf_get_index('MU')     , mu     )
+         call pbuf_get_field(pbuf, pbuf_get_index('LAMBDAC'), lambdac)
+         if (do_snow_optics()) then
+            call pbuf_get_field(pbuf, pbuf_get_index('ICSWP'), icswp)
+            call pbuf_get_field(pbuf, pbuf_get_index('DES')  , des  )
+            call pbuf_get_field(pbuf, pbuf_get_index('CLDFSNOW'), snow_fraction)
+            combined_cloud_fraction(1:ncol,1:pver) = max(cloud_fraction(1:ncol,1:pver), &
+                                                         snow_fraction(1:ncol,1:pver))
+         else
+            combined_cloud_fraction(1:ncol,1:pver) = cloud_fraction(1:ncol,1:pver)
+         end if
       end if
 
       ! Initialize clearsky-heating rates to make sure we do not get garbage
@@ -3055,7 +3056,7 @@ contains
       ! are set to zero in aer_rad_props_sw as far as I can tell.
       !
       ! NOTE: dimension ordering is different than for cloud optics!
-      real(r8), dimension(pcols,0:pver,nswbands) :: tau, tau_w, tau_w_g, tau_w_f
+      real(r8), dimension(pcols,pver,nswbands) :: tau, tau_w, tau_w_g, tau_w_f
 
       integer :: ncol
       integer :: icol, ilay
