@@ -366,6 +366,10 @@ subroutine phys_inidat( cam_out, pbuf2d )
     integer :: tpert_idx, qpert_idx, pblh_idx, vmag_gust_idx
 
     logical :: found=.false., found2=.false.
+    ! Flag for clubb warm initialization
+    logical :: do_clubb_int
+    logical :: do_output_clubb_int
+
     integer :: ierr
     character(len=8) :: dim1name, dim2name
     integer :: ixcldice, ixcldliq
@@ -657,6 +661,204 @@ subroutine phys_inidat( cam_out, pbuf2d )
 
     deallocate (tptr3d)
 
+
+!!read CLUBB warm start initial conditions 
+    call phys_getopts(do_clubb_int_out=do_clubb_int)
+
+    if (do_clubb_int) then
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='UPWP'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='VPWP'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='WP2_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='WP3_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='WPTHLP_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='WPRTP_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='RTPTHLP_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='RTP2_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='THLP2_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='UP2_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)       
+
+      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
+      fieldname='VP2_nadv'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            do n = 1, dyn_time_lvls
+               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
+            end do
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+      allocate(tptr3d(pcols,pver,begchunk:endchunk))
+      fieldname='RAD_CLUBB'
+      m = pbuf_get_index(fieldname,ierr)
+      if (m > 0) then
+         call infld(fieldname, fh_ini, dim1name, 'lev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
+              tptr3d, found, gridname='physgrid')
+         if(found) then
+            call pbuf_set_field(pbuf2d, m, tptr3d)
+         else
+            do_clubb_int = .false.
+         end if
+       end if
+       deallocate(tptr3d)
+
+    end if       
+    
     call initialize_short_lived_species(fh_ini, pbuf2d)
 end subroutine phys_inidat
 
