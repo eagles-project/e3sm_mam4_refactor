@@ -2257,6 +2257,25 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
+    !SZhang 
+    logical  :: l_dribling_tend                ! flag to turn on tendency dribling in CLUBB+MG2
+    real(r8) :: rztodt                         ! inverse of time step  
+    real(r8), pointer, dimension(:,:) :: qcwat
+    real(r8), pointer, dimension(:,:) :: lcwat
+    real(r8), pointer, dimension(:,:) :: tcwat
+    real(r8), pointer, dimension(:,:) :: icwat
+    real(r8), pointer, dimension(:,:) :: scwat
+    real(r8), pointer, dimension(:,:) :: nlwat
+    real(r8), pointer, dimension(:,:) :: niwat
+
+    real(r8):: ttend(pcols,pver)
+    real(r8):: qtend(pcols,pver)
+    real(r8):: ltend(pcols,pver)
+    real(r8):: itend(pcols,pver)
+    real(r8):: stend(pcols,pver)
+    real(r8):: nltend(pcols,pver)
+    real(r8):: nitend(pcols,pver)
+    !SZhang
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
@@ -2269,6 +2288,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
+                      ,l_dribling_tend_out    = l_dribling_tend    &                      
                       )
     
     !-----------------------------------------------------------------------
@@ -2648,6 +2668,16 @@ end if
 
        do macmic_it = 1, cld_macmic_num_steps
 
+        if((.not.is_first_step()) .and. l_dribling_tend) then
+          state%t(:ncol,:pver)          = state%t(:ncol,:pver)         + ttend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,1)        = state%q(:ncol,:pver,1)       + qtend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldliq) = state%q(:ncol,:pver,ixcldliq)+ ltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldice) = state%q(:ncol,:pver,ixcldice)+ itend(:ncol,:pver)*cld_macmic_ztodt
+          state%s(:ncol,:pver)          = state%s(:ncol,:pver)         + stend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumliq) = state%q(:ncol,:pver,ixnumliq)+ nltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumice) = state%q(:ncol,:pver,ixnumice)+ nitend(:ncol,:pver)*cld_macmic_ztodt
+        end if       
+
         if (l_st_mac) then
 
           if (micro_do_icesupersat) then 
@@ -2843,6 +2873,47 @@ end if
        snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
      end if !microp_scheme
+
+     if(l_dribling_tend) then
+
+     !save tcwat, qcwat, lcwat, icwat for the next call of macrophysics
+     itim_old  = pbuf_old_tim_idx()
+
+     ifld = pbuf_get_index('TCWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, tcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('QCWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, qcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('LCWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, lcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('ICWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, icwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('SCWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('NLWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     ifld = pbuf_get_index('NIWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+     call cnst_get_ind('CLDLIQ', ixcldliq)
+     call cnst_get_ind('CLDICE', ixcldice)
+     call cnst_get_ind('NUMLIQ', ixnumliq)
+     call cnst_get_ind('NUMICE', ixnumice)
+
+     tcwat(:ncol,:pver)  = state%t(:ncol,:pver)
+     qcwat(:ncol,:pver)  = state%q(:ncol,:pver,1)
+     lcwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldliq)
+     icwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldice)
+     scwat(:ncol,:pver)  = state%s(:ncol,:pver)
+     nlwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumliq)
+     niwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumice)
+
+     end if
 
 if (l_tracer_aero) then
 
