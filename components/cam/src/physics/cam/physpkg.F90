@@ -2259,6 +2259,7 @@ subroutine tphysbc (ztodt,               &
 
     !SZhang 
     logical  :: l_dribling_tend                ! flag to turn on tendency dribling in CLUBB+MG2
+    integer  :: ixnumliq, ixnumice             ! index for tracer number concentration
     real(r8) :: rztodt                         ! inverse of time step  
     real(r8), pointer, dimension(:,:) :: qcwat
     real(r8), pointer, dimension(:,:) :: lcwat
@@ -2666,16 +2667,67 @@ end if
        prec_pcw_macmic = 0._r8
        snow_pcw_macmic = 0._r8
 
+       if((.not.is_first_step()) .and. l_dribling_tend) then
+
+        rztodt = 1.0_r8/ztodt
+
+        call cnst_get_ind('CLDLIQ', ixcldliq)
+        call cnst_get_ind('CLDICE', ixcldice)
+        call cnst_get_ind('NUMLIQ', ixnumliq)
+        call cnst_get_ind('NUMICE', ixnumice)
+        
+        itim_old  = pbuf_old_tim_idx()
+
+        ifld = pbuf_get_index('SCWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('TCWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, tcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('QCWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, qcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('LCWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, lcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('ICWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, icwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('NLWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        ifld = pbuf_get_index('NIWAT_DBL')
+        call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+        stend(:ncol,:pver)  = (state%s(:ncol,:pver) - scwat(:ncol,:pver))*rztodt          ! Tendency of static energy
+        ttend(:ncol,:pver)  = (state%t(:ncol,:pver) - tcwat(:ncol,:pver))*rztodt          ! Tendency of temperature
+        qtend(:ncol,:pver)  = (state%q(:ncol,:pver,1) - qcwat(:ncol,:pver))*rztodt        ! Tendency of water vapor
+        ltend(:ncol,:pver)  = (state%q(:ncol,:pver,ixcldliq) - lcwat(:ncol,:pver))*rztodt ! Tendency of cloud liquid water  
+        itend(:ncol,:pver)  = (state%q(:ncol,:pver,ixcldice) - icwat(:ncol,:pver))*rztodt ! Tendency of cloud ice water
+        nltend(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - nlwat(:ncol,:pver))*rztodt ! Tendency of number liquid
+        nitend(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - niwat(:ncol,:pver))*rztodt ! Tendency of number ice
+
+        !restore the state variable back to the previous step for the first substep  
+        state%s(:ncol,:pver)          = scwat(:ncol,:pver)
+        state%t(:ncol,:pver)          = tcwat(:ncol,:pver)
+        state%q(:ncol,:pver,1)        = qcwat(:ncol,:pver)
+        state%q(:ncol,:pver,ixcldliq) = lcwat(:ncol,:pver)
+        state%q(:ncol,:pver,ixcldice) = icwat(:ncol,:pver)
+        state%q(:ncol,:pver,ixnumliq) = nlwat(:ncol,:pver)
+        state%q(:ncol,:pver,ixnumice) = niwat(:ncol,:pver)
+
+       end if
+
        do macmic_it = 1, cld_macmic_num_steps
 
         if((.not.is_first_step()) .and. l_dribling_tend) then
-          state%t(:ncol,:pver)          = state%t(:ncol,:pver)         + ttend(:ncol,:pver)*cld_macmic_ztodt
-          state%q(:ncol,:pver,1)        = state%q(:ncol,:pver,1)       + qtend(:ncol,:pver)*cld_macmic_ztodt
-          state%q(:ncol,:pver,ixcldliq) = state%q(:ncol,:pver,ixcldliq)+ ltend(:ncol,:pver)*cld_macmic_ztodt
-          state%q(:ncol,:pver,ixcldice) = state%q(:ncol,:pver,ixcldice)+ itend(:ncol,:pver)*cld_macmic_ztodt
-          state%s(:ncol,:pver)          = state%s(:ncol,:pver)         + stend(:ncol,:pver)*cld_macmic_ztodt
-          state%q(:ncol,:pver,ixnumliq) = state%q(:ncol,:pver,ixnumliq)+ nltend(:ncol,:pver)*cld_macmic_ztodt
-          state%q(:ncol,:pver,ixnumice) = state%q(:ncol,:pver,ixnumice)+ nitend(:ncol,:pver)*cld_macmic_ztodt
+          state%s(:ncol,:pver)          = state%s(:ncol,:pver)          + stend(:ncol,:pver)*cld_macmic_ztodt
+          state%t(:ncol,:pver)          = state%t(:ncol,:pver)          + ttend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,1)        = state%q(:ncol,:pver,1)        + qtend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldliq) = state%q(:ncol,:pver,ixcldliq) + ltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldice) = state%q(:ncol,:pver,ixcldice) + itend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumliq) = state%q(:ncol,:pver,ixnumliq) + nltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumice) = state%q(:ncol,:pver,ixnumice) + nitend(:ncol,:pver)*cld_macmic_ztodt
         end if       
 
         if (l_st_mac) then
@@ -2876,8 +2928,11 @@ end if
 
      if(l_dribling_tend) then
 
-     !save tcwat, qcwat, lcwat, icwat for the next call of macrophysics
+     !save swat, tcwat, qcwat, lcwat, icwat, nlwat, niwat for the next call of macrophysics
      itim_old  = pbuf_old_tim_idx()
+
+     ifld = pbuf_get_index('SCWAT_DBL')
+     call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
      ifld = pbuf_get_index('TCWAT_DBL')
      call pbuf_get_field(pbuf, ifld, tcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -2890,9 +2945,6 @@ end if
 
      ifld = pbuf_get_index('ICWAT_DBL')
      call pbuf_get_field(pbuf, ifld, icwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('SCWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
      ifld = pbuf_get_index('NLWAT_DBL')
      call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
