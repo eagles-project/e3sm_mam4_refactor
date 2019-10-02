@@ -184,7 +184,6 @@ module clubb_intr
   integer, public  :: &
     qcwat_dbl_idx  = 0, &
     lcwat_dbl_idx  = 0, &
-    tcwat_dbl_idx  = 0, &
     scwat_dbl_idx  = 0, &
     icwat_dbl_idx  = 0, &
     nlwat_dbl_idx  = 0, &
@@ -270,7 +269,6 @@ module clubb_intr
     ! save the variables used for dribbling the effect of other processes on CLUBB+MG2
     call pbuf_add_field('QCWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), qcwat_dbl_idx)
     call pbuf_add_field('LCWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), lcwat_dbl_idx)
-    call pbuf_add_field('TCWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), tcwat_dbl_idx)
     call pbuf_add_field('ICWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), icwat_dbl_idx)
     call pbuf_add_field('SCWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), scwat_dbl_idx)
     call pbuf_add_field('NLWAT_DBL',      'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), nlwat_dbl_idx)
