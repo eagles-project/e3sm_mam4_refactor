@@ -2070,7 +2070,7 @@ subroutine tphysbc (ztodt,               &
     use microp_driver,   only: microp_driver_tend
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
-    use physics_types,   only: physics_state, physics_tend, physics_ptend, &
+    use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_state_copy,&
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
@@ -2289,6 +2289,7 @@ subroutine tphysbc (ztodt,               &
     !HuiWan (2014/15): added for a short-term time step convergence test ==
    
     !SZhang 
+    type(physics_state) :: state1              ! Local copy of state variable   
     logical  :: l_dribling_tend                ! flag to turn on tendency dribling in CLUBB+MG2
     logical  :: l_dribling_uv                  ! flag to turn on tendency dribling in CLUBB+MG2
     logical  :: l_dribling_w                   ! flag to turn on tendency dribling in CLUBB+MG2
@@ -2723,7 +2724,9 @@ end if
     !   end if  
 
        if((.not.is_first_step()) .and. l_dribling_tend) then
-               
+ 
+        call physics_state_copy(state,state1)
+              
         rztodt = 1.0_r8/ztodt
 
         call cnst_get_ind('CLDLIQ', ixcldliq)
@@ -2771,6 +2774,15 @@ end if
         state%q(:ncol,:pver,ixnumliq) = nlwat(:ncol,:pver)
         state%q(:ncol,:pver,ixnumice) = niwat(:ncol,:pver)
 
+        state1%t(:ncol,:pver)          = tcwat(:ncol,:pver)
+        state1%q(:ncol,:pver,1)        = qcwat(:ncol,:pver)
+        state1%q(:ncol,:pver,ixcldliq) = lcwat(:ncol,:pver)
+        state1%q(:ncol,:pver,ixcldice) = icwat(:ncol,:pver)
+        state1%s(:ncol,:pver)          = scwat(:ncol,:pver)
+        state1%q(:ncol,:pver,ixnumliq) = nlwat(:ncol,:pver)
+        state1%q(:ncol,:pver,ixnumice) = niwat(:ncol,:pver)
+
+
         if(l_dribling_uv) then
          ifld = pbuf_get_index('UCWAT_DBL')
          call pbuf_get_field(pbuf, ifld, ucwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -2799,38 +2811,41 @@ end if
        do macmic_it = 1, cld_macmic_num_steps
 
         if((.not.is_first_step()) .and. l_dribling_tend) then
+          state%t(:ncol,:pver)          = state%t(:ncol,:pver)          + ttend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,1)        = state%q(:ncol,:pver,1)        + qtend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldliq) = state%q(:ncol,:pver,ixcldliq) + ltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixcldice) = state%q(:ncol,:pver,ixcldice) + itend(:ncol,:pver)*cld_macmic_ztodt
+          state%s(:ncol,:pver)          = state%s(:ncol,:pver)          + stend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumliq) = state%q(:ncol,:pver,ixnumliq) + nltend(:ncol,:pver)*cld_macmic_ztodt
+          state%q(:ncol,:pver,ixnumice) = state%q(:ncol,:pver,ixnumice) + nitend(:ncol,:pver)*cld_macmic_ztodt
+          if(l_dribling_uv) then
+           state%u(:ncol,:pver)         = state%u(:ncol,:pver)         + utend(:ncol,:pver)*cld_macmic_ztodt
+           state%v(:ncol,:pver)         = state%v(:ncol,:pver)         + vtend(:ncol,:pver)*cld_macmic_ztodt
+          endif
+          if(l_dribling_w) then
+           state%omega(:ncol,:pver)     = state%omega(:ncol,:pver)     + wtend(:ncol,:pver)*cld_macmic_ztodt
+          endif
 
          write (tmpname,"(A16,I2.2)")    "drib_tend_clubb_", macmic_it
 
          call t_startf(trim(adjustl(tmpname)))
 
          ! the flag lu,lv,ls,lq is to control whether or not do physics update on the variables 
-         if(l_dribling_uv) then
-          lu = .TRUE.
-          lv = .TRUE.
-         else
-          lu = .FALSE.
-          lv = .FALSE.       
-         end if
+         lu    = .FALSE.
+         lv    = .FALSE.       
          ls    = .TRUE. 
          lq(:) = .TRUE.
-         call physics_ptend_init(ptend, state%psetcols, trim(adjustl(tmpname)), ls=ls, lu=lu, lv=lv, lq=lq)
+         call physics_ptend_init(ptend, state1%psetcols, trim(adjustl(tmpname)), ls=ls, lu=lu, lv=lv, lq=lq)
               ptend%s(:ncol,:pver)          = stend(:ncol,:pver) !T will be changed via s
               ptend%q(:ncol,:pver,1)        = qtend(:ncol,:pver)
               ptend%q(:ncol,:pver,ixcldliq) = ltend(:ncol,:pver)
               ptend%q(:ncol,:pver,ixcldice) = itend(:ncol,:pver)
               ptend%q(:ncol,:pver,ixnumliq) = nltend(:ncol,:pver)
               ptend%q(:ncol,:pver,ixnumice) = nitend(:ncol,:pver)
-              if(l_dribling_uv) then
-               ptend%u(:ncol,:pver)         = utend(:ncol,:pver)
-               ptend%v(:ncol,:pver)         = vtend(:ncol,:pver) 
-              endif
-         call physics_update(state, ptend, cld_macmic_ztodt)
-         !note: physics_update and ptend do not have omega, 
-         if(l_dribling_w) then
-          state%omega(:ncol,:pver)     = state%omega(:ncol,:pver)     + wtend(:ncol,:pver)*cld_macmic_ztodt
-         endif
+         call physics_update(state1, ptend, cld_macmic_ztodt)
          call t_stopf(trim(adjustl(tmpname)))
+         !use the callibrated temperature, this is to test if s is the key
+         state%t(:ncol,:pver)          = state1%t(:ncol,:pver) 
         end if
          
         if (macmic_extra_diag) then
