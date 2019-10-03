@@ -2845,7 +2845,8 @@ end if
          call physics_update(state1, ptend, cld_macmic_ztodt)
          call t_stopf(trim(adjustl(tmpname)))
          !use the callibrated temperature, this is to test if s is the key
-         state%t(:ncol,:pver)          = state1%t(:ncol,:pver) 
+         state%zm(:ncol,:pver)          = state1%zm(:ncol,:pver) 
+         state%zi(:ncol,:pverp)         = state1%zi(:ncol,:pverp)
         end if
          
         if (macmic_extra_diag) then
