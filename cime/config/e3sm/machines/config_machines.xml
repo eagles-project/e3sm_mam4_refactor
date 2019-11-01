@@ -148,9 +148,9 @@
       <modules compiler="gnu">
         <command name="swap">PrgEnv-intel PrgEnv-gnu/6.0.5</command>
         <command name="rm">gcc</command>
-        <command name="load">gcc/8.2.0</command>
+        <command name="load">gcc/8.3.0</command>
         <command name="rm">cray-libsci</command>
-        <command name="load">cray-libsci/19.02.1</command>
+        <command name="load">cray-libsci/19.06.1</command>
       </modules>
 
       <modules>
@@ -307,9 +307,9 @@
       <modules compiler="gnu">
         <command name="swap">PrgEnv-intel PrgEnv-gnu/6.0.5</command>
         <command name="rm">gcc</command>
-        <command name="load">gcc/8.2.0</command>
+        <command name="load">gcc/8.3.0</command>
         <command name="rm">cray-libsci</command>
-        <command name="load">cray-libsci/19.02.1</command>
+        <command name="load">cray-libsci/19.06.1</command>
       </modules>
 
       <modules>

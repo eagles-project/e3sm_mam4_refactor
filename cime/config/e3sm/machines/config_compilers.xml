@@ -137,8 +137,10 @@ for mct, etc.
        so that these are passed to cmake builds (cmake builds don't use FIXEDFLAGS and FREEFLAGS). -->
     <base> -mcmodel=medium -fconvert=big-endian -ffree-line-length-none -ffixed-line-length-none </base>
     <append compile_threaded="TRUE"> -fopenmp </append>
-    <append DEBUG="TRUE"> -g -Wall -Og -fbacktrace -fcheck=bounds -ffpe-trap=invalid,zero,overflow</append>
-    <append DEBUG="FALSE"> -O </append>
+    <!--append DEBUG="TRUE"> -g -Wall -Og -fbacktrace -fcheck=bounds -ffpe-trap=invalid,zero,overflow</append-->
+    <append DEBUG="TRUE"> -g -fbacktrace -fcheck=bounds -fcheck=pointer -fcheck=mem</append>
+    <!--append DEBUG="FALSE"> -O </append-->
+    <append DEBUG="FALSE"> -O -g -fbacktrace -fcheck=bounds -fcheck=pointer -fcheck=mem</append>
   </FFLAGS>
   <FFLAGS_NOOPT>
     <base> -O0 </base>
