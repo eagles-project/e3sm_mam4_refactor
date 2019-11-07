@@ -38,8 +38,6 @@ module  PhotosynthesisMod
   use VegetationDataType  , only : veg_wf, veg_ws
   use ColumnDataType      , only : col_es, col_ws, col_wf
   use SoilStateType       , only : soilstate_type
-  use WaterfluxType       , only : waterflux_type
-  use WaterStateType      , only : waterstate_type
   !
   implicit none
   save
@@ -205,7 +203,7 @@ contains
   subroutine Photosynthesis ( bounds, fn, filterp, &
        esat_tv, eair, oair, cair, rb, btran, &
        dayl_factor, atm2lnd_vars, surfalb_vars, solarabs_vars, &
-       canopystate_vars, photosyns_vars, waterstate_vars, phase)
+       canopystate_vars, photosyns_vars, phase)
     !
     ! !DESCRIPTION:
     ! Leaf photosynthesis and stomatal conductance calculation as described by
@@ -237,7 +235,6 @@ contains
     type(solarabs_type)    , intent(inout)    :: solarabs_vars
     type(canopystate_type) , intent(inout)    :: canopystate_vars
     type(photosyns_type)   , intent(inout)    :: photosyns_vars
-    type(waterstate_type),  intent(in)     :: waterstate_vars
     character(len=3)       , intent(in)    :: phase                          ! 'sun' or 'sha'
 
     !
@@ -402,8 +399,8 @@ contains
          leafp_xfer    => veg_ps%leafp_xfer    , &
          i_vcmax       => veg_vp%i_vc                          , &
          s_vcmax       => veg_vp%s_vc                          , &
-         h2o_moss_wc   => veg_ws%h2o_moss_wc_patch         , & !Input: [real(r8) (:)   ]  Total Moss water content
-         h2osfc        => veg_ws%h2osfc_col                 & !Input: [real(r8) (:)   ]  Surface water
+         h2o_moss_wc   => veg_ws%h2o_moss_wc                  , & !Input: [real(r8) (:)   ]  Total Moss water content
+         h2osfc        => col_ws%h2osfc                         & !Input: [real(r8) (:)   ]  Surface water
          )
 
       if (phase == 'sun') then !sun
@@ -815,18 +812,18 @@ contains
          gb_mol(p) = gb * cf
 
          !Dessication and submergence scalaers for moss photosynthesis
-         if (veg_pp%itype(p) == 12)then
-            wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
-            !DMR 05/11/17 - add scaler for submergence effect
-            !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
-            wcscaler = max(0._r8, min(1.0_r8, wcscaler))
-         endif
+         !if (veg_pp%itype(p) == 12)then
+         !   wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
+         !   !DMR 05/11/17 - add scaler for submergence effect
+         !   !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
+         !   wcscaler = max(0._r8, min(1.0_r8, wcscaler))
+         !endif
 
          ! Loop through canopy layers (above snow). Only do calculations if daytime
         do iv = 1, nrad(p)
 
-            if (veg_pp%itype(p) == 12) lmr_z(p,iv) = lmr_z(p,iv) * wcscaler
-            if (par_z(p,iv) <= 0._r8) then           ! night time
+           !if (veg_pp%itype(p) == 12) lmr_z(p,iv) = lmr_z(p,iv) * wcscaler
+           if (par_z(p,iv) <= 0._r8) then           ! night time
 
                ac(p,iv) = 0._r8
                aj(p,iv) = 0._r8
@@ -878,7 +875,7 @@ contains
                !find ci and stomatal conductance
                call hybrid(ciold, p, iv, c, t, gb_mol(p), je, cair(p), oair(p), &
                     lmr_z(p,iv), par_z(p,iv), rh_can, gs_mol(p,iv), niter, &
-                    atm2lnd_vars, photosyns_vars, waterstate_vars)
+                    atm2lnd_vars, photosyns_vars)
 
                ! End of ci iteration.  Check for an < 0, in which case gs_mol = bbb
 
@@ -1161,7 +1158,7 @@ contains
   !-------------------------------------------------------------------------------
   subroutine hybrid(x0, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z,&
        rh_can, gs_mol,iter, &
-       atm2lnd_vars, photosyns_vars, waterstate_vars)
+       atm2lnd_vars, photosyns_vars)
     !
     !! DESCRIPTION:
     ! use a hybrid solver to find the root of equation
@@ -1192,7 +1189,6 @@ contains
     integer,  intent(out) :: iter              !number of iterations used, for record only
     type(atm2lnd_type)  , intent(in)    :: atm2lnd_vars
     type(photosyns_type), intent(inout) :: photosyns_vars
-    type(waterstate_type), intent(in)   :: waterstate_vars
     !
     !! LOCAL VARIABLES
     real(r8) :: a, b
@@ -1205,7 +1201,7 @@ contains
     real(r8) :: tol,minx,minf
 
     call ci_func(x0, f0, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z, rh_can, gs_mol, &
-         atm2lnd_vars, photosyns_vars, waterstate_vars)
+         atm2lnd_vars, photosyns_vars)
 
     if(f0 == 0._r8)return
 
@@ -1214,7 +1210,7 @@ contains
     x1 = x0 * 0.99_r8
 
     call ci_func(x1,f1, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z, rh_can, gs_mol, &
-         atm2lnd_vars, photosyns_vars, waterstate_vars)
+         atm2lnd_vars, photosyns_vars)
 
     if(f1==0._r8)then
        x0 = x1
@@ -1241,7 +1237,7 @@ contains
        x1 = x
 
        call ci_func(x1,f1, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z, rh_can, gs_mol, &
-            atm2lnd_vars, photosyns_vars, waterstate_vars)
+            atm2lnd_vars, photosyns_vars)
 
        if(f1<minf)then
           minx=x1
@@ -1257,7 +1253,7 @@ contains
 
           call brent(x, x0,x1,f0,f1, tol, p, iv, c, t, gb_mol, je, cair, oair, &
                lmr_z, par_z, rh_can, gs_mol, &
-               atm2lnd_vars, photosyns_vars, waterstate_vars)
+               atm2lnd_vars, photosyns_vars)
 
           x0=x
           exit
@@ -1269,7 +1265,7 @@ contains
           !and it happens usually in very dry places and more likely with c4 plants.
 
           call ci_func(minx,f1, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z, rh_can, gs_mol, &
-               atm2lnd_vars, photosyns_vars, waterstate_vars)
+               atm2lnd_vars, photosyns_vars)
 
           exit
        endif
@@ -1280,7 +1276,7 @@ contains
   !------------------------------------------------------------------------------
   subroutine brent(x, x1,x2,f1, f2, tol, ip, iv, ic, it, gb_mol, je, cair, oair,&
        lmr_z, par_z, rh_can, gs_mol, &
-       atm2lnd_vars, photosyns_vars, waterstate_vars)
+       atm2lnd_vars, photosyns_vars)
      !$acc routine seq
 
     !!DESCRIPTION:
@@ -1305,7 +1301,6 @@ contains
     real(r8), intent(out) :: gs_mol           ! leaf stomatal conductance (umol H2O/m**2/s)
     type(atm2lnd_type)  , intent(in)    :: atm2lnd_vars
     type(photosyns_type), intent(inout) :: photosyns_vars
-    type(waterstate_type), intent(in)   :: waterstate_vars
     !
     !!LOCAL VARIABLES:
     integer, parameter :: ITMAX=20            !maximum number of iterations
@@ -1381,7 +1376,7 @@ contains
        endif
 
        call ci_func(b, fb, ip, iv, ic, it, gb_mol, je, cair, oair, lmr_z, par_z, rh_can, gs_mol, &
-         atm2lnd_vars, photosyns_vars, waterstate_vars)
+         atm2lnd_vars, photosyns_vars)
 
        if(fb==0._r8)exit
 
@@ -1471,7 +1466,7 @@ contains
 
   !------------------------------------------------------------------------------
   subroutine ci_func(ci, fval, p, iv, c, t, gb_mol, je, cair, oair, lmr_z, par_z,&
-       rh_can, gs_mol, atm2lnd_vars, photosyns_vars, waterstate_vars)
+       rh_can, gs_mol, atm2lnd_vars, photosyns_vars)
     !$acc routine seq
     !! DESCRIPTION:
     ! evaluate the function
@@ -1496,7 +1491,6 @@ contains
     real(r8)             , intent(out)   :: gs_mol   ! leaf stomatal conductance (umol H2O/m**2/s)
     type(atm2lnd_type)   , intent(in)    :: atm2lnd_vars
     type(photosyns_type) , intent(inout) :: photosyns_vars
-    type(waterstate_type), intent(in)    :: waterstate_vars
     !
     !local variables
     real(r8) :: ai                  ! intermediate co-limited photosynthesis (umol CO2/m**2/s)
@@ -1516,20 +1510,20 @@ contains
          ac         => photosyns_vars%ac_patch                 , & ! Output: [real(r8) (:,:) ]  Rubisco-limited gross photosynthesis (umol CO2/m**2/s)
          aj         => photosyns_vars%aj_patch                 , & ! Output: [real(r8) (:,:) ]  RuBP-limited gross photosynthesis (umol CO2/m**2/s)
          ap         => photosyns_vars%ap_patch                 , & ! Output: [real(r8) (:,:) ]  product-limited (C3) or CO2-limited (C4) gross photosynthesis (umol CO2/m**2/s)
-         ag         => photosyns_vars%ag_patch                 , & ! Output: [real(r8) (:,:) ]  co-limited gross leaf photosynthesis (umol CO2/m**2/s)
-         an         => photosyns_vars%an_patch                 , & ! Output: [real(r8) (:,:) ]  net leaf photosynthesis (umol CO2/m**2/s)
-         vcmax_z    => photosyns_vars%vcmax_z_patch            , & ! Input:  [real(r8) (:,:) ]  maximum rate of carboxylation (umol co2/m**2/s)
-         cp         => photosyns_vars%cp_patch                 , & ! Output: [real(r8) (:)   ]  CO2 compensation point (Pa)
-         kc         => photosyns_vars%kc_patch                 , & ! Output: [real(r8) (:)   ]  Michaelis-Menten constant for CO2 (Pa)
-         ko         => photosyns_vars%ko_patch                 , & ! Output: [real(r8) (:)   ]  Michaelis-Menten constant for O2 (Pa)
-         qe         => photosyns_vars%qe_patch                 , & ! Output: [real(r8) (:)   ]  quantum efficiency, used only for C4 (mol CO2 / mol photons)
-         tpu_z      => photosyns_vars%tpu_z_patch              , & ! Output: [real(r8) (:,:) ]  triose phosphate utilization rate (umol CO2/m**2/s)
-         kp_z       => photosyns_vars%kp_z_patch               , & ! Output: [real(r8) (:,:) ]  initial slope of CO2 response curve (C4 plants)
-         theta_cj   => photosyns_vars%theta_cj_patch           , & ! Output: [real(r8) (:)   ]  empirical curvature parameter for ac, aj photosynthesis co-limitation
-         bbb        => photosyns_vars%bbb_patch                , & ! Output: [real(r8) (:)   ]  Ball-Berry minimum leaf conductance (umol H2O/m**2/s)
-         mbb        => photosyns_vars%mbb_patch                , & ! Output: [real(r8) (:)   ]  Ball-Berry slope of conductance-photosynthesis relationship
-         h2o_moss_wc   => waterstate_vars%h2o_moss_wc_patch    , & ! Input: [real(r8) (:)   ]  Total Moss water content
-         h2osfc        => waterstate_vars%h2osfc_col             & ! Input: [real(r8) (:)   ]  Surface water
+         ag         => photosyns_vars%ag_patch                 , & ! Output: [real(r8) (:,:) ]  co-limited gross leaf photosynthesis (umol CO2/m**2/s)              
+         an         => photosyns_vars%an_patch                 , & ! Output: [real(r8) (:,:) ]  net leaf photosynthesis (umol CO2/m**2/s)                           
+         vcmax_z    => photosyns_vars%vcmax_z_patch            , & ! Input:  [real(r8) (:,:) ]  maximum rate of carboxylation (umol co2/m**2/s)                     
+         cp         => photosyns_vars%cp_patch                 , & ! Output: [real(r8) (:)   ]  CO2 compensation point (Pa)                                           
+         kc         => photosyns_vars%kc_patch                 , & ! Output: [real(r8) (:)   ]  Michaelis-Menten constant for CO2 (Pa)                                
+         ko         => photosyns_vars%ko_patch                 , & ! Output: [real(r8) (:)   ]  Michaelis-Menten constant for O2 (Pa)                                 
+         qe         => photosyns_vars%qe_patch                 , & ! Output: [real(r8) (:)   ]  quantum efficiency, used only for C4 (mol CO2 / mol photons)          
+         tpu_z      => photosyns_vars%tpu_z_patch              , & ! Output: [real(r8) (:,:) ]  triose phosphate utilization rate (umol CO2/m**2/s)                 
+         kp_z       => photosyns_vars%kp_z_patch               , & ! Output: [real(r8) (:,:) ]  initial slope of CO2 response curve (C4 plants)                     
+         theta_cj   => photosyns_vars%theta_cj_patch           , & ! Output: [real(r8) (:)   ]  empirical curvature parameter for ac, aj photosynthesis co-limitation 
+         bbb        => photosyns_vars%bbb_patch                , & ! Output: [real(r8) (:)   ]  Ball-Berry minimum leaf conductance (umol H2O/m**2/s)                 
+         mbb        => photosyns_vars%mbb_patch                , & ! Output: [real(r8) (:)   ]  Ball-Berry slope of conductance-photosynthesis relationship           
+         h2o_moss_wc   => veg_ws%h2o_moss_wc                   , & ! Input: [real(r8) (:)   ]  Total Moss water content
+         h2osfc        => col_ws%h2osfc                          & ! Input: [real(r8) (:)   ]  Surface water
          )
 
       ! Miscellaneous parameters, from Bonan et al (2011) JGR, 116, doi:10.1029/2010JG001593
@@ -1575,14 +1569,14 @@ contains
       ag(p,iv) = min(r1,r2)
 
       !Dessication and submergence effects for moss PFT
-      if (veg_pp%itype(p) == 12)then
-         wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
-         !DMR 05/11/17 - add scaler for submergence effect
-         !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
-         wcscaler = max(0._r8, min(1.0_r8, wcscaler))
-         ag(p,iv) = ag(p,iv) * wcscaler
-         !if (h2osfc(c) > 0) print*, 'AG', c, h2osfc(c), wcscaler
-      endif
+      !if (veg_pp%itype(p) == 12)then
+      !   wcscaler = (-0.656_r8 + 1.654_r8 *log10(h2o_moss_wc (p)))
+      !   !DMR 05/11/17 - add scaler for submergence effect
+      !   !wcscaler = wcscaler * (1.0_r8 - min(h2osfc(c),50.0_r8)/50.0_r8)
+      !   wcscaler = max(0._r8, min(1.0_r8, wcscaler))
+      !   ag(p,iv) = ag(p,iv) * wcscaler
+      !   !if (h2osfc(c) > 0) print*, 'AG', c, h2osfc(c), wcscaler
+      !endif
 
       ! Net photosynthesis. Exit iteration if an < 0
 

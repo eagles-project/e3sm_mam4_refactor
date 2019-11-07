@@ -260,7 +260,7 @@ contains
          else
 #if (defined HUM_HOL)
            if (ivt(p) == 12) then
-             thiswtht = zwt(c)*-1.0_r8+humhol_ht/2.0_r8+h2osfc(c)/1000._r8 !height above hollow bottom
+             thiswtht = zwt(c)*(-1.0_r8)+humhol_ht/2.0_r8+h2osfc(c)/1000._r8 !height above hollow bottom
              !calculate submerged LAI
              !Calculate LAI buried by snow (5cm is assumed)
              fb1 = 1._r8 - max(min(snow_depth(c),0.05_r8),0._r8)/0.05_r8

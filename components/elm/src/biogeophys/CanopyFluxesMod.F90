@@ -18,6 +18,7 @@ module CanopyFluxesMod
   use elm_varpar            , only : nlevgrnd, nlevsno
   use elm_varcon            , only : namep
   use pftvarcon             , only : nbrdlf_dcd_tmp_shrub, nsoybean , nsoybeanirrig
+  use pftvarcon             , only : slatop
   use decompMod             , only : bounds_type
   use PhotosynthesisMod     , only : Photosynthesis, PhotosynthesisTotal, Fractionation, PhotoSynthesisHydraulicStress
   use SoilMoistStressMod    , only : calc_effective_soilporosity, calc_volumetric_h2oliq
@@ -865,8 +866,9 @@ contains
                     h2o_moss_inter(p) = -18032 *0.25**4 + 7248.1 * 0.25**3 &
                                      -591.74 *0.25**2 + 6.9031*0.25 + 0.4954
                 endif
-                if (leafn(p).gt. 0._r8) then
-                   h2o_moss_wc(p) = h2o_moss_inter(p) + h2ocan(p)/(leafn(p)*60.0*2.0_r8/1000.0_r8)
+                if (elai(p) .gt. 0._r8) then 
+                   h2o_moss_wc(p) = h2o_moss_inter(p) + h2ocan(p)/(elai(p)/slatop(veg_pp%itype(p)) &
+                             * 2.0_r8 / 1000.0_r8)
                 else
                    h2o_moss_wc(p) = 0._r8
                 endif
