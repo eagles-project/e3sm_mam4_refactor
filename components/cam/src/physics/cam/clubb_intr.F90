@@ -2979,10 +2979,11 @@ end function diag_ustar
 
     integer :: i, ntot, read_status
     integer :: iunit
-    integer :: macmic_it                       ! iteration variables
+    integer :: macmic_it, cld_macmic_num_steps                       ! iteration variables
 
     character(len=fieldname_len) :: varname, substep
-
+    logical:: macmic_clubb_diag 
+     
     ! get the namelist variables to determine if we ouput diagnostics at each substep
     call phys_getopts(cld_macmic_num_steps_out = cld_macmic_num_steps, &
                       macmic_clubb_diag_out = macmic_clubb_diag)
