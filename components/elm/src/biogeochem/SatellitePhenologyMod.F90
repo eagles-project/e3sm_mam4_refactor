@@ -23,8 +23,9 @@ module SatellitePhenologyMod
   use decompMod       , only : gsmap_lnd_gdc2glo
   use domainMod       , only : ldomain
   use fileutils       , only : getavu, relavu
-  use GridcellType    , only : grc_pp
-  use VegetationType  , only : veg_pp, veg_es
+  use GridcellType         , only : grc_pp
+  use VegetationType       , only : veg_pp                
+  use VegetationDataType   , only : veg_es
   use CanopyStateType , only : canopystate_type
   use WaterstateType  , only : waterstate_type
   use ColumnDataType  , only : col_ws, col_es
@@ -204,7 +205,7 @@ contains
     ! Interpolate data stream information for Lai.
     !
     ! !USES:
-    use clm_time_manager, only : get_curr_date
+    use timeinfoMod
     use pftvarcon       , only : noveg
     !
     ! !ARGUMENTS:
@@ -222,7 +223,10 @@ contains
     character(len=CL)  :: stream_var_name
     !-----------------------------------------------------------------------
 
-    call get_curr_date(year, mon, day, sec)
+    year=year_curr
+    mon=mon_curr
+    day=day_curr
+    sec=secs_curr
     mcdate = year*10000 + mon*100 + day
 
     call shr_strdata_advance(sdat_lai, mcdate, sec, mpicom, 'laidyn')
@@ -308,9 +312,9 @@ contains
     !
     ! !USES:
     use pftvarcon, only : noveg, nbrdlf_dcd_brl_shrub
-    use clm_time_manager, only : get_curr_date, get_step_size, get_nstep
+    use timeinfoMod
     use clm_varcon      , only : secspday
-    use pftvarcon, only : noveg, nbrdlf_dcd_brl_shrub, season_decid, stress_decid
+    use pftvarcon, only : season_decid, stress_decid
 #if defined HUM_HOL
     use pftvarcon, only : phen_a, phen_b, phen_c, phen_topt, phen_fstar, phen_tc
     use pftvarcon, only : phen_cstar, phen_tforce, phen_tchil, phen_pstart, phen_tb, phen_ycrit 
@@ -367,7 +371,7 @@ contains
          call lai_interp(bounds, canopystate_vars)
       endif
  
-      dt      = real( get_step_size(), r8 )
+      dt      = dtime_mode
       fracday = dt/secspday
 
       do fp = 1, num_nolakep
