@@ -917,7 +917,7 @@ contains
          Nudge_Qtau(:ncol,:pver,lchnk) =                             &
          Nudge_Qtau(:ncol,:pver,lchnk) * Nudge_Qcoef/float(Nudge_Step)
          Nudge_PStau(:ncol,lchnk)=                             &
-         Nudge_PStau(:ncol,lchnk)* Nudge_PScoef/float(Nudge_Step)
+         Nudge_PStau(:ncol,lchnk) * Nudge_PScoef/float(Nudge_Step)
      else          ! use Nudge_Tau directy as relaxation timescale
          Nudge_Utau(:ncol,:pver,lchnk) =                        &
          Nudge_Utau(:ncol,:pver,lchnk) / Nudge_Tau / sec_per_hour
@@ -1235,11 +1235,14 @@ contains
       else
          ! The following lines are used to reset the nudging tendency
          ! to zero in order to perform an intermittent simulation
-         Nudge_Ustep(:ncol,:pver,:) = 0._r8
-         Nudge_Vstep(:ncol,:pver,:) = 0._r8
-         Nudge_Tstep(:ncol,:pver,:) = 0._r8
-         Nudge_Qstep(:ncol,:pver,:) = 0._r8
-         Nudge_PSstep(:ncol,:) = 0._r8
+        do lchnk=begchunk,endchunk
+         ncol=phys_state(lchnk)%ncol
+         Nudge_Ustep(:ncol,:pver,lchnk) = 0._r8
+         Nudge_Vstep(:ncol,:pver,lchnk) = 0._r8
+         Nudge_Tstep(:ncol,:pver,lchnk) = 0._r8
+         Nudge_Qstep(:ncol,:pver,lchnk) = 0._r8
+         Nudge_PSstep(:ncol,lchnk) = 0._r8
+        end do 
 !==> JS END
       end if
 !==> JS ADD
