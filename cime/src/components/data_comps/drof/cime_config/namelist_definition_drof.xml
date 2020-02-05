@@ -124,7 +124,7 @@
         area   area
         mask   mask
       </value>
-      <value stream="rof.diatren_iaf_rx1">. <!--DC: no JRA entry? Remove before PR -->
+      <value stream="rof.diatren_iaf_rx1">
         time   time
         xc     lon
         yc     lat
