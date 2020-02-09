@@ -1608,7 +1608,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
-    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
+    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend    
     use phys_control,       only: use_qqflx_fixer
 
     implicit none
@@ -1936,6 +1936,16 @@ if (l_gw_drag) then
 
 end if ! l_gw_drag
 
+!==> JS ADD
+    !===================================================
+    ! Update Nudging values, if needed
+    !===================================================
+    if((Nudge_Model).and.(Nudge_ON)) then
+      call nudging_timestep_tend(state,ptend)
+      call physics_update(state,ptend,ztodt,tend)
+    endif
+!==> JS END
+
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -2004,10 +2014,10 @@ end if ! l_ac_energy_chk
     !===================================================
     ! Update Nudging values, if needed
     !===================================================
-    if((Nudge_Model).and.(Nudge_ON)) then
-      call nudging_timestep_tend(state,ptend)
-      call physics_update(state,ptend,ztodt,tend)
-    endif
+    !if((Nudge_Model).and.(Nudge_ON)) then
+    !  call nudging_timestep_tend(state,ptend)
+    !  call physics_update(state,ptend,ztodt,tend)
+    !endif
 
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
          tmp_t, qini, cldliqini, cldiceini)
@@ -2106,6 +2116,9 @@ subroutine tphysbc (ztodt,               &
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
+!==> JS ADD
+    use nudging,         only: Nudge_Model,Nudge_Loc,nudging_calc_tend
+!==> JS END
 
     implicit none
 
@@ -3350,6 +3363,14 @@ end if ! l_tracer_aero
 
     call t_stopf('bc_history_write')
 
+    !==> JS ADD
+    ! Update Nudging values, if needed
+    !----------------------------------
+    if (Nudge_Model .and. Nudge_Loc) then
+       call nudging_calc_tend(state)
+    endif
+    !==> JS END
+
     !===================================================
     ! Write cloud diagnostics on history file
     !===================================================
@@ -3439,9 +3460,7 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
   use aerodep_flx,         only: aerodep_flx_adv
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
-  use nudging,             only: Nudge_Model,Nudge_Data,nudging_timestep_init
-  use cam_history,         only: outfld
-
+  use nudging,             only: Nudge_Model,nudging_timestep_init
   use seasalt_model,       only: advance_ocean_data, has_mam_mom
 
   use constituents,        only: cnst_get_ind
@@ -3513,24 +3532,6 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
 
   ! age of air tracers
   call aoa_tracers_timestep_init(phys_state)
-
-  !--------------------------------------------------------
-  ! Generate Nudging data if needed. This data is used 
-  ! for nudging to CLIM experiment the output here is 
-  ! to make the output nudging data and calculation of 
-  ! nudging tendency  in the same time level
-  !-------------------------------------------------------
-  if (Nudge_Data)  then
-   call cnst_get_ind('Q',indw)
-   do c=begchunk, endchunk
-    ncol = phys_state(c)%ncol
-    call outfld('T_ndg   ',phys_state(c)%t        , pcols   ,c   )
-    call outfld('PS_ndg  ',phys_state(c)%ps       , pcols   ,c   )
-    call outfld('U_ndg   ',phys_state(c)%u        , pcols   ,c   )
-    call outfld('V_ndg   ',phys_state(c)%v        , pcols   ,c   )   
-    call outfld('Q_ndg   ',phys_state(c)%q(1,1,1) , pcols   ,c   )
-   end do 
-  end if 
 
   ! Update Nudging values, if needed
   !----------------------------------
