@@ -182,6 +182,11 @@ def buildnml(case, caseroot, compname):
         grid_prefix += 'seaice.ARRM60to6'
         decomp_date += '180820'
         decomp_prefix += 'mpas-cice.graph.info.'
+    elif ice_grid == 'oSO60to10wISC':
+        grid_date += '20200106'
+        grid_prefix += 'seaice.SO60to10wISC'
+        decomp_date += '20200107'
+        decomp_prefix += 'mpas-seaice.graph.info.'
 
 
     #--------------------------------------------------------------------
@@ -199,7 +204,7 @@ def buildnml(case, caseroot, compname):
     #--------------------------------------------------------------------
 
     with open(os.path.join(casebuild, "mpassi.input_data_list"), "w") as input_list:
-        input_list.write("mesh = {}\n".format(input_file))
+#        input_list.write("mesh = {}\n".format(input_file))
         input_list.write("snow_data = {}/ice/mpas-cice/general/snicar_drdt_bst_fit_60_c04262019.nc\n".format(din_loc_root))
         input_list.write("snicar_data = {}/ice/mpas-cice/general/snicar_optics_5bnd_snow_and_aerosols.nc\n".format(din_loc_root))
         if points_file != '':
