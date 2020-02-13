@@ -416,7 +416,7 @@
 <config_check_ssh_consistency>.true.</config_check_ssh_consistency>
 <config_check_ssh_consistency ocn_grid="oEC60to30v3wLI">.false.</config_check_ssh_consistency>
 <config_check_ssh_consistency ocn_grid="oRRS30to10v3wLI">.false.</config_check_ssh_consistency>
-<config_check_ssh_consistency ocn_grid="oSOto10wISC">.false.</config_check_ssh_consistency>
+<config_check_ssh_consistency ocn_grid="oSO60to10wISC">.false.</config_check_ssh_consistency>
 <config_filter_btr_mode>.false.</config_filter_btr_mode>
 <config_prescribe_velocity>.false.</config_prescribe_velocity>
 <config_prescribe_thickness>.false.</config_prescribe_thickness>
