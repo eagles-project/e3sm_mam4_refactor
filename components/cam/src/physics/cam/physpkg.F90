@@ -1608,7 +1608,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
-    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend    
+    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
 
     implicit none
@@ -3363,13 +3363,13 @@ end if ! l_tracer_aero
 
     call t_stopf('bc_history_write')
 
-    !==> JS ADD
+!==> JS ADD
     ! Update Nudging values, if needed
     !----------------------------------
     if (Nudge_Model .and. Nudge_Loc) then
        call nudging_calc_tend(state)
     endif
-    !==> JS END
+!==> JS END
 
     !===================================================
     ! Write cloud diagnostics on history file
@@ -3461,6 +3461,8 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
   use nudging,             only: Nudge_Model,nudging_timestep_init
+  use cam_history,         only: outfld
+
   use seasalt_model,       only: advance_ocean_data, has_mam_mom
 
   use constituents,        only: cnst_get_ind

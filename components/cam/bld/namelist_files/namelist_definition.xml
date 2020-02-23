@@ -482,40 +482,43 @@
 <entry id="Nudge_Method" type="char*80" category="nudging"
        group="nudging_nl" valid_values="" >
        Method to perform Nudging analyses.
-       Default: none
+       Default: Step
        </entry>
 <entry id="Nudge_Tau" type="real" category="nudging"
        group="nudging_nl" valid_values="" >
-       Method to perform Nudging time scale.
-       Default: none
+       Use user-defined relaxation time scale.
+       Default: -999
+       </entry>
+<entry id="Nudge_Loc" type="logical" category="nudging"
+       group="nudging_nl" valid_values="" >
+       Change the location of calculation of nudging tendency to the same location
+       where the nudging data is written out
+       Default: FALSE
+       </entry>
+<entry id="Nudge_Curr" type="logical" category="nudging"
+       group="nudging_nl" valid_values="" >
+       Linearly interpolate nudging data to current or future model time step
+       Default: FALSE
+       </entry>
+<entry id="Num_Slice" type="integer" category="nudging"
+       group="nudging_nl" valid_values="" >
+       Number of time slices per nudging data file; Must be 1 or Nudge_Times_Per_Day
+       Default: 1
        </entry>
 <!-- JS END -->
 
 <!-- SZ ADD -->
-<entry id="Nudge_Data" type="logical" category="nudging"
+<entry id="Nudge_Z3thres" type="real" category="nudging"
        group="nudging_nl" valid_values="" >
-       Toggle Generating Nudging Data ON/OFF.
+       The threshold of surface geopotential used to determine if the nudging
+       tendency should be set to zero.
+       Default: -999
+       </entry>
+<entry id="Nudge_Zconstrain" type="logical" category="nudging"
+       group="nudging_nl" valid_values="" >
+       Turn on/off the constrain on nudging tendency based on the surface geoptential. The nudging
+       tendnecy over the whole column will be set to zero when surface geoptential > Nudge_Z3thres
        Default: FALSE
-       </entry>
-<entry id="Nudge_Unam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "U"
-       </entry>
-<entry id="Nudge_Vnam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "V"
-       </entry>
-<entry id="Nudge_Tnam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "T"
-       </entry>
-<entry id="Nudge_Qnam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "Q"
        </entry>
 <!-- SZ END -->
 
