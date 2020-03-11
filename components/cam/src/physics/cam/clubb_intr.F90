@@ -281,7 +281,7 @@ module clubb_intr
     call pbuf_add_field('FICE',       'physpkg',dtype_r8, (/pcols,pver/),               fice_idx)
     call pbuf_add_field('RAD_CLUBB',  'global', dtype_r8, (/pcols,pver/),               radf_idx)
     call pbuf_add_field('CMELIQ',     'physpkg',dtype_r8, (/pcols,pver/),                  cmeliq_idx)
-    
+ 
     call pbuf_add_field('WP2_nadv',        'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), wp2_idx)
     call pbuf_add_field('WP3_nadv',        'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), wp3_idx)
     call pbuf_add_field('WPTHLP_nadv',     'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), wpthlp_idx)
@@ -560,6 +560,9 @@ end subroutine clubb_init_cnst
 
     logical :: clubb_history, clubb_rad_history, clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff ! Stats enabled (T/F)
 
+    ! Flag for clubb warm initialization
+    logical :: do_clubb_warmint    
+
     ! The similar name to clubb_history is unfortunate...
     logical :: history_amwg, history_clubb
 
@@ -604,6 +607,7 @@ end subroutine clubb_init_cnst
     call phys_getopts(prog_modal_aero_out=prog_modal_aero, &
                       history_amwg_out=history_amwg, &
                       history_clubb_out=history_clubb,&
+                      do_clubb_warmint_out=do_clubb_warmint,&
                       liqcf_fix_out   = liqcf_fix)
 
     !  Select variables to apply tendencies back to CAM
@@ -922,25 +926,36 @@ end subroutine clubb_init_cnst
     !  Is this the first time step?  If so then initialize CLUBB variables as follows
     if (is_first_step()) then
 
-       call pbuf_set_field(pbuf2d, wp2_idx,     w_tol_sqd)
-       call pbuf_set_field(pbuf2d, wp3_idx,     0.0_r8)
-       call pbuf_set_field(pbuf2d, wpthlp_idx,  0.0_r8)
-       call pbuf_set_field(pbuf2d, wprtp_idx,   0.0_r8)
-       call pbuf_set_field(pbuf2d, rtpthlp_idx, 0.0_r8)
-       call pbuf_set_field(pbuf2d, rtp2_idx,    rt_tol**2)
-       call pbuf_set_field(pbuf2d, thlp2_idx,   thl_tol**2)
-       call pbuf_set_field(pbuf2d, up2_idx,     w_tol_sqd)
-       call pbuf_set_field(pbuf2d, vp2_idx,     w_tol_sqd)
-      
-       call pbuf_set_field(pbuf2d, upwp_idx,    0.0_r8)
-       call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
-       call pbuf_set_field(pbuf2d, tke_idx,     0.0_r8)
-       call pbuf_set_field(pbuf2d, kvh_idx,     0.0_r8)
-       call pbuf_set_field(pbuf2d, fice_idx,    0.0_r8)
-       call pbuf_set_field(pbuf2d, radf_idx,    0.0_r8)
-       call pbuf_set_field(pbuf2d, qrl_idx,     0.0_r8)
+       if (do_clubb_warmint)then
+        ! other variables will be read from initial files
+        ! the remindar variables are output by CLUBB     
+        call pbuf_set_field(pbuf2d, tke_idx,       0.0_r8)
+        call pbuf_set_field(pbuf2d, kvh_idx,       0.0_r8)
+        call pbuf_set_field(pbuf2d, fice_idx,      0.0_r8)
 
-       call pbuf_set_field(pbuf2d, vmag_gust_idx,    1.0_r8)
+        call pbuf_set_field(pbuf2d, vmag_gust_idx, 1.0_r8)
+
+       else 
+        call pbuf_set_field(pbuf2d, wp2_idx,     w_tol_sqd)
+        call pbuf_set_field(pbuf2d, wp3_idx,     0.0_r8)
+        call pbuf_set_field(pbuf2d, wpthlp_idx,  0.0_r8)
+        call pbuf_set_field(pbuf2d, wprtp_idx,   0.0_r8)
+        call pbuf_set_field(pbuf2d, rtpthlp_idx, 0.0_r8)
+        call pbuf_set_field(pbuf2d, rtp2_idx,    rt_tol**2)
+        call pbuf_set_field(pbuf2d, thlp2_idx,   thl_tol**2)
+        call pbuf_set_field(pbuf2d, up2_idx,     w_tol_sqd)
+        call pbuf_set_field(pbuf2d, vp2_idx,     w_tol_sqd)
+      
+        call pbuf_set_field(pbuf2d, upwp_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, tke_idx,     0.0_r8)
+        call pbuf_set_field(pbuf2d, kvh_idx,     0.0_r8)
+        call pbuf_set_field(pbuf2d, fice_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, radf_idx,    0.0_r8)
+        call pbuf_set_field(pbuf2d, qrl_idx,     0.0_r8)
+
+        call pbuf_set_field(pbuf2d, vmag_gust_idx,    1.0_r8)
+       endif 
 
     endif
    
