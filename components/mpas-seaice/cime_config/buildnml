@@ -208,7 +208,7 @@ def buildnml(case, caseroot, compname):
 #        input_list.write("mesh = {}\n".format(input_file))
         if points_file != '':
             input_list.write("points = {}/ice/mpas-cice/{}/{}\n".format(din_loc_root, ice_mask, points_file))
-        if iceberg_mode == 'data':
+#        if iceberg_mode == 'data':
 #            input_list.write("data_iceberg = {}/ice/mpas-cice/{}/{}\n".format(din_loc_root, ice_mask, data_iceberg_file))
 
     #--------------------------------------------------------------------
