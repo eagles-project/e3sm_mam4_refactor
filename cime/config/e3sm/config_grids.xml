@@ -2274,6 +2274,7 @@
       <map name="ATM2OCN_VMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_T62_to_ECwISC30to60E1r2_patch.200410.nc</map>
       <map name="OCN2ATM_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2_to_T62_aave.200410.nc</map>
       <map name="OCN2ATM_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2_to_T62_aave.200410.nc</map>
+    <!-- DC: should the above two be 'no-mask'? -->
     </gridmap>
 
     <gridmap atm_grid="T62" ocn_grid="oRRS30to10">
