@@ -2048,8 +2048,8 @@
       <map name="ATM2OCN_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ne30np4_to_ECwISC30to60E1r2_aave.200410.nc</map>
       <map name="ATM2OCN_VMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ne30np4_to_ECwISC30to60E1r2_aave.200410.nc</map>
       <map name="ATM2OCN_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ne30np4_to_ECwISC30to60E1r2-nomask_bilin.200408.nc</map>
-      <map name="OCN2ATM_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2_to_ne30np4_aave.200410.nc</map>
-      <map name="OCN2ATM_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2_to_ne30np4_aave.200410.nc</map>
+      <map name="OCN2ATM_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2-nomask_to_ne30np4_aave.200408.nc</map>
+      <map name="OCN2ATM_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/ECwISC30to60E1r2/map_ECwISC30to60E1r2-nomask_to_ne30np4_aave.200408.nc</map>
     <!-- DC: changed OCN2ATM from 'no-mask' to masked -->
     </gridmap>
 
