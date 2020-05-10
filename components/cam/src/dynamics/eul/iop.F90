@@ -463,11 +463,11 @@ endif !scm_observed_aero
 
      if ( use_camiop ) then
        call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'t', have_tsair, &
-          tsair(1), fill_ends, &
+          tsair(1), .true. , &
           dplevs, nlev,ps(1,1,n3),tobs, status )
      else
        call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'T', have_tsair, &
-          tsair(1), fill_ends, &
+          tsair(1), .true. , &
           dplevs, nlev,ps(1,1,n3), tobs, status )
      endif
      if ( status .ne. nf90_noerr ) then
@@ -506,7 +506,7 @@ endif !scm_observed_aero
      endif
 
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,  'q', have_srf, &
-        srf(1), fill_ends, &
+        srf(1), .true., &
         dplevs, nlev,ps(1,1,n3), qobs, status )
      if ( status .ne. nf90_noerr ) then
         have_q = .false.
