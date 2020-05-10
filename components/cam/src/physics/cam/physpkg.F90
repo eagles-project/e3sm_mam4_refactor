@@ -2088,7 +2088,7 @@ subroutine tphysbc (ztodt,               &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
-    use physconst,       only: cpair, latvap, gravit, rga
+    use physconst,       only: rair, cpair, latvap, gravit, rga
     use constituents,    only: pcnst, qmin, cnst_get_ind
     use convect_deep,    only: convect_deep_tend, convect_deep_tend_2, deep_scheme_does_scav_trans
     use time_manager,    only: is_first_step, get_nstep
@@ -2150,6 +2150,7 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:,:) :: tmp_npccn     !temporary array for npccn
     real(r8), pointer, dimension(:,:) :: tmp_alst      !temporary array for ALST
 
+    real(r8) :: tmpthlm(pcols,pver)            !temporary array for thlm
     real(r8) :: tmpnumliq(pcols,pver)          !temporary array for numliq
     real(r8) :: tmpcldliq(pcols,pver)          !temporary array for cldliq 
     real(r8) :: tmpnumice(pcols,pver)          !temporary array for numice
@@ -2163,9 +2164,10 @@ subroutine tphysbc (ztodt,               &
     character(200) :: numicename               !String for numice name at each sub step
     character(200) :: cldicename               !String for cldice name at each sub step
 
-    character(200) :: tmpname,qvaporname                  !String for temporal variable name
+    character(200) :: tmpname,thlname,qvaporname        !String for temporal variable name
     integer :: ixnumliq, ixnumice, ifnpccn,ixqvapor     ! index for tracer number concentration
     integer :: ifalst                          ! index for liquid cloud fraction alst
+    real(r8) :: exner_clubb                    ! Exner function consistent with CLUBB          [-]
 
     type(physics_ptend)   :: ptend            ! indivdual parameterization tendencies
     type(physics_state)   :: state_sc         ! state for sub-columns
@@ -2739,7 +2741,8 @@ end if
     !   !call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk) 
     !   end if  
 
-       if((.not.is_first_step()) .and. l_dribling_tend) then
+       !if((.not.is_first_step()) .and. l_dribling_tend) then
+        if((nstep.gt.20) .and. l_dribling_tend) then
                
         rztodt = 1.0_r8/ztodt
 
@@ -2815,7 +2818,52 @@ end if
 
        do macmic_it = 1, cld_macmic_num_steps
 
-        if((.not.is_first_step()) .and. l_dribling_tend) then
+        if (macmic_extra_diag) then
+           !SZhang add output here to diagnose npcc 
+           call cnst_get_ind('Q',ixqvapor)
+           call cnst_get_ind('CLDLIQ',ixcldliq)
+           call cnst_get_ind('CLDICE',ixcldice)
+           call cnst_get_ind('NUMLIQ',ixnumliq)
+           call cnst_get_ind('NUMICE',ixnumice)
+
+           !ifnpccn  = pbuf_get_index('NPCCN')
+           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it
+           write (numliqname,"(A16,I2.2)") "numliq_bf_drib_", macmic_it
+           write (cldliqname,"(A16,I2.2)") "cldliq_bf_drib_", macmic_it
+           write (numicename,"(A16,I2.2)") "numice_bf_drib_", macmic_it
+           write (cldicename,"(A16,I2.2)") "cldice_bf_drib_", macmic_it
+           write (qvaporname,"(A16,I2.2)") "qvapor_bf_drib_", macmic_it
+           write (tmpname,"(A14,I2.2)")    "temp_bf_drib_", macmic_it
+
+!           call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
+           tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+           tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+           tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+           tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+           tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
+           tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
+
+           !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
+           call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+           call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+           call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+           call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+           call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+           call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+           write (thlname,"(A14,I2.2)")    "thlm_bf_drib_", macmic_it
+           do k=1,pver
+            do i=1,ncol
+               exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+               tmpthlm(i,k) = state%t(i,k)*exner_clubb - (latvap/cpair)*state%q(i,k,ixcldliq)
+            end do
+           end do
+           call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+        end if
+
+        !if((.not.is_first_step()) .and. l_dribling_tend) then
+        if((nstep.gt.20) .and. l_dribling_tend) then
 
          write (tmpname,"(A16,I2.2)")    "drib_tend_clubb_", macmic_it
 
@@ -2882,6 +2930,15 @@ end if
            call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
            call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
            call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+           write (thlname,"(A14,I2.2)")    "thlm_bf_clubb_", macmic_it
+           do k=1,pver
+            do i=1,ncol
+               exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+               tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+            end do
+           end do
+           call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
 
         end if
 
@@ -3016,6 +3073,15 @@ end if
            call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
            call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
            call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+           write (thlname,"(A16,I2.2)")    "thlm_bf_micaero_", macmic_it
+           do k=1,pver
+            do i=1,ncol
+               exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+               tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+            end do
+           end do
+           call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
 
 !           write(tmpname,"(A17,I2.2)") "alstn_bf_micaero_", macmic_it
 !           ifalst   = pbuf_get_index('ALST')
@@ -3184,6 +3250,15 @@ end if
             call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
             call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
             call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+            write (thlname,"(A16,I2.2)")    "thlm_af_mg2tend_", macmic_it
+            do k=1,pver
+             do i=1,ncol
+                exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+                tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+             end do
+            end do
+            call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
 
 !            write(tmpname,"(A17,I2.2)") "alstn_af_mg2tend_", macmic_it
 !            ifalst   = pbuf_get_index('ALST')
@@ -3387,6 +3462,48 @@ if (l_rad) then
     !===================================================
     call t_startf('radiation')
 
+        if (macmic_extra_diag) then
+           !SZhang add output here to diagnose npcc 
+           call cnst_get_ind('Q',ixqvapor)
+           call cnst_get_ind('CLDLIQ',ixcldliq)
+           call cnst_get_ind('CLDICE',ixcldice)
+           call cnst_get_ind('NUMLIQ',ixnumliq)
+           call cnst_get_ind('NUMICE',ixnumice)
+
+           numliqname = "numliq_bf_rad"
+           cldliqname = "cldliq_bf_rad"
+           numicename = "numice_bf_rad"
+           cldicename = "cldice_bf_rad"
+           qvaporname = "qvapor_bf_rad"
+           tmpname    = "temp_bf_rad"
+
+!           call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
+           tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+           tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+           tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+           tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+           tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
+           tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
+
+           !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
+           call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+           call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+           call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+           call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+           call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+           call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+           thlname    = "thlm_bf_rad"
+           do k=1,pver
+            do i=1,ncol
+               exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+               tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+            end do
+           end do
+           call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+        end if
+
 
     call radiation_tend(state,ptend, pbuf, &
          cam_out, cam_in, &
@@ -3402,6 +3519,48 @@ if (l_rad) then
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
     call t_stopf('radiation')
+
+    if (macmic_extra_diag) then
+         !SZhang add output here to diagnose npcc 
+         call cnst_get_ind('Q',ixqvapor)
+         call cnst_get_ind('CLDLIQ',ixcldliq)
+         call cnst_get_ind('CLDICE',ixcldice)
+         call cnst_get_ind('NUMLIQ',ixnumliq)
+         call cnst_get_ind('NUMICE',ixnumice)
+         
+         numliqname = "numliq_af_rad"
+         cldliqname = "cldliq_af_rad"
+         numicename = "numice_af_rad"
+         cldicename = "cldice_af_rad"
+         qvaporname = "qvapor_af_rad"
+         tmpname    = "temp_af_rad"
+    
+!        call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
+         tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+         tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+         tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+         tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+         tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
+         tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
+
+         !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
+         call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+         call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+         call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+         call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+         call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+         call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+         thlname    = "thlm_af_rad"
+         do k=1,pver
+          do i=1,ncol
+             exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+             tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+          end do
+         end do
+         call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+    end if
 
 end if ! l_rad
 
@@ -3627,15 +3786,24 @@ subroutine add_fld_extra_macmic_calls ()
 
   implicit none
   !Add all existing ptend names for the addfld calls
-  character(len=17), parameter ::vlist(19) = (/ 'npccn_af_micaero ',&
+  character(len=17), parameter ::vlist(29) = (/ 'npccn_af_micaero ',&
          'numliq_bf_clubb  ','numliq_bf_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_mg2tend',&
 !        'numliq_bf_reg    ','numliq_af_reg    ','numliq_bf_mix    ','numliq_af_mix    ',&
-!         'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
-!         'wtke             ','wtke_cen         ','alstn_bf_micaero ','alstn_af_micaero ','alstn_af_mg2tend ',&
-!         'alsto_bf_micaero ','alsto_af_micaero ','alsto_af_mg2tend ',
+!        'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
+!        'wtke             ','wtke_cen         ','alstn_bf_micaero ','alstn_af_micaero ','alstn_af_mg2tend ',&
+!        'alsto_bf_micaero ','alsto_af_micaero ','alsto_af_mg2tend ',
          'cldliq_bf_clubb  ','qvapor_bf_clubb  ','qvapor_bf_micaero','qvapor_af_mg2tend','cldice_bf_clubb  ',&
          'numice_bf_clubb  ','numice_bf_micaero','numice_af_mg2tend','cldice_bf_micaero','cldice_af_mg2tend',&
-         'temp_bf_clubb    ','temp_bf_micaero  ','temp_af_mg2tend  '/) 
+         'temp_bf_clubb    ','temp_bf_micaero  ','temp_af_mg2tend  ', &
+         'temp_bf_drib     ','qvapor_bf_drib   ','cldliq_bf_drib   ','cldice_bf_drib   ','numliq_bf_drib   ', &
+         'numice_bf_drib   ', &
+         'thlm_bf_clubb    ','thlm_bf_micaero  ','thlm_af_mg2tend  ','thlm_bf_drib     '/) 
+
+  character(len=17), parameter ::vlist0(14) =  (/'temp_bf_rad      ','qvapor_bf_rad    ','cldliq_bf_rad    ', &
+         'cldice_bf_rad    ','numliq_bf_rad    ','numice_bf_rad    ','temp_af_rad      ','qvapor_af_rad    ', &
+         'cldliq_af_rad    ','cldice_af_rad    ','numliq_af_rad    ','numice_af_rad    ','thlm_bf_rad      ', &
+         'thlm_af_rad      '/)
+
 
   character(len=15), parameter :: vlist2(4) = (/ 'alstn_af_macmic'  ,'alstn_bf_macmic', 'alsto_af_macmic'  ,'alsto_bf_macmic'/)  !no substepping variable
   character(len=17), parameter :: vlist3(2) = (/ 'factnum_mam      ','raerosol_tot_mam '/) !aerosol-related variables
@@ -3660,6 +3828,13 @@ subroutine add_fld_extra_macmic_calls ()
         call add_default (trim(adjustl(varname)), 1, ' ')
     enddo     
   enddo
+
+  ntot = size(vlist0)
+  do iv = 1, ntot
+   varname=vlist0(iv)
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_units',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+   call add_default (trim(adjustl(varname)), 1, ' ')
+  enddo  
 
 !  ntot = size(vlist2)
 !
