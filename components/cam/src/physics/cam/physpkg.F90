@@ -2827,7 +2827,7 @@ end if
            call cnst_get_ind('NUMICE',ixnumice)
 
            !ifnpccn  = pbuf_get_index('NPCCN')
-           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it
+           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it 
            write (numliqname,"(A16,I2.2)") "numliq_bf_drib_", macmic_it
            write (cldliqname,"(A16,I2.2)") "cldliq_bf_drib_", macmic_it
            write (numicename,"(A16,I2.2)") "numice_bf_drib_", macmic_it
