@@ -2738,7 +2738,7 @@
     <gridmap atm_grid="ne30np4" ocn_grid="SOwISC10to60E2r2">
       <map name="ATM2OCN_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_ne30np4_to_SOwISC10to60E2r2_aave.200504.nc</map>
       <map name="ATM2OCN_VMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_ne30np4_to_SOwISC10to60E2r2_aave.200504.nc</map>
-      <map name="ATM2OCN_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_ne30np4_to_SOwISC10to60E2r2_nomask_bilin.200504.nc</map>
+      <map name="ATM2OCN_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_ne30np4_to_SOwISC10to60E2r2-nomask_bilin.200504.nc</map>
       <map name="OCN2ATM_FMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_SOwISC10to60E2r2-nomask_to_ne30np4_aave.200504.nc</map>
       <map name="OCN2ATM_SMAPNAME">/global/cfs/cdirs/m3412/dcomeau/SOwISC10to60E2r2/map_SOwISC10to60E2r2-nomask_to_ne30np4_aave.200504.nc</map>
     </gridmap>
