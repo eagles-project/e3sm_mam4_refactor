@@ -315,11 +315,11 @@ contains
     use timeinfoMod
     use clm_varcon      , only : secspday
     use pftvarcon, only : season_decid, stress_decid
-#if defined HUM_HOL
+!#if defined HUM_HOL
     use pftvarcon, only : phen_a, phen_b, phen_c, phen_topt, phen_fstar, phen_tc
     use pftvarcon, only : phen_cstar, phen_tforce, phen_tchil, phen_pstart, phen_tb, phen_ycrit 
-    use pftvarcon, only : phen_spring, phen_autumn, phen_tbase
-#endif
+    use pftvarcon, only : phen_spring, phen_autumn, phen_tbase, phen_crit_dayl
+!#endif
     !
     ! !ARGUMENTS:
     type(bounds_type)      , intent(in)    :: bounds                          
@@ -416,12 +416,12 @@ contains
               ws_flag = 0._r8
             end if
             !------ Seasonal deciduous phenology ----------------------
-#if defined HUM_HOL
+!put IFDEf hum_hol here
             !crit_onset_gdd = exp(4.8_r8 + 0.13_r8*(tmean(p) - SHR_CONST_TKFRZ))
             crit_onset_gdd = phen_fstar
             if (.not. use_cn .and. season_decid(ivt(p)) == 1._r8) then
                tlai(p) = maxval(annlai(:,p))
-               crit_dayl = 39300_r8
+               crit_dayl = phen_crit_dayl !39300_r8
                !Spring phenology
                !Increment GDD and chilling days, check threshold according to model formulation
                spring_threshold = 0 
@@ -492,7 +492,6 @@ contains
                  end if
                  tlai(p) = max(tlai(p) * (ndays_off - sp_offset_day(p)) / ndays_off, 0._r8)
                end if
-               if (p == 4 .and. sp_offset_day(p) .gt. 0 .and. sp_offset_day(p) .lt. 0.5) print*, p, dayl(g), t_ref2m(p), tlai(p), sp_gdd(p), sp_dayl_temp(p)
             end if
  
             !-------------Stress deciduous phenology ------------------------
@@ -540,7 +539,7 @@ contains
                 sp_fdd_off(p)    = 0._r8
               end if
            endif
-#endif
+!End the ifdef here
          endif
 
          tsai(p) = timwt(1)*msai2t(p,1) + timwt(2)*msai2t(p,2)
