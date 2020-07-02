@@ -158,7 +158,6 @@
 <config_use_GM ocn_grid="oRRS18to6">.false.</config_use_GM>
 <config_use_GM ocn_grid="oRRS18to6v3">.false.</config_use_GM>
 <config_use_GM ocn_grid="oRRS15to5">.false.</config_use_GM>
-<config_use_GM ocn_grid="SOwISC10to60E2r2">.false.</config_use_GM>
 <config_GM_kappa>1800.0</config_GM_kappa>
 <config_GM_kappa ocn_forcing="datm_forced_restoring" ocn_grid="oEC60to30v3wLI">600.0</config_GM_kappa>
 <config_GM_kappa ocn_grid="SOwISC10to60E2r2">600.0</config_GM_kappa>
