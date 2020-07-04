@@ -97,12 +97,15 @@ module model_flags
   ! wpxp_ta affects wprtp, wpthlp, & wpsclrp
   ! xpyp_ta affects rtp2, thlp2, up2, vp2, sclrp2, rtpthlp, sclrprtp, & sclrpthlp
   ! xm_ma affects rtm, thlm, sclrm, um and vm.
+  ! l_upwind_wp3_ta is a newly added flag by Shixuan Zhang @PNNL to turn on/off 
+  ! the upwind scheme derived by Chris Vogl @LLNL. 
   logical, public :: & 
+    l_upwind_wp3_ta  = .true., &
     l_upwind_wpxp_ta = .false., & 
     l_upwind_xpyp_ta = .true.,  &
     l_upwind_xm_ma   = .true.
 
-!$omp threadprivate(l_upwind_wpxp_ta, l_upwind_xpyp_ta, l_upwind_xm_ma)
+!$omp threadprivate(l_upwind_wp3_ta, l_upwind_wpxp_ta, l_upwind_xpyp_ta, l_upwind_xm_ma)
 
   logical, public :: & 
     l_quintic_poly_interp = .false. ! Use a quintic polynomial in mono_cubic_interp
@@ -144,7 +147,7 @@ module model_flags
 !$omp   l_call_pdf_closure_twice, l_single_C2_Skw)
 
   logical, public :: &
-    l_standard_term_ta = .false.    ! Use the standard discretization for the
+    l_standard_term_ta = .true.    ! Use the standard discretization for the
   ! turbulent advection terms.  Setting to
   ! .false. means that a_1 and a_3 are pulled
   ! outside of the derivative in advance_wp2_wp3_module.F90
@@ -152,7 +155,7 @@ module model_flags
 !$omp threadprivate(l_standard_term_ta)
 
   logical, public :: & 
-    l_smooth_wp3_on_wp2 = .true. ! Apply back and forth vertical interpolation
+    l_smooth_wp3_on_wp2 = .false. ! Apply back and forth vertical interpolation
   ! to smooth the calculated wp3/wp2 (wp3_on_wp2). Setting to .false. means that 
   ! the smoothing on wp3/wp2 are turned off in advance_clubb_core.F90. Default 
   ! set up is .true. 

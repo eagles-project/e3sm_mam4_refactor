@@ -3509,7 +3509,8 @@ module advance_wp2_wp3_module
         gr ! Variable gr%weights_zt2zm
 
     use model_flags, only:  &
-        l_standard_term_ta
+        l_standard_term_ta, &
+        l_upwind_wp3_ta 
 
     implicit none
 
@@ -3565,6 +3566,8 @@ module advance_wp2_wp3_module
 
     if ( l_standard_term_ta ) then
 
+      if(.not.l_upwind_wp3_ta)then
+
        ! The turbulent advection term is discretized normally, in accordance
        ! with the model equations found in the documentation and the description
        ! listed above.
@@ -3610,6 +3613,121 @@ module advance_wp2_wp3_module
              * rho_ds_zmm1 * a1m1 &
              * wp3_on_wp2_m1 &
              * gr%weights_zt2zm(t_below,mkm1)
+
+      else ! l_upwind_wp3_ta == .true.; use "upwind" differencing
+
+       if( a1*wp3_on_wp2 >= zero ) then
+
+        if( a1m1*wp3_on_wp2_m1 >= zero ) then
+
+         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+         lhs(kp1_tdiag) &
+         = zero
+
+         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+         lhs(k_mdiag) &
+         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+
+         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+         lhs(k_tdiag) &
+         = + invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_zt * a1 * wp3_on_wp2
+
+         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+         lhs(km1_mdiag) &
+         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
+
+         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+         lhs(km1_tdiag) &
+         = - invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_ztm1 * a1m1 * wp3_on_wp2_m1
+        else
+
+         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+         lhs(kp1_tdiag) &
+         = zero
+
+         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+         lhs(k_mdiag) &
+         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+
+         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+         lhs(k_tdiag) &
+         = + invrs_rho_ds_zt &
+             * invrs_dzt &
+               *rho_ds_zt &
+                *(a1 * wp3_on_wp2 - a1m1 * wp3_on_wp2_m1)
+
+         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+         lhs(km1_mdiag) &
+         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
+
+         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+         lhs(km1_tdiag) &
+         = zero
+
+        end if
+
+       else
+
+        if( a1m1*wp3_on_wp2_m1 >= zero ) then
+
+         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+         lhs(kp1_tdiag) &
+         = + invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_ztp1 * a1 * wp3_on_wp2
+
+         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+         lhs(k_mdiag) &
+         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+
+         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+         lhs(k_tdiag) &
+         = zero
+
+         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+         lhs(km1_mdiag) &
+         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
+
+         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+         lhs(km1_tdiag) &
+         = - invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_ztm1 * a1m1 * wp3_on_wp2_m1
+
+        else
+         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+         lhs(kp1_tdiag) &
+         = + invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_ztp1 * a1 * wp3_on_wp2
+
+         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+         lhs(k_mdiag) &
+         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+
+         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+         lhs(k_tdiag) &
+         = - invrs_rho_ds_zt &
+             * invrs_dzt &
+               * rho_ds_zt * a1m1 * wp3_on_wp2_m1
+
+         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+         lhs(km1_mdiag) &
+         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
+
+         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+         lhs(km1_tdiag) &
+         = zero
+
+        end if
+
+       end if
+
+      end if
 
     else
 
