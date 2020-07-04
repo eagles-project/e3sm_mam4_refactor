@@ -100,7 +100,7 @@ module model_flags
   ! l_upwind_wp3_ta is a newly added flag by Shixuan Zhang @PNNL to turn on/off 
   ! the upwind scheme derived by Chris Vogl @LLNL. 
   logical, public :: & 
-    l_upwind_wp3_ta  = .true., &
+    l_upwind_wp3_ta  = .false., &
     l_upwind_wpxp_ta = .false., & 
     l_upwind_xpyp_ta = .true.,  &
     l_upwind_xm_ma   = .true.
