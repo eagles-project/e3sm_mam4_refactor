@@ -151,6 +151,13 @@ module model_flags
   ! and in advance_xp2_xpyp_module.F90.
 !$omp threadprivate(l_standard_term_ta)
 
+  logical, public :: & 
+    l_smooth_wp3_on_wp2 = .true. ! Apply back and forth vertical interpolation
+  ! to smooth the calculated wp3/wp2 (wp3_on_wp2). Setting to .false. means that 
+  ! the smoothing on wp3/wp2 are turned off in advance_clubb_core.F90. Default 
+  ! set up is .true. 
+!$omp threadprivate(l_smooth_wp3_on_wp2)
+
   ! Use to determine whether a host model has already applied the surface flux,
   ! to avoid double counting.
   logical, public :: &

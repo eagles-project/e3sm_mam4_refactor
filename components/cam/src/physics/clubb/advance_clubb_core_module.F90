@@ -146,7 +146,8 @@ module advance_clubb_core_module
       l_call_pdf_closure_twice, &
       l_host_applies_sfc_fluxes, &
       l_use_cloud_cover, &
-      l_rtm_nudge
+      l_rtm_nudge, &
+      l_smooth_wp3_on_wp2
 
     use grid_class, only: & 
       gr,  & ! Variable(s)
@@ -1009,24 +1010,36 @@ module advance_clubb_core_module
                    * ( wp3_zm(1:gr%nz) / max( wp2(1:gr%nz), w_tol_sqd ) )
     end if
 
-    ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
-    ! denominator since it's less likely to create spikes
-    wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+    if ( .not. l_smooth_wp3_on_wp2) then
+    
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in
+      ! the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+      wp3_on_wp2    = ( wp3_zm(1:gr%nz) / max(wp2(1:gr%nz), w_tol_sqd ) )
 
-    ! Clip wp3_on_wp2_zt if it's too large
-    do k=1, gr%nz
-      if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
-        wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
-      else
-        wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
-      end if
-    end do
+    else
 
-    ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
-    wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
 
-    ! Smooth again as above
-    wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+      ! Clip wp3_on_wp2_zt if it's too large
+      do k=1, gr%nz
+        if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
+          wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
+        else
+          wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
+        end if
+      end do
+
+      ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
+      wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+
+      ! Smooth again as above
+      wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+
+    end if 
 
     !----------------------------------------------------------------
     ! Call closure scheme
