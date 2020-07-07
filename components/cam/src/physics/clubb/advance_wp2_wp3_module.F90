@@ -540,7 +540,7 @@ module advance_wp2_wp3_module
                    a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                    upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt,  & 
                    Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
-                   C11_Skw_fnc, rho_ds_zm, invrs_rho_ds_zt, radf, &
+                   C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zt, radf, &
                    thv_ds_zm, thv_ds_zt, l_crank_nich_diff, &
                    rhs )
 
@@ -1392,6 +1392,7 @@ module advance_wp2_wp3_module
                              a3(k), a3_zt(k), a3(km1),  &
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
+                             rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), & 
                              invrs_rho_ds_zt(k),  &
                              three_halves,  &
                              gr%invrs_dzt(k), k )
@@ -1450,6 +1451,7 @@ module advance_wp2_wp3_module
                                  a3(km1)+3.0_core_rknd,  &
                                  wp3_on_wp2(k), wp3_on_wp2(km1), &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
+                                 rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                  invrs_rho_ds_zt(k),  &
                                  0.0_core_rknd,  &
                                  gr%invrs_dzt(k), k )
@@ -1476,6 +1478,7 @@ module advance_wp2_wp3_module
                                  0.0_core_rknd-3.0_core_rknd,  &
                                  0.0_core_rknd, 0.0_core_rknd, &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
+                                 rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                  invrs_rho_ds_zt(k),  &
                                  three_halves,  &
                                  gr%invrs_dzt(k), k )
@@ -2060,6 +2063,7 @@ module advance_wp2_wp3_module
                              a3(k), a3_zt(k), a3(km1),  &
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
+                             rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                              invrs_rho_ds_zt(k),  &
                              three_halves,  &
                              gr%invrs_dzt(k), k )
@@ -2119,6 +2123,7 @@ module advance_wp2_wp3_module
                                  a3(km1)+3.0_core_rknd,  &
                                  wp3_on_wp2(k), wp3_on_wp2(km1), &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
+                                 rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                  invrs_rho_ds_zt(k),  &
                                  0.0_core_rknd,  &
                                  gr%invrs_dzt(k), k )
@@ -2145,6 +2150,7 @@ module advance_wp2_wp3_module
                                  0.0_core_rknd-3.0_core_rknd,  &
                                  0.0_core_rknd, 0.0_core_rknd, &
                                  rho_ds_zm(k), rho_ds_zm(km1),  &
+                                 rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                  invrs_rho_ds_zt(k),  &
                                  three_halves,  &
                                  gr%invrs_dzt(k), k )
@@ -2284,7 +2290,7 @@ module advance_wp2_wp3_module
                        a3, a3_zt, wp3_on_wp2, wpthvp, wp2thvp, um, vm,  & 
                        upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt, & 
                        Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
-                       C11_Skw_fnc, rho_ds_zm, invrs_rho_ds_zt, radf, &
+                       C11_Skw_fnc, rho_ds_zm, rho_ds_zt, invrs_rho_ds_zt, radf, &
                        thv_ds_zm, thv_ds_zt, l_crank_nich_diff, &
                        rhs )
 
@@ -2376,6 +2382,7 @@ module advance_wp2_wp3_module
       C1_Skw_fnc,      & ! C_1 parameter with Sk_w applied           [-]
       C11_Skw_fnc,     & ! C_11 parameter with Sk_w applied          [-]
       rho_ds_zm,       & ! Dry, static density on momentum levels    [kg/m^3]
+      rho_ds_zt,       & ! Dry, static density on thermo. levels    [kg/m^3]
       invrs_rho_ds_zt, & ! Inv. dry, static density @ thermo. levs.  [m^3/kg]
       radf,            & ! Buoyancy production at the CL top         [m^2/s^3]
       thv_ds_zm,       & ! Dry, base-state theta_v on momentum levs. [K]
@@ -2632,6 +2639,7 @@ module advance_wp2_wp3_module
                              a3(k), a3_zt(k), a3(km1),  &
                              wp3_on_wp2(k), wp3_on_wp2(km1), &
                              rho_ds_zm(k), rho_ds_zm(km1),  &
+                             rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                              invrs_rho_ds_zt(k),  &
                              three_halves,  &
                              gr%invrs_dzt(k), k )
@@ -2724,6 +2732,7 @@ module advance_wp2_wp3_module
                                a3(km1)+3.0_core_rknd,  &
                                wp3_on_wp2(k), wp3_on_wp2(km1), &
                                rho_ds_zm(k), rho_ds_zm(km1),  &
+                               rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                invrs_rho_ds_zt(k),  &
                                0.0_core_rknd,  &
                                gr%invrs_dzt(k), k )
@@ -2766,6 +2775,7 @@ module advance_wp2_wp3_module
                                0.0_core_rknd-3.0_core_rknd,  &
                                0.0_core_rknd, 0.0_core_rknd, &
                                rho_ds_zm(k), rho_ds_zm(km1), &
+                               rho_ds_zt(k),rho_ds_zt(km1),rho_ds_zt(kp1), &
                                invrs_rho_ds_zt(k), &
                                three_halves, &
                                gr%invrs_dzt(k), k )
@@ -3389,6 +3399,7 @@ module advance_wp2_wp3_module
                                      a3, a3_zt, a3m1,  &
                                      wp3_on_wp2, wp3_on_wp2_m1, &
                                      rho_ds_zm, rho_ds_zmm1,  &
+                                     rho_ds_zt,rho_ds_ztm1,rho_ds_ztp1, &
                                      invrs_rho_ds_zt,  &
                                      const_three_halves,  &
                                      invrs_dzt, level )  &
@@ -3512,6 +3523,9 @@ module advance_wp2_wp3_module
         l_standard_term_ta, &
         l_upwind_wp3_ta 
 
+    use constants_clubb, only: &
+        zero
+
     implicit none
 
     ! Constant parameters
@@ -3540,6 +3554,9 @@ module advance_wp2_wp3_module
       wp3_on_wp2_m1,      & ! wp3 / wp2 (k-1)                          [m/s]
       rho_ds_zm,          & ! Dry, static density at moment. lev (k)   [kg/m^3]
       rho_ds_zmm1,        & ! Dry, static density at moment. lev (k-1) [kg/m^3]
+      rho_ds_zt,          & ! Dry, static density at thermo level (k)     [kg/m^3]
+      rho_ds_ztm1,        & ! Dry, static density at thermo level (k-1)   [kg/m^3]
+      rho_ds_ztp1,        & ! Dry, static density at thermo level (k+1)   [kg/m^3]
       invrs_rho_ds_zt,    & ! Inv dry, static density @ thermo lev (k) [m^3/kg]
       const_three_halves, & ! "3/2" ("0" is sent in for wp3_ta budget) [-]
       invrs_dzt             ! Inverse of grid spacing (k)              [1/m]
