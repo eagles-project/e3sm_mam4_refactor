@@ -3633,116 +3633,42 @@ module advance_wp2_wp3_module
 
       else ! l_upwind_wp3_ta == .true.; use "upwind" differencing
 
-       if( a1*wp3_on_wp2 >= zero ) then
+       ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
 
-        if( a1m1*wp3_on_wp2_m1 >= zero ) then
+       lhs(kp1_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zt  &
+             * min(zero, a1* wp3_on_wp2) 
+   
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt * rho_ds_zm * a3 * wp2 &
+         + const_three_halves &
+           * invrs_dzt * wp2
 
-         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-         lhs(kp1_tdiag) &
-         = zero
+       ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+       lhs(k_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zt &
+             * ( max(zero, a1 * wp3_on_wp2) - &
+                 min(zero, a1m1 * wp3_on_wp2_m1) )
 
-         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-         lhs(k_mdiag) &
-         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - invrs_rho_ds_zt &
+           * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1 &
+         - const_three_halves &
+           * invrs_dzt * wp2m1
 
-         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
-         lhs(k_tdiag) &
-         = + invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_zt * a1 * wp3_on_wp2
-
-         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-         lhs(km1_mdiag) &
-         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
-
-         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
-         lhs(km1_tdiag) &
-         = - invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_ztm1 * a1m1 * wp3_on_wp2_m1
-        else
-
-         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-         lhs(kp1_tdiag) &
-         = zero
-
-         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-         lhs(k_mdiag) &
-         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
-
-         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
-         lhs(k_tdiag) &
-         = + invrs_rho_ds_zt &
-             * invrs_dzt &
-               *rho_ds_zt &
-                *(a1 * wp3_on_wp2 - a1m1 * wp3_on_wp2_m1)
-
-         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-         lhs(km1_mdiag) &
-         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
-
-         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
-         lhs(km1_tdiag) &
-         = zero
-
-        end if
-
-       else
-
-        if( a1m1*wp3_on_wp2_m1 >= zero ) then
-
-         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-         lhs(kp1_tdiag) &
-         = + invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_ztp1 * a1 * wp3_on_wp2
-
-         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-         lhs(k_mdiag) &
-         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
-
-         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
-         lhs(k_tdiag) &
-         = zero
-
-         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-         lhs(km1_mdiag) &
-         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
-
-         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
-         lhs(km1_tdiag) &
-         = - invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_ztm1 * a1m1 * wp3_on_wp2_m1
-
-        else
-         ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-         lhs(kp1_tdiag) &
-         = + invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_ztp1 * a1 * wp3_on_wp2
-
-         ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-         lhs(k_mdiag) &
-         = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
-
-         ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
-         lhs(k_tdiag) &
-         = - invrs_rho_ds_zt &
-             * invrs_dzt &
-               * rho_ds_zt * a1m1 * wp3_on_wp2_m1
-
-         ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-         lhs(km1_mdiag) &
-         = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
-
-         ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
-         lhs(km1_tdiag) &
-         = zero
-
-        end if
-
-       end if
+       ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+       lhs(km1_tdiag) &
+       = - invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_ztm1 &
+             * max(zero, a1m1 * wp3_on_wp2_m1)
 
       end if
 
