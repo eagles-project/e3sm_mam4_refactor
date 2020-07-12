@@ -3581,13 +3581,54 @@ module advance_wp2_wp3_module
     ! and thermodynamic level (k-1).
     mkm1 = level - 1
 
-    if ( l_standard_term_ta ) then
+    if ( l_upwind_wp3_ta ) then
 
-      if(.not.l_upwind_wp3_ta)then
+       ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+
+       lhs(kp1_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zt  &
+             * min(zero, a1* wp3_on_wp2)
+
+       ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+       lhs(k_tdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_zt &
+             * ( max(zero, a1 * wp3_on_wp2) - &
+                 min(zero, a1m1 * wp3_on_wp2_m1) )
+
+       ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+       lhs(km1_tdiag) &
+       = - invrs_rho_ds_zt &
+           * invrs_dzt &
+             * rho_ds_ztm1 &
+             * max(zero, a1m1 * wp3_on_wp2_m1)
+
+    end if 
+
+    if ( l_standard_term_ta ) then
 
        ! The turbulent advection term is discretized normally, in accordance
        ! with the model equations found in the documentation and the description
        ! listed above.
+
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + invrs_rho_ds_zt &
+           * invrs_dzt * rho_ds_zm * a3 * wp2 &
+         + const_three_halves &
+           * invrs_dzt * wp2
+
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - invrs_rho_ds_zt &
+           * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1 &
+         - const_three_halves &
+           * invrs_dzt * wp2m1
+
+      if( .not. l_upwind_wp3_ta )then
 
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) &
@@ -3596,13 +3637,6 @@ module advance_wp2_wp3_module
              * rho_ds_zm * a1 &
              * wp3_on_wp2 &
              * gr%weights_zt2zm(t_above,mk)
-
-       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-       lhs(k_mdiag) &
-       = + invrs_rho_ds_zt &
-           * invrs_dzt * rho_ds_zm * a3 * wp2 &
-         + const_three_halves &
-           * invrs_dzt * wp2
 
        ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
        lhs(k_tdiag) &
@@ -3616,13 +3650,6 @@ module advance_wp2_wp3_module
                    * gr%weights_zt2zm(t_above,mkm1) &
                )
 
-       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-       lhs(km1_mdiag) &
-       = - invrs_rho_ds_zt &
-           * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1 &
-         - const_three_halves &
-           * invrs_dzt * wp2m1
-
        ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
        lhs(km1_tdiag) &
        = - invrs_rho_ds_zt &
@@ -3631,46 +3658,7 @@ module advance_wp2_wp3_module
              * wp3_on_wp2_m1 &
              * gr%weights_zt2zm(t_below,mkm1)
 
-      else ! l_upwind_wp3_ta == .true.; use "upwind" differencing
-
-       ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-
-       lhs(kp1_tdiag) &
-       = + invrs_rho_ds_zt &
-           * invrs_dzt &
-             * rho_ds_zt  &
-             * min(zero, a1* wp3_on_wp2) 
-   
-       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-       lhs(k_mdiag) &
-       = + invrs_rho_ds_zt &
-           * invrs_dzt * rho_ds_zm * a3 * wp2 &
-         + const_three_halves &
-           * invrs_dzt * wp2
-
-       ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
-       lhs(k_tdiag) &
-       = + invrs_rho_ds_zt &
-           * invrs_dzt &
-             * rho_ds_zt &
-             * ( max(zero, a1 * wp3_on_wp2) - &
-                 min(zero, a1m1 * wp3_on_wp2_m1) )
-
-       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-       lhs(km1_mdiag) &
-       = - invrs_rho_ds_zt &
-           * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1 &
-         - const_three_halves &
-           * invrs_dzt * wp2m1
-
-       ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
-       lhs(km1_tdiag) &
-       = - invrs_rho_ds_zt &
-           * invrs_dzt &
-             * rho_ds_ztm1 &
-             * max(zero, a1m1 * wp3_on_wp2_m1)
-
-      end if
+      end if 
 
     else
 
@@ -3690,6 +3678,22 @@ module advance_wp2_wp3_module
        ! this effects the momentum superdiagonal (k_mdiag) and the momentum 
        ! subdiagonal (km1_mdiag).
 
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + invrs_rho_ds_zt &
+           * a3_zt * invrs_dzt * rho_ds_zm * wp2 &
+         + const_three_halves &
+           * invrs_dzt * wp2
+
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - invrs_rho_ds_zt &
+           * a3_zt * invrs_dzt * rho_ds_zmm1 * wp2m1 &
+         - const_three_halves &
+           * invrs_dzt * wp2m1
+
+      if ( .not. l_upwind_wp3_ta ) then
+
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) & 
        = + invrs_rho_ds_zt &
@@ -3697,13 +3701,6 @@ module advance_wp2_wp3_module
              * rho_ds_zm &
              * wp3_on_wp2 &
              * gr%weights_zt2zm(t_above,mk)
-
-       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-       lhs(k_mdiag) & 
-       = + invrs_rho_ds_zt &
-           * a3_zt * invrs_dzt * rho_ds_zm * wp2 &
-         + const_three_halves &
-           * invrs_dzt * wp2
 
        ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
        lhs(k_tdiag) & 
@@ -3717,13 +3714,6 @@ module advance_wp2_wp3_module
                    * gr%weights_zt2zm(t_above,mkm1) & 
                )
 
-       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-       lhs(km1_mdiag) & 
-       = - invrs_rho_ds_zt &
-           * a3_zt * invrs_dzt * rho_ds_zmm1 * wp2m1 &
-         - const_three_halves &
-           * invrs_dzt * wp2m1
-
        ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
        lhs(km1_tdiag) & 
        = - invrs_rho_ds_zt &
@@ -3731,6 +3721,8 @@ module advance_wp2_wp3_module
              * rho_ds_zmm1 &
              * wp3_on_wp2_m1 & 
              * gr%weights_zt2zm(t_below,mkm1)
+
+      end if 
 
        ! End of code that pulls out a3.
        ! End of Brian's a1 change.  Feb. 14, 2008.
