@@ -1966,8 +1966,6 @@ subroutine tphysbc (ztodt,               &
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
     integer :: ixnumliq, ixnumice              ! constituent indices for cloud liquid and ice number concentration.
 
-    character(200) :: tmpname                  !String for temporal variable name
-
 
     ! for macro/micro co-substepping
     integer :: macmic_it                       ! iteration variables
@@ -2528,12 +2526,10 @@ end if
        do macmic_it = 1, cld_macmic_num_steps
 
         !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
-        if((.not.is_first_step()) .and. l_dribbling_tend_to_clubb_mg2) then
+        if ((.not.is_first_step()) .and. l_dribbling_tend_to_clubb_mg2) then
 
-           write (tmpname,"(A16,I2.2)")    "drib_tend_clubb_", macmic_it
-         
            ! the flag lu,lv,ls,lq is to control whether or not do physics update on the variables 
-           if(l_dribbling_uv_tend) then
+           if (l_dribbling_uv_tend) then
              lu  = .TRUE.
              lv  = .TRUE.
            else
@@ -2544,7 +2540,7 @@ end if
            ls    = .TRUE.
            lq(:) = .TRUE.
 
-           call physics_ptend_init(ptend, state%psetcols, trim(adjustl(tmpname)), ls=ls, lu=lu, lv=lv, lq=lq)
+           call physics_ptend_init(ptend, state%psetcols, 'clubb_mg2_dribbling_tend', ls=ls, lu=lu, lv=lv, lq=lq)
 
               ptend%s(:ncol,:pver)          = stend(:ncol,:pver) !T will be updated based on s when physics_update is called
               ptend%q(:ncol,:pver,1)        = qtend(:ncol,:pver)
@@ -2553,23 +2549,21 @@ end if
               ptend%q(:ncol,:pver,ixnumliq) = nltend(:ncol,:pver)
               ptend%q(:ncol,:pver,ixnumice) = nitend(:ncol,:pver)
 
-              if(l_dribbling_uv_tend) then
+              if (l_dribbling_uv_tend) then
 
                  ptend%u(:ncol,:pver)         = utend(:ncol,:pver)
                  ptend%v(:ncol,:pver)         = vtend(:ncol,:pver)
 
-              endif
+              end if
 
            call physics_update(state, ptend, cld_macmic_ztodt)
 
            !note: physics_update and ptend will not affect omega, update omega in state separately
-           if(l_dribbling_omega_tend) then
+           if (l_dribbling_omega_tend) then
 
              state%omega(:ncol,:pver)     = state%omega(:ncol,:pver)     + wtend(:ncol,:pver)*cld_macmic_ztodt
 
-           endif
-
-           call t_stopf(trim(adjustl(tmpname)))
+           end if
 
         end if 
         !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
