@@ -169,12 +169,11 @@ logical :: l_st_mac        = .true.
 logical :: l_st_mic        = .true.
 logical :: l_rad           = .true.
 
-!Comment by Shixuan Zhang (PNNL, 2020-07): 
-!This set of switches were implemented for a test of using tendency
-!dribbling in cloud physics parameterizations (i.e CLUBB + MG2)  
-logical :: l_dribbling_tend_to_clubb_mg2 = .false.
-logical :: l_dribbling_uv_tend           = .false.
-logical :: l_dribbling_omega_tend        = .false.
+!Comment by ShixuanZhang & HuiWan (PNNL, 2020-07): 
+!This set of namelist variables were implemented for a test of using tendency
+!dribbling in cloud physics parameterizations (macmic loop) 
+logical  :: l_dribble_tend_into_macmic_loop = .false.
+integer  :: dribble_start_step = 1
 
 !======================================================================= 
 contains
@@ -216,7 +215,7 @@ subroutine phys_ctl_readnl(nlfile)
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, &
-      l_dribbling_tend_to_clubb_mg2,l_dribbling_uv_tend,l_dribbling_omega_tend, &
+      l_dribble_tend_into_macmic_loop, dribble_start_step, &
       prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
       rrtmg_temp_fix
    !-----------------------------------------------------------------------------
@@ -309,9 +308,8 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_st_mac,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_st_mic,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_rad,                           1 , mpilog,  0, mpicom)
-   call mpibcast(l_dribbling_tend_to_clubb_mg2,   1 , mpilog,  0, mpicom)
-   call mpibcast(l_dribbling_uv_tend,             1 , mpilog,  0, mpicom)
-   call mpibcast(l_dribbling_omega_tend,          1 , mpilog,  0, mpicom)
+   call mpibcast(l_dribble_tend_into_macmic_loop, 1 , mpilog,  0, mpicom)
+   call mpibcast(dribble_start_step,              1 , mpiint,  0, mpicom)
    call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
    call mpibcast(prc_coef1,                       1 , mpir8,   0, mpicom)
    call mpibcast(prc_exp,                         1 , mpir8,   0, mpicom)
@@ -484,7 +482,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
-                       ,l_dribbling_tend_to_clubb_mg2_out, l_dribbling_uv_tend_out, l_dribbling_omega_tend_out &
+                       ,l_dribble_tend_into_macmic_loop_out, dribble_start_step_out &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
 !-----------------------------------------------------------------------
@@ -563,9 +561,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: l_st_mac_out
    logical,           intent(out), optional :: l_st_mic_out
    logical,           intent(out), optional :: l_rad_out
-   logical,           intent(out), optional :: l_dribbling_tend_to_clubb_mg2_out
-   logical,           intent(out), optional :: l_dribbling_uv_tend_out
-   logical,           intent(out), optional :: l_dribbling_omega_tend_out
+   logical,           intent(out), optional :: l_dribble_tend_into_macmic_loop_out
+   integer,           intent(out), optional :: dribble_start_step_out
    logical,           intent(out), optional :: mg_prc_coeff_fix_out
    logical,           intent(out), optional :: rrtmg_temp_fix_out
    integer,           intent(out), optional :: cld_macmic_num_steps_out
@@ -643,9 +640,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(l_st_mac_out            ) ) l_st_mac_out          = l_st_mac
    if ( present(l_st_mic_out            ) ) l_st_mic_out          = l_st_mic
    if ( present(l_rad_out               ) ) l_rad_out             = l_rad
-   if ( present(l_dribbling_tend_to_clubb_mg2_out ) ) l_dribbling_tend_to_clubb_mg2_out = l_dribbling_tend_to_clubb_mg2
-   if ( present(l_dribbling_uv_tend_out           ) ) l_dribbling_uv_tend_out           = l_dribbling_uv_tend
-   if ( present(l_dribbling_omega_tend_out        ) ) l_dribbling_omega_tend_out        = l_dribbling_omega_tend
+   if ( present(l_dribble_tend_into_macmic_loop_out ) ) l_dribble_tend_into_macmic_loop_out = l_dribble_tend_into_macmic_loop
+   if ( present(dribble_start_step_out              ) ) dribble_start_step_out              = dribble_start_step
    if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
    if ( present(prc_coef1_out           ) ) prc_coef1_out            = prc_coef1
    if ( present(prc_exp_out             ) ) prc_exp_out              = prc_exp

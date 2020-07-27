@@ -70,6 +70,17 @@ module physpkg
   integer ::  snow_sh_idx        = 0
   integer :: species_class(pcnst)  = -1 !BSINGH: Moved from modal_aero_data.F90 as it is being used in second call to zm deep convection scheme (convect_deep_tend_2)
 
+  ! Physics buffer indices for variables used for tendency dribbling in cloud physics parameterizations (macmic loop)
+  integer :: &
+    s_after_macmic_idx   = 0, &
+    t_after_macmic_idx   = 0, &
+    q_after_macmic_idx   = 0, &
+    ql_after_macmic_idx  = 0, &
+    qi_after_macmic_idx  = 0, &
+    nl_after_macmic_idx  = 0, &
+    ni_after_macmic_idx  = 0
+
+
   save
 
   ! Public methods
@@ -109,7 +120,7 @@ subroutine phys_register
     !            A. Gettelman, Nov 2010 - put micro/macro physics into separate routines
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer,     only: pbuf_init_time
+    use physics_buffer,     only: pbuf_init_time, dyn_time_lvls
     use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use spmd_utils,         only: masterproc
@@ -238,6 +249,18 @@ subroutine phys_register
          call pbuf_register_subcol('PREC_SED', 'phys_register', prec_sed_idx)
          call pbuf_register_subcol('SNOW_SED', 'phys_register', snow_sed_idx)
        end if
+
+       ! ShixuanZhang & HuiWan (2020/07)
+       ! There variables are used for testing the tendency dribbling in cloud physics
+       ! paramterization (macmic loop)
+       call pbuf_add_field('S_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), s_after_macmic_idx)
+       call pbuf_add_field('T_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), t_after_macmic_idx)
+       call pbuf_add_field('Q_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), q_after_macmic_idx)
+       call pbuf_add_field('QL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), ql_after_macmic_idx)
+       call pbuf_add_field('QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), qi_after_macmic_idx)
+       call pbuf_add_field('NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), nl_after_macmic_idx)
+       call pbuf_add_field('NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), ni_after_macmic_idx)
+
 
     ! Who should add FRACIS? 
     ! -- It does not seem that aero_intr should add it since FRACIS is used in convection
@@ -1881,7 +1904,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, &
-         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale, physics_state_copy
+         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale, physics_ptend_copy
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
     use physconst,       only: cpair, latvap, gravit, rga
@@ -1943,9 +1966,6 @@ subroutine tphysbc (ztodt,               &
     type(physics_ptend)   :: ptend_aero       ! ptend for microp_aero
     type(physics_ptend)   :: ptend_aero_sc    ! ptend for microp_aero on sub-columns
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
-
-    type(physics_state)   :: state1           ! Local copy of state variable (used for tendency dribbling)
-    type(physics_ptend)   :: ptend_loc        ! Local tendency from processes (used for tendency dribbling) 
 
     integer :: nstep                          ! current timestep number
 
@@ -2070,25 +2090,20 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
-    !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
-    logical  :: l_dribbling_tend_to_clubb_mg2  ! flag to turn on tendency dribbling in CLUBB+MG2
-    logical  :: l_dribbling_uv_tend            ! flag to further turn on tendency dribbling for horizontal wind in CLUBB+MG2
-    logical  :: l_dribbling_omega_tend         ! flag to further turn on tendency dribbling for pressure vertical velocity in CLUBB+MG2
-    logical  :: dbl_lu                         ! flag in ptend and physics_update
-    logical  :: dbl_lv                         ! for u, v wind update
-    logical  :: dbl_ls                         ! flag in ptend and physics_update for dry static energy
-    logical  :: dbl_lq(pcnst)
+    !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+    type(physics_ptend)   :: ptend_dribble                    ! local array to save tendencies to be dribbled 
+    logical               :: l_dribble_tend_into_macmic_loop  ! namelist variable, flag to turn on tendency dribbling in cloud physics
+    integer               :: dribble_start_step               ! namelist variable, specifying which step the dribbling start  
+    logical               :: l_dribble                        ! local variabel to determine if tendency dribbling is applied in macmic loop
 
-    real(r8), pointer, dimension(:,:) :: swat
-    real(r8), pointer, dimension(:,:) :: qwat
-    real(r8), pointer, dimension(:,:) :: uwat
-    real(r8), pointer, dimension(:,:) :: vwat
-    real(r8), pointer, dimension(:,:) :: wwat
-    real(r8), pointer, dimension(:,:) :: qlwat
-    real(r8), pointer, dimension(:,:) :: qiwat
-    real(r8), pointer, dimension(:,:) :: nlwat
-    real(r8), pointer, dimension(:,:) :: niwat
-    !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+    real(r8), pointer, dimension(:,:) :: s_after_macmic
+    real(r8), pointer, dimension(:,:) :: t_after_macmic
+    real(r8), pointer, dimension(:,:) :: q_after_macmic
+    real(r8), pointer, dimension(:,:) :: ql_after_macmic
+    real(r8), pointer, dimension(:,:) :: qi_after_macmic
+    real(r8), pointer, dimension(:,:) :: nl_after_macmic
+    real(r8), pointer, dimension(:,:) :: ni_after_macmic
+    !Shixuan Zhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
 
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
@@ -2102,9 +2117,8 @@ subroutine tphysbc (ztodt,               &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
-                      ,l_dribbling_tend_to_clubb_mg2_out = l_dribbling_tend_to_clubb_mg2 & 
-                      ,l_dribbling_uv_tend_out           = l_dribbling_uv_tend           & 
-                      ,l_dribbling_omega_tend_out        = l_dribbling_omega_tend        &
+                      ,l_dribble_tend_into_macmic_loop_out = l_dribble_tend_into_macmic_loop & 
+                      ,dribble_start_step_out              = dribble_start_step           & 
                       )
     
     !-----------------------------------------------------------------------
@@ -2440,121 +2454,77 @@ end if
        snow_pcw_macmic = 0._r8
 
 
+       !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+       l_dribble = l_dribble_tend_into_macmic_loop .and. ( nstep .ge. dribble_start_step )
+
+       if ( l_dribble ) then
+
+          call cnst_get_ind('CLDLIQ', ixcldliq)
+          call cnst_get_ind('CLDICE', ixcldice)
+          call cnst_get_ind('NUMLIQ', ixnumliq)
+          call cnst_get_ind('NUMICE', ixnumice)
+
+          !Extract the variables in previous time step that are saved for the
+          !caculation of dribbling  tendencies 
+          ifld = pbuf_get_index('S_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, s_after_macmic,  start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('T_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, t_after_macmic,  start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('Q_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, q_after_macmic,  start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('QL_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, ql_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('QI_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, qi_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('NL_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, nl_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+          ifld = pbuf_get_index('NI_After_MACMIC')
+          call pbuf_get_field(pbuf, ifld, ni_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+
+          !Calculate tendencies to be dribbled, and save in ptend_dribble
+          lq(:)        = .FALSE.
+          lq(1)        = .TRUE.
+          lq(ixcldliq) = .TRUE.
+          lq(ixcldice) = .TRUE.
+          lq(ixnumliq) = .TRUE.
+          lq(ixnumice) = .TRUE.
+
+          call physics_ptend_init(ptend_dribble, state%psetcols, 'macmic_dribble_tend', ls= .true., lq=lq)
+
+          ptend_dribble%s(:ncol,:pver)          = (state%s(:ncol,:pver)          -   s_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%q(:ncol,:pver,1)        = (state%q(:ncol,:pver,1)        -   q_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%q(:ncol,:pver,ixcldliq) = (state%q(:ncol,:pver,ixcldliq) -  ql_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%q(:ncol,:pver,ixcldice) = (state%q(:ncol,:pver,ixcldice) -  qi_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%q(:ncol,:pver,ixnumliq) = (state%q(:ncol,:pver,ixnumliq) -  nl_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%q(:ncol,:pver,ixnumice) = (state%q(:ncol,:pver,ixnumice) -  ni_after_macmic(:ncol,:pver))  / ztodt
+
+          !restore the state variable back to the previous step as that is the start point for tendency dribbling  
+          state%s(:ncol,:pver)          = s_after_macmic(:ncol,:pver)
+          state%t(:ncol,:pver)          = t_after_macmic(:ncol,:pver)
+          state%q(:ncol,:pver,1)        = q_after_macmic(:ncol,:pver)
+          state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
+          state%q(:ncol,:pver,ixcldice) = qi_after_macmic(:ncol,:pver)
+          state%q(:ncol,:pver,ixnumliq) = nl_after_macmic(:ncol,:pver)
+          state%q(:ncol,:pver,ixnumice) = ni_after_macmic(:ncol,:pver)
+        
+       end if 
+ 
        do macmic_it = 1, cld_macmic_num_steps
 
-        !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
-        if ((.not.is_first_step()) .and. l_dribbling_tend_to_clubb_mg2) then
+        !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+        if (l_dribble) then
 
-           call cnst_get_ind('CLDLIQ', ixcldliq)
-           call cnst_get_ind('CLDICE', ixcldice)
-           call cnst_get_ind('NUMLIQ', ixnumliq)
-           call cnst_get_ind('NUMICE', ixnumice)
-
-           if (macmic_it .eq. 1) then
-
-             ! Copy the state to state1 array for the calculation of dribbling tendency            
-             call physics_state_copy(state,state1)
-            
-             ! Flags for physics update
-             dbl_lu           = .FALSE.
-             dbl_lv           = .FALSE.
-             dbl_ls           = .TRUE.
-             dbl_lq(:)        = .FALSE.
-             dbl_lq(1)        = .TRUE.
-             dbl_lq(ixcldliq) = .TRUE.
-             dbl_lq(ixcldice) = .TRUE.
-             dbl_lq(ixnumliq) = .TRUE.
-             dbl_lq(ixnumice) = .TRUE.
-             
-             !Extract the variables in previous time step that are saved for the
-             !caculation of dribbling  tendencies 
-             itim_old  = pbuf_old_tim_idx()
-
-             ifld = pbuf_get_index('SWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, swat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('QWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, qwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('QLWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, qlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('QIWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, qiwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('NLWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('NIWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('UWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, uwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('VWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, vwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             ifld = pbuf_get_index('WWAT_DBL')
-             call pbuf_get_field(pbuf, ifld, wwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-             !restore the state variable back to the previous step as that is the
-             !start point for tendency dribbling  
-             state%s(:ncol,:pver)          = swat(:ncol,:pver)
-             state%q(:ncol,:pver,1)        = qwat(:ncol,:pver)
-             state%q(:ncol,:pver,ixcldliq) = qlwat(:ncol,:pver)
-             state%q(:ncol,:pver,ixcldice) = qiwat(:ncol,:pver)
-             state%q(:ncol,:pver,ixnumliq) = nlwat(:ncol,:pver)
-             state%q(:ncol,:pver,ixnumice) = niwat(:ncol,:pver)
-
-             !if further turn on the tendency dribbling for horizontal wind fields  
-             if(l_dribbling_uv_tend) then
-
-               state%u(:ncol,:pver)     = uwat(:ncol,:pver)
-               state%v(:ncol,:pver)     = vwat(:ncol,:pver)
-  
-               dbl_lu  = .TRUE.
-               dbl_lv  = .TRUE.
-    
-             end if
-
-             !if further turn on the tendency dribbling for perssulre vetical velocity 
-             if(l_dribbling_omega_tend) then
-
-               state%omega(:ncol,:pver) = wwat(:ncol,:pver)
-
-             end if
-
-           end if
-
-
-           call physics_ptend_init(ptend_loc, state%psetcols, 'clubb_mg2_dribbling_tend', ls=dbl_ls, lu=dbl_lu, lv=dbl_lv, lq=dbl_lq)
-
-            ptend_loc%s(:ncol,:pver)          = (state1%s(:ncol,:pver)            -   swat(:ncol,:pver))  / ztodt
-            ptend_loc%q(:ncol,:pver,1)        = (state1%q(:ncol,:pver,1)          -   qwat(:ncol,:pver))  / ztodt
-            ptend_loc%q(:ncol,:pver,ixcldliq) = (state1%q(:ncol,:pver,ixcldliq)   -  qlwat(:ncol,:pver))  / ztodt
-            ptend_loc%q(:ncol,:pver,ixcldice) = (state1%q(:ncol,:pver,ixcldice)   -  qiwat(:ncol,:pver))  / ztodt
-            ptend_loc%q(:ncol,:pver,ixnumliq) = (state1%q(:ncol,:pver,ixnumliq)   -  nlwat(:ncol,:pver))  / ztodt
-            ptend_loc%q(:ncol,:pver,ixnumice) = (state1%q(:ncol,:pver,ixnumice)   -  niwat(:ncol,:pver))  / ztodt
-
-            if(l_dribbling_uv_tend) then
-  
-               ptend_loc%u(:ncol,:pver)          = (state1%u(:ncol,:pver) -   uwat(:ncol,:pver))  / ztodt
-               ptend_loc%v(:ncol,:pver)          = (state1%v(:ncol,:pver) -   vwat(:ncol,:pver))  / ztodt
-
-            end if 
-
-           call physics_update(state, ptend_loc, cld_macmic_ztodt)
-
-           !note: physics_update and ptend will not affect omega, update omega in state separately
-           if (l_dribbling_omega_tend) then
-
-             state%omega(:ncol,:pver)     = state%omega(:ncol,:pver)  + &
-                                            (state1%omega(:ncol,:pver)  -   wwat(:ncol,:pver)) / cld_macmic_num_steps
-
-           end if
+           call physics_ptend_copy(ptend_dribble, ptend)
+           call physics_update(state, ptend, cld_macmic_ztodt)
 
         end if 
-        !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
 
         if (l_st_mac) then
 
@@ -2750,59 +2720,50 @@ end if
        prec_str(:ncol) = prec_pcw(:ncol) + prec_sed(:ncol)
        snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
+       !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+
+       if ( l_dribble ) then
+
+          !deallocate the individual ptend_dribble components after the macmic loop
+          call physics_ptend_dealloc(ptend_dribble)
+
+       end if
+
+       if ( l_dribble_tend_into_macmic_loop ) then
+
+         !save swat, qwat, qlwat, qiwat, nlwat, niwat for the next call of tedency dribbling in macmic 
+         ifld = pbuf_get_index('S_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, s_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('T_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, t_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('Q_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, q_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('QL_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, ql_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('QI_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, qi_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('NL_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, nl_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         ifld = pbuf_get_index('NI_After_MACMIC')
+         call pbuf_get_field(pbuf, ifld, ni_after_macmic, start=(/1,1,1/), kount=(/pcols,pver,1/) )
+
+         s_after_macmic(:ncol,:pver)   = state%s(:ncol,:pver)
+         t_after_macmic(:ncol,:pver)   = state%t(:ncol,:pver)
+         q_after_macmic(:ncol,:pver)   = state%q(:ncol,:pver,1)
+         ql_after_macmic(:ncol,:pver)  = state%q(:ncol,:pver,ixcldliq)
+         qi_after_macmic(:ncol,:pver)  = state%q(:ncol,:pver,ixcldice)
+         nl_after_macmic(:ncol,:pver)  = state%q(:ncol,:pver,ixnumliq)
+         ni_after_macmic(:ncol,:pver)  = state%q(:ncol,:pver,ixnumice)
+
+       end if 
+
      end if !microp_scheme
-
-     !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
-     if(l_dribbling_tend_to_clubb_mg2) then
-
-       call cnst_get_ind('CLDLIQ', ixcldliq)
-       call cnst_get_ind('CLDICE', ixcldice)
-       call cnst_get_ind('NUMLIQ', ixnumliq)
-       call cnst_get_ind('NUMICE', ixnumice)
-
-       !save swat, qwat, qlwat, qiwat, nlwat, niwat for the next call of macrophysics
-       itim_old  = pbuf_old_tim_idx()
-
-       ifld = pbuf_get_index('SWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, swat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('UWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, uwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('VWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, vwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('WWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, wwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('QWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, qwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('QLWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, qlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('QIWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, qiwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('NLWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-       ifld = pbuf_get_index('NIWAT_DBL')
-       call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
- 
-       swat(:ncol,:pver)   = state%s(:ncol,:pver)
-       uwat(:ncol,:pver)   = state%u(:ncol,:pver)
-       vwat(:ncol,:pver)   = state%v(:ncol,:pver)
-       wwat(:ncol,:pver)   = state%omega(:ncol,:pver)
-       qwat(:ncol,:pver)   = state%q(:ncol,:pver,1)
-       qlwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldliq)
-       qiwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldice)
-       nlwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumliq)
-       niwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumice)
-
-     end if 
-    !SZhang (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
-
 
 
    if (l_tracer_aero) then

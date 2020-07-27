@@ -2644,22 +2644,16 @@ Do radiative transfer and heating/cooling calculation.
 Default: TRUE
 </entry>
 
-<entry id="l_dribbling_tend_to_clubb_mg2" type="logical" category="physc_test"
+<entry id="l_dribble_tend_into_macmic_loop" type="logical" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
-Do tendency dribbling during CLUBB+MG2 calculation.
+Do tendency dribbling during macmic loop.
 Default: FALSE
 </entry>
 
-<entry id="l_dribbling_uv_tend" type="logical" category="physc_test"
+<entry id="dribble_start_step" type="integer" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
-Do tendency dribblingfor horizontal wind fields during CLUBB+MG2 calculation.
-Default: FALSE
-</entry>
-
-<entry id="l_dribbling_omega_tend" type="logical" category="physc_test"
-       group="phys_ctl_nl" valid_values="" >
-Do tendency dribbling for pressure vertical velocity during CLUBB+MG2 calculation.
-Default: FALSE
+Start step of the tendency dribbling during macmic loop.
+Default: 1
 </entry>
 
 
