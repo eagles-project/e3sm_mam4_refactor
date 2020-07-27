@@ -120,7 +120,7 @@ subroutine phys_register
     !            A. Gettelman, Nov 2010 - put micro/macro physics into separate routines
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer,     only: pbuf_init_time, dyn_time_lvls
+    use physics_buffer,     only: pbuf_init_time
     use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use spmd_utils,         only: masterproc
@@ -2456,13 +2456,12 @@ end if
 
        !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
        l_dribble = l_dribble_tend_into_macmic_loop .and. ( nstep .ge. dribble_start_step )
+       call cnst_get_ind('CLDLIQ', ixcldliq)
+       call cnst_get_ind('CLDICE', ixcldice)
+       call cnst_get_ind('NUMLIQ', ixnumliq)
+       call cnst_get_ind('NUMICE', ixnumice)
 
        if ( l_dribble ) then
-
-          call cnst_get_ind('CLDLIQ', ixcldliq)
-          call cnst_get_ind('CLDICE', ixcldice)
-          call cnst_get_ind('NUMLIQ', ixnumliq)
-          call cnst_get_ind('NUMICE', ixnumice)
 
           !Extract the variables in previous time step that are saved for the
           !caculation of dribbling  tendencies 
