@@ -88,7 +88,7 @@ module advance_clubb_core_module
 #ifdef CLUBB_CAM
                qclvar, thlprcp_out, &                                            ! intent(out)
 #endif
-               pdf_params, thfrq_lt, thfrq_ge )                                  ! intent(out)
+               pdf_params )                                  ! intent(out)
 
     ! Description:
     !   Subroutine to advance the model one timestep
@@ -512,10 +512,6 @@ module advance_clubb_core_module
       rtpthlp, & ! r_t' th_l' (momentum levels)                   [(kg/kg) K]
       wp2,     & ! w'^2 (momentum levels)                         [m^2/s^2]
       wp3        ! w'^3 (thermodynamic levels)                    [m^3/s^3]
-
-    real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
-      thfrq_ge, & ! frequency of thlm1000 - thlm700 >= 20 K
-      thfrq_lt    ! frequency of thlm1000 - thlm700 < 20 K
 
     ! Passive scalar variables
     real( kind = core_rknd ), intent(inout), dimension(gr%nz,sclr_dim) :: &
@@ -2031,12 +2027,12 @@ module advance_clubb_core_module
 				  
       call pvertinterp(gr%nz, p_in_Pa, 70000.0_core_rknd, thlm, thlm700)
       call pvertinterp(gr%nz, p_in_Pa, 100000.0_core_rknd, thlm, thlm1000)			  
+
       if (do_expldiff .and. thlm700 - thlm1000 .lt. 20.0_core_rknd) then
+
         thlm(:) = edsclrm(:,edsclr_dim-1)
 	rtm(:) = edsclrm(:,edsclr_dim)
-        thfrq_lt(:) = 1.0_core_rknd
-      else
-        thfrq_ge(:) = 1.0_core_rknd
+
       endif	
       
       do ixind=1,edsclr_dim

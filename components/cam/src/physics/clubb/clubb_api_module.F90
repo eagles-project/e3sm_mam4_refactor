@@ -461,7 +461,7 @@ contains
 #ifdef CLUBB_CAM
     qclvar, &                                               ! intent(out)
 #endif
-    pdf_params, thfrq_lt, thfrq_ge )                        ! intent(out)
+    pdf_params )                                            ! intent(out)
 
     use advance_clubb_core_module, only : advance_clubb_core
 
@@ -592,10 +592,6 @@ contains
       rcm_in_layer, & ! rcm in cloud layer                              [kg/kg]
       cloud_cover     ! cloud cover                                     [-]
 
-    real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
-      thfrq_ge, & ! frequency of thlm1000 - thlm700 >= 20 K
-      thfrq_lt    ! frequency of thlm1000 - thlm700 < 20 K
-
     type(pdf_parameter), dimension(gr%nz), intent(out) :: &
       pdf_params      ! PDF parameters   [units vary]
 
@@ -665,7 +661,7 @@ contains
 #ifdef CLUBB_CAM
                qclvar, &                                               ! intent(out)
 #endif
-      pdf_params, thfrq_lt, thfrq_ge )                                            ! intent(out)
+      pdf_params )                                            ! intent(out)
   end subroutine advance_clubb_core_api
 
   !================================================================================================

@@ -93,9 +93,6 @@ module physpkg
   logical           :: micro_do_icesupersat
   logical           :: pergro_test_active= .false.
   logical           :: pergro_mods = .false.
-  logical           :: macmic_extra_diag = .false.
-  logical           :: macmic_clubb_diag = .false.
-  logical           :: macmic_mg2_diag   = .false.
   logical           :: is_cmip6_volc !true if cmip6 style volcanic file is read otherwise false
 
   !======================================================================= 
@@ -175,10 +172,8 @@ subroutine phys_register
                       state_debug_checks_out   = state_debug_checks, &
                       micro_do_icesupersat_out = micro_do_icesupersat, &
                       pergro_test_active_out   = pergro_test_active, &
-                      pergro_mods_out          = pergro_mods, &
-                      macmic_extra_diag_out    = macmic_extra_diag, &
-                      macmic_clubb_diag_out    = macmic_clubb_diag, &
-                      macmic_mg2_diag_out      = macmic_mg2_diag)
+                      pergro_mods_out          = pergro_mods)
+
     ! Initialize dyn_time_lvls
     call pbuf_init_time()
 
@@ -358,8 +353,6 @@ subroutine phys_inidat( cam_out, pbuf2d )
     use short_lived_species, only: initialize_short_lived_species
     use comsrf,              only: landm, sgh, sgh30
     use cam_control_mod,     only: aqua_planet
-    use phys_control,        only: phys_getopts
-    use constants_clubb,     only: w_tol_sqd, rt_tol, thl_tol
 
     type(cam_out_t),     intent(inout) :: cam_out(begchunk:endchunk)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -374,14 +367,9 @@ subroutine phys_inidat( cam_out, pbuf2d )
     integer :: tpert_idx, qpert_idx, pblh_idx
 
     logical :: found=.false., found2=.false.
-
-    ! Flag for clubb warm initialization
-    logical :: do_clubb_int
-    logical :: all_clubb_int = .true. !default is true
-
     integer :: ierr
     character(len=8) :: dim1name, dim2name
-    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
+    integer :: ixcldice, ixcldliq
     integer                   :: grid_id  ! grid ID for data mapping
     nullify(tptr,tptr3d,tptr3d_2,cldptr,convptr_3d)
 
@@ -660,243 +648,6 @@ subroutine phys_inidat( cam_out, pbuf2d )
 
     deallocate (tptr3d)
 
-!!read CLUBB warm start initial conditions 
-    call phys_getopts(do_clubb_int_out=do_clubb_int)
-
-    if (do_clubb_int) then 
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='UPWP'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='VPWP'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='WP2_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if 
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='WP3_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='WPTHLP_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='WPRTP_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='RTPTHLP_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='RTP2_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='THLP2_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='UP2_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pverp,begchunk:endchunk))
-      fieldname='VP2_nadv'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'ilev', dim2name, 1, pcols, 1, pverp, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            do n = 1, dyn_time_lvls
-               call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
-            end do
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      allocate(tptr3d(pcols,pver,begchunk:endchunk))
-      fieldname='RAD_CLUBB'
-      m = pbuf_get_index(fieldname,ierr)
-      if (m > 0) then
-         call infld(fieldname, fh_ini, dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
-              tptr3d, found, gridname='physgrid')
-         if(found) then
-            call pbuf_set_field(pbuf2d, m, tptr3d)
-         else
-            all_clubb_int = .false.
-         end if
-       end if
-       deallocate(tptr3d)
-
-      !!warm initialization needs to be done for all of required variables!!!!!!!!!
-      !!if any variables is missing, then set back to CLUBB default initialization!
-      if( .not. all_clubb_int ) then
-       fieldname='UP2_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    w_tol_sqd)
-       fieldname='VP2_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    w_tol_sqd)
-       fieldname='WP2_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    w_tol_sqd)
-       fieldname='RTP2_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    rt_tol**2)
-       fieldname='THLP2_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    thl_tol**2)
-       fieldname='WP3_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='WPTHLP_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='WPRTP_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='RTPTHLP_nadv'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='UPWP'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='VPWP'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-       fieldname='RAD_CLUBB'
-       m = pbuf_get_index(fieldname,ierr)
-       call pbuf_set_field(pbuf2d, m,    0.0_r8)
-      end if 
-
-    end if 
-
     call initialize_short_lived_species(fh_ini, pbuf2d)
 end subroutine phys_inidat
 
@@ -1158,10 +909,8 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     
    !BSINGH -  addfld and adddefault calls for perturb growth testing    
-    if(pergro_test_active) call add_fld_default_calls()
-
-   !SZHANG -  addfld and adddefault calls for CLUBB+MG2 diagnosing    
-    if(macmic_extra_diag)  call add_fld_extra_macmic_calls()
+    if(pergro_test_active)call add_fld_default_calls()
+   
 
 end subroutine phys_init
 
@@ -1608,7 +1357,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
-    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend    
+    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
 
     implicit none
@@ -1822,27 +1571,28 @@ end if ! l_tracer_aero
        call physics_update(state, ptend, ztodt, tend)
 
     else
-    if (l_vdiff) then
 
-       call t_startf('vertical_diffusion_tend')
-       call vertical_diffusion_tend (ztodt ,state ,cam_in%wsx, cam_in%wsy,   &
-            cam_in%shf     ,cam_in%cflx     ,surfric  ,obklen   ,ptend    ,ast    ,&
-            cam_in%ocnfrac  , cam_in%landfrac ,        &
-            sgh30    ,pbuf )
+      if (l_vdiff) then
 
-    !------------------------------------------
-    ! Call major diffusion for extended model
-    !------------------------------------------
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
-       call mspd_intr (ztodt    ,state    ,ptend)
+         call t_startf('vertical_diffusion_tend')
+         call vertical_diffusion_tend (ztodt ,state ,cam_in%wsx, cam_in%wsy,   &
+              cam_in%shf     ,cam_in%cflx     ,surfric  ,obklen   ,ptend    ,ast    ,&
+              cam_in%ocnfrac  , cam_in%landfrac ,        &
+              sgh30    ,pbuf )
+
+      !------------------------------------------
+      ! Call major diffusion for extended model
+      !------------------------------------------
+       if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
+         call mspd_intr (ztodt    ,state    ,ptend)
+       endif
+
+         call physics_update(state, ptend, ztodt, tend)
+         call t_stopf ('vertical_diffusion_tend')
+
+      end if ! l_vdiff
+    
     endif
-
-       call physics_update(state, ptend, ztodt, tend)
-       call t_stopf ('vertical_diffusion_tend')
- 
-    end if ! l_vdiff
-    endif
-
 
 if (l_rayleigh) then
     !===================================================
@@ -2011,14 +1761,6 @@ end if ! l_ac_energy_chk
        endif
     endif
 
-    !===================================================
-    ! Update Nudging values, if needed
-    !===================================================
-    !if((Nudge_Model).and.(Nudge_ON)) then
-    !  call nudging_timestep_tend(state,ptend)
-    !  call physics_update(state,ptend,ztodt,tend)
-    !endif
-
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
          tmp_t, qini, cldliqini, cldiceini)
 
@@ -2076,7 +1818,7 @@ subroutine tphysbc (ztodt,               &
     !-----------------------------------------------------------------------
 
     use physics_buffer,          only : physics_buffer_desc, pbuf_get_field
-    use physics_buffer,          only : pbuf_get_index,  pbuf_old_tim_idx
+    use physics_buffer,          only : pbuf_get_index, pbuf_old_tim_idx
     use physics_buffer,          only : col_type_subcol, dyn_time_lvls
     use shr_kind_mod,    only: r8 => shr_kind_r8
 
@@ -2088,7 +1830,7 @@ subroutine tphysbc (ztodt,               &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
-    use physconst,       only: cpair, latvap, gravit, rga
+    use physconst,       only: rair, cpair, latvap, gravit, rga
     use constituents,    only: pcnst, qmin, cnst_get_ind
     use convect_deep,    only: convect_deep_tend, convect_deep_tend_2, deep_scheme_does_scav_trans
     use time_manager,    only: is_first_step, get_nstep
@@ -2147,26 +1889,6 @@ subroutine tphysbc (ztodt,               &
     !---------------------------Local workspace-----------------------------
     !
 
-    real(r8), pointer, dimension(:,:) :: tmp_npccn     !temporary array for npccn
-    real(r8), pointer, dimension(:,:) :: tmp_alst      !temporary array for ALST
-
-    real(r8) :: tmpnumliq(pcols,pver)          !temporary array for numliq
-    real(r8) :: tmpcldliq(pcols,pver)          !temporary array for cldliq 
-    real(r8) :: tmpnumice(pcols,pver)          !temporary array for numice
-    real(r8) :: tmpcldice(pcols,pver)          !temporary array for cldice
-    real(r8) :: tmpvar(pcols,pver)          !temporary array for temperature
-    real(r8) :: tmpqvapor(pcols,pver)          !temporary array for vapor
-
-    character(200) :: npccnname                !String for npccn name at each sub step
-    character(200) :: numliqname               !String for numliq name at each sub step
-    character(200) :: cldliqname               !String for cldliq name at each sub step
-    character(200) :: numicename               !String for numice name at each sub step
-    character(200) :: cldicename               !String for cldice name at each sub step
-
-    character(200) :: tmpname,qvaporname                  !String for temporal variable name
-    integer :: ixnumliq, ixnumice, ifnpccn,ixqvapor     ! index for tracer number concentration
-    integer :: ifalst                          ! index for liquid cloud fraction alst
-
     type(physics_ptend)   :: ptend            ! indivdual parameterization tendencies
     type(physics_state)   :: state_sc         ! state for sub-columns
     type(physics_ptend)   :: ptend_sc         ! ptend for sub-columns
@@ -2195,7 +1917,7 @@ subroutine tphysbc (ztodt,               &
     integer  i,k,m,ihist                       ! Longitude, level, constituent indices
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
     ! for macro/micro co-substepping
-    integer  :: macmic_it                       ! iteration variables
+    integer :: macmic_it                       ! iteration variables
     real(r8) :: cld_macmic_ztodt               ! modified timestep
 
     ! physics buffer fields to compute tendencies for stratiform package
@@ -2207,7 +1929,6 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:,:) :: tm1   ! intermediate T between n and n-1 time step
     real(r8), pointer, dimension(:,:) :: qm1   ! intermediate q between n and n-1 time step
 !>songxl 2011-09-20----------------------------
-    character(len=16)  :: deep_scheme      ! Default set in phys_control.F90
 
     ! physics buffer fields for total energy and mass adjustment
     real(r8), pointer, dimension(:  ) :: teout
@@ -2304,42 +2025,20 @@ subroutine tphysbc (ztodt,               &
     logical :: l_st_mic
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
-   
-    !SZhang 
-    logical  :: l_dribling_tend                ! flag to turn on tendency dribling in CLUBB+MG2
-    logical  :: l_dribling_uv                  ! flag to turn on tendency dribling in CLUBB+MG2
-    logical  :: l_dribling_w                   ! flag to turn on tendency dribling in CLUBB+MG2
-    logical  :: lu                             ! flag in ptend and physics_update
-    logical  :: lv                             ! for u, v wind update
-    logical  :: ls                             ! flag in ptend and physics_update for dry static energy
-    real(r8) :: rztodt                         ! inverse of time step  
-    real(r8), pointer, dimension(:,:) :: qcwat
-    real(r8), pointer, dimension(:,:) :: lcwat
-    real(r8), pointer, dimension(:,:) :: tcwat
-    real(r8), pointer, dimension(:,:) :: icwat
-    real(r8), pointer, dimension(:,:) :: scwat
-    real(r8), pointer, dimension(:,:) :: nlwat
-    real(r8), pointer, dimension(:,:) :: niwat
-    real(r8), pointer, dimension(:,:) :: ucwat    
-    real(r8), pointer, dimension(:,:) :: vcwat
-    real(r8), pointer, dimension(:,:) :: wcwat
 
-    real(r8):: ttend(pcols,pver)
-    real(r8):: qtend(pcols,pver)
-    real(r8):: ltend(pcols,pver)
-    real(r8):: itend(pcols,pver)
-    real(r8):: stend(pcols,pver)
-    real(r8):: nltend(pcols,pver)
-    real(r8):: nitend(pcols,pver)
-    real(r8):: utend(pcols,pver)
-    real(r8):: vtend(pcols,pver)
-    real(r8):: wtend(pcols,pver)
-    !SZhang
+    !ShixuanZhang & HuiWan: added for extra output before/inside/after macmic loop
+    real(r8), parameter :: p0_thlm = 100000._r8
+    real(r8) :: exner_thlm
+    real(r8) :: thlm(pcols,pver)        ! Mean liquid potential temperature [K]
+    character(200) :: output_name     ! String for temporal variable name
+
+    !real(r8), pointer, dimension(:,:) :: thlm     ! mean liquid potential temperature [K]
+
+    !ShixuanZhang & HuiWan: added for extra output before/inside/after macmic oop
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
-                       deep_scheme_out        = deep_scheme,       &
                        state_debug_checks_out = state_debug_checks &
                       ,l_bc_energy_fix_out    = l_bc_energy_fix    &
                       ,l_dry_adj_out          = l_dry_adj          &
@@ -2347,9 +2046,6 @@ subroutine tphysbc (ztodt,               &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
-                      ,l_dribling_tend_out    = l_dribling_tend    &
-                      ,l_dribling_uv_out      = l_dribling_uv      &
-                      ,l_dribling_w_out       = l_dribling_w       &
                       )
     
     !-----------------------------------------------------------------------
@@ -2414,12 +2110,10 @@ subroutine tphysbc (ztodt,               &
 !   if(trigmem)then
 #ifdef USE_UNICON
 #else
-    if (deep_scheme.eq.'ZM') then
       ifld = pbuf_get_index('TM1')
       call pbuf_get_field(pbuf, ifld, tm1, (/1,1/),(/pcols,pver/))
       ifld = pbuf_get_index('QM1')
       call pbuf_get_field(pbuf, ifld, qm1, (/1,1/),(/pcols,pver/))
-    end if
 #endif
 !   endif
 !>songxl 2011-09-20---------------------------
@@ -2697,7 +2391,7 @@ end if
 
     if( microp_scheme == 'RK' ) then
 
-     if (l_st_mac.or.l_st_mic) then
+     if (l_st_mac) then
        !===================================================
        ! Calculate stratiform tendency (sedimentation, detrain, cloud fraction and microphysics )
        !===================================================
@@ -2727,163 +2421,7 @@ end if
        prec_pcw_macmic = 0._r8
        snow_pcw_macmic = 0._r8
 
-    ! write the liquid cloud fraction before macmic substepping
-    !  if (macmic_extra_diag) then
-    !   write(tmpname,"(A15)") "alstn_bf_macmic"
-    !   ifalst   = pbuf_get_index('ALST')
-    !   call pbuf_get_field(pbuf, ifalst, tmp_alst)
-    !   call outfld(trim(adjustl(tmpname)), tmp_alst, pcols, lchnk)
-    !   !write(tmpname,"(A15)") "alsto_bf_macmic"
-    !   !ifalst   = pbuf_get_index('ALSTO')
-    !   !call pbuf_get_field(pbuf, ifalst, tmp_alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-    !   !call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk) 
-    !   end if  
-
-       if((.not.is_first_step()) .and. l_dribling_tend) then
-               
-        rztodt = 1.0_r8/ztodt
-
-        call cnst_get_ind('CLDLIQ', ixcldliq)
-        call cnst_get_ind('CLDICE', ixcldice)
-        call cnst_get_ind('NUMLIQ', ixnumliq)
-        call cnst_get_ind('NUMICE', ixnumice)
-
-        itim_old  = pbuf_old_tim_idx()        
-
-        ifld = pbuf_get_index('TCWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, tcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ifld = pbuf_get_index('QCWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, qcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ifld = pbuf_get_index('LCWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, lcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ifld = pbuf_get_index('ICWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, icwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-        
-        ifld = pbuf_get_index('SCWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ifld = pbuf_get_index('NLWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ifld = pbuf_get_index('NIWAT_DBL')
-        call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-        ttend(:ncol,:pver)  = (state%t(:ncol,:pver) - tcwat(:ncol,:pver))*rztodt
-        qtend(:ncol,:pver)  = (state%q(:ncol,:pver,1) - qcwat(:ncol,:pver))*rztodt 
-        ltend(:ncol,:pver)  = (state%q(:ncol,:pver,ixcldliq) - lcwat(:ncol,:pver))*rztodt 
-        itend(:ncol,:pver)  = (state%q(:ncol,:pver,ixcldice) - icwat(:ncol,:pver))*rztodt
-        stend(:ncol,:pver)  = (state%s(:ncol,:pver) - scwat(:ncol,:pver))*rztodt ! Tendency of static energy
-        nltend(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - nlwat(:ncol,:pver))*rztodt
-        nitend(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - niwat(:ncol,:pver))*rztodt
-
-        !restore the state variable back to the previous step for tendency dribbling  
-        state%t(:ncol,:pver)          = tcwat(:ncol,:pver)
-        state%q(:ncol,:pver,1)        = qcwat(:ncol,:pver)
-        state%q(:ncol,:pver,ixcldliq) = lcwat(:ncol,:pver) 
-        state%q(:ncol,:pver,ixcldice) = icwat(:ncol,:pver)
-        state%s(:ncol,:pver)          = scwat(:ncol,:pver)
-        state%q(:ncol,:pver,ixnumliq) = nlwat(:ncol,:pver)
-        state%q(:ncol,:pver,ixnumice) = niwat(:ncol,:pver)
-
-        if(l_dribling_uv) then
-         ifld = pbuf_get_index('UCWAT_DBL')
-         call pbuf_get_field(pbuf, ifld, ucwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-         ifld = pbuf_get_index('VCWAT_DBL')
-         call pbuf_get_field(pbuf, ifld, vcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-         utend(:ncol,:pver)  = (state%u(:ncol,:pver) - ucwat(:ncol,:pver))*rztodt
-         vtend(:ncol,:pver)  = (state%v(:ncol,:pver) - vcwat(:ncol,:pver))*rztodt
-
-         state%u(:ncol,:pver) = ucwat(:ncol,:pver)
-         state%v(:ncol,:pver) = vcwat(:ncol,:pver)
-        end if
-
-        if(l_dribling_w) then
-         ifld = pbuf_get_index('WCWAT_DBL')
-         call pbuf_get_field(pbuf, ifld, wcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-         wtend(:ncol,:pver)  = (state%omega(:ncol,:pver) - wcwat(:ncol,:pver))*rztodt
-
-         state%omega(:ncol,:pver) = wcwat(:ncol,:pver)
-        end if
-
-       end if 
-
        do macmic_it = 1, cld_macmic_num_steps
-
-        if((.not.is_first_step()) .and. l_dribling_tend) then
-
-         write (tmpname,"(A16,I2.2)")    "drib_tend_clubb_", macmic_it
-
-         call t_startf(trim(adjustl(tmpname)))
-
-         ! the flag lu,lv,ls,lq is to control whether or not do physics update on the variables 
-         if(l_dribling_uv) then
-          lu = .TRUE.
-          lv = .TRUE.
-         else
-          lu = .FALSE.
-          lv = .FALSE.       
-         end if
-         ls    = .TRUE. 
-         lq(:) = .TRUE.
-         call physics_ptend_init(ptend, state%psetcols, trim(adjustl(tmpname)), ls=ls, lu=lu, lv=lv, lq=lq)
-              ptend%s(:ncol,:pver)          = stend(:ncol,:pver) !T will be changed via s
-              ptend%q(:ncol,:pver,1)        = qtend(:ncol,:pver)
-              ptend%q(:ncol,:pver,ixcldliq) = ltend(:ncol,:pver)
-              ptend%q(:ncol,:pver,ixcldice) = itend(:ncol,:pver)
-              ptend%q(:ncol,:pver,ixnumliq) = nltend(:ncol,:pver)
-              ptend%q(:ncol,:pver,ixnumice) = nitend(:ncol,:pver)
-              if(l_dribling_uv) then
-               ptend%u(:ncol,:pver)         = utend(:ncol,:pver)
-               ptend%v(:ncol,:pver)         = vtend(:ncol,:pver) 
-              endif
-         call physics_update(state, ptend, cld_macmic_ztodt)
-         !note: physics_update and ptend do not have omega, 
-         if(l_dribling_w) then
-          state%omega(:ncol,:pver)     = state%omega(:ncol,:pver)     + wtend(:ncol,:pver)*cld_macmic_ztodt
-         endif
-         call t_stopf(trim(adjustl(tmpname)))
-        end if
-         
-        if (macmic_extra_diag) then
-           !SZhang add output here to diagnose npcc 
-           call cnst_get_ind('Q',ixqvapor)
-           call cnst_get_ind('CLDLIQ',ixcldliq)
-           call cnst_get_ind('CLDICE',ixcldice)
-           call cnst_get_ind('NUMLIQ',ixnumliq)
-           call cnst_get_ind('NUMICE',ixnumice)
-
-           !ifnpccn  = pbuf_get_index('NPCCN')
-           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it
-           write (numliqname,"(A16,I2.2)") "numliq_bf_clubb_", macmic_it
-           write (cldliqname,"(A16,I2.2)") "cldliq_bf_clubb_", macmic_it
-           write (numicename,"(A16,I2.2)") "numice_bf_clubb_", macmic_it
-           write (cldicename,"(A16,I2.2)") "cldice_bf_clubb_", macmic_it
-           write (qvaporname,"(A16,I2.2)") "qvapor_bf_clubb_", macmic_it
-           write (tmpname,"(A14,I2.2)")    "temp_bf_clubb_", macmic_it
-
-!           call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
-           tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
-           tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
-           tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
-           tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-           tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
-           tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
-
-           !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
-           call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
-           call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
-           call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
-           call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
-           call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
-           call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
-
-        end if
 
         if (l_st_mac) then
 
@@ -2893,7 +2431,7 @@ end if
             ! Aerosol Activation
             !===================================================
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
+            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo)
             call t_stopf('microp_aero_run')
 
             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
@@ -2982,57 +2520,15 @@ end if
           endif
 
           call t_stopf('macrop_tend')
+
         end if ! l_st_mac
 
-        if (macmic_extra_diag) then
-           !SZhang add output here to diagnose npcc 
-           call cnst_get_ind('Q',ixqvapor)
-           call cnst_get_ind('CLDLIQ',ixcldliq)
-           call cnst_get_ind('CLDICE',ixcldice)
-           call cnst_get_ind('NUMLIQ',ixnumliq)
-           call cnst_get_ind('NUMICE',ixnumice)
-
-           !ifnpccn  = pbuf_get_index('NPCCN')
-           !write (npccnname, "(A17,I2.2)") "npccn_bf_micaero_", macmic_it
-           write (numliqname,"(A18,I2.2)") "numliq_bf_micaero_", macmic_it
-           write (cldliqname,"(A18,I2.2)") "cldliq_bf_micaero_", macmic_it
-           write (numicename,"(A18,I2.2)") "numice_bf_micaero_", macmic_it
-           write (cldicename,"(A18,I2.2)") "cldice_bf_micaero_", macmic_it
-           write (qvaporname,"(A18,I2.2)") "qvapor_bf_micaero_", macmic_it
-           write (tmpname,"(A16,I2.2)")    "temp_bf_micaero_", macmic_it
-
-           !call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
-           tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
-           tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
-           tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
-           tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-           tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
-           tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
-
-           !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
-           call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
-           call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
-           call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
-           call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
-           call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
-           call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
-
-!           write(tmpname,"(A17,I2.2)") "alstn_bf_micaero_", macmic_it
-!           ifalst   = pbuf_get_index('ALST')
-!           call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!           call outfld(trim(adjustl(tmpname)), tmp_alst, pcols, lchnk)
-!           write(tmpname,"(A17,I2.2)") "alsto_bf_micaero_", macmic_it
-!           !ifalst   = pbuf_get_index('ALSTO')
-!           !call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!           call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk) 
-
-        end if
 
           !===================================================
           ! Calculate cloud microphysics 
           !===================================================
         if (l_st_mic) then
-  
+
           if (is_subcol_on()) then
              ! Allocate sub-column structures. 
              call physics_state_alloc(state_sc, lchnk, psubcols*pcols)
@@ -3046,56 +2542,18 @@ end if
           end if
 
           if (.not. micro_do_icesupersat) then 
-             
+
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
+            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo)
             call t_stopf('microp_aero_run')
 
           endif
-
-          if (macmic_extra_diag) then
-            !SZhang add output here to diagnose npcc
-            !call cnst_get_ind('Q',ixq)
-!            call cnst_get_ind('CLDLIQ',ixcldliq)
-!            call cnst_get_ind('CLDICE',ixcldice)
-!            call cnst_get_ind('NUMLIQ',ixnumliq)
-!            call cnst_get_ind('NUMICE',ixnumice)
-
-            ifnpccn  = pbuf_get_index('NPCCN')
-            write (npccnname, "(A17,I2.2)") "npccn_af_micaero_", macmic_it
-!            write (numliqname,"(A18,I2.2)") "numliq_af_micaero_", macmic_it
-!            write (cldliqname,"(A18,I2.2)") "cldliq_af_micaero_", macmic_it
-!            write (numicename,"(A18,I2.2)") "numice_af_micaero_", macmic_it
-!            write (cldicename,"(A18,I2.2)") "cldice_af_micaero_", macmic_it
-
-            call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
-!            tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq) + ptend_aero%q(:ncol,:pver,ixnumliq)*cld_macmic_ztodt
-!            tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq) + ptend_aero%q(:ncol,:pver,ixcldliq)*cld_macmic_ztodt
-!            tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice) + ptend_aero%q(:ncol,:pver,ixnumice)*cld_macmic_ztodt
-!            tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice) + ptend_aero%q(:ncol,:pver,ixcldice)*cld_macmic_ztodt
-
-            call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
-!            call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
-!            call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
-!            call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
-!            call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
-
-!            write(tmpname,"(A17,I2.2)") "alstn_af_micaero_", macmic_it
-!            ifalst   = pbuf_get_index('ALST')
-!            call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!            call outfld(trim(adjustl(tmpname)), tmp_alst, pcols, lchnk)
-!            write(tmpname,"(A17,I2.2)") "alsto_af_micaero_", macmic_it
-!            !ifalst   = pbuf_get_index('ALSTO')
-!            !call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!            call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk)
-
-          end if          
 
           call t_startf('microp_tend')
 
 
           if (use_subcol_microp) then
-             call microp_driver_tend(state_sc, ptend_sc, macmic_it, cld_macmic_ztodt, pbuf)
+             call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, pbuf)
 
              ! Average the sub-column ptend for use in gridded update - will not contain ptend_aero
              call subcol_ptend_avg(ptend_sc, state_sc%ngrdcol, lchnk, ptend)
@@ -3118,7 +2576,7 @@ end if
              call physics_tend_dealloc(tend_sc)
              call physics_ptend_dealloc(ptend_sc)
           else
-             call microp_driver_tend(state, ptend, macmic_it, cld_macmic_ztodt, pbuf)
+             call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
           end if
           ! combine aero and micro tendencies for the grid
           if (.not. micro_do_icesupersat) then
@@ -3138,7 +2596,8 @@ end if
           call t_stopf('microp_tend')
 
         else
-        ! If microphysics is off, set surface cloud liquid/ice and rain/snow fluxes to zero
+        ! If microphysics is off, set surface cloud liquid/ice and rain/snow
+        ! fluxes to zero
 
           prec_sed = 0._r8
           snow_sed = 0._r8
@@ -3152,50 +2611,6 @@ end if
           prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
-          if (macmic_extra_diag) then
-            !SZhang add output here to diagnose npcc 
-            call cnst_get_ind('Q',ixqvapor)
-            call cnst_get_ind('CLDLIQ',ixcldliq)
-            call cnst_get_ind('CLDICE',ixcldice)
-            call cnst_get_ind('NUMLIQ',ixnumliq)
-            call cnst_get_ind('NUMICE',ixnumice)
-
-           ! ifnpccn  = pbuf_get_index('NPCCN')
-           ! write (npccnname, "(A17,I2.2)") "npccn_af_mg2tend_", macmic_it
-            write (numliqname,"(A18,I2.2)") "numliq_af_mg2tend_", macmic_it
-            write (cldliqname,"(A18,I2.2)") "cldliq_af_mg2tend_", macmic_it
-            write (numicename,"(A18,I2.2)") "numice_af_mg2tend_", macmic_it
-            write (cldicename,"(A18,I2.2)") "cldice_af_mg2tend_", macmic_it
-            write (qvaporname,"(A18,I2.2)") "qvapor_af_mg2tend_", macmic_it
-            write (tmpname,"(A16,I2.2)")    "temp_af_mg2tend_", macmic_it
-
-           ! call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
-            tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
-            tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
-            tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
-            tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-            tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
-            tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
-
-!            call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
-            call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
-            call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
-            call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
-            call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
-            call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
-            call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
-
-!            write(tmpname,"(A17,I2.2)") "alstn_af_mg2tend_", macmic_it
-!            ifalst   = pbuf_get_index('ALST')
-!            call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!            call outfld(trim(adjustl(tmpname)), tmp_alst, pcols, lchnk)
-!            write(tmpname,"(A17,I2.2)") "alsto_af_mg2tend_", macmic_it
-!            !ifalst   = pbuf_get_index('ALSTO')
-!            !call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!            call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk)
-
-          end if
-
        end do ! end substepping over macrophysics/microphysics
 
        prec_sed(:ncol) = prec_sed_macmic(:ncol)/cld_macmic_num_steps
@@ -3205,78 +2620,7 @@ end if
        prec_str(:ncol) = prec_pcw(:ncol) + prec_sed(:ncol)
        snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
-     end if ! l_st_mic
-
-     if(l_dribling_tend) then
-
-     !save tcwat, qcwat, lcwat, icwat for the next call of macrophysics
-     itim_old  = pbuf_old_tim_idx()
-
-     ifld = pbuf_get_index('TCWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, tcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('QCWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, qcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('LCWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, lcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('ICWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, icwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('SCWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, scwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
- 
-     ifld = pbuf_get_index('NLWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, nlwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     ifld = pbuf_get_index('NIWAT_DBL')
-     call pbuf_get_field(pbuf, ifld, niwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-     call cnst_get_ind('CLDLIQ', ixcldliq)
-     call cnst_get_ind('CLDICE', ixcldice)
-     call cnst_get_ind('NUMLIQ', ixnumliq)
-     call cnst_get_ind('NUMICE', ixnumice)
-
-     tcwat(:ncol,:pver)  = state%t(:ncol,:pver)
-     qcwat(:ncol,:pver)  = state%q(:ncol,:pver,1)
-     lcwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldliq)
-     icwat(:ncol,:pver)  = state%q(:ncol,:pver,ixcldice)
-     scwat(:ncol,:pver)  = state%s(:ncol,:pver)
-     nlwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumliq)
-     niwat(:ncol,:pver)  = state%q(:ncol,:pver,ixnumice)
-
-     if(l_dribling_uv) then
-      ifld = pbuf_get_index('UCWAT_DBL')
-      call pbuf_get_field(pbuf, ifld, ucwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-      ifld = pbuf_get_index('VCWAT_DBL')
-      call pbuf_get_field(pbuf, ifld, vcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-      ucwat(:ncol,:pver)  = state%u(:ncol,:pver) 
-      vcwat(:ncol,:pver)  = state%v(:ncol,:pver) 
-     end if
-
-     if(l_dribling_w) then
-      ifld = pbuf_get_index('WCWAT_DBL')
-      call pbuf_get_field(pbuf, ifld, wcwat, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-      wcwat(:ncol,:pver) = state%omega(:ncol,:pver) 
-     end if
-
-     end if 
-
-!    ! write the liquid cloud fraction after macmic substepping
-!     if (macmic_extra_diag) then
-!      write(tmpname,"(A15)") "alstn_af_macmic"
-!      ifalst   = pbuf_get_index('ALST')
-!      call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!      call outfld(trim(adjustl(tmpname)), tmp_alst, pcols, lchnk)
-!      write(tmpname,"(A15)") "alsto_af_macmic"
-!      !ifalst   = pbuf_get_index('ALSTO')
-!      !call pbuf_get_field(pbuf, ifalst, tmp_alst)
-!      call outfld(trim(adjustl(tmpname)), lcldo, pcols, lchnk)     
-!     end if   
+     end if !microp_scheme
 
 if (l_tracer_aero) then
 
@@ -3344,7 +2688,7 @@ if (l_tracer_aero) then
 end if ! l_tracer_aero
 
 !<songxl 2011-9-20---------------------------------
-   if(deep_scheme.eq.'ZM' .and. trigmem)then
+   if(trigmem)then
       do k=1,pver
         qm1(:ncol,k) = state%q(:ncol,k,1)
         tm1(:ncol,k) = state%t(:ncol,k)
@@ -3402,6 +2746,7 @@ if (l_rad) then
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
     call t_stopf('radiation')
+
 
 end if ! l_rad
 
@@ -3461,13 +2806,11 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
   use nudging,             only: Nudge_Model,nudging_timestep_init
-  use seasalt_model,       only: advance_ocean_data, has_mam_mom
 
-  use constituents,        only: cnst_get_ind
+  use seasalt_model,       only: advance_ocean_data, has_mam_mom
 
   implicit none
 
-  integer :: c,ncol,indw   ! indices
   type(physics_state), intent(inout), dimension(begchunk:endchunk) :: phys_state
   type(cam_out_t),     intent(inout), dimension(begchunk:endchunk) :: cam_out
   
@@ -3547,56 +2890,16 @@ subroutine add_fld_default_calls()
   implicit none
 
   !Add all existing ptend names for the addfld calls
-!  character(len=20), parameter :: vlist(27) = (/     'topphysbc           '                       ,&
-!       'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
-!       'momtran             ','zm_conv_tend        ','UWSHCU              ','convect_shallow     ',&
-!       'pcwdetrain_mac      ','macro_park          ','macrop              ','micro_mg            ',&
-!       'cldwat_mic          ','aero_model_wetdep_ma','convtran2           ','cam_radheat         ',&
-!       'chemistry           ','vdiff               ','rayleigh_friction   ','aero_model_drydep_ma',&
-!       'Grav_wave_drag      ','convect_shallow_off ','clubb_ice1          ','clubb_det           ',&
-!       'clubb_ice4          ','clubb_srf           ' /)
+  character(len=20), parameter :: vlist(27) = (/     'topphysbc           '                       ,&
+       'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
+       'momtran             ','zm_conv_tend        ','UWSHCU              ','convect_shallow     ',&
+       'pcwdetrain_mac      ','macro_park          ','macrop              ','micro_mg            ',&
+       'cldwat_mic          ','aero_model_wetdep_ma','convtran2           ','cam_radheat         ',&
+       'chemistry           ','vdiff               ','rayleigh_friction   ','aero_model_drydep_ma',&
+       'Grav_wave_drag      ','convect_shallow_off ','clubb_ice1          ','clubb_det           ',&
+       'clubb_ice4          ','clubb_srf           ' /)
 
-!Add all existing ptend names in e3smv1 for the addfld calls
-  character(len=20), parameter :: vlist(198) = (/ 'topphysbc           ', 'chkenergyfix        ', 'dadadj              ', 'zm_convr            ', 'zm_conv_evap        ',&
-           'momtran             ', 'zm_conv_tend        ', 'convect_shallow_off ', 'convect_shallow     ', 'clubb_ice1_sub01    ', 'clubb_det_sub01     ',&
-           'clubb_ice4_sub01    ', 'micro_mg_sub01      ', 'cldwat_mic_sub01    ', 'clubb_ice1_sub02    ', 'clubb_det_sub02     ',&
-           'clubb_ice4_sub02    ', 'micro_mg_sub02      ', 'cldwat_mic_sub02    ', 'clubb_ice1_sub03    ', 'clubb_det_sub03     ',&
-           'clubb_ice4_sub03    ', 'micro_mg_sub03      ', 'cldwat_mic_sub03    ', 'clubb_ice1_sub04    ', 'clubb_det_sub04     ',&
-           'clubb_ice4_sub04    ', 'micro_mg_sub04      ', 'cldwat_mic_sub04    ', 'clubb_ice1_sub05    ', 'clubb_det_sub05     ',&
-           'clubb_ice4_sub05    ', 'micro_mg_sub05      ', 'cldwat_mic_sub05    ', 'clubb_ice1_sub06    ', 'clubb_det_sub06     ',&
-           'clubb_ice4_sub06    ', 'micro_mg_sub06      ', 'cldwat_mic_sub06    ', 'clubb_ice1_sub07    ', 'clubb_det_sub07     ',&
-           'clubb_ice4_sub07    ', 'micro_mg_sub07      ', 'cldwat_mic_sub07    ', 'clubb_ice1_sub08    ', 'clubb_det_sub08     ',&
-           'clubb_ice4_sub08    ', 'micro_mg_sub08      ', 'cldwat_mic_sub08    ', 'clubb_ice1_sub09    ', 'clubb_det_sub09     ',&
-           'clubb_ice4_sub09    ', 'micro_mg_sub09      ', 'cldwat_mic_sub09    ', 'clubb_ice1_sub10    ', 'clubb_det_sub10     ',&
-           'clubb_ice4_sub10    ', 'micro_mg_sub10      ', 'cldwat_mic_sub10    ', 'clubb_ice1_sub11    ', 'clubb_det_sub11     ',&
-           'clubb_ice4_sub11    ', 'micro_mg_sub11      ', 'cldwat_mic_sub11    ', 'clubb_ice1_sub12    ', 'clubb_det_sub12     ',&
-           'clubb_ice4_sub12    ', 'micro_mg_sub12      ', 'cldwat_mic_sub12    ', 'clubb_ice1_sub13    ', 'clubb_det_sub13     ',&
-           'clubb_ice4_sub13    ', 'micro_mg_sub13      ', 'cldwat_mic_sub13    ', 'clubb_ice1_sub14    ', 'clubb_det_sub14     ',&
-           'clubb_ice4_sub14    ', 'micro_mg_sub14      ', 'cldwat_mic_sub14    ', 'clubb_ice1_sub15    ', 'clubb_det_sub15     ',&
-           'clubb_ice4_sub15    ', 'micro_mg_sub15      ', 'cldwat_mic_sub15    ', 'clubb_ice1_sub16    ', 'clubb_det_sub16     ',&
-           'clubb_ice4_sub16    ', 'micro_mg_sub16      ', 'cldwat_mic_sub16    ', 'clubb_ice1_sub17    ', 'clubb_det_sub17     ',&
-           'clubb_ice4_sub17    ', 'micro_mg_sub17      ', 'cldwat_mic_sub17    ', 'clubb_ice1_sub18    ', 'clubb_det_sub18     ',&
-           'clubb_ice4_sub18    ', 'micro_mg_sub18      ', 'cldwat_mic_sub18    ', 'clubb_ice1_sub19    ', 'clubb_det_sub19     ',&
-           'clubb_ice4_sub19    ', 'micro_mg_sub19      ', 'cldwat_mic_sub19    ', 'clubb_ice1_sub20    ', 'clubb_det_sub20     ',&
-           'clubb_ice4_sub20    ', 'micro_mg_sub20      ', 'cldwat_mic_sub20    ', 'clubb_ice1_sub21    ', 'clubb_det_sub21     ',&
-           'clubb_ice4_sub21    ', 'micro_mg_sub21      ', 'cldwat_mic_sub21    ', 'clubb_ice1_sub22    ', 'clubb_det_sub22     ',&
-           'clubb_ice4_sub22    ', 'micro_mg_sub22      ', 'cldwat_mic_sub22    ', 'clubb_ice1_sub23    ', 'clubb_det_sub23     ',&
-           'clubb_ice4_sub23    ', 'micro_mg_sub23      ', 'cldwat_mic_sub23    ', 'clubb_ice1_sub24    ', 'clubb_det_sub24     ',&
-           'clubb_ice4_sub24    ', 'micro_mg_sub24      ', 'cldwat_mic_sub24    ', 'clubb_ice1_sub25    ', 'clubb_det_sub25     ',&
-           'clubb_ice4_sub25    ', 'micro_mg_sub25      ', 'cldwat_mic_sub25    ', 'clubb_ice1_sub26    ', 'clubb_det_sub26     ',&
-           'clubb_ice4_sub26    ', 'micro_mg_sub26      ', 'cldwat_mic_sub26    ', 'clubb_ice1_sub27    ', 'clubb_det_sub27     ',&
-           'clubb_ice4_sub27    ', 'micro_mg_sub27      ', 'cldwat_mic_sub27    ', 'clubb_ice1_sub28    ', 'clubb_det_sub28     ',&
-           'clubb_ice4_sub28    ', 'micro_mg_sub28      ', 'cldwat_mic_sub28    ', 'clubb_ice1_sub29    ', 'clubb_det_sub29     ',&
-           'clubb_ice4_sub29    ', 'micro_mg_sub29      ', 'cldwat_mic_sub29    ', 'clubb_ice1_sub30    ', 'clubb_det_sub30     ',&
-           'clubb_ice4_sub30    ', 'micro_mg_sub30      ', 'cldwat_mic_sub30    ', 'clubb_ice1_sub31    ', 'clubb_det_sub31     ',&
-           'clubb_ice4_sub31    ', 'micro_mg_sub31      ', 'cldwat_mic_sub31    ', 'clubb_ice1_sub32    ', 'clubb_det_sub32     ',&
-           'clubb_ice4_sub32    ', 'micro_mg_sub32      ', 'cldwat_mic_sub32    ', 'clubb_ice1_sub33    ', 'clubb_det_sub33     ',&
-           'clubb_ice4_sub33    ', 'micro_mg_sub33      ', 'cldwat_mic_sub33    ', 'clubb_ice1_sub34    ', 'clubb_det_sub34     ',&
-           'clubb_ice4_sub34    ', 'micro_mg_sub34      ', 'cldwat_mic_sub34    ', 'clubb_ice1_sub35    ', 'clubb_det_sub35     ',&
-           'clubb_ice4_sub35    ', 'micro_mg_sub35      ', 'cldwat_mic_sub35    ', 'clubb_ice1_sub36    ', 'clubb_det_sub36     ',&
-           'clubb_ice4_sub36    ', 'micro_mg_sub36      ', 'cldwat_mic_sub36    ', 'aero_model_wetdep_ma', 'convtran2           ',&
-           'cam_radheat         ', 'chemistry           ', 'clubb_srf           ', 'rayleigh_friction   ', 'aero_model_drydep_ma',&
-           'Grav_wave_drag      ', 'nudging             ' /)
+
 
   character(len=fieldname_len) :: varname
   character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
@@ -3618,75 +2921,48 @@ subroutine add_fld_default_calls()
 end subroutine add_fld_default_calls
 
 subroutine add_fld_extra_macmic_calls ()
-  !SZHANG -  For adding addfld and add defualt calls
+  !ShixuanZhang & HuiWan -  For adding addfld and add defualt calls for extra output before/inside/after macmic loop
   use cam_history,      only: addfld, add_default, fieldname_len
-  use rad_constituents, only: rad_cnst_get_info  
+  use rad_constituents, only: rad_cnst_get_info
   use phys_control,     only: phys_getopts
+
 
   implicit none
   !Add all existing ptend names for the addfld calls
-  character(len=17), parameter ::vlist(19) = (/ 'npccn_af_micaero ',&
-         'numliq_bf_clubb  ','numliq_bf_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_mg2tend',&
-!        'numliq_bf_reg    ','numliq_af_reg    ','numliq_bf_mix    ','numliq_af_mix    ',&
-!         'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
-!         'wtke             ','wtke_cen         ','alstn_bf_micaero ','alstn_af_micaero ','alstn_af_mg2tend ',&
-!         'alsto_bf_micaero ','alsto_af_micaero ','alsto_af_mg2tend ',
-         'cldliq_bf_clubb  ','qvapor_bf_clubb  ','qvapor_bf_micaero','qvapor_af_mg2tend','cldice_bf_clubb  ',&
-         'numice_bf_clubb  ','numice_bf_micaero','numice_af_mg2tend','cldice_bf_micaero','cldice_af_mg2tend',&
-         'temp_bf_clubb    ','temp_bf_micaero  ','temp_af_mg2tend  '/) 
+  character(len=17), parameter ::vlist(20) = (/'qliq_bf_drib     ','qice_bf_drib     ', 'qvap_bf_drib     ',&
+       'temp_bf_drib     ','thlm_bf_drib     ','qliq_bf_club     ','qice_bf_club     ', 'qvap_bf_club     ',&
+       'temp_bf_club     ','thlm_bf_club     ','qliq_af_club     ','qice_af_club     ', 'qvap_af_club     ',&
+       'temp_af_club     ','thlm_af_club     ','qliq_af_mg2      ','qice_af_mg2      ', 'qvap_af_mg2      ',&
+       'temp_af_mg2      ','thlm_af_mg2      '/)
 
-  character(len=15), parameter :: vlist2(4) = (/ 'alstn_af_macmic'  ,'alstn_bf_macmic', 'alsto_af_macmic'  ,'alsto_bf_macmic'/)  !no substepping variable
-  character(len=17), parameter :: vlist3(2) = (/ 'factnum_mam      ','raerosol_tot_mam '/) !aerosol-related variables
+  character(len=17), parameter ::vlist0(5) = (/'temp_af_rad      ','qvap_af_rad      ', 'qliq_af_rad      ',&
+                                               'qice_af_rad      ','thlm_af_rad      '/)
 
   character(len=fieldname_len) :: varname, substep, modal
-  character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
 
-  integer :: iv, ntot, ihist, it, ip, m,ntot_amode
+  integer :: iv, ntot, it, ip, m
   integer :: cld_macmic_num_steps
 
   call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps)
 
   ntot = size(vlist)
-
   do iv = 1, ntot
-
     do it=1,cld_macmic_num_steps
         write(substep,"(I2.2)")it
-        varname  = trim(adjustl(vlist(iv)))//'_'//trim(adjustl(substep)) ! form variable name  !trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist(iv))) ! form variable name
-
-        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
+        varname  = trim(adjustl(vlist(iv)))//'_'//trim(adjustl(substep))
+        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
         call add_default (trim(adjustl(varname)), 1, ' ')
-    enddo     
+    enddo
   enddo
 
-!  ntot = size(vlist2)
-!
-!  do iv=1,ntot
-!  varname=vlist2(iv)
-!  call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'fraction', 'liquid cloud fraction',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-!  call add_default (trim(adjustl(varname)), 1, ' ')
-!  enddo  
-!  
-! call rad_cnst_get_info(0, nmodes=ntot_amode)
-!
-! ntot = size(vlist3)
-!
-! do iv = 1, ntot
-! 
-!   do it=1,cld_macmic_num_steps
-!     write(substep,"(I2.2)")it
-!
-!     do m=1,ntot_amode
-!      write(modal,"(I2.2)")m
-!      varname  = trim(adjustl(vlist3(iv)))//'_mod'//trim(adjustl(modal))//'_'//trim(adjustl(substep))
-!      call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
-!      call add_default (trim(adjustl(varname)), 1, ' ')
-!     enddo
-!
-!   enddo     
-! enddo
-
+  ntot = size(vlist0)
+  do iv = 1, ntot
+   varname=vlist0(iv)
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_units',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+   call add_default (trim(adjustl(varname)), 1, ' ')
+  enddo
 
 end subroutine add_fld_extra_macmic_calls
+
 
 end module physpkg

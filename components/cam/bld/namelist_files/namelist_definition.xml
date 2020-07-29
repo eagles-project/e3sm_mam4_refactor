@@ -2668,24 +2668,6 @@ Do radiative transfer and heating/cooling calculation.
 Default: TRUE
 </entry>
 
-<entry id="l_dribling_tend" type="logical" category="physc_test"
-       group="phys_ctl_nl" valid_values="" >
-Do dribling tendency during CLUBB+MG2 calculation.
-Default: FALSE
-</entry>
-
-<entry id="l_dribling_uv" type="logical" category="physc_test"
-       group="phys_ctl_nl" valid_values="" >
-Do dribling tendency for uv during CLUBB+MG2 calculation.
-Default: FALSE
-</entry>
-
-<entry id="l_dribling_w" type="logical" category="physc_test"
-       group="phys_ctl_nl" valid_values="" >
-Do dribling tendency for omega during CLUBB+MG2 calculation.
-Default: FALSE
-</entry>
-
 <!-- Physics sub-column switches -->
 
 <entry id="use_subcol_microp" type="logical" category="conv"
@@ -2916,39 +2898,6 @@ This is part of PNNL bug fixes under Polar project.It fixes the
 aerosol regeration bug in ndrop.F90
 Default: .false.
 </entry>
-
-<!-- Added flags to turn off progesses in aerosol activation-->
-<entry id="l_aerosol_mixing" type="logical" category="conv"
-       group="phys_ctl_nl" valid_values="" >
-This is used for test simulations in SciDAC project.It turns off 
-part of the aerosol activation processes in ndrop.F90
-Default: .false.
-</entry>
-
-<!-- Added flags to turn off progesses in aerosol activation-->
-<entry id="l_aerosol_cldgrow" type="logical" category="conv"
-       group="phys_ctl_nl" valid_values="" >
-This is used for test simulations in SciDAC project.It turns off         
-part of the aerosol activation processes in ndrop.F90       
-Default: .true.
-</entry>
-
-<!-- Added flags to turn off progesses in aerosol activation-->
-<entry id="l_aerosol_cldshnk" type="logical" category="conv"
-	group="phys_ctl_nl" valid_values="" >
-This is used for test simulations in SciDAC project.It turns off         
-part of the aerosol activation processes in ndrop.F90	
-Default: .true.
-</entry>
-
-<!-- Added flags to turn off progesses in aerosol activation-->
-<entry id="l_aerosol_oldcld" type="logical" category="conv"
-       group="phys_ctl_nl" valid_values="" >
-This is used for test simulations in SciDAC project.It turns off         
-part of the aerosol activation processes in ndrop.F90       
-Default: .true.
-</entry>
-
 
 <entry id="liqcf_fix" type="logical" category="conv"
        group="phys_ctl_nl" valid_values="" >
@@ -3964,24 +3913,6 @@ Default: .false.
 <entry id="pergro_test_active" type="logical"  category="perturbation"
        group="phys_ctl_nl" valid_values="" >
 switch to turn on code instrumentations for running pergro test
-Default: .false.
-</entry>
-
-<entry id="macmic_extra_diag" type="logical"  category="perturbation"
-       group="phys_ctl_nl" valid_values="" >
-switch to turn on code instrumentations for extra output in physpkg
-Default: .false.
-</entry>
-
-<entry id="macmic_clubb_diag" type="logical"  category="perturbation"
-       group="phys_ctl_nl" valid_values="" >
-switch to turn on code instrumentations for extra output in clubb only
-Default: .false.
-</entry>
-
-<entry id="macmic_mg2_diag" type="logical"  category="perturbation"
-       group="phys_ctl_nl" valid_values="" >
-switch to turn on code instrumentations for extra output in mg2 only 
 Default: .false.
 </entry>
 
