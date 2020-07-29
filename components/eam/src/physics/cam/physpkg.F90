@@ -2502,7 +2502,7 @@ end if
 
           call physics_ptend_init(ptend_dribble, state%psetcols, 'macmic_dribble_tend', ls= .true., lq=lq)
 
-          ptend_dribble%s(:ncol,:pver)          = (state%s(:ncol,:pver)          -   s_after_macmic(:ncol,:pver))  / ztodt
+          ptend_dribble%s(:ncol,:pver)          = cpair * (state%t(:ncol,:pver)  -   t_after_macmic(:ncol,:pver))  / ztodt
           ptend_dribble%q(:ncol,:pver,1)        = (state%q(:ncol,:pver,1)        -   q_after_macmic(:ncol,:pver))  / ztodt
           ptend_dribble%q(:ncol,:pver,ixcldliq) = (state%q(:ncol,:pver,ixcldliq) -  ql_after_macmic(:ncol,:pver))  / ztodt
           ptend_dribble%q(:ncol,:pver,ixcldice) = (state%q(:ncol,:pver,ixcldice) -  qi_after_macmic(:ncol,:pver))  / ztodt
