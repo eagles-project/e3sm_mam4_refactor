@@ -888,7 +888,8 @@ end subroutine clubb_init_cnst
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,     hdtime, &
                               cmfmc,   cam_in,   sgh30, & 
-                              macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
+                              macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o, &
+                              thl_dribble_forcing, rt_dribble_forcing)
 
 !-------------------------------------------------------------------------------
 ! Description: Provide tendencies of shallow convection, turbulence, and 
@@ -959,6 +960,10 @@ end subroutine clubb_init_cnst
    integer,             intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
    integer,             intent(in)    :: macmic_it                ! number of mac-mic iterations
     
+   real(r8),            intent(in)    :: thl_dribble_forcing(pcols,pver)     ! the dribbled tendency of thlm
+   real(r8),            intent(in)    :: rt_dribble_forcing(pcols,pver)      ! the dribbled tendency of rtm 
+
+
    ! ---------------------- !
    ! Input-Output Auguments !
    ! ---------------------- !
@@ -1661,10 +1666,17 @@ end subroutine clubb_init_cnst
          wpedsclrp_sfc(ixind) = 0._r8
       enddo 
 
+      !  Define forcings from CAM to CLUBB for thlm and rtm
+      do k=1,pver
+         thlm_forcing(k+1) = thl_dribble_forcing(i,pver-k+1)
+         rtm_forcing(k+1)  = rt_dribble_forcing(i,pver-k+1)
+      enddo
+      ! Set forcing to zero for the ghost point.
+      thlm_forcing(1) = 0._r8 !thl_forcing(1:ncol,pver)
+      rtm_forcing(1)  = 0._r8 !rt_forcing(1:ncol,pver)
+       
       !  Define forcings from CAM to CLUBB as zero for momentum and thermo,
       !  forcings already applied through CAM
-      thlm_forcing(1:pverp) = 0._r8
-      rtm_forcing(1:pverp)  = 0._r8
       um_forcing(1:pverp)   = 0._r8
       vm_forcing(1:pverp)   = 0._r8
  
