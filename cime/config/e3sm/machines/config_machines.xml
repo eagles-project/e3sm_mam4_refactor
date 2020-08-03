@@ -1349,6 +1349,7 @@
       <env name="MPAS_TOOL_DIR">/projects/ccsm/acme/tools/mpas</env>
       <env name="labeling">-e PMI_LABEL_ERROUT=1</env>
       <env name="SMP_VARS"> </env>
+      <env name="PERL5LIB">/projects/ClimateEnergy_4/ndkeen/perl5</env>
     </environment_variables>
     <environment_variables SMP_PRESENT="TRUE" compiler="intel">
       <env name="SMP_VARS">-e OMP_NUM_THREADS=$ENV{OMP_NUM_THREADS} -e OMP_STACKSIZE=128M -e KMP_AFFINITY=granularity=thread,scatter</env>
@@ -1380,38 +1381,38 @@
         <command name="rm">cray-netcdf-hdf5parallel</command>
         <command name="rm">cray-libsci</command>
         <command name="rm">craype</command>
+        <command name="rm">darshan</command>	
       </modules>
       <modules>
-        <command name="load">archive/0.0.1</command>
-        <command name="load">craype/2.5.12</command>
+        <command name="load">craype/2.6.5</command>
       </modules>
       <modules compiler="intel">
-        <command name="load">intel/18.0.0.128</command>
-        <command name="load">PrgEnv-intel/6.0.4</command>
+        <command name="load">intel/19.1.0.166</command>
+        <command name="load">PrgEnv-intel/6.0.7</command>
       </modules>
       <modules compiler="cray">
-        <command name="load">cce/8.6.2</command>
-        <command name="load">PrgEnv-cray/6.0.4</command>
+        <command name="load">cce/10.0.1</command>
+        <command name="load">PrgEnv-cray/6.0.7</command>
       </modules>
       <modules compiler="gnu">
-        <command name="load">gcc/6.3.0</command>
-        <command name="load">PrgEnv-gnu/6.0.4</command>
+        <command name="load">gcc/9.3.0</command>
+        <command name="load">PrgEnv-gnu/6.0.7</command>
       </modules>
       <modules compiler="!intel">
-        <command name="switch">cray-libsci/17.09.1</command>
+        <command name="switch">cray-libsci/20.06.1</command>
       </modules>
       <modules>
         <command name="load">craype-mic-knl</command>
-        <command name="load">cray-mpich/7.6.2</command>
+        <command name="load">cray-mpich/7.7.14</command>
       </modules>
       <modules mpilib="mpt">
-        <command name="load">cray-netcdf-hdf5parallel/4.4.1.1.3</command>
-        <command name="load">cray-hdf5-parallel/1.10.0.3</command>
-        <command name="load">cray-parallel-netcdf/1.8.1.3</command>
+	<command name="load">cray-netcdf-hdf5parallel/4.7.3.3</command>
+        <command name="load">cray-hdf5-parallel/1.10.6.1</command>
+        <command name="load">cray-parallel-netcdf/1.12.0.1</command>
       </modules>
       <modules mpilib="mpi-serial">
-        <command name="load">cray-hdf5/1.10.0.3</command>
-        <command name="load">cray-netcdf/4.4.1.1.3</command>
+        <command name="load">cray-netcdf/4.7.3.3</command>
+        <command name="load">cray-hdf5/1.10.6.1</command>
       </modules>
     </module_system>
 </machine>
