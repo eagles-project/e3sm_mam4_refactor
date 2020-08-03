@@ -482,42 +482,30 @@
 <entry id="Nudge_Method" type="char*80" category="nudging"
        group="nudging_nl" valid_values="" >
        Method to perform Nudging analyses.
-       Default: none
+       Default: Step
        </entry>
 <entry id="Nudge_Tau" type="real" category="nudging"
        group="nudging_nl" valid_values="" >
-       Method to perform Nudging time scale.
-       Default: none
+       Use user-defined relaxation time scale.
+       Default: -999
        </entry>
-<!-- JS END -->
-
-<!-- SZ ADD -->
-<entry id="Nudge_Data" type="logical" category="nudging"
+<entry id="Nudge_Loc" type="logical" category="nudging"
        group="nudging_nl" valid_values="" >
-       Toggle Generating Nudging Data ON/OFF.
+       Change the location of calculation of nudging tendency to the same location
+       where the nudging data is written out
        Default: FALSE
        </entry>
-<entry id="Nudge_Unam" type="char*80" category="nudging"
+<entry id="Nudge_Curr" type="logical" category="nudging"
        group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "U"
+       Linearly interpolate nudging data to current or future model time step
+       Default: FALSE
        </entry>
-<entry id="Nudge_Vnam" type="char*80" category="nudging"
+<entry id="Num_Slice" type="integer" category="nudging"
        group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "V"
+       Number of time slices per nudging data file; Must be 1 or Nudge_Times_Per_Day
+       Default: 1
        </entry>
-<entry id="Nudge_Tnam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "T"
-       </entry>
-<entry id="Nudge_Qnam" type="char*80" category="nudging"
-       group="nudging_nl" valid_values="" >
-       U-name in Nudging data.
-       Default: "Q"
-       </entry>
-<!-- SZ END -->
+<!-- JS END -->
 
 <!-- Aerosols: Data (CAM version) -->
 
@@ -2666,6 +2654,18 @@ Default: TRUE
        group="phys_ctl_nl" valid_values="" >
 Do radiative transfer and heating/cooling calculation.
 Default: TRUE
+</entry>
+
+<entry id="l_dribble_tend_into_macmic_loop" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Do tendency dribbling during macmic loop.
+Default: FALSE
+</entry>
+
+<entry id="dribble_start_step" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Start step of the tendency dribbling during macmic loop.
+Default: 1
 </entry>
 
 <!-- Physics sub-column switches -->
