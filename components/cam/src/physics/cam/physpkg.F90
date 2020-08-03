@@ -2026,16 +2026,6 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
-    !ShixuanZhang & HuiWan: added for extra output before/inside/after macmic loop
-    real(r8), parameter :: p0_thlm = 100000._r8
-    real(r8) :: exner_thlm
-    real(r8) :: thlm(pcols,pver)        ! Mean liquid potential temperature [K]
-    character(200) :: output_name     ! String for temporal variable name
-
-    !real(r8), pointer, dimension(:,:) :: thlm     ! mean liquid potential temperature [K]
-
-    !ShixuanZhang & HuiWan: added for extra output before/inside/after macmic oop
-
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
@@ -2919,50 +2909,5 @@ subroutine add_fld_default_calls()
   enddo
 
 end subroutine add_fld_default_calls
-
-subroutine add_fld_extra_macmic_calls ()
-  !ShixuanZhang & HuiWan -  For adding addfld and add defualt calls for extra output before/inside/after macmic loop
-  use cam_history,      only: addfld, add_default, fieldname_len
-  use rad_constituents, only: rad_cnst_get_info
-  use phys_control,     only: phys_getopts
-
-
-  implicit none
-  !Add all existing ptend names for the addfld calls
-  character(len=17), parameter ::vlist(20) = (/'qliq_bf_drib     ','qice_bf_drib     ', 'qvap_bf_drib     ',&
-       'temp_bf_drib     ','thlm_bf_drib     ','qliq_bf_club     ','qice_bf_club     ', 'qvap_bf_club     ',&
-       'temp_bf_club     ','thlm_bf_club     ','qliq_af_club     ','qice_af_club     ', 'qvap_af_club     ',&
-       'temp_af_club     ','thlm_af_club     ','qliq_af_mg2      ','qice_af_mg2      ', 'qvap_af_mg2      ',&
-       'temp_af_mg2      ','thlm_af_mg2      '/)
-
-  character(len=17), parameter ::vlist0(5) = (/'temp_af_rad      ','qvap_af_rad      ', 'qliq_af_rad      ',&
-                                               'qice_af_rad      ','thlm_af_rad      '/)
-
-  character(len=fieldname_len) :: varname, substep, modal
-
-  integer :: iv, ntot, it, ip, m
-  integer :: cld_macmic_num_steps
-
-  call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps)
-
-  ntot = size(vlist)
-  do iv = 1, ntot
-    do it=1,cld_macmic_num_steps
-        write(substep,"(I2.2)")it
-        varname  = trim(adjustl(vlist(iv)))//'_'//trim(adjustl(substep))
-        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-        call add_default (trim(adjustl(varname)), 1, ' ')
-    enddo
-  enddo
-
-  ntot = size(vlist0)
-  do iv = 1, ntot
-   varname=vlist0(iv)
-   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_units',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-   call add_default (trim(adjustl(varname)), 1, ' ')
-  enddo
-
-end subroutine add_fld_extra_macmic_calls
-
 
 end module physpkg
