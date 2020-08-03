@@ -2538,15 +2538,13 @@ end if
             rt_dribble_forcing(:ncol,:pver)     =  (state%q(:ncol,:pver,1)        -  q_after_macmic(:ncol,:pver)   ) / ztodt  &
                                                   +(state%q(:ncol,:pver,ixcldliq) -  ql_after_macmic(:ncol,:pver)  ) / ztodt
 
-            !recalculate the tendency of dry static energy that is only associated with thlm
-            !ptend_dribble%s(:ncol,:pver)        = cpair*( ((thlm(:ncol,:pver) + (latvap/cpair)*state%q(:ncol,:pver,ixcldliq))        &
-            !                                      - (thlm_after_macmic(:ncol,:pver) + (latvap/cpair)*ql_after_macmic(:ncol,:pver)) ) &
-            !                                      * ((state%pmid(:ncol,:pver)/p_reference)**(rair/cpair)) )           / ztodt
+            !Deduct the dribbled tendency from the tend, otherwise it will be double counted
+            tend%dtdt(:ncol,:pver)              = tend%dtdt(:ncol,:pver) - &
+                                                            (state%t(:ncol,:pver) -   t_after_macmic(:ncol,:pver))   / ztodt
 
           end if
 
-          !Restore the state variable back to the previous step as that is the
-          !start point for tendency dribbling  
+          !Restore the state variable back to the previous step as that is the start point for tendency dribbling  
           state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
           state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
           state%q(:ncol,:pver,1)        =  q_after_macmic(:ncol,:pver)
@@ -2556,6 +2554,13 @@ end if
           state%q(:ncol,:pver,ixnumice) = ni_after_macmic(:ncol,:pver)
 
           if ( dribble_tend_into_macmic_loop == 2 ) then
+
+            ! the state for dry static energy should include the geopotential from dynamics
+            do i = 1, ncol
+              do k=1,pver
+                 state%s(i,k)           = cpair*t_after_macmic(i,k) + gravit*state%zm(i,k)+state%phis(i)
+              end do
+            enddo
 
             !Ensure consistency of dry static energy, temperature and geopential height
             call physics_ptend_copy(ptend_dribble, ptend)
@@ -2568,9 +2573,6 @@ end if
             ptend_dribble%ls           = .false.
             ptend_dribble%lq(1)        = .false.
             ptend_dribble%lq(ixcldliq) = .false.
-
-            !Deduct the dribbled tendency from the "tend", otherwise it will be double counted
-            tend%dtdt(:ncol,:pver)          = tend%dtdt(:ncol,:pver) - ptend_dribble%s(:ncol,:pver)/cpair
 
           end if 
 
