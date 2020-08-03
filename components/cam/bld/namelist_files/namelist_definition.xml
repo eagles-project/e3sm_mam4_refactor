@@ -2656,10 +2656,10 @@ Do radiative transfer and heating/cooling calculation.
 Default: TRUE
 </entry>
 
-<entry id="l_dribble_tend_into_macmic_loop" type="logical" category="physc_test"
+<entry id="dribble_tend_into_macmic_loop" type="integer" category="physc_test"
        group="phys_ctl_nl" valid_values="" >
-Do tendency dribbling during macmic loop.
-Default: FALSE
+Options for tendency dribbling during macmic loop.
+Default: 0
 </entry>
 
 <entry id="dribble_start_step" type="integer" category="physc_test"
