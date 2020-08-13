@@ -35,6 +35,12 @@ if (NOT HAS_SAMXX EQUAL -1)
   set(USE_SAMXX TRUE)
 endif()
 
+string(FIND "${CAM_CONFIG_OPTS}" "-rrtmgpxx" HAS_RRTMGPXX)
+if (NOT HAS_RRTMGPXX EQUAL -1)
+  # The following is for the RRTMGPXX code:
+  set(USE_RRTMGPXX TRUE)
+endif()
+
 # If samxx is being used, then YAKL must be used as well
 set(USE_YAKL ${USE_SAMXX})
 
