@@ -66,6 +66,7 @@ OPTIONS
      -ice_bgc              check for coupling with sea ice BGC
      -ntasks_ocn           NTASKS_OCN for this case
      -ninst_ocn            NINST_OCN for this case
+     -input_path           path to input data
 
 NOTE: The precedence for setting the values of namelist variables is (highest to lowest):
       1. namelist values set by specific command-line options, i.e. (none right now)
@@ -117,6 +118,7 @@ my %opts = ( help          => 0,
              cfg_dir       => $cfgdir,
              ntasks_ocn    => 0,
              ninst_ocn     => 0,
+             input_path    => undef,
            );
 
 GetOptions(
@@ -141,6 +143,7 @@ GetOptions(
     "cfg_dir=s"       => \$opts{'cfg_dir'},
     "ntasks_ocn=i"    => \$opts{'ntasks_ocn'},
     "ninst_ocn=i"     => \$opts{'ninst_ocn'},
+    "input_path=s"    => \$opts{'input_path'},
     "preview"         => \$opts{'preview'},
 )  or usage();
 
@@ -181,6 +184,7 @@ my $atm_co2_const_val = $opts{'atm_co2_const_val'};
 my $ice_bgc       = $opts{'ice_bgc'};
 my $NINST_OCN     = $opts{'ninst_ocn'};
 my $NTASKS_OCN    = $opts{'ntasks_ocn'};
+my $input_path    = $opts{'input_path'};
 $cfgdir           = $opts{'cfg_dir'};
 
 my $CIMEROOT;
@@ -493,7 +497,7 @@ add_default($nl, 'config_pio_stride');
 #################################
 
 add_default($nl, 'config_num_halos');
-add_default($nl, 'config_block_decomp_file_prefix', 'val'=>"'${DIN_LOC_ROOT}/ocn/mpas-o/${OCN_GRID}/${decomp_prefix}${date_stamp}.part.'");
+add_default($nl, 'config_block_decomp_file_prefix', 'val'=>"'${input_path}/${decomp_prefix}${date_stamp}.part.'");
 add_default($nl, 'config_number_of_blocks');
 add_default($nl, 'config_explicit_proc_decomp');
 add_default($nl, 'config_proc_decomp_file_prefix');
@@ -1565,7 +1569,7 @@ print $input_list "graph$NTASKS_OCN = $block_decomp_file\n";
 $input_list->close;
 
 # Write input dataset list.
-check_input_files($DIN_LOC_ROOT, "$CASEBUILD/mpaso.input_data_list");
+check_input_files($input_path, "$CASEBUILD/mpaso.input_data_list");
 
 #-----------------------------------------------------------------------------------------------
 # END OF MAIN SCRIPT

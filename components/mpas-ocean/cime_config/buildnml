@@ -205,6 +205,22 @@ def buildnml(case, caseroot, compname):
         decomp_prefix += 'mpas-o.graph.info.'
         restoring_file += 'sss.monthlyClimatology.PHC2_salx.2004_08_03.ARRM60to6.190214.nc'
         analysis_mask_file += 'ARRM60to6_SingleRegionAtlanticWTransportTransects_masks.nc'
+    elif ocn_grid == 'EC30to60E2r2':
+        ic_date += '200717'
+        ic_prefix += 'ocean.EC30to60E2r2'
+        decomp_date += '200717'
+        decomp_prefix += 'mpas-o.graph.info.'
+        restoring_file += 'sss.PHC2_monthlyClimatology.EC30to60E2r2.200720.nc'
+    elif ocn_grid == 'EC30to60E2r2_ICG':
+        ic_date += '200813'
+        ic_prefix += 'mpaso.EC30to60E2r2.rstFromG-anvil'
+        decomp_date += '200813'
+        decomp_prefix += 'mpas-o.graph.info.'
+    elif ocn_grid == 'EC30to60E2r2-1900_ICG':
+        ic_date += '200813'
+        ic_prefix += 'mpaso.EC30to60E2r2-1900.rstFromG-anvil'
+        decomp_date += '200813'
+        decomp_prefix += 'mpas-o.graph.info.'
 
     #--------------------------------------------------------------------
     # Set OCN_FORCING = datm_forced_restoring if restoring file is available
@@ -220,8 +236,13 @@ def buildnml(case, caseroot, compname):
     # Set the initial file, changing to a restart file for branch and hybrid runs
     # Note: this is not setup for multiple instances
     #--------------------------------------------------------------------
+    din_loc_root_override = '/qfs/people/wolf966/EC30to60E2r2'
+    if din_loc_root_override != '':
+        input_path = "{}".format(din_loc_root_override)
+    else:
+        input_path = "{}/ocn/mpas-o/{}".format(din_loc_root, ocn_mask)
 
-    input_file = "{}/ocn/mpas-o/{}/{}.{}.nc".format(din_loc_root, ocn_mask, ic_prefix, ic_date)
+    input_file = "{}/{}.{}.nc".format(input_path, ic_prefix, ic_date)
     if run_type == 'hybrid' or run_type == 'branch':
         input_file = "{}/mpaso.rst.{}_{}.nc".format(rundir, run_refdate, run_reftod)
         expect(os.path.exists(input_file), "ERROR mpaso buildnml: missing specified restart file for branch or hybrid run: " + input_file)
@@ -232,16 +253,16 @@ def buildnml(case, caseroot, compname):
 
     with open(os.path.join(casebuild, "mpaso.input_data_list"), "w") as input_list:
 
-        input_list.write("mesh = {}/ocn/mpas-o/{}/{}.{}.nc\n".format(din_loc_root, ocn_mask, ic_prefix, ic_date))
+        input_list.write("mesh = {}/{}.{}.nc\n".format(input_path, ic_prefix, ic_date))
         input_list.write("ic = {}\n".format(input_file))
         if analysis_mask_file != '':
-            input_list.write("moc = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, analysis_mask_file))
+            input_list.write("moc = {}/{}\n".format(input_path, analysis_mask_file))
 
         if ocn_forcing == 'datm_forced_restoring':
-            input_list.write("sss = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, restoring_file))
+            input_list.write("sss = {}/{}\n".format(input_path, restoring_file))
 
         if eco_forcing_file != '':
-            input_list.write("eco_forcing = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, eco_forcing_file))
+            input_list.write("eco_forcing = {}/{}\n".format(input_path, eco_forcing_file))
 
     #--------------------------------------------------------------------
     # Invoke mpas build-namelist - output will go in $CASEBUILD/mpasoconf
@@ -295,6 +316,7 @@ def buildnml(case, caseroot, compname):
         sysmod += " -ice_bgc '{}'".format(ice_bgc)
         sysmod += " -ntasks_ocn '{}'".format(ntasks_ocn)
         sysmod += " -ninst_ocn '{}'".format(ninst_ocn_real)
+        sysmod += " -input_path '{}'".format(input_path)
         # pass in OCN_MASK for now as a short-cut for the grid
         # at some point, we may want to pass both -- but for now this is simpler
 
@@ -324,7 +346,7 @@ def buildnml(case, caseroot, compname):
         else:
             lines.append('                  io_type="{}"'.format(ocn_pio_typename))
 
-        lines.append('                  filename_template="{}/ocn/mpas-o/{}/{}.{}.nc"'.format(din_loc_root, ocn_mask, ic_prefix, ic_date))
+        lines.append('                  filename_template="{}/{}.{}.nc"'.format(input_path, ic_prefix, ic_date))
         lines.append('/>')
         lines.append('<immutable_stream name="input"')
         lines.append('                  type="input"')
@@ -467,7 +489,7 @@ def buildnml(case, caseroot, compname):
             lines.append('<stream name="surface_salinity_monthly_data"')
             lines.append('       type="input"')
             lines.append('       io_type="{}"'.format(ocn_pio_typename))
-            lines.append('       filename_template="{}/ocn/mpas-o/{}/{}"'.format(din_loc_root, ocn_mask, restoring_file))
+            lines.append('       filename_template="{}/{}"'.format(input_path, restoring_file))
             lines.append('       input_interval="none"')
             lines.append('       packages="activeTracersSurfaceRestoringPKG">')
             lines.append('')
@@ -480,7 +502,7 @@ def buildnml(case, caseroot, compname):
             lines.append('<stream name="transectMasksInput"')
             lines.append('        type="input"')
             lines.append('        io_type="{}"'.format(ocn_pio_typename))
-            lines.append('        filename_template="{}/ocn/mpas-o/{}/{}"'.format(din_loc_root, ocn_mask, analysis_mask_file))
+            lines.append('        filename_template="{}/{}"'.format(input_path, analysis_mask_file))
             lines.append('        input_interval="initial_only">')
             lines.append('')
             lines.append('        <var name="transectEdgeMasks"/>')
@@ -494,7 +516,7 @@ def buildnml(case, caseroot, compname):
             lines.append('<stream name="regionalMasksInput"')
             lines.append('        type="input"')
             lines.append('        io_type="{}"'.format(ocn_pio_typename))
-            lines.append('        filename_template="{}/ocn/mpas-o/{}/{}"'.format(din_loc_root, ocn_mask, analysis_mask_file))
+            lines.append('        filename_template="{}/{}"'.format(input_path, analysis_mask_file))
             lines.append('        input_interval="initial_only">')
             lines.append('')
             lines.append('        <var name="regionCellMasks"/>')
@@ -1284,7 +1306,7 @@ def buildnml(case, caseroot, compname):
             lines.append('<stream name="ecosys_monthly_flux"')
             lines.append('        type="input"')
             lines.append('        io_type="{}"'.format(ocn_pio_typename))
-            lines.append('        filename_template="{}/ocn/mpas-o/{}/{}"'.format(din_loc_root, ocn_mask, eco_forcing_file))
+            lines.append('        filename_template="{}/{}"'.format(input_path, eco_forcing_file))
             lines.append('        input_interval="none"')
             lines.append('        packages="ecosysTracersPKG">')
             lines.append('    <var name="xtime"/>')
