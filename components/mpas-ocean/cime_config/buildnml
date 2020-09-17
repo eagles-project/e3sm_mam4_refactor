@@ -231,6 +231,27 @@ def buildnml(case, caseroot, compname):
         decomp_date += '200904'
         decomp_prefix += 'mpas-o.graph.info.'
         analysis_mask_file += 'EC30to60E2r2_moc_masks_and_transects.nc'
+    elif ocn_grid == 'ECwISC30to60E2r1':
+        ic_date += '200916'
+        ic_prefix += 'ocean.ECwISC30to60E2r1'
+        decomp_date += '200915'
+        decomp_prefix += 'mpas-o.graph.info.'
+        restoring_file += 'sss.PHC2_monthlyClimatology.ECwISC30to60E2r1.200917.nc'
+        analysis_mask_file += 'ECwISC30to60E2r1_moc_masks_and_transects.nc'
+    elif ocn_grid == 'ECwISC30to60E2r1_ICG':
+        ic_date += '200916'
+        ic_prefix += 'ocean.ECwISC30to60E2r1'
+        decomp_date += '200915'
+        decomp_prefix += 'mpas-o.graph.info.'
+        restoring_file += 'sss.PHC2_monthlyClimatology.ECwISC30to60E2r1.200917.nc'
+        analysis_mask_file += 'ECwISC30to60E2r1_moc_masks_and_transects.nc'
+    elif ocn_grid == 'ECwISC30to60E2r1-1900_ICG':
+        ic_date += '200916'
+        ic_prefix += 'ocean.ECwISC30to60E2r1'
+        decomp_date += '200915'
+        decomp_prefix += 'mpas-o.graph.info.'
+        restoring_file += 'sss.PHC2_monthlyClimatology.ECwISC30to60E2r1.200917.nc'
+        analysis_mask_file += 'ECwISC30to60E2r1_moc_masks_and_transects.nc'
 
     #--------------------------------------------------------------------
     # Set OCN_FORCING = datm_forced_restoring if restoring file is available
@@ -258,13 +279,13 @@ def buildnml(case, caseroot, compname):
 
     with open(os.path.join(casebuild, "mpaso.input_data_list"), "w") as input_list:
 
-        input_list.write("mesh = {}/ocn/mpas-o/{}/{}.{}.nc\n".format(din_loc_root, ocn_mask, ic_prefix, ic_date))
-        input_list.write("ic = {}\n".format(input_file))
-        if analysis_mask_file != '':
-            input_list.write("moc = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, analysis_mask_file))
+#        input_list.write("mesh = {}/ocn/mpas-o/{}/{}.{}.nc\n".format(din_loc_root, ocn_mask, ic_prefix, ic_date))
+#        input_list.write("ic = {}\n".format(input_file))
+#        if analysis_mask_file != '':
+#            input_list.write("moc = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, analysis_mask_file))
 
-        if ocn_forcing == 'datm_forced_restoring':
-            input_list.write("sss = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, restoring_file))
+#        if ocn_forcing == 'datm_forced_restoring':
+#            input_list.write("sss = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, restoring_file))
 
         if eco_forcing_file != '':
             input_list.write("eco_forcing = {}/ocn/mpas-o/{}/{}\n".format(din_loc_root, ocn_mask, eco_forcing_file))
