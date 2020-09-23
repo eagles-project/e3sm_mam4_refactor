@@ -7975,8 +7975,9 @@
           <rootpe_ocn>1368</rootpe_ocn>
           <rootpe_cpl>0</rootpe_cpl>
         </rootpe>
-	  </pes>
-	</mach>
+       </pes>
+      </mach>
+     </grid>
   <grid name="a%ne30np4.pg2_l%.+_oi%ECwISC30to60E2r1">
 	<mach name="anvil">
 	  <pes compset=".*CAM5.+CLM45.+MPASSI.+MPASO.+MOSART.+" pesize="M">
