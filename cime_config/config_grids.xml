@@ -3142,7 +3142,7 @@
 
     <gridmap atm_grid="ne30np4.pg2" ocn_grid="ECwISC30to60E2r1_ICG">
       <map name="ATM2OCN_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
-      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-mono.200916.nc</map>
+      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
       <map name="ATM2OCN_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-nomask_bilin.200916.nc</map>
       <map name="OCN2ATM_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
       <map name="OCN2ATM_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
@@ -3150,7 +3150,7 @@
 
     <gridmap atm_grid="ne30np4.pg2" ocn_grid="ECwISC30to60E2r1-1900_ICG">
       <map name="ATM2OCN_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
-      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-mono.200916.nc</map>
+      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
       <map name="ATM2OCN_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-nomask_bilin.200916.nc</map>
       <map name="OCN2ATM_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
       <map name="OCN2ATM_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
@@ -3158,7 +3158,7 @@
 
     <gridmap atm_grid="ne30np4.pg2" ocn_grid="ECwISC30to60E2r1">
       <map name="ATM2OCN_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
-      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-mono.200916.nc</map>
+      <map name="ATM2OCN_VMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1_mono.200916.nc</map>
       <map name="ATM2OCN_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ne30pg2_to_ECwISC30to60E2r1-nomask_bilin.200916.nc</map>
       <map name="OCN2ATM_FMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
       <map name="OCN2ATM_SMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_ECwISC30to60E2r1-nomask_to_ne30pg2_mono.200916.nc</map>
@@ -4410,6 +4410,16 @@
     </gridmap>
 
     <gridmap ocn_grid="ECwISC30to60E2r1" rof_grid="r05">
+      <map name="ROF2OCN_ICE_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
+      <map name="ROF2OCN_LIQ_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
+    </gridmap>
+
+    <gridmap ocn_grid="ECwISC30to60E2r1_ICG" rof_grid="r05">
+      <map name="ROF2OCN_ICE_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
+      <map name="ROF2OCN_LIQ_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
+    </gridmap>
+
+    <gridmap ocn_grid="ECwISC30to60E2r1-1900_ICG" rof_grid="r05">
       <map name="ROF2OCN_ICE_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
       <map name="ROF2OCN_LIQ_RMAPNAME">/home/ac.dcomeau/cryo/ECwISC30to60E2r1/map_r05_to_ECwISC30to60E2r1_smoothed.r150e300.200916.nc</map>
     </gridmap>
