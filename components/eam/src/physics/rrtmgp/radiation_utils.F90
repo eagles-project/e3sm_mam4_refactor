@@ -8,7 +8,9 @@ module radiation_utils
 
    public :: compress_day_columns, expand_day_columns, &
              calculate_heating_rate, clip_values, &
-             handle_error, fluxes_t, initialize_fluxes
+             handle_error, &
+             fluxes_t, initialize_fluxes, reset_fluxes, free_fluxes, &
+             expand_day_fluxes
 
    ! Interface blocks for overloaded procedures
    interface compress_day_columns
@@ -98,6 +100,56 @@ contains
       if (allocated(fluxes%bnd_flux_dn_dir)) fluxes%bnd_flux_dn_dir(:,:,:) = 0._r8
 
    end subroutine reset_fluxes
+   !-------------------------------------------------------------------------------
+   subroutine free_fluxes(fluxes)
+      type(fluxes_t), intent(inout) :: fluxes
+      if (allocated(fluxes%flux_up)) deallocate(fluxes%flux_up)
+      if (allocated(fluxes%flux_dn)) deallocate(fluxes%flux_dn)
+      if (allocated(fluxes%flux_net)) deallocate(fluxes%flux_net)
+      if (allocated(fluxes%flux_dn_dir)) deallocate(fluxes%flux_dn_dir)
+      if (allocated(fluxes%bnd_flux_up)) deallocate(fluxes%bnd_flux_up)
+      if (allocated(fluxes%bnd_flux_dn)) deallocate(fluxes%bnd_flux_dn)
+      if (allocated(fluxes%bnd_flux_net)) deallocate(fluxes%bnd_flux_net)
+      if (allocated(fluxes%bnd_flux_dn_dir)) deallocate(fluxes%bnd_flux_dn_dir)
+   end subroutine free_fluxes
+   !-------------------------------------------------------------------------------
+   subroutine expand_day_fluxes(daytime_fluxes, expanded_fluxes, day_indices)
+      type(fluxes_t), intent(in) :: daytime_fluxes
+      type(fluxes_t), intent(inout) :: expanded_fluxes
+      integer, intent(in) :: day_indices(:)
+      integer :: nday, iday, icol
+
+      ! Reset fluxes in expanded_fluxes object to zero
+      call reset_fluxes(expanded_fluxes)
+
+      ! Number of daytime columns is number of indices greater than zero
+      nday = count(day_indices > 0)
+
+      ! Loop over daytime indices and map daytime fluxes into expanded arrays
+      do iday = 1,nday
+
+         ! Map daytime index to proper column index
+         icol = day_indices(iday)
+
+         ! Expand broadband fluxes
+         expanded_fluxes%flux_up(icol,:) = daytime_fluxes%flux_up(iday,:)
+         expanded_fluxes%flux_dn(icol,:) = daytime_fluxes%flux_dn(iday,:)
+         expanded_fluxes%flux_net(icol,:) = daytime_fluxes%flux_net(iday,:)
+         if (allocated(daytime_fluxes%flux_dn_dir)) then
+            expanded_fluxes%flux_dn_dir(icol,:) = daytime_fluxes%flux_dn_dir(iday,:)
+         end if
+
+         ! Expand band-by-band fluxes
+         expanded_fluxes%bnd_flux_up(icol,:,:) = daytime_fluxes%bnd_flux_up(iday,:,:)
+         expanded_fluxes%bnd_flux_dn(icol,:,:) = daytime_fluxes%bnd_flux_dn(iday,:,:)
+         expanded_fluxes%bnd_flux_net(icol,:,:) = daytime_fluxes%bnd_flux_net(iday,:,:)
+         if (allocated(daytime_fluxes%bnd_flux_dn_dir)) then
+            expanded_fluxes%bnd_flux_dn_dir(icol,:,:) = daytime_fluxes%bnd_flux_dn_dir(iday,:,:)
+         end if
+
+      end do
+
+   end subroutine expand_day_fluxes
    !-------------------------------------------------------------------------------
    subroutine compress_day_columns_1d(xcol, xday, day_indices)
 

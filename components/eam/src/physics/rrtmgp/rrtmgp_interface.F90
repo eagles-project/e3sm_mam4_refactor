@@ -39,7 +39,7 @@ module rrtmgp_interface
       get_min_temperature, get_max_temperature, &
       initialize_rrtmgp_fluxes, free_fluxes, &
       free_optics_sw, free_optics_lw, reset_fluxes, &
-      set_gas_concentrations, expand_day_fluxes
+      set_gas_concentrations
 
 contains
 
@@ -406,48 +406,6 @@ contains
          end do
       end do
    end subroutine compress_optics_sw
-
-
-   subroutine expand_day_fluxes(daytime_fluxes, expanded_fluxes, day_indices)
-      use mo_rte_kind, only: wp
-      use mo_fluxes_byband, only: ty_fluxes_byband
-      type(ty_fluxes_byband), intent(in) :: daytime_fluxes
-      type(ty_fluxes_byband), intent(inout) :: expanded_fluxes
-      integer, intent(in) :: day_indices(:)
-
-      integer :: nday, iday, icol
-
-      ! Reset fluxes in expanded_fluxes object to zero
-      call reset_fluxes(expanded_fluxes)
-
-      ! Number of daytime columns is number of indices greater than zero
-      nday = count(day_indices > 0)
-
-      ! Loop over daytime indices and map daytime fluxes into expanded arrays
-      do iday = 1,nday
-
-         ! Map daytime index to proper column index
-         icol = day_indices(iday)
-
-         ! Expand broadband fluxes
-         expanded_fluxes%flux_up(icol,:) = daytime_fluxes%flux_up(iday,:)
-         expanded_fluxes%flux_dn(icol,:) = daytime_fluxes%flux_dn(iday,:)
-         expanded_fluxes%flux_net(icol,:) = daytime_fluxes%flux_net(iday,:)
-         if (associated(daytime_fluxes%flux_dn_dir)) then
-            expanded_fluxes%flux_dn_dir(icol,:) = daytime_fluxes%flux_dn_dir(iday,:)
-         end if
-
-         ! Expand band-by-band fluxes
-         expanded_fluxes%bnd_flux_up(icol,:,:) = daytime_fluxes%bnd_flux_up(iday,:,:)
-         expanded_fluxes%bnd_flux_dn(icol,:,:) = daytime_fluxes%bnd_flux_dn(iday,:,:)
-         expanded_fluxes%bnd_flux_net(icol,:,:) = daytime_fluxes%bnd_flux_net(iday,:,:)
-         if (associated(daytime_fluxes%bnd_flux_dn_dir)) then
-            expanded_fluxes%bnd_flux_dn_dir(icol,:,:) = daytime_fluxes%bnd_flux_dn_dir(iday,:,:)
-         end if
-
-      end do
-
-   end subroutine expand_day_fluxes
 
 
    subroutine set_gas_concentrations(ncol, gas_names, gas_vmr, gas_concentrations)

@@ -28,16 +28,12 @@ module radiation
    ! here so that we can make the k_dist objects module data and only load them
    ! once.
    use rrtmgp_interface, only: &
-      k_dist_sw, k_dist_lw, &
       rrtmgp_initialize, rrtmgp_run_sw, rrtmgp_run_lw, &
       rrtmgp_nswbands => nswbands, rrtmgp_nlwbands => nlwbands, &
       rrtmgp_get_min_temperature => get_min_temperature, &
       rrtmgp_get_max_temperature => get_max_temperature, &
       get_gpoint_bands_sw, get_gpoint_bands_lw, &
-      nswgpts, nlwgpts, &
-      initialize_rrtmgp_fluxes, free_fluxes, &
-      free_optics_sw, free_optics_lw, reset_fluxes, &
-      expand_day_fluxes
+      nswgpts, nlwgpts
    use mo_rte_kind, only: wp
 
    ! Use my assertion routines to perform sanity checks
@@ -45,7 +41,8 @@ module radiation
 
    use radiation_state, only: ktop, kbot, nlev_rad
    use radiation_utils, only: compress_day_columns, expand_day_columns, &
-                              handle_error, fluxes_t, initialize_fluxes
+                              handle_error, fluxes_t, &
+                              initialize_fluxes, reset_fluxes, free_fluxes, expand_day_fluxes
 
    implicit none
    private
@@ -1033,9 +1030,6 @@ contains
       ! For getting radiative constituent gases
       use rad_constituents, only: N_DIAG, rad_cnst_get_call_list
 
-      ! RRTMGP radiation drivers and derived types
-      use mo_fluxes_byband, only: ty_fluxes_byband
-
       ! CAM history module provides subroutine to send output data to the history
       ! buffer to be aggregated and written to disk
       use cam_history, only: outfld
@@ -1162,7 +1156,7 @@ contains
       character(*), parameter :: subname = 'radiation_tend'
 
       ! Radiative fluxes
-      type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
+      type(fluxes_t) :: fluxes_allsky, fluxes_clrsky
       !type(fluxes_t) :: fluxes_allsky, fluxes_clrsky
 
       ! Zero-array for cloud properties if not diagnosed by microphysics
@@ -1232,8 +1226,8 @@ contains
       if (radiation_do('sw')) then
 
          ! Allocate shortwave fluxes
-         call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nswbands, fluxes_allsky, do_direct=.true.)
-         call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nswbands, fluxes_clrsky, do_direct=.true.)
+         call initialize_fluxes(ncol, nlev_rad+1, nswbands, fluxes_allsky, do_direct=.true.)
+         call initialize_fluxes(ncol, nlev_rad+1, nswbands, fluxes_clrsky, do_direct=.true.)
 
          ! Get albedo. This uses CAM routines internally and just provides a
          ! wrapper to improve readability of the code here.
@@ -1370,11 +1364,11 @@ contains
       if (radiation_do('lw')) then
 
          ! Allocate longwave outputs; why is this not part of the
-         ! ty_fluxes_byband object?
+         ! fluxes_t object?
          ! NOTE: fluxes defined at interfaces, so initialize to have vertical
          ! dimension nlev_rad+1
-         call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_allsky)
-         call initialize_rrtmgp_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_clrsky)
+         call initialize_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_allsky)
+         call initialize_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_clrsky)
 
          call t_startf('rad_cld_optics_lw')
          cld_tau_gpt_lw = 0._r8
@@ -1514,13 +1508,12 @@ contains
                                   fluxes_allsky, fluxes_clrsky, qrs, qrsc)
      
       use perf_mod, only: t_startf, t_stopf
-      use mo_fluxes_byband, only: ty_fluxes_byband
       use radiation_utils, only: calculate_heating_rate
                            
 
       ! Inputs
       integer, intent(in) :: ncol
-      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
+      type(fluxes_t), intent(inout) :: fluxes_allsky, fluxes_clrsky
       real(r8), intent(inout) :: qrs(:,:), qrsc(:,:)
       character(len=*), intent(in), dimension(:) :: gas_names
       real(r8), intent(in), dimension(:,:,:) :: gas_vmr
@@ -1547,7 +1540,7 @@ contains
       real(wp), dimension(size(gas_names),ncol,pver) :: gas_vmr_day
       real(wp), dimension(ncol,nlev_rad-1,nswgpts) :: cld_tau_gpt_day, cld_ssa_gpt_day, cld_asm_gpt_day
       real(wp), dimension(ncol,nlev_rad-1,nswbands) :: aer_tau_bnd_day, aer_ssa_bnd_day, aer_asm_bnd_day
-      type(ty_fluxes_byband) :: fluxes_allsky_day, fluxes_clrsky_day
+      type(fluxes_t) :: fluxes_allsky_day, fluxes_clrsky_day
 
       ! Scaling factor for total sky irradiance; used to account for orbital
       ! eccentricity, and could be used to scale total sky irradiance for different
@@ -1605,13 +1598,13 @@ contains
 
       ! Allocate shortwave fluxes (allsky and clearsky)
       ! TODO: why do I need to provide my own routines to do this? Why is 
-      ! this not part of the ty_fluxes_byband object?
+      ! this not part of the fluxes_t object?
       !
       ! NOTE: fluxes defined at interfaces, so initialize to have vertical
       ! dimension nlev_rad+1, while we initialized the RRTMGP input variables to
       ! have vertical dimension nlev_rad (defined at midpoints).
-      call initialize_rrtmgp_fluxes(nday, nlev_rad+1, nswbands, fluxes_allsky_day, do_direct=.true.)
-      call initialize_rrtmgp_fluxes(nday, nlev_rad+1, nswbands, fluxes_clrsky_day, do_direct=.true.)
+      call initialize_fluxes(nday, nlev_rad+1, nswbands, fluxes_allsky_day, do_direct=.true.)
+      call initialize_fluxes(nday, nlev_rad+1, nswbands, fluxes_clrsky_day, do_direct=.true.)
 
       ! Add a level above model top to optical properties!
 
@@ -1757,12 +1750,11 @@ contains
                                   fluxes_allsky, fluxes_clrsky, qrl, qrlc)
     
       use perf_mod, only: t_startf, t_stopf
-      use mo_fluxes_byband, only: ty_fluxes_byband
       use radiation_utils, only: calculate_heating_rate
 
       ! Inputs
       integer, intent(in) :: ncol
-      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
+      type(fluxes_t), intent(inout) :: fluxes_allsky, fluxes_clrsky
       real(r8), intent(inout) :: qrl(:,:), qrlc(:,:)
       character(len=*), intent(in), dimension(:) :: gas_names
       real(r8), intent(in), dimension(:,:,:) :: gas_vmr
@@ -1833,10 +1825,9 @@ contains
    !----------------------------------------------------------------------------
 
    subroutine export_surface_fluxes(fluxes, cam_out, band)
-      use mo_fluxes_byband, only: ty_fluxes_byband
       use camsrfexch, only: cam_out_t
 
-      type(ty_fluxes_byband), intent(in) :: fluxes
+      type(fluxes_t), intent(in) :: fluxes
       type(cam_out_t), intent(inout) :: cam_out
       character(len=*), intent(in) :: band
       integer :: icol
@@ -1914,8 +1905,7 @@ contains
 
    subroutine set_net_fluxes_sw(fluxes, fsds, fsns, fsnt)
 
-      use mo_fluxes_byband, only: ty_fluxes_byband
-      type(ty_fluxes_byband), intent(in) :: fluxes
+      type(fluxes_t), intent(in) :: fluxes
       real(r8), intent(inout) :: fsds(:)
       real(r8), intent(inout) :: fsns(:)
       real(r8), intent(inout) :: fsnt(:)
@@ -1934,8 +1924,7 @@ contains
 
    subroutine set_net_fluxes_lw(fluxes, flns, flnt)
 
-      use mo_fluxes_byband, only: ty_fluxes_byband
-      type(ty_fluxes_byband), intent(in) :: fluxes
+      type(fluxes_t), intent(in) :: fluxes
       real(r8), intent(inout) :: flns(:)
       real(r8), intent(inout) :: flnt(:)
       integer :: ncol
@@ -2178,12 +2167,11 @@ contains
       use physconst, only: cpair
       use physics_types, only: physics_state
       use cam_history, only: outfld
-      use mo_fluxes_byband, only: ty_fluxes_byband
       
       integer, intent(in) :: icall
       type(physics_state), intent(in) :: state
-      type(ty_fluxes_byband), intent(in) :: flux_all
-      type(ty_fluxes_byband), intent(in) :: flux_clr
+      type(fluxes_t), intent(in) :: flux_all
+      type(fluxes_t), intent(in) :: flux_clr
       real(r8), intent(in) :: qrs(:,:), qrsc(:,:)
 
       ! SW cloud radiative effect
@@ -2243,12 +2231,11 @@ contains
       use physconst, only: cpair
       use physics_types, only: physics_state
       use cam_history, only: outfld
-      use mo_fluxes_byband, only: ty_fluxes_byband
       
       integer, intent(in) :: icall
       type(physics_state), intent(in) :: state
-      type(ty_fluxes_byband), intent(in) :: flux_all
-      type(ty_fluxes_byband), intent(in) :: flux_clr
+      type(fluxes_t), intent(in) :: flux_all
+      type(fluxes_t), intent(in) :: flux_clr
 
       ! Heating rates
       real(r8), intent(in) :: qrl(:,:), qrlc(:,:)
