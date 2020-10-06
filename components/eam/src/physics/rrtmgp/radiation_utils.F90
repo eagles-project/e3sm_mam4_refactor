@@ -8,7 +8,7 @@ module radiation_utils
 
    public :: compress_day_columns, expand_day_columns, &
              calculate_heating_rate, clip_values, &
-             handle_error
+             handle_error, fluxes_t, initialize_fluxes
 
    ! Interface blocks for overloaded procedures
    interface compress_day_columns
@@ -23,6 +23,19 @@ module radiation_utils
       module procedure clip_values_1d, clip_values_2d, clip_values_3d
    end interface clip_values
 
+   ! Type to hold fluxes
+   type fluxes_t
+      real(r8), allocatable :: flux_up(:,:)
+      real(r8), allocatable :: flux_dn(:,:)
+      real(r8), allocatable :: flux_net(:,:)
+      real(r8), allocatable :: flux_dn_dir(:,:)
+      real(r8), allocatable :: bnd_flux_up(:,:,:)
+      real(r8), allocatable :: bnd_flux_dn(:,:,:)
+      real(r8), allocatable :: bnd_flux_net(:,:,:)
+      real(r8), allocatable :: bnd_flux_dn_dir(:,:,:)
+   end type
+
+
    ! Max length for character strings
    integer, parameter :: max_char_len = 512
 
@@ -30,7 +43,61 @@ module radiation_utils
    character(len=*), parameter :: module_name = 'radiation_utils'
 
 contains
+   !-------------------------------------------------------------------------------
+   !-------------------------------------------------------------------------------
+   subroutine initialize_fluxes(ncol, nlevels, nbands, fluxes, do_direct)
 
+      integer, intent(in) :: ncol, nlevels, nbands
+      type(fluxes_t), intent(inout) :: fluxes
+      logical, intent(in), optional :: do_direct
+
+      logical :: do_direct_local
+
+      if (present(do_direct)) then
+         do_direct_local = .true.
+      else
+         do_direct_local = .false.
+      end if
+
+      ! Allocate flux arrays
+      ! NOTE: fluxes defined at interfaces, so need to either pass nlevels as
+      ! number of model levels plus one, or allocate as nlevels+1 if nlevels
+      ! represents number of model levels rather than number of interface levels.
+
+      ! Broadband fluxes
+      allocate(fluxes%flux_up(ncol, nlevels))
+      allocate(fluxes%flux_dn(ncol, nlevels))
+      allocate(fluxes%flux_net(ncol, nlevels))
+      if (do_direct_local) allocate(fluxes%flux_dn_dir(ncol, nlevels))
+
+      ! Fluxes by band
+      allocate(fluxes%bnd_flux_up(ncol, nlevels, nbands))
+      allocate(fluxes%bnd_flux_dn(ncol, nlevels, nbands))
+      allocate(fluxes%bnd_flux_net(ncol, nlevels, nbands))
+      if (do_direct_local) allocate(fluxes%bnd_flux_dn_dir(ncol, nlevels, nbands))
+
+      ! Initialize
+      call reset_fluxes(fluxes)
+
+   end subroutine initialize_fluxes
+   !-------------------------------------------------------------------------------
+   subroutine reset_fluxes(fluxes)
+
+      type(fluxes_t), intent(inout) :: fluxes
+
+      ! Reset broadband fluxes
+      fluxes%flux_up(:,:) = 0._r8
+      fluxes%flux_dn(:,:) = 0._r8
+      fluxes%flux_net(:,:) = 0._r8
+      if (allocated(fluxes%flux_dn_dir)) fluxes%flux_dn_dir(:,:) = 0._r8
+
+      ! Reset band-by-band fluxes
+      fluxes%bnd_flux_up(:,:,:) = 0._r8
+      fluxes%bnd_flux_dn(:,:,:) = 0._r8
+      fluxes%bnd_flux_net(:,:,:) = 0._r8
+      if (allocated(fluxes%bnd_flux_dn_dir)) fluxes%bnd_flux_dn_dir(:,:,:) = 0._r8
+
+   end subroutine reset_fluxes
    !-------------------------------------------------------------------------------
    subroutine compress_day_columns_1d(xcol, xday, day_indices)
 

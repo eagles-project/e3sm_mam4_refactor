@@ -2087,7 +2087,14 @@ contains
          albedo_dif_day(1:nswbands,1:nday), &
          cld_tau_gpt_day(1:nday,1:pver,1:nswgpts), cld_ssa_gpt_day(1:nday,1:pver,1:nswgpts), cld_asm_gpt_day(1:nday,1:pver,1:nswgpts), &
          aer_tau_bnd_day(1:nday,1:pver,1:nswbands), aer_ssa_bnd_day(1:nday,1:pver,1:nswbands), aer_asm_bnd_day(1:nday,1:pver,1:nswbands), &
-         fluxes_allsky_day, fluxes_clrsky_day, &
+         fluxes_allsky_day%flux_up, fluxes_allsky_day%flux_dn, fluxes_allsky_day%flux_net, &
+         fluxes_allsky_day%flux_dn_dir, &
+         fluxes_allsky_day%bnd_flux_up, fluxes_allsky_day%bnd_flux_dn, fluxes_allsky_day%bnd_flux_net, &
+         fluxes_allsky_day%bnd_flux_dn_dir, &
+         fluxes_clrsky_day%flux_up, fluxes_clrsky_day%flux_dn, fluxes_clrsky_day%flux_net, &
+         fluxes_clrsky_day%flux_dn_dir, &
+         fluxes_clrsky_day%bnd_flux_up, fluxes_clrsky_day%bnd_flux_dn, fluxes_clrsky_day%bnd_flux_net, &
+         fluxes_clrsky_day%bnd_flux_dn_dir, &
          tsi_scaling &
       )
       call t_stopf('rad_calculations_sw')
@@ -2165,7 +2172,10 @@ contains
             emis_sfc, &
             pmid, tmid, pint, tint, &
             cld_tau_gpt_rad, aer_tau_bnd_rad, &
-            fluxes_allsky, fluxes_clrsky &
+            fluxes_allsky%flux_up, fluxes_allsky%flux_dn, fluxes_allsky%flux_net, &
+            fluxes_allsky%bnd_flux_up, fluxes_allsky%bnd_flux_dn, fluxes_allsky%bnd_flux_net, &
+            fluxes_clrsky%flux_up, fluxes_clrsky%flux_dn, fluxes_clrsky%flux_net, &
+            fluxes_clrsky%bnd_flux_up, fluxes_clrsky%bnd_flux_dn, fluxes_clrsky%bnd_flux_net &
             )
       call t_stopf('rad_rrtmgp_run_lw')
 

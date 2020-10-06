@@ -101,7 +101,10 @@ contains
          albedo_dir, albedo_dif, &
          cld_tau_gpt, cld_ssa_gpt, cld_asm_gpt, &
          aer_tau_bnd, aer_ssa_bnd, aer_asm_bnd, &
-         fluxes_allsky, fluxes_clrsky, &
+         allsky_flux_up, allsky_flux_dn, allsky_flux_net, allsky_flux_dn_dir, &
+         allsky_bnd_flux_up, allsky_bnd_flux_dn, allsky_bnd_flux_net, allsky_bnd_flux_dn_dir, &
+         clrsky_flux_up, clrsky_flux_dn, clrsky_flux_net, clrsky_flux_dn_dir, &
+         clrsky_bnd_flux_up, clrsky_bnd_flux_dn, clrsky_bnd_flux_net, clrsky_bnd_flux_dn_dir, &
          tsi_scaling &
          )
       integer, intent(in) :: ngas, ncol, nlev
@@ -114,9 +117,15 @@ contains
       real(wp), intent(in), dimension(:,:,:) :: &
          cld_tau_gpt, cld_ssa_gpt, cld_asm_gpt, &
          aer_tau_bnd, aer_ssa_bnd, aer_asm_bnd
-      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
+      real(wp), intent(inout), target, dimension(:,:) :: &
+         allsky_flux_up, allsky_flux_dn, allsky_flux_net, allsky_flux_dn_dir, &
+         clrsky_flux_up, clrsky_flux_dn, clrsky_flux_net, clrsky_flux_dn_dir
+      real(wp), intent(inout), target, dimension(:,:,:) :: &
+         allsky_bnd_flux_up, allsky_bnd_flux_dn, allsky_bnd_flux_net, allsky_bnd_flux_dn_dir, &
+         clrsky_bnd_flux_up, clrsky_bnd_flux_dn, clrsky_bnd_flux_net, clrsky_bnd_flux_dn_dir
       real(wp), intent(in) :: tsi_scaling
 
+      type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
       type(ty_gas_concs) :: gas_concentrations
       type(ty_optical_props_2str) :: cld_optics_sw, aer_optics_sw
 
@@ -124,8 +133,22 @@ contains
       integer :: iband, igas, iday, icol
 
       ! Allocate shortwave fluxes (allsky and clearsky)
-      ! TODO: why do I need to provide my own routines to do this? Why is 
-      ! this not part of the ty_fluxes_byband object?
+      fluxes_allsky%flux_up => allsky_flux_up
+      fluxes_allsky%flux_dn => allsky_flux_dn
+      fluxes_allsky%flux_net => allsky_flux_net
+      fluxes_allsky%flux_dn_dir => allsky_flux_dn_dir
+      fluxes_allsky%bnd_flux_up => allsky_bnd_flux_up
+      fluxes_allsky%bnd_flux_dn => allsky_bnd_flux_dn
+      fluxes_allsky%bnd_flux_net => allsky_bnd_flux_net
+      fluxes_allsky%bnd_flux_dn_dir => allsky_bnd_flux_dn_dir
+      fluxes_clrsky%flux_up => clrsky_flux_up
+      fluxes_clrsky%flux_dn => clrsky_flux_dn
+      fluxes_clrsky%flux_net => clrsky_flux_net
+      fluxes_clrsky%flux_dn_dir => clrsky_flux_dn_dir
+      fluxes_clrsky%bnd_flux_up => clrsky_bnd_flux_up
+      fluxes_clrsky%bnd_flux_dn => clrsky_bnd_flux_dn
+      fluxes_clrsky%bnd_flux_net => clrsky_bnd_flux_net
+      fluxes_clrsky%bnd_flux_dn_dir => clrsky_bnd_flux_dn_dir
 
       ! Populate RRTMGP optics
       call handle_error(cld_optics_sw%alloc_2str(ncol, nlev, k_dist_sw, name='shortwave cloud optics'))
@@ -189,7 +212,10 @@ contains
          surface_emissivity, &
          pmid, tmid, pint, tint, &
          cld_tau_gpt, aer_tau_bnd, &
-         fluxes_allsky, fluxes_clrsky &
+         allsky_flux_up, allsky_flux_dn, allsky_flux_net, &
+         allsky_bnd_flux_up, allsky_bnd_flux_dn, allsky_bnd_flux_net, &
+         clrsky_flux_up, clrsky_flux_dn, clrsky_flux_net, &
+         clrsky_bnd_flux_up, clrsky_bnd_flux_dn, clrsky_bnd_flux_net &
          )
 
       integer, intent(in) :: ngas, ncol, nlev
@@ -198,10 +224,32 @@ contains
       real(wp), intent(in), dimension(:,:) :: surface_emissivity
       real(wp), intent(in), dimension(:,:) :: pmid, tmid, pint, tint
       real(wp), intent(in), dimension(:,:,:) :: cld_tau_gpt, aer_tau_bnd
-      type(ty_fluxes_byband), intent(inout) :: fluxes_allsky, fluxes_clrsky
+      real(wp), intent(inout), dimension(:,:), target :: &
+         allsky_flux_up, allsky_flux_dn, allsky_flux_net, &
+         clrsky_flux_up, clrsky_flux_dn, clrsky_flux_net
+      real(wp), intent(inout), dimension(:,:,:), target :: &
+         allsky_bnd_flux_up, allsky_bnd_flux_dn, allsky_bnd_flux_net, &
+         clrsky_bnd_flux_up, clrsky_bnd_flux_dn, clrsky_bnd_flux_net
+
+      type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
 
       type(ty_gas_concs) :: gas_concentrations
       type(ty_optical_props_1scl) :: cld_optics, aer_optics
+
+
+      ! Allocate fluxes (allsky and clearsky)
+      fluxes_allsky%flux_up => allsky_flux_up
+      fluxes_allsky%flux_dn => allsky_flux_dn
+      fluxes_allsky%flux_net => allsky_flux_net
+      fluxes_allsky%bnd_flux_up => allsky_bnd_flux_up
+      fluxes_allsky%bnd_flux_dn => allsky_bnd_flux_dn
+      fluxes_allsky%bnd_flux_net => allsky_bnd_flux_net
+      fluxes_clrsky%flux_up => clrsky_flux_up
+      fluxes_clrsky%flux_dn => clrsky_flux_dn
+      fluxes_clrsky%flux_net => clrsky_flux_net
+      fluxes_clrsky%bnd_flux_up => clrsky_bnd_flux_up
+      fluxes_clrsky%bnd_flux_dn => clrsky_bnd_flux_dn
+      fluxes_clrsky%bnd_flux_net => clrsky_bnd_flux_net
 
       ! Setup gas concentrations object
       call t_startf('rad_gas_concentrations_lw')
@@ -276,48 +324,6 @@ contains
       call handle_error(gas_concentrations%init(gases_lowercase))
 
    end subroutine set_available_gases
-
-   ! For some reason the RRTMGP flux objects do not include initialization
-   ! routines, but rather expect the user to associate the individual fluxes (which
-   ! are pointers) with appropriate targets. Instead, this routine treats those
-   ! pointers as allocatable members and allocates space for them. TODO: is this
-   ! appropriate use?
-   subroutine initialize_rrtmgp_fluxes(ncol, nlevels, nbands, fluxes, do_direct)
-
-      use mo_fluxes_byband, only: ty_fluxes_byband
-      integer, intent(in) :: ncol, nlevels, nbands
-      type(ty_fluxes_byband), intent(inout) :: fluxes
-      logical, intent(in), optional :: do_direct
-
-      logical :: do_direct_local
-
-      if (present(do_direct)) then
-         do_direct_local = .true.
-      else
-         do_direct_local = .false.
-      end if
-
-      ! Allocate flux arrays
-      ! NOTE: fluxes defined at interfaces, so need to either pass nlevels as
-      ! number of model levels plus one, or allocate as nlevels+1 if nlevels
-      ! represents number of model levels rather than number of interface levels.
-
-      ! Broadband fluxes
-      allocate(fluxes%flux_up(ncol, nlevels))
-      allocate(fluxes%flux_dn(ncol, nlevels))
-      allocate(fluxes%flux_net(ncol, nlevels))
-      if (do_direct_local) allocate(fluxes%flux_dn_dir(ncol, nlevels))
-
-      ! Fluxes by band
-      allocate(fluxes%bnd_flux_up(ncol, nlevels, nbands))
-      allocate(fluxes%bnd_flux_dn(ncol, nlevels, nbands))
-      allocate(fluxes%bnd_flux_net(ncol, nlevels, nbands))
-      if (do_direct_local) allocate(fluxes%bnd_flux_dn_dir(ncol, nlevels, nbands))
-
-      ! Initialize
-      call reset_fluxes(fluxes)
-
-   end subroutine initialize_rrtmgp_fluxes
 
    !----------------------------------------------------------------------------
 
@@ -491,7 +497,43 @@ contains
 
    !----------------------------------------------------------------------------
 
+   subroutine initialize_rrtmgp_fluxes(ncol, nlevels, nbands, fluxes, do_direct)
 
+      use mo_fluxes_byband, only: ty_fluxes_byband
+
+      integer, intent(in) :: ncol, nlevels, nbands
+      type(ty_fluxes_byband), intent(inout) :: fluxes
+      logical, intent(in), optional :: do_direct
+
+      logical :: do_direct_local
+
+      if (present(do_direct)) then
+         do_direct_local = .true.
+      else
+         do_direct_local = .false.
+      end if
+
+      ! Allocate flux arrays
+      ! NOTE: fluxes defined at interfaces, so need to either pass nlevels as
+      ! number of model levels plus one, or allocate as nlevels+1 if nlevels
+      ! represents number of model levels rather than number of interface levels.
+
+      ! Broadband fluxes
+      allocate(fluxes%flux_up(ncol, nlevels))
+      allocate(fluxes%flux_dn(ncol, nlevels))
+      allocate(fluxes%flux_net(ncol, nlevels))
+      if (do_direct_local) allocate(fluxes%flux_dn_dir(ncol, nlevels))
+
+      ! Fluxes by band
+      allocate(fluxes%bnd_flux_up(ncol, nlevels, nbands))
+      allocate(fluxes%bnd_flux_dn(ncol, nlevels, nbands))
+      allocate(fluxes%bnd_flux_net(ncol, nlevels, nbands))
+      if (do_direct_local) allocate(fluxes%bnd_flux_dn_dir(ncol, nlevels, nbands))
+
+      ! Initialize
+      call reset_fluxes(fluxes)
+
+   end subroutine initialize_rrtmgp_fluxes
 
    ! Stop run ungracefully since we don't want dependencies on E3SM abortutils
    ! here

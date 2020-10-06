@@ -45,7 +45,7 @@ module radiation
 
    use radiation_state, only: ktop, kbot, nlev_rad
    use radiation_utils, only: compress_day_columns, expand_day_columns, &
-                              handle_error
+                              handle_error, fluxes_t, initialize_fluxes
 
    implicit none
    private
@@ -1163,6 +1163,7 @@ contains
 
       ! Radiative fluxes
       type(ty_fluxes_byband) :: fluxes_allsky, fluxes_clrsky
+      !type(fluxes_t) :: fluxes_allsky, fluxes_clrsky
 
       ! Zero-array for cloud properties if not diagnosed by microphysics
       real(r8), target, dimension(pcols,pver) :: zeros
@@ -1345,13 +1346,13 @@ contains
                call output_fluxes_sw(icall, state, fluxes_allsky, fluxes_clrsky, qrs,  qrsc)
             end if
          end do
-              
+
          ! Set net fluxes used by other components (land?) 
          call set_net_fluxes_sw(fluxes_allsky, fsds, fsns, fsnt)
 
          ! Set surface fluxes that are used by the land model
          call export_surface_fluxes(fluxes_allsky, cam_out, 'shortwave')
-         
+
          ! Free memory allocated for shortwave fluxes
          call free_fluxes(fluxes_allsky)
          call free_fluxes(fluxes_clrsky)
@@ -1513,7 +1514,6 @@ contains
                                   fluxes_allsky, fluxes_clrsky, qrs, qrsc)
      
       use perf_mod, only: t_startf, t_stopf
-      use mo_rrtmgp_clr_all_sky, only: rte_sw
       use mo_fluxes_byband, only: ty_fluxes_byband
       use radiation_utils, only: calculate_heating_rate
                            
@@ -1628,7 +1628,11 @@ contains
          albedo_dif_day(1:nswbands,1:nday), &
          cld_tau_gpt_day(1:nday,1:pver,1:nswgpts), cld_ssa_gpt_day(1:nday,1:pver,1:nswgpts), cld_asm_gpt_day(1:nday,1:pver,1:nswgpts), &
          aer_tau_bnd_day(1:nday,1:pver,1:nswbands), aer_ssa_bnd_day(1:nday,1:pver,1:nswbands), aer_asm_bnd_day(1:nday,1:pver,1:nswbands), &
-         fluxes_allsky_day, fluxes_clrsky_day, &
+         fluxes_allsky_day%flux_up, fluxes_allsky_day%flux_dn, fluxes_allsky_day%flux_net, fluxes_allsky_day%flux_dn_dir, &
+         fluxes_allsky_day%bnd_flux_up, fluxes_allsky_day%bnd_flux_dn, fluxes_allsky_day%bnd_flux_net, fluxes_allsky_day%bnd_flux_dn_dir, &
+         fluxes_clrsky_day%flux_up, fluxes_clrsky_day%flux_dn, fluxes_clrsky_day%flux_net, fluxes_clrsky_day%flux_dn_dir, &
+         fluxes_clrsky_day%bnd_flux_up, fluxes_clrsky_day%bnd_flux_dn, fluxes_clrsky_day%bnd_flux_net, fluxes_clrsky_day%bnd_flux_dn_dir, &
+         !fluxes_allsky_day, fluxes_clrsky_day, &
          tsi_scaling &
       )
       call t_stopf('rad_calculations_sw')
@@ -1753,7 +1757,6 @@ contains
                                   fluxes_allsky, fluxes_clrsky, qrl, qrlc)
     
       use perf_mod, only: t_startf, t_stopf
-      use mo_rrtmgp_clr_all_sky, only: rte_lw
       use mo_fluxes_byband, only: ty_fluxes_byband
       use radiation_utils, only: calculate_heating_rate
 
@@ -1800,7 +1803,10 @@ contains
             surface_emissivity, &
             pmid, tmid, pint, tint, &
             cld_tau_gpt_rad, aer_tau_bnd_rad, &
-            fluxes_allsky, fluxes_clrsky &
+            fluxes_allsky%flux_up, fluxes_allsky%flux_dn, fluxes_allsky%flux_net, &
+            fluxes_allsky%bnd_flux_up, fluxes_allsky%bnd_flux_dn, fluxes_allsky%bnd_flux_net, &
+            fluxes_clrsky%flux_up, fluxes_clrsky%flux_dn, fluxes_clrsky%flux_net, &
+            fluxes_clrsky%bnd_flux_up, fluxes_clrsky%bnd_flux_dn, fluxes_clrsky%bnd_flux_net &
             )
       call t_stopf('rad_calculations_lw')
 
