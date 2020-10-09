@@ -1485,6 +1485,8 @@
       <file grid="ice|ocn" mask="oARRM60to10">$DIN_LOC_ROOT/share/domains/domain.ocn.TL319_oARRM60to10.180905.nc</file>
       <file grid="atm|lnd" mask="oARRM60to6">$DIN_LOC_ROOT/share/domains/domain.lnd.TL319_oARRM60to6.180905.nc</file>
       <file grid="ice|ocn" mask="oARRM60to6">$DIN_LOC_ROOT/share/domains/domain.ocn.TL319_oARRM60to6.180905.nc</file>
+      <file grid="atm|lnd" mask="ECwISC30to60E1r2">/home/ac.dcomeau/cryo/ECwISC30to60E1r2/domain.lnd.TL319_ECwISC30to60E1r2.201009.nc</file>
+      <file grid="ice|ocn" mask="ECwISC30to60E1r2">/home/ac.dcomeau/cryo/ECwISC30to60E1r2/domain.ocn.TL319_ECwISC30to60E1r2.201009.nc</file>
       <desc>TL319 is JRA lat/lon grid:</desc>
     </domain>
 
