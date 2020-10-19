@@ -338,6 +338,7 @@ subroutine diag_init()
       call add_default ('VU      ', 1, ' ')
       call add_default ('VV      ', 1, ' ')
       call add_default ('VQ      ', 1, ' ')
+      call add_default ('NSTEP   ', 1, ' ')
 
       if(prog_modal_aero .and. history_verbose) then !Only for prognostic aerosols
          call add_default ('Vbc_a1  ', 1, ' ')
