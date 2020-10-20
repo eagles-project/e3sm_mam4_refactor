@@ -27,6 +27,7 @@ module physics_update_mod
   use shr_kind_mod,  only: r8 => shr_kind_r8
   use ppgrid,        only: pcols, pver, begchunk
   use physics_types, only: physics_update_main, physics_ptend, physics_state, physics_tend
+  use wv_saturation, only: qsat, qsat_water, qsat_ice, svp_ice
 
   implicit none
   private
@@ -174,6 +175,9 @@ contains
     character(len=fieldname_len), intent(in)  :: hist_var
     type(physics_state),          intent(in)  :: state  
     real(r8)                                  :: prg_var(pcols,pver)
+    real(r8) esl(pcols,pver)   ! saturation vapor pressures 
+    real(r8) esi(pcols,pver)   ! 
+    real(r8) ftem(pcols,pver)  ! temporary workspace
 
     !local vars
     integer :: idx
