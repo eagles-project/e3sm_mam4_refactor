@@ -1378,6 +1378,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use cam_history,        only: outfld, fieldname_len
 
     implicit none
 
@@ -1428,7 +1429,9 @@ subroutine tphysac (ztodt,   cam_in,  &
     real(r8), pointer, dimension(:) :: water_vap_ac_2d   ! Vertically integrated water vapor
 
     ! physics buffer fields for total energy and mass adjustment
-    integer itim_old, ifld
+    integer itim_old, ifld, ihist
+
+    character(len=fieldname_len)   :: varname, vsuffix
 
     real(r8), pointer, dimension(:,:) :: tini
     real(r8), pointer, dimension(:,:) :: cld
@@ -1465,6 +1468,16 @@ subroutine tphysac (ztodt,   cam_in,  &
                       ,l_gw_drag_out          = l_gw_drag          &
                       ,l_ac_energy_chk_out    = l_ac_energy_chk    &
                      )
+
+    !!Add output for Water budget analysis
+    if (pergro_test_active) then
+       !call outfld calls
+       do ihist = 1 , nvars_prtrb_hist
+          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_topphysac' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+       enddo
+    endif
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
     if (phys_do_flux_avg()) then 
@@ -1612,6 +1625,16 @@ if (l_vdiff) then
 
 end if ! l_vdiff
 
+!!Add output for Water budget analysis
+if (pergro_test_active) then
+   !call outfld calls
+   do ihist = 1 , nvars_prtrb_hist
+      vsuffix  = trim(adjustl(hist_vars(ihist)))
+      varname  = trim(adjustl(vsuffix))//'_af_clubb_srf' ! form variable name
+      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+   enddo
+endif
+
 if (l_rayleigh) then
     !===================================================
     ! Rayleigh friction calculation
@@ -1663,6 +1686,16 @@ if (l_tracer_aero) then
 
 end if ! l_tracer_aero
 
+!!Add output for Water budget analysis
+if (pergro_test_active) then
+   !call outfld calls
+   do ihist = 1 , nvars_prtrb_hist
+      vsuffix  = trim(adjustl(hist_vars(ihist)))
+      varname  = trim(adjustl(vsuffix))//'_bf_gw_drag' ! form variable name
+      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
+   enddo
+endif
+
 if (l_gw_drag) then
     !===================================================
     ! Gravity wave drag
@@ -1711,6 +1744,16 @@ end if ! l_gw_drag
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
+
+!!Add output for water budget analysis
+if (pergro_test_active) then
+   !call outfld calls
+   do ihist = 1 , nvars_prtrb_hist
+      vsuffix  = trim(adjustl(hist_vars(ihist)))
+      varname  = trim(adjustl(vsuffix))//'_bf_ac_energy_chk' ! form variable name
+      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+   enddo
+endif
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -1766,6 +1809,15 @@ if (l_ac_energy_chk) then
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 end if ! l_ac_energy_chk
 
+!!Add output for water budget analysis
+if (pergro_test_active) then
+   !call outfld calls
+   do ihist = 1 , nvars_prtrb_hist
+      vsuffix  = trim(adjustl(hist_vars(ihist)))
+      varname  = trim(adjustl(vsuffix))//'_af_ac_energy_chk' ! form variable name
+      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+   enddo
+endif
 
     if (aqua_planet) then
        labort = .false.
@@ -1800,6 +1852,16 @@ end if ! l_ac_energy_chk
        ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
     end do
     water_vap_ac_2d(:ncol) = ftem(:ncol,1)
+
+    !!Add output for water budget analysis 
+    if (pergro_test_active) then
+       !call outfld calls
+       do ihist = 1 , nvars_prtrb_hist
+          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_endphysac' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+       enddo
+    endif
 
 end subroutine tphysac
 
@@ -2994,31 +3056,45 @@ subroutine add_fld_default_calls()
   implicit none
 
   !Add all existing ptend names for the addfld calls
-  character(len=20), parameter :: vlist(27) = (/     'topphysbc           '                       ,&
-       'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
-       'momtran             ','zm_conv_tend        ','UWSHCU              ','convect_shallow     ',&
-       'pcwdetrain_mac      ','macro_park          ','macrop              ','micro_mg            ',&
-       'cldwat_mic          ','aero_model_wetdep_ma','convtran2           ','cam_radheat         ',&
-       'chemistry           ','vdiff               ','rayleigh_friction   ','aero_model_drydep_ma',&
-       'Grav_wave_drag      ','convect_shallow_off ','clubb_ice1          ','clubb_det           ',&
-       'clubb_ice4          ','clubb_srf           ' /)
+  character(len=20), parameter :: vlist_all(30) = (/     'topphysbc           ',&
+           'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
+           'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow_off ',&
+           'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
+           'cldwat_mic          ','aero_model_wetdep_ma','convtran2           ','cam_radheat         ',&
+           'chemistry           ','clubb_srf           ','rayleigh_friction   ','aero_model_drydep_ma',&
+           'Grav_wave_drag      ','nudging             ','convect_shallow     ','topphysac           ',&
+           'endphysac           ','bf_ac_energy_chk    ','af_ac_energy_chk    ','af_clubb_srf        ',&
+           'bf_gw_drag          '/)
 
-
+  !Add default for selected processes
+  character(len=20), parameter :: vlist_default(23) = (/ 'topphysbc           ',&
+           'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
+           'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow     ',&
+           'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
+           'cldwat_mic          ','cam_radheat         ','topphysac           ','af_clubb_srf        ',&
+           'rayleigh_friction   ','bf_gw_drag          ','Grav_wave_drag      ','bf_ac_energy_chk    ',&
+           'af_ac_energy_chk    ','endphysac           '/)
 
   character(len=fieldname_len) :: varname
   character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
   
-  integer :: iv, ntot, ihist
+  integer :: iv, id, ntot, ndef, ihist
 
-  ntot = size(vlist)
+  ntot = size(vlist_all)
+  ndef = size(vlist_default)
 
   do ihist = 1 , nvars_prtrb_hist
      do iv = 1, ntot   
         
-        varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist(iv))) ! form variable name
+        varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
 
-        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
-        call add_default (trim(adjustl(varname)), 1, ' ')        
+        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+        !Add default for selected processes
+        do id = 1, ndef
+         if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
+          call add_default (trim(adjustl(varname)), 1, ' ')        
+         end if 
+        enddo 
      enddo
   enddo
 
