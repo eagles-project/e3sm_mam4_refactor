@@ -1452,6 +1452,8 @@ subroutine tphysac (ztodt,   cam_in,  &
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
 
+    real(r8)                         :: timestep(pcols)  ! used for outfld call
+
     !
     !-----------------------------------------------------------------------
     !
@@ -1475,8 +1477,16 @@ subroutine tphysac (ztodt,   cam_in,  &
        do ihist = 1 , nvars_prtrb_hist
           vsuffix  = trim(adjustl(hist_vars(ihist)))
           varname  = trim(adjustl(vsuffix))//'_topphysac' ! form variable name
-          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          if(vsuffix.ne."NSTEP") then
+           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          else
+           !Output NSTEP for debugging
+           nstep = get_nstep()
+           timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if 
        enddo
+ 
     endif
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1631,8 +1641,16 @@ if (pergro_test_active) then
    do ihist = 1 , nvars_prtrb_hist
       vsuffix  = trim(adjustl(hist_vars(ihist)))
       varname  = trim(adjustl(vsuffix))//'_af_clubb_srf' ! form variable name
-      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      if(vsuffix.ne."NSTEP") then
+       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      else
+       !Output NSTEP for debugging
+       nstep = get_nstep()
+       timestep(:ncol) = nstep
+       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+      end if 
    enddo
+
 endif
 
 if (l_rayleigh) then
@@ -1692,7 +1710,14 @@ if (pergro_test_active) then
    do ihist = 1 , nvars_prtrb_hist
       vsuffix  = trim(adjustl(hist_vars(ihist)))
       varname  = trim(adjustl(vsuffix))//'_bf_gw_drag' ! form variable name
-      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
+      if(vsuffix.ne."NSTEP") then
+       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      else
+       !Output NSTEP for debugging
+       nstep = get_nstep()
+       timestep(:ncol) = nstep
+       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+      end if
    enddo
 endif
 
@@ -1751,7 +1776,14 @@ if (pergro_test_active) then
    do ihist = 1 , nvars_prtrb_hist
       vsuffix  = trim(adjustl(hist_vars(ihist)))
       varname  = trim(adjustl(vsuffix))//'_bf_ac_energy_chk' ! form variable name
-      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      if(vsuffix.ne."NSTEP") then
+       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
+      else
+       !Output NSTEP for debugging
+       nstep = get_nstep()
+       timestep(:ncol) = nstep
+       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+      end if
    enddo
 endif
 
@@ -1815,7 +1847,14 @@ if (pergro_test_active) then
    do ihist = 1 , nvars_prtrb_hist
       vsuffix  = trim(adjustl(hist_vars(ihist)))
       varname  = trim(adjustl(vsuffix))//'_af_ac_energy_chk' ! form variable name
-      call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      if(vsuffix.ne."NSTEP") then
+       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+      else
+       !Output NSTEP for debugging
+       nstep = get_nstep()
+       timestep(:ncol) = nstep
+       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+      end if
    enddo
 endif
 
@@ -1859,7 +1898,14 @@ endif
        do ihist = 1 , nvars_prtrb_hist
           vsuffix  = trim(adjustl(hist_vars(ihist)))
           varname  = trim(adjustl(vsuffix))//'_endphysac' ! form variable name
-          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          if(vsuffix.ne."NSTEP") then
+           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
+          else
+           !Output NSTEP for debugging
+           nstep = get_nstep()
+           timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if
        enddo
     endif
 
@@ -2119,6 +2165,8 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:,:) :: ni_after_macmic
     !Shixuan Zhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
 
+    real(r8) timestep(pcols)  ! used for outfld call
+
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
@@ -2152,7 +2200,14 @@ subroutine tphysbc (ztodt,               &
        do ihist = 1 , nvars_prtrb_hist
           vsuffix  = trim(adjustl(hist_vars(ihist)))
           varname  = trim(adjustl(vsuffix))//'_topphysbc' ! form variable name
-          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          if(vsuffix.ne."NSTEP") then
+           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          else
+           !Output NSTEP for debugging
+           nstep = get_nstep()
+           timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if
        enddo
     endif
 
@@ -3051,7 +3106,7 @@ end subroutine phys_timestep_init
 
 subroutine add_fld_default_calls()
   !BSINGH -  For adding addfld and add defualt calls
-  use cam_history,        only: addfld, add_default, fieldname_len
+  use cam_history,        only: addfld, add_default, fieldname_len, horiz_only
 
   implicit none
 
@@ -3088,8 +3143,12 @@ subroutine add_fld_default_calls()
         
         varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
 
-        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-        !Add default for selected processes
+        if (trim(adjustl(hist_vars(ihist))).ne."NSTEP") then 
+          call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+          !Add default for selected processes
+        else
+          call addfld (trim(adjustl(varname)), horiz_only, 'A','timestep','Model timestep')
+        end if 
         do id = 1, ndef
          if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
           call add_default (trim(adjustl(varname)), 1, ' ')        

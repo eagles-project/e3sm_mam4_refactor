@@ -48,11 +48,11 @@ module physics_update_mod
   !2. If the variable is not present in the constituent array,add a "case" statement for that variable in the "select case" 
   !   construct in get_var function in this module
 
-  integer, public, parameter :: nvars_prtrb_hist = 15
+  integer, public, parameter :: nvars_prtrb_hist = 16
   !character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['s     ', 't     ', 'Q     ', 'v     ', &
   !     'CLDLIQ', 'NUMLIQ', 'CLDICE', 'NUMICE', 'num_a1','num_a2','num_a3']
   character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['t     ', 'Q     ', 'u     ','CLDLIQ', 'NUMLIQ', &
-       'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ']
+       'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ','NSTEP ']
 
 contains 
 
@@ -91,7 +91,7 @@ contains
     !purpose: This subroutine calls physics_update_main (old physics_update)
     !and also output variables for pergro test
 
-    use time_manager,  only: is_first_step
+    use time_manager,  only: is_first_step, get_nstep
 
     
     !Arguments
@@ -106,9 +106,12 @@ contains
     character(len = fieldname_len)   :: pname, varname, vsuffix
     
     logical                          :: outfld_active, add_pname
-    integer                          :: lchnk, stat, ip, ihist
+    integer                          :: lchnk, stat, ip, ihist, ncol, nstep
     
+    real(r8)                         :: timestep(pcols)  ! used for outfld call
+
     lchnk = state%lchnk
+    ncol  = state%ncol
     
     !IMPORTANT:Store ptend%name as it will be modified in physics_update_main call
     pname = ptend%name
@@ -158,9 +161,17 @@ contains
        do ihist = 1 , nvars_prtrb_hist
           vsuffix  = trim(adjustl(hist_vars(ihist)))
           varname  = trim(adjustl(vsuffix))//'_'//trim(adjustl(pname)) ! form variable name
-          !find the prognostic variable associated with this hist_vars(ihist) via "get_var" function
-          call outfld( trim(adjustl(varname)), get_var(state,vsuffix), pcols, lchnk )          
+          if(vsuffix.ne."NSTEP") then
+           !find the prognostic variable associated with this hist_vars(ihist) via "get_var" function
+           call outfld( trim(adjustl(varname)), get_var(state,vsuffix), pcols, lchnk )
+          else
+           !Output NSTEP for debugging
+           nstep = get_nstep()
+           timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if
        enddo
+
     endif
   end subroutine physics_update
   
