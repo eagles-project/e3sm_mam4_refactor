@@ -620,6 +620,10 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
    ! add tendency from this process to tend from other processes here
    call physics_ptend_sum(ptend_loc,ptend_all, ncol)
 
+   ! update physics state type state1 with ptend_loc to allow output in pergro
+   ! test mode after convtran1
+   call physics_update(state1, ptend_loc, ztodt)
+
    call physics_state_dealloc(state1)
    call physics_ptend_dealloc(ptend_loc)
 
