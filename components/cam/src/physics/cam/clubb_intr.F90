@@ -1213,6 +1213,9 @@ end subroutine clubb_init_cnst
    real(r8)  qitend(pcols,pver)
    real(r8)  initend(pcols,pver)
    logical            :: lqice(pcnst)
+
+   !local temporary strings 
+   character(len=200)                    :: ptendname
    
    integer :: ixorg
 
@@ -1252,7 +1255,9 @@ end subroutine clubb_init_cnst
  !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
 
    if (.not. micro_do_icesupersat) then    
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
+    !call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
+     write (ptendname, "(A20,I2.2)") "clubb_ice1_sub", macmic_it
+     call physics_ptend_init(ptend_loc,state%psetcols, trim(adjustl(ptendname)), ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
    call physics_state_copy(state,state1)
@@ -2127,7 +2132,9 @@ end subroutine clubb_init_cnst
 
    !  Update physics tendencies     
    if (.not. micro_do_icesupersat) then
-      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice4')
+     !call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice4')
+      write (ptendname, "(A20,I2.2)") "clubb_ice4_sub", macmic_it
+      call physics_ptend_init(ptend_all,state%psetcols, trim(adjustl(ptendname)))
    endif
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2156,7 +2163,9 @@ end subroutine clubb_init_cnst
    lqice(ixnumliq) = .true.
    lqice(ixnumice) = .true.
     
-   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det', ls=.true., lq=lqice)
+   !call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det', ls=.true., lq=lqice)
+   write (ptendname, "(A20,I2.2)") "clubb_det_sub", macmic_it
+   call physics_ptend_init(ptend_loc,state%psetcols, trim(adjustl(ptendname)), ls=.true., lq=lqice)
    
    call t_startf('ice_cloud_detrain_diag')
    do k=1,pver

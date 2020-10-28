@@ -2764,7 +2764,7 @@ end if
 
 
           if (use_subcol_microp) then
-             call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, pbuf)
+             call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, macmic_it, pbuf)
 
              ! Average the sub-column ptend for use in gridded update - will not contain ptend_aero
              call subcol_ptend_avg(ptend_sc, state_sc%ngrdcol, lchnk, ptend)
@@ -2787,7 +2787,7 @@ end if
              call physics_tend_dealloc(tend_sc)
              call physics_ptend_dealloc(ptend_sc)
           else
-             call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
+             call microp_driver_tend(state, ptend, cld_macmic_ztodt, macmic_it, pbuf)
           end if
           ! combine aero and micro tendencies for the grid
           if (.not. micro_do_icesupersat) then
@@ -3105,8 +3105,10 @@ end subroutine phys_timestep_init
 
 
 subroutine add_fld_default_calls()
-  !BSINGH -  For adding addfld and add defualt calls
+  !BSINGH - For adding addfld and add defualt calls
   use cam_history,        only: addfld, add_default, fieldname_len, horiz_only
+  !SZHANG - For adding substepping output
+  use phys_control,     only: phys_getopts
 
   implicit none
 
@@ -3131,29 +3133,64 @@ subroutine add_fld_default_calls()
            'af_ac_energy_chk    ','endphysac           '/)
 
   character(len=fieldname_len) :: varname
-  character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
+  character(len=1000)          :: substep
   
-  integer :: iv, id, ntot, ndef, ihist
+  integer :: iv, id, ntot, ndef, ihist, imacmic
+  integer :: cld_macmic_num_steps
+
+  call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps)
 
   ntot = size(vlist_all)
   ndef = size(vlist_default)
 
   do ihist = 1 , nvars_prtrb_hist
+
      do iv = 1, ntot   
-        
+
+       if( trim(adjustl(vlist_all(iv))).eq."clubb_ice1" .or. &
+           trim(adjustl(vlist_all(iv))).eq."clubb_det"  .or. &
+           trim(adjustl(vlist_all(iv))).eq."clubb_ice4" .or. &
+           trim(adjustl(vlist_all(iv))).eq."micro_mg"   .or. &
+           trim(adjustl(vlist_all(iv))).eq."cldwat_mic" &
+         ) then
+
+        do imacmic = 1,cld_macmic_num_steps
+          write(substep,"(A3,I2.2)")"sub",imacmic
+          varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv)))//'_'//trim(adjustl(substep))
+          if (trim(adjustl(hist_vars(ihist))).ne."NSTEP") then
+            call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+          else
+            call addfld (trim(adjustl(varname)), horiz_only, 'A','timestep','Model timestep')
+          end if
+
+          !Add default for selected processes
+          do id = 1, ndef
+           if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
+            call add_default (trim(adjustl(varname)), 1, ' ')
+           end if
+          enddo
+   
+        end do 
+     
+       else
+
         varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
 
         if (trim(adjustl(hist_vars(ihist))).ne."NSTEP") then 
           call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-          !Add default for selected processes
         else
           call addfld (trim(adjustl(varname)), horiz_only, 'A','timestep','Model timestep')
-        end if 
+        end if
+ 
+        !Add default for selected processes
         do id = 1, ndef
          if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
           call add_default (trim(adjustl(varname)), 1, ' ')        
          end if 
         enddo 
+
+       end if  
+
      enddo
   enddo
 
