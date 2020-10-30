@@ -3170,8 +3170,8 @@ subroutine add_fld_default_calls()
            'Grav_wave_drag      ','nudging             ','convect_shallow     ','topphysac           ',&
            'endphysac           ','bf_ac_energy_chk    ','af_ac_energy_chk    ','af_clubb_srf        ',&
            'bf_gw_drag          ','topmacmic           ','topradiation        ','dp_energy_chk       ',&
-           'top_ndrop           ','end_ndrop           ','af_regeneration     ','af_old_cld_activate ',&
-           'af_mixing           '/)
+           'top_ndrop           ','end_ndrop           ','ndrop_afreg         ','ndrop_afact         ',&
+           'ndrop_afmix         '/)
 
   !Add default for selected processes
   character(len=20), parameter :: vlist_default(25) = (/ 'topphysbc           ',&
