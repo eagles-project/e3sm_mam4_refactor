@@ -2470,6 +2470,22 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
+    if (pergro_test_active) then
+       !call outfld calls
+       do ihist = 1 , nvars_prtrb_hist
+          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_dp_energy_chk' ! form variable name
+          if(vsuffix.ne."NSTEP") then
+            call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols, lchnk )
+          else
+           !Output NSTEP for debugging
+            nstep = get_nstep()
+            timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if
+       enddo
+    endif
+
     !
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
     !
@@ -2628,6 +2644,22 @@ end if
          state%q(:ncol,:pver,ixnumice) = ni_after_macmic(:ncol,:pver)
 
        end if
+
+       if (pergro_test_active) then
+          !call outfld calls
+          do ihist = 1 , nvars_prtrb_hist
+             vsuffix  = trim(adjustl(hist_vars(ihist)))
+             varname  = trim(adjustl(vsuffix))//'_topmacmic' ! form variable name
+             if(vsuffix.ne."NSTEP") then
+               call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+             else
+              !Output NSTEP for debugging
+              nstep = get_nstep()
+              timestep(:ncol) = nstep
+              call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+             end if
+          enddo
+       endif
 
 
        do macmic_it = 1, cld_macmic_num_steps
@@ -2947,6 +2979,22 @@ end if ! l_tracer_aero
        call nudging_calc_tend(state)
     endif
 
+    if (pergro_test_active) then
+       !call outfld calls
+       do ihist = 1 , nvars_prtrb_hist
+          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_topradiation' ! form variable name
+          if(vsuffix.ne."NSTEP") then
+           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          else
+           !Output NSTEP for debugging
+           nstep = get_nstep()
+           timestep(:ncol) = nstep
+           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
+          end if
+       enddo
+    endif
+
 if (l_rad) then
     !===================================================
     ! Radiation computations
@@ -3113,7 +3161,7 @@ subroutine add_fld_default_calls()
   implicit none
 
   !Add all existing ptend names for the addfld calls
-  character(len=20), parameter :: vlist_all(30) = (/     'topphysbc           ',&
+  character(len=20), parameter :: vlist_all(33) = (/     'topphysbc           ',&
            'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
            'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow_off ',&
            'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
@@ -3121,16 +3169,17 @@ subroutine add_fld_default_calls()
            'chemistry           ','clubb_srf           ','rayleigh_friction   ','aero_model_drydep_ma',&
            'Grav_wave_drag      ','nudging             ','convect_shallow     ','topphysac           ',&
            'endphysac           ','bf_ac_energy_chk    ','af_ac_energy_chk    ','af_clubb_srf        ',&
-           'bf_gw_drag          '/)
+           'bf_gw_drag          ','topmacmic           ','topradiation        ','dp_energy_chk       '/)
 
   !Add default for selected processes
-  character(len=20), parameter :: vlist_default(23) = (/ 'topphysbc           ',&
+  character(len=20), parameter :: vlist_default(26) = (/ 'topphysbc           ',&
            'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
            'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow     ',&
            'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
            'cldwat_mic          ','cam_radheat         ','topphysac           ','af_clubb_srf        ',&
            'rayleigh_friction   ','bf_gw_drag          ','Grav_wave_drag      ','bf_ac_energy_chk    ',&
-           'af_ac_energy_chk    ','endphysac           '/)
+           'af_ac_energy_chk    ','endphysac           ','topmacmic           ','topradiation        ',&
+           'dp_energy_chk       '/)
 
   character(len=fieldname_len) :: varname
   character(len=1000)          :: substep
