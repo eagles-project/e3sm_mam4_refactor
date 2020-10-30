@@ -388,7 +388,7 @@ end subroutine microp_aero_readnl
 !=========================================================================================
 
 subroutine microp_aero_run ( &
-   state, ptend, deltatin, pbuf, liqcldfo )
+   state, ptend, deltatin, pbuf, liqcldfo, macmic_it )
 
    ! input arguments
    type(physics_state), target, intent(in)    :: state
@@ -396,6 +396,7 @@ subroutine microp_aero_run ( &
    real(r8),                    intent(in)    :: deltatin     ! time step (s)
    real(r8),                    intent(in)    :: liqcldfo(pcols,pver)  ! old liquid cloud fraction
    type(physics_buffer_desc),   pointer       :: pbuf(:)
+   integer,                     intent(in)    :: macmic_it
 
    ! local workspace
    ! all units mks unless otherwise stated
@@ -734,7 +735,7 @@ subroutine microp_aero_run ( &
       call t_startf('dropmixnuc')
       call dropmixnuc( &
          state, ptend, deltatin, pbuf, wsub, &
-         lcldn, lcldo, nctend_mixnuc, factnum)
+         lcldn, lcldo, nctend_mixnuc, factnum, macmic_it)
       call t_stopf('dropmixnuc')
 
       npccn(:ncol,:) = nctend_mixnuc(:ncol,:)

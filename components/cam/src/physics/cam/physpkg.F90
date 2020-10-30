@@ -2678,7 +2678,7 @@ end if
             ! Aerosol Activation
             !===================================================
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo)
+            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
             call t_stopf('microp_aero_run')
 
             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
@@ -2787,7 +2787,7 @@ end if
           if (.not. micro_do_icesupersat) then 
 
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo)
+            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
             call t_stopf('microp_aero_run')
 
           endif
@@ -3161,7 +3161,7 @@ subroutine add_fld_default_calls()
   implicit none
 
   !Add all existing ptend names for the addfld calls
-  character(len=20), parameter :: vlist_all(33) = (/     'topphysbc           ',&
+  character(len=20), parameter :: vlist_all(38) = (/     'topphysbc           ',&
            'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
            'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow_off ',&
            'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
@@ -3169,17 +3169,18 @@ subroutine add_fld_default_calls()
            'chemistry           ','clubb_srf           ','rayleigh_friction   ','aero_model_drydep_ma',&
            'Grav_wave_drag      ','nudging             ','convect_shallow     ','topphysac           ',&
            'endphysac           ','bf_ac_energy_chk    ','af_ac_energy_chk    ','af_clubb_srf        ',&
-           'bf_gw_drag          ','topmacmic           ','topradiation        ','dp_energy_chk       '/)
+           'bf_gw_drag          ','topmacmic           ','topradiation        ','dp_energy_chk       ',&
+           'top_ndrop           ','end_ndrop           ','af_regeneration     ','af_old_cld_activate ',&
+           'af_mixing           '/)
 
   !Add default for selected processes
-  character(len=20), parameter :: vlist_default(26) = (/ 'topphysbc           ',&
+  character(len=20), parameter :: vlist_default(25) = (/ 'topphysbc           ',&
            'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
-           'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow     ',&
+           'momtran             ','convtran1           ','zm_conv_tend        ','topmacmic           ',&
            'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
-           'cldwat_mic          ','cam_radheat         ','topphysac           ','af_clubb_srf        ',&
-           'rayleigh_friction   ','bf_gw_drag          ','Grav_wave_drag      ','bf_ac_energy_chk    ',&
-           'af_ac_energy_chk    ','endphysac           ','topmacmic           ','topradiation        ',&
-           'dp_energy_chk       '/)
+           'cldwat_mic          ','topradiation        ','cam_radheat         ','topphysac           ',&
+           'rayleigh_friction   ','Grav_wave_drag      ','endphysac           ','top_ndrop           ',&
+           'end_ndrop           ','ndrop_afreg         ','ndrop_afact         ','ndrop_afmix         '/)
 
   character(len=fieldname_len) :: varname
   character(len=1000)          :: substep
@@ -3196,11 +3197,16 @@ subroutine add_fld_default_calls()
 
      do iv = 1, ntot   
 
-       if( trim(adjustl(vlist_all(iv))).eq."clubb_ice1" .or. &
-           trim(adjustl(vlist_all(iv))).eq."clubb_det"  .or. &
-           trim(adjustl(vlist_all(iv))).eq."clubb_ice4" .or. &
-           trim(adjustl(vlist_all(iv))).eq."micro_mg"   .or. &
-           trim(adjustl(vlist_all(iv))).eq."cldwat_mic" &
+       if( trim(adjustl(vlist_all(iv))).eq."clubb_ice1"    .or. &
+           trim(adjustl(vlist_all(iv))).eq."clubb_det"     .or. &
+           trim(adjustl(vlist_all(iv))).eq."clubb_ice4"    .or. &
+           trim(adjustl(vlist_all(iv))).eq."micro_mg"      .or. &
+           trim(adjustl(vlist_all(iv))).eq."cldwat_mic"    .or. &
+           trim(adjustl(vlist_all(iv))).eq."top_ndrop"     .or. &
+           trim(adjustl(vlist_all(iv))).eq."end_ndrop"     .or. &
+           trim(adjustl(vlist_all(iv))).eq."ndrop_afreg"   .or. &
+           trim(adjustl(vlist_all(iv))).eq."ndrop_afact"   .or. &
+           trim(adjustl(vlist_all(iv))).eq."ndrop_afmix"        &
          ) then
 
         do imacmic = 1,cld_macmic_num_steps

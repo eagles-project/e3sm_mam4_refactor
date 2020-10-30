@@ -298,7 +298,7 @@ end subroutine ndrop_init
 
 subroutine dropmixnuc( &
    state, ptend, dtmicro, pbuf, wsub, &
-   cldn, cldo, tendnd, factnum)
+   cldn, cldo, tendnd, factnum, macmic_it)
 
    ! vertical diffusion and nucleation of cloud droplets
    ! assume cloud presence controlled by cloud fraction
@@ -435,8 +435,20 @@ subroutine dropmixnuc( &
    integer  :: idx1000
    logical  :: zmflag
 
+   ! add extra diagnostic output at each macmic step
+   integer,intent(in)    :: macmic_it
+   real(r8)              :: numliq_top_ndrop(pcols,pver)
+   real(r8)              :: numliq_ndrop_afreg(pcols,pver)
+   real(r8)              :: numliq_ndrop_afact(pcols,pver)
+   real(r8)              :: numliq_ndrop_afmix(pcols,pver)
+   real(r8)              :: numliq_end_ndrop(pcols,pver)
+   character(len=25)     :: tmpstrname
+   logical               :: pergro_test_active
 
    !-------------------------------------------------------------------------------
+
+   call phys_getopts(pergro_test_active_out = pergro_test_active) !! get flag to control the extra output
+
 
    sq2pi = sqrt(2._r8*pi)
 
@@ -580,6 +592,8 @@ subroutine dropmixnuc( &
          end do
       end do
 
+      numliq_top_ndrop(i,:) = qcld(:)
+
       ! droplet nucleation/aerosol activation
 
       ! tau_cld_regenerate = time scale for regeneration of cloudy air 
@@ -687,6 +701,9 @@ subroutine dropmixnuc( &
 
       enddo  ! grow_shrink_main_k_loop
       ! end of k-loop for growing/shrinking cloud calcs ......................
+
+      !! save the variable for output
+      numliq_ndrop_afreg(i,:)= qcld(:)
 
       ! ......................................................................
       ! start of k-loop for calc of old cloud activation tendencies ..........
@@ -857,6 +874,9 @@ subroutine dropmixnuc( &
 
       end do  ! old_cloud_main_k_loop
 
+     !save the variables for output
+      numliq_ndrop_afact(i,:)=qcld(:pver)
+
       ! switch nsav, nnew so that nnew is the updated aerosol
       ntemp = nsav
       nsav  = nnew
@@ -938,7 +958,6 @@ subroutine dropmixnuc( &
             mact(k,m) = min( mact(k,m), ekkp(k) )
          end do
       end do
-
 
       ! old_cloud_nsubmix_loop
       do n = 1, nsubmix
@@ -1024,6 +1043,9 @@ subroutine dropmixnuc( &
 
       end do ! old_cloud_nsubmix_loop
 
+      !save the variables for output
+      numliq_ndrop_afmix(i,:)=qcld(:pver)
+
       ! evaporate particles again if no cloud
 
       do k = top_lev, pver
@@ -1082,8 +1104,31 @@ subroutine dropmixnuc( &
 
       end if
 
+      !save the variables for output
+      numliq_end_ndrop(i,:)=qcld(:pver)
+
    end do  ! overall_main_i_loop
    ! end of main loop over i/longitude ....................................
+
+   !!output extra diagnostics!!!!
+   if (pergro_test_active) then !! add extra diagnostic variables
+
+    write (tmpstrname, "(A20,I2.2)") "numliq_top_ndrop_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   numliq_top_ndrop, pcols, lchnk )
+
+    write (tmpstrname, "(A20,I2.2)") "numliq_end_ndrop_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   numliq_end_ndrop, pcols, lchnk )
+
+    write (tmpstrname, "(A20,I2.2)") "numliq_ndrop_afreg_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afreg, pcols, lchnk )
+
+    write (tmpstrname, "(A20,I2.2)") "numliq_ndrop_afact_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afact, pcols, lchnk )
+
+    write (tmpstrname, "(A20,I2.2)") "numliq_ndrop_afmix_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afmix, pcols, lchnk )
+
+   end if 
 
    call outfld('NDROPCOL', ndropcol, pcols, lchnk)
    call outfld('NDROPSRC', nsource,  pcols, lchnk)
