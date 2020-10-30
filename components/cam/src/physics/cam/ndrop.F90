@@ -1113,19 +1113,19 @@ subroutine dropmixnuc( &
    !!output extra diagnostics!!!!
    if (pergro_test_active) then !! add extra diagnostic variables
 
-    write (tmpstrname, "(A20,I2.2)") "NUMLIQ_top_ndrop_sub", macmic_it
+    write (tmpstrname, "(A25,I2.2)") "NUMLIQ_top_ndrop_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_top_ndrop, pcols, lchnk )
 
-    write (tmpstrname, "(A20,I2.2)") "NUMLIQ_end_ndrop_sub", macmic_it
+    write (tmpstrname, "(A25,I2.2)") "NUMLIQ_end_ndrop_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_end_ndrop, pcols, lchnk )
 
-    write (tmpstrname, "(A20,I2.2)") "NUMLIQ_ndrop_afreg_sub", macmic_it
+    write (tmpstrname, "(A25,I2.2)") "NUMLIQ_ndrop_afreg_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afreg, pcols, lchnk )
 
-    write (tmpstrname, "(A20,I2.2)") "NUMLIQ_ndrop_afact_sub", macmic_it
+    write (tmpstrname, "(A25,I2.2)") "NUMLIQ_ndrop_afact_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afact, pcols, lchnk )
 
-    write (tmpstrname, "(A20,I2.2)") "NUMLIQ_ndrop_afmix_sub", macmic_it
+    write (tmpstrname, "(A25,I2.2)") "NUMLIQ_ndrop_afmix_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afmix, pcols, lchnk )
 
    end if 
