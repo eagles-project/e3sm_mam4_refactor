@@ -442,7 +442,7 @@ subroutine dropmixnuc( &
    real(r8)              :: numliq_ndrop_afact(pcols,pver)
    real(r8)              :: numliq_ndrop_afmix(pcols,pver)
    real(r8)              :: numliq_end_ndrop(pcols,pver)
-   character(len=25)     :: tmpstrname
+   character(len=40)     :: tmpstrname
    logical               :: pergro_test_active
 
    !-------------------------------------------------------------------------------

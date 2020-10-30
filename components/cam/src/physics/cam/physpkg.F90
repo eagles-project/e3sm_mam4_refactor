@@ -3220,9 +3220,26 @@ subroutine add_fld_default_calls()
 
           !Add default for selected processes
           do id = 1, ndef
+
            if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
-            call add_default (trim(adjustl(varname)), 1, ' ')
+
+             if( trim(adjustl(vlist_all(iv))).eq."top_ndrop"     .or. &
+                trim(adjustl(vlist_all(iv))).eq."end_ndrop"     .or. &
+                trim(adjustl(vlist_all(iv))).eq."ndrop_afreg"   .or. &
+                trim(adjustl(vlist_all(iv))).eq."ndrop_afact"   .or. &
+                trim(adjustl(vlist_all(iv))).eq."ndrop_afmix"        &
+                ) then 
+                
+               if (trim(adjustl(hist_vars(ihist))) .eq. "NUMLIQ") then
+                 call add_default (trim(adjustl(varname)), 1, ' ')  
+               end if 
+
+             else
+               call add_default (trim(adjustl(varname)), 1, ' ')
+             end if 
+
            end if
+
           enddo
    
         end do 
