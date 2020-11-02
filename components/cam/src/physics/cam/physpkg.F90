@@ -1635,24 +1635,6 @@ if (l_vdiff) then
 
 end if ! l_vdiff
 
-!!Add output for Water budget analysis
-if (pergro_test_active) then
-   !call outfld calls
-   do ihist = 1 , nvars_prtrb_hist
-      vsuffix  = trim(adjustl(hist_vars(ihist)))
-      varname  = trim(adjustl(vsuffix))//'_af_clubb_srf' ! form variable name
-      if(vsuffix.ne."NSTEP") then
-       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
-      else
-       !Output NSTEP for debugging
-       nstep = get_nstep()
-       timestep(:ncol) = nstep
-       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-      end if 
-   enddo
-
-endif
-
 if (l_rayleigh) then
     !===================================================
     ! Rayleigh friction calculation
@@ -1704,23 +1686,6 @@ if (l_tracer_aero) then
 
 end if ! l_tracer_aero
 
-!!Add output for Water budget analysis
-if (pergro_test_active) then
-   !call outfld calls
-   do ihist = 1 , nvars_prtrb_hist
-      vsuffix  = trim(adjustl(hist_vars(ihist)))
-      varname  = trim(adjustl(vsuffix))//'_bf_gw_drag' ! form variable name
-      if(vsuffix.ne."NSTEP") then
-       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
-      else
-       !Output NSTEP for debugging
-       nstep = get_nstep()
-       timestep(:ncol) = nstep
-       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-      end if
-   enddo
-endif
-
 if (l_gw_drag) then
     !===================================================
     ! Gravity wave drag
@@ -1769,23 +1734,6 @@ end if ! l_gw_drag
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
-
-!!Add output for water budget analysis
-if (pergro_test_active) then
-   !call outfld calls
-   do ihist = 1 , nvars_prtrb_hist
-      vsuffix  = trim(adjustl(hist_vars(ihist)))
-      varname  = trim(adjustl(vsuffix))//'_bf_ac_energy_chk' ! form variable name
-      if(vsuffix.ne."NSTEP") then
-       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
-      else
-       !Output NSTEP for debugging
-       nstep = get_nstep()
-       timestep(:ncol) = nstep
-       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-      end if
-   enddo
-endif
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -1840,23 +1788,6 @@ if (l_ac_energy_chk) then
 
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 end if ! l_ac_energy_chk
-
-!!Add output for water budget analysis
-if (pergro_test_active) then
-   !call outfld calls
-   do ihist = 1 , nvars_prtrb_hist
-      vsuffix  = trim(adjustl(hist_vars(ihist)))
-      varname  = trim(adjustl(vsuffix))//'_af_ac_energy_chk' ! form variable name
-      if(vsuffix.ne."NSTEP") then
-       call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
-      else
-       !Output NSTEP for debugging
-       nstep = get_nstep()
-       timestep(:ncol) = nstep
-       call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-      end if
-   enddo
-endif
 
     if (aqua_planet) then
        labort = .false.
@@ -2469,22 +2400,6 @@ end if
     ! Check energy integrals, including "reserved liquid"
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
-
-    if (pergro_test_active) then
-       !call outfld calls
-       do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
-          varname  = trim(adjustl(vsuffix))//'_dp_energy_chk' ! form variable name
-          if(vsuffix.ne."NSTEP") then
-            call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols, lchnk )
-          else
-           !Output NSTEP for debugging
-            nstep = get_nstep()
-            timestep(:ncol) = nstep
-           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-          end if
-       enddo
-    endif
 
     !
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
@@ -3161,17 +3076,15 @@ subroutine add_fld_default_calls()
   implicit none
 
   !Add all existing ptend names for the addfld calls
-  character(len=20), parameter :: vlist_all(38) = (/     'topphysbc           ',&
+  character(len=20), parameter :: vlist_all(33) = (/     'topphysbc           ',&
            'chkenergyfix        ','dadadj              ','zm_convr            ','zm_conv_evap        ',&
            'momtran             ','convtran1           ','zm_conv_tend        ','convect_shallow_off ',&
            'clubb_ice1          ','clubb_det           ','clubb_ice4          ','micro_mg            ',&
            'cldwat_mic          ','aero_model_wetdep_ma','convtran2           ','cam_radheat         ',&
            'chemistry           ','clubb_srf           ','rayleigh_friction   ','aero_model_drydep_ma',&
            'Grav_wave_drag      ','nudging             ','convect_shallow     ','topphysac           ',&
-           'endphysac           ','bf_ac_energy_chk    ','af_ac_energy_chk    ','af_clubb_srf        ',&
-           'bf_gw_drag          ','topmacmic           ','topradiation        ','dp_energy_chk       ',&
-           'top_ndrop           ','end_ndrop           ','ndrop_afreg         ','ndrop_afact         ',&
-           'ndrop_afmix         '/)
+           'endphysac           ','topmacmic           ','topradiation        ','top_ndrop           ',&
+           'end_ndrop           ','ndrop_afreg         ','ndrop_afact         ','ndrop_afmix         '/)
 
   !Add default for selected processes
   character(len=20), parameter :: vlist_default(25) = (/ 'topphysbc           ',&
