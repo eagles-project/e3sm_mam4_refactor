@@ -345,15 +345,15 @@
     <OS>CNL</OS>
     <COMPILERS>intel,gnu,intel19</COMPILERS>
     <MPILIBS>mpt,impi</MPILIBS>
-    <PROJECT>acme</PROJECT>
-    <SAVE_TIMING_DIR>/project/projectdirs/acme</SAVE_TIMING_DIR>
-    <SAVE_TIMING_DIR_PROJECTS>acme,m2830,m2833</SAVE_TIMING_DIR_PROJECTS>
-    <CIME_OUTPUT_ROOT>$ENV{SCRATCH}/acme_scratch/cori-knl</CIME_OUTPUT_ROOT>
-    <DIN_LOC_ROOT>/project/projectdirs/acme/inputdata</DIN_LOC_ROOT>
-    <DIN_LOC_ROOT_CLMFORC>/project/projectdirs/acme/inputdata/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+    <PROJECT>e3sm</PROJECT>
+    <SAVE_TIMING_DIR>/global/cfs/cdirs/e3sm</SAVE_TIMING_DIR>
+    <SAVE_TIMING_DIR_PROJECTS>e3sm,m3411,m3412</SAVE_TIMING_DIR_PROJECTS>
+    <CIME_OUTPUT_ROOT>$ENV{SCRATCH}/e3sm_scratch/cori-knl</CIME_OUTPUT_ROOT>
+    <DIN_LOC_ROOT>/global/cfs/cdirs/e3sm/inputdata</DIN_LOC_ROOT>
+    <DIN_LOC_ROOT_CLMFORC>/global/cfs/cdirs/e3sm/inputdata/atm/datm7</DIN_LOC_ROOT_CLMFORC>
     <DOUT_S_ROOT>$CIME_OUTPUT_ROOT/archive/$CASE</DOUT_S_ROOT>
-    <BASELINE_ROOT>/project/projectdirs/acme/baselines/$COMPILER</BASELINE_ROOT>
-    <CCSM_CPRNC>/project/projectdirs/acme/tools/cprnc.cori/cprnc</CCSM_CPRNC>
+    <BASELINE_ROOT>/global/cfs/cdirs/e3sm/baselines/$COMPILER</BASELINE_ROOT>
+    <CCSM_CPRNC>/global/cfs/cdirs/e3sm/tools/cprnc.cori/cprnc</CCSM_CPRNC>
     <GMAKE_J>8</GMAKE_J>
     <TESTS>e3sm_developer</TESTS>
     <BATCH_SYSTEM>nersc_slurm</BATCH_SYSTEM>
@@ -382,6 +382,7 @@
       <cmd_path lang="csh">module</cmd_path>
       <modules>
         <command name="rm">craype</command>
+        <command name="rm">craype-hugepages2M</command>
         <command name="rm">craype-mic-knl</command>
         <command name="rm">craype-haswell</command>
         <command name="rm">PrgEnv-intel</command>
@@ -391,7 +392,7 @@
         <command name="rm">cce</command>
         <command name="rm">gcc</command>
         <command name="rm">cray-parallel-netcdf</command>
-        <command name="rm">cray-parallel-hdf5</command>
+        <command name="rm">cray-hdf5-parallel</command>
         <command name="rm">pmi</command>
         <command name="rm">cray-mpich2</command>
         <command name="rm">cray-mpich</command>
@@ -404,7 +405,9 @@
         <command name="rm">cray-petsc</command>
         <command name="rm">esmf</command>
         <command name="rm">zlib</command>
-
+        <command name="rm">craype-hugepages2M</command>
+        <command name="rm">darshan</command>
+        
         <!-- first load basic defaults, then remove/swap/load as necessary -->
         <command name="load">craype</command>
         <command name="load">PrgEnv-intel</command>
@@ -414,37 +417,37 @@
       </modules>
 
       <modules mpilib="mpt">
-        <command name="swap">cray-mpich cray-mpich/7.7.0</command>
+        <command name="swap">cray-mpich cray-mpich/7.7.6</command>
       </modules>
 
       <modules mpilib="impi">
-        <command name="swap">cray-mpich impi/2018.up2</command>
+        <command name="swap">cray-mpich impi/2019.up3</command>
       </modules>
 
       <modules compiler="intel">
-        <command name="load">PrgEnv-intel/6.0.4</command>
+        <command name="load">PrgEnv-intel/6.0.5</command>
         <command name="rm">intel</command>
         <command name="load">intel/18.0.1.163</command>
       </modules>
 
       <modules compiler="intel19">
-        <command name="load">PrgEnv-intel/6.0.4</command>
+        <command name="load">PrgEnv-intel/6.0.5</command>
         <command name="rm">intel</command>
-        <command name="load">intel/19.0.0.117</command>
+        <command name="load">intel/19.0.3.199</command>
       </modules>
 
       <modules compiler="gnu">
-        <command name="swap">PrgEnv-intel PrgEnv-gnu/6.0.4</command>
+        <command name="swap">PrgEnv-intel PrgEnv-gnu/6.0.5</command>
         <command name="rm">gcc</command>
-        <command name="load">gcc/7.3.0</command>
+        <command name="load">gcc/8.2.0</command>
         <command name="rm">cray-libsci</command>
-        <command name="load">cray-libsci/18.03.1</command>
+        <command name="load">cray-libsci/19.02.1</command>
       </modules>
 
       <modules>
-        <command name="swap">craype craype/2.5.14</command>
+        <command name="swap">craype craype/2.5.18</command>
         <command name="rm">pmi</command>
-        <command name="load">pmi/5.0.13</command>
+        <command name="load">pmi/5.0.14</command>
         <command name="rm">craype-haswell</command>
         <command name="load">craype-mic-knl</command>
       </modules>
@@ -453,21 +456,21 @@
         <command name="rm">cray-netcdf-hdf5parallel</command>
         <command name="rm">cray-hdf5-parallel</command>
         <command name="rm">cray-parallel-netcdf</command>
-        <command name="load">cray-netcdf/4.4.1.1.6</command>
-        <command name="load">cray-hdf5/1.10.1.1</command>
+        <command name="load">cray-netcdf/4.6.1.3</command>
+        <command name="load">cray-hdf5/1.10.2.0</command>
       </modules>
       <modules mpilib="!mpi-serial">
         <command name="rm">cray-netcdf-hdf5parallel</command>
-        <command name="load">cray-netcdf-hdf5parallel/4.4.1.1.6</command>
-        <command name="load">cray-hdf5-parallel/1.10.1.1</command>
-        <command name="load">cray-parallel-netcdf/1.8.1.3</command>
+        <command name="load">cray-netcdf-hdf5parallel/4.6.1.3</command>
+        <command name="load">cray-hdf5-parallel/1.10.2.0</command>
+        <command name="load">cray-parallel-netcdf/1.8.1.4</command>
       </modules>
 
       <modules>
         <command name="rm">git</command>
         <command name="load">git</command>
         <command name="rm">cmake</command>
-        <command name="load">cmake/3.3.2</command>
+        <command name="load">cmake/3.14.4</command>
       </modules>
 
       <!--command name="list">&gt;&amp; ml.txt</command-->
@@ -486,17 +489,11 @@
       <env name="OMP_PROC_BIND">spread</env>
       <env name="OMP_PLACES">threads</env>
       <env name="HDF5_USE_FILE_LOCKING">FALSE</env>
+      <env name="CRAYPE_LINK_TYPE">static</env>
     </environment_variables>
 
     <environment_variables mpilib="mpt">
       <env name="MPICH_GNI_DYNAMIC_CONN">disabled</env>
-    </environment_variables>
-    <environment_variables mpilib="impi">
-      <env name="I_MPI_FABRICS">ofi</env>
-      <env name="I_MPI_OFI_PROVIDER">gni</env>
-      <env name="I_MPI_PRINT_VERSION">yes</env>
-      <env name="I_MPI_OFI_LIBRARY">/global/common/cori/software/libfabric/1.6.1/gnu/lib/libfabric.so</env>
-      <env name="I_MPI_PMI_LIBRARY">/usr/lib64/slurmpmi/libpmi.so</env>
     </environment_variables>
     <environment_variables compiler="intel">
       <env name="FORT_BUFFERED">yes</env>
