@@ -48,11 +48,11 @@ module physics_update_mod
   !2. If the variable is not present in the constituent array,add a "case" statement for that variable in the "select case" 
   !   construct in get_var function in this module
 
-  integer, public, parameter :: nvars_prtrb_hist = 16
+  integer, public, parameter :: nvars_prtrb_hist = 15
   !character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['s     ', 't     ', 'Q     ', 'v     ', &
   !     'CLDLIQ', 'NUMLIQ', 'CLDICE', 'NUMICE', 'num_a1','num_a2','num_a3']
   character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['t     ', 'Q     ', 'u     ','CLDLIQ', 'NUMLIQ', &
-       'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ','NSTEP ']
+       'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ']
 
 contains 
 

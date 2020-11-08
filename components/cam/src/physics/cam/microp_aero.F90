@@ -693,7 +693,7 @@ subroutine microp_aero_run ( &
    !ICE Nucleation
 
    call t_startf('nucleate_ice_cam_calc')
-   call nucleate_ice_cam_calc(state, wsubice, pbuf)
+   call nucleate_ice_cam_calc(state, wsubice, pbuf, macmic_it)
    call t_stopf('nucleate_ice_cam_calc')
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -850,7 +850,7 @@ subroutine microp_aero_run ( &
    if (use_hetfrz_classnuc) then
 
       call t_startf('hetfrz_classnuc_cam_calc')
-      call hetfrz_classnuc_cam_calc(state, deltatin, factnum, pbuf)
+      call hetfrz_classnuc_cam_calc(state, deltatin, factnum, pbuf, macmic_it)
       call t_stopf('hetfrz_classnuc_cam_calc')
 
    end if

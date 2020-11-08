@@ -442,6 +442,11 @@ subroutine dropmixnuc( &
    real(r8)              :: numliq_ndrop_afact(pcols,pver)
    real(r8)              :: numliq_ndrop_afmix(pcols,pver)
    real(r8)              :: numliq_end_ndrop(pcols,pver)
+   real(r8)              :: npccn_top_ndrop(pcols,pver)
+   real(r8)              :: npccn_ndrop_afreg(pcols,pver)
+   real(r8)              :: npccn_ndrop_afact(pcols,pver)
+   real(r8)              :: npccn_ndrop_afmix(pcols,pver)
+   real(r8)              :: npccn_end_ndrop(pcols,pver)
    character(len=40)     :: tmpstrname
    logical               :: pergro_test_active
 
@@ -1127,6 +1132,9 @@ subroutine dropmixnuc( &
 
     write (tmpstrname, "(A25,I2.2)") "NUMLIQ_ndrop_afmix_sub", macmic_it
     call outfld(trim(adjustl(tmpstrname)),   numliq_ndrop_afmix, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NPCCN_end_ndrop_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   tendnd, pcols, lchnk )
 
    end if 
 

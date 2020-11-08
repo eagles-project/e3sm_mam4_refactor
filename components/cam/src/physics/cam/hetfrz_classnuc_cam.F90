@@ -671,7 +671,7 @@ end subroutine hetfrz_classnuc_cam_init
 !================================================================================================
 
 subroutine hetfrz_classnuc_cam_calc( &
-   state, deltatin, factnum, pbuf)
+   state, deltatin, factnum, pbuf, macmic_it)
 
    ! arguments
    type(physics_state), target, intent(in)    :: state
@@ -679,6 +679,8 @@ subroutine hetfrz_classnuc_cam_calc( &
    real(r8),                    intent(in)    :: factnum(:,:,:) ! activation fraction for aerosol number
    type(physics_buffer_desc),   pointer       :: pbuf(:)
  
+   integer,intent(in)    :: macmic_it
+
    ! local workspace
 
    ! outputs shared with the microphysics via the pbuf
@@ -734,6 +736,13 @@ subroutine hetfrz_classnuc_cam_calc( &
    real(r8) :: na500(pcols,pver)
    real(r8) :: tot_na500(pcols,pver)
 
+   real(r8) :: nifrzimm(pcols,pver)
+   real(r8) :: nifrzcnt(pcols,pver)
+   real(r8) :: nifrzdep(pcols,pver)
+   real(r8) :: nifrztot(pcols,pver)
+   character(len=40)     :: tmpstrname
+   logical               :: pergro_test_active
+
    character(128) :: errstring   ! Error status
    !-------------------------------------------------------------------------------
 
@@ -749,6 +758,9 @@ subroutine hetfrz_classnuc_cam_calc( &
 
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+
+   !-------------------------------------------------------------------------------
+   call phys_getopts(pergro_test_active_out = pergro_test_active) !! get flag to control the extra output
 
    !initialize rho
    rho(:,:) = 0.0_r8
@@ -947,6 +959,12 @@ subroutine hetfrz_classnuc_cam_calc( &
          numice10s(i,k) = (frzimm(i,k)+frzcnt(i,k)+frzdep(i,k))*1.0e6_r8*deltatin*(10._r8/deltatin)
          numice10s_imm_dst(i,k) = frzduimm(i,k)*1.0e6_r8*deltatin*(10._r8/deltatin)
          numice10s_imm_bc(i,k) = frzbcimm(i,k)*1.0e6_r8*deltatin*(10._r8/deltatin)
+
+         nifrzimm(i,k)  = frzimm(i,k)*1.0e6_r8/rho(i,k)
+         nifrzcnt(i,k)  = frzcnt(i,k)*1.0e6_r8/rho(i,k)
+         nifrzdep(i,k)  = frzdep(i,k)*1.0e6_r8/rho(i,k)
+         nifrztot(i,k)  = (frzimm(i,k)+frzcnt(i,k)+frzdep(i,k))*1.0e6_r8/rho(i,k)
+ 
       end do
    end do
 
@@ -981,6 +999,24 @@ subroutine hetfrz_classnuc_cam_calc( &
    call outfld('NUMICE10s',    numice10s,         pcols, lchnk)
    call outfld('NUMIMM10sDST', numice10s_imm_dst, pcols, lchnk)
    call outfld('NUMIMM10sBC',  numice10s_imm_bc,  pcols, lchnk)
+
+   !!output extra diagnostics!!!!
+   if (pergro_test_active) then !! add extra diagnostic variables
+
+    write (tmpstrname, "(A25,I2.2)") "NIIMM_end_hetfrz_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   nifrzimm, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NICNT_end_hetfrz_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   nifrzcnt, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NIDEP_end_hetfrz_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   nifrzdep, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NITOT_end_hetfrz_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),   nifrztot, pcols, lchnk )
+
+   end if
+
 
    end associate
 

@@ -14,7 +14,7 @@ use physconst,      only: pi, rair, tmelt
 use constituents,   only: cnst_get_ind
 use physics_types,  only: physics_state
 use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
-use phys_control,   only: use_hetfrz_classnuc
+use phys_control,   only: phys_getopts, use_hetfrz_classnuc
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
                             rad_cnst_get_mode_num, rad_cnst_get_mode_props
 
@@ -457,13 +457,15 @@ end subroutine nucleate_ice_cam_init
 !================================================================================================
 
 subroutine nucleate_ice_cam_calc( &
-   state, wsubi, pbuf)
+   state, wsubi, pbuf, macmic_it)
 
    ! arguments
    type(physics_state), target, intent(in)    :: state
    real(r8),                    intent(in)    :: wsubi(:,:)
    type(physics_buffer_desc),   pointer       :: pbuf(:)
- 
+   
+   integer, intent(in) :: macmic_it
+
    ! local workspace
 
    ! naai and naai_hom are the outputs shared with the microphysics
@@ -556,7 +558,12 @@ subroutine nucleate_ice_cam_calc( &
    real(r8) :: soot_sfc, organic_sfc, dst_sfc, &
                dst1_sfc, dst2_sfc, dst3_sfc, dst4_sfc     ! aerosol surface area (m2/cm^3)
 
+   real(r8) :: tmpvar(pcols,pver) 
+   character(len=40)     :: tmpstrname
+   logical               :: pergro_test_active
+  
    !-------------------------------------------------------------------------------
+   call phys_getopts(pergro_test_active_out = pergro_test_active) !! get flag to control the extra output
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -856,6 +863,29 @@ subroutine nucleate_ice_cam_calc( &
    call outfld('NIIMM', niimm, pcols, lchnk)
    call outfld('NIDEP', nidep, pcols, lchnk)
    call outfld('NIMEY', nimey, pcols, lchnk)
+
+   !!output extra diagnostics!!!!
+   if (pergro_test_active) then !! add extra diagnostic variables
+
+    write (tmpstrname, "(A25,I2.2)") "NIHF_end_icenuc_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)), naai_hom, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NIIMM_end_icenuc_sub", macmic_it
+    tmpvar = niimm / rho
+    call outfld(trim(adjustl(tmpstrname)),   tmpvar, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NIDEP_end_icenuc_sub", macmic_it
+    tmpvar = nidep / rho
+    call outfld(trim(adjustl(tmpstrname)),   tmpvar, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NIMEY_end_icenuc_sub", macmic_it
+    tmpvar = nimey / rho
+    call outfld(trim(adjustl(tmpstrname)),   tmpvar, pcols, lchnk )
+
+    write (tmpstrname, "(A25,I2.2)") "NAAI_end_icenuc_sub", macmic_it
+    call outfld(trim(adjustl(tmpstrname)),     naai, pcols, lchnk )
+
+   end if
 
    if (use_preexisting_ice) then
       call outfld( 'fhom' , fhom, pcols, lchnk)
