@@ -940,7 +940,8 @@ end subroutine clubb_init_cnst
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,     hdtime, &
                               cmfmc,   cam_in,   sgh30, & 
-                              macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
+                              macmic_it, cld_macmic_num_steps, macmic_extra_diag, &
+                              dlf, det_s, det_ice, alst_o)
 
 !-------------------------------------------------------------------------------
 ! Description: Provide tendencies of shallow convection, turbulence, and 
@@ -1010,7 +1011,7 @@ end subroutine clubb_init_cnst
    real(r8),            intent(in)    :: sgh30(pcols)             ! std deviation of orography              [m]
    integer,             intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
    integer,             intent(in)    :: macmic_it                ! number of mac-mic iterations
-    
+   logical,             intent(in)    :: macmic_extra_diag        ! flag to output extra diagnostics 
    ! ---------------------- !
    ! Input-Output Auguments !
    ! ---------------------- !
@@ -1266,6 +1267,20 @@ end subroutine clubb_init_cnst
    real(r8) frediff_ge(pcols,pverp)
    real(r8) thfrq_lt(pverp)
    real(r8) thfrq_ge(pverp)
+
+    character(200) :: numliqname               !String for numliq name at each sub step
+    character(200) :: cldliqname               !String for cldliq name at each sub step
+    character(200) :: numicename               !String for numice name at each sub step
+    character(200) :: cldicename               !String for cldice name at each sub step
+    character(200) :: tmpname,thlname,qvaporname        !String for temporal variable name
+
+    real(r8) :: tmpthlm(pcols,pver)            !temporary array for thlm
+    real(r8) :: tmpnumliq(pcols,pver)          !temporary array for numliq
+    real(r8) :: tmpcldliq(pcols,pver)          !temporary array for cldliq 
+    real(r8) :: tmpnumice(pcols,pver)          !temporary array for numice
+    real(r8) :: tmpcldice(pcols,pver)          !temporary array for cldice
+    real(r8) :: tmpvar(pcols,pver)          !temporary array for temperature
+    real(r8) :: tmpqvapor(pcols,pver)          !temporary array for vapor
 
 !PMA
    real(r8)  relvarc(pcols,pver)
@@ -2208,6 +2223,44 @@ end subroutine clubb_init_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
 
+   if (macmic_extra_diag) then
+      call cnst_get_ind('Q',ixq)
+      call cnst_get_ind('CLDLIQ',ixcldliq)
+      call cnst_get_ind('CLDICE',ixcldice)
+      call cnst_get_ind('NUMLIQ',ixnumliq)
+      call cnst_get_ind('NUMICE',ixnumice)
+
+      write (numliqname,"(A18,I2.2)") "numliq_af_clubb_", macmic_it
+      write (cldliqname,"(A18,I2.2)") "cldliq_af_clubb_", macmic_it
+      write (numicename,"(A18,I2.2)") "numice_af_clubb_", macmic_it
+      write (cldicename,"(A18,I2.2)") "cldice_af_clubb_", macmic_it
+      write (qvaporname,"(A18,I2.2)") "qvapor_af_clubb_", macmic_it
+      write (tmpname,"(A16,I2.2)")    "temp_af_clubb_", macmic_it
+
+      tmpnumliq(:ncol,:pver) = state1%q(:ncol,:pver,ixnumliq)
+      tmpcldliq(:ncol,:pver) = state1%q(:ncol,:pver,ixcldliq)
+      tmpnumice(:ncol,:pver) = state1%q(:ncol,:pver,ixnumice)
+      tmpcldice(:ncol,:pver) = state1%q(:ncol,:pver,ixcldice)
+      tmpqvapor(:ncol,:pver) = state1%q(:ncol,:pver,ixq)
+      tmpvar(:ncol,:pver) = state1%t(:ncol,:pver)
+
+      call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+      call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+      call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+      call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+      call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+      call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+      write (thlname,"(A16,I2.2)")    "thlm_af_clubb_", macmic_it
+      do k=1,pver
+        do i=1,ncol
+           tmpthlm(i,k) = state1%t(i,k)*exner_clubb(i,k) - (latvap/cpair)*state1%q(i,k,ixcldliq)
+        end do
+      end do
+      call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+   end if
+
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ ! 
    ! ------------------------------------------------------------ !
@@ -2279,6 +2332,44 @@ end subroutine clubb_init_cnst
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
+
+   if (macmic_extra_diag) then
+      call cnst_get_ind('Q',ixq)
+      call cnst_get_ind('CLDLIQ',ixcldliq)
+      call cnst_get_ind('CLDICE',ixcldice)
+      call cnst_get_ind('NUMLIQ',ixnumliq)
+      call cnst_get_ind('NUMICE',ixnumice)
+
+      write (numliqname,"(A18,I2.2)") "numliq_af_detrain_", macmic_it
+      write (cldliqname,"(A18,I2.2)") "cldliq_af_detrain_", macmic_it
+      write (numicename,"(A18,I2.2)") "numice_af_detrain_", macmic_it
+      write (cldicename,"(A18,I2.2)") "cldice_af_detrain_", macmic_it
+      write (qvaporname,"(A18,I2.2)") "qvapor_af_detrain_", macmic_it
+      write (tmpname,"(A16,I2.2)")    "temp_af_detrain_", macmic_it
+
+      tmpnumliq(:ncol,:pver) = state1%q(:ncol,:pver,ixnumliq)
+      tmpcldliq(:ncol,:pver) = state1%q(:ncol,:pver,ixcldliq)
+      tmpnumice(:ncol,:pver) = state1%q(:ncol,:pver,ixnumice)
+      tmpcldice(:ncol,:pver) = state1%q(:ncol,:pver,ixcldice)
+      tmpqvapor(:ncol,:pver) = state1%q(:ncol,:pver,ixq)
+      tmpvar(:ncol,:pver) = state1%t(:ncol,:pver)
+
+      call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+      call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+      call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+      call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+      call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+      call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+      write (thlname,"(A16,I2.2)")    "thlm_af_detrain_", macmic_it
+      do k=1,pver
+        do i=1,ncol
+           tmpthlm(i,k) = state1%t(i,k)*exner_clubb(i,k) - (latvap/cpair)*state1%q(i,k,ixcldliq)
+        end do
+      end do
+      call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+   end if
 
    ! ------------------------------------------------- !
    ! Diagnose relative cloud water variance            !

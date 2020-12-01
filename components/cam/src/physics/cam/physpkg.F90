@@ -2606,6 +2606,49 @@ end if
     ! Since the PBL doesn't pass constituent perturbations, they
     ! are zeroed here for input to the moist convection routine
     !
+
+    if (macmic_extra_diag) then
+        !SZhang add output here to diagnose npcc 
+        call cnst_get_ind('Q',ixqvapor)
+        call cnst_get_ind('CLDLIQ',ixcldliq)
+        call cnst_get_ind('CLDICE',ixcldice)
+        call cnst_get_ind('NUMLIQ',ixnumliq)
+        call cnst_get_ind('NUMICE',ixnumice)
+
+        numliqname = "numliq_bf_dpcu"
+        cldliqname = "cldliq_bf_dpcu"
+        numicename = "numice_bf_dpcu"
+        cldicename = "cldice_bf_dpcu"
+        qvaporname = "qvapor_bf_dpcu"
+        tmpname    = "temp_bf_dpcu"
+
+!        call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
+        tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+        tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+        tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+        tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+        tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
+        tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
+
+        !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
+        call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+        call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+        call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+        call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+        call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+        call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+        thlname    = "thlm_bf_dpcu"
+        do k=1,pver
+         do i=1,ncol
+            exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+            tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+         end do
+        end do
+        call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+    end if
+
     call t_startf ('convect_deep_tend')
     call convect_deep_tend(  &
          cmfmc,      cmfcme,             &
@@ -2617,6 +2660,49 @@ end if
     call t_stopf('convect_deep_tend')
 
     call physics_update(state, ptend, ztodt, tend)
+
+    if (macmic_extra_diag) then
+        !SZhang add output here to diagnose npcc 
+        call cnst_get_ind('Q',ixqvapor)
+        call cnst_get_ind('CLDLIQ',ixcldliq)
+        call cnst_get_ind('CLDICE',ixcldice)
+        call cnst_get_ind('NUMLIQ',ixnumliq)
+        call cnst_get_ind('NUMICE',ixnumice)
+
+        numliqname = "numliq_af_dpcu"
+        cldliqname = "cldliq_af_dpcu"
+        numicename = "numice_af_dpcu"
+        cldicename = "cldice_af_dpcu"
+        qvaporname = "qvapor_af_dpcu"
+        tmpname    = "temp_af_dpcu"
+
+!        call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
+        tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+        tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+        tmpnumice(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+        tmpcldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+        tmpqvapor(:ncol,:pver) = state%q(:ncol,:pver,ixqvapor)
+        tmpvar(:ncol,:pver) = state%t(:ncol,:pver)
+
+        !call outfld(trim(adjustl(npccnname)),   tmp_npccn, pcols, lchnk )
+        call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+        call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+        call outfld(trim(adjustl(numicename)),  tmpnumice, pcols, lchnk )
+        call outfld(trim(adjustl(cldicename)),  tmpcldice, pcols, lchnk )
+        call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
+        call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
+
+        thlname    = "thlm_af_dpcu"
+        do k=1,pver
+         do i=1,ncol
+            exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
+            tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+         end do
+        end do
+        call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
+
+    end if
+
 
     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp )
     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp )
@@ -2827,7 +2913,7 @@ end if
            call cnst_get_ind('NUMICE',ixnumice)
 
            !ifnpccn  = pbuf_get_index('NPCCN')
-           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it
+           !write (npccnname, "(A15,I2.2)") "npccn_af_clubb_", macmic_it
            write (numliqname,"(A16,I2.2)") "numliq_bf_drib_", macmic_it
            write (cldliqname,"(A16,I2.2)") "cldliq_bf_drib_", macmic_it
            write (numicename,"(A16,I2.2)") "numice_bf_drib_", macmic_it
@@ -2897,7 +2983,7 @@ end if
          endif
          call t_stopf(trim(adjustl(tmpname)))
         end if
-         
+
         if (macmic_extra_diag) then
            !SZhang add output here to diagnose npcc 
            call cnst_get_ind('Q',ixqvapor)
@@ -2907,13 +2993,13 @@ end if
            call cnst_get_ind('NUMICE',ixnumice)
 
            !ifnpccn  = pbuf_get_index('NPCCN')
-           !write (npccnname, "(A15,I2.2)") "npccn_bf_clubb_", macmic_it
-           write (numliqname,"(A16,I2.2)") "numliq_bf_clubb_", macmic_it
-           write (cldliqname,"(A16,I2.2)") "cldliq_bf_clubb_", macmic_it
-           write (numicename,"(A16,I2.2)") "numice_bf_clubb_", macmic_it
-           write (cldicename,"(A16,I2.2)") "cldice_bf_clubb_", macmic_it
-           write (qvaporname,"(A16,I2.2)") "qvapor_bf_clubb_", macmic_it
-           write (tmpname,"(A14,I2.2)")    "temp_bf_clubb_", macmic_it
+           !write (npccnname, "(A15,I2.2)") "npccn_af_clubb_", macmic_it
+           write (numliqname,"(A16,I2.2)") "numliq_af_drib_", macmic_it
+           write (cldliqname,"(A16,I2.2)") "cldliq_af_drib_", macmic_it
+           write (numicename,"(A16,I2.2)") "numice_af_drib_", macmic_it
+           write (cldicename,"(A16,I2.2)") "cldice_af_drib_", macmic_it
+           write (qvaporname,"(A16,I2.2)") "qvapor_af_drib_", macmic_it
+           write (tmpname,"(A14,I2.2)")    "temp_af_drib_", macmic_it
 
 !           call pbuf_get_field(pbuf, ifnpccn, tmp_npccn)
            tmpnumliq(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
@@ -2931,17 +3017,17 @@ end if
            call outfld(trim(adjustl(qvaporname)),  tmpqvapor, pcols, lchnk )
            call outfld(trim(adjustl(tmpname)),  tmpvar, pcols, lchnk )
 
-           write (thlname,"(A14,I2.2)")    "thlm_bf_clubb_", macmic_it
+           write (thlname,"(A14,I2.2)")    "thlm_af_drib_", macmic_it
            do k=1,pver
             do i=1,ncol
                exner_clubb = 1._r8/((state%pmid(i,k)/100000._r8)**(rair/cpair))
-               tmpthlm(i,k) = state%t(i,k)*exner_clubb -(latvap/cpair)*state%q(i,k,ixcldliq)
+               tmpthlm(i,k) = state%t(i,k)*exner_clubb - (latvap/cpair)*state%q(i,k,ixcldliq)
             end do
            end do
            call outfld(trim(adjustl(thlname)),  tmpthlm, pcols, lchnk )
 
         end if
-
+         
         if (l_st_mac) then
 
           if (micro_do_icesupersat) then 
@@ -3015,7 +3101,7 @@ end if
              ! =====================================================  
    
              call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
-                cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+                cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, macmic_extra_diag, & 
                 dlf, det_s, det_ice, lcldo)
 
                 !  Since we "added" the reserved liquid back in this routine, we need 
@@ -3786,24 +3872,28 @@ subroutine add_fld_extra_macmic_calls ()
 
   implicit none
   !Add all existing ptend names for the addfld calls
-  character(len=17), parameter ::vlist(29) = (/ 'npccn_af_micaero ',&
-         'numliq_bf_clubb  ','numliq_bf_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_mg2tend',&
+  character(len=17), parameter ::vlist(43) = (/ 'npccn_af_micaero ',&
+         'numliq_af_clubb  ','numliq_bf_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_mg2tend',&
 !        'numliq_bf_reg    ','numliq_af_reg    ','numliq_bf_mix    ','numliq_af_mix    ',&
 !        'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
 !        'wtke             ','wtke_cen         ','alstn_bf_micaero ','alstn_af_micaero ','alstn_af_mg2tend ',&
 !        'alsto_bf_micaero ','alsto_af_micaero ','alsto_af_mg2tend ',
-         'cldliq_bf_clubb  ','qvapor_bf_clubb  ','qvapor_bf_micaero','qvapor_af_mg2tend','cldice_bf_clubb  ',&
-         'numice_bf_clubb  ','numice_bf_micaero','numice_af_mg2tend','cldice_bf_micaero','cldice_af_mg2tend',&
-         'temp_bf_clubb    ','temp_bf_micaero  ','temp_af_mg2tend  ', &
+         'cldliq_af_clubb  ','qvapor_af_clubb  ','qvapor_bf_micaero','qvapor_af_mg2tend','cldice_af_clubb  ',&
+         'numice_af_clubb  ','numice_bf_micaero','numice_af_mg2tend','cldice_bf_micaero','cldice_af_mg2tend',&
+         'temp_af_clubb    ','temp_bf_micaero  ','temp_af_mg2tend  ', &
          'temp_bf_drib     ','qvapor_bf_drib   ','cldliq_bf_drib   ','cldice_bf_drib   ','numliq_bf_drib   ', &
          'numice_bf_drib   ', &
-         'thlm_bf_clubb    ','thlm_bf_micaero  ','thlm_af_mg2tend  ','thlm_bf_drib     '/) 
-
-  character(len=17), parameter ::vlist0(14) =  (/'temp_bf_rad      ','qvapor_bf_rad    ','cldliq_bf_rad    ', &
+         'thlm_af_clubb    ','thlm_bf_micaero  ','thlm_af_mg2tend  ','thlm_bf_drib     ','thlm_af_detrain  ', &
+         'temp_af_detrain  ','qvapor_af_detrain','cldliq_af_detrain','cldice_af_detrain','numliq_af_detrain', &
+         'numice_af_detrain','temp_af_drib     ','qvapor_af_drib   ','cldliq_af_drib   ','cldice_af_drib   ', &
+         'numliq_af_drib   ','numice_af_drib   ','thlm_af_drib     '/)
+   
+  character(len=17), parameter ::vlist0(28) =  (/'temp_bf_rad      ','qvapor_bf_rad    ','cldliq_bf_rad    ', &
          'cldice_bf_rad    ','numliq_bf_rad    ','numice_bf_rad    ','temp_af_rad      ','qvapor_af_rad    ', &
          'cldliq_af_rad    ','cldice_af_rad    ','numliq_af_rad    ','numice_af_rad    ','thlm_bf_rad      ', &
-         'thlm_af_rad      '/)
-
+         'thlm_af_rad      ','thlm_af_dpcu     ','temp_af_dpcu     ','qvapor_af_dpcu   ','cldliq_af_dpcu   ', &
+         'cldice_af_dpcu   ','numliq_af_dpcu   ','numice_af_dpcu   ','thlm_bf_dpcu     ','temp_bf_dpcu     ', &
+         'qvapor_bf_dpcu   ','cldliq_bf_dpcu   ','cldice_bf_dpcu   ','numliq_bf_dpcu   ','numice_bf_dpcu   '/)
 
   character(len=15), parameter :: vlist2(4) = (/ 'alstn_af_macmic'  ,'alstn_bf_macmic', 'alsto_af_macmic'  ,'alsto_bf_macmic'/)  !no substepping variable
   character(len=17), parameter :: vlist3(2) = (/ 'factnum_mam      ','raerosol_tot_mam '/) !aerosol-related variables
