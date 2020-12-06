@@ -2992,6 +2992,8 @@ end if
 
        end if
 
+     end if ! l_st_mic and l_st_mac
+
 if (l_tracer_aero) then
 
     ! Add the precipitation from CARMA to the precipitation from stratiform.
