@@ -163,6 +163,13 @@ module model_flags
 
 !$omp threadprivate(l_upwind_wpxp_ta, l_upwind_xpyp_ta, l_upwind_xm_ma)
 
+ logical, public :: &
+    l_godunov_upwind_wp3_ta   = .false., &
+    l_godunov_upwind_wpxp_ta  = .false., &
+    l_godunov_upwind_xpyp_ta  = .false. 
+
+!$omp threadprivate(l_godunov_upwind_wp3_ta, l_godunov_upwind_wpxp_ta, l_godunov_upwind_xpyp_ta)
+
   logical, public :: & 
     l_quintic_poly_interp = .false. ! Use a quintic polynomial in mono_cubic_interp
 
@@ -219,7 +226,7 @@ module model_flags
 !$omp threadprivate(l_smooth_wp3_on_wp2)
 
   logical, public :: &
-    l_smooth_brunt_vaisala_freq = .false.  ! Flag for appling smoothing on calculated brunt vaisala frequency 
+    l_smooth_brunt_vaisala_freq = .true.  ! Flag for appling smoothing on calculated brunt vaisala frequency 
 !$omp threadprivate(l_smooth_brunt_vaisala_freq)
 
   ! Use to determine whether a host model has already applied the surface flux,
