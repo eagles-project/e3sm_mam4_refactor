@@ -232,6 +232,8 @@ module advance_clubb_core_module
         l_damp_wp2_using_em, &
         l_advance_xp3, &
         l_predict_upwp_vpwp, &
+        l_smooth_wp3_on_wp2, &
+        l_smooth_brunt_vaisala_freq, &
         l_diag_Lscale_from_tau, &
         l_use_C7_Richardson, &
         l_use_C11_Richardson, &
@@ -737,6 +739,10 @@ module advance_clubb_core_module
        tau_C1_zm,              & ! Tau values used for the C1 (dp1) term in wp2 [s]
        Cx_fnc_Richardson,      & ! Cx_fnc computed from Richardson_num          [-]
        brunt_vaisala_freq_sqd, & ! Buoyancy frequency squared, N^2              [s^-2]
+       brunt_freq_nosmth1,     & ! Non-smoothed brunt vaisala freq
+       brunt_freq_nosmth2,     & ! Non-smoothed brunt vaisala freq
+       brunt_freq_pos1,        & ! smoothed square root of brunt vaisala freq
+       brunt_freq_pos2,        & ! smoothed square root of brunt vaisala freq 
        invrs_tau_zm,           & ! One divided by tau on zm levels              [s^-1]
        invrs_tau_N2_zm,        & ! One divided by tau, including stability effects [s^-1]
        ustar,                  &   ! Friction velocity  [m/s]
@@ -1038,24 +1044,37 @@ module advance_clubb_core_module
     rtp2_zt    = max( zm2zt( rtp2 ), rt_tol**2 )   ! Positive def. quantity
     rtpthlp_zt = zm2zt( rtpthlp )
 
-    ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
-    ! denominator since it's less likely to create spikes
-    wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+    if( .not. l_smooth_wp3_on_wp2)then
 
-    ! Clip wp3_on_wp2_zt if it's too large
-    do k=1, gr%nz
-      if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
-        wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
-      else
-        wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
-      end if
-    end do
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in
+      ! the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
 
-    ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
-    wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+      wp3_on_wp2    = ( wp3_zm(1:gr%nz) / max(wp2(1:gr%nz), w_tol_sqd ) )
 
-    ! Smooth again as above
-    wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+    else
+
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+
+      ! Clip wp3_on_wp2_zt if it's too large
+      do k=1, gr%nz
+        if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
+          wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
+        else
+          wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
+        end if
+      end do
+
+      ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
+      wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+
+      ! Smooth again as above
+      wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+
+    end if
 
       !----------------------------------------------------------------
       ! Compute thvm
@@ -1262,11 +1281,27 @@ module advance_clubb_core_module
 
         ustar = max( ( upwp_sfc**2 + vpwp_sfc**2 )**(one_fourth), ufmin )
 
+       !Add code to smooth the brunt vaisala frequency   
+       if (l_smooth_brunt_vaisala_freq) then
+
+         brunt_freq_nosmth1 = sqrt( max( zero_threshold, &
+                                    brunt_vaisala_freq_sqd - 1e-4_core_rknd ) )
+         brunt_freq_nosmth2 = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) )
+         brunt_freq_pos1    = zt2zm( zm2zt( brunt_freq_nosmth1 ))
+         brunt_freq_pos2    = zt2zm( zm2zt( brunt_freq_nosmth2 ))
+
+       else
+
+         brunt_freq_pos1    = sqrt( max( zero_threshold, &
+                              zt2zm( zm2zt( brunt_vaisala_freq_sqd ) ) - 1e-4_core_rknd) )
+         brunt_freq_pos2    = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) )
+
+       end if 
+
         invrs_tau_zm = C_invrs_tau_bkgnd / tau_const &
          + C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace ) &
          + C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) )  &
-         + C_invrs_tau_N2 * sqrt( max( zero_threshold, &
-              zt2zm( zm2zt( brunt_vaisala_freq_sqd ) ) - 1e-4_core_rknd) )
+         + C_invrs_tau_N2 * brunt_freq_pos1
 
         invrs_tau_zm_simp = C_invrs_tau_bkgnd  / tau_const & 
          + C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace ) & 
@@ -1282,13 +1317,12 @@ module advance_clubb_core_module
         tau_zt = zm2zt( tau_zm )
 
         invrs_tau_N2_zm = invrs_tau_zm  &
-                          + C_invrs_tau_N2 * sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) )
+                          + C_invrs_tau_N2 * brunt_freq_pos2
 
         tau_N2_zm = tau_zm
 
 !        tau_zt = tau_const / &
-!                     ( one + 0.1_core_rknd * tau_const * &
-!                             sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) ) )
+!                     ( one + 0.1_core_rknd * tau_const * brunt_freq_pos2 )
 !        tau_zm = max( zero_threshold, zt2zm( tau_zt ) )
 
         Lscale = tau_zt * sqrt_em_zt
