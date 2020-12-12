@@ -203,13 +203,24 @@ module model_flags
 !$omp threadprivate(l_trapezoidal_rule_zt, l_trapezoidal_rule_zm, l_call_pdf_closure_twice)
 
   logical, public :: &
-    l_standard_term_ta = .false.    ! Use the standard discretization for the
+    l_standard_term_ta = .true.    ! Use the standard discretization for the
                                     ! turbulent advection terms.  Setting to
                                     ! .false. means that a_1 and a_3 are pulled
                                     ! outside of the derivative in advance_wp2_wp3_module.F90
                                     ! and in advance_xp2_xpyp_module.F90.
 
 !$omp threadprivate(l_standard_term_ta)
+
+  logical, public :: &
+    l_smooth_wp3_on_wp2 = .true. ! Apply back and forth vertical interpolation
+  ! to smooth the calculated wp3/wp2 (wp3_on_wp2). Setting to .false. means that 
+  ! the smoothing on wp3/wp2 are turned off in advance_clubb_core.F90. Default 
+  ! set up is .true. 
+!$omp threadprivate(l_smooth_wp3_on_wp2)
+
+  logical, public :: &
+    l_smooth_brunt_vaisala_freq = .false.  ! Flag for appling smoothing on calculated brunt vaisala frequency 
+!$omp threadprivate(l_smooth_brunt_vaisala_freq)
 
   ! Use to determine whether a host model has already applied the surface flux,
   ! to avoid double counting.
@@ -257,14 +268,14 @@ module model_flags
     l_Lscale_plume_centered = .false.,   & ! Alternate that uses the PDF to
                                            ! compute the perturbed values
 
-    l_diag_Lscale_from_tau  = .false.,   & ! First diagnose dissipation time tau, 
+    l_diag_Lscale_from_tau  = .true.,   & ! First diagnose dissipation time tau, 
                                            ! and then diagnose the mixing length
                                            ! scale as Lscale = tau * tke
 
     l_use_ice_latent = .false.,          & ! Includes the effects of ice latent heating in
                                            !  turbulence terms
 
-    l_use_C7_Richardson = .false.,       & ! Parameterize C7 based on Richardson number
+    l_use_C7_Richardson = .true.,       & ! Parameterize C7 based on Richardson number
     l_use_C11_Richardson = .false.,      & ! Parameterize C16 based on Richardson number
 
     l_brunt_vaisala_freq_moist = .false.,& ! Use a different formula for the Brunt-Vaisala 
