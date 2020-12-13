@@ -1297,6 +1297,9 @@ end subroutine clubb_init_cnst
    character(len=6) :: choice_radf
    
    integer                               :: time_elapsed                ! time keep track of stats          [s]
+   integer                               :: stats_nsamp                 ! time keep track of sampling       [s]
+   integer                               :: stats_nout                  ! time keep track of output         [s]
+
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
    real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
@@ -2056,7 +2059,9 @@ end subroutine clubb_init_cnst
          !  Increment the statistics then being stats timestep
          if (l_stats) then
             time_elapsed = time_elapsed+dtime
-            call stats_begin_timestep_api(time_elapsed, 1, 1)
+            stats_nsamp  = stats_tsamp 
+            stats_nout   = stats_tout
+            call stats_begin_timestep_api(time_elapsed, stats_nsamp, stats_nout)
          endif 
 
          !  Advance CLUBB CORE one timestep in the future

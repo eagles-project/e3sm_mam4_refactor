@@ -731,7 +731,8 @@ module advance_wp2_wp3_module
                    coef_wp4_implicit, wp4, wpthvp, wp2thvp, um, vm, &          ! intent(in)
                    upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt,  &                   ! intent(in)
                    Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &             ! intent(in)
-                   C11_Skw_fnc, C16_fnc, rho_ds_zm, invrs_rho_ds_zt, radf, &   ! intent(in)
+                   C11_Skw_fnc, C16_fnc, rho_ds_zm,  &                         ! intent(in)
+                   rho_ds_zt, invrs_rho_ds_zt, radf, &                         ! intent(in)
                    thv_ds_zm, thv_ds_zt, wp2_splat, wp3_splat, &               ! intent(in)
                    l_crank_nich_diff, &                                        ! intent(in)
                    rhs )                                                       ! intent(out)
@@ -1762,6 +1763,7 @@ module advance_wp2_wp3_module
                                            a3(:), a3_zt(:), &
                                            wp3_on_wp2(:), &
                                            rho_ds_zm(:), &
+                                           rho_ds_zt(:), &
                                            invrs_rho_ds_zt(:), &
                                            gr%invrs_dzt(:), &
                                            wp3_term_ta_lhs_result(:,:) )
@@ -2424,7 +2426,8 @@ module advance_wp2_wp3_module
                                     a3(k), a3_zt(k), a3(km1),  &
                                     wp3_on_wp2(k), wp3_on_wp2(km1), &
                                     rho_ds_zm(k), rho_ds_zm(km1),  &
-                                    invrs_rho_ds_zt(k),  &
+                                    rho_ds_zt(k), rho_ds_zt(km1),  &
+                                    invrs_rho_ds_zt(k), &
                                     gr%invrs_dzt(k), k )
 
             lhs_a_csr(t_kp1_tdiag:t_km1_tdiag:-1) & 
@@ -2539,6 +2542,7 @@ module advance_wp2_wp3_module
                                         a3(k), a3_zt(k), a3(km1), &
                                         wp3_on_wp2(k), wp3_on_wp2(km1), &
                                         rho_ds_zm(k), rho_ds_zm(km1), &
+                                        rho_ds_zt(k), rho_ds_zt(km1), &
                                         invrs_rho_ds_zt(k), &
                                         gr%invrs_dzt(k), k )
               ztscr05(k) = -tmp(5)
@@ -2717,7 +2721,8 @@ module advance_wp2_wp3_module
                        coef_wp4_implicit, wp4, wpthvp, wp2thvp, um, vm, & 
                        upwp, vpwp, up2, vp2, Kw1, Kw8, Kh_zt, & 
                        Skw_zt, tau1m, tauw3t, tau_C1_zm, C1_Skw_fnc, &
-                       C11_Skw_fnc, C16_fnc, rho_ds_zm, invrs_rho_ds_zt, radf, &
+                       C11_Skw_fnc, C16_fnc, rho_ds_zm, rho_ds_zt, &
+                       invrs_rho_ds_zt, radf, &
                        thv_ds_zm, thv_ds_zt, wp2_splat, wp3_splat, & 
                        l_crank_nich_diff, &
                        rhs )
@@ -2844,6 +2849,7 @@ module advance_wp2_wp3_module
       C11_Skw_fnc,       & ! C_11 parameter with Sk_w applied          [-]
       C16_fnc,           & ! C_16 parameter                            [-]
       rho_ds_zm,         & ! Dry, static density on momentum levels    [kg/m^3]
+      rho_ds_zt,         & ! Dry, static density on thermo. levels     [kg/m^3]
       invrs_rho_ds_zt,   & ! Inv. dry, static density @ thermo. levs.  [m^3/kg]
       radf,              & ! Buoyancy production at the CL top         [m^2/s^3]
       thv_ds_zm,         & ! Dry, base-state theta_v on momentum levs. [K]
@@ -3124,6 +3130,7 @@ module advance_wp2_wp3_module
                                            a3(:), a3_zt(:), &
                                            wp3_on_wp2(:), &
                                            rho_ds_zm(:), &
+                                           rho_ds_zt(:), &
                                            invrs_rho_ds_zt(:), &
                                            gr%invrs_dzt(:), &
                                            wp3_term_ta_lhs_result(:,:) )
@@ -4623,6 +4630,7 @@ module advance_wp2_wp3_module
                                       a3, a3_zt, a3m1, &
                                       wp3_on_wp2, wp3_on_wp2_m1, &
                                       rho_ds_zm, rho_ds_zmm1, &
+                                      rho_ds_zt, rho_ds_ztm1, &
                                       invrs_rho_ds_zt, &
                                       invrs_dzt, level ) &
   result( lhs )
@@ -4718,11 +4726,14 @@ module advance_wp2_wp3_module
         gr ! Variable gr%weights_zt2zm
 
     use model_flags, only:  &
-        l_standard_term_ta,
+        l_standard_term_ta, &
         l_godunov_upwind_wp3_ta  
 
     use clubb_precision, only: &
         core_rknd ! Variable(s)
+
+    use constants_clubb, only: &
+        zero                
 
     implicit none
 
@@ -4752,6 +4763,8 @@ module advance_wp2_wp3_module
       wp3_on_wp2_m1,   & ! w'^3 / w'^2 at momentum level (k-1)         [m/s]
       rho_ds_zm,       & ! Dry, static density at momentum level (k)   [kg/m^3]
       rho_ds_zmm1,     & ! Dry, static density at momentum level (k-1) [kg/m^3]
+      rho_ds_zt,       & ! Dry, static density at thermo level (k)     [kg/m^3]
+      rho_ds_ztm1,     & ! Dry, static density at thermo level (k-1)   [kg/m^3]
       invrs_rho_ds_zt, & ! Inv dry, static density at thermo level (k) [m^3/kg]
       invrs_dzt          ! Inverse of grid spacing (k)                 [1/m]
 
@@ -4816,7 +4829,7 @@ module advance_wp2_wp3_module
        lhs(km1_mdiag) &
        = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
 
-      if( .not. l_upwind_wp3_ta )then
+      if( .not. l_godunov_upwind_wp3_ta )then
 
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) &
@@ -4870,7 +4883,7 @@ module advance_wp2_wp3_module
        lhs(km1_mdiag) &
        = - invrs_rho_ds_zt * a3_zt * invrs_dzt * rho_ds_zmm1 * wp2m1
 
-      if ( .not. l_upwind_wp3_ta ) then
+      if ( .not. l_godunov_upwind_wp3_ta ) then
 
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) &
@@ -4914,6 +4927,7 @@ module advance_wp2_wp3_module
                                               a3, a3_zt, &
                                               wp3_on_wp2, &
                                               rho_ds_zm, &
+                                              rho_ds_zt, &
                                               invrs_rho_ds_zt, &
                                               invrs_dzt, &
                                               lhs_ta_wp3 )
@@ -4929,11 +4943,14 @@ module advance_wp2_wp3_module
             gr ! Variable gr%weights_zt2zm
 
         use model_flags, only:  &
-            l_standard_term_ta,
+            l_standard_term_ta, &
             l_godunov_upwind_wp3_ta
    
         use clubb_precision, only: &
             core_rknd ! Variable(s)
+
+        use constants_clubb, only: &
+            zero
 
         implicit none
 
@@ -4946,6 +4963,7 @@ module advance_wp2_wp3_module
           a3_zt,           & ! a_3 interpolated to thermodynamic level (k) [-]
           wp3_on_wp2,      & ! w'^3 / w'^2 at momentum level (k)           [m/s]
           rho_ds_zm,       & ! Dry, static density at momentum level (k)   [kg/m^3]
+          rho_ds_zt,       & ! Dry, static density at thermo level (k)     [kg/m^3]
           invrs_rho_ds_zt, & ! Inv dry, static density at thermo level (k) [m^3/kg]
           invrs_dzt          ! Inverse of grid spacing (k)                 [1/m]
 
