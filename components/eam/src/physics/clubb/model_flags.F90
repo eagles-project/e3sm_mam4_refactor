@@ -164,9 +164,9 @@ module model_flags
 !$omp threadprivate(l_upwind_wpxp_ta, l_upwind_xpyp_ta, l_upwind_xm_ma)
 
  logical, public :: &
-    l_godunov_upwind_wp3_ta   = .false., &
-    l_godunov_upwind_wpxp_ta  = .false., &
-    l_godunov_upwind_xpyp_ta  = .false. 
+    l_godunov_upwind_wp3_ta   = .true., &
+    l_godunov_upwind_wpxp_ta  = .true., &
+    l_godunov_upwind_xpyp_ta  = .true. 
 
 !$omp threadprivate(l_godunov_upwind_wp3_ta, l_godunov_upwind_wpxp_ta, l_godunov_upwind_xpyp_ta)
 

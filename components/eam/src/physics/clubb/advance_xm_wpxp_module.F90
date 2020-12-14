@@ -132,6 +132,7 @@ module advance_xm_wpxp_module
         l_use_C7_Richardson,           &
         l_explicit_turbulent_adv_wpxp, &
         l_upwind_wpxp_ta,              &
+        l_godunov_upwind_wpxp_ta,      &
         l_predict_upwp_vpwp,           &
         l_uv_nudge
 
@@ -706,6 +707,22 @@ module advance_xm_wpxp_module
 
           endif ! l_upwind_wpxp_ta
 
+          if ( l_godunov_upwind_wpxp_ta ) then
+
+             ! Calculate coef_wprtp2_implicit and term_wprtp2_explicit on
+             ! momentum levels as coef_wprtp2_implicit_zm and
+             ! term_wprtp2_explicit_zm, respectively.
+             coef_wp2rtp_implicit = a1_zt * wp3_on_wp2_zt
+
+             term_wp2rtp_explicit = zero
+
+             ! For ADG1, the sign of the turbulent velocity is the sign of
+             ! <w'^3> / <w'^2>.  For simplicity, the sign of turbulent velocity
+             ! is set to wp3_on_wp2.
+             sgn_t_vel_wprtp = a1 * wp3_on_wp2
+
+          endif ! l_godunov_upwind_wpxp_ta
+
           ! Implicit coefficient on <w'thl'> in <w'^2 thl'> equation.
           ! For ADG1, this is the same as coef_wp2rtp_implicit.
           coef_wp2thlp_implicit = coef_wp2rtp_implicit
@@ -729,6 +746,22 @@ module advance_xm_wpxp_module
              sgn_t_vel_wpthlp = wp3_on_wp2
 
           endif ! l_upwind_wpxp_ta
+
+          if ( l_godunov_upwind_wpxp_ta ) then
+
+             ! Calculate coef_wprtp2_implicit and term_wprtp2_explicit on
+             ! momentum levels as coef_wprtp2_implicit_zm and
+             ! term_wprtp2_explicit_zm, respectively.
+             coef_wp2thlp_implicit = a1_zt * wp3_on_wp2_zt
+
+             term_wp2thlp_explicit = zero
+
+             ! For ADG1, the sign of the turbulent velocity is the sign of
+             ! <w'^3> / <w'^2>.  For simplicity, the sign of turbulent velocity
+             ! is set to wp3_on_wp2.
+             sgn_t_vel_wpthlp = a1 * wp3_on_wp2
+
+          endif ! l_godunov_upwind_wpxp_ta
 
           do i = 1, sclr_dim, 1
 
@@ -1985,6 +2018,7 @@ module advance_xm_wpxp_module
     use model_flags, only: &
         l_clip_semi_implicit,          & ! Variable(s)
         l_upwind_wpxp_ta,              &
+        l_godunov_upwind_wpxp_ta,              &
         l_diffuse_rtm_and_thlm,        &
         l_stability_correct_Kh_N2_zm
 
@@ -1999,7 +2033,8 @@ module advance_xm_wpxp_module
 
     use turbulent_adv_pdf, only: &
         xpyp_term_ta_pdf_lhs, & ! Procedure(s)
-        xpyp_term_ta_pdf_lhs_all
+        xpyp_term_ta_pdf_lhs_all,&
+        xpyp_term_ta_pdf_lhs_godunov
 
     use diffusion, only:  & 
         diffusion_zt_lhs, &! Procedure(s)
@@ -2209,18 +2244,30 @@ module advance_xm_wpxp_module
 
     ! Calculate turbulent advection terms of w'x' for all grid levels
     ! An "over-implicit" weighted time step is applied to this term, see notes above
-    call xpyp_term_ta_pdf_lhs_all( coef_wp2xp_implicit(:),      & ! Intent(in)
-                                   rho_ds_zt(:),                & ! Intent(in)
-                                   invrs_rho_ds_zm(:),          & ! Intent(in)
-                                   gr%invrs_dzm(:),             & ! Intent(in)
-                                   l_upwind_wpxp_ta,            & ! Intent(in)
-                                   sgn_turbulent_vel(:),        & ! Intent(in)
-                                   coef_wp2xp_implicit_zm(:),   & ! Intent(in)
-                                   rho_ds_zm(:),                & ! Intent(in)
-                                   gr%invrs_dzt(:),             & ! Intent(in)
-                                   lhs_ta_wpxp(:,:)             ) ! Intent(out)
+ 
+    if (.not.l_godunov_upwind_wpxp_ta)then
 
+        call xpyp_term_ta_pdf_lhs_all( coef_wp2xp_implicit(:),      & ! Intent(in)
+                                       rho_ds_zt(:),                & ! Intent(in)
+                                       invrs_rho_ds_zm(:),          & ! Intent(in)
+                                       gr%invrs_dzm(:),             & ! Intent(in)
+                                       l_upwind_wpxp_ta,            & ! Intent(in)
+                                       sgn_turbulent_vel(:),        & ! Intent(in)
+                                       coef_wp2xp_implicit_zm(:),   & ! Intent(in)
+                                       rho_ds_zm(:),                & ! Intent(in)
+                                       gr%invrs_dzt(:),             & ! Intent(in)
+                                       lhs_ta_wpxp(:,:)             ) ! Intent(out)
+ 
+    else
 
+       ! Godunov-like method for the vertical discretization of ta term  
+       call xpyp_term_ta_pdf_lhs_godunov( coef_wp2xp_implicit(:),     & ! Intent(in)
+                                          invrs_rho_ds_zm(:),          & ! Intent(in)
+                                          gr%invrs_dzm(:),             & ! Intent(in)
+                                          rho_ds_zm(:),                & ! Intent(in)
+                                          lhs_ta_wpxp(:,:)           ) ! Intent(out)
+
+    end if
 
     ! Calculate turbulent advection terms of xm for all grid levels
     call xm_term_ta_lhs_all( rho_ds_zm(:),       & ! Intent(in)
@@ -2488,13 +2535,16 @@ module advance_xm_wpxp_module
 
     use model_flags, only: &
         l_clip_semi_implicit,          & ! Variable(s)
-        l_upwind_wpxp_ta
+        l_upwind_wpxp_ta, &
+        l_godunov_upwind_wpxp_ta
 
     use turbulent_adv_pdf, only: &
         xpyp_term_ta_pdf_lhs, & ! Procedure(s)
         xpyp_term_ta_pdf_rhs, &
         xpyp_term_ta_pdf_lhs_all, & ! Procedure(s)
-        xpyp_term_ta_pdf_rhs_all
+        xpyp_term_ta_pdf_lhs_godunov, &
+        xpyp_term_ta_pdf_rhs_all, &
+        xpyp_term_ta_pdf_rhs_godunov
 
     use clubb_precision, only:  & 
         core_rknd ! Variable(s)
@@ -2615,31 +2665,59 @@ module advance_xm_wpxp_module
 
 
     ! Calculate turbulent advection terms of w'x' for all grid levels
-    call xpyp_term_ta_pdf_rhs_all( term_wp2xp_explicit(:),      & ! Intent(in)
-                                   rho_ds_zt(:),                & ! Intent(in)
-                                   invrs_rho_ds_zm(:),          & ! Intent(in)
-                                   gr%invrs_dzm(:),             & ! Intent(in)
-                                   l_upwind_wpxp_ta,            & ! Intent(in)
-                                   sgn_turbulent_vel(:),        & ! Intent(in)
-                                   term_wp2xp_explicit_zm(:),   & ! Intent(in)
-                                   rho_ds_zm(:),                & ! Intent(in)
-                                   gr%invrs_dzt(:),             & ! Intent(in)
-                                   rhs_ta(:)                    ) ! Intent(out)
+    ! Note: the godunov-like upwind scheme only works with iiPDF_ADG1
+    ! i.e. do not use l_godunov_upwind_wpxp_ta = .true. when iiPDF_ADG1 is not used
+    ! otherwise, the rhs terms for ta is not calculated correctly. 
+    if (.not.l_godunov_upwind_wpxp_ta)then
 
+          call xpyp_term_ta_pdf_rhs_all( term_wp2xp_explicit(:),      & ! Intent(in)
+                                          rho_ds_zt(:),                & ! Intent(in)
+                                          invrs_rho_ds_zm(:),          & ! Intent(in)
+                                          gr%invrs_dzm(:),             & ! Intent(in)
+                                          l_upwind_wpxp_ta,            & ! Intent(in)
+                                          sgn_turbulent_vel(:),        & ! Intent(in)
+                                          term_wp2xp_explicit_zm(:),   & ! Intent(in)
+                                          rho_ds_zm(:),                & ! Intent(in)
+                                          gr%invrs_dzt(:),             & ! Intent(in)
+                                          rhs_ta(:)                    ) ! Intent(out)
+
+    else
+
+          call xpyp_term_ta_pdf_rhs_godunov( term_wp2xp_explicit(:),   & ! Intent(in)
+                                             rho_ds_zm(:),             & ! Intent(in)
+                                             rho_ds_zt(:),             & ! Intent(in)
+                                             invrs_rho_ds_zm(:),       & ! Intent(in)
+                                             gr%invrs_dzm(:),          & ! Intent(in)
+                                             sgn_turbulent_vel(:),     & ! Intent(in)
+                                             rhs_ta(:)                 ) ! Intent(out)
+
+    end if     
 
     ! Calculate turbulent advection terms of w'x' for all grid levels
     ! An "over-implicit" weighted time step is applied to this term, see notes above
-    call xpyp_term_ta_pdf_lhs_all( coef_wp2xp_implicit(:),      & ! Intent(in)
-                                   rho_ds_zt(:),                & ! Intent(in)
-                                   invrs_rho_ds_zm(:),          & ! Intent(in)
-                                   gr%invrs_dzm(:),             & ! Intent(in)
-                                   l_upwind_wpxp_ta,            & ! Intent(in)
-                                   sgn_turbulent_vel(:),        & ! Intent(in)
-                                   coef_wp2xp_implicit_zm(:),   & ! Intent(in)
-                                   rho_ds_zm(:),                & ! Intent(in)
-                                   gr%invrs_dzt(:),             & ! Intent(in)
-                                   lhs_ta_wpxp(:,:)             ) ! Intent(out)
+    if (.not.l_godunov_upwind_wpxp_ta)then
 
+          call xpyp_term_ta_pdf_lhs_all( coef_wp2xp_implicit(:),      & ! Intent(in)
+                                         rho_ds_zt(:),                & ! Intent(in)
+                                         invrs_rho_ds_zm(:),          & ! Intent(in)
+                                         gr%invrs_dzm(:),             & ! Intent(in)
+                                         l_upwind_wpxp_ta,            & ! Intent(in)
+                                         sgn_turbulent_vel(:),        & ! Intent(in)
+                                         coef_wp2xp_implicit_zm(:),   & ! Intent(in)
+                                         rho_ds_zm(:),                & ! Intent(in)
+                                         gr%invrs_dzt(:),             & ! Intent(in)
+                                         lhs_ta_wpxp(:,:)             ) ! Intent(out)
+
+    else
+
+          ! Godunov-like method for the vertical discretization of ta term  
+          call xpyp_term_ta_pdf_lhs_godunov( coef_wp2xp_implicit(:),     & ! Intent(in)
+                                             invrs_rho_ds_zm(:),          & ! Intent(in)
+                                             gr%invrs_dzm(:),             & ! Intent(in)
+                                             rho_ds_zm(:),                & ! Intent(in)
+                                             lhs_ta_wpxp(:,:)           ) ! Intent(out)
+    
+    end if 
 
     ! Calculate pressure term 1 for w'x' for all grid level
     ! Note:  An "over-implicit" weighted time step is applied to this term.

@@ -94,6 +94,7 @@ module advance_xp2_xpyp_module
         l_single_C2_Skw, &
         l_explicit_turbulent_adv_xpyp, &
         l_upwind_xpyp_ta, &
+        l_godunov_upwind_xpyp_ta, &
         l_min_xp2_from_corr_wx, &
         l_C2_cloud_frac
 
@@ -590,6 +591,22 @@ module advance_xp2_xpyp_module
 
           endif ! l_upwind_xpyp_ta
 
+          if ( l_godunov_upwind_xpyp_ta ) then
+
+             ! Calculate coef_wprtp2_implicit and term_wprtp2_explicit on
+             ! momentum levels as coef_wprtp2_implicit_zm and
+             ! term_wprtp2_explicit_zm, respectively.
+             coef_wprtp2_implicit = one_third * beta * a1_zt * wp3_on_wp2_zt
+
+             term_wprtp2_explicit = wprtp**2
+
+             ! For ADG1, the sign of the turbulent velocity is the sign of
+             ! <w'^3> / <w'^2>.  For simplicity, the sign of turbulent velocity
+             ! is set to wp3_on_wp2.
+             sgn_t_vel_rtp2 = ( one - one_third * beta ) * a1_zt**2 * wp3_on_wp2_zt / wp2_zt
+
+          endif ! l_godunov_upwind_xpyp_ta
+
           ! Implicit coefficient on <thl'^2> in <w'thl'^2> equation.
           ! For ADG1, this is the same as coef_wprtp2_implicit.
           coef_wpthlp2_implicit = coef_wprtp2_implicit
@@ -615,6 +632,22 @@ module advance_xp2_xpyp_module
              sgn_t_vel_thlp2 = wp3_on_wp2
 
           endif ! l_upwind_xpyp_ta
+
+          if ( l_godunov_upwind_xpyp_ta ) then
+
+             ! Calculate coef_wprtp2_implicit and term_wprtp2_explicit on
+             ! momentum levels as coef_wprtp2_implicit_zm and
+             ! term_wprtp2_explicit_zm, respectively.
+             coef_wpthlp2_implicit = one_third * beta * a1_zt * wp3_on_wp2_zt
+
+             term_wpthlp2_explicit_zm = wpthlp**2
+
+             ! For ADG1, the sign of the turbulent velocity is the sign of
+             ! <w'^3> / <w'^2>.  For simplicity, the sign of turbulent velocity
+             ! is set to wp3_on_wp2.
+             sgn_t_vel_thlp2 = ( one - one_third * beta ) * a1_zt**2 * wp3_on_wp2_zt / wp2_zt
+
+          endif ! l_godunov_upwind_xpyp_ta
 
           ! Implicit coefficient on <rt'thl'> in <w'rt'thl'> equation.
           ! For ADG1, this is the same as coef_wprtp2_implicit.
@@ -642,6 +675,23 @@ module advance_xp2_xpyp_module
              sgn_t_vel_rtpthlp = wp3_on_wp2
 
           endif ! l_upwind_xpyp_ta
+
+
+          if ( l_godunov_upwind_xpyp_ta ) then
+
+             ! Calculate coef_wprtp2_implicit and term_wprtp2_explicit on
+             ! momentum levels as coef_wprtp2_implicit_zm and
+             ! term_wprtp2_explicit_zm, respectively.
+             coef_wprtpthlp_implicit = one_third * beta * a1_zt * wp3_on_wp2_zt
+
+             term_wprtpthlp_explicit = wprtp*wpthlp
+
+             ! For ADG1, the sign of the turbulent velocity is the sign of
+             ! <w'^3> / <w'^2>.  For simplicity, the sign of turbulent velocity
+             ! is set to wp3_on_wp2.
+             sgn_t_vel_rtpthlp = ( one - one_third * beta ) * a1_zt**2 * wp3_on_wp2_zt / wp2_zt
+
+          endif ! l_godunov_upwind_xpyp_ta
 
        elseif ( iiPDF_type == iiPDF_new ) then
 
@@ -1624,6 +1674,7 @@ module advance_xp2_xpyp_module
 
     use turbulent_adv_pdf, only: &
         xpyp_term_ta_pdf_lhs_all, & ! Procedure(s)
+        xpyp_term_ta_pdf_lhs_godunov, &
         xpyp_term_ta_pdf_lhs
 
     use mean_adv, only:  & 
@@ -1635,7 +1686,8 @@ module advance_xp2_xpyp_module
         diffusion_zm_lhs
 
     use model_flags, only: &
-        l_upwind_xpyp_ta    ! Variable(s)
+        l_upwind_xpyp_ta,&    ! Variable(s)
+        l_godunov_upwind_xpyp_ta
 
     use clubb_precision, only:  & 
         core_rknd ! Variable(s)
@@ -1733,16 +1785,32 @@ module advance_xp2_xpyp_module
                              
 
     ! Calculate LHS turbulent advection (ta) terms
-    call xpyp_term_ta_pdf_lhs_all( coef_wpxpyp_implicit(:),             & ! Intent(in)
-                                   rho_ds_zt(:),                        & ! Intent(in)
-                                   invrs_rho_ds_zm(:),                  & ! Intent(in)
-                                   gr%invrs_dzm(:),                     & ! Intent(in)
-                                   l_upwind_xpyp_ta,                    & ! Intent(in)
-                                   sgn_turbulent_vel(:),                & ! Intent(in)
-                                   coef_wpxpyp_implicit_zm(:),          & ! Intent(in)
-                                   rho_ds_zm(:),                        & ! Intent(in)
-                                   gr%invrs_dzt(:),                     & ! Intent(in)
-                                   lhs_ta(:,:)                        ) ! Intent(out)
+    ! RHS contribution from "over-implicit" weighted time step
+    ! for LHS turbulent advection (ta) term. See notes above
+    if ( .not. l_godunov_upwind_xpyp_ta ) then
+
+          call xpyp_term_ta_pdf_lhs_all( coef_wpxpyp_implicit(:),             & ! Intent(in)
+                                         rho_ds_zt(:),                        & ! Intent(in)
+                                         invrs_rho_ds_zm(:),                  & ! Intent(in)
+                                         gr%invrs_dzm(:),                     & ! Intent(in)
+                                         l_upwind_xpyp_ta,                    & ! Intent(in)
+                                         sgn_turbulent_vel(:),                & ! Intent(in)
+                                         coef_wpxpyp_implicit_zm(:),          & ! Intent(in)
+                                         rho_ds_zm(:),                        & ! Intent(in)
+                                         gr%invrs_dzt(:),                     & ! Intent(in)
+                                         lhs_ta(:,:)                        ) ! Intent(out)
+
+    else
+
+          ! Godunov-like method for the vertical discretization of ta term  
+          call xpyp_term_ta_pdf_lhs_godunov( coef_wpxpyp_implicit(:),         & ! Intent(in)
+                                             invrs_rho_ds_zm(:),              & ! Intent(in)
+                                             gr%invrs_dzm(:),                 & ! Intent(in)
+                                             rho_ds_zm(:),                    & ! Intent(in)
+                                             lhs_ta(:,:)                    ) ! Intent(out)
+
+    end if
+
 
     ! Combine all lhs terms into lhs, should be fully vectorized
     do k = 2, gr%nz-1
@@ -2175,12 +2243,15 @@ module advance_xp2_xpyp_module
 
     use turbulent_adv_pdf, only: &
         xpyp_term_ta_pdf_lhs_all, & ! Procedure(s)
+        xpyp_term_ta_pdf_lhs_godunov, & 
         xpyp_term_ta_pdf_lhs,     &
         xpyp_term_ta_pdf_rhs_all, &
+        xpyp_term_ta_pdf_rhs_godunov, &
         xpyp_term_ta_pdf_rhs
 
     use model_flags, only: &
-        l_upwind_xpyp_ta ! Constant(s)
+        l_upwind_xpyp_ta,& ! Constant(s)
+        l_godunov_upwind_xpyp_ta
 
     use clubb_precision, only:  & 
         core_rknd ! Variable(s)
@@ -2512,12 +2583,15 @@ module advance_xp2_xpyp_module
 
     use turbulent_adv_pdf, only: &
         xpyp_term_ta_pdf_lhs_all, & ! Procedure(s)
+        xpyp_term_ta_pdf_lhs_godunov, &
         xpyp_term_ta_pdf_lhs,     &
         xpyp_term_ta_pdf_rhs_all, &
+        xpyp_term_ta_pdf_rhs_godunov, &
         xpyp_term_ta_pdf_rhs
 
     use model_flags, only: &
-        l_upwind_xpyp_ta    ! Constant(s)
+        l_upwind_xpyp_ta, &    ! Constant(s)
+        l_godunov_upwind_xpyp_ta
 
     use clubb_precision, only:  & 
         core_rknd ! Variable(s)
@@ -2658,29 +2732,57 @@ module advance_xp2_xpyp_module
     end select
 
     ! Calculate RHS turbulent advection (ta) term
-    call xpyp_term_ta_pdf_rhs_all( term_wpxpyp_explicit(:),           & ! Intent(in)
-                                   rho_ds_zt(:),                      & ! Intent(in)
-                                   invrs_rho_ds_zm(:),                & ! Intent(in)
-                                   gr%invrs_dzm(:),                   & ! Intent(in)
-                                   l_upwind_xpyp_ta,                  & ! Intent(in)
-                                   sgn_turbulent_vel(:),              & ! Intent(in)
-                                   term_wpxpyp_explicit_zm(:),        & ! Intent(in)
-                                   rho_ds_zm(:),                      & ! Intent(in)
-                                   gr%invrs_dzt(:),                   & ! Intent(in)
-                                   rhs_ta(:)                        ) ! Intent(out
-    
+    if ( .not. l_godunov_upwind_xpyp_ta) then
+
+          call xpyp_term_ta_pdf_rhs_all( term_wpxpyp_explicit(:),           & ! Intent(in)
+                                         rho_ds_zt(:),                      & ! Intent(in)
+                                         invrs_rho_ds_zm(:),                & ! Intent(in)
+                                         gr%invrs_dzm(:),                   & ! Intent(in)
+                                         l_upwind_xpyp_ta,                  & ! Intent(in)
+                                         sgn_turbulent_vel(:),              & ! Intent(in)
+                                         term_wpxpyp_explicit_zm(:),        & ! Intent(in)
+                                         rho_ds_zm(:),                      & ! Intent(in)
+                                         gr%invrs_dzt(:),                   & ! Intent(in)
+                                         rhs_ta(:)                        ) ! Intent(out)
+    else
+
+          call xpyp_term_ta_pdf_rhs_godunov( term_wpxpyp_explicit(:),       & ! Intent(in)
+                                             rho_ds_zm(:),                  & ! Intent(in)
+                                             rho_ds_zt(:),                  & ! Intent(in)
+                                             invrs_rho_ds_zm(:),            & ! Intent(in)
+                                             gr%invrs_dzm(:),               & ! Intent(in)
+                                             sgn_turbulent_vel(:),          & ! Intent(in)
+                                             rhs_ta(:)                    ) ! Intent(out)
+
+    end if 
+
     ! RHS contribution from "over-implicit" weighted time step
     ! for LHS turbulent advection (ta) term. See notes above
-    call xpyp_term_ta_pdf_lhs_all( coef_wpxpyp_implicit(:),             & ! Intent(in)
-                                   rho_ds_zt(:),                        & ! Intent(in)
-                                   invrs_rho_ds_zm(:),                  & ! Intent(in)
-                                   gr%invrs_dzm(:),                     & ! Intent(in)
-                                   l_upwind_xpyp_ta,                    & ! Intent(in)
-                                   sgn_turbulent_vel(:),                & ! Intent(in)
-                                   coef_wpxpyp_implicit_zm(:),          & ! Intent(in)
-                                   rho_ds_zm(:),                        & ! Intent(in)
-                                   gr%invrs_dzt(:),                     & ! Intent(in)
-                                   lhs_ta(:,:)                        ) ! Intent(out)
+    if ( .not. l_godunov_upwind_xpyp_ta) then
+
+          call xpyp_term_ta_pdf_lhs_all( coef_wpxpyp_implicit(:),             & ! Intent(in)
+                                         rho_ds_zt(:),                        & ! Intent(in)
+                                         invrs_rho_ds_zm(:),                  & ! Intent(in)
+                                         gr%invrs_dzm(:),                     & ! Intent(in)
+                                         l_upwind_xpyp_ta,                    & ! Intent(in)
+                                         sgn_turbulent_vel(:),                & ! Intent(in)
+                                         coef_wpxpyp_implicit_zm(:),          & ! Intent(in)
+                                         rho_ds_zm(:),                        & ! Intent(in)
+                                         gr%invrs_dzt(:),                     & ! Intent(in)
+                                         lhs_ta(:,:)                        ) ! Intent(out)
+
+    else
+
+          ! Godunov-like method for the vertical discretization of ta term  
+          call xpyp_term_ta_pdf_lhs_godunov( coef_wpxpyp_implicit(:),         & ! Intent(in)
+                                             invrs_rho_ds_zm(:),              & ! Intent(in)
+                                             gr%invrs_dzm(:),                 & ! Intent(in)
+                                             rho_ds_zm(:),                    & ! Intent(in)
+                                             lhs_ta(:,:)                    ) ! Intent(out)
+
+    end if
+
+
 
     ! Finish RHS calc with vectorizable loop, functions are in source file and should
     ! be inlined with an -O2 or above compiler optimization flag

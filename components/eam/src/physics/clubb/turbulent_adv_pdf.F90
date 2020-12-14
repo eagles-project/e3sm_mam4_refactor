@@ -19,8 +19,10 @@ module turbulent_adv_pdf
 
   public :: xpyp_term_ta_pdf_lhs,     &
             xpyp_term_ta_pdf_lhs_all, &
+            xpyp_term_ta_pdf_lhs_godunov, &
             xpyp_term_ta_pdf_rhs,     &
             xpyp_term_ta_pdf_rhs_all, &
+            xpyp_term_ta_pdf_rhs_godunov, &
             sgn_turbulent_velocity
 
   private    ! Set default scope
@@ -572,6 +574,87 @@ module turbulent_adv_pdf
 
     end subroutine xpyp_term_ta_pdf_lhs_all
 
+    !=============================================================================================
+    pure subroutine xpyp_term_ta_pdf_lhs_godunov( coef_wpxpyp_implicit, & ! Intent(in)
+                                                  invrs_rho_ds_zm, invrs_dzm, & ! Intent(in)
+                                                  rho_ds_zm,  & ! Intent(in)
+                                                  lhs_ta )
+    ! Intent(out)
+    ! Description:
+    !   This subroutine is a revised version of xpyp_term_ta_pdf_lhs_all. The
+    !   revisions are maded to use the  Godunov-like upwind scheme for the
+    !   vertical discretization of the turbulent advection term. This subroutine 
+    !   returns an array of 3 dimensional arrays, one for every grid level not
+    !   including
+    !   boundary values.
+    ! 
+    ! Optional Arguements:
+    !   The optional arguements can be used to override the default indices. 
+    !   from_level - low index, default 2
+    !   to level   - high index, default gr%nz-1
+    ! 
+    ! Notes:
+    !   This subroutine exists for testing of Godunov-like upwind scheme. 
+    !   THIS SUBROUTINE DOES NOT HANDLE BOUNDARY CONDITIONS AND SETS THEM TO 0
+    !---------------------------------------------------------------------------------------------
+
+        use grid_class, only:  & ! for gr%weights_zm2zt
+            gr    ! Variable Type
+
+        use clubb_precision, only: &
+            core_rknd    ! Variable(s)
+
+        implicit none
+
+        !------------------- Input Variables -------------------
+        real( kind = core_rknd ), dimension(gr%nz), intent(in) :: &
+            coef_wpxpyp_implicit,     & ! Coef. of <x'y'> in <w'x'y'>; t-lev [m/s]
+            invrs_rho_ds_zm,          & ! Inv dry, static density @ m-level [m^3/kg]
+            invrs_dzm,                & ! Inverse of grid spacing [1/m]
+            rho_ds_zm                   ! Dry, static density at m-lev [kg/m^3]
+
+        !------------------- Output Variables -------------------
+        real( kind = core_rknd ), dimension(3,gr%nz), intent(out) :: &
+            lhs_ta
+
+        !---------------- Local Variables -------------------
+        integer :: &
+            k             ! Loop variable for current grid level
+
+        !---------------- Begin Code -------------------
+
+        ! Set lower boundary array to 0
+        lhs_ta(:,1) = 0.0_core_rknd
+
+        ! Godunov-like upwind discretization
+        do k = 2, gr%nz-1
+
+           ! Momentum superdiagonal: [ x xpyp(k+1,<t+1>) ]
+           lhs_ta(1,k) = invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k+1) &
+                         * min(0.0_core_rknd,coef_wpxpyp_implicit(k+1))
+
+           ! Momentum main diagonal: [ x xpyp(k,<t+1>) ]
+           lhs_ta(2,k) = invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k) &
+                         * ( max(0.0_core_rknd,coef_wpxpyp_implicit(k+1)) - &
+                             min(0.0_core_rknd,coef_wpxpyp_implicit(k)) )
+
+           ! Momentum subdiagonal: [ x xpyp(k-1,<t+1>) ]
+           lhs_ta(3,k) = - invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k-1) &
+                         * max(0.0_core_rknd,coef_wpxpyp_implicit(k) )
+
+        end do
+
+        ! Set upper boundary array to 0
+        lhs_ta(:,gr%nz) = 0.0_core_rknd
+
+        return
+
+    end subroutine xpyp_term_ta_pdf_lhs_godunov
+
+
   !=============================================================================
   pure function xpyp_term_ta_pdf_rhs( term_wpxpyp_explicitp1, &
                                       term_wpxpyp_explicit, &
@@ -998,6 +1081,84 @@ module turbulent_adv_pdf
     end subroutine xpyp_term_ta_pdf_rhs_all
   
 
+    !============================================================================================
+    pure subroutine xpyp_term_ta_pdf_rhs_godunov( term_wpxpyp_explicit, & ! Intent(in)
+                                                  rho_ds_zm, rho_ds_zt, & ! Intent(in)
+                                                  invrs_rho_ds_zm, invrs_dzm, & ! Intent(in)
+                                                  sgn_turbulent_vel, & ! Intent(in)
+                                                  rhs_ta                          ) ! Intent(out)
+    ! Description:
+    !   This subroutine is an optimized version of xpyp_term_ta_pdf_rhs.
+    !   xpyp_term_ta_pdf_rhs
+    !   returns a single value for any specified grid level. This subroutine
+    !   returns an array
+    !   of values for every grid level.
+    ! 
+    ! Optional Arguements:
+    !   The optional arguements can be used to override the default indices. 
+    !   from_level - low index, default 2
+    !   to level   - high index, default gr%nz-1
+    ! 
+    ! Notes:
+    !   This subroutine exists for performance concerns. It returns all rhs
+    !   values at once
+    !   so that it can be properly vectorized, see clubb:ticket:834 for detail.
+    !   
+    !   THIS SUBROUTINE DOES NOT HANDLE BOUNDARY CONDITIONS AND SETS THEM TO 0
+    !--------------------------------------------------------------------------------------------
+        use clubb_precision, only: &
+            core_rknd ! Variable(s)
+
+        use grid_class, only: &
+            gr    ! Variable type
+
+        implicit none
+
+        !------------------- Input Variables -------------------
+        real( kind = core_rknd ), dimension(gr%nz), intent(in) :: &
+          term_wpxpyp_explicit,         & ! RHS: <w'x'y'> eq; t-lev(k)   [m/s(x un)(y un)]
+          rho_ds_zt,                    & ! Dry, static density at t-lev (k) [kg/m^3]
+          rho_ds_zm,                    & ! Dry, static density at m-lev (k) [kg/m^3]
+          invrs_rho_ds_zm,              & ! Inv dry, static density at m-lev (k) [m^3/kg]
+          invrs_dzm,                    & ! Inverse of grid spacing (k) [1/m]
+          sgn_turbulent_vel               ! Sign of the turbulent velocity [-]
+
+        !------------------- Output Variables -------------------
+        real( kind = core_rknd ), dimension(gr%nz), intent(out) :: &
+            rhs_ta
+
+        !---------------- Local Variables -------------------
+        integer :: &
+            k             ! Loop variable for current grid level
+
+        !---------------- Begin Code -------------------
+
+        ! Set lower boundary value to 0
+        rhs_ta(1) = 0.0_core_rknd
+
+        do k = 2, gr%nz-1
+           rhs_ta(k) = - invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k+1) &
+                         * min(0.0_core_rknd,sgn_turbulent_vel(k+1)) &
+                         * term_wpxpyp_explicit(k+1) &
+                       - invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k) &
+                         * ( max(0.0_core_rknd,sgn_turbulent_vel(k+1)) - &
+                             min(0.0_core_rknd,sgn_turbulent_vel(k)) ) &
+                         * term_wpxpyp_explicit(k) &
+                       + invrs_rho_ds_zm(k) * invrs_dzm(k) &
+                         * rho_ds_zm(k-1) &
+                         * max(0.0_core_rknd,sgn_turbulent_vel(k) ) &
+                         * term_wpxpyp_explicit(k-1)  
+        end do
+
+        ! Set upper boundary value to 0
+        rhs_ta(gr%nz) = 0.0_core_rknd
+
+        return
+
+    end subroutine xpyp_term_ta_pdf_rhs_godunov
+  
   !=============================================================================
   pure function sgn_turbulent_velocity( wpxpyp_zm, xpyp ) &
   result( sgn_turbulent_vel )
