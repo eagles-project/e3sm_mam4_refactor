@@ -127,6 +127,30 @@ module rrtmgpxx_interface
          real(kind=c_double), value :: tsi_scaling
       end subroutine rrtmgpxx_run_sw_cpp
 
+      subroutine rrtmgpxx_run_lw_cpp ( &
+         ngas, ncol, nlev, &
+         gas_vmr, &
+         pmid, tmid, pint, tint, &
+         surface_emissivity, &
+         cld_tau, aer_tau, &
+         allsky_flux_up_cxx    , allsky_flux_dn_cxx    , allsky_flux_net_cxx, &
+         allsky_bnd_flux_up_cxx, allsky_bnd_flux_dn_cxx, allsky_bnd_flux_net_cxx, &
+         clrsky_flux_up_cxx    , clrsky_flux_dn_cxx    , clrsky_flux_net_cxx, &
+         clrsky_bnd_flux_up_cxx, clrsky_bnd_flux_dn_cxx, clrsky_bnd_flux_net_cxx &
+         ) bind(C, name="rrtmgpxx_run_lw_cpp")
+         use iso_c_binding
+         implicit none
+         integer(kind=c_int), value :: ngas, ncol, nlev
+         real(kind=c_double), dimension(*) :: &
+            gas_vmr, &
+            pmid, tmid, pint, tint, surface_emissivity, &
+            cld_tau, aer_tau, &
+            allsky_flux_up_cxx, allsky_flux_dn_cxx, allsky_flux_net_cxx, &
+            allsky_bnd_flux_up_cxx, allsky_bnd_flux_dn_cxx, allsky_bnd_flux_net_cxx, &
+            clrsky_flux_up_cxx, clrsky_flux_dn_cxx, clrsky_flux_net_cxx, &
+            clrsky_bnd_flux_up_cxx, clrsky_bnd_flux_dn_cxx, clrsky_bnd_flux_net_cxx
+      end subroutine rrtmgpxx_run_lw_cpp
+
       subroutine add_gas_name(gas_name) bind(C, name="add_gas_name")
          use iso_c_binding, only: C_CHAR
          character(kind=c_char) :: gas_name
@@ -355,7 +379,8 @@ contains
       character(len=*), intent(in), dimension(:) :: gas_names
       real(wp), intent(in), dimension(:,:,:) :: gas_vmr
       real(wp), intent(in), dimension(:,:) :: surface_emissivity
-      real(wp), intent(in), dimension(:,:) :: pmid, tmid, pint, tint
+      real(wp), intent(in), dimension(ncol,nlev) :: pmid, tmid
+      real(wp), intent(in), dimension(ncol,nlev+1) :: pint, tint
       real(wp), intent(in), dimension(:,:,:) :: cld_tau_gpt, aer_tau_bnd
       real(wp), intent(inout), dimension(:,:), target :: &
          allsky_flux_up, allsky_flux_dn, allsky_flux_net, &
@@ -369,6 +394,14 @@ contains
       type(ty_gas_concs) :: gas_concentrations
       type(ty_optical_props_1scl) :: cld_optics, aer_optics
 
+      real(wp), allocatable, dimension(:,:,:) :: gas_vmr_rad
+
+      real(wp), dimension(ncol,nlev+1) :: &
+         allsky_flux_up_cxx, allsky_flux_dn_cxx, allsky_flux_net_cxx, &
+         clrsky_flux_up_cxx, clrsky_flux_dn_cxx, clrsky_flux_net_cxx
+      real(wp), dimension(ncol,nlev+1,nlwbands) :: &
+         allsky_bnd_flux_up_cxx, allsky_bnd_flux_dn_cxx, allsky_bnd_flux_net_cxx, &
+         clrsky_bnd_flux_up_cxx, clrsky_bnd_flux_dn_cxx, clrsky_bnd_flux_net_cxx
 
       ! Allocate fluxes (allsky and clearsky)
       fluxes_allsky%flux_up => allsky_flux_up
@@ -411,6 +444,10 @@ contains
       aer_optics%tau(1:ncol,1:nlev,1:nlwbands) = aer_tau_bnd(1:ncol,1:nlev,1:nlwbands)
       call handle_error(aer_optics%delta_scale())
 
+      ! DEBUG
+      !cld_optics%tau = 0
+      !aer_optics%tau = 0
+
       ! Do longwave radiative transfer calculations
       call handle_error(rte_lw( &
          k_dist_lw, gas_concentrations, &
@@ -423,6 +460,41 @@ contains
          t_lev=tint(1:ncol,1:nlev+1), &
          n_gauss_angles=1 & ! Set to 3 for consistency with RRTMG
       ))
+
+      ! Try calling C++ version
+      allocate(gas_vmr_rad(ngas, ncol, nlev))
+      gas_vmr_rad(:,1:ncol,1) = gas_vmr(:,1:ncol,1)
+      gas_vmr_rad(:,1:ncol,2:nlev) = gas_vmr(:,1:ncol,:)
+      call rrtmgpxx_run_lw_cpp( &
+         ngas, ncol, nlev, &
+         gas_vmr_rad, &
+         !pmid(1:ncol,1:nlev), tmid(1:ncol,1:nlev), pint(1:ncol,1:nlev+1), tint(1:ncol,1:nlev+1), surface_emissivity, &
+         pmid(1:ncol,1:nlev), tmid(1:ncol,1:nlev), pint(1:ncol,1:nlev+1), tint(1:ncol,1:nlev+1), surface_emissivity, &
+         cld_optics%tau, &
+         aer_optics%tau, &
+         allsky_flux_up_cxx, allsky_flux_dn_cxx, allsky_flux_net_cxx, &
+         allsky_bnd_flux_up_cxx, allsky_bnd_flux_dn_cxx, allsky_bnd_flux_net_cxx, &
+         clrsky_flux_up_cxx, clrsky_flux_dn_cxx, clrsky_flux_net_cxx, &
+         clrsky_bnd_flux_up_cxx, clrsky_bnd_flux_dn_cxx, clrsky_bnd_flux_net_cxx &
+         )
+      deallocate(gas_vmr_rad)
+
+      ! Check values
+      !print *, 'CXX, F90 flux_up: ', maxval(allsky_flux_up_cxx), ', ', maxval(allsky_flux_up)
+      !print *, 'CXX - F90 flux_up: ', maxval(abs(allsky_flux_up_cxx - allsky_flux_up))
+      !print *, 'min(pmid): ', minval(pmid) !(abs(allsky_flux_up_cxx - allsky_flux_up))
+      if (.true.) then
+         call assert(all(abs(allsky_flux_up_cxx - allsky_flux_up) < 1e-5), 'F90 and CXX allsky_flux_up differs.')
+         call assert(all(abs(allsky_flux_dn_cxx - allsky_flux_dn) < 1e-5), 'F90 and CXX allsky_flux_dn differs.')
+         call assert(all(abs(allsky_flux_net_cxx - allsky_flux_net) < 1e-5), 'F90 and CXX allsky_flux_net differs.')
+         call assert(all(abs(clrsky_flux_up_cxx - clrsky_flux_up) < 1e-5), 'F90 and CXX clrsky_flux_up differs.')
+         call assert(all(abs(clrsky_flux_dn_cxx - clrsky_flux_dn) < 1e-5), 'F90 and CXX clrsky_flux_dn differs.')
+         call assert(all(abs(clrsky_flux_net_cxx - clrsky_flux_net) < 1e-5), 'F90 and CXX clrsky_flux_net differs.')
+      end if
+
+      ! Clean up after ourselves
+      call free_optics_lw(cld_optics)
+      call free_optics_lw(aer_optics)
 
    end subroutine rrtmgpxx_run_lw
 
