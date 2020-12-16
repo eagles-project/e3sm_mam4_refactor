@@ -34,7 +34,7 @@ extern "C" void rrtmgpxx_run_sw_cpp (
         double *clrsky_bnd_flux_up_p, double *clrsky_bnd_flux_dn_p, double *clrsky_bnd_flux_net_p, double *clrsky_bnd_flux_dn_dir_p,
         double tsi_scaling
         );
-extern "C" void rrtmgpxx_run_lw_cpp (
+extern "C" void rrtmgpxx_run_lw (
         int ngas, int ncol, int nlay,
         double *gas_vmr_p           , 
         double *pmid_p              , double *tmid_p              , double *pint_p               , double *tint_p,
@@ -182,7 +182,7 @@ extern "C" void rrtmgpxx_run_sw_cpp (
     auto clrsky_flux_dn_dir = real2d("clrsky_flux_dn_dir", clrsky_flux_dn_dir_p, ncol, nlay+1);
     auto clrsky_flux_net = real2d("clrsky_flux_net", clrsky_flux_net_p, ncol, nlay+1);
 
-    // Populate gas concentrations
+    // Populate gas concentrations object
     string1d gas_names("gas_names", gas_names_vect.size());
     convert_gas_names(gas_names);
     GasConcs gas_concs;
@@ -198,7 +198,7 @@ extern "C" void rrtmgpxx_run_sw_cpp (
         gas_concs.set_vmr(gas_names(igas), tmp2d);
     }
 
-    // Populate optical property objects
+    // Do gas optics
     OpticalProps2str combined_optics;
     combined_optics.alloc_2str(ncol, nlay, k_dist_sw);
     auto pmid_host = pmid.createHostCopy();
@@ -213,21 +213,22 @@ extern "C" void rrtmgpxx_run_sw_cpp (
 
     // Add in aerosol
     OpticalProps2str aerosol_optics;
-    /*
-    aerosol_optics.alloc_2str(ncol, nlay, k_dist_sw);
-    auto gpt_bnd = aerosol_optics.get_gpoint_bands();
-    parallel_for(Bounds<3>(nswgpts,nlay,ncol) , YAKL_LAMBDA (int igpt, int ilay, int icol) {
-        aerosol_optics.tau(icol,ilay,igpt) = aer_tau_bnd(icol,ilay,gpt_bnd(igpt));
-        aerosol_optics.ssa(icol,ilay,igpt) = aer_ssa_bnd(icol,ilay,gpt_bnd(igpt));
-        aerosol_optics.g  (icol,ilay,igpt) = aer_asm_bnd(icol,ilay,gpt_bnd(igpt));
-    });
-     */
-    aerosol_optics.alloc_2str(ncol, nlay, k_dist_sw.get_band_lims_wavenumber());
-    parallel_for(Bounds<3>(nswbands,nlay,ncol), YAKL_LAMBDA (int ibnd, int ilay, int icol) {
-        aerosol_optics.tau(icol,ilay,ibnd) = aer_tau_bnd(icol,ilay,ibnd);
-        aerosol_optics.ssa(icol,ilay,ibnd) = aer_ssa_bnd(icol,ilay,ibnd);
-        aerosol_optics.g  (icol,ilay,ibnd) = aer_asm_bnd(icol,ilay,ibnd);
-    });
+    if (true) {
+        aerosol_optics.alloc_2str(ncol, nlay, k_dist_sw);
+        auto gpt_bnd = aerosol_optics.get_gpoint_bands();
+        parallel_for(Bounds<3>(nswgpts,nlay,ncol) , YAKL_LAMBDA (int igpt, int ilay, int icol) {
+            aerosol_optics.tau(icol,ilay,igpt) = aer_tau_bnd(icol,ilay,gpt_bnd(igpt));
+            aerosol_optics.ssa(icol,ilay,igpt) = aer_ssa_bnd(icol,ilay,gpt_bnd(igpt));
+            aerosol_optics.g  (icol,ilay,igpt) = aer_asm_bnd(icol,ilay,gpt_bnd(igpt));
+        });
+    } else {
+        aerosol_optics.alloc_2str(ncol, nlay, k_dist_sw.get_band_lims_wavenumber());
+        parallel_for(Bounds<3>(nswbands,nlay,ncol), YAKL_LAMBDA (int ibnd, int ilay, int icol) {
+            aerosol_optics.tau(icol,ilay,ibnd) = aer_tau_bnd(icol,ilay,ibnd);
+            aerosol_optics.ssa(icol,ilay,ibnd) = aer_ssa_bnd(icol,ilay,ibnd);
+            aerosol_optics.g  (icol,ilay,ibnd) = aer_asm_bnd(icol,ilay,ibnd);
+        });
+    }
     aerosol_optics.increment(combined_optics);
 
     // Do the clearsky calculation before adding in clouds
@@ -257,7 +258,7 @@ extern "C" void rrtmgpxx_run_sw_cpp (
     rte_sw(combined_optics, top_at_1, coszrs, toa_flux, albedo_dir, albedo_dif, fluxes_allsky);
 } 
 
-extern "C" void rrtmgpxx_run_lw_cpp (
+extern "C" void rrtmgpxx_run_lw (
         int ngas, int ncol, int nlay,
         double *gas_vmr_p           , 
         double *pmid_p              , double *tmid_p              , double *pint_p               , double *tint_p,
@@ -336,24 +337,25 @@ extern "C" void rrtmgpxx_run_lw_cpp (
     for (int icol=1; icol<=ncol; icol++) {
         t_sfc(icol) = tint(icol,nlay+1);
     }
-    //k_dist_lw.gas_optics(top_at_1, pmid, pint, tmid, t_sfc, gas_concs, combined_optics, lw_sources, real2d(), tint);
+    //k_dist_lw.gas_optics(top_at_1, pmid, pint, tmid, t_sfc, gas_concs, combined_optics, lw_sources, real2d(), real2d());
     k_dist_lw.gas_optics(top_at_1, pmid, pint, tmid, t_sfc, gas_concs, combined_optics, lw_sources, real2d(), tint);
 
-    // Add in aerosol
+    // Add in aerosol; we can define this by bands or gpoints. If we define by
+    // bands, then internally when increment() is called it will map these to
+    // gpoints. Not sure if there is a beneift one way or another.
     OpticalProps1scl aerosol_optics;
-    /*
-    aerosol_optics.alloc_1scl(ncol, nlay, k_dist_lw);
-    auto gpt_bnd = aerosol_optics.get_gpoint_bands();
-    parallel_for(Bounds<3>(nlwgpts,nlay,ncol) , YAKL_LAMBDA (int igpt, int ilay, int icol) {
-        aerosol_optics.tau(icol,ilay,igpt) = aer_tau_bnd(icol,ilay,gpt_bnd(igpt));
-        aerosol_optics.ssa(icol,ilay,igpt) = aer_ssa_bnd(icol,ilay,gpt_bnd(igpt));
-        aerosol_optics.g  (icol,ilay,igpt) = aer_asm_bnd(icol,ilay,gpt_bnd(igpt));
-    });
-     */
-    aerosol_optics.alloc_1scl(ncol, nlay, k_dist_lw.get_band_lims_wavenumber());
-    parallel_for(Bounds<3>(nlwbands,nlay,ncol), YAKL_LAMBDA (int ibnd, int ilay, int icol) {
-        aerosol_optics.tau(icol,ilay,ibnd) = aer_tau_bnd(icol,ilay,ibnd);
-    });
+    if (false) {
+        aerosol_optics.alloc_1scl(ncol, nlay, k_dist_lw);
+        auto gpt_bnd = aerosol_optics.get_gpoint_bands();
+        parallel_for(Bounds<3>(nlwgpts,nlay,ncol) , YAKL_LAMBDA (int igpt, int ilay, int icol) {
+            aerosol_optics.tau(icol,ilay,igpt) = aer_tau_bnd(icol,ilay,gpt_bnd(igpt));
+        });
+    } else {
+        aerosol_optics.alloc_1scl(ncol, nlay, k_dist_lw.get_band_lims_wavenumber());
+        parallel_for(Bounds<3>(nlwbands,nlay,ncol), YAKL_LAMBDA (int ibnd, int ilay, int icol) {
+            aerosol_optics.tau(icol,ilay,ibnd) = aer_tau_bnd(icol,ilay,ibnd);
+        });
+    }
     aerosol_optics.increment(combined_optics);
 
     // Do the clearsky calculation before adding in clouds
