@@ -20,7 +20,7 @@ module physpkg
        physics_ptend, physics_tend_init,    &
        physics_type_alloc, physics_ptend_dealloc,&
        physics_state_alloc, physics_state_dealloc, physics_tend_alloc, physics_tend_dealloc
-  use physics_update_mod,  only: physics_update, physics_update_init, hist_vars, nvars_prtrb_hist, get_var
+  use physics_update_mod,  only: physics_update, physics_update_init, hist_var3d, hist_var2d, nvars_prtrb_hist, get_var_3d, get_var_2d
   use phys_grid,        only: get_ncols_p
   use phys_gmean,       only: gmean_mass
   use ppgrid,           only: begchunk, endchunk, pcols, pver, pverp, psubcols
@@ -1475,16 +1475,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     if (pergro_test_active) then
        !call outfld calls
        do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          vsuffix  = trim(adjustl(hist_var3d(ihist)))
           varname  = trim(adjustl(vsuffix))//'_topphysac' ! form variable name
-          if(vsuffix.ne."NSTEP") then
-           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
-          else
-           !Output NSTEP for debugging
-           nstep = get_nstep()
-           timestep(:ncol) = nstep
-           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-          end if 
+          call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk )
+          vsuffix  = trim(adjustl(hist_var2d(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_topphysac' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var_2d(state,vsuffix), pcols , lchnk )
        enddo
  
     endif
@@ -1827,16 +1823,12 @@ end if ! l_ac_energy_chk
     if (pergro_test_active) then
        !call outfld calls
        do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          vsuffix  = trim(adjustl(hist_var3d(ihist)))
           varname  = trim(adjustl(vsuffix))//'_endphysac' ! form variable name
-          if(vsuffix.ne."NSTEP") then
-           call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk)
-          else
-           !Output NSTEP for debugging
-           nstep = get_nstep()
-           timestep(:ncol) = nstep
-           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-          end if
+          call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk)
+          vsuffix  = trim(adjustl(hist_var2d(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_endphysac' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var_2d(state,vsuffix), pcols , lchnk)
        enddo
     endif
 
@@ -2129,9 +2121,12 @@ subroutine tphysbc (ztodt,               &
     if (pergro_test_active) then 
        !call outfld calls
        do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          vsuffix  = trim(adjustl(hist_var3d(ihist)))
           varname  = trim(adjustl(vsuffix))//'_topphysbc' ! form variable name
-          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk )
+          vsuffix  = trim(adjustl(hist_var2d(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_topphysbc' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var_2d(state,vsuffix), pcols , lchnk )
        enddo
     endif
 
@@ -2556,9 +2551,12 @@ end if
        if (pergro_test_active) then
           !call outfld calls
           do ihist = 1 , nvars_prtrb_hist
-             vsuffix  = trim(adjustl(hist_vars(ihist)))
+             vsuffix  = trim(adjustl(hist_var3d(ihist)))
              varname  = trim(adjustl(vsuffix))//'_topmacmic' ! form variable name
-             call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+             call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk )
+             vsuffix  = trim(adjustl(hist_var2d(ihist)))
+             varname  = trim(adjustl(vsuffix))//'_topmacmic' ! form variable name
+             call outfld( trim(adjustl(varname)),get_var_2d(state,vsuffix), pcols , lchnk )
           enddo
        endif
 
@@ -2572,6 +2570,14 @@ end if
             call physics_update(state, ptend, cld_macmic_ztodt)
 
           end if
+          
+          !Output supersaturation flag before CLUBB. 
+          if (pergro_test_active) then
+             !call outfld calls
+             write (varname, "(A20,I2.2)") 'SUPERSAT_FLAG_sub',macmic_it
+             vsuffix = 'SUPERSAT_FLAG'   
+             call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk )
+          endif
 
           if (micro_do_icesupersat) then 
 
@@ -2883,9 +2889,12 @@ end if ! l_tracer_aero
     if (pergro_test_active) then
        !call outfld calls
        do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          vsuffix  = trim(adjustl(hist_var3d(ihist)))
           varname  = trim(adjustl(vsuffix))//'_topradiation' ! form variable name
-          call outfld( trim(adjustl(varname)),get_var(state,vsuffix), pcols , lchnk )
+          call outfld( trim(adjustl(varname)),get_var_3d(state,vsuffix), pcols , lchnk )
+          vsuffix  = trim(adjustl(hist_var2d(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_topradiation' ! form variable name
+          call outfld( trim(adjustl(varname)),get_var_2d(state,vsuffix), pcols , lchnk )
        enddo
     endif
 
@@ -3077,13 +3086,15 @@ subroutine add_fld_default_calls()
            'NUMLIQ_end_ndrop    ','NUMLIQ_ndrop_afreg  ','NUMLIQ_ndrop_afact  ','NUMLIQ_ndrop_afmix  ',&
            'NIIMM_end_hetfrz    ','NICNT_end_hetfrz    ','NIDEP_end_hetfrz    ','NITOT_end_hetfrz    ',&
            'NIHF_end_icenuc     ','NIIMM_end_icenuc    ','NIDEP_end_icenuc    ','NIMEY_end_icenuc    ',&
-           'NAAI_end_icenuc     ' /) 
+           'NAAI_end_icenuc     '/) 
 
+  !Extra diagnostics for supersaturation with respect to water
+  character(len=20), parameter :: vlist_extrb(1)  = (/   'SUPERSAT_FLAG       '/)
 
-  character(len=fieldname_len) :: varname
+  character(len=fieldname_len) :: varnm3d,varnm2d
   character(len=1000)          :: substep
   
-  integer :: iv, id, ntot, ndef, next, ihist, imacmic
+  integer :: iv, id, ntot, ndef, next,nexb, ihist, imacmic
   integer :: cld_macmic_num_steps
 
   call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps)
@@ -3091,6 +3102,7 @@ subroutine add_fld_default_calls()
   ntot = size(vlist_all)
   ndef = size(vlist_default)
   next = size(vlist_extra)
+  nexb = size(vlist_extrb)
   
   do ihist = 1 , nvars_prtrb_hist
 
@@ -3105,14 +3117,17 @@ subroutine add_fld_default_calls()
 
         do imacmic = 1,cld_macmic_num_steps
           write(substep,"(A3,I2.2)")"sub",imacmic
-          varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv)))//'_'//trim(adjustl(substep))
-          call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+          varnm3d  = trim(adjustl(hist_var3d(ihist)))//'_'//trim(adjustl(vlist_all(iv)))//'_'//trim(adjustl(substep))
+          call addfld (trim(adjustl(varnm3d)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+          varnm2d  = trim(adjustl(hist_var2d(ihist)))//'_'//trim(adjustl(vlist_all(iv)))//'_'//trim(adjustl(substep))
+          call addfld (trim(adjustl(varnm2d)),horiz_only, 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
 
           !Add default for selected processes
           do id = 1, ndef
 
            if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
-             call add_default (trim(adjustl(varname)), 1, ' ')
+             call add_default (trim(adjustl(varnm3d)), 1, ' ')
+             call add_default (trim(adjustl(varnm2d)), 1, ' ')
            end if
 
           enddo
@@ -3121,14 +3136,17 @@ subroutine add_fld_default_calls()
      
        else
 
-        varname  = trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
+        varnm3d  = trim(adjustl(hist_var3d(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
+        varnm2d  = trim(adjustl(hist_var2d(ihist)))//'_'//trim(adjustl(vlist_all(iv))) ! form variable name
 
-        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+        call addfld (trim(adjustl(varnm3d)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+        call addfld (trim(adjustl(varnm2d)), horiz_only, 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
  
         !Add default for selected processes
         do id = 1, ndef
          if(trim(adjustl(vlist_default(id))).eq.trim(adjustl(vlist_all(iv))))then
-          call add_default (trim(adjustl(varname)), 1, ' ')        
+          call add_default (trim(adjustl(varnm3d)), 1, ' ')        
+          call add_default (trim(adjustl(varnm2d)), 1, ' ')
          end if 
         enddo 
 
@@ -3142,12 +3160,24 @@ subroutine add_fld_default_calls()
 
   do imacmic = 1,cld_macmic_num_steps
     write(substep,"(A3,I2.2)")"sub",imacmic
-    varname  = trim(adjustl(vlist_extra(iv)))//'_'//trim(adjustl(substep))
-    call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
-    call add_default (trim(adjustl(varname)), 1, ' ')
+    varnm3d  = trim(adjustl(vlist_extra(iv)))//'_'//trim(adjustl(substep))
+    call addfld (trim(adjustl(varnm3d)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+    call add_default (trim(adjustl(varnm3d)), 1, ' ')
   enddo
 
  end do 
+
+ !!Add Extra diagnostic variables!!!
+ do iv = 1,nexb
+
+  do imacmic = 1,cld_macmic_num_steps
+    write(substep,"(A3,I2.2)")"sub",imacmic
+    varnm3d  = trim(adjustl(vlist_extrb(iv)))//'_'//trim(adjustl(substep))
+    call addfld (trim(adjustl(varnm3d)), (/ 'lev' /), 'A', 'prg_test_units', 'pergro_longname',flag_xyfill=.true.) !The units and longname are dummy as it is for a test only
+    call add_default (trim(adjustl(varnm3d)), 1, ' ')
+  enddo
+
+ end do
 
 end subroutine add_fld_default_calls
 

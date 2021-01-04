@@ -31,7 +31,7 @@ module physics_update_mod
 
   implicit none
   private
-  public  :: physics_update_init, physics_update, get_var
+  public  :: physics_update_init, physics_update, get_var_2d, get_var_3d
   
   save
 
@@ -43,16 +43,18 @@ module physics_update_mod
   !Following arrays and variables are declared so that we can add all variables in a loop to the history files for pergro test.
   !For adding any new variables, we need to do the following:
   !
-  !1. Add variable name to 'hist_vars' (and increment nvars_prtrb_hist variable accordingly), if a variable is part of the 
+  !1. Add variable name to 'hist_var3d' (and increment nvars_prtrb_hist variable accordingly), if a variable is part of the 
   !   constituent array ("q" array), add the _exact_ name as in cnst_add call(e.g.  NUMLIQ, CLDICE etc.)
   !2. If the variable is not present in the constituent array,add a "case" statement for that variable in the "select case" 
-  !   construct in get_var function in this module
+  !   construct in get_var_2d and get_var_3d functions in this module
 
   integer, public, parameter :: nvars_prtrb_hist = 15
-  !character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['s     ', 't     ', 'Q     ', 'v     ', &
-  !     'CLDLIQ', 'NUMLIQ', 'CLDICE', 'NUMICE', 'num_a1','num_a2','num_a3']
-  character(len=6), public, parameter :: hist_vars(nvars_prtrb_hist) = ['t     ', 'Q     ', 'u     ','CLDLIQ', 'NUMLIQ', &
-       'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ']
+ !character(len=6), public, parameter :: hist_var3d(nvars_prtrb_hist) = ['s     ', 't     ', 'Q     ', 'v     ', &
+ !     'CLDLIQ', 'NUMLIQ', 'CLDICE', 'NUMICE', 'num_a1','num_a2','num_a3']
+  character(len=6), public, parameter :: hist_var3d(nvars_prtrb_hist) = ['t     ', 'Q     ', 'u     ', 'CLDLIQ', 'NUMLIQ', &
+        'CLDICE', 'NUMICE', 'RAINQM','NUMRAI','SNOWQM','NUMSNO','QSW   ','QSI   ', 'RHW   ', 'RHI   ']
+  character(len=6), public, parameter :: hist_var2d(nvars_prtrb_hist) = ['tvint ', 'QVINT ', 'uvint ', 'CLVINT', 'NLVINT', &
+        'CIVINT', 'NIVINT', 'RIVINT','NRVINT','SOVINT','NSVINT','QSWVIN','QSIVIN', 'RHWVIN', 'RHIVIN']
 
 contains 
 
@@ -159,17 +161,15 @@ contains
           
        !call outfld
        do ihist = 1 , nvars_prtrb_hist
-          vsuffix  = trim(adjustl(hist_vars(ihist)))
+          vsuffix  = trim(adjustl(hist_var3d(ihist)))
           varname  = trim(adjustl(vsuffix))//'_'//trim(adjustl(pname)) ! form variable name
-          if(vsuffix.ne."NSTEP") then
-           !find the prognostic variable associated with this hist_vars(ihist) via "get_var" function
-           call outfld( trim(adjustl(varname)), get_var(state,vsuffix), pcols, lchnk )
-          else
-           !Output NSTEP for debugging
-           nstep = get_nstep()
-           timestep(:ncol) = nstep
-           call outfld (trim(adjustl(varname)),timestep, pcols, lchnk)
-          end if
+          !find the prognostic variable associated with this hist_var3d(ihist) via "get_var_3d" function
+          call outfld( trim(adjustl(varname)), get_var_3d(state,vsuffix), pcols, lchnk )
+          !!output the vertically integrated values;
+          vsuffix  = trim(adjustl(hist_var2d(ihist)))
+          varname  = trim(adjustl(vsuffix))//'_'//trim(adjustl(pname)) ! form variable name
+          !find the prognostic variable associated with this hist_var2d(ihist) via "get_var_2d" function
+          call outfld( trim(adjustl(varname)), get_var_2d(state,vsuffix), pcols, lchnk )
        enddo
 
     endif
@@ -178,27 +178,29 @@ contains
   !----------------------------------------------------------------------------
   !----------------------------------------------------------------------------
 
-  function get_var(state,hist_var) result (prg_var)
+  function get_var_3d(state,hist_var) result (prg_var)
     !Purpose: Find which state variable to output based on the hist_var string
 
     use constituents, only: cnst_get_ind
-    
+    use physconst,    only: cpair, latvap, gravit, rga
+   
     character(len=fieldname_len), intent(in)  :: hist_var
     type(physics_state),          intent(in)  :: state  
     real(r8)                                  :: prg_var(pcols,pver)
     real(r8) esl(pcols,pver)   ! saturation vapor pressures 
     real(r8) esi(pcols,pver)   ! 
     real(r8) ftem(pcols,pver)  ! temporary workspace
+    real(r8) gtem(pcols,pver)  ! temporary workspace
 
     !local vars
-    integer :: idx
+    integer :: idx,k
 
     !see if the hist_var exists in constituent array
     call cnst_get_ind(trim(adjustl(hist_var)), idx, abort=.false.)
     
     if (idx .ne. -1 ) then ! idx == -1  means, variable doesn't exists in the constituent array
 
-       prg_var(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx)
+       prg_var(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx)*state%pdel(1:pcols,1:pver)*rga
 
     else !variable doesn't exists in the constituent array
 
@@ -206,15 +208,19 @@ contains
        case('s')
           prg_var(1:pcols,1:pver) = state%s(1:pcols,1:pver)
        case('t')
-          prg_var(1:pcols,1:pver) = state%t(1:pcols,1:pver)
+          prg_var(1:pcols,1:pver) = cpair*state%t(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+                                    !state%t(1:pcols,1:pver)
        case('u')
-          prg_var(1:pcols,1:pver) = state%u(1:pcols,1:pver)
+          prg_var(1:pcols,1:pver) = state%u(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+
        case('v')
-          prg_var(1:pcols,1:pver) = state%v(1:pcols,1:pver)
+          prg_var(1:pcols,1:pver) = state%v(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+
        case('QSW')
          ! calculate from CAM q and t using CAM built-in functions
          call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
-              esl(1:pcols,1:pver), prg_var(1:pcols,1:pver))
+              esl(1:pcols,1:pver), ftem(1:pcols,1:pver))
+              prg_var(1:pcols,1:pver) = ftem(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
        case('RHW')
          ! calculate from CAM q and t using CAM built-in functions
          call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
@@ -223,19 +229,182 @@ contains
        case('QSI')
          ! calculate from CAM q and t using CAM built-in functions
          call qsat_ice(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
-              esi(1:pcols,1:pver), prg_var(1:pcols,1:pver))
+              esi(1:pcols,1:pver), ftem(1:pcols,1:pver))
+              prg_var(1:pcols,1:pver) = ftem(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
        case('RHI')
          ! calculate from CAM q and t using CAM built-in functions
          call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
               esl(1:pcols,1:pver), ftem(1:pcols,1:pver))
-         ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,1)/ftem(1:pcols,1:pver) * 100._r8
+         gtem(1:pcols,1:pver) = state%q(1:pcols,1:pver,1)/ftem(1:pcols,1:pver) * 100._r8
          ! convert to RHI (ice)
          esi(1:pcols,1:pver)=svp_ice(state%t(1:pcols,1:pver))
-         prg_var(1:pcols,1:pver)=ftem(1:pcols,1:pver)*esl(1:pcols,1:pver)/esi(1:pcols,1:pver)
+         prg_var(1:pcols,1:pver)=gtem(1:pcols,1:pver)*esl(1:pcols,1:pver)/esi(1:pcols,1:pver)
+       case('SUPERSAT_FLAG')
+         ! calculate from CAM q and t using CAM built-in functions
+         call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
+              esl(1:pcols,1:pver), ftem(1:pcols,1:pver))
+         gtem(1:pcols,1:pver) = state%q(1:pcols,1:pver,1)
+         prg_var(1:pcols,1:pver) = 1._r8
+         where(ftem(1:pcols,1:pver) .gt. gtem(1:pcols,1:pver))
+          prg_var = 0._r8
+         end where
        case default
-         call endrun('physics_update_mod.F90 - func get_var, unrecognized variable: '// trim(adjustl(hist_var)))
+         call endrun('physics_update_mod.F90 - func get_var_3d, unrecognized variable: '// trim(adjustl(hist_var)))
        end select
     endif
-  end function get_var
-     
+  end function get_var_3d
+
+  function get_var_2d(state,hist_var) result (prg_var)
+    !Purpose: Find which state variable to output based on the hist_var string
+
+    use constituents, only: cnst_get_ind
+    use physconst,    only: cpair, latvap, gravit, rga
+
+    character(len=fieldname_len), intent(in)  :: hist_var
+    type(physics_state),          intent(in)  :: state
+    real(r8)                                  :: prg_var(pcols)
+    real(r8) esl(pcols,pver)   ! saturation vapor pressures 
+    real(r8) esi(pcols,pver)   ! 
+    real(r8) ftem(pcols,pver)  ! temporary workspace
+    real(r8) gtem(pcols,pver)  ! temporary workspace
+
+    !local vars
+    integer :: idx,k
+
+    !see if the hist_var exists in constituent array
+    select case (trim(adjustl(hist_var)))
+    case('tvint') 
+      ftem(1:pcols,1:pver) = cpair*state%t(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('uvint')
+      ftem(1:pcols,1:pver) = state%u(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('vvint')
+      ftem(1:pcols,1:pver) = state%v(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('QVINT')
+      call cnst_get_ind('Q', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('CLVINT')
+      call cnst_get_ind('CLDLIQ', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+     case('NLVINT')
+      call cnst_get_ind('NUMLIQ', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('CIVINT')
+      call cnst_get_ind('CLDICE', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('NIVINT')
+      call cnst_get_ind('NUMICE', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('RIVINT')
+      call cnst_get_ind('RAINQM', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('NRVINT')
+      call cnst_get_ind('NUMRAI', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('SOVINT')
+      call cnst_get_ind('SNOWQM', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('NSVINT')
+      call cnst_get_ind('NUMSNO', idx, abort=.false.)
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,idx) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('QSWVIN')
+      ! calculate from CAM q and t using CAM built-in functions
+      call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
+           esl(1:pcols,1:pver), gtem(1:pcols,1:pver))
+      ftem(1:pcols,1:pver) = gtem(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('RHWVIN')
+      ! calculate from CAM q and t using CAM built-in functions
+      call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
+           esl(1:pcols,1:pver), ftem(1:pcols,1:pver))
+      gtem(1:pcols,1:pver) = state%q(1:pcols,1:pver,1)/ftem(1:pcols,1:pver) * 100._r8
+      ftem(1:pcols,1:pver) = gtem(1:pcols,1:pver) - 100._r8
+      where(gtem(1:pcols,1:pver) .lt. 100._r8)
+       ftem = 0._r8
+      end where
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('QSIVIN')
+      ! calculate from CAM q and t using CAM built-in functions
+      call qsat_ice(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
+           esi(1:pcols,1:pver), gtem(1:pcols,1:pver))
+      ftem(1:pcols,1:pver) = gtem(1:pcols,1:pver) * state%pdel(1:pcols,1:pver)*rga
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case('RHIVIN')
+      ! calculate from CAM q and t using CAM built-in functions
+      call qsat_water(state%t(1:pcols,1:pver), state%pmid(1:pcols,1:pver), &
+           esl(1:pcols,1:pver), ftem(1:pcols,1:pver))
+      ftem(1:pcols,1:pver) = state%q(1:pcols,1:pver,1)/ftem(1:pcols,1:pver) * 100._r8
+      ! convert to RHI (ice)
+      esi(1:pcols,1:pver)  = svp_ice(state%t(1:pcols,1:pver))
+      gtem(1:pcols,1:pver) = ftem(1:pcols,1:pver)*esl(1:pcols,1:pver)/esi(1:pcols,1:pver) 
+      ftem(1:pcols,1:pver) = gtem(1:pcols,1:pver) - 100._r8
+      where(gtem(1:pcols,1:pver) .lt. 100._r8)
+       ftem = 0._r8
+      end where
+      do k=2,pver
+         ftem(1:pcols,1) = ftem(1:pcols,1) + ftem(1:pcols,k)
+      end do
+      prg_var(1:pcols) = ftem(1:pcols,1)
+    case default
+      call endrun('physics_update_mod.F90 - func get_var_2d, unrecognized variable: '// trim(adjustl(hist_var)))
+    end select
+
+  end function get_var_2d
+
 end module physics_update_mod
