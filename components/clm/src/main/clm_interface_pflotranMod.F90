@@ -54,7 +54,7 @@ module clm_interface_pflotranMod
   use clm_interface_dataType, only : clm_interface_data_type
 
 #ifdef CLM_PFLOTRAN
-  use clm_pflotran_interface_data
+  use clmpf_interface_data
   use pflotran_clm_main_module
   use pflotran_clm_setmapping_module
 #include "petsc/finclude/petscsys.h"
@@ -1088,7 +1088,7 @@ contains
          pf_tmode = .true.
       endif
 
-      if (pflotran_m%option%use_th_freezing .and. pf_tmode) then
+      if (pflotran_m%option%th_freezing .and. pf_tmode) then
          pf_frzmode = .true.
       else
          pf_frzmode = .false.
@@ -2333,7 +2333,7 @@ contains
     use clm_time_manager, only : get_step_size, get_nstep
     use shr_infnan_mod  , only : shr_infnan_isnan
 
-    use clm_pflotran_interface_data
+    use clmpf_interface_data
     use clm_varctl      , only : pf_clmnstep0
 
   ! !ARGUMENTS:
@@ -2725,7 +2725,7 @@ contains
     use clm_varpar      , only : nlevgrnd
     use shr_infnan_mod  , only : shr_infnan_isnan
 
-    use clm_pflotran_interface_data
+    use clmpf_interface_data
     use clm_varctl      , only : pf_clmnstep0
 
   ! !ARGUMENTS:
