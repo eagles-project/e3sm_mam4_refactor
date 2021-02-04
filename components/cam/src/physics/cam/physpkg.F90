@@ -1151,6 +1151,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     use cam_diagnostics,only: diag_deallocate, diag_surf
     use comsrf,         only: trefmxav, trefmnav, sgh, sgh30, fsds 
+    use comsrf,         only: fsns, fsnt, flns, flnt
     use physconst,      only: stebol, latvap
     use carma_intr,     only: carma_accumulate_stats
 #if ( defined OFFLINE_DYN )
@@ -1243,7 +1244,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
        call tphysac(ztodt, cam_in(c),  &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
             phys_state(c), phys_tend(c), phys_buffer_chunk,&
-            fsds(1,c))
+            fsds(1,c), fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c))
     end do                    ! Chunk loop
 
     !call t_adj_detailf(-1)
@@ -1302,7 +1303,7 @@ end subroutine phys_final
 subroutine tphysac (ztodt,   cam_in,  &
        sgh,     sgh30,                                     &
        cam_out,  state,   tend,    pbuf,            &
-       fsds    )
+       fsds, fsns, fsnt, flns, flnt   )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -1365,6 +1366,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     !
     real(r8), intent(in) :: ztodt                  ! Two times model timestep (2 delta-t)
     real(r8), intent(in) :: fsds(pcols)            ! down solar flux
+
+    real(r8), intent(in) :: fsns(pcols)            ! Surface solar absorbed flux
+    real(r8), intent(in) :: fsnt(pcols)            ! Net column abs solar flux at model top
+    real(r8), intent(in) :: flns(pcols)            ! Srf longwave cooling (up-down) flux
+    real(r8), intent(in) :: flnt(pcols)            ! Net outgoing lw flux at model top
+
     real(r8), intent(in) :: sgh(pcols)             ! Std. deviation of orography for gwd
     real(r8), intent(in) :: sgh30(pcols)           ! Std. deviation of 30s orography for tms
 
