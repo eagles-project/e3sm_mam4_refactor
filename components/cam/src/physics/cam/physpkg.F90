@@ -1847,7 +1847,8 @@ subroutine tphysbc (ztodt,               &
     use aero_model,      only: aero_model_wetdep
     use carma_intr,      only: carma_wetdep_tend, carma_timestep_tend
     use carma_flags_mod, only: carma_do_detrain, carma_do_cldice, carma_do_cldliq,  carma_do_wetdep
-    use radiation,       only: radiation_tend
+    use radiation,       only: radiation_tend, get_saved_qrl_qrs
+    use radheat,         only: radheat_tend_add_subtract
     use cloud_diagnostics, only: cloud_diagnostics_calc
     use perf_mod
     use mo_gas_phase_chemdr,only: map2chm
@@ -2027,6 +2028,10 @@ subroutine tphysbc (ztodt,               &
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
 
+    integer :: radheat_cpl_opt
+    real(r8):: zqrl(pcols,pver) ! longwave heating
+    real(r8):: zqrs(pcols,pver) ! shortwave heating
+
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
@@ -2037,6 +2042,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
+                      ,radheat_cpl_opt_out = radheat_cpl_opt &
                       )
     
     !-----------------------------------------------------------------------
@@ -2379,6 +2385,20 @@ if (l_tracer_aero) then
 
 end if
 
+if (l_rad .and. (radheat_cpl_opt==2) .and. (nstep > dyn_time_lvls-1) ) then 
+! apply radiative heating calculated in the previous time step
+
+    call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
+    call radheat_tend_add_subtract( 1._wp, state, ptend,                &! in, in, out
+                                    zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
+                                    net_flx                             )! out
+
+    tend%flx_net(:ncol) = net_flx(:ncol) ! Set net flux used by spectral dycores
+    call physics_update(state, ptend, ztodt, tend)
+    call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
+                           zero, zero, zero, net_flx)
+end if
+
 
     if( microp_scheme == 'RK' ) then
 
@@ -2710,12 +2730,33 @@ if (l_rad) then
          fsns,    fsnt, flns,    flnt,  &
          fsds, net_flx,is_cmip6_volc)
 
+  if (radheat_cpl_opt == 2 ) then
+    ! QRL, QRS and various fluxes have been saved in pbuf or comsrf. Do not apply the tendencies yet.
+    ! Only initialize tend%flx_net to zero, then destroy ptend.
+
+    tend%flx_net(:ncol) = 0._wp 
+
+    call physics_ptend_dealloc(ptend)
+
+    ptend%name  = "default"
+    ptend%lq(:) = .false.
+    ptend%ls    = .false.
+    ptend%lu    = .false.
+    ptend%lv    = .false.
+    ptend%psetcols = 0
+    
+  else
+    ! Default model: update temperature, dry static energy, geopotential height etc.
+    ! and register net flux. 
+
     ! Set net flux used by spectral dycores
     do i=1,ncol
        tend%flx_net(i) = net_flx(i)
     end do
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
+
+  end if
 
     call t_stopf('radiation')
 

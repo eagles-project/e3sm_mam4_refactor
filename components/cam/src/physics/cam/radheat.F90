@@ -26,7 +26,8 @@ public  &
    radheat_readnl,        &!
    radheat_init,          &!
    radheat_timestep_init, &!
-   radheat_tend            ! return net radiative heating
+   radheat_tend,          &! return net radiative heating
+   radheat_tend_add_subtract
 
 !===============================================================================
 contains
