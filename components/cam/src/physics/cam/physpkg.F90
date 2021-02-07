@@ -1320,7 +1320,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! Author: CCM1, CMS Contact: J. Truesdale
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx, dyn_time_lvls
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use chemistry,          only: chem_is_active, chem_timestep_tend, chem_emissions
     use cam_diagnostics,    only: diag_phys_tend_writeout
@@ -1358,6 +1358,8 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use radiation,          only: get_saved_qrl_qrs
+    use radheat,            only: radheat_tend_add_subtract
 
     implicit none
 
@@ -1434,6 +1436,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     logical :: l_rayleigh
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
+    logical :: l_rad
+
+    integer :: radheat_cpl_opt
+    real(r8):: zqrl(pcols,pver) ! longwave heating
+    real(r8):: zqrs(pcols,pver) ! shortwave heating
+    real(r8):: net_flx(pcols)
 
     !
     !-----------------------------------------------------------------------
@@ -1450,6 +1458,8 @@ subroutine tphysac (ztodt,   cam_in,  &
                       ,l_rayleigh_out         = l_rayleigh         &
                       ,l_gw_drag_out          = l_gw_drag          &
                       ,l_ac_energy_chk_out    = l_ac_energy_chk    &
+                      ,l_rad_out              = l_rad              &
+                      ,radheat_cpl_opt_out    = radheat_cpl_opt    &
                      )
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1690,6 +1700,22 @@ if (l_gw_drag) then
 
 end if ! l_gw_drag
 
+if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
+! Undo the radiative heating applied after radiative_tend.
+! (Will be added back again before macmic in the next call of tphysbc.) 
+
+    call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
+    call radheat_tend_add_subtract( -1._wp, state, ptend,               &! in, in, out
+                                    zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
+                                    net_flx                             )! out
+
+    tend%flx_net(:ncol) = tend%flx_net(:ncol) + net_flx(:ncol) ! Set net flux used by spectral dycores
+    call physics_update(state, ptend, ztodt, tend)
+    call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
+                           zero, zero, zero, net_flx)
+
+end if ! l_rad
+
     !===================================================
     ! Update Nudging values, if needed
     !===================================================
@@ -1697,6 +1723,7 @@ end if ! l_gw_drag
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
+
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -2385,7 +2412,7 @@ if (l_tracer_aero) then
 
 end if
 
-if (l_rad .and. (radheat_cpl_opt==1) .and. (nstep > dyn_time_lvls-1) ) then 
+if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then 
 ! apply radiative heating calculated in the previous time step
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
