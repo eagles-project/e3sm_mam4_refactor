@@ -2385,7 +2385,7 @@ if (l_tracer_aero) then
 
 end if
 
-if (l_rad .and. (radheat_cpl_opt==2) .and. (nstep > dyn_time_lvls-1) ) then 
+if (l_rad .and. (radheat_cpl_opt==1) .and. (nstep > dyn_time_lvls-1) ) then 
 ! apply radiative heating calculated in the previous time step
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
@@ -2730,7 +2730,7 @@ if (l_rad) then
          fsns,    fsnt, flns,    flnt,  &
          fsds, net_flx,is_cmip6_volc)
 
-  if (radheat_cpl_opt == 2 ) then
+  if (radheat_cpl_opt == 1 ) then
     ! QRL, QRS and various fluxes have been saved in pbuf or comsrf. Do not apply the tendencies yet.
     ! Only initialize tend%flx_net to zero, then destroy ptend.
 
@@ -2746,7 +2746,7 @@ if (l_rad) then
     ptend%psetcols = 0
     
   else
-    ! Default model: update temperature, dry static energy, geopotential height etc.
+    ! Update temperature, dry static energy, geopotential height etc.
     ! and register net flux. 
 
     ! Set net flux used by spectral dycores
