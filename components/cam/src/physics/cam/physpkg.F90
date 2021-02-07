@@ -1711,7 +1711,7 @@ if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
 
     tend%flx_net(:ncol) = tend%flx_net(:ncol) + net_flx(:ncol) ! Set net flux used by spectral dycores
     call physics_update(state, ptend, ztodt, tend)
-    call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
+    call check_energy_chng(state, tend, "radheat_subtract_before_dyn", nstep, ztodt, &
                            zero, zero, zero, net_flx)
 
 end if ! l_rad
