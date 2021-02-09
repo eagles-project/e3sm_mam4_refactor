@@ -1705,7 +1705,7 @@ if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
 ! (Will be added back again before macmic in the next call of tphysbc.) 
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
-    call radheat_tend_add_subtract( -1._wp, state, ptend,               &! in, in, out
+    call radheat_tend_add_subtract( -1._r8, state, ptend,               &! in, in, out
                                     zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
                                     net_flx                             )! out
 
@@ -2416,7 +2416,7 @@ if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then
 ! apply radiative heating calculated in the previous time step
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
-    call radheat_tend_add_subtract( 1._wp, state, ptend,                &! in, in, out
+    call radheat_tend_add_subtract( 1._r8, state, ptend,                &! in, in, out
                                     zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
                                     net_flx                             )! out
 
