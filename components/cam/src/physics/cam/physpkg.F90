@@ -1701,7 +1701,7 @@ if (l_gw_drag) then
 end if ! l_gw_drag
 
 if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
-! Undo the radiative heating applied after radiative_tend.
+! Undo the radiative heating applied after radiative_tend: 
 ! (Will be added back again before macmic in the next call of tphysbc.) 
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
@@ -2759,9 +2759,6 @@ if (l_rad) then
 
   if (radheat_cpl_opt == 1 ) then
     ! QRL, QRS and various fluxes have been saved in pbuf or comsrf. Do not apply the tendencies yet.
-    ! Only initialize tend%flx_net to zero, then destroy ptend.
-
-    tend%flx_net(:ncol) = 0._wp 
 
     call physics_ptend_dealloc(ptend)
 
