@@ -66,6 +66,8 @@ integer :: cldfsnow_idx = 0
 integer :: cld_idx      = 0 
 integer :: concld_idx   = 0
 
+logical  :: conserve_energy = .true.       ! flag to carry (QRS,QRL)*dp across time steps
+
 ! Default values for namelist variables
 
 integer :: iradsw = -1     ! freq. of shortwave radiation calc in time steps (positive)
@@ -889,7 +891,6 @@ end function radiation_nextsw_cday
     real(r8) :: clat(pcols)                   ! current latitudes(radians)
     real(r8) :: clon(pcols)                   ! current longitudes(radians)
     real(r8) coszrs(pcols)                     ! Cosine solar zenith angle
-    logical  :: conserve_energy = .true.       ! flag to carry (QRS,QRL)*dp across time steps
 
     ! Local variables from radctl
     integer :: i, k, iseed, ilchnk                  ! index
