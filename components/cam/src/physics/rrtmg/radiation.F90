@@ -55,7 +55,7 @@ integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 integer, public, parameter   :: kiss_seed_num = 4
 integer, public, allocatable :: rad_randn_seedrst(:,:,:), tot_chnk_till_this_prc(:) !total number of chunks till this processor
 
-real(r8), parameter :: ocn_sfc_emis = 0.96_wp  ! emissivity of ocean surface
+real(r8), parameter :: ocn_sfc_emis = 0.96_r8  ! emissivity of ocean surface
 
 ! Private module data
 integer :: qrs_idx      = 0 
