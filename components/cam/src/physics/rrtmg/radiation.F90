@@ -55,6 +55,8 @@ integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 integer, public, parameter   :: kiss_seed_num = 4
 integer, public, allocatable :: rad_randn_seedrst(:,:,:), tot_chnk_till_this_prc(:) !total number of chunks till this processor
 
+real(r8), parameter :: ocn_sfc_emis = 0.96_wp  ! emissivity of ocean surface
+
 ! Private module data
 integer :: qrs_idx      = 0 
 integer :: qrl_idx      = 0 
@@ -927,6 +929,7 @@ end function radiation_nextsw_cday
     real(r8) pnm(pcols,pverp)     ! Model interface pressures (dynes/cm2)
     real(r8) eccf                 ! Earth/sun distance factor
     real(r8) lwupcgs(pcols)       ! Upward longwave flux in cgs units
+    real(r8) lwup(pcols)          ! Upward longwave flux in original units
 
     real(r8) dy                   ! Temporary layer pressure thickness
     real(r8) tint(pcols,pverp)    ! Model interface temperature
@@ -1051,8 +1054,20 @@ end function radiation_nextsw_cday
 
     if (dosw .or. dolw) then
 
+       !Change upward LW flux from ocean surface to account for emissivity < 1.
+       !This is a quick-and-dirty implementation for initial testing.
+       !by Hui Wan and Phil Rasch, PNNL, Feb 2021.
+     
+       do i = 1,ncol
+          if (landfrac(i).le.0.1) then 
+             lwup(i) = ocn_sfc_emis*cam_in%lwup(i) + (1._r8 - ocn_sfc_emis)*cam_out%flwds(i)
+          else
+             lwup(i) = cam_in%lwup(i)
+          end if
+       end do
+
        ! construct an RRTMG state object
-       r_state => rrtmg_state_create( state, cam_in )
+       r_state => rrtmg_state_create( state, lwup )
 
        ! For CRM, make cloud liquid water path equal to input observations
        if(single_column.and.scm_crm_mode.and.have_clwp)then
@@ -1188,7 +1203,7 @@ end function radiation_nextsw_cday
        ! stebol constant in mks units
        do i = 1,ncol
           tint(i,1) = state%t(i,1)
-          tint(i,pverp) = sqrt(sqrt(cam_in%lwup(i)/stebol))
+          tint(i,pverp) = sqrt(sqrt(lwup(i)/stebol))
           do k = 2,pver
              dy = (state%lnpint(i,k) - state%lnpmid(i,k)) / (state%lnpmid(i,k-1) - state%lnpmid(i,k))
              tint(i,k) = state%t(i,k) - dy * (state%t(i,k) - state%t(i,k-1))
@@ -1351,9 +1366,17 @@ end function radiation_nextsw_cday
           ! Convert upward longwave flux units to CGS
           !
           do i=1,ncol
-             lwupcgs(i) = cam_in%lwup(i)*1000._r8
-             if(single_column.and.scm_crm_mode.and.have_tg) &
-                  lwupcgs(i) = 1000*stebol*tground(1)**4
+             lwupcgs(i) = lwup(i)*1000._r8
+
+             if(single_column.and.scm_crm_mode.and.have_tg) then 
+                if (landfrac(i).le.0.1_r8) then 
+                   lwupcgs(i) = 1000._r8*ocn_sfc_emis*stebol*tground(1)**4 &
+                              + 1000._r8*(1._r8 - ocn_sfc_emis)*cam_out%flwds(i)
+                else
+                   lwupcgs(i) = 1000._r8*stebol*tground(1)**4
+                end if
+             end if
+
           end do
 
           call rad_cnst_get_call_list(active_calls)
@@ -1438,7 +1461,7 @@ end function radiation_nextsw_cday
           call t_startf ('dohirs')
 
           do i= 1, ncol
-             ts(i) = sqrt(sqrt(cam_in%lwup(i)/stebol))
+             ts(i) = sqrt(sqrt(lwup(i)/stebol))
              ! Set oro (land/sea flag) for compatibility with landfrac/icefrac/ocnfrac
              ! oro=0 (sea or ice); oro=1 (land)
              if (landfrac(i).ge.0.001) then
