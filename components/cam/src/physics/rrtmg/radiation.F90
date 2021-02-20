@@ -631,6 +631,10 @@ end function radiation_nextsw_cday
                                                                            sampling_seq='rad_lwsw')
           call addfld('FLNS'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at surface', &
                                                                            sampling_seq='rad_lwsw')
+
+          call addfld('FLNScr'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at surface', &
+                                                                           sampling_seq='rad_lwsw')
+
           call addfld('FLNT'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at top of model', &
                                                                            sampling_seq='rad_lwsw')
           call addfld('FLUT'//diag(icall), horiz_only,    'A',    'W/m2', 'Upwelling longwave flux at top of model', &
@@ -654,6 +658,7 @@ end function radiation_nextsw_cday
           if (history_amwg) then
              call add_default('QRL'//diag(icall),   1, ' ')
              call add_default('FLNS'//diag(icall),  1, ' ')
+             call add_default('FLNScr'//diag(icall),  1, ' ')
              call add_default('FLDS'//diag(icall),  1, ' ')
              call add_default('FLNT'//diag(icall),  1, ' ')
              call add_default('FLUT'//diag(icall),  1, ' ')
@@ -787,6 +792,15 @@ end function radiation_nextsw_cday
     use orbit,            only: zenith
     use output_aerocom_aie , only: do_aerocom_ind3
 
+    !Hui Wan ++++
+
+    use physconst,      only: gravit
+
+    logical :: test_sfc_qrl = .true.
+    real(r8) :: zflns_cr(pcols) 
+
+    !Hui Wan ++++
+
     ! Arguments
     logical,  intent(in)    :: is_cmip6_volc    ! true if cmip6 style volcanic file is read otherwise false 
     real(r8), intent(in)    :: landfrac(pcols)  ! land fraction
@@ -808,6 +822,7 @@ end function radiation_nextsw_cday
     type(cam_in_t),      intent(in)         :: cam_in
 
     ! Local variables
+
 
     logical :: dosw, dolw
     integer nstep                       ! current timestep number
@@ -1378,6 +1393,15 @@ end function radiation_nextsw_cday
                        flut,         flutc,        fnl,             fcnl,         fldsc,         &
                        clm_seed,     lu,           ld                                            )
                   call t_stopf ('rad_rrtmg_lw')
+
+                  if (test_sfc_qrl) then
+
+                     zflns_cr(:ncol) = ( qrl(:ncol,pver-1) - qrl(:ncol,pver) )*state%pdel(pver)/gravit
+                     call outfld('FLNScr'//diag(icall),zflns_cr,pcols,lchnk)
+
+                     flns(:ncol) = flns(:ncol) + zflns_cr(:ncol)
+                     qrl(:ncol,pver) = qrl(:ncol,pver-1)
+                  end if
 
                   if (lwrad_off) then
                      qrl(:,:) = 0._r8
