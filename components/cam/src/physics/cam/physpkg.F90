@@ -2533,12 +2533,16 @@ end if
    
              call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
                 cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+                radheat_cpl_opt, &
                 dlf, det_s, det_ice, lcldo)
 
                 !  Since we "added" the reserved liquid back in this routine, we need 
                 !    to account for it in the energy checker
                 flx_cnd(:ncol) = -1._r8*rliq(:ncol) 
                 flx_heat(:ncol) = cam_in%shf(:ncol) + det_s(:ncol)
+
+                if (radheat_cpl_opt==31) &
+                flx_heat(:ncol) = flx_heat(:ncol) + cam_in%lwup(:ncol)
 
                 ! Unfortunately, physics_update does not know what time period
                 ! "tend" is supposed to cover, and therefore can't update it
@@ -2773,10 +2777,20 @@ if (l_rad) then
     ! Update temperature, dry static energy, geopotential height etc.
     ! and register net flux. 
 
+    if (radheat_cpl_opt == 31) then 
+    ! Exclude the contribution to ptend%s from cam_in%lwup. 
+    ! cam_in%lwup is provided to the turbulence scheme as part of the surface heat flux.
+
+        ptend%s(:ncol,pver) = ptend%s(:ncol,pver) - cam_in%lwup(:ncol)*gravit/state%pdel(:ncol,pver)
+        net_flx(:ncol)      = net_flx(:ncol)      - cam_in%lwup(:ncol)
+    end if
+
     ! Set net flux used by spectral dycores
     do i=1,ncol
        tend%flx_net(i) = net_flx(i)
     end do
+
+    ! Update model state
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 

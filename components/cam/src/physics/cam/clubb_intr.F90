@@ -887,8 +887,10 @@ end subroutine clubb_init_cnst
 
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,     hdtime, &
-                              cmfmc,   cam_in,   sgh30, & 
-                              macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
+                              cmfmc,   cam_in,   sgh30, &
+                              macmic_it, cld_macmic_num_steps, &
+                              radheat_cpl_opt, &
+                              dlf, det_s, det_ice, alst_o)
 
 !-------------------------------------------------------------------------------
 ! Description: Provide tendencies of shallow convection, turbulence, and 
@@ -958,6 +960,7 @@ end subroutine clubb_init_cnst
    real(r8),            intent(in)    :: sgh30(pcols)             ! std deviation of orography              [m]
    integer,             intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
    integer,             intent(in)    :: macmic_it                ! number of mac-mic iterations
+   integer,             intent(in)    :: radheat_cpl_opt          ! numerical treatment of surface rad flux 
     
    ! ---------------------- !
    ! Input-Output Auguments !
@@ -1704,6 +1707,11 @@ end subroutine clubb_init_cnst
       
       !  Surface fluxes provided by host model
       wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
+
+      if (radheat_cpl_opt == 31) then
+         wpthlp_sfc = wpthlp_sfc + cam_in%lwup(i)/(cpair*rho_ds_zm(1))  ! surface upward longwave flux
+      end if
+
       wprtp_sfc  = cam_in%cflx(i,1)/(rho_ds_zm(1))      ! Latent heat flux
       upwp_sfc   = cam_in%wsx(i)/rho_ds_zm(1)               ! Surface meridional momentum flux
       vpwp_sfc   = cam_in%wsy(i)/rho_ds_zm(1)               ! Surface zonal momentum flux  
