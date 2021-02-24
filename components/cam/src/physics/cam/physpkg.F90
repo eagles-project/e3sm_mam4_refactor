@@ -2412,7 +2412,7 @@ if (l_tracer_aero) then
 
 end if
 
-if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then 
+if (l_rad .and. ((radheat_cpl_opt.eq.1).or.(radheat_cpl_opt.eq.2)) .and. (nstep > dyn_time_lvls-1) ) then 
 ! apply radiative heating calculated in the previous time step
 
     call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
