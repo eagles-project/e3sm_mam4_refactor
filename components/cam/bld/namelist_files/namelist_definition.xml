@@ -2458,6 +2458,18 @@ Where to apply radiative heatingto apply radiative heating
 Default: 0
 </entry>
 
+<entry id="l_dribble_tend_into_macmic_loop" type="logical" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Do tendency dribbling during macmic loop.
+Default: FALSE
+</entry>
+
+<entry id="dribble_start_step" type="integer" category="physc_test"
+       group="phys_ctl_nl" valid_values="" >
+Start step of the tendency dribbling during macmic loop.
+Default: 1
+</entry>
+
 <!-- Physics sub-column switches -->
 
 <entry id="use_subcol_microp" type="logical" category="conv"

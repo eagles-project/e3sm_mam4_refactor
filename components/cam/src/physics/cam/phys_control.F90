@@ -154,6 +154,11 @@ logical :: l_st_mac        = .true.
 logical :: l_st_mic        = .true.
 logical :: l_rad           = .true.
 
+!Comment by ShixuanZhang & HuiWan (PNNL, 2020-07): 
+!This set of namelist variables were implemented for a test of using tendency 
+!dribbling in cloud physics parameterizations (macmic loop) 
+logical  :: l_dribble_tend_into_macmic_loop = .false.
+integer  :: dribble_start_step = 1
 
 !When and where to apply radiative heating (Hui Wan, Feb 2021)
 integer :: radheat_cpl_opt = 0  ! EAMv1. Apply tendencies after radiation_tend
@@ -191,7 +196,7 @@ subroutine phys_ctl_readnl(nlfile)
       fix_g1_err_ndrop, ssalt_tuning, resus_fix, convproc_do_aer, &
       convproc_do_gas, convproc_method_activate, liqcf_fix, regen_fix, demott_ice_nuc, pergro_mods, pergro_test_active, &
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
-      radheat_cpl_opt, &
+      l_dribble_tend_into_macmic_loop, dribble_start_step, radheat_cpl_opt, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
       rrtmg_temp_fix
@@ -275,6 +280,8 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_st_mac,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_st_mic,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_rad,                           1 , mpilog,  0, mpicom)
+   call mpibcast(l_dribble_tend_into_macmic_loop, 1 , mpilog,  0, mpicom)
+   call mpibcast(dribble_start_step,              1 , mpiint,  0, mpicom)
    call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
    call mpibcast(prc_coef1,                       1 , mpir8,   0, mpicom)
    call mpibcast(prc_exp,                         1 , mpir8,   0, mpicom)
@@ -425,7 +432,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         fix_g1_err_ndrop_out, ssalt_tuning_out,resus_fix_out,convproc_do_aer_out,  &
                         convproc_do_gas_out, convproc_method_activate_out, mam_amicphys_optaa_out, n_so4_monolayers_pcage_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
-                       ,radheat_cpl_opt_out &
+                       ,l_dribble_tend_into_macmic_loop_out, dribble_start_step_out, radheat_cpl_opt_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
@@ -497,6 +504,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: l_st_mac_out
    logical,           intent(out), optional :: l_st_mic_out
    logical,           intent(out), optional :: l_rad_out
+   logical,           intent(out), optional :: l_dribble_tend_into_macmic_loop_out
+   integer,           intent(out), optional :: dribble_start_step_out
    logical,           intent(out), optional :: mg_prc_coeff_fix_out
    logical,           intent(out), optional :: rrtmg_temp_fix_out
    integer,           intent(out), optional :: cld_macmic_num_steps_out
@@ -564,6 +573,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(l_st_mac_out            ) ) l_st_mac_out          = l_st_mac
    if ( present(l_st_mic_out            ) ) l_st_mic_out          = l_st_mic
    if ( present(l_rad_out               ) ) l_rad_out             = l_rad
+   if ( present(l_dribble_tend_into_macmic_loop_out ) ) l_dribble_tend_into_macmic_loop_out = l_dribble_tend_into_macmic_loop
+   if ( present(dribble_start_step_out              ) ) dribble_start_step_out = dribble_start_step
    if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
    if ( present(prc_coef1_out           ) ) prc_coef1_out            = prc_coef1
    if ( present(prc_exp_out             ) ) prc_exp_out              = prc_exp
