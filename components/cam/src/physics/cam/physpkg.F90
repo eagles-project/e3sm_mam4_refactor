@@ -119,7 +119,7 @@ subroutine phys_register
     !            A. Gettelman, Nov 2010 - put micro/macro physics into separate routines
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer,     only: pbuf_init_time
+    use physics_buffer,     only: pbuf_init_time, dyn_time_lvls
     use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use spmd_utils,         only: masterproc
@@ -1877,7 +1877,7 @@ subroutine tphysbc (ztodt,               &
     use microp_aero,     only: microp_aero_run
     use macrop_driver,   only: macrop_driver_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, &
-         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
+         physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale, physics_ptend_copy
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
     use physconst,       only: cpair, latvap, gravit, rga
@@ -2498,8 +2498,7 @@ end if
        prec_pcw_macmic = 0._r8
        snow_pcw_macmic = 0._r8
 
-       !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency
-       !dribbling in cloud physics parameterizations 
+       !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
        call cnst_get_ind('CLDLIQ', ixcldliq)
        call cnst_get_ind('CLDICE', ixcldice)
        call cnst_get_ind('NUMLIQ', ixnumliq)
@@ -2534,7 +2533,7 @@ end if
 
        end if
 
-       l_dribble = l_dribble_tend_into_macmic_loop .and. ( nstep .ge. dribble_start_step )
+       l_dribble = l_dribble_tend_into_macmic_loop .and. ( nstep >=  dribble_start_step )
 
        if ( l_dribble ) then
 
