@@ -1082,7 +1082,7 @@ end subroutine micro_mg_cam_init
 
 !===============================================================================
 
-subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
+subroutine micro_mg_cam_tend(state, ptend, dtime, macmic_it, pbuf)
 
    use micro_mg_utils, only: size_dist_param_basic, size_dist_param_liq, &
         mg_liq_props, mg_ice_props, avg_diameter, rhoi, rhosn, rhow, rhows, &
@@ -1106,6 +1106,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
    real(r8),                    intent(in)    :: dtime
+
+   integer,                     intent(in)    :: macmic_it
+
    type(physics_buffer_desc),   pointer       :: pbuf(:)
 
    ! Local variables
@@ -1590,9 +1593,14 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    integer :: autocl_idx, accretl_idx  ! Aerocom IND3
    integer :: cldliqbf_idx, cldicebf_idx, numliqbf_idx, numicebf_idx
 
+   !local temporary strings 
+   character(len=200) :: tsubname
+
    !-------------------------------------------------------------------------------
 
    call t_startf('micro_mg_cam_tend_init')
+
+   write (tsubname, "(A4,I2.2)") "_sub", macmic_it
 
    ! Find the number of levels used in the microphysics.
    nlev  = pver - top_lev + 1
@@ -1813,7 +1821,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
    ! the name 'cldwat' triggers special tests on cldliq
    ! and cldice in physics_update
-   call physics_ptend_init(ptend, psetcols, "cldwat_mic", ls=.true., lq=lq)
+   call physics_ptend_init(ptend, psetcols, "cldwat_mic"//trim(adjustl(tsubname)), ls=.true., lq=lq)
 
    select case (micro_mg_version)
    case (1)
@@ -2251,7 +2259,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
       call handle_errmsg(errstring, subname="micro_mg_tend")
 
-      call physics_ptend_init(ptend_loc, psetcols, "micro_mg", &
+      call physics_ptend_init(ptend_loc, psetcols, "micro_mg"//trim(adjustl(tsubname)), &
                               ls=.true., lq=lq)
 
       ! Set local tendency.

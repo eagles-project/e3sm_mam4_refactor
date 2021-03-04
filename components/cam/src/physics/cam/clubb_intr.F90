@@ -1214,6 +1214,9 @@ end subroutine clubb_init_cnst
    real(r8)  initend(pcols,pver)
    logical            :: lqice(pcnst)
    
+   !local temporary strings 
+   character(len=200) :: tsubname
+
    integer :: ixorg
 
    intrinsic :: selected_real_kind, max
@@ -1222,6 +1225,8 @@ end subroutine clubb_init_cnst
    det_s(:)   = 0.0_r8
    det_ice(:) = 0.0_r8
 #ifdef CLUBB_SGS
+
+   write (tsubname, "(A4,I2.2)") "_sub", macmic_it
 
    !-----------------------------------------------------------------------------------------------!
    !-----------------------------------------------------------------------------------------------!
@@ -1252,7 +1257,7 @@ end subroutine clubb_init_cnst
  !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
 
    if (.not. micro_do_icesupersat) then    
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice1', ls=.true., lu=.true., lv=.true., lq=lq)
+     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_ice1'//trim(adjustl(tsubname)), ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
    call physics_state_copy(state,state1)
@@ -2127,7 +2132,7 @@ end subroutine clubb_init_cnst
 
    !  Update physics tendencies     
    if (.not. micro_do_icesupersat) then
-      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice4')
+      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice4'//trim(adjustl(tsubname)))
    endif
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2156,7 +2161,7 @@ end subroutine clubb_init_cnst
    lqice(ixnumliq) = .true.
    lqice(ixnumice) = .true.
     
-   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det', ls=.true., lq=lqice)
+   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det'//trim(adjustl(tsubname)), ls=.true., lq=lqice)
    
    call t_startf('ice_cloud_detrain_diag')
    do k=1,pver

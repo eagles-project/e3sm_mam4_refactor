@@ -150,7 +150,10 @@ contains
              plist(pid) = trim(adjustl(pname))
           endif
        endif
-          
+       
+       !determine if there is substeps for certain processes 
+       
+   
        !call outfld
        do ihist = 1 , nvars_prtrb_hist
           vsuffix  = trim(adjustl(hist_vars(ihist)))
