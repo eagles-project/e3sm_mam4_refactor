@@ -804,15 +804,17 @@ add_default($nl, 'ncdata', %atts);
 add_default($nl,'ieflx_opt');
 
 # Add other variables that are previously set in use_case but not previously set
-add_default($nl,'use_hetfrz_classnuc');
-add_default($nl,'hist_hetfrz_classnuc');
-add_default($nl,'gw_convect_hcf');
-add_default($nl,'linoz_psc_t');
-add_default($nl,'micro_mg_dcs_tdep');
-add_default($nl,'micro_mincdnc');
-add_default($nl,'microp_aero_wsub_scheme');
-add_default($nl,'microp_aero_wsubmin');
-add_default($nl,'use_preexisting_ice');
+if (!$adia_mode and !$ideal_mode) {
+  add_default($nl,'use_hetfrz_classnuc');
+  add_default($nl,'hist_hetfrz_classnuc');
+  add_default($nl,'gw_convect_hcf');
+  add_default($nl,'linoz_psc_t');
+  add_default($nl,'micro_mg_dcs_tdep');
+  add_default($nl,'micro_mincdnc');
+  add_default($nl,'microp_aero_wsub_scheme');
+  add_default($nl,'microp_aero_wsubmin');
+  add_default($nl,'use_preexisting_ice');
+}
 
 
 #BSINGH - (when .true.)calculate solar zenith angle averaged over a time step.

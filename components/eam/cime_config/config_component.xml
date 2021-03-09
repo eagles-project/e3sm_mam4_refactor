@@ -97,8 +97,8 @@
       <value compset="_ELM%[^_]*BC"     >-bc_dep_to_snow_updates</value>
 
       <!-- Simple/idealized configurations -->
-      <value compset="_EAM%IDEAL"     >-phys ideal</value>
-      <value compset="_EAM%ADIAB"     >-phys adiabatic</value>
+      <value compset="_EAM%IDEAL"     >-phys ideal     -rad rrtmgp</value>
+      <value compset="_EAM%ADIAB"     >-phys adiabatic -rad rrtmgp</value>
 
       <!-- Aquaplanet -->
       <value compset="_EAM%AQUA"   >-nlev 72 -clubb_sgs -microphys mg2 -aquaplanet -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates </value>

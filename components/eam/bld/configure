@@ -1062,9 +1062,9 @@ if ($print>=2) { print "Using $pbl_pkg PBL scheme.$eol"; }
 
 # Set default
 my $rad_pkg = 'rrtmg';
-if ($phys_pkg =~ m/^ideal$|^adiabatic$|^cam[34]$/) {
-    $rad_pkg = 'camrt';
-}
+# if ($phys_pkg =~ m/^ideal$|^adiabatic$|^cam[34]$/) {
+#     $rad_pkg = 'camrt';
+# }
 
 # Allow the user to override the default via the commandline.
 if (defined $opts{'rad'}) {

@@ -140,6 +140,7 @@
 <bnd_topo hgrid="ne0np4_twpx4v1" >atm/cam/topo/USGS_twpx4v1_tensor12x_consistentSGH_170629.nc</bnd_topo>
 
 <!-- ieflx_opt 0: atmonly, 2: coupled -->
+<ieflx_opt>0</ieflx_opt>
 <ieflx_opt  ocn="docn" >0</ieflx_opt>
 <ieflx_opt  ocn="mpaso" >2</ieflx_opt>
 
@@ -1633,6 +1634,9 @@ with se_tstep, dt_remap_factor, dt_tracer_factor set to -1
 <!-- set default parameter values for v2, moved from use_case file -->
 
 <!-- Ice nucleation mods-->
+<use_hetfrz_classnuc>.false.</use_hetfrz_classnuc>
+<hist_hetfrz_classnuc>.false.</hist_hetfrz_classnuc>
+
 <use_hetfrz_classnuc phys="default">.true.</use_hetfrz_classnuc>
 <use_preexisting_ice phys="default">.false.</use_preexisting_ice>
 <hist_hetfrz_classnuc phys="default">.false.</hist_hetfrz_classnuc>
