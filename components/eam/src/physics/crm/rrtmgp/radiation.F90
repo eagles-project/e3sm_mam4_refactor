@@ -2158,7 +2158,6 @@ contains
       real(r8), intent(in) :: pmid(:,:), tmid(:,:), pint(:,:), tint(:,:)
       real(r8), intent(in) :: cld_tau_gpt(:,:,:), aer_tau_bnd(:,:,:)
       type(fluxes_t), intent(inout) :: fluxes_allsky, fluxes_clrsky
-      type(fluxes_t) :: fluxes_allsky_cxx, fluxes_clrsky_cxx
 
       integer :: ncol, nlev, igas
 
@@ -2179,47 +2178,19 @@ contains
       gas_vmr_rad(:,1:ncol,ktop:kbot) = gas_vmr(:,1:ncol,:)
 
       ! Compute fluxes
-      call t_startf('rrtmgp_run_lw')
-      call rrtmgp_run_lw( &
-            size(active_gases), ncol, nlev_rad, &
-            gas_names, gas_vmr_rad(:,1:ncol,1:nlev_rad), &
-            surface_emissivity(1:nlwbands,1:ncol), &
-            pmid(1:ncol,:), tmid(1:ncol,:), pint(1:ncol,:), tint(1:ncol,:), &
-            cld_tau_gpt_rad(1:ncol,:,:), aer_tau_bnd_rad(1:ncol,:,:), &
-            fluxes_allsky%flux_up, fluxes_allsky%flux_dn, fluxes_allsky%flux_net, &
-            fluxes_allsky%bnd_flux_up, fluxes_allsky%bnd_flux_dn, fluxes_allsky%bnd_flux_net, &
-            fluxes_clrsky%flux_up, fluxes_clrsky%flux_dn, fluxes_clrsky%flux_net, &
-            fluxes_clrsky%bnd_flux_up, fluxes_clrsky%bnd_flux_dn, fluxes_clrsky%bnd_flux_net &
-            )
-      call t_stopf('rrtmgp_run_lw')
       call t_startf('rrtmgpxx_run_lw')
-      ! Try calling C++ version
-      call initialize_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_allsky_cxx)
-      call initialize_fluxes(ncol, nlev_rad+1, nlwbands, fluxes_clrsky_cxx)
       call rrtmgpxx_run_lw( &
          size(active_gases), ncol, nlev_rad, &
          c_strarr(active_gases, active_gases_c), gas_vmr_rad(:,1:ncol,:), &
          pmid(1:ncol,1:nlev_rad), tmid(1:ncol,1:nlev_rad), pint(1:ncol,1:nlev_rad+1), tint(1:ncol,1:nlev_rad+1), &
          surface_emissivity(1:nlwbands,1:ncol), &
          cld_tau_gpt_rad(1:ncol,:,:)  , aer_tau_bnd_rad(1:ncol,:,:)  , &
-         fluxes_allsky_cxx%flux_up    , fluxes_allsky_cxx%flux_dn    , fluxes_allsky_cxx%flux_net    , &
-         fluxes_allsky_cxx%bnd_flux_up, fluxes_allsky_cxx%bnd_flux_dn, fluxes_allsky_cxx%bnd_flux_net, &
-         fluxes_clrsky_cxx%flux_up    , fluxes_clrsky_cxx%flux_dn    , fluxes_clrsky_cxx%flux_net    , &
-         fluxes_clrsky_cxx%bnd_flux_up, fluxes_clrsky_cxx%bnd_flux_dn, fluxes_clrsky_cxx%bnd_flux_net  &
+         fluxes_allsky%flux_up    , fluxes_allsky%flux_dn    , fluxes_allsky%flux_net    , &
+         fluxes_allsky%bnd_flux_up, fluxes_allsky%bnd_flux_dn, fluxes_allsky%bnd_flux_net, &
+         fluxes_clrsky%flux_up    , fluxes_clrsky%flux_dn    , fluxes_clrsky%flux_net    , &
+         fluxes_clrsky%bnd_flux_up, fluxes_clrsky%bnd_flux_dn, fluxes_clrsky%bnd_flux_net  &
          )
       call t_stopf('rrtmgpxx_run_lw')
-      ! Check fluxes
-      if (.true.) then
-         call assert(all(abs(fluxes_allsky_cxx%flux_up - fluxes_allsky%flux_up) < 1e-5), 'F90 and CXX allsky_flux_up differs.')
-         call assert(all(abs(fluxes_allsky_cxx%flux_dn - fluxes_allsky%flux_dn) < 1e-5), 'F90 and CXX allsky_flux_dn differs.')
-         call assert(all(abs(fluxes_allsky_cxx%flux_net - fluxes_allsky%flux_net) < 1e-5), 'F90 and CXX allsky_flux_net differs.')
-         call assert(all(abs(fluxes_clrsky_cxx%flux_up - fluxes_clrsky%flux_up) < 1e-5), 'F90 and CXX clrsky_flux_up differs.')
-         call assert(all(abs(fluxes_clrsky_cxx%flux_dn - fluxes_clrsky%flux_dn) < 1e-5), 'F90 and CXX clrsky_flux_dn differs.')
-         call assert(all(abs(fluxes_clrsky_cxx%flux_net - fluxes_clrsky%flux_net) < 1e-5), 'F90 and CXX clrsky_flux_net differs.')
-      end if
-      call free_fluxes(fluxes_allsky_cxx)
-      call free_fluxes(fluxes_clrsky_cxx)
-
    end subroutine radiation_driver_lw
 
    !----------------------------------------------------------------------------
