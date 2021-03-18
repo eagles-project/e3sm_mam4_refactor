@@ -118,8 +118,8 @@ function(build_model COMP_CLASS COMP_NAME)
           ${CMAKE_CURRENT_SOURCE_DIR}/../../eam/src/physics/rrtmgp/external/cpp/extensions/cloud_optics
       )
       # Add files to the main E3SM build
-      set(SOURCES ${SOURCES} cmake/atm/../../eam/src/physics/rrtmgp/cpp/rrtmgpxx_interface.F90
-                             cmake/atm/../../eam/src/physics/rrtmgp/cpp/rrtmgpxx_interface.cpp
+      set(SOURCES ${SOURCES} cmake/atm/../../eam/src/physics/rrtmgp/cpp/rrtmgp_interface.F90
+                             cmake/atm/../../eam/src/physics/rrtmgp/cpp/rrtmgp_interface.cpp
                              cmake/atm/../../eam/src/physics/rrtmgp/cpp/mo_load_coefficients.cpp
                              cmake/atm/../../eam/src/physics/rrtmgp/cpp/mo_load_cloud_coefficients.cpp
                              cmake/atm/../../eam/src/physics/rrtmgp/cpp/mo_garand_atmos_io.cpp
