@@ -1010,8 +1010,9 @@ flags should be captured within MPAS CMake files.
   </CMAKE_OPTS>
   <CPPDEFS>
     <append> -DFORTRANUNDERSCORE -DNO_R16</append>
-    <!-- <append COMP_NAME="clm"> -DCLM_PFLOTRAN </append>
-         <append COMP_NAME="clm"> -DCOLUMN_MODE </append> -->
+    <!-- THE FOLLOWING if for ELM-PFLOTRAN coupling. IF NOT NEEDED, simply comment entire block out-->
+    <append MODEL="clm"> -DCLM_PFLOTRAN </append>
+    <append MODEL="clm"> -DCOLUMN_MODE </append>
   </CPPDEFS>
   <CXX_LINKER>FORTRAN</CXX_LINKER>
   <FC_AUTO_R8>
@@ -1023,7 +1024,8 @@ flags should be captured within MPAS CMake files.
     <base> -O -fconvert=big-endian -ffree-line-length-none -ffixed-line-length-none -fno-range-check</base>
     <append compile_threaded="TRUE"> -fopenmp </append>
     <append DEBUG="TRUE"> -g -Wall </append>
-    <!-- <append COMP_NAME="clm"> -I/lustre/or-hydra/cades-ccsi/$USER/models/pflotran-interface/src/clm-pflotran</append> -->
+    <!-- {PFLOTRAN_INC} defined in 'config_machines.xml', can be blank, PETSC_INC, or *.mod -->
+    <append MODEL="clm"> $ENV{PFLOTRAN_INC}</append>
   </FFLAGS>
   <FIXEDFLAGS>
     <base>  -ffixed-form </base>
@@ -1037,7 +1039,11 @@ flags should be captured within MPAS CMake files.
   <LAPACK_LIBDIR>/software/tools/compilers/intel_2017/mkl/lib/intel64</LAPACK_LIBDIR>
   <LDFLAGS>
     <append compile_threaded="TRUE"> -fopenmp </append>
-    <!-- <append COMP_CLASS="cpl"> -L$ENV{CLM_PFLOTRAN_SOURCE_DIR} -lpflotran $ENV{PETSC_LIB} </append> -->
+    <append MODEL="driver"> -L$NETCDF_PATH/lib -Wl,-rpath=$NETCDF_PATH/lib -lnetcdff -lnetcdf </append>
+    <append MODEL="driver"> -L$ENV{NETCDF_PATH}/lib -Wl,-rpath=$ENV{NETCDF_PATH}/lib -lnetcdff -lnetcdf </append>
+    <append MODEL="driver"> -L$ENV{HDF5_PATH}/lib -Wl,-rpath=$ENV{HDF5_PATH}/lib -lhdf5_hl -lhdf5 -lhdf5hl_fortran -lhdf5_fortran</append>
+    <!-- {PFLOTRAN_LIB} defined in 'config_machines.xml', can be blank, PETSC_LIB, or PETSC_LIB/libpflotran.a -->
+    <append MODEL="driver"> $ENV{PFLOTRAN_LIB} </append>
   </LDFLAGS>
   <SLIBS>
     <append> -L$NETCDF_PATH/lib -Wl,-rpath=$NETCDF_PATH/lib -lnetcdff -lnetcdf </append>
