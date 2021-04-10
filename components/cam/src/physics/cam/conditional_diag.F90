@@ -392,7 +392,7 @@ subroutine conditional_diag_alloc( psetcols, metric_nver, nphysproc, nfld, fld_n
   integer, intent(in) :: nfld
   integer, intent(in) :: fld_nver(nfld)
 
-  type(cnd_diag_t), intent(inout) :: cnd
+  type(metric_and_fields_t), intent(inout) :: cnd
 
   integer :: ifld
   integer :: ierr
