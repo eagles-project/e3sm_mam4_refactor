@@ -41,7 +41,7 @@ module conditional_diag
   integer, parameter :: fname_maxlen = 8 
 
   integer, parameter :: nphysproc_max   = 100
-  integer, parameter :: physproc_name_maxlen = 6
+  integer, parameter :: physproc_name_maxlen = 8
 
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
