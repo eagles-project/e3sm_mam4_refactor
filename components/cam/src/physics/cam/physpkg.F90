@@ -925,7 +925,7 @@ end subroutine phys_init
   !-----------------------------------------------------------------------
   !
 
-subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
+subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phys_diag )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -959,6 +959,7 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     type(physics_buffer_desc), pointer, dimension(:,:) :: pbuf2d
     type(cam_in_t),                     dimension(begchunk:endchunk) :: cam_in
     type(cam_out_t),                    dimension(begchunk:endchunk) :: cam_out
+    type(cnd_diag_t),    intent(inout), dimension(begchunk:endchunk) :: phys_diag
     !-----------------------------------------------------------------------
     !
     !---------------------------Local workspace-----------------------------
@@ -1146,7 +1147,7 @@ end subroutine phys_run1_adiabatic_or_ideal
   !
 
 subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
-       cam_in )
+       cam_in, phys_diag )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -1181,6 +1182,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     type(cam_out_t),     intent(inout), dimension(begchunk:endchunk) :: cam_out
     type(cam_in_t),      intent(inout), dimension(begchunk:endchunk) :: cam_in
+    type(cnd_diag_t),    intent(inout), dimension(begchunk:endchunk) :: phys_diag
     !
     !-----------------------------------------------------------------------
     !---------------------------Local workspace-----------------------------
@@ -1279,7 +1281,7 @@ end subroutine phys_run2
   !----------------------------------------------------------------------- 
   !
 
-subroutine phys_final( phys_state, phys_tend, pbuf2d )
+subroutine phys_final( phys_state, phys_tend, pbuf2d, phys_diag )
     use physics_buffer, only : physics_buffer_desc, pbuf_deallocate
     use chemistry, only : chem_final
     use carma_intr, only : carma_final
@@ -1294,6 +1296,7 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     type(physics_state), pointer :: phys_state(:)
     type(physics_tend ), pointer :: phys_tend(:)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+    type(cnd_diag_t),    pointer :: phys_diag(:)
 
     if(associated(pbuf2d)) then
        call pbuf_deallocate(pbuf2d,'global')
@@ -1301,6 +1304,7 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     end if
     deallocate(phys_state)
     deallocate(phys_tend)
+    deallocate(phys_diag)
     call chem_final
     call carma_final
     call wv_sat_final

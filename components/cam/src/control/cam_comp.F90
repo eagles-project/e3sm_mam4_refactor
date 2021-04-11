@@ -249,7 +249,7 @@ subroutine cam_run1(cam_in, cam_out)
    !
    call t_barrierf ('sync_phys_run1', mpicom)
    call t_startf ('phys_run1')
-   call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out)
+   call phys_run1(phys_state, dtime, phys_tend, pbuf2d,  cam_in, cam_out, phys_diag)
    call t_stopf  ('phys_run1')
 
 end subroutine cam_run1
@@ -284,7 +284,7 @@ subroutine cam_run2( cam_out, cam_in )
    !
    call t_barrierf ('sync_phys_run2', mpicom)
    call t_startf ('phys_run2')
-   call phys_run2(phys_state, dtime, phys_tend, pbuf2d,  cam_out, cam_in )
+   call phys_run2(phys_state, dtime, phys_tend, pbuf2d,  cam_out, cam_in, phys_diag )
    call t_stopf  ('phys_run2')
 
    !
@@ -462,7 +462,7 @@ subroutine cam_final( cam_out, cam_in )
    real(r8) :: mpi_wtime
 #endif
 
-   call phys_final( phys_state, phys_tend , pbuf2d)
+   call phys_final( phys_state, phys_tend , pbuf2d, phys_diag)
    call stepon_final(dyn_in, dyn_out)
 
    if(nsrest==0) then
