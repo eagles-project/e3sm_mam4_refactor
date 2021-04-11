@@ -399,7 +399,7 @@ subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_dia
   allocate(phys_diag(begchunk:endchunk), stat=ierr)
   if( ierr /= 0 ) then
      write(iulog,*) subname//': phys_diag allocation error = ',ierr
-     call endrun(subname': failed to allocate phys_diag array')
+     call endrun(subname//': failed to allocate phys_diag array')
   end if
 
   if (cnd_diag_info%ncnd <= 0) return
@@ -451,7 +451,7 @@ subroutine single_chunk_cnd_diag_alloc( diag, lchnk, psetcols, cnd_diag_info )
   !----------------------------------------------------------------
   do icnd = 1,ncnd
 
-     call metrics_and_fields_alloc( pdiag%cnd(icnd),                 &
+     call metrics_and_fields_alloc( diag%cnd(icnd),                  &
                                     cnd_diag_info%metric_nver(icnd), &
                                     cnd_diag_info%nphysproc, &
                                     cnd_diag_info%nfld,      &
