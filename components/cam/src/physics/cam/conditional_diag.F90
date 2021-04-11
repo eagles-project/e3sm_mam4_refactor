@@ -248,6 +248,8 @@ subroutine conditional_diag_readnl(nlfile)
    call mpibcast(nfld,     1, mpiint, 0, mpicom)
 #endif
 
+   cnd_diag_info%ncnd = ncnd
+
    if (ncnd==0) then
 
       if (masterproc) then
@@ -256,10 +258,7 @@ subroutine conditional_diag_readnl(nlfile)
          write(iulog,*)'==========================================================='
       end if
 
-      cnd_diag_info%ncnd = ncnd
-
       return
-
    end if
 
 #ifdef SPMD
@@ -344,12 +343,12 @@ subroutine conditional_diag_readnl(nlfile)
 
       write(iulog,*)'==========================================================='
       write(iulog,*)'       *** Conditional diagnostics requested ***'
-      write(iulog,*)'-----------------------------------------------------------'
+      write(iulog,*)'==========================================================='
 
       write(iulog,*)
-      write(iulog,'(4x,2x,a10,a6,a12,a20,a20)')'metric','nlev','cmpr_type','threshold', 'sample_after'
+      write(iulog,'(4x,2x,a20,a6,a12,a20,a20)')'metric','nlev','cmpr_type','threshold', 'sample_after'
       do ii = 1,cnd_diag_info%ncnd
-         write(iulog,'(i4.3,2x,a10,i6,i12,e20.10,a20)') ii,                          &
+         write(iulog,'(i4.3,2x,a20,i6,i12,e20.10,a20)') ii,                          &
                                                 adjustr(cnd_diag_info%metric_name(ii)),     &
                                                         cnd_diag_info%metric_nver(ii),      &
                                                         cnd_diag_info%metric_cmpr_type(ii), &
@@ -358,20 +357,21 @@ subroutine conditional_diag_readnl(nlfile)
       end do
 
       write(iulog,*)
+      write(iulog,*)'--------------------------------------------------'
       write(iulog,'(4x,a20)') 'physproc_name'
       do ii = 1,cnd_diag_info%nphysproc
          write(iulog,'(i4.3,a20)') ii, adjustr(cnd_diag_info%physproc_name(ii))
       end do
-      write(iulog,*)'--------------------------------------------------'
 
       write(iulog,*)
-      write(iulog,'(4x,a30,a6)')'physical fields','nlev'
+      write(iulog,*)'--------------------------------------------------'
+      write(iulog,'(4x,a20,a6)')'field','nlev'
       do ii = 1,cnd_diag_info%nfld
-         write(iulog,'(i4.3,a30,i6)') ii, adjustr(cnd_diag_info%fld_name(ii)), cnd_diag_info%fld_nver(ii)
+         write(iulog,'(i4.3,a20,i6)') ii, adjustr(cnd_diag_info%fld_name(ii)), cnd_diag_info%fld_nver(ii)
       end do
-      write(iulog,*)'--------------------------------------------------'
-
       write(iulog,*)
+
+      write(iulog,*)'--------------------------------------------------'
       write(iulog,*)' l_output_state = ',l_output_state
       write(iulog,*)' l_output_incrm = ',l_output_incrm
       write(iulog,*)
