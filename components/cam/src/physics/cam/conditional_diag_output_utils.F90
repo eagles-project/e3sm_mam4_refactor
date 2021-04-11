@@ -165,7 +165,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
 end subroutine conditional_diag_output_init
 
 !======================================================
-function get_metric_and_flag_names_for_output( icnd, cnd_diag_info,   &! in
+subroutine get_metric_and_flag_names_for_output( icnd, cnd_diag_info,   &! in
                                                metric_name_in_output, &! out
                                                flag_name_in_output    )! out
 
@@ -183,7 +183,7 @@ function get_metric_and_flag_names_for_output( icnd, cnd_diag_info,   &! in
    metric_name_in_output = 'cnd'//icnd_str//'_'//trim(cnd_diag_info%metric_name(icnd))
      flag_name_in_output = 'cnd'//icnd_str//'_'//trim(cnd_diag_info%metric_name(icnd))//'_flag'
 
-end function flag_name_in_output
+end subroutine get_metric_and_flag_names_for_output
 
 !======================================================
 subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
@@ -206,7 +206,7 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
                         trim(cnd_diag_info%fld_name(ifld))//'_'// &
                         trim(cnd_diag_info%physproc_name(iphys))//suff
 
-end subroutine get_fld_name_and_longname_for_output 
+end subroutine get_fld_name_for_output 
 
 !======================================================
 subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
@@ -230,6 +230,6 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
                              ' sampled under condition '//icnd_str// &
                              ' ('//trim(cnd_diag_info%metric_name(icnd))//')' 
 
-end subroutine get_fld_name_and_longname_for_output 
+end subroutine get_fld_longname_for_output 
 
 end module conditional_diag_output_utils
