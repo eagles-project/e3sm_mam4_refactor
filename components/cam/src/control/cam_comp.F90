@@ -20,6 +20,7 @@ module cam_comp
    use perf_mod
    use cam_logfile,       only: iulog
    use physics_buffer,            only: physics_buffer_desc
+   use conditional_diag,  only: cnd_diag_t
 
    implicit none
    private
@@ -56,6 +57,7 @@ module cam_comp
   type(physics_state), pointer :: phys_state(:) => null()
   type(physics_tend ), pointer :: phys_tend(:) => null()
   type(physics_buffer_desc), pointer :: pbuf2d(:,:) => null()
+  type(cnd_diag_t), pointer :: phys_diag(:) => null()
 
   real(r8) :: wcstart, wcend     ! wallclock timestamp at start, end of timestep
   real(r8) :: usrstart, usrend   ! user timestamp at start, end of timestep
@@ -175,7 +177,7 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
    end if
 
 
-   call phys_init( phys_state, phys_tend, pbuf2d,  cam_out )
+   call phys_init( phys_state, phys_tend, pbuf2d,  cam_out, phys_diag )
 
    call bldfld ()       ! master field list (if branch, only does hash tables)
 

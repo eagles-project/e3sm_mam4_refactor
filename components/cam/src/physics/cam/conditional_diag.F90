@@ -383,21 +383,103 @@ subroutine conditional_diag_readnl(nlfile)
 end subroutine conditional_diag_readnl
 
 !===============================================================================
-subroutine conditional_diag_alloc( psetcols, metric_nver, nphysproc, nfld, fld_nver, cnd )
+subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_diag_info )
+
+  type(cnd_diag_t), pointer :: phys_diag(:)
+
+  integer, intent(in) :: begchunk, endchunk
+  integer, intent(in) :: pcols
+  type(cnd_diag_info_t),intent(in) :: cnd_diag_info
+
+  integer :: ierr, lchnk
+
+  character(len=*), parameter :: subname = 'conditional_diag_alloc'
+  !-----------------------------------------------------------------
+
+  allocate(phys_diag(begchunk:endchunk), stat=ierr)
+  if( ierr /= 0 ) then
+     write(iulog,*) subname//': phys_diag allocation error = ',ierr
+     call endrun(subname': failed to allocate phys_diag array')
+  end if
+
+  if (cnd_diag_info%ncnd <= 0) return
+
+  do lchnk=begchunk,endchunk
+     call single_chunk_cnd_diag_alloc( phys_diag(lchnk), lchnk, pcols, cnd_diag_info )
+  end do
+
+  if (masterproc) then
+     write(iulog,*)
+     write(iulog,*) "====================================================================="
+     write(iulog,*) " Finished memory allocation for conditional diagnostics including:"
+     write(iulog,*) cnd_diag_info%ncnd,      " conditions"
+     write(iulog,*) cnd_diag_info%nphysproc, " atmospheric processes"
+     write(iulog,*) cnd_diag_info%nfld,      " physical fields"
+     write(iulog,*) "====================================================================="
+     write(iulog,*)
+  end if
+
+end subroutine conditional_diag_alloc
+
+
+!-----------------------------------------------------------------------------
+! Allocate memory for conditional diagnostics in a single grid chunk
+!-----------------------------------------------------------------------------
+subroutine single_chunk_cnd_diag_alloc( diag, lchnk, psetcols, cnd_diag_info )
+
+  type(cnd_diag_t), intent(inout)   :: diag
+  integer,intent(in)                :: lchnk
+
+  integer, intent(in)               :: psetcols
+  type(cnd_diag_info_t), intent(in) :: cnd_diag_info
+
+  integer :: ierr = 0
+  integer :: ncnd, icnd
+
+  character(len=*), parameter :: subname = 'single_chunk_cnd_diag_alloc'
+
+  !----------------------------------------------
+  ! Allocate an array for all sampling conditions
+  !----------------------------------------------
+  ncnd = cnd_diag_info%ncnd
+
+  allocate( diag%cnd(ncnd), stat=ierr)
+  if ( ierr /= 0 ) call endrun(subname//': allocation of diag%cnd')
+
+  !----------------------------------------------------------------
+  ! Allocate memory for metrics and diagnostics of each condition
+  !----------------------------------------------------------------
+  do icnd = 1,ncnd
+
+     call metrics_and_fields_alloc( pdiag%cnd(icnd),                 &
+                                    cnd_diag_info%metric_nver(icnd), &
+                                    cnd_diag_info%nphysproc, &
+                                    cnd_diag_info%nfld,      &
+                                    cnd_diag_info%fld_nver,  &
+                                    psetcols                 )
+  end do
+
+end subroutine single_chunk_cnd_diag_alloc
+
+
+!-----------------------------------------------------------------------------
+! Allocate memory for metrics and diagnostics for a single sampling condition
+!-----------------------------------------------------------------------------
+subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver, psetcols )
 
   use infnan, only : inf, assignment(=)
 
-  integer, intent(in) :: psetcols
+  type(metric_and_fields_t), intent(inout) :: cnd
+
   integer, intent(in) :: metric_nver, nphysproc
   integer, intent(in) :: nfld
   integer, intent(in) :: fld_nver(nfld)
-
-  type(metric_and_fields_t), intent(inout) :: cnd
+  integer, intent(in) :: psetcols
 
   integer :: ifld
   integer :: ierr
 
-  character(len=*), parameter :: subname = 'conditional_diag_alloc'
+  character(len=*), parameter :: subname = 'metrics_and_fields_alloc'
 
   ! the metric fields, which might have 1, pver, or pver+1 vertical levels
 
@@ -433,7 +515,7 @@ subroutine conditional_diag_alloc( psetcols, metric_nver, nphysproc, nfld, fld_n
 
    end if
 
-end subroutine conditional_diag_alloc
+end subroutine metrics_and_fields_alloc
 
 !subroutine conditional_diag_dealloc
 !end subroutine conditional_diag_alloc

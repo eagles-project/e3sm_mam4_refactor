@@ -20,6 +20,7 @@ module physpkg
        physics_ptend, physics_tend_init,    &
        physics_type_alloc, physics_ptend_dealloc,&
        physics_state_alloc, physics_state_dealloc, physics_tend_alloc, physics_tend_dealloc
+  use conditional_diag, only: cnd_diag_t, cnd_diag_info, conditional_diag_alloc
   use physics_update_mod,  only: physics_update, physics_update_init, hist_vars, nvars_prtrb_hist, get_var
   use phys_grid,        only: get_ncols_p
   use phys_gmean,       only: gmean_mass
@@ -651,7 +652,7 @@ subroutine phys_inidat( cam_out, pbuf2d )
 end subroutine phys_inidat
 
 
-subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
+subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out, phys_diag )
 
     !----------------------------------------------------------------------- 
     ! 
@@ -725,6 +726,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+    type(cnd_diag_t), pointer          :: phys_diag(:)
 
     type(cam_out_t),intent(inout)      :: cam_out(begchunk:endchunk)
 
@@ -739,6 +741,8 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     do lchnk = begchunk, endchunk
        call physics_state_set_grid(lchnk, phys_state(lchnk))
     end do
+
+    call conditional_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
 
     !-------------------------------------------------------------------------------------------
     ! Initialize any variables in physconst which are not temporally and/or spatially constant
