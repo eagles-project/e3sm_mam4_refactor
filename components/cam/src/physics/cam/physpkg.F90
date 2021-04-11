@@ -720,6 +720,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out, phys_diag )
     use rad_solar_var,      only: rad_solar_var_init
     use nudging,            only: Nudge_Model,nudging_init
     use output_aerocom_aie, only: output_aerocom_aie_init, do_aerocom_ind3
+    use conditional_diag_output_utils, only: conditional_diag_output_init
 
 
     ! Input/output arguments
@@ -771,6 +772,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out, phys_diag )
     call aoa_tracers_init()
 
     teout_idx = pbuf_get_index( 'TEOUT')
+
+    ! addfld and add_default calls for conditional diagnostics
+
+    call conditional_diag_output_init( pver, cnd_diag_info )
 
     ! For adiabatic or ideal physics don't need to initialize any of the
     ! parameterizations below:
