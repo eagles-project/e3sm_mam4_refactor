@@ -1314,7 +1314,7 @@ end subroutine phys_final
 
 subroutine tphysac (ztodt,   cam_in,  &
        sgh,     sgh30,                                     &
-       cam_out,  state,   tend,    pbuf,  diag          &
+       cam_out,  state,   tend,    pbuf,  diag,          &
        fsds    )
     !----------------------------------------------------------------------- 
     ! 
