@@ -33,7 +33,8 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
   use cam_history_support, only: max_fieldname_len
   use cam_history,         only: outfld
 
-  use conditional_diag_output_util, only: get_metric_and_flag_names_for_output, &
+  use conditional_diag,    only: cnd_diag_t
+  use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
                                           get_fld_name_for_output
 
   type(cnd_diag_t),    intent(inout), target :: diag
@@ -243,7 +244,7 @@ subroutine get_values( varname, state, arrayout )
   use time_manager, only: get_nstep
 
   character(len=*),   intent(in)    :: varname
-  type(physics_state),intent(inout) :: state
+  type(physics_state),intent(in)    :: state
   real(r8),           intent(inout) :: arrayout(:,:)
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
