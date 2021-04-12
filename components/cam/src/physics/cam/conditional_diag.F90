@@ -467,7 +467,7 @@ end subroutine single_chunk_cnd_diag_alloc
 !-----------------------------------------------------------------------------
 subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver, psetcols )
 
-  use infnan, only : inf, assignment(=)
+ !use infnan, only : inf, assignment(=)
 
   type(metric_and_fields_t), intent(inout) :: cnd
 
@@ -508,8 +508,8 @@ subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%inc')
 
         cnd%fld(ifld)% old(:,:)   = 0._r8
-        cnd%fld(ifld)% val(:,:,:) = inf
-        cnd%fld(ifld)% inc(:,:,:) = inf
+        cnd%fld(ifld)% val(:,:,:) = 0._r8
+        cnd%fld(ifld)% inc(:,:,:) = 0._r8
 
      end do !ifld
 
