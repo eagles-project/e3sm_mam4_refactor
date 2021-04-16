@@ -140,7 +140,7 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
         ! Get metric values and set flags 
 
         metric => diag%cnd(icnd)%metric
-        call get_values( metric, trim(cnd_diag_info%metric_name(ifld)), &! inout, in
+        call get_values( metric, trim(cnd_diag_info%metric_name(icnd)), &! inout, in
                          state, pbuf, cam_in )                           ! in
 
         flag => diag%cnd(icnd)%flag
