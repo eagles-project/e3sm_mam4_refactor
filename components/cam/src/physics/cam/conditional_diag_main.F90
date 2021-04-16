@@ -3,9 +3,6 @@ module conditional_diag_main
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use cam_abortutils, only: endrun
 
-  use physics_types,    only: physics_state
-  use camsrfexch,       only: cam_in_t
-
   use conditional_diag, only: cnd_diag_info, cnd_diag_info_t
 
   implicit none
@@ -27,11 +24,15 @@ module conditional_diag_main
 contains
 
 !======================================================
-subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
+subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in )
 
   use ppgrid,              only: pcols
   use cam_history_support, only: max_fieldname_len
   use cam_history,         only: outfld
+
+  use physics_types,    only: physics_state
+  use camsrfexch,       only: cam_in_t
+  use physics_buffer,   only: physics_buffer_desc
 
   use conditional_diag,    only: cnd_diag_t
   use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
@@ -40,8 +41,9 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
   type(cnd_diag_t),    intent(inout), target :: diag
   character(len=*),    intent(in)            :: proc_name
 
-  type(physics_state), intent(in)          :: state
-  type(cam_in_t),      intent(in),optional :: cam_in
+  type(physics_state),    intent(in) :: state
+  type(physics_buffer_desc), pointer :: pbuf(:)
+  type(cam_in_t),         intent(in) :: cam_in
 
   integer :: ncnd, nphysproc, nfld
   integer :: icnd, iphys, ii, ifld
@@ -93,7 +95,8 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
 
         icnd = 1
         new => diag%cnd(icnd)%fld(ifld)% val(:,:,iphys)
-        call get_values( trim(cnd_diag_info%fld_name(ifld)), state, new ) !in, in, out
+        call get_values( new, trim(cnd_diag_info%fld_name(ifld)), &! inout, in
+                         state, pbuf, cam_in )                     ! in
 
         do icnd = 2,ncnd
            diag%cnd(icnd)%fld(ifld)% val(1:ncol,:,iphys) = new(1:ncol,:)
@@ -137,7 +140,8 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
         ! Get metric values and set flags 
 
         metric => diag%cnd(icnd)%metric
-        call get_values( trim(cnd_diag_info%metric_name(icnd)), state, metric )
+        call get_values( metric, trim(cnd_diag_info%metric_name(ifld)), &! inout, in
+                         state, pbuf, cam_in )                           ! in
 
         flag => diag%cnd(icnd)%flag
         call get_flags( metric, icnd, ncol, cnd_diag_info, flag )
@@ -157,9 +161,10 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, cam_in )
 
         !----------------------------------------------------------------
         ! Apply conditional sampling to diagnostics and their increments
-        ! caused by various atmospheric processes.
-        ! Different actions are taken based on the vertical
-        ! dimension sizes of the metric and the diagnostic fields.
+        ! caused by various atmospheric processes, then send the results
+        ! to output.  In subroutine apply_masking, different actions are 
+        ! taken based on the vertical dimension sizes of the metric 
+        ! and the diagnostic fields.
         !----------------------------------------------------------------
         ! Diagnostic fields
 
@@ -239,13 +244,18 @@ end subroutine apply_masking
 
 
 !========================================================
-subroutine get_values( varname, state, arrayout )
+subroutine get_values( arrayout, varname, state, pbuf, cam_in )
 
-  use time_manager, only: get_nstep
+  use time_manager,   only: get_nstep
+  use physics_types,  only: physics_state
+  use camsrfexch,     only: cam_in_t
+  use physics_buffer, only: physics_buffer_desc
 
+  real(r8),           intent(inout) :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
   type(physics_state),intent(in)    :: state
-  real(r8),           intent(inout) :: arrayout(:,:)
+  type(physics_buffer_desc), pointer:: pbuf(:)
+  type(cam_in_t),     intent(in)    :: cam_in
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
@@ -267,10 +277,19 @@ subroutine get_values( varname, state, arrayout )
      arrayout(1:ncol,:) = state%pmid(1:ncol,:)
 
   case('PINT')
-     arrayout(1:ncol,:) = state%pmid(1:ncol,:)
+     arrayout(1:ncol,:) = state%pint(1:ncol,:)
+
+  case('ZI')
+     arrayout(1:ncol,:) = state%zi(1:ncol,:)
 
   case('PS')
      arrayout(1:ncol,1) = state%ps(1:ncol)
+
+  case('PHIS')
+     arrayout(1:ncol,1) = state%phis(1:ncol)
+
+  case('LANDFRAC')
+     arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
 
  !elseif (varname.eq.'QSATW') then
  !   call qsatw()

@@ -1461,7 +1461,7 @@ subroutine tphysac (ztodt,   cam_in,  &
                      )
     !----------------------------------------------------------------------------
 
-    call conditional_diag_cal_and_output( diag, 'MCTCPL', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'MCTCPL', state, pbuf, cam_in )
     !----------------------------------------------------------------------------
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1541,7 +1541,7 @@ end if ! l_tracer_aero
 
     call t_stopf('tphysac_init')
 
-    call conditional_diag_cal_and_output( diag, 'ACINIT', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'ACINIT', state, pbuf, cam_in )
 
 if (l_tracer_aero) then
     !===================================================
@@ -1560,7 +1560,7 @@ if (l_tracer_aero) then
     call check_tracers_chng(state, tracerint, "aoa_tracers_timestep_tend", nstep, ztodt,   &
          cam_in%cflx)
 
-    call conditional_diag_cal_and_output( diag, 'TRACER', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'TRACER', state, pbuf, cam_in )
 
     ! Chemistry calculation
     if (chem_is_active()) then
@@ -1572,7 +1572,7 @@ if (l_tracer_aero) then
        call check_tracers_chng(state, tracerint, "chem_timestep_tend", nstep, ztodt, &
             cam_in%cflx)
     end if
-    call conditional_diag_cal_and_output( diag, 'CHEM', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'CHEM', state, pbuf, cam_in )
 
     call t_stopf('adv_tracer_src_snk')
 
@@ -1594,7 +1594,7 @@ if (l_vdiff) then
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
 
-       call conditional_diag_cal_and_output( diag, 'SFC', state, cam_in )
+       call conditional_diag_cal_and_output( diag, 'SFC', state, pbuf, cam_in )
 
     else
 
@@ -1614,7 +1614,7 @@ if (l_vdiff) then
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('vertical_diffusion_tend')
 
-       call conditional_diag_cal_and_output( diag, 'VDF', state, cam_in )
+       call conditional_diag_cal_and_output( diag, 'VDF', state, pbuf, cam_in )
     
     endif
 
@@ -1639,7 +1639,7 @@ if (l_rayleigh) then
     call check_tracers_chng(state, tracerint, "vdiff", nstep, ztodt, cam_in%cflx)
 
 end if ! l_rayleigh
-    call conditional_diag_cal_and_output( diag, 'RYL', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'RYL', state, pbuf, cam_in )
 
 if (l_tracer_aero) then
 
@@ -1648,7 +1648,7 @@ if (l_tracer_aero) then
     call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
     call t_stopf('aero_drydep')
-    call conditional_diag_cal_and_output( diag, 'DRYDEP', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'DRYDEP', state, pbuf, cam_in )
 
    ! CARMA microphysics
    !
@@ -1665,7 +1665,7 @@ if (l_tracer_aero) then
      call check_energy_chng(state, tend, "carma_tend", nstep, ztodt, zero, zero, zero, zero)
      call t_stopf('carma_timestep_tend')
    end if
-   call conditional_diag_cal_and_output( diag, 'CARMAA', state, cam_in )
+   call conditional_diag_cal_and_output( diag, 'CARMAA', state, pbuf, cam_in )
 
     !---------------------------------------------------------------------------------
     !	... enforce charge neutrality
@@ -1714,7 +1714,7 @@ if (l_gw_drag) then
     call t_stopf  ( 'iondrag' )
 
 end if ! l_gw_drag
-    call conditional_diag_cal_and_output( diag, 'DRAG', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'DRAG', state, pbuf, cam_in )
 
     !===================================================
     ! Update Nudging values, if needed
@@ -1723,7 +1723,7 @@ end if ! l_gw_drag
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
-    call conditional_diag_cal_and_output( diag, 'NDG', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'NDG', state, pbuf, cam_in )
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -1779,7 +1779,7 @@ if (l_ac_energy_chk) then
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 end if ! l_ac_energy_chk
 
-    call conditional_diag_cal_and_output( diag, 'ACCHK', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'ACCHK', state, pbuf, cam_in )
 
 
     if (aqua_planet) then
@@ -2070,7 +2070,7 @@ subroutine tphysbc (ztodt,               &
                       )
     
     !-----------------------------------------------------------------------
-    call conditional_diag_cal_and_output( diag, 'DYN', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'DYN', state, pbuf, cam_in )
 
     !------------------------
     call t_startf('bc_init')
@@ -2313,7 +2313,7 @@ if (l_dry_adj) then
     call t_stopf('dry_adjustment')
 
 end if
-    call conditional_diag_cal_and_output( diag, 'DRYADJ', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'DRYADJ', state, pbuf, cam_in )
 
     !
     !===================================================
@@ -2356,7 +2356,7 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
-    call conditional_diag_cal_and_output( diag, 'DPCU', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'DPCU', state, pbuf, cam_in )
 
     !------------------------------------------------------------------------------
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
@@ -2375,7 +2375,7 @@ end if
 
     call check_tracers_chng(state, tracerint, "convect_shallow", nstep, ztodt, zero_tracers)
 
-    call conditional_diag_cal_and_output( diag, 'SHCU', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'SHCU', state, pbuf, cam_in )
 
     call t_stopf('moist_convection')
 
@@ -2417,7 +2417,7 @@ if (l_tracer_aero) then
     call t_stopf('carma_timestep_tend')
 
 end if
-    call conditional_diag_cal_and_output( diag, 'CARMA', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'CARMA', state, pbuf, cam_in )
 
 
     if( microp_scheme == 'RK' ) then
@@ -2635,7 +2635,7 @@ end if
 
      end if ! microp_scheme == 'MG' or 'RK'
 
-     call conditional_diag_cal_and_output( diag, 'STCLD', state, cam_in )
+     call conditional_diag_cal_and_output( diag, 'STCLD', state, pbuf, cam_in )
      !---------------------------------------------------------------------
 
 if (l_tracer_aero) then
@@ -2703,7 +2703,7 @@ if (l_tracer_aero) then
    endif
 end if ! l_tracer_aero
 
-     call conditional_diag_cal_and_output( diag, 'WETDEP', state, cam_in )
+     call conditional_diag_cal_and_output( diag, 'WETDEP', state, pbuf, cam_in )
 
 !<songxl 2011-9-20---------------------------------
    if(trigmem)then
@@ -2765,7 +2765,7 @@ if (l_rad) then
     call t_stopf('radiation')
 
 end if ! l_rad
-    call conditional_diag_cal_and_output( diag, 'RAD', state, cam_in )
+    call conditional_diag_cal_and_output( diag, 'RAD', state, pbuf, cam_in )
 
     if(do_aerocom_ind3) then
        call cloud_top_aerocom(state, pbuf) 
