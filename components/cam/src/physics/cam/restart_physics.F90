@@ -126,7 +126,7 @@ module restart_physics
     if (cnd_diag_info%ncnd > 0 ) then
 
        ncnd  = cnd_diag_info%ncnd
-       nphys = cnd_diag_info%nphys
+       nphys = cnd_diag_info%nphysproc
        nfld  = cnd_diag_info%nfld
 
        ! Allocation description info arrays.
@@ -165,12 +165,12 @@ module restart_physics
 
           ! Add the metric variable to the restart file
 
-          write(pname,'(a,i2.2)') 'cnd',icnd,'metric'
+          write(pname,'(a,i2.2,a)') 'cnd',icnd,'_metric'
           ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_metric_desc(icnd))
 
           ! Add the flag variable to the restart file
 
-          write(pname,'(a,i2.2)') 'cnd',icnd,'flag'
+          write(pname,'(a,i2.2,a)') 'cnd',icnd,'_flag'
           ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims),   cnd_flag_desc(icnd))
 
        end do
@@ -201,7 +201,7 @@ module restart_physics
           if (cnd_diag_info%l_output_state) then
            do icnd = 1,ncnd
             do iphys = 1,nphys
-               write(pname,'(3(a,i2.2))') 'cnd',icnd, 'fld',ifld, 'val',iphys
+               write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
                ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_val_desc(iphys,icnd,ifld))
             end do
            end do
@@ -213,15 +213,17 @@ module restart_physics
 
            do icnd = 1,ncnd
             do iphys = 1,nphys
-               write(pname,'(3(a,i2.2))') 'cnd',icnd, 'fld',ifld, 'inc',iphys
+               write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
                ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_inc_desc(iphys,icnd,ifld))
             end do
            end do
 
             ! Add to the restart file the variable containing the "old" value of the field 
 
-            write(pname,'(2(a,i2.2),a)') 'cnd',icnd, 'fld',ifld, 'old'
-            ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_old_desc(ifld,icnd))
+           do icnd = 1,ncnd
+              write(pname,'(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
+              ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_old_desc(icnd,ifld))
+           end do
 
           end if 
 
@@ -398,20 +400,20 @@ module restart_physics
       if (cnd_diag_info%ncnd > 0 ) then
 
         ncnd  = cnd_diag_info%ncnd
-        nphys = cnd_diag_info%nphys
+        nphys = cnd_diag_info%nphysproc
         nfld  = cnd_diag_info%nfld
 
         ! Done writing variables for restart. Dealocate description info arrays.
         ! (Question: would it be better to allocate and deallocate at the beginning
         ! and end of each run instead of each time step?)
 
-        deallocate( cnd_metric_desc(ncnd) )
-        deallocate( cnd_flag_desc(ncnd) )
+        deallocate( cnd_metric_desc )
+        deallocate( cnd_flag_desc )
 
         if (nfld>0) then
-           deallocate( cnd_fld_old_desc(nfld,ncnd) ) 
-           deallocate( cnd_fld_val_desc(nphys,ncnd,nfld) ) 
-           deallocate( cnd_fld_inc_desc(nphys,ncnd,nfld) ) 
+           deallocate( cnd_fld_old_desc ) 
+           deallocate( cnd_fld_val_desc ) 
+           deallocate( cnd_fld_inc_desc ) 
         end if
 
       end if
