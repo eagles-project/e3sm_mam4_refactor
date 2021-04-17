@@ -77,8 +77,8 @@ module restart_physics
     use subcol_utils,        only: is_subcol_on
     use subcol,              only: subcol_init_restart
     use phys_control,        only: phys_getopts
-    use ppgrid,              only: pver
-    use conditional_diag,    only: cnd_diag_info
+
+    use conditional_diag_restart_utils, only: cnd_diag_init_restart
 
     type(file_desc_t), intent(inout) :: file
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -92,14 +92,13 @@ module restart_physics
 
     type(cam_grid_header_info_t) :: info
 
-    integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
-    character(len=*),parameter :: subname = 'init_restart_physics'
-
     !--------------------
 
     call phys_getopts(pergro_mods_out = pergro_mods)
 
     call pio_seterrorhandling(File, PIO_BCAST_ERROR)
+
+    !----------------------------------
     ! Probably should have the grid write this out.
     grid_id = cam_grid_id('physgrid')
     call cam_grid_write_attr(File, grid_id, info)
@@ -120,116 +119,11 @@ module restart_physics
 
     call pbuf_init_restart(File, pbuf2d)
 
-    !----------------------------------
-    ! For the conditional diagnostics
-    !----------------------------------
-    if (cnd_diag_info%ncnd > 0 ) then
-
-       ncnd  = cnd_diag_info%ncnd
-       nphys = cnd_diag_info%nphysproc
-       nfld  = cnd_diag_info%nfld
-
-       ! Allocation description info arrays.
-       ! (Question: would it be better to allocate and deallocate at the beginning
-       ! and end of each run instead of each time step?)
-
-       allocate( cnd_metric_desc(ncnd) )
-       allocate( cnd_flag_desc(ncnd) )
-
-       if (nfld>0) then
-          allocate( cnd_fld_old_desc(nfld,ncnd) ) 
-          allocate( cnd_fld_val_desc(nphys,ncnd,nfld) ) 
-          allocate( cnd_fld_inc_desc(nphys,ncnd,nfld) ) 
-       end if
-
-       !-------------------------------------
-       ! Metrics and the corresponding flags
-       !-------------------------------------
-       do icnd = 1,ncnd
-
-          nver = cnd_diag_info%metric_nver(icnd)
-
-          ! Dimension information
-
-          if ( nver == 1) then
-             ndims = hdimcnt
-          else if ( nver == pver ) then
-             ndims = hdimcnt+1
-             dimids(ndims) = pver_id
-          else if ( nver == pver+1 ) then
-             ndims = hdimcnt
-             dimids(ndims) = pverp_id
-          else
-             call endrun(subname//': check cnd_diag_info%metric_nver')
-          end if
-
-          ! Add the metric variable to the restart file
-
-          write(pname,'(a,i2.2,a)') 'cnd',icnd,'_metric'
-          ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_metric_desc(icnd))
-
-          ! Add the flag variable to the restart file
-
-          write(pname,'(a,i2.2,a)') 'cnd',icnd,'_flag'
-          ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims),   cnd_flag_desc(icnd))
-
-       end do
-
-       !-----------------------------------
-       ! Conditionally sampled diagnostics
-       !-----------------------------------
-       do ifld = 1,nfld
-
-          ! Dimension information (might be different for different fields)
-
-          nver = cnd_diag_info%fld_nver(ifld)
-
-          if ( nver == 1) then
-             ndims = hdimcnt
-          else if ( nver == pver ) then
-             ndims = hdimcnt+1
-             dimids(ndims) = pver_id
-          else if ( nver == pver+1 ) then
-             ndims = hdimcnt
-             dimids(ndims) = pverp_id
-          else
-             call endrun(subname//': check cnd_diag_info%fld_nver')
-          end if
-
-          ! Add to the restart file the variables containing field values after various physics processes
-
-          if (cnd_diag_info%l_output_state) then
-           do icnd = 1,ncnd
-            do iphys = 1,nphys
-               write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
-               ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_val_desc(iphys,icnd,ifld))
-            end do
-           end do
-          end if 
-
-          ! Add to the restart file the variables containing increments associated with various physics processes
-
-          if (cnd_diag_info%l_output_incrm) then
-
-           do icnd = 1,ncnd
-            do iphys = 1,nphys
-               write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
-               ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_inc_desc(iphys,icnd,ifld))
-            end do
-           end do
-
-            ! Add to the restart file the variable containing the "old" value of the field 
-
-           do icnd = 1,ncnd
-              write(pname,'(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
-              ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:ndims), cnd_fld_old_desc(icnd,ifld))
-           end do
-
-          end if 
-
-       end do !ifld
-    end if ! ncnc > 0
-    !--------------------------------------------------
+    ! Conditional sampling and diagnostics
+    call cnd_diag_init_restart( dimids, hdimcnt, pver, pver_id, pverp_id,            &! in
+                                File, cnd_metric_desc,  cnd_flag_desc,               &! inout
+                                cnd_fld_val_desc, cnd_fld_old_desc, cnd_fld_inc_desc )! inout
+    ! ----
 
     if ( .not. adiabatic .and. .not. ideal_phys )then
        
