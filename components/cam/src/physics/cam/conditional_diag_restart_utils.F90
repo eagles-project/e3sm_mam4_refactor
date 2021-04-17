@@ -5,6 +5,7 @@ module conditional_diag_restart_utils
 
   public :: cnd_diag_init_restart
 
+contains
   !==================================================================================================
   subroutine cnd_diag_init_restart( dimids, hdimcnt, pver, pver_id, pverp_id,            &! in
                                     file, cnd_metric_desc,  cnd_flag_desc,               &! inout
@@ -14,8 +15,9 @@ module conditional_diag_restart_utils
   ! History: First version by Hui Wan, PNNL, 2021-04
   !------------------------------------------------------------------------------------------------
 
+  use cam_abortutils,   only: endrun
   use conditional_diag, only: cnd_diag_info
-  use pio, only: file_desc_t, var_desc_t, pio_def_var, pio_double
+  use pio,              only: file_desc_t, var_desc_t, pio_def_var, pio_double
 
   integer, intent(in) :: dimids(4)
   integer, intent(in) :: hdimcnt
@@ -33,7 +35,7 @@ module conditional_diag_restart_utils
 
   ! Local variables
 
-  integer :: ierr
+  integer :: ierr, ndims
   integer :: dimids_local(4)
   character(len=256) :: pname  !variable name in restart file
 
@@ -89,7 +91,7 @@ module conditional_diag_restart_utils
         dimids_local(ndims) = pver_id
 
      else if ( nver == pver+1 ) then
-        ndims = hdimcnt
+        ndims = hdimcnt+1
         dimids_local(ndims) = pverp_id
 
      else
@@ -125,7 +127,7 @@ module conditional_diag_restart_utils
         dimids_local(ndims) = pver_id
 
      else if ( nver == pver+1 ) then
-        ndims = hdimcnt
+        ndims = hdimcnt+1
         dimids_local(ndims) = pverp_id
 
      else
