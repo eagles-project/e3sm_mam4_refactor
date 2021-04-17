@@ -40,7 +40,7 @@ module conditional_diag
   integer, parameter :: nfld_max = 20
   integer, parameter :: fname_maxlen = 8 
 
-  integer, parameter :: nphysproc_max   = 100
+  integer, parameter :: nphysproc_max   = 99
   integer, parameter :: physproc_name_maxlen = 8
 
   !-------------------------------------------------------------------------------
@@ -456,6 +456,8 @@ subroutine single_chunk_cnd_diag_alloc( diag, lchnk, psetcols, cnd_diag_info )
                                     cnd_diag_info%nphysproc, &
                                     cnd_diag_info%nfld,      &
                                     cnd_diag_info%fld_nver,  &
+                                    cnd_diag_info%l_output_state, &
+                                    cnd_diag_info%l_output_incrm, &
                                     psetcols                 )
   end do
 
@@ -465,7 +467,8 @@ end subroutine single_chunk_cnd_diag_alloc
 !-----------------------------------------------------------------------------
 ! Allocate memory for metrics and diagnostics for a single sampling condition
 !-----------------------------------------------------------------------------
-subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver, psetcols )
+subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver, &
+                                     l_output_state, l_output_incrm, psetcols )
 
  !use infnan, only : inf, assignment(=)
 
@@ -474,6 +477,8 @@ subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver
   integer, intent(in) :: metric_nver, nphysproc
   integer, intent(in) :: nfld
   integer, intent(in) :: fld_nver(nfld)
+  logical, intent(in) :: l_output_state
+  logical, intent(in) :: l_output_incrm
   integer, intent(in) :: psetcols
 
   integer :: ifld
@@ -496,22 +501,33 @@ subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver
      allocate( cnd% fld( nfld ), stat=ierr)
      if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld')
 
-     do ifld = 1, nfld  ! snapshots and increments of each field
-
-        allocate( cnd%fld(ifld)% old(psetcols,fld_nver(ifld)), stat=ierr)
-        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%old')
+     ! snapshots of each field
+     if (l_output_state) then
+      do ifld = 1, nfld
 
         allocate( cnd%fld(ifld)% val(psetcols,fld_nver(ifld),nphysproc), stat=ierr)
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%val')
+
+        cnd%fld(ifld)% val(:,:,:) = 0._r8
+
+      end do !ifld
+     end if
+
+     ! increments of each field
+     if (l_output_incrm) then
+      do ifld = 1, nfld
+
+        allocate( cnd%fld(ifld)% old(psetcols,fld_nver(ifld)), stat=ierr)
+        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%old')
 
         allocate( cnd%fld(ifld)% inc(psetcols,fld_nver(ifld),nphysproc), stat=ierr)
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%inc')
 
         cnd%fld(ifld)% old(:,:)   = 0._r8
-        cnd%fld(ifld)% val(:,:,:) = 0._r8
         cnd%fld(ifld)% inc(:,:,:) = 0._r8
 
-     end do !ifld
+      end do !ifld
+     end if
 
    end if
 
