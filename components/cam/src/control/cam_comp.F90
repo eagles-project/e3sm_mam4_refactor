@@ -393,10 +393,10 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
    if (rstwr) then
       call t_startf ('cam_write_restart')
       if (present(yr_spec).and.present(mon_spec).and.present(day_spec).and.present(sec_spec)) then
-         call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, &
+         call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, phys_diag, &
               yr_spec=yr_spec, mon_spec=mon_spec, day_spec=day_spec, sec_spec= sec_spec )
       else
-         call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d )
+         call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, phys_diag )
       end if
       call t_stopf  ('cam_write_restart')
    end if

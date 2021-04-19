@@ -228,7 +228,7 @@ module restart_physics
       
   end subroutine init_restart_physics
 
-  subroutine write_restart_physics (File, cam_in, cam_out, pbuf2d)
+  subroutine write_restart_physics (File, cam_in, cam_out, pbuf2d, phys_diag)
 
       !-----------------------------------------------------------------------
       use physics_buffer,      only: physics_buffer_desc, pbuf_write_restart
@@ -250,7 +250,8 @@ module restart_physics
       use subcol_utils,        only: is_subcol_on
       use subcol,              only: subcol_write_restart
       use ppgrid,              only: pver
-      use conditional_diag,    only: cnd_diag_info
+      use conditional_diag,    only: cnd_diag_t
+      use conditional_diag_restart_utils, only: cnd_diag_write_restart
       !
       ! Input arguments
       !
@@ -258,6 +259,7 @@ module restart_physics
       type(cam_in_t),    intent(in)    :: cam_in(begchunk:endchunk)
       type(cam_out_t),   intent(in)    :: cam_out(begchunk:endchunk)
       type(physics_buffer_desc), pointer        :: pbuf2d(:,:)
+      type(cnd_diag_t),  intent(in)    :: phys_diag(begchunk:endchunk)
       !
       ! Local workspace
       !
@@ -270,6 +272,9 @@ module restart_physics
       integer :: physgrid
       integer :: dims(3), gdims(3)
       integer :: nhdims
+
+      integer :: lchnk
+      integer :: chunk_ncols(begchunk:endchunk)
 
       integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
       character(len=*),parameter :: subname = 'write_restart_physics'
@@ -288,30 +293,20 @@ module restart_physics
       physgrid = cam_grid_id('physgrid')
       call cam_grid_dimensions(physgrid, gdims(1:2), nhdims)
 
-      !----------------------------------
-      ! For the conditional diagnostics
-      !----------------------------------
-      if (cnd_diag_info%ncnd > 0 ) then
+      !---------------------------------------
+      ! Conditional sampling and diagnostics
 
-        ncnd  = cnd_diag_info%ncnd
-        nphys = cnd_diag_info%nphysproc
-        nfld  = cnd_diag_info%nfld
+      do lchnk = begchunk,endchunk
+         chunk_ncols(lchnk) = cam_out(lchnk)%ncol
+      end do
 
-        ! Done writing variables for restart. Dealocate description info arrays.
-        ! (Question: would it be better to allocate and deallocate at the beginning
-        ! and end of each run instead of each time step?)
-
-        deallocate( cnd_metric_desc )
-        deallocate( cnd_flag_desc )
-
-        if (nfld>0) then
-           deallocate( cnd_fld_old_desc ) 
-           deallocate( cnd_fld_val_desc ) 
-           deallocate( cnd_fld_inc_desc ) 
-        end if
-
-      end if
-      !----------------------------------
+      call cnd_diag_write_restart( phys_diag, begchunk, endchunk,        &! in
+                                   physgrid, gdims(1:2), nhdims,         &! in
+                                   pcols, chunk_ncols, fillvalue,        &! in
+                                   File, cnd_metric_desc, cnd_flag_desc, &! inout
+                                   cnd_fld_val_desc, cnd_fld_inc_desc,   &! inout
+                                   cnd_fld_old_desc                      )
+      !------
 
       if ( .not. adiabatic .and. .not. ideal_phys )then
 

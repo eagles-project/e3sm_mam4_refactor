@@ -141,7 +141,7 @@ end subroutine restart_printopts
 
 !=========================================================================================
 
-   subroutine cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, &
+   subroutine cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, phys_diag, &
 	                         yr_spec, mon_spec, day_spec, sec_spec )
 
 !----------------------------------------------------------------------- 
@@ -169,6 +169,7 @@ end subroutine restart_printopts
       use restart_physics,  only: write_restart_physics, init_restart_physics
       use cam_pio_utils,    only: cam_pio_createfile
       use spmd_utils,       only: iam, mpicom
+      use conditional_diag, only: cnd_diag_t
       !
       ! Arguments
       !
@@ -178,6 +179,7 @@ end subroutine restart_printopts
       type(dyn_export_t),  intent(in) :: dyn_out
       
       type(physics_buffer_desc), pointer  :: pbuf2d(:,:)
+      type(cnd_diag_t),    intent(in) :: phys_diag(begchunk:endchunk)
 
       integer            , intent(in), optional :: yr_spec         ! Simulation year
       integer            , intent(in), optional :: mon_spec        ! Simulation month
@@ -241,7 +243,7 @@ end subroutine restart_printopts
       call t_stopf("write_restart_dynamics")
 
       call t_startf("write_restart_physics")
-      call write_restart_physics(File, cam_in, cam_out, pbuf2d)
+      call write_restart_physics(File, cam_in, cam_out, pbuf2d, phys_diag)
       call t_stopf("write_restart_physics")
 
       call t_startf("write_restart_history")
