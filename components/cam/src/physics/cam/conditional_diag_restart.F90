@@ -472,4 +472,312 @@ contains
   end if
  
   end subroutine cnd_diag_write_restart
+
+  !======================================================================
+  subroutine cnd_diag_read_restart( phys_diag, begchunk, endchunk,         &! in
+                                    physgrid, file_hdimsizes, file_nhdims, &! in
+                                    pcols, fillvalue, file                 )! inout 
+  !------------------------------------------------------------------------------------------------
+  ! Purpose: read variables for conditional sampling and diagnostics from restart file
+  ! History: First version by Hui Wan, PNNL, 2021-04
+  !------------------------------------------------------------------------------------------------
+
+  use cam_abortutils,   only: endrun
+  use conditional_diag, only: cnd_diag_info, cnd_diag_t
+  use pio,              only: file_desc_t, io_desc_t, var_desc_t, pio_double, pio_read_darray
+  use cam_grid_support, only: cam_grid_get_decomp, cam_grid_read_dist_array
+  use shr_kind_mod,     only: r8 => shr_kind_r8
+
+  integer, intent(in) :: begchunk, endchunk
+  type(cnd_diag_t),intent(in) :: phys_diag(begchunk:endchunk)
+
+  integer, intent(in) :: physgrid
+  integer, intent(in) :: file_nhdims                  ! number of horizontal dimensions in restart file 
+  integer, intent(in) :: file_hdimsizes(file_nhdims)  ! horizontal dimension sizes in restart file
+
+  integer, intent(in) :: pcols
+  real(r8),intent(in) :: fillvalue
+
+  type(file_desc_t), intent(inout) :: file
+
+  ! Local variables
+
+  integer :: file_dims(3)   ! dimension sizes in restart file, local variable
+  integer :: arry_dims(3)   ! dimension sizes of array holding values to be written out, local variable
+
+  type(io_desc_t), pointer :: iodesc
+  type(var_desc_t) :: vardesc
+
+  integer :: ierr
+  integer :: lchnk
+  integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
+
+  real(r8) :: tmpfield_2d(pcols, begchunk:endchunk)
+  real(r8), allocatable :: tmpfield_3d(:,:,:)
+
+  character(len=256) :: varname  !variable name in restart file
+
+  character(len=*),parameter :: subname = 'cnd_read_init_restart'
+
+  !----------------------------------------
+
+  if (cnd_diag_info%ncnd <= 0 ) return
+
+  !---------------------------------------------------------------
+  ! Gather dimension info and save in local variables
+  !---------------------------------------------------------------
+  ncnd  = cnd_diag_info%ncnd
+  nphys = cnd_diag_info%nphysproc
+  nfld  = cnd_diag_info%nfld
+
+  file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
+
+  !-----------------
+  ! metric and flag
+  !-----------------
+  do icnd = 1,ncnd
+
+     nver = cnd_diag_info%metric_nver(icnd)
+
+     if (nver==1) then
+
+        tmpfield_2d = fillvalue
+        !--------------------------------------------
+        ! get iodesc needed by pio_write_darray calls
+        !--------------------------------------------
+        arry_dims(1) = pcols
+        arry_dims(2) = endchunk - begchunk + 1
+
+        call cam_grid_get_decomp(physgrid, arry_dims(1:2), file_hdimsizes(1:file_nhdims), pio_double, iodesc)
+
+        !----------------------------
+        ! read and unpack the metric 
+        !----------------------------
+        write(varname,'(a,i2.2,a)') 'cnd',icnd,'_metric'
+        ierr = pio_inq_varid(File, trim(varname), vardesc)
+        call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
+
+        do lchnk = begchunk,endchunk
+           phy_diag(lchnk)%cnd(icnd)% metric(:,1) = tmpfield_2d(:,lchnk)
+        end do
+
+        !----------------------------
+        ! read and unpack the flags
+        !----------------------------
+        write(varname,'(a,i2.2,a)') 'cnd',icnd,'_flag'
+        ierr = pio_inq_varid(File, trim(varname), vardesc)
+        call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
+
+        do lchnk = begchunk,endchunk
+           phy_diag(lchnk)%cnd(icnd)% flag(:,1) = tmpfield_2d(:,lchnk)
+        end do
+
+     else ! nver > 1
+
+        !----------------------------------------------------
+        ! prepare input for cam_grid_write_dist_array calls
+        !----------------------------------------------------
+        arry_dims(1) = pcols
+        arry_dims(2) = nver
+        arry_dims(3) = endchunk - begchunk + 1
+
+        file_dims(file_nhdims+1) = nver
+
+        allocate( tmpfield_3d(pcols,nver,begchunk:endchunk) )
+        tmpfield_3d = fillvalue
+        
+        !-------------------------------
+        ! read and unpack metric values 
+        !-------------------------------
+        write(varname,'(a,i2.2,a)') 'cnd',icnd,'_metric'
+        ierr = pio_inq_varid(File, trim(varname), vardesc)
+
+        call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
+
+        do lchnk = begchunk, endchunk
+           phys_diag(lchnk)%cnd(icnd)% metric(:,:) = tmpfield_3d(:,:,lchnk)
+        end do
+
+        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d_2,   cnd_flag_desc(icnd))
+
+        !-------------------------------
+        ! read and unpack flag values 
+        !-------------------------------
+        write(varname,'(a,i2.2,a)') 'cnd',icnd,'_flag'
+        ierr = pio_inq_varid(File, trim(varname), vardesc)
+
+        call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
+
+        do lchnk = begchunk, endchunk
+           phys_diag(lchnk)%cnd(icnd)% flag(:,:) = tmpfield_3d(:,:,lchnk)
+        end do
+
+        !----------
+        ! clean up
+        !----------
+        deallocate(tmpfield_3d)
+
+     end if 
+  end do
+
+  !-------------------------------------------------------------------------
+  ! Conditionally sampled diagnostics (fields): "old", "val", and "inc"
+  !-------------------------------------------------------------------------
+  do ifld = 1,nfld
+
+     nver = cnd_diag_info%fld_nver(ifld)
+
+     if (nver==1) then
+
+        tmpfield_2d = fillvalue
+
+        !--------------------------------------------
+        ! get iodesc needed by pio_write_darray calls
+        !--------------------------------------------
+        arry_dims(1) = pcols
+        arry_dims(2) = endchunk - begchunk + 1
+ 
+        call cam_grid_get_decomp(physgrid, arry_dims(1:2), file_dims(1:file_nhdims), pio_double, iodesc) ! 4xin, out
+
+        !-------------------------------
+        ! read and unpack field values 
+        !-------------------------------
+        if (cnd_diag_info%l_output_state) then
+
+           do icnd = 1,ncnd
+           do iphys = 1,nphys
+
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
+              ierr = pio_inq_varid(File, trim(varname), vardesc)
+              call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
+
+              do lchnk = begchunk,endchunk
+                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
+              end do
+
+           end do
+           end do
+
+        end if !cnd_diag_info%l_output_state
+
+        !------------------------------------------
+        ! read and unpack increment and old values 
+        !------------------------------------------
+        if (cnd_diag_info%l_output_incrm) then
+
+           do icnd = 1,ncnd
+
+              ! increments corresponding to various physical processes
+
+              do iphys = 1,nphys
+
+                 write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
+                 ierr = pio_inq_varid(File, trim(varname), vardesc)
+                 call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
+
+                 do lchnk = begchunk,endchunk
+                    phy_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
+                 end do
+
+              end do !iphys
+
+              ! the "old" values
+ 
+              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
+              ierr = pio_inq_varid(File, trim(varname), vardesc)
+              call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
+
+              do lchnk = begchunk,endchunk
+                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,1) = tmpfield_2d(:,lchnk)
+              end do
+
+           end do !icnd
+
+        end if !cnd_diag_info%l_output_incrm
+
+    else ! nver > 1
+
+        !----------------------------------------------------
+        ! prepare input for cam_grid_write_dist_array calls
+        !----------------------------------------------------
+        arry_dims(1) = pcols
+        arry_dims(2) = nver
+        arry_dims(3) = endchunk - begchunk + 1
+
+        file_dims(file_nhdims+1) = nver
+
+        allocate( tmpfield_3d(pcols,nver,begchunk:endchunk) )
+        tmpfield_3d = fillvalue
+        
+        !------------------------------
+        ! read and unpack field values 
+        !------------------------------
+        if (cnd_diag_info%l_output_state) then
+
+           do icnd = 1,ncnd
+           do iphys = 1,nphys
+
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
+              ierr = pio_inq_varid(File, trim(varname), vardesc)
+
+              call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
+
+              do lchnk = begchunk,endchunk
+                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+              end do
+
+           end do
+           end do
+
+        end if !cnd_diag_info%l_output_state
+
+        !-------------------------------------------------------------------
+        ! pack increment and old values into tmp arrays and write them out
+        !-------------------------------------------------------------------
+        if (cnd_diag_info%l_output_incrm) then
+
+           ! increments associated with various physical processes 
+
+           do icnd = 1,ncnd
+           do iphys = 1,nphys
+
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
+              ierr = pio_inq_varid(File, trim(varname), vardesc)
+
+              call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
+
+              do lchnk = begchunk,endchunk
+                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+              end do
+
+           end do
+           end do
+
+           ! the "old" values
+
+           do icnd = 1,ncnd
+
+              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
+              ierr = pio_inq_varid(File, trim(varname), vardesc)
+
+              call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
+
+              do lchnk = begchunk,endchunk
+                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,:) = tmpfield_3d(:,:,lchnk)
+              end do
+
+           end do
+
+        end if !cnd_diag_info%l_output_incrm
+
+        !----------
+        ! Clean up
+        !----------
+        deallocate(tmpfield_3d)
+
+    end if 
+  end do
+ 
+  end subroutine cnd_diag_read_restart
+
 end module conditional_diag_restart_utils

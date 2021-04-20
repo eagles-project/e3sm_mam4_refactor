@@ -78,7 +78,7 @@ module restart_physics
     use subcol,              only: subcol_init_restart
     use phys_control,        only: phys_getopts
 
-    use conditional_diag_restart_utils, only: cnd_diag_init_restart
+    use conditional_diag_restart, only: cnd_diag_init_restart
 
     type(file_desc_t), intent(inout) :: file
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -251,7 +251,7 @@ module restart_physics
       use subcol,              only: subcol_write_restart
       use ppgrid,              only: pver
       use conditional_diag,    only: cnd_diag_t
-      use conditional_diag_restart_utils, only: cnd_diag_write_restart
+      use conditional_diag_restart, only: cnd_diag_write_restart
       !
       ! Input arguments
       !
@@ -545,7 +545,7 @@ module restart_physics
 
 !#######################################################################
 
-    subroutine read_restart_physics(File, cam_in, cam_out, pbuf2d)
+    subroutine read_restart_physics(File, cam_in, cam_out, pbuf2d, phys_diag)
 
      !-----------------------------------------------------------------------
      use physics_buffer,      only: physics_buffer_desc, pbuf_read_restart
@@ -563,6 +563,8 @@ module restart_physics
      use subcol_utils,        only: is_subcol_on
      use subcol,              only: subcol_read_restart
      use pio,                 only: pio_read_darray
+     use conditional_diag,    only: cnd_diag_t
+     use conditional_diag_restart, only: cnd_diag_read_restart
      !
      ! Arguments
      !
@@ -570,6 +572,7 @@ module restart_physics
      type(cam_in_t),            pointer :: cam_in(:)
      type(cam_out_t),           pointer :: cam_out(:)
      type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+     type(cnd_diag_t),          pointer :: phys_diag(:)
      !
      ! Local workspace
      !
@@ -599,6 +602,9 @@ module restart_physics
 
      call pbuf_read_restart(File, pbuf2d)
 
+     !-------------------------------
+     ! grid and dimension sizes
+     !-------------------------------
      csize=endchunk-begchunk+1
      dims(1) = pcols
      dims(2) = csize
@@ -615,6 +621,17 @@ module restart_physics
      
      call cam_grid_get_decomp(physgrid, dims(1:2), gdims(1:nhdims), pio_double, &
           iodesc)
+
+     !--------------------------------------
+     ! conditional sampling and diagnostics
+     !--------------------------------------
+     call cnd_diag_read_restart( phys_diag, begchunk, endchunk,     &! in
+                                 physgrid, gdims(1:nhdims), nhdims, &! in
+                                 pcols, fillvalue, File             )! inout 
+
+     !-------------------------------
+     ! miscellaneous fields
+     !-------------------------------
      if ( .not. adiabatic .and. .not. ideal_phys )then
 
         ! data for chemistry

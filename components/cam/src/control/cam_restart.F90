@@ -273,7 +273,7 @@ end subroutine restart_printopts
 
 !#######################################################################
 
-   subroutine cam_read_restart( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod, NLFileName )
+   subroutine cam_read_restart( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, phys_diag, stop_ymd, stop_tod, NLFileName )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -313,6 +313,7 @@ end subroutine restart_printopts
    type(dyn_import_t), intent(inout) :: dyn_in
    type(dyn_export_t), intent(inout) :: dyn_out
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+   type(cnd_diag_t),   pointer     :: phys_diag(:)
    character(len=*),   intent(in)  :: NLFileName
    integer,            intent(IN)  :: stop_ymd       ! Stop date (YYYYMMDD)
    integer,            intent(IN)  :: stop_tod       ! Stop time of day (sec)
@@ -403,11 +404,13 @@ end subroutine restart_printopts
    call hub2atm_alloc( cam_in )
    call atm2hub_alloc( cam_out )
 
+   !!!! call conditional_diag_alloc needs to be moved here because that call
+   !!!! has to happen after phys_grid_init and before read_restart_physics
 
    ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
    call ref_pres_init()
 
-   call read_restart_physics( File, cam_in, cam_out, pbuf2d )
+   call read_restart_physics( File, cam_in, cam_out, pbuf2d, phys_diag )
 
    if (nlres .and. .not.lbrnch) then
       call read_restart_history ( File )
