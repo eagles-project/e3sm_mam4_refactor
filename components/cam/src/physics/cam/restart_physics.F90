@@ -301,7 +301,7 @@ module restart_physics
       end do
 
       call cnd_diag_write_restart( phys_diag, begchunk, endchunk,        &! in
-                                   physgrid, gdims(1:2), nhdims,         &! in
+                                   physgrid, gdims(1:nhdims), nhdims,    &! in
                                    pcols, chunk_ncols, fillvalue,        &! in
                                    File, cnd_metric_desc, cnd_flag_desc, &! inout
                                    cnd_fld_val_desc, cnd_fld_inc_desc,   &! inout

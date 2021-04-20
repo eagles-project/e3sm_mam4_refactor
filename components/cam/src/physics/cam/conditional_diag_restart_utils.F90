@@ -4,6 +4,7 @@ module conditional_diag_restart_utils
   private
 
   public :: cnd_diag_init_restart
+  public :: cnd_diag_write_restart
 
 contains
   !==================================================================================================
@@ -171,7 +172,7 @@ contains
   !=========================================================
 
   subroutine cnd_diag_write_restart( phys_diag, begchunk, endchunk,         &! in
-                                     physgrid, file_hdimsize, file_nhdim,   &! in
+                                     physgrid, file_hdimsizes, file_nhdims, &! in
                                      pcols, chunk_ncols, fillvalue,         &! in
                                      file, cnd_metric_desc,  cnd_flag_desc, &! inout
                                      cnd_fld_val_desc, cnd_fld_inc_desc,    &! inout
@@ -182,19 +183,20 @@ contains
   !------------------------------------------------------------------------------------------------
 
   use cam_abortutils,   only: endrun
-  use conditional_diag, only: cnd_diag_info
-  use pio,              only: file_desc_t, var_desc_t, pio_def_var, pio_double
+  use conditional_diag, only: cnd_diag_info, cnd_diag_t
+  use pio,              only: file_desc_t, io_desc_t, var_desc_t, pio_double, pio_write_darray
   use cam_grid_support, only: cam_grid_get_decomp, cam_grid_write_dist_array
+  use shr_kind_mod,     only: r8 => shr_kind_r8
 
-  type(cnd_diag_t),intent(in) :: phys_diag(begchunk:endchunk)
   integer, intent(in) :: begchunk, endchunk
+  type(cnd_diag_t),intent(in) :: phys_diag(begchunk:endchunk)
 
   integer, intent(in) :: physgrid
-  integer, intent(in) :: file_hdimidsize(*)  ! horizontal dimension sizes in restart file
-  integer, intent(in) :: file_nhdims         ! number of horizontal dimensions in restart file (?)
+  integer, intent(in) :: file_nhdims                  ! number of horizontal dimensions in restart file 
+  integer, intent(in) :: file_hdimsizes(file_nhdims)  ! horizontal dimension sizes in restart file
 
   integer, intent(in) :: pcols
-  integer, intent(in) :: chunk_ncols(begchunk,endchunk)
+  integer, intent(in) :: chunk_ncols(begchunk:endchunk)
   real(r8),intent(in) :: fillvalue
 
   type(file_desc_t), intent(inout) :: file
@@ -209,6 +211,8 @@ contains
 
   integer :: file_dims(3)   ! dimension sizes in restart file, local variable
   integer :: arry_dims(3)   ! dimension sizes of array holding values to be written out, local variable
+
+  type(io_desc_t), pointer :: iodesc
 
   integer :: ierr
   integer :: lchnk,ncol
@@ -231,7 +235,7 @@ contains
   nphys = cnd_diag_info%nphysproc
   nfld  = cnd_diag_info%nfld
 
-  file_dims(1:file_nhdims) = file_hdimsize(1:file_nhdims)
+  file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
 
   !-----------------
   ! metric and flag
@@ -291,8 +295,8 @@ contains
            tmpfield_3d_2(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%   flag(:ncol,:)
         end do
 
-        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:grid_nhdims+1), tmpfield_3d_1, cnd_metric_desc(icnd))
-        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:grid_nhdims+1), tmpfield_3d_2,   cnd_flag_desc(icnd))
+        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d_1, cnd_metric_desc(icnd))
+        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d_2,   cnd_flag_desc(icnd))
 
         deallocate(tmpfield_3d_1)
         deallocate(tmpfield_3d_2)
@@ -310,7 +314,6 @@ contains
      if (nver==1) then
 
         tmpfield_2d_1 = fillvalue
-        tmpfield_2d_2 = fillvalue
 
         !--------------------------------------------
         ! get iodesc needed by pio_write_darray calls
@@ -386,14 +389,11 @@ contains
         file_dims(file_nhdims+1) = nver
 
         allocate( tmpfield_3d_1(pcols,nver,begchunk:endchunk) )
-        allocate( tmpfield_3d_2(pcols,nver,begchunk:endchunk) )
-        
         tmpfield_3d_1 = fillvalue
-        tmpfield_3d_2 = fillvalue
         
-        !----------------------------------------------------------------
-        ! pack metric and flag values into tmp arrays and write them out
-        !----------------------------------------------------------------
+        !-------------------------------------------------------
+        ! pack field values into tmp arrays and write them out
+        !-------------------------------------------------------
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
@@ -404,18 +404,20 @@ contains
                  tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:ncol,:,iphys)
               end do
 
-              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:grid_nhdims+1), &
-                                              tmpfield_3d_1, cnd_fld_val_desc(iphy,icnd,ifld)             )
+              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
+                                              tmpfield_3d_1, cnd_fld_val_desc(iphys,icnd,ifld)            )
 
            end do
            end do
 
         end if !cnd_diag_info%l_output_state
 
-        !----------------------------------------------------------------
-        ! pack metric and flag values into tmp arrays and write them out
-        !----------------------------------------------------------------
+        !-------------------------------------------------------------------
+        ! pack increment and old values into tmp arrays and write them out
+        !-------------------------------------------------------------------
         if (cnd_diag_info%l_output_incrm) then
+
+           ! increments associated with various physical processes 
 
            do icnd = 1,ncnd
            do iphys = 1,nphys
@@ -425,11 +427,13 @@ contains
                  tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:ncol,:,iphys)
               end do
 
-              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:grid_nhdims+1), &
-                                              tmpfield_3d_1, cnd_fld_inc_desc(iphy,icnd,ifld)             )
+              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
+                                              tmpfield_3d_1, cnd_fld_inc_desc(iphys,icnd,ifld)            )
 
            end do
            end do
+
+           ! the "old" values
 
            do icnd = 1,ncnd
 
@@ -438,16 +442,17 @@ contains
                  tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:ncol,:)
               end do
 
-              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:grid_nhdims+1), &
+              call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
                                               tmpfield_3d_1, cnd_fld_old_desc(icnd,ifld)             )
 
            end do
 
-       end if !cnd_diag_info%l_output_state
+        end if !cnd_diag_info%l_output_incrm
 
-
+        !----------
+        ! Clean up
+        !----------
         deallocate(tmpfield_3d_1)
-        deallocate(tmpfield_3d_2)
 
     end if 
   end do
@@ -466,4 +471,5 @@ contains
      deallocate( cnd_fld_inc_desc )
   end if
  
+  end subroutine cnd_diag_write_restart
 end module conditional_diag_restart_utils
