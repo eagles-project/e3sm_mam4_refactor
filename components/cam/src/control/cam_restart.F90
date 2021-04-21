@@ -302,6 +302,7 @@ end subroutine restart_printopts
       use time_manager,     only: timemgr_read_restart, timemgr_restart
       use filenames,        only: caseid, brnch_retain_casename
       use ref_pres,         only: ref_pres_init
+      use conditional_diag, only: cnd_diag_t
 
 !
 !-----------------------------------------------------------------------

@@ -1,10 +1,11 @@
-module conditional_diag_restart_utils
+module conditional_diag_restart
 
   implicit none
   private
 
   public :: cnd_diag_init_restart
   public :: cnd_diag_write_restart
+  public :: cnd_diag_read_restart
 
 contains
   !==================================================================================================
@@ -484,12 +485,12 @@ contains
 
   use cam_abortutils,   only: endrun
   use conditional_diag, only: cnd_diag_info, cnd_diag_t
-  use pio,              only: file_desc_t, io_desc_t, var_desc_t, pio_double, pio_read_darray
+  use pio,              only: file_desc_t, io_desc_t, var_desc_t, pio_double, pio_read_darray, pio_inq_varid
   use cam_grid_support, only: cam_grid_get_decomp, cam_grid_read_dist_array
   use shr_kind_mod,     only: r8 => shr_kind_r8
 
   integer, intent(in) :: begchunk, endchunk
-  type(cnd_diag_t),intent(in) :: phys_diag(begchunk:endchunk)
+  type(cnd_diag_t),intent(inout) :: phys_diag(begchunk:endchunk)
 
   integer, intent(in) :: physgrid
   integer, intent(in) :: file_nhdims                  ! number of horizontal dimensions in restart file 
@@ -558,7 +559,7 @@ contains
         call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
         do lchnk = begchunk,endchunk
-           phy_diag(lchnk)%cnd(icnd)% metric(:,1) = tmpfield_2d(:,lchnk)
+           phys_diag(lchnk)%cnd(icnd)% metric(:,1) = tmpfield_2d(:,lchnk)
         end do
 
         !----------------------------
@@ -569,7 +570,7 @@ contains
         call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
         do lchnk = begchunk,endchunk
-           phy_diag(lchnk)%cnd(icnd)% flag(:,1) = tmpfield_2d(:,lchnk)
+           phys_diag(lchnk)%cnd(icnd)% flag(:,1) = tmpfield_2d(:,lchnk)
         end do
 
      else ! nver > 1
@@ -597,8 +598,6 @@ contains
         do lchnk = begchunk, endchunk
            phys_diag(lchnk)%cnd(icnd)% metric(:,:) = tmpfield_3d(:,:,lchnk)
         end do
-
-        call cam_grid_write_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d_2,   cnd_flag_desc(icnd))
 
         !-------------------------------
         ! read and unpack flag values 
@@ -652,7 +651,7 @@ contains
               call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
               do lchnk = begchunk,endchunk
-                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
               end do
 
            end do
@@ -676,7 +675,7 @@ contains
                  call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
                  do lchnk = begchunk,endchunk
-                    phy_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
+                    phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
                  end do
 
               end do !iphys
@@ -688,7 +687,7 @@ contains
               call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
               do lchnk = begchunk,endchunk
-                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,1) = tmpfield_2d(:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,1) = tmpfield_2d(:,lchnk)
               end do
 
            end do !icnd
@@ -723,7 +722,7 @@ contains
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -747,7 +746,7 @@ contains
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -763,7 +762,7 @@ contains
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phy_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,:) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,:) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -780,4 +779,4 @@ contains
  
   end subroutine cnd_diag_read_restart
 
-end module conditional_diag_restart_utils
+end module conditional_diag_restart
