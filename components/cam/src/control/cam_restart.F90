@@ -6,7 +6,7 @@ module cam_restart
 !----------------------------------------------------------------------- 
    use shr_kind_mod,     only: r8 => shr_kind_r8, cl=>shr_kind_cl
    use spmd_utils,       only: masterproc
-   use ppgrid,           only: begchunk, endchunk
+   use ppgrid,           only: begchunk, endchunk, pcols
    use pmgrid,           only: plev, plevp, plat
    use rgrid,            only: nlon, wnummax, fullgrid
    use ioFileMod,        only: getfil, opnfil
@@ -302,7 +302,7 @@ end subroutine restart_printopts
       use time_manager,     only: timemgr_read_restart, timemgr_restart
       use filenames,        only: caseid, brnch_retain_casename
       use ref_pres,         only: ref_pres_init
-      use conditional_diag, only: cnd_diag_t
+      use conditional_diag, only: cnd_diag_t, cnd_diag_info, conditional_diag_alloc
 
 !
 !-----------------------------------------------------------------------
@@ -405,8 +405,7 @@ end subroutine restart_printopts
    call hub2atm_alloc( cam_in )
    call atm2hub_alloc( cam_out )
 
-   !!!! call conditional_diag_alloc needs to be moved here because that call
-   !!!! has to happen after phys_grid_init and before read_restart_physics
+   call conditional_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
 
    ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
    call ref_pres_init()

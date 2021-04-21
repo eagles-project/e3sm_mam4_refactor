@@ -16,7 +16,7 @@ module cam_comp
    use physics_types,     only: physics_state, physics_tend
    use cam_control_mod,   only: nsrest, print_step_cost, obliqr, lambm0, mvelpp, eccen
    use dyn_comp,          only: dyn_import_t, dyn_export_t
-   use ppgrid,            only: begchunk, endchunk
+   use ppgrid,            only: begchunk, endchunk, pcols
    use perf_mod
    use cam_logfile,       only: iulog
    use physics_buffer,            only: physics_buffer_desc
@@ -99,6 +99,7 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
    use scamMod,          only: single_column
    use cam_pio_utils,    only: init_pio_subsystem
    use cam_instance,     only: inst_suffix
+   use conditional_diag, only: cnd_diag_info, conditional_diag_alloc
 
 #if ( defined SPMD )   
    real(r8) :: mpi_wtime  ! External
@@ -164,6 +165,10 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
       call atm2hub_alloc(cam_out)
       call hub2atm_alloc(cam_in)
 
+      ! Allocate memory for conditional sampling and diagnostics
+      ! (when nsrest /= 0, the call is placed inside cam_read_restart)
+      call conditional_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
+
    else
 
       call cam_read_restart ( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, phys_diag, stop_ymd, stop_tod, NLFileName=filein )
@@ -177,7 +182,7 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
    end if
 
 
-   call phys_init( phys_state, phys_tend, pbuf2d,  cam_out, phys_diag )
+   call phys_init( phys_state, phys_tend, pbuf2d,  cam_out )
 
    call bldfld ()       ! master field list (if branch, only does hash tables)
 
