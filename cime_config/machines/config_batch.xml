@@ -331,6 +331,16 @@
     </queues>
   </batch_system>
 
+  <batch_system MACH="cori-gpu" type="nersc_slurm">
+    <directives>
+      <directive> --constraint=knl,quad,cache</directive>
+    </directives>
+    <queues>
+      <queue walltimemax="00:30:00" nodemax="512" strict="true">debug</queue>
+      <queue walltimemax="01:15:00" default="true">regular</queue>
+    </queues>
+  </batch_system>
+
   <batch_system MACH="stampede2" type="slurm">
     <directives>
       <directive>-n {{ total_tasks }}</directive>
