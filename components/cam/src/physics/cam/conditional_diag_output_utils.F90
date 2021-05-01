@@ -43,7 +43,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
   integer,intent(in) :: pver
   type(cnd_diag_info_t), intent(in) :: cnd_diag_info
 
-  integer          :: icnd, ifld, iphys, ii
+  integer          :: icnd, iqoi, iphys, ii
   character(len=4) :: val_inc_suff(2), suff
   logical          :: l_output(2)
 
@@ -119,15 +119,15 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
         if (.not.l_output(ii)) cycle
         suff = val_inc_suff(ii)
 
-        do ifld  = 1,cnd_diag_info%nfld
+        do iqoi  = 1,cnd_diag_info%nqoi
         do iphys = 1,cnd_diag_info%nphysproc
 
            call get_fld_name_for_output( suff, cnd_diag_info, &! in
-                                         icnd, ifld, iphys,   &! in
+                                         icnd, iqoi, iphys,   &! in
                                          output_fld_name      )! out
 
            call get_fld_longname_for_output( suff, cnd_diag_info, &! in
-                                             icnd, ifld, iphys,   &! in
+                                             icnd, iqoi, iphys,   &! in
                                              fld_long_name        )! out
 
            ! Add the variable to the master list of possible output variables.
@@ -136,16 +136,16 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
            ! Units are set to blank right now; we could add a namelist variable
            ! to let the user provide the info. 
 
-           if (cnd_diag_info%fld_nver(ifld)==1) then
+           if (cnd_diag_info%qoi_nver(iqoi)==1) then
               call addfld(trim(output_fld_name), horiz_only, 'A',' ',trim(fld_long_name)) 
 
-           elseif (cnd_diag_info%fld_nver(ifld)==pver) then
+           elseif (cnd_diag_info%qoi_nver(iqoi)==pver) then
               call addfld(trim(output_fld_name), (/'lev'/),  'A',' ',trim(fld_long_name)) 
 
-           elseif (cnd_diag_info%fld_nver(ifld)==pver+1) then
+           elseif (cnd_diag_info%qoi_nver(iqoi)==pver+1) then
               call addfld(trim(output_fld_name), (/'ilev'/), 'A',' ',trim(fld_long_name)) 
            else
-              call endrun(subname//': invalid number of vertical levels for '//cnd_diag_info%fld_name(ifld))
+              call endrun(subname//': invalid number of vertical levels for '//cnd_diag_info%qoi_name(iqoi))
            end if
 
            ! Add the variable to the first history tape (i.e., the h0 file)
@@ -156,7 +156,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
            call add_default(trim(output_fld_name),1,' ')
 
         end do ! iphys
-        end do ! ifld
+        end do ! iqoi
 
      end do ! ii = 1,2, field value (state) or tendency
 
@@ -187,14 +187,14 @@ end subroutine get_metric_and_flag_names_for_output
 
 !======================================================
 subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
-                                    icnd, ifld, iphys,      &!in
+                                    icnd, iqoi, iphys,      &!in
                                     fld_name_in_output      )!out
 
    use cam_history_support, only: max_fieldname_len
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
-   integer,               intent(in)  :: icnd, ifld, iphys
+   integer,               intent(in)  :: icnd, iqoi, iphys
 
    character(len=max_fieldname_len),intent(out) :: fld_name_in_output 
 
@@ -203,21 +203,21 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
    write(icnd_str,'(i2.2)') icnd
 
    fld_name_in_output = 'cnd'//icnd_str//'_'// &
-                        trim(cnd_diag_info%fld_name(ifld))//'_'// &
+                        trim(cnd_diag_info%qoi_name(iqoi))//'_'// &
                         trim(cnd_diag_info%physproc_name(iphys))//suff
 
 end subroutine get_fld_name_for_output 
 
 !======================================================
 subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
-                                        icnd, ifld, iphys,      &!in
+                                        icnd, iqoi, iphys,      &!in
                                         fld_long_name_in_output )!out
 
    use cam_history_support, only: max_fieldname_len
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
-   integer,               intent(in)  :: icnd, ifld, iphys
+   integer,               intent(in)  :: icnd, iqoi, iphys
 
    character(len=256),intent(out)     :: fld_long_name_in_output 
 
@@ -225,7 +225,7 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
 
    write(icnd_str,'(i2.2)') icnd
 
-   fld_long_name_in_output = trim(cnd_diag_info%fld_name(ifld))//suff// &
+   fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//suff// &
                              ' at '//trim(cnd_diag_info%physproc_name(iphys))// &
                              ' sampled under condition '//icnd_str// &
                              ' ('//trim(cnd_diag_info%metric_name(icnd))//')' 

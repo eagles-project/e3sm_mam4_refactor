@@ -37,8 +37,8 @@ module conditional_diag
   integer, parameter :: ncnd_max = 10
   integer, parameter :: mname_maxlen = 8
 
-  integer, parameter :: nfld_max = 20
-  integer, parameter :: fname_maxlen = 8 
+  integer, parameter :: nqoi_max = 20
+  integer, parameter :: qoiname_maxlen = 8 
 
   integer, parameter :: nphysproc_max   = 99
   integer, parameter :: physproc_name_maxlen = 8
@@ -79,9 +79,9 @@ module conditional_diag
 
     ! Physical fields to be monitored. Each field can have 1, nlev, or nlev+1 vertical levels
 
-    integer                                 :: nfld = 0
-    character(len=fname_maxlen),allocatable :: fld_name(:)     ! shape = (nfld)
-    integer,allocatable                     :: fld_nver(:)     ! shape = (nfld); # of vertical levels
+    integer                                   :: nqoi = 0
+    character(len=qoiname_maxlen),allocatable :: qoi_name(:)     ! shape = (nqoi)
+    integer,allocatable                       :: qoi_nver(:)     ! shape = (nqoi); # of vertical levels
 
   end type cnd_diag_info_t
 
@@ -93,9 +93,9 @@ module conditional_diag
 
   type snapshots_and_increments_t
 
-    real(r8), allocatable :: val(:,:,:) ! shape = (pcols,info%fld_nver(ifld),info%nphysproc) field values after different processes
-    real(r8), allocatable :: inc(:,:,:) ! shape = (pcols,info%fld_nver(ifld),info%nphysproc) increments caused by different processes
-    real(r8), allocatable :: old(:,:)   ! shape = (pcols,info%fld_nver(ifld)) old field values
+    real(r8), allocatable :: val(:,:,:) ! shape = (pcols,info%qoi_nver(iqoi),info%nphysproc) field values after different processes
+    real(r8), allocatable :: inc(:,:,:) ! shape = (pcols,info%qoi_nver(iqoi),info%nphysproc) increments caused by different processes
+    real(r8), allocatable :: old(:,:)   ! shape = (pcols,info%qoi_nver(iqoi)) old field values
 
   end type snapshots_and_increments_t
 
@@ -107,7 +107,7 @@ module conditional_diag
 
     real(r8),                        allocatable :: metric (:,:)     ! shape = (pcols, info%metric_nver(icnd))
     real(r8),                        allocatable :: flag   (:,:)     ! shape = (pcols, info%metric_nver(icnd))
-    type(snapshots_and_increments_t),allocatable :: fld    (:)       ! shape = (info%nfld)
+    type(snapshots_and_increments_t),allocatable :: qoi    (:)       ! shape = (info%nqoi)
 
   end type metric_and_fields_t
 
@@ -155,22 +155,22 @@ subroutine conditional_diag_readnl(nlfile)
 
    character(len=physproc_name_maxlen) :: physproc_name(nphysproc_max)
 
-   character(len=fname_maxlen)    :: fld_name (nfld_max)
-   integer                        :: fld_nver (nfld_max)
+   character(len=qoiname_maxlen)    :: qoi_name (nqoi_max)
+   integer                          :: qoi_nver (nqoi_max)
 
    logical :: l_output_state, l_output_incrm
 
    ! other misc local variables
    integer :: ncnd
    integer :: nphysproc
-   integer :: nfld
+   integer :: nqoi
 
    integer :: ii
 
    !-------
    namelist /conditional_diag_nl/  &
             metric_name, metric_nver, metric_cmpr_type, metric_threshold, sample_after, &
-            physproc_name, fld_name, fld_nver, l_output_state, l_output_incrm
+            physproc_name, qoi_name, qoi_nver, l_output_state, l_output_incrm
 
    !----------------------------------------
    !  Default values
@@ -183,8 +183,8 @@ subroutine conditional_diag_readnl(nlfile)
 
    physproc_name   = ' '
 
-   fld_name       = ' '
-   fld_nver       = 0 
+   qoi_name       = ' '
+   qoi_nver       = 0 
 
    l_output_state = .false.
    l_output_incrm = .false.
@@ -232,12 +232,12 @@ subroutine conditional_diag_readnl(nlfile)
       ! Check validity of namelist variables for physical fields to monitor
 
       ii = 0
-      do while ( (ii+1) <= nfld_max .and. fld_name(ii+1) /= ' ')
+      do while ( (ii+1) <= nqoi_max .and. qoi_name(ii+1) /= ' ')
          ii = ii + 1
       end do
-      nfld = ii
+      nqoi = ii
 
-      if (any(fld_nver(1:nfld)<=0)) call endrun(subname//'error: need positive fld_nver for each fld_name')
+      if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
 
    end if ! masterproc
    !--------------------------------------
@@ -245,7 +245,7 @@ subroutine conditional_diag_readnl(nlfile)
 #ifdef SPMD
    call mpibcast(ncnd,     1, mpiint, 0, mpicom)
    call mpibcast(nphysproc,1, mpiint, 0, mpicom)
-   call mpibcast(nfld,     1, mpiint, 0, mpicom)
+   call mpibcast(nqoi,     1, mpiint, 0, mpicom)
 #endif
 
    cnd_diag_info%ncnd = ncnd
@@ -273,8 +273,8 @@ subroutine conditional_diag_readnl(nlfile)
 
    call mpibcast(physproc_name,  nphysproc_max*len(physproc_name(1)), mpichar, 0, mpicom)
 
-   call mpibcast(fld_name,  nfld_max*len(fld_name(1)),  mpichar, 0, mpicom)
-   call mpibcast(fld_nver,  nfld_max,                   mpiint,  0, mpicom)
+   call mpibcast(qoi_name,  nqoi_max*len(qoi_name(1)),  mpichar, 0, mpicom)
+   call mpibcast(qoi_nver,  nqoi_max,                   mpiint,  0, mpicom)
 
    call mpibcast(l_output_state, 1, mpilog, 0, mpicom)
    call mpibcast(l_output_incrm, 1, mpilog, 0, mpicom)
@@ -319,17 +319,17 @@ subroutine conditional_diag_readnl(nlfile)
 
    ! snapshots and increments of physical fields
 
-   cnd_diag_info%nfld = nfld
+   cnd_diag_info%nqoi = nqoi
 
-   allocate( cnd_diag_info%fld_name(nfld), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info%fld_name')
-   do ii = 1,nfld
-      cnd_diag_info%fld_name(ii) = trim(adjustl(fld_name(ii)))
+   allocate( cnd_diag_info%qoi_name(nqoi), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info%qoi_name')
+   do ii = 1,nqoi
+      cnd_diag_info%qoi_name(ii) = trim(adjustl(qoi_name(ii)))
    end do
 
-   allocate( cnd_diag_info%fld_nver(nfld), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info%fld_nver')
-   cnd_diag_info%fld_nver(1:nfld) = fld_nver(1:nfld)
+   allocate( cnd_diag_info%qoi_nver(nqoi), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info%qoi_nver')
+   cnd_diag_info%qoi_nver(1:nqoi) = qoi_nver(1:nqoi)
 
    ! output to history file(s)
 
@@ -366,8 +366,8 @@ subroutine conditional_diag_readnl(nlfile)
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,'(4x,a20,a6)')'field','nlev'
-      do ii = 1,cnd_diag_info%nfld
-         write(iulog,'(i4.3,a20,i6)') ii, adjustr(cnd_diag_info%fld_name(ii)), cnd_diag_info%fld_nver(ii)
+      do ii = 1,cnd_diag_info%nqoi
+         write(iulog,'(i4.3,a20,i6)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii)
       end do
       write(iulog,*)
 
@@ -414,7 +414,7 @@ subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_dia
      write(iulog,*) " Finished memory allocation for conditional diagnostics including:"
      write(iulog,*) cnd_diag_info%ncnd,      " conditions"
      write(iulog,*) cnd_diag_info%nphysproc, " atmospheric processes"
-     write(iulog,*) cnd_diag_info%nfld,      " physical fields"
+     write(iulog,*) cnd_diag_info%nqoi,      " quantities of interest to sample and output"
      write(iulog,*) "====================================================================="
      write(iulog,*)
   end if
@@ -454,8 +454,8 @@ subroutine single_chunk_cnd_diag_alloc( diag, lchnk, psetcols, cnd_diag_info )
      call metrics_and_fields_alloc( diag%cnd(icnd),                  &
                                     cnd_diag_info%metric_nver(icnd), &
                                     cnd_diag_info%nphysproc, &
-                                    cnd_diag_info%nfld,      &
-                                    cnd_diag_info%fld_nver,  &
+                                    cnd_diag_info%nqoi,      &
+                                    cnd_diag_info%qoi_nver,  &
                                     cnd_diag_info%l_output_state, &
                                     cnd_diag_info%l_output_incrm, &
                                     psetcols                 )
@@ -467,7 +467,7 @@ end subroutine single_chunk_cnd_diag_alloc
 !-----------------------------------------------------------------------------
 ! Allocate memory for metrics and diagnostics for a single sampling condition
 !-----------------------------------------------------------------------------
-subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver, &
+subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nqoi, qoi_nver, &
                                      l_output_state, l_output_incrm, psetcols )
 
  !use infnan, only : inf, assignment(=)
@@ -475,13 +475,13 @@ subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver
   type(metric_and_fields_t), intent(inout) :: cnd
 
   integer, intent(in) :: metric_nver, nphysproc
-  integer, intent(in) :: nfld
-  integer, intent(in) :: fld_nver(nfld)
+  integer, intent(in) :: nqoi
+  integer, intent(in) :: qoi_nver(nqoi)
   logical, intent(in) :: l_output_state
   logical, intent(in) :: l_output_incrm
   integer, intent(in) :: psetcols
 
-  integer :: ifld
+  integer :: iqoi
   integer :: ierr
 
   character(len=*), parameter :: subname = 'metrics_and_fields_alloc'
@@ -496,37 +496,37 @@ subroutine metrics_and_fields_alloc( cnd, metric_nver, nphysproc, nfld, fld_nver
 
   ! diagnostical fields
 
-  if (nfld > 0) then
+  if (nqoi > 0) then
 
-     allocate( cnd% fld( nfld ), stat=ierr)
-     if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld')
+     allocate( cnd% qoi( nqoi ), stat=ierr)
+     if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi')
 
      ! snapshots of each field
      if (l_output_state) then
-      do ifld = 1, nfld
+      do iqoi = 1, nqoi
 
-        allocate( cnd%fld(ifld)% val(psetcols,fld_nver(ifld),nphysproc), stat=ierr)
-        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%val')
+        allocate( cnd%qoi(iqoi)% val(psetcols,qoi_nver(iqoi),nphysproc), stat=ierr)
+        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi%val')
 
-        cnd%fld(ifld)% val(:,:,:) = 0._r8
+        cnd%qoi(iqoi)% val(:,:,:) = 0._r8
 
-      end do !ifld
+      end do !iqoi
      end if
 
      ! increments of each field
      if (l_output_incrm) then
-      do ifld = 1, nfld
+      do iqoi = 1, nqoi
 
-        allocate( cnd%fld(ifld)% old(psetcols,fld_nver(ifld)), stat=ierr)
-        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%old')
+        allocate( cnd%qoi(iqoi)% old(psetcols,qoi_nver(iqoi)), stat=ierr)
+        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi%old')
 
-        allocate( cnd%fld(ifld)% inc(psetcols,fld_nver(ifld),nphysproc), stat=ierr)
-        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%fld%inc')
+        allocate( cnd%qoi(iqoi)% inc(psetcols,qoi_nver(iqoi),nphysproc), stat=ierr)
+        if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi%inc')
 
-        cnd%fld(ifld)% old(:,:)   = 0._r8
-        cnd%fld(ifld)% inc(:,:,:) = 0._r8
+        cnd%qoi(iqoi)% old(:,:)   = 0._r8
+        cnd%qoi(iqoi)% inc(:,:,:) = 0._r8
 
-      end do !ifld
+      end do !iqoi
      end if
 
    end if

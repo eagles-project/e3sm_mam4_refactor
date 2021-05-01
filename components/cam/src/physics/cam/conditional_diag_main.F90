@@ -45,12 +45,12 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
   type(physics_buffer_desc), pointer :: pbuf(:)
   type(cam_in_t),         intent(in) :: cam_in
 
-  integer :: ncnd, nphysproc, nfld
-  integer :: icnd, iphys, ii, ifld
+  integer :: ncnd, nphysproc, nqoi
+  integer :: icnd, iphys, ii, iqoi
   integer :: ncol, lchnk
 
   real(r8),pointer :: metric(:,:), flag(:,:), new(:,:), inc(:,:), old(:,:)
-  real(r8),pointer :: fld(:,:)
+  real(r8),pointer :: qoi(:,:)
 
   character(len=max_fieldname_len) :: outfldname, flag_name_out, metric_name_out
 
@@ -58,7 +58,7 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
 
   ncnd      = cnd_diag_info%ncnd
   nphysproc = cnd_diag_info%nphysproc
-  nfld      = cnd_diag_info%nfld
+  nqoi      = cnd_diag_info%nqoi
 
   lchnk    = state%lchnk
   ncol     = state%ncol
@@ -82,7 +82,7 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
   ! Conditional sampling won't be applied until the metrics and flags 
   ! have been obtained.
   !------------------------------------------------------------------------
-     do ifld = 1,nfld
+     do iqoi = 1,nqoi
 
         ! Note: The current implementation is such that the same set of 
         ! atmospheric processes and diagnostics are monitored for all 
@@ -94,12 +94,12 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
         ! Obtain the most up-to-date values of the diagnostic variable 
 
         icnd = 1
-        new => diag%cnd(icnd)%fld(ifld)% val(:,:,iphys)
-        call get_values( new, trim(cnd_diag_info%fld_name(ifld)), &! inout, in
+        new => diag%cnd(icnd)%qoi(iqoi)% val(:,:,iphys)
+        call get_values( new, trim(cnd_diag_info%qoi_name(iqoi)), &! inout, in
                          state, pbuf, cam_in )                     ! in
 
         do icnd = 2,ncnd
-           diag%cnd(icnd)%fld(ifld)% val(1:ncol,:,iphys) = new(1:ncol,:)
+           diag%cnd(icnd)%qoi(iqoi)% val(1:ncol,:,iphys) = new(1:ncol,:)
         end do
 
         !--------------------------------------------------------------
@@ -108,8 +108,8 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
         if (cnd_diag_info%l_output_incrm) then
 
            icnd = 1
-           inc => diag%cnd(icnd)%fld(ifld)% inc(:,:,iphys)
-           old => diag%cnd(icnd)%fld(ifld)% old
+           inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,iphys)
+           old => diag%cnd(icnd)%qoi(iqoi)% old
 
            inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
            old(1:ncol,:) = new(1:ncol,:)
@@ -117,13 +117,13 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
            ! Save increments for other metrics; update "old" value
 
            do icnd = 2,ncnd
-              diag%cnd(icnd)%fld(ifld)% inc(1:ncol,:,iphys) = inc(1:ncol,:)
-              diag%cnd(icnd)%fld(ifld)% old(1:ncol,:)       = new(1:ncol,:)
+              diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,iphys) = inc(1:ncol,:)
+              diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:)       = new(1:ncol,:)
            end do
           
         end if ! l_output_incrm
 
-     end do ! ifld = 1,nfld
+     end do ! iqoi = 1,nqoi
   end if ! iphys > 0
 
   !-------------------------------------------------------------------------------
@@ -169,13 +169,13 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
         ! Diagnostic fields
 
         if (cnd_diag_info%l_output_state) then        
-           do ifld = 1,nfld
+           do iqoi = 1,nqoi
 
-              call apply_masking( flag, diag%cnd(icnd)%fld(ifld)%val ) 
+              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val ) 
   
               do ii = 1,nphysproc
-                 call get_fld_name_for_output( '_val', cnd_diag_info, icnd, ifld, ii, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%fld(ifld)%val(:,:,ii), pcols, lchnk )
+                 call get_fld_name_for_output( '_val', cnd_diag_info, icnd, iqoi, ii, outfldname)
+                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ii), pcols, lchnk )
               end do
 
            end do
@@ -184,13 +184,13 @@ subroutine conditional_diag_cal_and_output( diag, proc_name, state, pbuf, cam_in
         ! Increments
 
         if (cnd_diag_info%l_output_incrm) then        
-           do ifld = 1,nfld
+           do iqoi = 1,nqoi
 
-              call apply_masking( flag, diag%cnd(icnd)%fld(ifld)%inc ) 
+              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc ) 
 
               do ii = 1,nphysproc
-                 call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, ifld, ii, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%fld(ifld)%inc(:,:,ii), pcols, lchnk )
+                 call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ii, outfldname)
+                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ii), pcols, lchnk )
               end do
 
            end do

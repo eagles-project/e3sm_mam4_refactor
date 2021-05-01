@@ -11,7 +11,7 @@ contains
   !==================================================================================================
   subroutine cnd_diag_init_restart( dimids, hdimcnt, pver, pver_id, pverp_id,            &! in
                                     file, cnd_metric_desc,  cnd_flag_desc,               &! inout
-                                    cnd_fld_val_desc, cnd_fld_old_desc, cnd_fld_inc_desc )! inout
+                                    cnd_qoi_val_desc, cnd_qoi_old_desc, cnd_qoi_inc_desc )! inout
   !------------------------------------------------------------------------------------------------
   ! Purpose: add variables to the restart file for conditional sampling and diagnostics.
   ! History: First version by Hui Wan, PNNL, 2021-04
@@ -31,9 +31,9 @@ contains
 
   type(var_desc_t),allocatable,intent(inout) :: cnd_metric_desc(:)
   type(var_desc_t),allocatable,intent(inout) :: cnd_flag_desc(:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_val_desc(:,:,:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_inc_desc(:,:,:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_old_desc(:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_val_desc(:,:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_inc_desc(:,:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_old_desc(:,:)
 
   ! Local variables
 
@@ -41,7 +41,7 @@ contains
   integer :: dimids_local(4)
   character(len=256) :: pname  !variable name in restart file
 
-  integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
+  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
   character(len=*),parameter :: subname = 'cnd_diag_init_restart'
 
   if (cnd_diag_info%ncnd <= 0 ) return
@@ -65,15 +65,15 @@ contains
 
   ncnd  = cnd_diag_info%ncnd
   nphys = cnd_diag_info%nphysproc
-  nfld  = cnd_diag_info%nfld
+  nqoi  = cnd_diag_info%nqoi
 
   allocate( cnd_metric_desc(ncnd) )
   allocate( cnd_flag_desc(ncnd) )
 
-  if (nfld>0) then
-     allocate( cnd_fld_old_desc(nfld,ncnd) )
-     allocate( cnd_fld_val_desc(nphys,ncnd,nfld) )
-     allocate( cnd_fld_inc_desc(nphys,ncnd,nfld) )
+  if (nqoi>0) then
+     allocate( cnd_qoi_old_desc(nqoi,ncnd) )
+     allocate( cnd_qoi_val_desc(nphys,ncnd,nqoi) )
+     allocate( cnd_qoi_inc_desc(nphys,ncnd,nqoi) )
   end if
 
   !-----------------------------------------------------------
@@ -115,11 +115,11 @@ contains
   !-----------------------------------------------------------
   ! Add the conditionally sampled diagnostics to restart file
   !-----------------------------------------------------------
-  do ifld = 1,nfld
+  do iqoi = 1,nqoi
 
      ! Dimension information
 
-     nver = cnd_diag_info%fld_nver(ifld)
+     nver = cnd_diag_info%qoi_nver(iqoi)
 
      if ( nver == 1) then
         ndims = hdimcnt
@@ -133,7 +133,7 @@ contains
         dimids_local(ndims) = pverp_id
 
      else
-        call endrun(subname//': check cnd_diag_info%fld_nver')
+        call endrun(subname//': check cnd_diag_info%qoi_nver')
      end if
 
      ! Add to the restart file the variables containing field values after various physics processes
@@ -141,8 +141,8 @@ contains
      if (cnd_diag_info%l_output_state) then
         do icnd = 1,ncnd
          do iphys = 1,nphys
-            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
-            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_fld_val_desc(iphys,icnd,ifld))
+            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
+            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_val_desc(iphys,icnd,iqoi))
          end do
         end do
      end if
@@ -153,21 +153,21 @@ contains
 
         do icnd = 1,ncnd
          do iphys = 1,nphys
-            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
-            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_fld_inc_desc(iphys,icnd,ifld))
+            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
+            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_inc_desc(iphys,icnd,iqoi))
          end do
         end do
 
         ! Add to the restart file the variable containing the "old" value of the field 
 
         do icnd = 1,ncnd
-           write(pname,'(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
-           ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_fld_old_desc(icnd,ifld))
+           write(pname,'(2(a,i2.2),a)') 'cnd',icnd, '_qoi',iqoi, '_old'
+           ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_old_desc(icnd,iqoi))
         end do
 
      end if
 
-  end do !ifld
+  end do !iqoi
 
   end subroutine cnd_diag_init_restart
   !=========================================================
@@ -176,8 +176,8 @@ contains
                                      physgrid, file_hdimsizes, file_nhdims, &! in
                                      pcols, chunk_ncols, fillvalue,         &! in
                                      file, cnd_metric_desc,  cnd_flag_desc, &! inout
-                                     cnd_fld_val_desc, cnd_fld_inc_desc,    &! inout
-                                     cnd_fld_old_desc                       )! inout
+                                     cnd_qoi_val_desc, cnd_qoi_inc_desc,    &! inout
+                                     cnd_qoi_old_desc                       )! inout
   !------------------------------------------------------------------------------------------------
   ! Purpose: add variables to the restart file for conditional sampling and diagnostics.
   ! History: First version by Hui Wan, PNNL, 2021-04
@@ -204,9 +204,9 @@ contains
 
   type(var_desc_t),allocatable,intent(inout) :: cnd_metric_desc(:)
   type(var_desc_t),allocatable,intent(inout) :: cnd_flag_desc(:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_val_desc(:,:,:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_inc_desc(:,:,:)
-  type(var_desc_t),allocatable,intent(inout) :: cnd_fld_old_desc(:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_val_desc(:,:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_inc_desc(:,:,:)
+  type(var_desc_t),allocatable,intent(inout) :: cnd_qoi_old_desc(:,:)
 
   ! Local variables
 
@@ -217,7 +217,7 @@ contains
 
   integer :: ierr
   integer :: lchnk,ncol
-  integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
+  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
   character(len=*),parameter :: subname = 'cnd_write_init_restart'
 
   real(r8):: tmpfield_2d_1(pcols, begchunk:endchunk)
@@ -234,7 +234,7 @@ contains
   !---------------------------------------------------------------
   ncnd  = cnd_diag_info%ncnd
   nphys = cnd_diag_info%nphysproc
-  nfld  = cnd_diag_info%nfld
+  nqoi  = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
 
@@ -308,9 +308,9 @@ contains
   !-------------------------------------------------------------------------
   ! Conditionally sampled diagnostics (fields): "old", "val", and "inc"
   !-------------------------------------------------------------------------
-  do ifld = 1,nfld
+  do iqoi = 1,nqoi
 
-     nver = cnd_diag_info%fld_nver(ifld)
+     nver = cnd_diag_info%qoi_nver(iqoi)
 
      if (nver==1) then
 
@@ -334,10 +334,10 @@ contains
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:ncol,1,iphys)
+                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,1,iphys)
               end do
 
-              call pio_write_darray(File, cnd_fld_val_desc(iphys,icnd,ifld), iodesc, tmpfield_2d_1, ierr)
+              call pio_write_darray(File, cnd_qoi_val_desc(iphys,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
 
            end do
            end do
@@ -357,10 +357,10 @@ contains
 
                  do lchnk = begchunk, endchunk
                     ncol = chunk_ncols(lchnk)
-                    tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:ncol,1,iphys)
+                    tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,1,iphys)
                  end do
 
-                 call pio_write_darray(File, cnd_fld_inc_desc(iphys,icnd,ifld), iodesc, tmpfield_2d_1, ierr)
+                 call pio_write_darray(File, cnd_qoi_inc_desc(iphys,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
 
               end do !iphys
 
@@ -368,10 +368,10 @@ contains
  
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)%old(:ncol,1)
+                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)%old(:ncol,1)
               end do
 
-              call pio_write_darray(File, cnd_fld_old_desc(icnd,ifld), iodesc, tmpfield_2d_1, ierr)
+              call pio_write_darray(File, cnd_qoi_old_desc(icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
 
            end do !icnd
 
@@ -402,11 +402,11 @@ contains
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:ncol,:,iphys)
+                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,:,iphys)
               end do
 
               call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
-                                              tmpfield_3d_1, cnd_fld_val_desc(iphys,icnd,ifld)            )
+                                              tmpfield_3d_1, cnd_qoi_val_desc(iphys,icnd,iqoi)            )
 
            end do
            end do
@@ -425,11 +425,11 @@ contains
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:ncol,:,iphys)
+                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,:,iphys)
               end do
 
               call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
-                                              tmpfield_3d_1, cnd_fld_inc_desc(iphys,icnd,ifld)            )
+                                              tmpfield_3d_1, cnd_qoi_inc_desc(iphys,icnd,iqoi)            )
 
            end do
            end do
@@ -440,11 +440,11 @@ contains
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:ncol,:)
+                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% old(:ncol,:)
               end do
 
               call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
-                                              tmpfield_3d_1, cnd_fld_old_desc(icnd,ifld)             )
+                                              tmpfield_3d_1, cnd_qoi_old_desc(icnd,iqoi)             )
 
            end do
 
@@ -466,10 +466,10 @@ contains
   deallocate( cnd_metric_desc )
   deallocate( cnd_flag_desc )
 
-  if (nfld>0) then
-     deallocate( cnd_fld_old_desc )
-     deallocate( cnd_fld_val_desc )
-     deallocate( cnd_fld_inc_desc )
+  if (nqoi>0) then
+     deallocate( cnd_qoi_old_desc )
+     deallocate( cnd_qoi_val_desc )
+     deallocate( cnd_qoi_inc_desc )
   end if
  
   end subroutine cnd_diag_write_restart
@@ -511,7 +511,7 @@ contains
 
   integer :: ierr
   integer :: lchnk
-  integer :: ncnd, nphys, nfld, icnd, iphys, ifld, nver
+  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
 
   real(r8) :: tmpfield_2d(pcols, begchunk:endchunk)
   real(r8), allocatable :: tmpfield_3d(:,:,:)
@@ -529,7 +529,7 @@ contains
   !---------------------------------------------------------------
   ncnd  = cnd_diag_info%ncnd
   nphys = cnd_diag_info%nphysproc
-  nfld  = cnd_diag_info%nfld
+  nqoi  = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
 
@@ -622,9 +622,9 @@ contains
   !-------------------------------------------------------------------------
   ! Conditionally sampled diagnostics (fields): "old", "val", and "inc"
   !-------------------------------------------------------------------------
-  do ifld = 1,nfld
+  do iqoi = 1,nqoi
 
-     nver = cnd_diag_info%fld_nver(ifld)
+     nver = cnd_diag_info%qoi_nver(iqoi)
 
      if (nver==1) then
 
@@ -646,12 +646,12 @@ contains
            do icnd = 1,ncnd
            do iphys = 1,nphys
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
               ierr = pio_inq_varid(File, trim(varname), vardesc)
               call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
               end do
 
            end do
@@ -670,24 +670,24 @@ contains
 
               do iphys = 1,nphys
 
-                 write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
+                 write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
                  ierr = pio_inq_varid(File, trim(varname), vardesc)
                  call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
                  do lchnk = begchunk,endchunk
-                    phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
+                    phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
                  end do
 
               end do !iphys
 
               ! the "old" values
  
-              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
+              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_qoi',iqoi, '_old'
               ierr = pio_inq_varid(File, trim(varname), vardesc)
               call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,1) = tmpfield_2d(:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% old(:,1) = tmpfield_2d(:,lchnk)
               end do
 
            end do !icnd
@@ -716,13 +716,13 @@ contains
            do icnd = 1,ncnd
            do iphys = 1,nphys
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_val',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
               ierr = pio_inq_varid(File, trim(varname), vardesc)
 
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -740,13 +740,13 @@ contains
            do icnd = 1,ncnd
            do iphys = 1,nphys
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_fld',ifld, '_inc',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
               ierr = pio_inq_varid(File, trim(varname), vardesc)
 
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -756,13 +756,13 @@ contains
 
            do icnd = 1,ncnd
 
-              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_fld',ifld, '_old'
+              write(varname, '(2(a,i2.2),a)') 'cnd',icnd, '_qoi',iqoi, '_old'
               ierr = pio_inq_varid(File, trim(varname), vardesc)
 
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%fld(ifld)% old(:,:) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% old(:,:) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
