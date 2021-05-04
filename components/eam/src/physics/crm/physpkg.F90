@@ -1571,12 +1571,14 @@ subroutine tphysbc(ztodt, fsns, fsnt, flns, flnt, &
   !-----------------------------------------------------------------------------
   ! Run the CRM 
   !-----------------------------------------------------------------------------
+!$OMP CRITICAL
   call t_startf('crm_physics_tend')
   call crm_physics_tend(ztodt, state, tend,ptend, pbuf, cam_in, cam_out,    &
                         species_class, crm_ecpp_output, mmf_clear_rh,       &
                         mmf_qchk_prec_dp, mmf_qchk_snow_dp, mmf_rad_flux)
   call physics_update(state, ptend, ztodt, tend)
   call t_stopf('crm_physics_tend')
+!$OMP END CRITICAL
 
   call check_energy_chng(state, tend, "crm_tend", nstep, ztodt,  &
                          zero, mmf_qchk_prec_dp, mmf_qchk_snow_dp, mmf_rad_flux)
