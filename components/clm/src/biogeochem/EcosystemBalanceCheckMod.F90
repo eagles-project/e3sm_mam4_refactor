@@ -287,7 +287,7 @@ contains
             write(iulog,*)'hrv_to_prod100        = ',hrv_deadstemc_to_prod100c(c)*dt
             write(iulog,*)'leach                 = ',som_c_leached(c)*dt
             write(iulog,*)'begcb                 = ',col_begcb(c)
-            write(iulog,*)'endcb                 = ',col_endcb(c),col_cs%totsomc(c)
+            write(iulog,*)'endcb                 = ',col_endcb(c),col_cs%totsomc(c),col_cs%totlitc(c)
             write(iulog,*)'delta store           = ',col_endcb(c)-col_begcb(c)
 
             if (ero_ccycle) then
@@ -1042,8 +1042,8 @@ contains
          write(iulog,*)'input                 = ',grc_pinputs*dt
          write(iulog,*)'output                = ',grc_poutputs*dt
          write(iulog,*)'error                 = ',errpb_grc(g)*dt
-         write(iulog,*)'begcb                 = ',begpb_grc(g)
-         write(iulog,*)'endcb                 = ',endpb_grc(g)
+         write(iulog,*)'begpb                 = ',begpb_grc(g)
+         write(iulog,*)'endpb                 = ',endpb_grc(g)
          write(iulog,*)'delta store           = ',endpb_grc(g)-begpb_grc(g)
          call endrun(msg=errMsg(__FILE__, __LINE__))
       end if

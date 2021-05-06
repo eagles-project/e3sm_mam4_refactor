@@ -26,7 +26,7 @@ module ColumnDataType
   use clm_varctl      , only : use_clm_interface, use_pflotran, pf_cmode
   use clm_varctl      , only : hist_wrtch4diag, use_nitrif_denitrif, use_century_decomp
   use clm_varctl      , only : get_carbontag, override_bgc_restart_mismatch_dump
-  use clm_varctl      , only : pf_hmode, nu_com
+  use clm_varctl      , only : pf_tmode, pf_hmode, nu_com
   use ch4varcon       , only : allowlakeprod
   use pftvarcon       , only : VMAX_MINSURF_P_vr, KM_MINSURF_P_vr
   use soilorder_varcon, only : smax, ks_sorption
@@ -2830,7 +2830,7 @@ contains
        end do
     end do
 
-    if ( nlevdecomp > 1) then
+    if ( nlev > 1) then
        ! vertically integrate each of the decomposing C pools to 1 meter
        maxdepth = 1._r8
        do l = 1, ndecomp_pools
@@ -2840,7 +2840,7 @@ contains
           end do
        end do
        do l = 1, ndecomp_pools
-          do j = 1, nlevdecomp
+          do j = 1, nlev
              if ( zisoi(j) <= maxdepth ) then
                 do fc = 1,num_soilc
                    c = filter_soilc(fc)
@@ -2940,7 +2940,7 @@ contains
        end if
     end do
 
-    ! truncation carbon
+    ! truncation carbon of soil-layers
     do fc = 1,num_soilc
        c = filter_soilc(fc)
        this%ctrunc(c) = 0._r8
@@ -3417,7 +3417,7 @@ contains
             interpinic_flag='interp' , readvar=readvar, data=ptr1d)
     end if
 
-    if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
+    if (use_nitrif_denitrif .or. (use_pflotran .and. (pf_cmode .or. flag=='read'))) then
        ! smin_no3_vr
        if (use_vertsoilc) then
           ptr2d => this%smin_no3_vr(:,:)
@@ -3437,7 +3437,7 @@ contains
        end if
     end if
 
-    if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
+    if (use_nitrif_denitrif .or. (use_pflotran .and. (pf_cmode .or. flag=='read'))) then
        ! smin_nh4
        if (use_vertsoilc) then
           ptr2d => this%smin_nh4_vr(:,:)
@@ -3458,7 +3458,7 @@ contains
     end if
 
     ! pflotran: smin_nh4sorb
-    if (use_pflotran .and. pf_cmode) then
+    if (use_pflotran .and. (pf_cmode .or. flag=='read')) then
        if (use_vertsoilc) then
           ptr2d => this%smin_nh4sorb_vr(:,:)
           call restartvar(ncid=ncid, flag=flag, varname='smin_nh4sorb_vr', xtype=ncd_double, &
@@ -3519,7 +3519,7 @@ contains
        decomp_cascade_state = 0
     end if
     ! add info about the nitrification / denitrification state
-    if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
+    if (use_nitrif_denitrif .or. (use_pflotran .and. (pf_cmode .or. flag=='read'))) then
        decomp_cascade_state = decomp_cascade_state + 10
     end if
     if (flag == 'write') itemp = decomp_cascade_state    
@@ -3754,7 +3754,7 @@ contains
     end do
     
     ! for vertically-resolved soil biogeochemistry, calculate some diagnostics of carbon pools to a given depth
-    if ( nlevdecomp > 1) then
+    if ( nlev > 1) then
     
        do l = 1, ndecomp_pools
           do fc = 1,num_soilc
@@ -3766,7 +3766,7 @@ contains
        ! vertically integrate each of the decomposing n pools to 1 meter
        maxdepth = 1._r8
        do l = 1, ndecomp_pools
-          do j = 1, nlevdecomp
+          do j = 1, nlev
              if ( zisoi(j) <= maxdepth ) then
                 do fc = 1,num_soilc
                    c = filter_soilc(fc)
@@ -3881,7 +3881,7 @@ contains
        end do
     end do
     
-    ! total col_ntrunc
+    ! total col_ntrunc of soil-layers
     do fc = 1,num_soilc
        c = filter_soilc(fc)
        this%ntrunc(c) = 0._r8
@@ -6515,7 +6515,9 @@ contains
 
     ! clm_interface & pflotran
     !------------------------------------------------------------------------
-    if (use_pflotran .and. pf_cmode) then
+    ! when reading restFile, 'pf_cmode, pf_hmode' not yet set.
+    ! Then no matter what let it read, and if not defined/written, it should be OK!
+    if (use_pflotran .and. (pf_cmode .or. flag=='read')) then
        do k = 1, ndecomp_pools
           varname=trim(decomp_cascade_con%decomp_pool_name_restart(k))//'external_c'
           if (use_vertsoilc) then
@@ -6592,6 +6594,7 @@ contains
           end do
        endif
     endif
+
     nlev = nlevdecomp
     if (use_pflotran .and. pf_cmode) nlev = nlevdecomp_full
 
@@ -6649,14 +6652,14 @@ contains
        if (.not. (use_pflotran .and. pf_cmode)) then
        ! pflotran has returned 'hr_vr(begc:endc,1:nlevdecomp)' to ALM before this subroutine is called in CNEcosystemDynNoLeaching2
        ! thus 'hr_vr_col' should NOT be set to 0
-            this%hr_vr(c,1:nlevdecomp) = 0._r8
+            this%hr_vr(c,1:nlev) = 0._r8
        end if
     enddo
 
     ! vertically integrate HR and decomposition cascade fluxes
     do k = 1, ndecomp_cascade_transitions
 
-       do j = 1,nlevdecomp
+       do j = 1,nlev
           do fc = 1,num_soilc
              c = filter_soilc(fc)
        
@@ -6695,7 +6698,7 @@ contains
     ! total heterotrophic respiration, vertically resolved (HR)
 
     do k = 1, ndecomp_cascade_transitions
-       do j = 1,nlevdecomp
+       do j = 1,nlev
           do fc = 1,num_soilc
             c = filter_soilc(fc)
             this%hr_vr(c,j) = &
@@ -7360,6 +7363,7 @@ contains
 
     do fc = 1,num_soilc
        c = filter_soilc(fc)
+
        do l = 1, ndecomp_pools
           do j = 1, nlevdecomp_full
              ! for litter C pools
@@ -7402,6 +7406,10 @@ contains
 
              end if
 
+             if (abs(this%externalc_to_decomp_cpools(c,j,l))<=1.e-20_r8) then
+                 this%externalc_to_decomp_cpools(c,j,l) = 0._r8
+             end if
+
              ! the following is the net changes of plant C to decompible C poools between time-step
              ! in pflotran, decomposible C pools increments ARE from previous time-step (saved above);
              ! while, in CLM-CN all plant C pools are updated with current C fluxes among plant and ground/soil.
@@ -7409,12 +7417,9 @@ contains
              this%externalc_to_decomp_delta(c) = this%externalc_to_decomp_delta(c) - &
                                 this%externalc_to_decomp_cpools(c,j,l)*dzsoi_decomp(j)
 
-             if (abs(this%externalc_to_decomp_cpools(c,j,l))<=1.e-20_r8) then
-                 this%externalc_to_decomp_cpools(c,j,l) = 0._r8
-             end if
-
           end do
        end do
+
     end do
 
     ! change the sign so that it is the increments from the previous time-step (unit: from g/m2/s)
@@ -8452,7 +8457,9 @@ contains
     real(r8), pointer :: ptr1d(:)   ! temp. pointers for slicing larger arrays
     character(len=128):: varname    ! temporary
     !------------------------------------------------------------------------
-    if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
+    ! when reading restFile, 'pf_cmode' not yet set.
+    ! Then no matter what let it read, and if not defined/written, it should be OK!
+    if (use_nitrif_denitrif .or. (use_pflotran .and. (pf_cmode .or. flag=='read'))) then
        ! pot_f_nit_vr
        if (use_vertsoilc) then
           ptr2d => this%pot_f_nit_vr(:,:)
@@ -8490,7 +8497,9 @@ contains
        end if
     end if
 
-    if (use_pflotran .and. pf_cmode) then
+    ! when reading restFile, 'pf_cmode, pf_hmode' not yet set.
+    ! Then no matter what let it read, and if not defined/written, it should be OK!
+    if (use_pflotran .and. (pf_cmode .or. flag=='read')) then
        ! externaln_to_decomp_npools_col
        do k = 1, ndecomp_pools
           varname=trim(decomp_cascade_con%decomp_pool_name_restart(k))//'external_n'
@@ -8514,7 +8523,7 @@ contains
           end if
        end do
        !no3_net_transport_vr
-       if (.not.pf_hmode) then
+       if (.not.pf_hmode .or. flag=='read') then
           if (use_vertsoilc) then
              ptr2d => this%no3_net_transport_vr(:,:)
              call restartvar(ncid=ncid, flag=flag, varname='no3_net_transport_vr', xtype=ncd_double, &
@@ -9103,6 +9112,7 @@ contains
                this%plant_to_cwd_nflux(c) + &
                this%gap_mortality_n_to_cwdn(c,j)* dzsoi_decomp(j) + &
                this%fire_mortality_n_to_cwdn(c,j)* dzsoi_decomp(j)
+
        end do
     end do
 
@@ -9215,6 +9225,7 @@ contains
        this%denit(c)     = this%f_ngas_denit(c)
        this%f_n2o_nit(c) = this%f_ngas_decomp(c) + this%f_ngas_nitri(c)
     end do !fc = 1,num_soilc
+
     ! summarize at column-level vertically-resolved littering/removal for PFLOTRAN bgc input needs
     ! first it needs to save the total column-level N rate btw plant pool and decomposible pools at previous time step
     ! for adjusting difference when doing balance check
@@ -9284,6 +9295,10 @@ contains
              
              end if
 
+             if (abs(this%externaln_to_decomp_npools(c,j,l))<=1.e-21_r8) then
+                 this%externaln_to_decomp_npools(c,j,l) = 0._r8
+             end if
+
              ! the following is the net changes of plant N to decompible N poools between time-step
              ! in pflotran, decomposible N pools increments ARE from previous time-step (saved above);
              ! while, in CLM-CN all plant N pools are updated with current N fluxes among plant and ground/soil.
@@ -9291,10 +9306,6 @@ contains
              this%externaln_to_decomp_delta(c) =   &
                          this%externaln_to_decomp_delta(c) - &
                          this%externaln_to_decomp_npools(c,j,l)*dzsoi_decomp(j)
-
-             if (abs(this%externaln_to_decomp_npools(c,j,l))<=1.e-21_r8) then
-                 this%externaln_to_decomp_npools(c,j,l) = 0._r8
-             end if
           end do !l = 1, ndecomp_pools
        end do !j = 1, nlevdecomp_full
     end do !fc = 1,num_soilc
@@ -10062,7 +10073,9 @@ contains
     character(len=128) :: varname      ! temporary
     !------------------------------------------------------------------------
   
-    if (use_pflotran .and. pf_cmode) then
+    ! when reading restFile, 'pf_cmode, pf_hmode' not yet set.
+    ! Then no matter what let it read, and if not defined/written, it should be OK!
+    if (use_pflotran .and. (pf_cmode .or. flag=='read')) then
        ! externalp_to_decomp_ppools_col
        do k = 1, ndecomp_pools
           varname=trim(decomp_cascade_con%decomp_pool_name_restart(k))//'external_p'
@@ -10087,7 +10100,7 @@ contains
        end do
 
        !sminp_net_transport_vr
-       if (.not.pf_hmode) then
+       if (.not.pf_hmode .or. flag=='read') then
           if (use_vertsoilc) then
              ptr2d => this%sminp_net_transport_vr(:,:)
              call restartvar(ncid=ncid, flag=flag, varname='sminp_net_transport_vr', xtype=ncd_double, &

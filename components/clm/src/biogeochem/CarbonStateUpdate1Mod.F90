@@ -10,6 +10,7 @@ module CarbonStateUpdate1Mod
   use clm_time_manager        , only : get_step_size
   use decompMod               , only : bounds_type
   use clm_varpar              , only : ndecomp_cascade_transitions, nlevdecomp
+  use clm_varpar              , only : ndecomp_pools, nlevdecomp_full
   use clm_varpar              , only : i_met_lit, i_cel_lit, i_lig_lit, i_cwd
   use clm_varcon              , only : dzsoi_decomp
   use clm_varctl              , only : nu_com
@@ -74,6 +75,10 @@ contains
                - grc_cf%dwt_seedc_to_deadstem(g) * dt
        end do
 
+       ! when coupling with PFLOTRAN, the following are portions of (root-)literfalling into soil
+       ! as source/sink terms (ColumnDataType.F90::col_cf_summary_pf).
+       ! So, don't directly update organic cpools here.
+       if (.not.(use_pflotran .and. pf_cmode)) then
        do j = 1,nlevdecomp
           do fc = 1, num_soilc_with_inactive
              c = filter_soilc_with_inactive(fc)
@@ -89,6 +94,8 @@ contains
 
           end do
        end do
+       end if !if (.not.(use_pflotran .and. pf_cmode))
+
     end if
 
   end subroutine CarbonStateUpdateDynPatch

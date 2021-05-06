@@ -84,6 +84,10 @@ contains
                  - grc_nf%dwt_seedn_to_npool(g)    * dt
          end do
 
+         ! when coupling with PFLOTRAN, the following are portions of (root-)literfalling into soil
+         ! as source/sink terms (ColumnDataType.F90::col_nf_summaryint).
+         ! So, don't directly update organic npools here.
+         if (.not.(use_pflotran .and. pf_cmode)) then
          do j = 1,nlevdecomp
             do fc = 1, num_soilc_with_inactive
                c = filter_soilc_with_inactive(fc)
@@ -99,6 +103,7 @@ contains
 
             end do
          end do
+         end if !if (.not.(use_pflotran .and. pf_cmode))
       end if
 
     end associate
