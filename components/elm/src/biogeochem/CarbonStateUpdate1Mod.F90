@@ -11,6 +11,7 @@ module CarbonStateUpdate1Mod
   use elm_varcon              , only : dzsoi_decomp
   use elm_varctl              , only : nu_com, use_c13, use_c14
   use elm_varctl              , only : use_pflotran, pf_cmode, use_fates
+  use clm_varpar              , only : ndecomp_pools, nlevdecomp_full
   use pftvarcon               , only : npcropmin, nc3crop
   use CNDecompCascadeConType  , only : decomp_cascade_type
   use CNStateType             , only : cnstate_type
@@ -97,7 +98,13 @@ contains
              c14_col_cs%prod1c(c) = c14_col_cs%prod1c(c) + c14_col_cf%dwt_crop_productc_gain(c)*dt
           end if
 
+          ! when coupling with PFLOTRAN, the following are portions of (root-)literfalling into soil
+          ! as source/sink terms (ColumnDataType.F90::col_cf_summary_pf).
+          ! So, don't directly update organic cpools here.
+          if (.not.(use_pflotran .and. pf_cmode)) then
           do j = 1,nlevdecomp
+          do fc = 1, num_soilc_with_inactive
+             c = filter_soilc_with_inactive(fc)
 
              col_cs%decomp_cpools_vr(c,j,i_met_lit) = col_cs%decomp_cpools_vr(c,j,i_met_lit) + &
                   col_cf%dwt_frootc_to_litr_met_c(c,j) * dt
@@ -131,7 +138,9 @@ contains
              end if
 
           end do
-       end do
+          end do
+          end if !if (.not.(use_pflotran .and. pf_cmode))
+
     end if
 
   end subroutine CarbonStateUpdateDynPatch

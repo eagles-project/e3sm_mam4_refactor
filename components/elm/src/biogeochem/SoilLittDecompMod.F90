@@ -18,6 +18,7 @@ module SoilLittDecompMod
   use DecompCascadeBGCMod    , only : decomp_rate_constants_bgc
   use NitrifDenitrifMod    , only : nitrif_denitrif
   use VerticalProfileMod     , only : decomp_vertprofiles
+  use clm_varpar             , only : nlevdecomp_full
   use CNDecompCascadeConType , only : decomp_cascade_con
   use CNStateType            , only : cnstate_type
   !!  add phosphorus  -X. YANG
@@ -888,7 +889,7 @@ contains
 
    do fc = 1,num_soilc
       c = filter_soilc(fc)
-      do j = 1,nlevdecomp
+      do j = 1,nlevdecomp_full
          do k = 1, ndecomp_cascade_transitions
             decomp_cascade_ctransfer_vr(c,j,k) = 0._r8
             decomp_cascade_ntransfer_vr(c,j,k) = 0._r8
