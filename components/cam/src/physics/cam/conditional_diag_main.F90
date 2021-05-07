@@ -27,6 +27,7 @@ contains
 !======================================================
 subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_in )
 
+ !use time_manager,        only: get_nstep
   use ppgrid,              only: pcols
   use cam_history_support, only: max_fieldname_len
   use cam_history,         only: outfld
@@ -46,9 +47,10 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   type(physics_buffer_desc), pointer :: pbuf(:)
   type(cam_in_t),         intent(in) :: cam_in
 
-  integer :: ncnd, nphysproc, nqoi
+  integer :: ncnd, nchkpt, nqoi
   integer :: icnd, ichkpt, ii, iqoi
   integer :: ncol, lchnk
+ !integer :: nstep
 
   real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old(:,:)
   real(r8),allocatable :: new(:,:)
@@ -69,7 +71,8 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   !=======================================
   ! First check if this checkpoint is active for QoI monitoring
 
-  ichkpt = 0  ! 0 = inactive; this is the default
+  ichkpt = 0  ! 0 = checkpoint inactive; this is the default
+
   do ii = 1,nchkpt
      if ( trim(cnd_diag_info%chkpt_name(ii)) == trim(this_chkpt) ) then 
         ichkpt = ii
@@ -120,12 +123,15 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
            inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
            old => diag%cnd(icnd)%qoi(iqoi)% old
 
+          !if (.not.is_firststep)& 
            inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
+
            old(1:ncol,:) = new(1:ncol,:)
 
-           ! Save increments for other metrics; update "old" value
+           ! Save increments for other sampling conditions; update "old" value
 
            do icnd = 2,ncnd
+             !if (.not.is_firststep)& 
               diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
               diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:)        = new(1:ncol,:)
            end do
@@ -163,26 +169,31 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
         !--------------------------------------
         where(flag.eq.OFF)  metric = FILLVALUE
 
-        !--------------------------------------------
-        ! Send both metric and flag values to output
-        !--------------------------------------------
+        !----------------------------------------------------
+        ! Send both metric and flag values to history buffer
+        !----------------------------------------------------
         call get_metric_and_flag_names_for_output( icnd, cnd_diag_info, metric_name_out, flag_name_out )
 
         call outfld( trim(metric_name_out), metric, pcols, lchnk )
         call outfld( trim(flag_name_out),     flag, pcols, lchnk )
 
-     end if
-  end do
+     end if !right chkpt
+  end do    !icnd
 
   !-------------------------------------------------------------------------------
-  ! Apply conditional sampling, then send values to output
+  ! Apply conditional sampling, then send QoIs to history buffer
   !-------------------------------------------------------------------------------
   do icnd = 1,ncnd
 
-     ! Check if conditional sampling needs to be applied at this checkpoint.
+     ! Check if conditional sampling needs to be completed at this checkpoint.
      ! The answer could be .t. for multiple icnd values
 
      if (trim(cnd_diag_info% sample_after(icnd)).eq.trim(this_chkpt)) then 
+
+        ! Each sampling condition has its own flags that will be applied
+        ! to all QoIs and checkpoints
+
+        flag => diag%cnd(icnd)%flag
 
         !----------------------------------------------------------------
         ! Apply conditional sampling to QoIs (and/or their increments),
@@ -190,7 +201,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
         ! different actions are taken depending on the vertical 
         ! dimension sizes of the metric and the QoIs.
         !----------------------------------------------------------------
-        ! QoI values
+        ! Apply to QoI values
 
         if (cnd_diag_info%l_output_state) then        
            do iqoi = 1,nqoi
@@ -252,10 +263,8 @@ subroutine apply_masking( flag, array )
     elseif (flag_nver == 1 .and. array_nver > 1) then 
     ! apply the same masking to all vertical levels
 
-       do ichkpt = 1,nchkpt
-       do kk  = 1,array_nver
-          where(flag(:,1).eq.OFF) array(:,kk,ichkpt) = FILLVALUE 
-       end do
+       do icol = 1,pcols
+          if (flag(icol,1).eq.OFF) array(icol,:,:) = FILLVALUE
        end do
 
     elseif (flag_nver > 1 .and. array_nver == 1) then
@@ -310,11 +319,17 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in )
   case('V')
      arrayout(1:ncol,:) = state%v(1:ncol,:)
 
+  case('OMEGA')
+     arrayout(1:ncol,:) = state%omega(1:ncol,:)
+
   case('PMID')
      arrayout(1:ncol,:) = state%pmid(1:ncol,:)
 
   case('PINT')
      arrayout(1:ncol,:) = state%pint(1:ncol,:)
+
+  case('ZM')
+     arrayout(1:ncol,:) = state%zm(1:ncol,:)
 
   case('ZI')
      arrayout(1:ncol,:) = state%zi(1:ncol,:)

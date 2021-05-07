@@ -247,6 +247,9 @@ subroutine conditional_diag_readnl(nlfile)
       end do
       nchkpt = ii
 
+      if (nqoi==0) nchkpt = 0 ! If user did not specify any QoI, set nchkpt to 0 for consistency
+      if (nchkpt==0) nqoi = 0 ! If user did not specify any checkpoint for QoI monitoring, set nqoi to 0 for consistency
+
    end if ! masterproc
    !--------------------------------------
 
