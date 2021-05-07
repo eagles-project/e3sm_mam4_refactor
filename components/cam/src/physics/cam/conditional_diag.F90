@@ -48,11 +48,21 @@ module conditional_diag
   !-------------------------------------------------------------------------------
   type cnd_diag_info_t
 
-    ! Do we want to write out the field value after different physical processes?
+    ! Do we want to write out the QoIs?
     logical :: l_output_state = .false.
 
-    ! Do we want to write out increments caused by different physicall processes? 
+    ! Do we want to write out increments of the QoIs? 
     logical :: l_output_incrm = .false.
+
+    ! Which history tape (1-6) should contain a complete set of the conditional diagnostics?
+    ! Note: we allow the user to specify multiple history tapes that will contain all output variables 
+    ! associated with the conditional diagnostics. It is envisioned that these multiple history 
+    ! tapes might have different output frequencies and averaging flags. In addition,
+    ! the user can manually add or remove individual variables using fincl or fexcl, 
+    ! just as is the case for all other variables on the master list.
+
+    integer,allocatable :: hist_tape_with_all_output(:)  ! tape indices
+    integer             :: ntape                         ! number of tapes
 
     ! Sampling conditions. 
     ! The current implementation allows the user to define multiple conditions,
@@ -135,6 +145,7 @@ contains
 !===============================================================================
 subroutine conditional_diag_readnl(nlfile)
 
+   use cam_history_support,only: ptapes
    use infnan,          only: nan, assignment(=), isnan
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
@@ -162,9 +173,11 @@ subroutine conditional_diag_readnl(nlfile)
    integer                         :: qoi_nver (nqoi_max)
 
    logical :: l_output_state, l_output_incrm
+   integer :: hist_tape_with_all_output(ptapes)  ! tape indices
+   integer :: ntape
 
    ! other misc local variables
-   integer :: ncnd, nchkpt, nqoi
+   integer :: ncnd, nchkpt, nqoi, ntape
 
    integer :: ii
 
@@ -172,7 +185,8 @@ subroutine conditional_diag_readnl(nlfile)
    namelist /conditional_diag_nl/  &
             metric_name, metric_nver, metric_cmpr_type, metric_threshold, metric_tolerance, &
             eval_after, sample_after, & 
-            chkpt_name, qoi_name, qoi_nver, l_output_state, l_output_incrm
+            chkpt_name, qoi_name, qoi_nver, &
+            l_output_state, l_output_incrm, hist_tape_with_all_output
 
    !----------------------------------------
    !  Default values
@@ -192,6 +206,7 @@ subroutine conditional_diag_readnl(nlfile)
 
    l_output_state = .false.
    l_output_incrm = .false.
+   hist_tape_with_all_output = -1
 
    !----------------------------------------
    ! Read namelist and check validity
@@ -212,8 +227,8 @@ subroutine conditional_diag_readnl(nlfile)
       end if
       close(unitn)
 
-      !--------------------------------------------------------------------
-      ! Count user-specified sampling conditions, then do some sanity check
+      !------------------------------------------
+      ! Count user-specified sampling conditions
 
       ii = 0
       do while ( (ii+1) <= ncnd_max .and. metric_name(ii+1) /= ' ')
@@ -221,34 +236,67 @@ subroutine conditional_diag_readnl(nlfile)
       end do
       ncnd = ii
 
-      if (any( metric_nver     (1:ncnd) <= 0   )) call endrun(subname//' error: need positive metric_nver for each metric_name')
-      if (any( metric_cmpr_type(1:ncnd) == -99 )) call endrun(subname//' error: need valid metric_cmpr_type for each metric_name')
-      if (any( isnan(metric_threshold(1:ncnd)) )) call endrun(subname//' error: need valid metric_threshold for each metric_name')
-      if (any( eval_after      (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify eval_after for each metric_name')
-      if (any( sample_after    (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify sample_after for each metric_name')
+      !----------------------------------------------------------------------
+      ! If no condition has been specified, set the other counts to zero
+      !----------------------------------------------------------------------
+      if (ncnd==0) then
 
-      !-------------------------------------------------------
-      ! Count QoIs to be monitored, then do some sanity check
+         nqoi   = 0
+         nchkpt = 0
+         ntape  = 0
 
-      ii = 0
-      do while ( (ii+1) <= nqoi_max .and. qoi_name(ii+1) /= ' ')
-         ii = ii + 1
-      end do
-      nqoi = ii
+      !----------------------------------------------------------------------
+      ! If at least one condition has been sepecified, do some sanity check, 
+      ! then parse additional namelist settings
+      !----------------------------------------------------------------------
+      else
 
-      if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
+         if (any( metric_nver     (1:ncnd) <= 0   )) call endrun(subname//' error: need positive metric_nver for each metric_name')
+         if (any( metric_cmpr_type(1:ncnd) == -99 )) call endrun(subname//' error: need valid metric_cmpr_type for each metric_name')
+         if (any( isnan(metric_threshold(1:ncnd)) )) call endrun(subname//' error: need valid metric_threshold for each metric_name')
+         if (any( eval_after      (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify eval_after for each metric_name')
+         if (any( sample_after    (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify sample_after for each metric_name')
 
-      !--------------------------
-      ! Count active checkpoints 
+         !-------------------------------------------------------
+         ! Count QoIs to be monitored, then do some sanity check
 
-      ii = 0
-      do while ( (ii+1) <= nchkpt_max .and. chkpt_name(ii+1) /= ' ')
-         ii = ii + 1
-      end do
-      nchkpt = ii
+         ii = 0
+         do while ( (ii+1) <= nqoi_max .and. qoi_name(ii+1) /= ' ')
+            ii = ii + 1
+         end do
+         nqoi = ii
 
-      if (nqoi==0) nchkpt = 0 ! If user did not specify any QoI, set nchkpt to 0 for consistency
-      if (nchkpt==0) nqoi = 0 ! If user did not specify any checkpoint for QoI monitoring, set nqoi to 0 for consistency
+         if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
+
+         !--------------------------
+         ! Count active checkpoints 
+
+         ii = 0
+         do while ( (ii+1) <= nchkpt_max .and. chkpt_name(ii+1) /= ' ')
+            ii = ii + 1
+         end do
+         nchkpt = ii
+
+         if (nqoi==0) nchkpt = 0 ! If user did not specify any QoI, set nchkpt to 0 for consistency
+         if (nchkpt==0) nqoi = 0 ! If user did not specify any checkpoint for QoI monitoring, set nqoi to 0 for consistency
+
+         !---------------------------------------------------------------------------------
+         ! Count history tapes that will each contain a full suite of the output variables
+
+         ii = 0
+         do while ( (ii+1) <= ptapes .and. hist_tape_with_all_output(ii+1) >= 0)
+            ii = ii + 1
+         end do
+         ntape = ii
+
+         ! If the user did not specify any tape, then at least add the output variables to h0
+
+         if (ntape==0) then
+            ntape = 1
+            hist_tape_with_all_output(ntape) = 1
+         end if
+
+      end if ! ncnd = 0 or > 0
 
    end if ! masterproc
    !--------------------------------------
@@ -257,6 +305,7 @@ subroutine conditional_diag_readnl(nlfile)
    call mpibcast(ncnd,   1, mpiint, 0, mpicom)
    call mpibcast(nqoi,   1, mpiint, 0, mpicom)
    call mpibcast(nchkpt, 1, mpiint, 0, mpicom)
+   call mpibcast(ntape,  1, mpiint, 0, mpicom)
 #endif
 
    cnd_diag_info%ncnd = ncnd
@@ -291,6 +340,8 @@ subroutine conditional_diag_readnl(nlfile)
 
    call mpibcast(l_output_state, 1, mpilog, 0, mpicom)
    call mpibcast(l_output_incrm, 1, mpilog, 0, mpicom)
+
+   call mpibcast(hist_tape_with_all_output, ptapes, mpiint, 0, mpicom)
 #endif
 
    !-------------------------------------------
@@ -352,10 +403,14 @@ subroutine conditional_diag_readnl(nlfile)
       cnd_diag_info% chkpt_name(ii) = trim(adjustl(chkpt_name(ii)))
    end do
 
-   ! output to history file(s)
+   ! output to history tape(s)
 
    cnd_diag_info%l_output_state = l_output_state
    cnd_diag_info%l_output_incrm = l_output_incrm
+
+   allocate( cnd_diag_info% hist_tape_with_all_output(ntape), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% hist_tape_with_all_output')
+   cnd_diag_info% hist_tape_with_all_output(1:ntape) = hist_tape_with_all_output(1:ntape)
 
    !-----------------------------------------------
    ! Send information to log file
@@ -398,6 +453,7 @@ subroutine conditional_diag_readnl(nlfile)
       write(iulog,*)' l_output_state = ',l_output_state
       write(iulog,*)' l_output_incrm = ',l_output_incrm
       write(iulog,*)
+      write(iulog,'(a,i3)')' hist_tape_with_all_output = ',hist_tape_with_all_output
       write(iulog,*)'==========================================================='
       write(iulog,*)
 

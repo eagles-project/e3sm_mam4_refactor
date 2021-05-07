@@ -41,7 +41,7 @@ contains
   integer :: dimids_local(4)
   character(len=256) :: pname  !variable name in restart file
 
-  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
+  integer :: ncnd, nchkpt, nqoi, icnd, ichkpt, iqoi, nver
   character(len=*),parameter :: subname = 'cnd_diag_init_restart'
 
   if (cnd_diag_info%ncnd <= 0 ) return
@@ -64,7 +64,7 @@ contains
   ! and end of each run instead of each time step?)
 
   ncnd  = cnd_diag_info%ncnd
-  nphys = cnd_diag_info%nphysproc
+  nchkpt = cnd_diag_info%nchkpt
   nqoi  = cnd_diag_info%nqoi
 
   allocate( cnd_metric_desc(ncnd) )
@@ -72,8 +72,8 @@ contains
 
   if (nqoi>0) then
      allocate( cnd_qoi_old_desc(nqoi,ncnd) )
-     allocate( cnd_qoi_val_desc(nphys,ncnd,nqoi) )
-     allocate( cnd_qoi_inc_desc(nphys,ncnd,nqoi) )
+     allocate( cnd_qoi_val_desc(nchkpt,ncnd,nqoi) )
+     allocate( cnd_qoi_inc_desc(nchkpt,ncnd,nqoi) )
   end if
 
   !-----------------------------------------------------------
@@ -136,25 +136,25 @@ contains
         call endrun(subname//': check cnd_diag_info%qoi_nver')
      end if
 
-     ! Add to the restart file the variables containing field values after various physics processes
+     ! Add to the restart file the variables containing QoIs at various checkpoints 
 
      if (cnd_diag_info%l_output_state) then
         do icnd = 1,ncnd
-         do iphys = 1,nphys
-            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
-            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_val_desc(iphys,icnd,iqoi))
+         do ichkpt = 1,nchkpt
+            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_',ichkpt
+            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_val_desc(ichkpt,icnd,iqoi))
          end do
         end do
      end if
 
-     ! Add to the restart file the variables containing increments associated with various physics processes
+     ! Add to the restart file the variables containing increments at various checkpoints 
 
      if (cnd_diag_info%l_output_incrm) then
 
         do icnd = 1,ncnd
-         do iphys = 1,nphys
-            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
-            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_inc_desc(iphys,icnd,iqoi))
+         do ichkpt = 1,nchkpt
+            write(pname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',ichkpt
+            ierr = pio_def_var(File, trim(pname), pio_double, dimids_local(1:ndims), cnd_qoi_inc_desc(ichkpt,icnd,iqoi))
          end do
         end do
 
@@ -217,7 +217,7 @@ contains
 
   integer :: ierr
   integer :: lchnk,ncol
-  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
+  integer :: ncnd, nchkpt, nqoi, icnd, ichkpt, iqoi, nver
   character(len=*),parameter :: subname = 'cnd_write_init_restart'
 
   real(r8):: tmpfield_2d_1(pcols, begchunk:endchunk)
@@ -233,7 +233,7 @@ contains
   ! Gather dimension info and save in local variables
   !---------------------------------------------------------------
   ncnd  = cnd_diag_info%ncnd
-  nphys = cnd_diag_info%nphysproc
+  nchkpt = cnd_diag_info%nchkpt
   nqoi  = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
@@ -330,14 +330,14 @@ contains
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,1,iphys)
+                 tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,1,ichkpt)
               end do
 
-              call pio_write_darray(File, cnd_qoi_val_desc(iphys,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
+              call pio_write_darray(File, cnd_qoi_val_desc(ichkpt,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
 
            end do
            end do
@@ -351,18 +351,18 @@ contains
 
            do icnd = 1,ncnd
 
-              ! increments corresponding to various physical processes
+              ! increments corresponding to various checkpoints 
 
-              do iphys = 1,nphys
+              do ichkpt = 1,nchkpt
 
                  do lchnk = begchunk, endchunk
                     ncol = chunk_ncols(lchnk)
-                    tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,1,iphys)
+                    tmpfield_2d_1(:ncol,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,1,ichkpt)
                  end do
 
-                 call pio_write_darray(File, cnd_qoi_inc_desc(iphys,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
+                 call pio_write_darray(File, cnd_qoi_inc_desc(ichkpt,icnd,iqoi), iodesc, tmpfield_2d_1, ierr)
 
-              end do !iphys
+              end do !ichkpt
 
               ! the "old" values
  
@@ -398,15 +398,15 @@ contains
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,:,iphys)
+                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:ncol,:,ichkpt)
               end do
 
               call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
-                                              tmpfield_3d_1, cnd_qoi_val_desc(iphys,icnd,iqoi)            )
+                                              tmpfield_3d_1, cnd_qoi_val_desc(ichkpt,icnd,iqoi)            )
 
            end do
            end do
@@ -418,18 +418,18 @@ contains
         !-------------------------------------------------------------------
         if (cnd_diag_info%l_output_incrm) then
 
-           ! increments associated with various physical processes 
+           ! increments associated with various checkpoints 
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
               do lchnk = begchunk, endchunk
                  ncol = chunk_ncols(lchnk)
-                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,:,iphys)
+                 tmpfield_3d_1(:ncol,:,lchnk) = phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:ncol,:,ichkpt)
               end do
 
               call cam_grid_write_dist_array( File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), &
-                                              tmpfield_3d_1, cnd_qoi_inc_desc(iphys,icnd,iqoi)            )
+                                              tmpfield_3d_1, cnd_qoi_inc_desc(ichkpt,icnd,iqoi)            )
 
            end do
            end do
@@ -511,7 +511,7 @@ contains
 
   integer :: ierr
   integer :: lchnk
-  integer :: ncnd, nphys, nqoi, icnd, iphys, iqoi, nver
+  integer :: ncnd, nchkpt, nqoi, icnd, ichkpt, iqoi, nver
 
   real(r8) :: tmpfield_2d(pcols, begchunk:endchunk)
   real(r8), allocatable :: tmpfield_3d(:,:,:)
@@ -528,7 +528,7 @@ contains
   ! Gather dimension info and save in local variables
   !---------------------------------------------------------------
   ncnd  = cnd_diag_info%ncnd
-  nphys = cnd_diag_info%nphysproc
+  nchkpt = cnd_diag_info%nchkpt
   nqoi  = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
@@ -644,14 +644,14 @@ contains
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_',ichkpt
               ierr = pio_inq_varid(File, trim(varname), vardesc)
               call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,1,iphys) = tmpfield_2d(:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,1,ichkpt) = tmpfield_2d(:,lchnk)
               end do
 
            end do
@@ -666,19 +666,19 @@ contains
 
            do icnd = 1,ncnd
 
-              ! increments corresponding to various physical processes
+              ! increments corresponding to various checkpoints
 
-              do iphys = 1,nphys
+              do ichkpt = 1,nchkpt
 
-                 write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
+                 write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',ichkpt
                  ierr = pio_inq_varid(File, trim(varname), vardesc)
                  call pio_read_darray(File, vardesc, iodesc, tmpfield_2d, ierr)
 
                  do lchnk = begchunk,endchunk
-                    phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,1,iphys) = tmpfield_2d(:,lchnk)
+                    phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,1,ichkpt) = tmpfield_2d(:,lchnk)
                  end do
 
-              end do !iphys
+              end do !ichkpt
 
               ! the "old" values
  
@@ -714,15 +714,15 @@ contains
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_val',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_',ichkpt
               ierr = pio_inq_varid(File, trim(varname), vardesc)
 
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% val(:,:,ichkpt) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do
@@ -735,18 +735,18 @@ contains
         !-------------------------------------------------------------------
         if (cnd_diag_info%l_output_incrm) then
 
-           ! increments associated with various physical processes 
+           ! increments associated with various checkpoints 
 
            do icnd = 1,ncnd
-           do iphys = 1,nphys
+           do ichkpt = 1,nchkpt
 
-              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',iphys
+              write(varname,'(3(a,i2.2))') 'cnd',icnd, '_qoi',iqoi, '_inc',ichkpt
               ierr = pio_inq_varid(File, trim(varname), vardesc)
 
               call cam_grid_read_dist_array(File, physgrid, arry_dims(1:3), file_dims(1:file_nhdims+1), tmpfield_3d, vardesc)
 
               do lchnk = begchunk,endchunk
-                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,:,iphys) = tmpfield_3d(:,:,lchnk)
+                 phys_diag(lchnk)%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt) = tmpfield_3d(:,:,lchnk)
               end do
 
            end do

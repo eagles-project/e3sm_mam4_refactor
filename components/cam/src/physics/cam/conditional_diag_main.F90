@@ -209,7 +209,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
               call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val ) 
   
               do ii = 1,nchkpt
-                 call get_fld_name_for_output( '_val', cnd_diag_info, icnd, iqoi, ii, outfldname)
+                 call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ii, outfldname)
                  call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ii), pcols, lchnk )
               end do
 

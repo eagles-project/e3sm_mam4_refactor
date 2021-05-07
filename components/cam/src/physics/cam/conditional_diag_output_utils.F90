@@ -7,10 +7,10 @@ module conditional_diag_output_utils
 ! addfld and add_default calls to register output
 ! variables during model initialization.
 ! The outfld calls can be found in module 
-! conditional_diag_main, subroutine xxx.
+! conditional_diag_main.
 !
 ! History:
-!  First version by Hui Wan, PNNL, March-April 2021
+!  First version by Hui Wan, PNNL, March-May 2021
 !-------------------------------------------------
   use cam_abortutils, only: endrun
 
@@ -22,28 +22,30 @@ module conditional_diag_output_utils
 contains
 
 subroutine conditional_diag_output_init(pver, cnd_diag_info)
-!----------------------------------------------------------------------- 
+!----------------------------------------------------------------------------------- 
 ! 
-! Purpose: Register variables related to conditional diagnostics for output
+! Purpose: Register variables related to conditional diagnostics for history output
 !
 ! Method: (1) Add variables to the master field list by doing addfld calls
 !         (2) Add variables, by default, to the first history tape (h0 files)
 !             by doing add_default calls.
 !         These two things are done for each sampling condition. 
 !         Registered output variables include, for each condition,
-!          - the metric used for sampling,
-!          - the flag resulting from conditional sampling,
-!          - the various diagnostic variables to which the conditional sampling
-!            is applied. Per user's choice, these diagnostics (and their increments
-!            if requested) are written out after various physical processes.
-!-----------------------------------------------------------------------
+!          - the metric used for evaluating sampling condition,
+!          - the flag field resulting from evaluating sampling condition,
+!          - the various QoIs (and their increments if requested) to which 
+!            the conditional sampling is applied. Per user's choice, 
+!            these QoIs and increments might be monitored at various checkpoints
+!            in each time step.
+!-----------------------------------------------------------------------------------
   use cam_history,         only: addfld, horiz_only, add_default
   use cam_history_support, only: max_fieldname_len
 
   integer,intent(in) :: pver
   type(cnd_diag_info_t), intent(in) :: cnd_diag_info
 
-  integer          :: icnd, iqoi, iphys, ii
+  integer          :: ntape,itape
+  integer          :: icnd, iqoi, ichkpt, ii
   character(len=4) :: val_inc_suff(2), suff
   logical          :: l_output(2)
 
@@ -56,13 +58,15 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
 
   if (cnd_diag_info%ncnd==0) return
 
-  ! Loop through all sampling conditions. Each of then will have
-  ! its out set of output variables identified by the prefix cndxx_
+  ntape = cnd_diag_info%ntape
+
+  ! Loop through all sampling conditions. Each of them will have
+  ! its own set of output variables distinguished by the prefix cndxx_
 
   do icnd = 1,cnd_diag_info%ncnd
 
      !-------------------------------------------------------
-     ! Register the sampling metric and the flag
+     ! Register the sampling metric and the flag field
      !-------------------------------------------------------
      call get_metric_and_flag_names_for_output( icnd, cnd_diag_info, &!in
                                                 output_fld_name,     &!out
@@ -93,13 +97,14 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
        call endrun(subname//': invalid number of vertical levels for metric '//trim(cnd_diag_info%metric_name(icnd)))
      end if 
 
-     ! Add the 2 variables to the first history tape (i.e., the h0 file)
-     ! so that the user does not need to explicit request them via namelist.
+     ! Add the variable to user-specified history tapes.
      ! The 3 arguments of an add_default call are (1) variable name, (2) hist. tape index,
      ! and (3) hist. averaging flag
 
-     call add_default(trim(output_fld_name ),1,' ')  
-     call add_default(trim(output_fld_name2),1,' ')
+     do itape = 1,ntape
+        call add_default(trim(output_fld_name ), cnd_diag_info%hist_tape_with_all_output(itape), ' ')  
+        call add_default(trim(output_fld_name2), cnd_diag_info%hist_tape_with_all_output(itape), ' ')
+     end do
 
      !-------------------------------------------------------------------
      ! Register the diagnostics fields and their increments 
@@ -112,7 +117,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
      ! In terms of variable names in the output files, the values and 
      ! increments of a field are distinguished by different suffixes
 
-     val_inc_suff = (/"_val","_inc"/)
+     val_inc_suff = (/"","_inc"/)
 
      do ii = 1,2 ! field value (state) or increment
 
@@ -120,14 +125,14 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
         suff = val_inc_suff(ii)
 
         do iqoi  = 1,cnd_diag_info%nqoi
-        do iphys = 1,cnd_diag_info%nphysproc
+        do ichkpt = 1,cnd_diag_info%nchkpt
 
            call get_fld_name_for_output( suff, cnd_diag_info, &! in
-                                         icnd, iqoi, iphys,   &! in
+                                         icnd, iqoi, ichkpt,  &! in
                                          output_fld_name      )! out
 
            call get_fld_longname_for_output( suff, cnd_diag_info, &! in
-                                             icnd, iqoi, iphys,   &! in
+                                             icnd, iqoi, ichkpt,  &! in
                                              fld_long_name        )! out
 
            ! Add the variable to the master list of possible output variables.
@@ -148,14 +153,15 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
               call endrun(subname//': invalid number of vertical levels for '//cnd_diag_info%qoi_name(iqoi))
            end if
 
-           ! Add the variable to the first history tape (i.e., the h0 file)
-           ! so that the user does not need to explicit request it via namelist.
+           ! Add the variable to user-specified history tapes.
            ! The 3 arguments of an add_default call are (1) variable name, (2) hist. tape index,
            ! and (3) hist. averaging flag
 
-           call add_default(trim(output_fld_name),1,' ')
+           do itape = 1,ntape
+              call add_default(trim(output_fld_name ), cnd_diag_info%hist_tape_with_all_output(itape), ' ')  
+           end do
 
-        end do ! iphys
+        end do ! ichkpt
         end do ! iqoi
 
      end do ! ii = 1,2, field value (state) or tendency
@@ -187,14 +193,14 @@ end subroutine get_metric_and_flag_names_for_output
 
 !======================================================
 subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
-                                    icnd, iqoi, iphys,      &!in
+                                    icnd, iqoi, ichkpt,     &!in
                                     fld_name_in_output      )!out
 
    use cam_history_support, only: max_fieldname_len
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
-   integer,               intent(in)  :: icnd, iqoi, iphys
+   integer,               intent(in)  :: icnd, iqoi, ichkpt
 
    character(len=max_fieldname_len),intent(out) :: fld_name_in_output 
 
@@ -204,20 +210,20 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
 
    fld_name_in_output = 'cnd'//icnd_str//'_'// &
                         trim(cnd_diag_info%qoi_name(iqoi))//'_'// &
-                        trim(cnd_diag_info%physproc_name(iphys))//suff
+                        trim(cnd_diag_info%chkpt_name(ichkpt))//suff
 
 end subroutine get_fld_name_for_output 
 
 !======================================================
 subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
-                                        icnd, iqoi, iphys,      &!in
+                                        icnd, iqoi, ichkpt,      &!in
                                         fld_long_name_in_output )!out
 
    use cam_history_support, only: max_fieldname_len
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
-   integer,               intent(in)  :: icnd, iqoi, iphys
+   integer,               intent(in)  :: icnd, iqoi, ichkpt
 
    character(len=256),intent(out)     :: fld_long_name_in_output 
 
@@ -226,7 +232,7 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
    write(icnd_str,'(i2.2)') icnd
 
    fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//suff// &
-                             ' at '//trim(cnd_diag_info%physproc_name(iphys))// &
+                             ' at '//trim(cnd_diag_info%chkpt_name(ichkpt))// &
                              ' sampled under condition '//icnd_str// &
                              ' ('//trim(cnd_diag_info%metric_name(icnd))//')' 
 
