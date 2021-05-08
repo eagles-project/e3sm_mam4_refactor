@@ -1269,18 +1269,33 @@ Different metrics can have different thresholds.
 Default: none
 </entry>
 
-<entry id="sample_after" type="char*8(10)"  category="history"
+<entry id="metric_tolerance" type="real(10)"  category="history"
        group="conditional_diag_nl" valid_values="" >
-List of atmospheric processes after which conditional sampling
-will be applied. The number of process names specified here
+Tolerance for the "equal to" comparison type.
+Default: none
+</entry>
+
+<entry id="cnd_eval_chkpt" type="char*8(10)"  category="history"
+       group="conditional_diag_nl" valid_values="" >
+A List. Each element specifies the checkpoint at which the 
+corresponding conditional sampling criterion
+will be evaluated. The number of checkpoints specified here
 should match the number of non-empty elements in metric_name;
 Default: none
 </entry>
 
-<entry id="physproc_name" type="char*8(100)"  category="history"
+<entry id="cnd_end_chkpt" type="char*8(10)"  category="history"
        group="conditional_diag_nl" valid_values="" >
-Labels of physical processes to which conditional sampling
-will be applied.
+A List. Each element specifies the checkpoint that marks the end 
+of the time step of the corresponding sampling condition.
+At this checkpoint, the masking of QoIs will be done
+and the masked values will be send to history buffer.
+Default: none
+</entry>
+
+<entry id="qoi_chkpt" type="char*8(99)"  category="history"
+       group="conditional_diag_nl" valid_values="" >
+Checkpoints at which QoIs will be monitored.
 Default: none
 </entry>
 
@@ -1307,6 +1322,13 @@ Default: none
        group="conditional_diag_nl" valid_values="" >
 Whether the increments of the above-specified fields will be written
 to history file(s).
+Default: none
+</entry>
+
+<entry id="hist_tape_with_all_output" type="integer(12)"  category="history"
+       group="conditional_diag_nl" valid_values="" >
+Indices of history tapes that will each contain a whole suite of the output
+variables specific to the conditional diagnostics tool.
 Default: none
 </entry>
 

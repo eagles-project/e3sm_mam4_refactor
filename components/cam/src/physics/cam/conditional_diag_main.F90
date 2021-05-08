@@ -57,6 +57,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
 
   character(len=max_fieldname_len) :: outfldname, flag_name_out, metric_name_out
 
+  !---------------------------------------------------------------------------
   if (cnd_diag_info%ncnd == 0) return  ! no conditional diagnostics requested 
 
   ncnd   = cnd_diag_info%ncnd
@@ -85,7 +86,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   ! This checkpoint is active for QoI monitoring. Obtain the QoI values 
   ! (and their increments if needed), and save to variable "diag". 
   ! Note that here we only obtain and save the QoIs. 
-  ! Conditional sampling won't be applied until the "sample_after" checkpoint
+  ! Conditional sampling won't be applied until the "cnd_end_chkpt" checkpoint
   !---------------------------------------------------------------------------
      do iqoi = 1,nqoi
 
@@ -152,7 +153,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
      ! Check if sampling condition needs to be evaluated at this checkpoint.
      ! The answer could be .t. for multiple icnd values
 
-     if (trim(cnd_diag_info% eval_after(icnd)) .eq. trim(this_chkpt)) then 
+     if (trim(cnd_diag_info% cnd_eval_chkpt(icnd)) .eq. trim(this_chkpt)) then 
 
         !---------------------------------
         ! Get metric values and set flags 
@@ -188,7 +189,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
      ! Check if conditional sampling needs to be completed at this checkpoint.
      ! The answer could be .t. for multiple icnd values
 
-     if (trim(cnd_diag_info% sample_after(icnd)).eq.trim(this_chkpt)) then 
+     if (trim(cnd_diag_info% cnd_end_chkpt(icnd)).eq.trim(this_chkpt)) then 
 
         ! Each sampling condition has its own flags that will be applied
         ! to all QoIs and checkpoints
@@ -231,7 +232,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
            end do
         end if
 
-     end if  !trim(this_chkpt).eq.trim(cnd_diag_info% sample_after(icnd))
+     end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
 
 end subroutine conditional_diag_cal_and_output

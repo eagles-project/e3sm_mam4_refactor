@@ -99,7 +99,7 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
    use scamMod,          only: single_column
    use cam_pio_utils,    only: init_pio_subsystem
    use cam_instance,     only: inst_suffix
-   use conditional_diag, only: cnd_diag_info, conditional_diag_alloc
+   use conditional_diag, only: cnd_diag_info, cnd_diag_alloc
 
 #if ( defined SPMD )   
    real(r8) :: mpi_wtime  ! External
@@ -167,7 +167,7 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
 
       ! Allocate memory for conditional sampling and diagnostics
       ! (when nsrest /= 0, the call is placed inside cam_read_restart)
-      call conditional_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
+      call cnd_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
 
    else
 

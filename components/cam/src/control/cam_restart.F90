@@ -302,7 +302,7 @@ end subroutine restart_printopts
       use time_manager,     only: timemgr_read_restart, timemgr_restart
       use filenames,        only: caseid, brnch_retain_casename
       use ref_pres,         only: ref_pres_init
-      use conditional_diag, only: cnd_diag_t, cnd_diag_info, conditional_diag_alloc
+      use conditional_diag, only: cnd_diag_t, cnd_diag_info, cnd_diag_alloc
 
 !
 !-----------------------------------------------------------------------
@@ -405,7 +405,7 @@ end subroutine restart_printopts
    call hub2atm_alloc( cam_in )
    call atm2hub_alloc( cam_out )
 
-   call conditional_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
+   call cnd_diag_alloc(phys_diag, begchunk, endchunk, pcols, cnd_diag_info)
 
    ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
    call ref_pres_init()

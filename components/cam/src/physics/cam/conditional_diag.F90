@@ -1,13 +1,16 @@
 module conditional_diag
-!-------------------------------------------------
-! Conditional sampling and diagnostics.
+!--------------------------------------------------------
+! This is one of the modules that support conditionally 
+! sampled diagnostics and budget analysis in EAM.
+!
 ! This module contains 
 !  - derived types definitions
-!  - namelist handling utilities
+!  - subroutine for namelist handling
+!  - subroutine for memory allocation
 !
 ! History:
-!  First version by Hui Wan, PNNL, March - Aprill 2021
-!-------------------------------------------------
+!  First version by Hui Wan, PNNL, March - May 2021
+!--------------------------------------------------------
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use spmd_utils,     only: masterproc
   use cam_logfile,    only: iulog
@@ -20,7 +23,7 @@ module conditional_diag
   ! Derived types
 
   public cnd_diag_info_t   ! for metadata
-  public cnd_diag_t        ! for actual data
+  public cnd_diag_t        ! for physical quantities
 
   ! Variable(s) of derived type
 
@@ -28,9 +31,8 @@ module conditional_diag
 
   ! Subroutines
 
-  public conditional_diag_readnl
-  public conditional_diag_alloc
- !public conditional_diag_dealloc
+  public cnd_diag_readnl
+  public cnd_diag_alloc
 
   ! module parameters
 
@@ -48,41 +50,43 @@ module conditional_diag
   !-------------------------------------------------------------------------------
   type cnd_diag_info_t
 
-    ! Do we want to write out the QoIs?
+    ! Do we want to write out the QoIs to history tapes?
     logical :: l_output_state = .false.
 
-    ! Do we want to write out increments of the QoIs? 
+    ! Do we want to write out increments of the QoIs to history tapes? 
     logical :: l_output_incrm = .false.
 
-    ! Which history tape (1-6) should contain a complete set of the conditional diagnostics?
+    ! Which history tapes should contain a complete set of the conditionally sampled diagnostics?
     ! Note: we allow the user to specify multiple history tapes that will contain all output variables 
     ! associated with the conditional diagnostics. It is envisioned that these multiple history 
-    ! tapes might have different output frequencies and averaging flags. In addition,
-    ! the user can manually add or remove individual variables using fincl or fexcl, 
-    ! just as is the case for all other variables on the master list.
+    ! tapes might have different output frequencies and/or averaging flags. Apart from that,
+    ! like with all other output variables on the master list, the user can manually add or 
+    ! remove individual variables using fincl or fexcl. 
 
-    integer,allocatable :: hist_tape_with_all_output(:)  ! tape indices
     integer             :: ntape                         ! number of tapes
+    integer,allocatable :: hist_tape_with_all_output(:)  ! tape indices
 
     ! Sampling conditions. 
     ! The current implementation allows the user to define multiple conditions,
-    ! each of which will correspond to its own metric, QoIs, and output.
+    ! each of which will have its own metric, QoIs, and output.
     ! But to keep it simple (at least as a start), we assume that
     ! the QoIs and checkpoints to monitor are the same for different sampling conditions
 
     integer                      :: ncnd = 0             ! total # of sampling conditions used in this simulation
     character(len=mname_maxlen),&
-                     allocatable :: metric_name(:)       ! shape = (ncnd); name of the metric
-    integer,allocatable          :: metric_nver(:)       ! shape = (ncnd); # of vertical levels of the metric
+                     allocatable :: metric_name(:)       ! shape = (ncnd); metric names
+    integer,allocatable          :: metric_nver(:)       ! shape = (ncnd); # of vertical levels of the metrics
     integer,allocatable          :: metric_cmpr_type(:)  ! shape = (ncnd); see module parameters in conditional_diag_main.F90
-    real(r8),allocatable         :: metric_threshold(:)  ! shape = (ncnd); threshold value for conditional sampling 
+    real(r8),allocatable         :: metric_threshold(:)  ! shape = (ncnd); threshold values for conditional sampling 
     real(r8),allocatable         :: metric_tolerance(:)  ! shape = (ncnd); tolerance for the "equal to" comparison type
     character(len=chkptname_maxlen),&
-                     allocatable :: eval_after(:)        ! shape = (ncnd); checkpoints at which the evaluation of 
-                                                         ! the sampling conditions will happen
+                     allocatable :: cnd_eval_chkpt(:)    ! shape = (ncnd); checkpoints at which the evaluation of 
+                                                         ! the corresponding sampling condition will happen
     character(len=chkptname_maxlen),&
-                     allocatable :: sample_after(:)      ! shape = (ncnd); checkpoints at which the sampling (masking) 
-                                                         ! of QoIs will happen
+                     allocatable :: cnd_end_chkpt(:)     ! shape = (ncnd); checkpoints marking end-of-time-step
+                                                         ! of the corresponding sampling conditions. 
+                                                         ! At this checkpoint, the masking of QoIs will be done
+                                                         ! and the masked values will be send to history buffer.
 
     ! QoIs to be monitored. Each QoI can have 1, pver, or pver+1 vertical levels
     integer                                   :: nqoi = 0
@@ -91,16 +95,16 @@ module conditional_diag
 
     ! Active checkpoints at which the QoI will be monitored 
     integer                                      :: nchkpt = 0     ! total # of active checkpoints
-    character(len=chkptname_maxlen), allocatable :: chkpt_name(:)  ! checkpoint names 
+    character(len=chkptname_maxlen), allocatable :: qoi_chkpt(:)   ! checkpoints at which QoIs will be monitored
 
 
   end type cnd_diag_info_t
 
   !-------------------------------------------------------------------------------
-  ! Derived types for the sampling conditions and sampled fields
+  ! Derived types for the sampling conditions and monitored QoIs
   !-------------------------------------------------------------------------------
-  ! Values of a single sampled field at different checkpoints and the 
-  ! inrements relative to the previous checkpoint
+  ! Values of a single QoI at different checkpoints and the 
+  ! inrements relative to the previous active checkpoint
 
   type snapshots_and_increments_t
 
@@ -111,7 +115,7 @@ module conditional_diag
   end type snapshots_and_increments_t
 
   !----------------------------------------------------------------------
-  ! The collection of all QoIs sampled under the same condition, and
+  ! The collection of all QoIs monitored under the same condition, and
   ! the values of the metric and flag used for sampling
 
   type metric_and_qois_t
@@ -124,7 +128,7 @@ module conditional_diag
 
   !----------------------------------------------------------------------
   ! A collection of multiple conditions (including the corresponding
-  ! metrics and sampled QoIs)
+  ! metrics and monitored QoIs)
 
   type cnd_diag_t
 
@@ -143,70 +147,70 @@ contains
 !===============================================================================
 ! Procedures
 !===============================================================================
-subroutine conditional_diag_readnl(nlfile)
+subroutine cnd_diag_readnl(nlfile)
 
    use cam_history_support,only: ptapes
-   use infnan,          only: nan, assignment(=), isnan
-   use namelist_utils,  only: find_group_name
-   use units,           only: getunit, freeunit
+   use infnan,             only: nan, assignment(=), isnan
+   use namelist_utils,     only: find_group_name
+   use units,              only: getunit, freeunit
    use mpishorthand
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
    ! Local variables
-   integer :: unitn, ierr
-   character(len=*), parameter :: subname = 'conditional_diag_readnl'
+   character(len=*), parameter :: subname = 'cnd_diag_readnl'
+
+   integer :: ncnd, nchkpt, nqoi, ntape, ii
 
    ! Local variables for reading namelist
+
+   integer :: unitn, ierr
 
    character(len=mname_maxlen)     :: metric_name     (ncnd_max)
    integer                         :: metric_nver     (ncnd_max)
    integer                         :: metric_cmpr_type(ncnd_max)
    real(r8)                        :: metric_threshold(ncnd_max)
    real(r8)                        :: metric_tolerance(ncnd_max)
-   character(len=chkptname_maxlen) :: eval_after      (ncnd_max)
-   character(len=chkptname_maxlen) :: sample_after    (ncnd_max)
 
-   character(len=chkptname_maxlen) :: chkpt_name(nchkpt_max)
+   character(len=chkptname_maxlen) :: cnd_eval_chkpt  (ncnd_max)
+   character(len=chkptname_maxlen) :: cnd_end_chkpt   (ncnd_max)
+
+   character(len=chkptname_maxlen) :: qoi_chkpt(nchkpt_max)
 
    character(len=qoiname_maxlen)   :: qoi_name (nqoi_max)
    integer                         :: qoi_nver (nqoi_max)
 
    logical :: l_output_state, l_output_incrm
    integer :: hist_tape_with_all_output(ptapes)  ! tape indices
-   integer :: ntape
-
-   ! other misc local variables
-   integer :: ncnd, nchkpt, nqoi, ntape
-
-   integer :: ii
 
    !-------
-   namelist /conditional_diag_nl/  &
-            metric_name, metric_nver, metric_cmpr_type, metric_threshold, metric_tolerance, &
-            eval_after, sample_after, & 
-            chkpt_name, qoi_name, qoi_nver, &
+   namelist /conditional_diag_nl/     &
+            metric_name, metric_nver, &
+            metric_cmpr_type, metric_threshold, metric_tolerance, &
+            cnd_eval_chkpt, cnd_end_chkpt, & 
+            qoi_chkpt, qoi_name, qoi_nver, &
             l_output_state, l_output_incrm, hist_tape_with_all_output
 
    !----------------------------------------
    !  Default values
    !----------------------------------------
-   metric_name      = ' '
-   metric_nver      = 0
-   metric_cmpr_type = -99
-   metric_threshold = nan
-   metric_tolerance = 0._r8
-   eval_after       = ' '
-   sample_after     = ' '
+   metric_name(:)      = ' '
+   metric_nver(:)      = 0
+   metric_cmpr_type(:) = -99
+   metric_threshold(:) = nan
+   metric_tolerance(:) = 0._r8
 
-   chkpt_name     = ' '
+   cnd_eval_chkpt(:)   = ' '
+   cnd_end_chkpt(:)    = ' '
+   qoi_chkpt(:)        = ' '
 
-   qoi_name       = ' '
-   qoi_nver       = 0 
+   qoi_name(:)       = ' '
+   qoi_nver(:)       = 0 
 
    l_output_state = .false.
    l_output_incrm = .false.
-   hist_tape_with_all_output = -1
+
+   hist_tape_with_all_output(:) = -1
 
    !----------------------------------------
    ! Read namelist and check validity
@@ -227,7 +231,6 @@ subroutine conditional_diag_readnl(nlfile)
       end if
       close(unitn)
 
-      !------------------------------------------
       ! Count user-specified sampling conditions
 
       ii = 0
@@ -237,7 +240,7 @@ subroutine conditional_diag_readnl(nlfile)
       ncnd = ii
 
       !----------------------------------------------------------------------
-      ! If no condition has been specified, set the other counts to zero
+      ! If no condition has been specified, set the other counts to zero, too
       !----------------------------------------------------------------------
       if (ncnd==0) then
 
@@ -254,8 +257,11 @@ subroutine conditional_diag_readnl(nlfile)
          if (any( metric_nver     (1:ncnd) <= 0   )) call endrun(subname//' error: need positive metric_nver for each metric_name')
          if (any( metric_cmpr_type(1:ncnd) == -99 )) call endrun(subname//' error: need valid metric_cmpr_type for each metric_name')
          if (any( isnan(metric_threshold(1:ncnd)) )) call endrun(subname//' error: need valid metric_threshold for each metric_name')
-         if (any( eval_after      (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify eval_after for each metric_name')
-         if (any( sample_after    (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify sample_after for each metric_name')
+         if (any( cnd_eval_chkpt  (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify cnd_eval_chkpt for each metric_name')
+         
+         do ii = 1,ncnd
+            if (cnd_end_chkpt(icnd)==' ')  cnd_end_chkpt(icnd) = cnd_eval_chkpt(icnd)
+         end do
 
          !-------------------------------------------------------
          ! Count QoIs to be monitored, then do some sanity check
@@ -268,14 +274,17 @@ subroutine conditional_diag_readnl(nlfile)
 
          if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
 
-         !--------------------------
-         ! Count active checkpoints 
+         !---------------------------------------------
+         ! Count active checkpoints for QoI monitoring
 
          ii = 0
-         do while ( (ii+1) <= nchkpt_max .and. chkpt_name(ii+1) /= ' ')
+         do while ( (ii+1) <= nchkpt_max .and. qoi_chkpt(ii+1) /= ' ')
             ii = ii + 1
          end do
          nchkpt = ii
+
+         !---------------------
+         ! Enforce consistency
 
          if (nqoi==0) nchkpt = 0 ! If user did not specify any QoI, set nchkpt to 0 for consistency
          if (nchkpt==0) nqoi = 0 ! If user did not specify any checkpoint for QoI monitoring, set nqoi to 0 for consistency
@@ -308,7 +317,10 @@ subroutine conditional_diag_readnl(nlfile)
    call mpibcast(ntape,  1, mpiint, 0, mpicom)
 #endif
 
-   cnd_diag_info%ncnd = ncnd
+   cnd_diag_info% ncnd   = ncnd
+   cnd_diag_info% nqoi   = nqoi
+   cnd_diag_info% nchkpt = nchkpt
+   cnd_diag_info% ntape  = ntape
 
    if (ncnd==0) then
 
@@ -330,10 +342,10 @@ subroutine conditional_diag_readnl(nlfile)
    call mpibcast(metric_cmpr_type, ncnd_max,                     mpiint,  0, mpicom)
    call mpibcast(metric_threshold, ncnd_max,                     mpir8,   0, mpicom)
    call mpibcast(metric_tolerance, ncnd_max,                     mpir8,   0, mpicom)
-   call mpibcast(eval_after,       ncnd_max*len(eval_after(1)),  mpichar, 0, mpicom)
-   call mpibcast(sample_after,     ncnd_max*len(sample_after(1)),mpichar, 0, mpicom)
 
-   call mpibcast(chkpt_name,     nchkpt_max*len(chkpt_name(1)), mpichar, 0, mpicom)
+   call mpibcast(cnd_eval_chkpt,   ncnd_max*len(cnd_eval_chkpt(1)), mpichar, 0, mpicom)
+   call mpibcast(cnd_end_chkpt,    ncnd_max*len(cnd_end_chkpt(1)),  mpichar, 0, mpicom)
+   call mpibcast(qoi_chkpt,        nchkpt_max*len(qoi_chkpt(1)),    mpichar, 0, mpicom)
 
    call mpibcast(qoi_name,  nqoi_max*len(qoi_name(1)),  mpichar, 0, mpicom)
    call mpibcast(qoi_nver,  nqoi_max,                   mpiint,  0, mpicom)
@@ -371,17 +383,15 @@ subroutine conditional_diag_readnl(nlfile)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% metric_tolerance')
    cnd_diag_info% metric_tolerance(1:ncnd) = metric_tolerance(1:ncnd)
 
-   allocate( cnd_diag_info% eval_after(ncnd), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% eval_after')
-   cnd_diag_info% eval_after(1:ncnd) = eval_after(1:ncnd)
+   allocate( cnd_diag_info% cnd_eval_chkpt(ncnd), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% cnd_eval_chkpt')
+   cnd_diag_info% cnd_eval_chkpt(1:ncnd) = cnd_eval_chkpt(1:ncnd)
 
-   allocate( cnd_diag_info% sample_after(ncnd), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% sample_after')
-   cnd_diag_info% sample_after(1:ncnd) = sample_after(1:ncnd)
+   allocate( cnd_diag_info% cnd_end_chkpt(ncnd), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% cnd_end_chkpt')
+   cnd_diag_info% cnd_end_chkpt(1:ncnd) = cnd_end_chkpt(1:ncnd)
 
    ! QoIs 
-
-   cnd_diag_info%nqoi = nqoi
 
    allocate( cnd_diag_info% qoi_name(nqoi), stat=ierr)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_name')
@@ -395,12 +405,10 @@ subroutine conditional_diag_readnl(nlfile)
 
    ! Active checkpoints at which the QoIs will be monitored
 
-   cnd_diag_info% nchkpt = nchkpt
-
-   allocate( cnd_diag_info% chkpt_name(nchkpt), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% chkpt_name')
+   allocate( cnd_diag_info% qoi_chkpt(nchkpt), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_chkpt')
    do ii = 1,nchkpt
-      cnd_diag_info% chkpt_name(ii) = trim(adjustl(chkpt_name(ii)))
+      cnd_diag_info% qoi_chkpt(ii) = trim(adjustl(qoi_chkpt(ii)))
    end do
 
    ! output to history tape(s)
@@ -422,7 +430,7 @@ subroutine conditional_diag_readnl(nlfile)
       write(iulog,*)'==========================================================='
 
       write(iulog,*)
-      write(iulog,'(4x,2x,a20,a6,a12,4a20)')'metric','nlev','cmpr_type','threshold','tolerance','eval_after','sample_after'
+      write(iulog,'(4x,2x,a20,a6,a12,4a20)')'metric','nlev','cmpr_type','threshold','tolerance','cnd_eval_chkpt','cnd_end_chkpt'
       do ii = 1,cnd_diag_info%ncnd
          write(iulog,'(i4.3,2x,a20,i6,i12,2e20.10,2a20)') ii,                               &
                                                 adjustr(cnd_diag_info%metric_name(ii)),     &
@@ -430,15 +438,15 @@ subroutine conditional_diag_readnl(nlfile)
                                                         cnd_diag_info%metric_cmpr_type(ii), &
                                                         cnd_diag_info%metric_threshold(ii), &
                                                         cnd_diag_info%metric_tolerance(ii), &
-                                                adjustr(cnd_diag_info%eval_after(ii)),      &
-                                                adjustr(cnd_diag_info%sample_after(ii))
+                                                adjustr(cnd_diag_info%cnd_eval_chkpt(ii)),  &
+                                                adjustr(cnd_diag_info%cnd_end_chkpt(ii))
       end do
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a20)') 'chkpt_name'
+      write(iulog,'(4x,a20)') 'qoi_chkpt'
       do ii = 1,cnd_diag_info%nchkpt
-         write(iulog,'(i4.3,a20)') ii, adjustr(cnd_diag_info%chkpt_name(ii))
+         write(iulog,'(i4.3,a20)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii))
       end do
 
       write(iulog,*)
@@ -459,10 +467,10 @@ subroutine conditional_diag_readnl(nlfile)
 
   end if  ! masterproc
 
-end subroutine conditional_diag_readnl
+end subroutine cnd_diag_readnl
 
 !===============================================================================
-subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_diag_info )
+subroutine cnd_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_diag_info )
 
   type(cnd_diag_t), pointer :: phys_diag(:)
 
@@ -472,7 +480,7 @@ subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_dia
 
   integer :: ierr, lchnk
 
-  character(len=*), parameter :: subname = 'conditional_diag_alloc'
+  character(len=*), parameter :: subname = 'cnd_diag_alloc'
   !-----------------------------------------------------------------
 
   allocate(phys_diag(begchunk:endchunk), stat=ierr)
@@ -498,7 +506,7 @@ subroutine conditional_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_dia
      write(iulog,*)
   end if
 
-end subroutine conditional_diag_alloc
+end subroutine cnd_diag_alloc
 
 
 !-----------------------------------------------------------------------------
@@ -548,8 +556,6 @@ end subroutine single_chunk_cnd_diag_alloc
 !-----------------------------------------------------------------------------
 subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
                                    l_output_state, l_output_incrm, psetcols )
-
- !use infnan, only : inf, assignment(=)
 
   type(metric_and_fields_t), intent(inout) :: cnd
 
@@ -611,10 +617,6 @@ subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
    end if
 
 end subroutine metrics_and_qois_alloc
-
-!subroutine conditional_diag_dealloc
-!end subroutine conditional_diag_alloc
-
 
 end module conditional_diag
 

@@ -272,7 +272,7 @@ contains
 #if ( defined OFFLINE_DYN )
    use metdata,             only: metdata_readnl
 #endif
-   use conditional_diag,    only: conditional_diag_readnl
+   use conditional_diag,    only: cnd_diag_readnl
 
 !---------------------------Arguments-----------------------------------
 
@@ -535,7 +535,7 @@ contains
 #if ( defined OFFLINE_DYN )
    call metdata_readnl(nlfilename)
 #endif
-   call conditional_diag_readnl(nlfilename)
+   call cnd_diag_readnl(nlfilename)
 
 ! 
 ! Print cam_inparm input variables to standard output
