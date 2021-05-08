@@ -1,19 +1,16 @@
 module conditional_diag_output_utils
-!-------------------------------------------------
+!----------------------------------------------------------------------
 ! Utility subroutines used for handling model output 
-! for the conditional diagnostics. Currently included
-! are a few small subroutines that construct output
-! variable names, and a subroutine that makes
-! addfld and add_default calls to register output
-! variables during model initialization.
-! The outfld calls can be found in module 
-! conditional_diag_main.
+! for the conditional sampling and budget analysis tool. 
+! Currently included are a few small subroutines that construct output
+! variable names, and a subroutine that makes addfld and add_default 
+! calls to register output variables during model initialization.
+! The outfld calls are in module conditional_diag_main.
 !
 ! History:
 !  First version by Hui Wan, PNNL, March-May 2021
-!-------------------------------------------------
+!----------------------------------------------------------------------
   use cam_abortutils, only: endrun
-
   use conditional_diag, only: cnd_diag_info_t
 
   implicit none
@@ -21,25 +18,26 @@ module conditional_diag_output_utils
 
 contains
 
-subroutine conditional_diag_output_init(pver, cnd_diag_info)
+subroutine cnd_diag_output_init(pver, cnd_diag_info)
 !----------------------------------------------------------------------------------- 
 ! 
-! Purpose: Register variables related to conditional diagnostics for history output
+! Purpose: Register variables related to conditional sampling and budget analysis
+!          for history output
 !
 ! Method: (1) Add variables to the master field list by doing addfld calls
-!         (2) Add variables, by default, to the first history tape (h0 files)
-!             by doing add_default calls.
+!         (2) Add the whole suite of supported output variables to 
+!             user-specified history tapes by doing add_default calls.
 !         These two things are done for each sampling condition. 
 !         Registered output variables include, for each condition,
-!          - the metric used for evaluating sampling condition,
-!          - the flag field resulting from evaluating sampling condition,
+!          - the metric used for evaluating the user-specified sampling condition,
+!          - the flag field resulting from evaluating the sampling condition,
 !          - the various QoIs (and their increments if requested) to which 
-!            the conditional sampling is applied. Per user's choice, 
+!            conditional sampling is applied. Per user's choice, 
 !            these QoIs and increments might be monitored at various checkpoints
 !            in each time step.
 !-----------------------------------------------------------------------------------
-  use cam_history,         only: addfld, horiz_only, add_default
-  use cam_history_support, only: max_fieldname_len
+  use cam_history_support, only: max_fieldname_len, horiz_only
+  use cam_history,         only: addfld, add_default
 
   integer,intent(in) :: pver
   type(cnd_diag_info_t), intent(in) :: cnd_diag_info
@@ -54,7 +52,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
 
   character(len=256) :: fld_long_name
 
-  character(len=*),parameter :: subname = 'conditional_diag_output_init'
+  character(len=*),parameter :: subname = 'cnd_diag_output_init'
 
   if (cnd_diag_info%ncnd==0) return
 
@@ -62,19 +60,20 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
 
   ! Loop through all sampling conditions. Each of them will have
   ! its own set of output variables distinguished by the prefix cndxx_
+  ! where xx is a two-digit integer.
 
   do icnd = 1,cnd_diag_info%ncnd
 
-     !-------------------------------------------------------
-     ! Register the sampling metric and the flag field
-     !-------------------------------------------------------
+     !------------------------------------------------------------------------------
+     ! Register the metric of the sampling condition and the associated flag field
+     !------------------------------------------------------------------------------
      call get_metric_and_flag_names_for_output( icnd, cnd_diag_info, &!in
                                                 output_fld_name,     &!out
                                                 output_fld_name2    ) !out
 
      ! Add the 2 variables to the master list of possible output variables.
-     ! The 4 arguments of an addfld call are: variable name, 
-     ! vertical dimension name, avg. flag, units, long_name.
+     ! The arguments of an addfld call are: (1) variable name, 
+     ! (2) vertical dimension name, (3) avg. flag, (4) unit, (5) long_name.
      ! Units are set to blank right now; we could add a namelist variable
      ! to let the user provide the info. 
 
@@ -136,8 +135,8 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
                                              fld_long_name        )! out
 
            ! Add the variable to the master list of possible output variables.
-           ! The 4 arguments of an addfld call are:
-           ! variable name, vertical dimension name, avg. flag, units, long_name.
+           ! The arguments of an addfld call are: (1) variable name, 
+           ! (2) vertical dimension name, (3) avg. flag, (4) unit, (5) long_name.
            ! Units are set to blank right now; we could add a namelist variable
            ! to let the user provide the info. 
 
@@ -168,7 +167,7 @@ subroutine conditional_diag_output_init(pver, cnd_diag_info)
 
   end do ! icnd = 1,ncnd
 
-end subroutine conditional_diag_output_init
+end subroutine cnd_diag_output_init
 
 !======================================================
 subroutine get_metric_and_flag_names_for_output( icnd, cnd_diag_info,   &! in

@@ -1,7 +1,7 @@
 module conditional_diag
 !--------------------------------------------------------
-! This is one of the modules that support conditionally 
-! sampled diagnostics and budget analysis in EAM.
+! This is one of the modules that support conditional
+! sampling and budget analysis in EAM.
 !
 ! This module contains 
 !  - derived types definitions

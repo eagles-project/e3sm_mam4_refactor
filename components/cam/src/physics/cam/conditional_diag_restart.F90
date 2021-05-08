@@ -49,7 +49,7 @@ contains
   !-------------------------------------------------------------------------------
   ! Copy dimension IDs to a local array.
   !-------------------------------------------------------------------------------
-  ! Because the various metrics, flags and fields in the conditional diagnostics 
+  ! Because the various metrics, flags and QoIs in the conditional diagnostics 
   ! data structre can have different sizes in the vertical dimension,
   ! the last element of the local variable dimids_local might get different values
   ! during this subroutine. The use of a local variable here ensures that 
@@ -63,15 +63,15 @@ contains
   ! (Question: would it be better to allocate and deallocate at the beginning
   ! and end of each run instead of each time step?)
 
-  ncnd  = cnd_diag_info%ncnd
+  ncnd   = cnd_diag_info%ncnd
   nchkpt = cnd_diag_info%nchkpt
-  nqoi  = cnd_diag_info%nqoi
+  nqoi   = cnd_diag_info%nqoi
 
   allocate( cnd_metric_desc(ncnd) )
   allocate( cnd_flag_desc(ncnd) )
 
   if (nqoi>0) then
-     allocate( cnd_qoi_old_desc(nqoi,ncnd) )
+     allocate( cnd_qoi_old_desc(       ncnd,nqoi) )
      allocate( cnd_qoi_val_desc(nchkpt,ncnd,nqoi) )
      allocate( cnd_qoi_inc_desc(nchkpt,ncnd,nqoi) )
   end if
@@ -112,9 +112,9 @@ contains
 
   end do
 
-  !-----------------------------------------------------------
-  ! Add the conditionally sampled diagnostics to restart file
-  !-----------------------------------------------------------
+  !--------------------------------
+  ! Add the QoIs to restart file
+  !--------------------------------
   do iqoi = 1,nqoi
 
      ! Dimension information
@@ -136,7 +136,7 @@ contains
         call endrun(subname//': check cnd_diag_info%qoi_nver')
      end if
 
-     ! Add to the restart file the variables containing QoIs at various checkpoints 
+     ! Add to restart file the variables containing QoIs at various checkpoints 
 
      if (cnd_diag_info%l_output_state) then
         do icnd = 1,ncnd
@@ -147,7 +147,7 @@ contains
         end do
      end if
 
-     ! Add to the restart file the variables containing increments at various checkpoints 
+     ! Add to restart file the variables containing increments at various checkpoints 
 
      if (cnd_diag_info%l_output_incrm) then
 
@@ -158,7 +158,7 @@ contains
          end do
         end do
 
-        ! Add to the restart file the variable containing the "old" value of the field 
+        ! Add to restart file the variable containing the "old" value of the field 
 
         do icnd = 1,ncnd
            write(pname,'(2(a,i2.2),a)') 'cnd',icnd, '_qoi',iqoi, '_old'
@@ -232,15 +232,15 @@ contains
   !---------------------------------------------------------------
   ! Gather dimension info and save in local variables
   !---------------------------------------------------------------
-  ncnd  = cnd_diag_info%ncnd
+  ncnd   = cnd_diag_info%ncnd
   nchkpt = cnd_diag_info%nchkpt
-  nqoi  = cnd_diag_info%nqoi
+  nqoi   = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
 
-  !-----------------
-  ! metric and flag
-  !-----------------
+  !-------------------
+  ! metrics and flags
+  !-------------------
   do icnd = 1,ncnd
 
      nver = cnd_diag_info%metric_nver(icnd)
@@ -305,9 +305,9 @@ contains
      end if 
   end do
 
-  !-------------------------------------------------------------------------
-  ! Conditionally sampled diagnostics (fields): "old", "val", and "inc"
-  !-------------------------------------------------------------------------
+  !----------------------------------------------------------
+  ! Conditionally sampled QoIs: "old", snapshots, and "inc"
+  !----------------------------------------------------------
   do iqoi = 1,nqoi
 
      nver = cnd_diag_info%qoi_nver(iqoi)
@@ -477,9 +477,9 @@ contains
   !======================================================================
   subroutine cnd_diag_read_restart( phys_diag, begchunk, endchunk,         &! in
                                     physgrid, file_hdimsizes, file_nhdims, &! in
-                                    pcols, fillvalue, file                 )! inout 
+                                    pcols, fillvalue, file                 )! in, in, inout 
   !------------------------------------------------------------------------------------------------
-  ! Purpose: read variables for conditional sampling and diagnostics from restart file
+  ! Purpose: read variables for conditional sampling and budget analysis from restart file
   ! History: First version by Hui Wan, PNNL, 2021-04
   !------------------------------------------------------------------------------------------------
 
@@ -504,7 +504,7 @@ contains
   ! Local variables
 
   integer :: file_dims(3)   ! dimension sizes in restart file, local variable
-  integer :: arry_dims(3)   ! dimension sizes of array holding values to be written out, local variable
+  integer :: arry_dims(3)   ! dimension sizes of array holding values to be read in, local variable
 
   type(io_desc_t), pointer :: iodesc
   type(var_desc_t) :: vardesc
@@ -527,9 +527,9 @@ contains
   !---------------------------------------------------------------
   ! Gather dimension info and save in local variables
   !---------------------------------------------------------------
-  ncnd  = cnd_diag_info%ncnd
+  ncnd   = cnd_diag_info%ncnd
   nchkpt = cnd_diag_info%nchkpt
-  nqoi  = cnd_diag_info%nqoi
+  nqoi   = cnd_diag_info%nqoi
 
   file_dims(1:file_nhdims) = file_hdimsizes(1:file_nhdims)
 
@@ -544,7 +544,7 @@ contains
 
         tmpfield_2d = fillvalue
         !--------------------------------------------
-        ! get iodesc needed by pio_write_darray calls
+        ! get iodesc needed by pio_read_darray calls
         !--------------------------------------------
         arry_dims(1) = pcols
         arry_dims(2) = endchunk - begchunk + 1
@@ -576,7 +576,7 @@ contains
      else ! nver > 1
 
         !----------------------------------------------------
-        ! prepare input for cam_grid_write_dist_array calls
+        ! prepare input for cam_grid_read_dist_array calls
         !----------------------------------------------------
         arry_dims(1) = pcols
         arry_dims(2) = nver
@@ -619,9 +619,9 @@ contains
      end if 
   end do
 
-  !-------------------------------------------------------------------------
-  ! Conditionally sampled diagnostics (fields): "old", "val", and "inc"
-  !-------------------------------------------------------------------------
+  !---------------------------------------------------------
+  ! Conditionally sampled QoIs: "old", snapsots, and "inc"
+  !---------------------------------------------------------
   do iqoi = 1,nqoi
 
      nver = cnd_diag_info%qoi_nver(iqoi)
@@ -631,16 +631,16 @@ contains
         tmpfield_2d = fillvalue
 
         !--------------------------------------------
-        ! get iodesc needed by pio_write_darray calls
+        ! get iodesc needed by pio_read_darray calls
         !--------------------------------------------
         arry_dims(1) = pcols
         arry_dims(2) = endchunk - begchunk + 1
  
         call cam_grid_get_decomp(physgrid, arry_dims(1:2), file_dims(1:file_nhdims), pio_double, iodesc) ! 4xin, out
 
-        !-------------------------------
-        ! read and unpack field values 
-        !-------------------------------
+        !----------------------------------------------
+        ! read and unpack QoIs at various checkpoints 
+        !----------------------------------------------
         if (cnd_diag_info%l_output_state) then
 
            do icnd = 1,ncnd
@@ -659,9 +659,9 @@ contains
 
         end if !cnd_diag_info%l_output_state
 
-        !------------------------------------------
-        ! read and unpack increment and old values 
-        !------------------------------------------
+        !-------------------------------------------
+        ! read and unpack increments and old values 
+        !-------------------------------------------
         if (cnd_diag_info%l_output_incrm) then
 
            do icnd = 1,ncnd
@@ -697,7 +697,7 @@ contains
     else ! nver > 1
 
         !----------------------------------------------------
-        ! prepare input for cam_grid_write_dist_array calls
+        ! prepare input for cam_grid_read_dist_array calls
         !----------------------------------------------------
         arry_dims(1) = pcols
         arry_dims(2) = nver
@@ -730,9 +730,9 @@ contains
 
         end if !cnd_diag_info%l_output_state
 
-        !-------------------------------------------------------------------
-        ! pack increment and old values into tmp arrays and write them out
-        !-------------------------------------------------------------------
+        !-------------------------------------------
+        ! read and unpack increments and old values 
+        !-------------------------------------------
         if (cnd_diag_info%l_output_incrm) then
 
            ! increments associated with various checkpoints 
