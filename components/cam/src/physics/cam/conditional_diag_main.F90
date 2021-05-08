@@ -9,7 +9,7 @@ module conditional_diag_main
 
   private
 
-  public conditional_diag_cal_and_output
+  public cnd_diag_checkpoint
 
   integer, parameter :: GE  =  2
   integer, parameter :: GT  =  1
@@ -25,7 +25,7 @@ module conditional_diag_main
 contains
 
 !======================================================
-subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_in )
+subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
  !use time_manager,        only: get_nstep
   use ppgrid,              only: pcols
@@ -33,12 +33,12 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   use cam_history,         only: outfld
 
   use physics_types,    only: physics_state
-  use camsrfexch,       only: cam_in_t
+  use camsrfexch,       only: cam_in_t, cam_out_t
   use physics_buffer,   only: physics_buffer_desc
 
   use conditional_diag,    only: cnd_diag_t
   use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
-                                          get_fld_name_for_output
+                                           get_fld_name_for_output
 
   type(cnd_diag_t),    intent(inout), target :: diag
   character(len=*),    intent(in)            :: this_chkpt
@@ -46,6 +46,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   type(physics_state),    intent(in) :: state
   type(physics_buffer_desc), pointer :: pbuf(:)
   type(cam_in_t),         intent(in) :: cam_in
+  type(cam_out_t),        intent(in) :: cam_out
 
   integer :: ncnd, nchkpt, nqoi
   integer :: icnd, ichkpt, ii, iqoi
@@ -68,14 +69,14 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   ncol   = state%ncol
 
   !=======================================
-  ! Obtain QoI values (and/or increments)
+  ! Obtain QoI values and/or increments
   !=======================================
   ! First check if this checkpoint is active for QoI monitoring
 
   ichkpt = 0  ! 0 = checkpoint inactive; this is the default
 
   do ii = 1,nchkpt
-     if ( trim(cnd_diag_info%chkpt_name(ii)) == trim(this_chkpt) ) then 
+     if ( trim(cnd_diag_info%qoi_chkpt(ii)) == trim(this_chkpt) ) then 
         ichkpt = ii
         exit
      end if
@@ -84,7 +85,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
   if (ichkpt>0) then 
   !---------------------------------------------------------------------------
   ! This checkpoint is active for QoI monitoring. Obtain the QoI values 
-  ! (and their increments if needed), and save to variable "diag". 
+  ! and/or their increments if needed, and save to variable "diag". 
   ! Note that here we only obtain and save the QoIs. 
   ! Conditional sampling won't be applied until the "cnd_end_chkpt" checkpoint
   !---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
         allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) )
 
         call get_values( new, trim(cnd_diag_info%qoi_name(iqoi)), &! inout, in
-                         state, pbuf, cam_in )                     ! in
+                         state, pbuf, cam_in, cam_out )            ! in
 
         !----------------------------------------------------------------
         ! The current implementation is such that the same set of 
@@ -145,9 +146,9 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
      end do ! iqoi = 1,nqoi
   end if ! ichkpt > 0
 
-  !===============================================================
-  ! Evaluate sampling condition if this is the correct checkpoint 
-  !===============================================================
+  !=======================================================
+  ! Evaluate sampling condition if this is cnd_eval_chkpt 
+  !=======================================================
   do icnd = 1,ncnd
 
      ! Check if sampling condition needs to be evaluated at this checkpoint.
@@ -160,7 +161,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
         !---------------------------------
         metric => diag%cnd(icnd)%metric
         call get_values( metric, trim(cnd_diag_info%metric_name(icnd)), &! inout, in
-                         state, pbuf, cam_in )                           ! in
+                         state, pbuf, cam_in, cam_out )                  ! in
 
         flag => diag%cnd(icnd)%flag
         call get_flags( metric, icnd, ncol, cnd_diag_info, flag )
@@ -197,8 +198,9 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
         flag => diag%cnd(icnd)%flag
 
         !----------------------------------------------------------------
-        ! Apply conditional sampling to QoIs (and/or their increments),
-        ! then do the outfld calls for output. In subroutine apply_masking,
+        ! Apply conditional sampling to QoIs and/or their increments,
+        ! then do the outfld calls to send the values to history buffer. 
+        ! In subroutine apply_masking,
         ! different actions are taken depending on the vertical 
         ! dimension sizes of the metric and the QoIs.
         !----------------------------------------------------------------
@@ -209,9 +211,9 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
 
               call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val ) 
   
-              do ii = 1,nchkpt
-                 call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ii, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ii), pcols, lchnk )
+              do ichkpt = 1,nchkpt
+                 call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
+                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ichkpt), pcols, lchnk )
               end do
 
            end do
@@ -224,9 +226,9 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
 
               call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc ) 
 
-              do ii = 1,nchkpt
-                 call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ii, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ii), pcols, lchnk )
+              do ichkpt = 1,nchkpt
+                 call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
+                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ichkpt), pcols, lchnk )
               end do
 
            end do
@@ -235,7 +237,7 @@ subroutine conditional_diag_cal_and_output( diag, this_chkpt, state, pbuf, cam_i
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
 
-end subroutine conditional_diag_cal_and_output
+end subroutine cnd_diag_checkpoint
 
 !==================================================================
 subroutine apply_masking( flag, array )
@@ -243,11 +245,11 @@ subroutine apply_masking( flag, array )
     real(r8),intent(in)    ::  flag(:,:)
     real(r8),intent(inout) :: array(:,:,:)
 
+    integer :: kk             ! vertical level index for a loop
     integer :: flag_nver      ! # of vertical levels the flag array has
     integer :: array_nver     ! # of vertical levels the output array has
-    integer :: kk             ! vertical level index for a loop
-    integer :: nchkpt, ichkpt ! # of physical processes to process, and the loop index
-    integer :: pcols, icol
+    integer :: nchkpt, ichkpt ! # of checkpoints to process, and the loop index
+    integer :: pcols, icol    ! # of columns in grid chunk, and the loop index
 
          pcols = size(flag, 1)
      flag_nver = size(flag, 2) 
@@ -255,14 +257,15 @@ subroutine apply_masking( flag, array )
         nchkpt = size(array,3)
 
     if (flag_nver == array_nver) then 
-    ! same vertical dimension size; simply apply masking
+    ! same vertical dimension size; simply apply masking - and do this 
+    ! for all checkpoints
 
        do ichkpt = 1,nchkpt
           where(flag(:,:).eq.OFF) array(:,:,ichkpt) = FILLVALUE 
        end do
 
     elseif (flag_nver == 1 .and. array_nver > 1) then 
-    ! apply the same masking to all vertical levels
+    ! apply the same masking to all vertical levels and checkpoints
 
        do icol = 1,pcols
           if (flag(icol,1).eq.OFF) array(icol,:,:) = FILLVALUE
@@ -271,10 +274,10 @@ subroutine apply_masking( flag, array )
     elseif (flag_nver > 1 .and. array_nver == 1) then
     ! if any level in a grid column is selected, select that column;
     ! In other words, mask out a column in the output array 
-    ! only if flags on all levels in that column are masked out.
+    ! only if cells on all levels in that column are masked out.
 
        do icol = 1,pcols
-          if (all(flag(icol,:).eq.OFF)) then
+          if (all( flag(icol,:).eq.OFF )) then
              array(icol,1,:) = FILLVALUE
           end if
        end do
@@ -291,22 +294,23 @@ end subroutine apply_masking
 
 
 !========================================================
-subroutine get_values( arrayout, varname, state, pbuf, cam_in )
+subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   use time_manager,   only: get_nstep
   use physics_types,  only: physics_state
-  use camsrfexch,     only: cam_in_t
-  use physics_buffer, only: physics_buffer_desc
+  use camsrfexch,     only: cam_in_t, cam_out_t
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
   real(r8),           intent(inout) :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
   type(physics_state),intent(in)    :: state
   type(physics_buffer_desc), pointer:: pbuf(:)
   type(cam_in_t),     intent(in)    :: cam_in
+  type(cam_out_t),    intent(in)    :: cam_out
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
-  integer :: ncol
+  integer :: ncol, idx
 
   ncol = state%ncol
 
@@ -343,6 +347,15 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in )
 
   case('LANDFRAC')
      arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
+
+  case('FLDS')
+     arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
+
+  case('PBLH')
+      idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, arrayout )
+
+  case('CLD')
+      idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, arrayout )
 
  !elseif (varname.eq.'QSATW') then
  !   call qsatw()
