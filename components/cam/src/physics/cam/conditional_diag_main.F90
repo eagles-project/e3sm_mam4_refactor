@@ -94,7 +94,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         !----------------------------------------------------------------
         ! Obtain the most up-to-date values of the QoI 
         !----------------------------------------------------------------
-        allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) )
+        allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) ))
 
         call get_values( new, trim(cnd_diag_info%qoi_name(iqoi)), &! inout, in
                          state, pbuf, cam_in, cam_out )            ! in
@@ -308,6 +308,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   type(cam_in_t),     intent(in)    :: cam_in
   type(cam_out_t),    intent(in)    :: cam_out
 
+  real(r8),pointer :: ptr2d(:,:)
+  real(r8),pointer :: ptr1d(:)
+
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
   integer :: ncol, idx
@@ -352,10 +355,12 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
      arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
 
   case('PBLH')
-      idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, arrayout )
+      idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
+      arrayout(:,1) = ptr1d
 
   case('CLD')
-      idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, arrayout )
+      idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+      arrayout(:,:) = ptr2d
 
  !elseif (varname.eq.'QSATW') then
  !   call qsatw()

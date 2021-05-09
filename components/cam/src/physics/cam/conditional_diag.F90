@@ -260,7 +260,7 @@ subroutine cnd_diag_readnl(nlfile)
          if (any( cnd_eval_chkpt  (1:ncnd) == ' ' )) call endrun(subname//' error: be sure to specify cnd_eval_chkpt for each metric_name')
          
          do ii = 1,ncnd
-            if (cnd_end_chkpt(icnd)==' ')  cnd_end_chkpt(icnd) = cnd_eval_chkpt(icnd)
+            if (cnd_end_chkpt(ii)==' ')  cnd_end_chkpt(ii) = cnd_eval_chkpt(ii)
          end do
 
          !-------------------------------------------------------
@@ -461,7 +461,7 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)' l_output_state = ',l_output_state
       write(iulog,*)' l_output_incrm = ',l_output_incrm
       write(iulog,*)
-      write(iulog,'(a,i3)')' hist_tape_with_all_output = ',hist_tape_with_all_output
+      write(iulog,'(a,12i5)')' hist_tape_with_all_output = ',hist_tape_with_all_output(1:ntape)
       write(iulog,*)'==========================================================='
       write(iulog,*)
 
@@ -557,7 +557,7 @@ end subroutine single_chunk_cnd_diag_alloc
 subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
                                    l_output_state, l_output_incrm, psetcols )
 
-  type(metric_and_fields_t), intent(inout) :: cnd
+  type(metric_and_qois_t), intent(inout) :: cnd
 
   integer, intent(in) :: metric_nver, nchkpt
   integer, intent(in) :: nqoi
