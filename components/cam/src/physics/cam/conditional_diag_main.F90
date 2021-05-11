@@ -43,10 +43,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   type(cnd_diag_t),    intent(inout), target :: diag
   character(len=*),    intent(in)            :: this_chkpt
 
-  type(physics_state),    intent(in) :: state
-  type(physics_buffer_desc), pointer :: pbuf(:)
-  type(cam_in_t),         intent(in) :: cam_in
-  type(cam_out_t),        intent(in) :: cam_out
+  type(physics_state),     intent(in) :: state
+  type(physics_buffer_desc),pointer   :: pbuf(:)
+  type(cam_in_t),          intent(in) :: cam_in
+  type(cam_out_t),optional,intent(in) :: cam_out
 
   integer :: ncnd, nchkpt, nqoi
   integer :: icnd, ichkpt, ii, iqoi
