@@ -27,7 +27,7 @@ contains
 !======================================================
 subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
- !use time_manager,        only: get_nstep
+  use time_manager,        only: get_nstep
   use ppgrid,              only: pcols
   use cam_history_support, only: max_fieldname_len
   use cam_history,         only: outfld
@@ -51,7 +51,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: ncnd, nchkpt, nqoi
   integer :: icnd, ichkpt, ii, iqoi
   integer :: ncol, lchnk
- !integer :: nstep
+  integer :: nstep
 
   real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old(:,:)
   real(r8),allocatable :: new(:,:)
@@ -67,6 +67,14 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
   lchnk  = state%lchnk
   ncol   = state%ncol
+
+  nstep  = get_nstep()  ! current time step. 
+                        ! Save QoI values starting from the initial step.
+                        ! Do increment calculation when nstep > 1.
+                        ! Do conditional sampling and outfld calls only when 
+                        ! nstep > 2, because the sampling time window might 
+                        ! involve some checkpints from the previous nstep,
+                        ! and valid increments are available only from nstep = 2.
 
   !=======================================
   ! Obtain QoI values and/or increments
@@ -125,17 +133,19 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
            inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
            old => diag%cnd(icnd)%qoi(iqoi)% old
 
-          !if (.not.is_firststep)& 
-           inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
+           if (nstep > 1) then 
+              inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
+           end if
 
            old(1:ncol,:) = new(1:ncol,:)
 
            ! Save increments for other sampling conditions; update "old" value
 
            do icnd = 2,ncnd
-             !if (.not.is_firststep)& 
-              diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
-              diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:)        = new(1:ncol,:)
+              if (nstep > 1) then 
+                 diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
+              end if
+              diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:) = new(1:ncol,:)
            end do
           
         end if ! l_output_incrm
@@ -145,6 +155,14 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
      end do ! iqoi = 1,nqoi
   end if ! ichkpt > 0
+
+!*************************************************************
+! Do conditional sampling and outfld calls only when 
+! nstep > 2, because the sampling time window might 
+! involve some checkpints from the previous nstep,
+! and valid increments are available only from nstep = 2.
+!*************************************************************
+if (nstep > 2) then
 
   !=======================================================
   ! Evaluate sampling condition if this is cnd_eval_chkpt 
@@ -236,6 +254,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
+
+!*************************************************************
+end if ! nstep > 2
+!*************************************************************
 
 end subroutine cnd_diag_checkpoint
 
