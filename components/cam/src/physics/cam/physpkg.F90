@@ -1538,7 +1538,7 @@ end if ! l_tracer_aero
 
     call t_stopf('tphysac_init')
 
-    call cnd_diag_checkpoint( diag, 'ACINIT', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'PACINI', state, pbuf, cam_in, cam_out )
 
 if (l_tracer_aero) then
     !===================================================
@@ -1591,7 +1591,7 @@ if (l_vdiff) then
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
 
-       call cnd_diag_checkpoint( diag, 'SFC', state, pbuf, cam_in, cam_out )
+       call cnd_diag_checkpoint( diag, 'VDFSFC', state, pbuf, cam_in, cam_out )
 
     else
 
@@ -1611,7 +1611,7 @@ if (l_vdiff) then
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('vertical_diffusion_tend')
 
-       call cnd_diag_checkpoint( diag, 'VDF', state, pbuf, cam_in, cam_out )
+       call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )
     
     endif
 
@@ -1636,7 +1636,7 @@ if (l_rayleigh) then
     call check_tracers_chng(state, tracerint, "vdiff", nstep, ztodt, cam_in%cflx)
 
 end if ! l_rayleigh
-    call cnd_diag_checkpoint( diag, 'RYL', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'RAYLEIGH', state, pbuf, cam_in, cam_out )
 
 if (l_tracer_aero) then
 
@@ -1645,7 +1645,7 @@ if (l_tracer_aero) then
     call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
     call t_stopf('aero_drydep')
-    call cnd_diag_checkpoint( diag, 'DRYDEP', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'AEDRYDEP', state, pbuf, cam_in, cam_out )
 
    ! CARMA microphysics
    !
@@ -1711,7 +1711,7 @@ if (l_gw_drag) then
     call t_stopf  ( 'iondrag' )
 
 end if ! l_gw_drag
-    call cnd_diag_checkpoint( diag, 'DRAG', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'GWDRAG', state, pbuf, cam_in, cam_out )
 
     !===================================================
     ! Update Nudging values, if needed
@@ -1776,7 +1776,7 @@ if (l_ac_energy_chk) then
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 end if ! l_ac_energy_chk
 
-    call cnd_diag_checkpoint( diag, 'ACCHK', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'DRYWET', state, pbuf, cam_in, cam_out )
 
 
     if (aqua_planet) then
@@ -1812,6 +1812,8 @@ end if ! l_ac_energy_chk
        ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
     end do
     water_vap_ac_2d(:ncol) = ftem(:ncol,1)
+
+    call cnd_diag_checkpoint( diag, 'PACEND', state, pbuf, cam_in, cam_out )
 
 end subroutine tphysac
 
@@ -2067,7 +2069,7 @@ subroutine tphysbc (ztodt,               &
                       )
     
     !-----------------------------------------------------------------------
-    call cnd_diag_checkpoint( diag, 'DYN', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'DYNEND', state, pbuf, cam_in, cam_out )
 
     !------------------------
     call t_startf('bc_init')
@@ -2283,6 +2285,7 @@ if (l_bc_energy_fix) then
     call t_stopf('energy_fixer')
 
 end if
+    call cnd_diag_checkpoint( diag, 'PBCINI', state, pbuf, cam_in, cam_out )
     !
     !===================================================
     ! Dry adjustment
@@ -2353,7 +2356,7 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
-    call cnd_diag_checkpoint( diag, 'DPCU', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
 
     !------------------------------------------------------------------------------
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
@@ -2700,8 +2703,6 @@ if (l_tracer_aero) then
    endif
 end if ! l_tracer_aero
 
-     call cnd_diag_checkpoint( diag, 'WETDEP', state, pbuf, cam_in, cam_out )
-
 !<songxl 2011-9-20---------------------------------
    if(trigmem)then
       do k=1,pver
@@ -2738,6 +2739,9 @@ end if ! l_tracer_aero
     call cloud_diagnostics_calc(state, pbuf)
 
     call t_stopf('bc_cld_diag_history_write')
+
+    call cnd_diag_checkpoint( diag, 'AEWETDEP', state, pbuf, cam_in, cam_out )
+
 
 if (l_rad) then
     !===================================================
@@ -2782,6 +2786,8 @@ end if ! l_rad
     call t_startf('diag_export')
     call diag_export(cam_out)
     call t_stopf('diag_export')
+
+    call cnd_diag_checkpoint( diag, 'PBCEND', state, pbuf, cam_in, cam_out )
 
 end subroutine tphysbc
 
