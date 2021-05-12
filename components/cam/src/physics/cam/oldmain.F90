@@ -318,11 +318,10 @@ end subroutine apply_masking
 !========================================================
 subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
+  use time_manager,   only: get_nstep
   use physics_types,  only: physics_state
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
-  use time_manager,   only: get_nstep
-  use constituents,   only: cnst_get_ind
 
   real(r8),           intent(inout) :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
@@ -348,8 +347,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   ! and index value of -1.
 
   call cnst_get_ind(trim(adjustl(varname)),idx)  !in, out
+  if (idx /= -1) then ! This variable is a tracer
 
-  if (idx /= -1) then ! This variable is a tracer field
      arrayout(1:ncol,:) = state%q(1:ncol,:,idx)
 
   else
@@ -387,17 +386,11 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   case('PHIS')
      arrayout(1:ncol,1) = state%phis(1:ncol)
 
-  !------ cam_in -------
-
   case('LANDFRAC')
      arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
 
-  !------ cam_out -------
-
   case('FLDS')
      arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
-
-  !------ pbuf -------
 
   case('PBLH')
       idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
@@ -420,17 +413,15 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
      arrayout(1:ncol,:) = get_nstep()
 
   case('LAT')
-     arrayout(1:ncol,1) = state%lat(1:ncol)
+     arrayout(1:ncol,:) = state%lat(1:ncol)
 
   case('LON')
-     arrayout(1:ncol,1) = state%lon(1:ncol)
+     arrayout(1:ncol,:) = state%lon(1:ncol)
 
   !-----------------------------------------------------------------------------------
   case default 
      call endrun(subname//': unknow varname - '//trim(varname))
   end select
-
-  end if !whether the requested variable is a tracer field
 
 end subroutine get_values
 
