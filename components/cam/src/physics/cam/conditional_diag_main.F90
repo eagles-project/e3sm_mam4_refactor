@@ -339,6 +339,22 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   ncol = state%ncol
 
+  !--------------------------------------------------------------------------------
+  ! If the requested variable is one of the advected tracers, get it from state%q
+  !--------------------------------------------------------------------------------
+  ! cnst_get_ind returns the index of a tracer in the host
+  ! model's advected tracer array. If not found, it will return
+  ! and index value of -1.
+
+  call cnst_get_ind(trim(adjustl(varname)),idx)  !in, out
+  if (idx /= -1) then ! This variable is a tracer
+
+     arrayout(1:ncol,:) = state%q(1:ncol,:,idx)
+
+  else
+  !-----------------------------------------------------------
+  ! Non-tracer variables
+  !-----------------------------------------------------------
   select case (trim(adjustl(varname)))
   case('T')
      arrayout(1:ncol,:) = state%t(1:ncol,:)
@@ -390,9 +406,19 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
  !elseif (varname.eq.'CAPE') then
  !   call cape()
 
+  !-----------------------------------------------------------------------------------
+  ! The following were added mostly for testing of the conditional diag functionality
+  !-----------------------------------------------------------------------------------
   case('NSTEP')
-     arrayout(1:ncol,:) = get_nstep() 
+     arrayout(1:ncol,:) = get_nstep()
 
+  case('LAT')
+     arrayout(1:ncol,:) = state%lat(1:ncol)
+
+  case('LON')
+     arrayout(1:ncol,:) = state%lon(1:ncol)
+
+  !-----------------------------------------------------------------------------------
   case default 
      call endrun(subname//': unknow varname - '//trim(varname))
   end select
