@@ -4,6 +4,7 @@ module conditional_diag_main
   use cam_abortutils, only: endrun
 
   use conditional_diag, only: cnd_diag_info, cnd_diag_info_t
+  use conditional_diag, only: NA, PDEL, PDELDRY
 
   implicit none
 
@@ -11,14 +12,20 @@ module conditional_diag_main
 
   public cnd_diag_checkpoint
 
+  ! comparison types used in defining sampling condition
+
   integer, parameter :: GE  =  2
   integer, parameter :: GT  =  1
   integer, parameter :: EQ  =  0
   integer, parameter :: LT  = -1
   integer, parameter :: LE  = -2
 
+  ! flags for grid cell/column masking
+
   real(r8),parameter :: ON  = 1._r8
   real(r8),parameter :: OFF = 0._r8
+
+  ! fillvalue for cells that are masked out 
 
   real(r8),parameter :: FILLVALUE = 0._r8
 
@@ -105,8 +112,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         !----------------------------------------------------------------
         allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) ))
 
-        call get_values( new, trim(cnd_diag_info%qoi_name(iqoi)), &! inout, in
-                         state, pbuf, cam_in, cam_out )            ! in
+        call get_values( new,                                &! out
+                         trim(cnd_diag_info%qoi_name(iqoi)), &! in
+                         cnd_diag_info%qoi_x_dp(iqoi),       &! in
+                         state, pbuf, cam_in, cam_out )       ! in
 
         !----------------------------------------------------------------
         ! The current implementation is such that the same set of 
@@ -171,8 +180,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         ! Get metric values and set flags 
         !---------------------------------
         metric => diag%cnd(icnd)%metric
-        call get_values( metric, trim(cnd_diag_info%metric_name(icnd)), &! inout, in
-                         state, pbuf, cam_in, cam_out )                  ! in
+        call get_values( metric,                                &! out
+                         trim(cnd_diag_info%metric_name(icnd)), &! in
+                         mult_by_dp = NA,                       &! in
+                         state, pbuf, cam_in, cam_out )          ! in
 
         flag => diag%cnd(icnd)%flag
         call get_flags( metric, icnd, ncol, cnd_diag_info, flag )
@@ -310,7 +321,7 @@ end subroutine apply_masking
 
 
 !========================================================
-subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
+subroutine get_values( arrayout, varname, mult_by_dp, state, pbuf, cam_in, cam_out )
 
   use physics_types,  only: physics_state
   use camsrfexch,     only: cam_in_t, cam_out_t
@@ -318,8 +329,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   use time_manager,   only: get_nstep
   use constituents,   only: cnst_get_ind
 
-  real(r8),           intent(inout) :: arrayout(:,:)
+  real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
+  integer,            intent(in)    :: mult_by_dp
   type(physics_state),intent(in)    :: state
   type(physics_buffer_desc), pointer:: pbuf(:)
   type(cam_in_t),     intent(in)    :: cam_in
@@ -347,9 +359,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
      arrayout(1:ncol,:) = state%q(1:ncol,:,idx)
 
   else
-  !-----------------------------------------------------------
+  !----------------------
   ! Non-tracer variables
-  !-----------------------------------------------------------
+  !----------------------
   select case (trim(adjustl(varname)))
   case('T')
      arrayout(1:ncol,:) = state%t(1:ncol,:)
@@ -419,12 +431,22 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   case('LON')
      arrayout(1:ncol,1) = state%lon(1:ncol)
 
-  !-----------------------------------------------------------------------------------
   case default 
      call endrun(subname//': unknow varname - '//trim(varname))
   end select
 
   end if !whether the requested variable is a tracer field
+
+  !-----------------------------------------------------------------------------------
+  ! Multiply the output array by dp (pressure layer thickness) if requested
+  !-----------------------------------------------------------------------------------
+  select case (mult_by_dp)
+  case (PDEL)
+     arrayout(1:ncol,:) = arrayout(1:ncol,:) * state%pdel(1:ncol,:)
+
+  case (PDELDRY)
+     arrayout(1:ncol,:) = arrayout(1:ncol,:) * state%pdeldry(1:ncol,:)
+  end select
 
 end subroutine get_values
 

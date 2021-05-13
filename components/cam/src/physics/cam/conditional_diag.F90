@@ -45,6 +45,12 @@ module conditional_diag
   integer, parameter :: nchkpt_max       = 99 ! max # of active checkpoints in a single simulation
   integer, parameter :: chkptname_maxlen = 8  ! string length for checkpoint name
 
+  ! what kind of dp (pressure layer thickness) to multiply QoI by
+
+  integer, parameter :: NA = 0
+  integer, parameter :: PDEL = 1
+  integer, parameter :: PDELDRY = 2
+
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
   !-------------------------------------------------------------------------------
@@ -92,6 +98,7 @@ module conditional_diag
     integer                                   :: nqoi = 0
     character(len=qoiname_maxlen),allocatable :: qoi_name(:)     ! shape = (nqoi)
     integer,allocatable                       :: qoi_nver(:)     ! shape = (nqoi); # of vertical levels
+    integer,allocatable                       :: qoi_x_dp(:)     ! shape = (nqoi); whether to multiply by dp, and if so, wet or dry
 
     ! Active checkpoints at which the QoI will be monitored 
     integer                                      :: nchkpt = 0     ! total # of active checkpoints
@@ -150,6 +157,7 @@ contains
 subroutine cnd_diag_readnl(nlfile)
 
    use cam_history_support,only: ptapes
+   use ppgrid,             only: pver
    use infnan,             only: nan, assignment(=), isnan
    use namelist_utils,     only: find_group_name
    use units,              only: getunit, freeunit
@@ -179,6 +187,7 @@ subroutine cnd_diag_readnl(nlfile)
 
    character(len=qoiname_maxlen)   :: qoi_name (nqoi_max)
    integer                         :: qoi_nver (nqoi_max)
+   integer                         :: qoi_x_dp (nqoi_max)
 
    logical :: l_output_state, l_output_incrm
    integer :: hist_tape_with_all_output(ptapes)  ! tape indices
@@ -188,7 +197,7 @@ subroutine cnd_diag_readnl(nlfile)
             metric_name, metric_nver, &
             metric_cmpr_type, metric_threshold, metric_tolerance, &
             cnd_eval_chkpt, cnd_end_chkpt, & 
-            qoi_chkpt, qoi_name, qoi_nver, &
+            qoi_chkpt, qoi_name, qoi_nver, qoi_x_dp, &
             l_output_state, l_output_incrm, hist_tape_with_all_output
 
    !----------------------------------------
@@ -206,6 +215,7 @@ subroutine cnd_diag_readnl(nlfile)
 
    qoi_name(:)       = ' '
    qoi_nver(:)       = 0 
+   qoi_x_dp(:)       = NA
 
    l_output_state = .false.
    l_output_incrm = .false.
@@ -273,6 +283,11 @@ subroutine cnd_diag_readnl(nlfile)
          nqoi = ii
 
          if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
+
+         do ii = 1,nqoi
+            if (qoi_x_dp(ii)/=DELP .and. qoi_x_dp(ii)/=DELPDRY) qoi_x_dp(ii) = NA
+            if (qoi_nver(ii)/=pver) qoi_x_dp(ii) = NA
+         end do
 
          !---------------------------------------------
          ! Count active checkpoints for QoI monitoring
@@ -349,6 +364,7 @@ subroutine cnd_diag_readnl(nlfile)
 
    call mpibcast(qoi_name,  nqoi_max*len(qoi_name(1)),  mpichar, 0, mpicom)
    call mpibcast(qoi_nver,  nqoi_max,                   mpiint,  0, mpicom)
+   call mpibcast(qoi_x_dp,  nqoi_max,                   mpiint,  0, mpicom)
 
    call mpibcast(l_output_state, 1, mpilog, 0, mpicom)
    call mpibcast(l_output_incrm, 1, mpilog, 0, mpicom)
@@ -403,6 +419,10 @@ subroutine cnd_diag_readnl(nlfile)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_nver')
    cnd_diag_info% qoi_nver(1:nqoi) = qoi_nver(1:nqoi)
 
+   allocate( cnd_diag_info% qoi_x_dp(nqoi), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_x_dp')
+   cnd_diag_info% qoi_x_dp(1:nqoi) = qoi_x_dp(1:nqoi)
+
    ! Active checkpoints at which the QoIs will be monitored
 
    allocate( cnd_diag_info% qoi_chkpt(nchkpt), stat=ierr)
@@ -451,9 +471,9 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a20,a6)')'QoI_name','nlev'
+      write(iulog,'(4x,a20,a6,a15)')'QoI_name','nlev', 'mult by dp'
       do ii = 1,cnd_diag_info%nqoi
-         write(iulog,'(i4.3,a20,i6)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii)
+         write(iulog,'(i4.3,a20,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), cnd_diag_info%qoi_x_dp(ii)
       end do
       write(iulog,*)
 
