@@ -59,6 +59,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: icnd, ichkpt, ii, iqoi
   integer :: ncol, lchnk
   integer :: nstep
+  integer :: mult_by_dp
 
   real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old(:,:)
   real(r8),allocatable :: new(:,:)
@@ -179,10 +180,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         !---------------------------------
         ! Get metric values and set flags 
         !---------------------------------
-        metric => diag%cnd(icnd)%metric
+        metric => diag%cnd(icnd)%metric  ;  mult_by_dp = NA
         call get_values( metric,                                &! out
                          trim(cnd_diag_info%metric_name(icnd)), &! in
-                         mult_by_dp = NA,                       &! in
+                         mult_by_dp,                            &! in
                          state, pbuf, cam_in, cam_out )          ! in
 
         flag => diag%cnd(icnd)%flag

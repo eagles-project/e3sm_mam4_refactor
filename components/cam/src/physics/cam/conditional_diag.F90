@@ -47,9 +47,9 @@ module conditional_diag
 
   ! what kind of dp (pressure layer thickness) to multiply QoI by
 
-  integer, parameter :: NA = 0
-  integer, parameter :: PDEL = 1
-  integer, parameter :: PDELDRY = 2
+  integer, parameter, public :: NA = 0
+  integer, parameter, public :: PDEL = 1
+  integer, parameter, public :: PDELDRY = 2
 
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
@@ -285,7 +285,7 @@ subroutine cnd_diag_readnl(nlfile)
          if (any(qoi_nver(1:nqoi)<=0)) call endrun(subname//'error: need positive qoi_nver for each qoi_name')
 
          do ii = 1,nqoi
-            if (qoi_x_dp(ii)/=DELP .and. qoi_x_dp(ii)/=DELPDRY) qoi_x_dp(ii) = NA
+            if (qoi_x_dp(ii)/=PDEL .and. qoi_x_dp(ii)/=PDELDRY) qoi_x_dp(ii) = NA
             if (qoi_nver(ii)/=pver) qoi_x_dp(ii) = NA
          end do
 

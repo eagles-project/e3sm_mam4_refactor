@@ -1311,6 +1311,13 @@ Number of vertical levels
 Default: none
 </entry>
 
+<entry id="qoi_x_dp" type="integer(20)"  category="history"
+       group="conditional_diag_nl" valid_values="" >
+Whether a QoI should be multiplied by dp for output;
+if so, wet or dry.
+Default: none
+</entry>
+
 <entry id="l_output_state" type="logical"  category="history"
        group="conditional_diag_nl" valid_values="" >
 Whether the state of the above-specified fields will be written
