@@ -68,13 +68,14 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   lchnk  = state%lchnk
   ncol   = state%ncol
 
-  nstep  = get_nstep()  ! current time step. 
-                        ! Save QoI values starting from the initial step.
-                        ! Do increment calculation when nstep > 1.
-                        ! Do conditional sampling and outfld calls only when 
-                        ! nstep > 2, because the sampling time window might 
-                        ! involve some checkpints from the previous nstep,
-                        ! and valid increments are available only from nstep = 2.
+  nstep  = get_nstep()  ! current time step. Later in this routine, we
+                        ! - save QoI values starting from the first step.
+                        ! - do increment calculation when nstep > 1.
+                        ! - evaluate sampling metrics starting from the first step.
+                        ! - do conditional sampling and outfld calls only when 
+                        !   nstep > 2, because the sampling time window might 
+                        !   involve some checkpints from the previous nstep,
+                        !   and valid increments are available only from nstep = 2.
 
   !=======================================
   ! Obtain QoI values and/or increments
@@ -156,14 +157,6 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
      end do ! iqoi = 1,nqoi
   end if ! ichkpt > 0
 
-!*************************************************************
-! Do conditional sampling and outfld calls only when 
-! nstep > 2, because the sampling time window might 
-! involve some checkpints from the previous nstep,
-! and valid increments are available only from nstep = 2.
-!*************************************************************
-if (nstep > 2) then
-
   !=======================================================
   ! Evaluate sampling condition if this is cnd_eval_chkpt 
   !=======================================================
@@ -202,7 +195,11 @@ if (nstep > 2) then
 
   !-------------------------------------------------------------------------------
   ! Apply conditional sampling, then send QoIs to history buffer
+  ! (Do this only when nstep > 2, because the sampling time window might 
+  ! involve some checkpints from the previous nstep,
+  ! and valid increments are available only from nstep = 2.)
   !-------------------------------------------------------------------------------
+  if (nstep > 2) then
   do icnd = 1,ncnd
 
      ! Check if conditional sampling needs to be completed at this checkpoint.
@@ -254,10 +251,7 @@ if (nstep > 2) then
 
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
-
-!*************************************************************
-end if ! nstep > 2
-!*************************************************************
+  end if ! nstep > 2
 
 end subroutine cnd_diag_checkpoint
 
