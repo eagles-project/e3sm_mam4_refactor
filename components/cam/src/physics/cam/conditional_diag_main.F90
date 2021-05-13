@@ -4,7 +4,7 @@ module conditional_diag_main
   use cam_abortutils, only: endrun
 
   use conditional_diag, only: cnd_diag_info, cnd_diag_info_t
-  use conditional_diag, only: NA, PDEL, PDELDRY
+  use conditional_diag, only: NODP, PDEL, PDELDRY
 
   implicit none
 
@@ -180,7 +180,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         !---------------------------------
         ! Get metric values and set flags 
         !---------------------------------
-        metric => diag%cnd(icnd)%metric  ;  mult_by_dp = NA
+        metric => diag%cnd(icnd)%metric  ;  mult_by_dp = NODP
         call get_values( metric,                                &! out
                          trim(cnd_diag_info%metric_name(icnd)), &! in
                          mult_by_dp,                            &! in
