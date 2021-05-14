@@ -47,10 +47,10 @@ module conditional_diag
 
   ! what kind of dp (pressure layer thickness) to multiply QoI by
 
+  integer, parameter         :: UNSET   = -1
   integer, parameter, public :: NODP    = 0
   integer, parameter, public :: PDEL    = 1
   integer, parameter, public :: PDELDRY = 2
-  integer, parameter, public :: UNSET   = -1
 
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
@@ -94,20 +94,21 @@ module conditional_diag
                                                          ! of the corresponding sampling conditions. 
                                                          ! At this checkpoint, the masking of QoIs will be done
                                                          ! and the masked values will be send to history buffer.
-    integer,allocatable          :: cnd_x_dp(:)          ! shape = (ncnd); whether QoIs under this condition should
-                                                         ! be multiplied by dp, and if so, wet or dry.
 
     ! QoIs to be monitored. Each QoI can have 1, pver, or pver+1 vertical levels
     integer                                   :: nqoi = 0
     character(len=qoiname_maxlen),allocatable :: qoi_name(:)     ! shape = (nqoi)
     integer,allocatable                       :: qoi_nver(:)     ! shape = (nqoi); # of vertical levels
-    integer,allocatable                       :: qoi_x_dp(:)     ! shape = (nqoi); whether to multiply by dp, and if so, wet or dry
 
     ! Active checkpoints at which the QoI will be monitored 
     integer                                      :: nchkpt = 0     ! total # of active checkpoints
     character(len=chkptname_maxlen), allocatable :: qoi_chkpt(:)   ! checkpoints at which QoIs will be monitored
-    integer,allocatable                          :: chkpt_x_dp(:)  ! shape = (nchkpt); whether QoIs at this should
-                                                                   ! be multiplied by dp, and if so, wet or dry.
+
+    ! "Multiply by dp" options
+    integer,allocatable :: x_dp(:,:,:)  ! shape = (ncnd,nqoi,nchkpt); whether QoIs at each checkpoint under each condition 
+                                        ! should be multiplied by dp, and if so, wet or dry.
+
+
   end type cnd_diag_info_t
 
   !-------------------------------------------------------------------------------
@@ -321,7 +322,7 @@ subroutine cnd_diag_readnl(nlfile)
          ! ... for all QoIs under a condition 
 
          do ii = 1,ncnd
-            if (cnd_x_dp(ii)/=PDEL .and. cnd_x_dp(ii)/=PDELDRY .and. cnd_x_dp(ii)/=NODP ) cnd_x_dp(ii) = UNSET
+            if (cnd_x_dp(ii)/=NODP ) cnd_x_dp(ii) = UNSET
          end do
 
          ! ... for checkpoints
@@ -456,21 +457,14 @@ subroutine cnd_diag_readnl(nlfile)
       cnd_diag_info% qoi_chkpt(ii) = trim(adjustl(qoi_chkpt(ii)))
    end do
 
-   ! "multiply by dp" options
+   ! "multiply by dp" selections
+   
+   allocate( cnd_diag_info% x_dp(ncnd,nqoi,nchkpt), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% x_dp')
 
-   allocate( cnd_diag_info% qoi_x_dp(nqoi), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_x_dp')
-   cnd_diag_info% qoi_x_dp(1:nqoi) = qoi_x_dp(1:nqoi)
+   call set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_xdp, cnd_diag_info%x_dp )! in, in, in, out
 
-   allocate( cnd_diag_info% cnd_x_dp(ncnd), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% cnd_x_dp')
-   cnd_diag_info% cnd_x_dp(1:ncnd) = cnd_x_dp(1:ncnd)
-
-   allocate( cnd_diag_info% chkpt_x_dp(nchkpt), stat=ierr)
-   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% chkpt_x_dp')
-   cnd_diag_info% chkpt_x_dp(1:nchkpt) = chkpt_x_dp(1:nchkpt)
-
-   ! utput to history tape(s)
+   ! output to history tape(s)
 
    cnd_diag_info%l_output_state = l_output_state
    cnd_diag_info%l_output_incrm = l_output_incrm
@@ -523,12 +517,99 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)' l_output_incrm = ',l_output_incrm
       write(iulog,*)
       write(iulog,'(a,12i5)')' hist_tape_with_all_output = ',hist_tape_with_all_output(1:ntape)
+      write(iulog,*)'--------------------------------------------------'
+      write(iulog,*)
+      write(iulog,*)'      "multiply by dp" selections'
+      write(iulog,*)
+      do icnd = 1,ncnd
+         write(iulog,*)
+         write(iulog,*) 'condition',icnd
+         write(iulog,'(10x,20a10)') cnd_diag_info%qoi_name(:)
+         do ichkpt = 1,nchkpt
+         write(iulog,'(a10,20i10)') adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), cnd_diag_info%x_dp(icnd,:,ichkpt)
+         end do
+      end do
       write(iulog,*)'==========================================================='
       write(iulog,*)
 
   end if  ! masterproc
 
 end subroutine cnd_diag_readnl
+
+!===============================================================
+subroutine set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_x_dp, x_dp_out )
+
+   integer,intent(in) ::   cnd_x_dp(:)
+   integer,intent(in) ::   qoi_x_dp(:)
+   integer,intent(in) :: chkpt_x_dp(:)
+   integer,intent(out) ::  x_dp_out(:,:,:)
+
+   integer :: ncnd, nqoi, nchkpt
+   integer :: icnd, iqoi, ichkpt
+
+   character(len=256) :: msg
+
+   ncnd   = size(cnd_x_dp)
+   nqoi   = size(qoi_x_dp)
+   nchkpt = size(chkpt_x_dp)
+
+  do icnd = 1,ncnd
+     !------------------------------------------------------------------------------------
+     ! If user has explicitly switched off multiplication by dp for a condition, then
+     ! turn off the multiplication for all QoIs and QoI_checkpoints under that condition
+     !------------------------------------------------------------------------------------
+     if ( cnd_x_dp(icnd)==NODP ) then
+
+        x_dp_out(icnd,:,:) = NODP
+
+     !--------------------------------------------------------------------------------------------
+     ! Otherwise, make selection for each QoI at each checkpoint based on qoi_x_dp and chkpt_x_dp
+     !--------------------------------------------------------------------------------------------
+     else
+        do iqoi = 1,nqoi
+
+           !---------------------------------------------------------------------------
+           ! If user has explicitly switched off multiplication by dp for a Qoi, then
+           ! turn off the multiplication for that QoI at all checkpoints under the 
+           ! current sampling condition
+           !---------------------------------------------------------------------------
+           if (qoi_x_dp(iqoi)==NODP) then
+
+              x_dp_out(icnd,iqoi,:) = NODP
+
+           !------------------------------------------------------------------
+           ! Otherwise, qoi_x_dp(iqoi) is expected to be either PDEL or PDELP
+           !------------------------------------------------------------------
+           else if (qoi_x_dp(iqoi)==PDEL .or. qoi_x_dp(iqoi)==PDELP)
+
+              !--------------------------------------------------------------
+              ! Loop through all checkpoints. If chkpt_x_dp(ichkpt) has been 
+              ! set, then take that value; otherwise, use qoi_x_dp(iqoi)
+              !--------------------------------------------------------------
+              do ichkpt = 1,nchkpt
+                 if (chkpt_x_dp(ichkpt)/=(-1)) then
+                    x_dp_out(icnd,iqoi,ichkpt) = chkpt_x_dp(ichkpt)
+                 else
+                    x_dp_out(icnd,iqoi,ichkpt) = qoi_x_dp(iqoi)
+                 end if
+              end do ! ichkpt
+
+           else
+           !-----------------------------------------------------------------------
+           ! Subroutine cnd_diag_readnl is supposed to have set the default value
+           ! of qoi_x_dp to NODP, so we do not expect values other than
+           ! NODP, PDEL, or PDELP.
+           !-----------------------------------------------------------------------
+              write(msg,'(a,i2,a,i2,a)') "qoi_x_dp(",iqoi,") =",qoi_x_dp(iqoi),' is unexpected'
+              call endrun(trim(msg))
+
+           end if ! qoi_x_dp(iqoi)
+        end do    ! iqoi
+
+     end if ! cnd_x_dp(icnd)==NODP
+  end do    ! icnd
+
+end subroutine set_x_dp
 
 !===============================================================================
 subroutine cnd_diag_alloc( phys_diag, begchunk, endchunk, pcols, cnd_diag_info )

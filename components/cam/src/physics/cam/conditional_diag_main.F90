@@ -4,7 +4,6 @@ module conditional_diag_main
   use cam_abortutils, only: endrun
 
   use conditional_diag, only: cnd_diag_info, cnd_diag_info_t
-  use conditional_diag, only: NODP, PDEL, PDELDRY
 
   implicit none
 
@@ -61,8 +60,8 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: nstep
   integer :: mult_by_dp
 
-  real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old(:,:)
-  real(r8),allocatable :: new(:,:)
+  real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old_x_dp(:,:)
+  real(r8),allocatable :: new(:,:), new_x_dp(:,:)
 
   character(len=max_fieldname_len) :: outfldname, flag_name_out, metric_name_out
 
@@ -88,7 +87,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   !=======================================
   ! Obtain QoI values and/or increments
   !=======================================
-  ! First check if this checkpoint is active for QoI monitoring
+  ! First determine if this checkpoint is active for QoI monitoring
 
   ichkpt = 0  ! 0 = checkpoint inactive; this is the default
 
@@ -103,69 +102,77 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   !---------------------------------------------------------------------------
   ! This checkpoint is active for QoI monitoring. Obtain the QoI values 
   ! and/or their increments if needed, and save to variable "diag". 
-  ! Note that here we only obtain and save the QoIs. 
+  ! Note that here we only obtain and save the QoIs and/or increments.
   ! Conditional sampling won't be applied until the "cnd_end_chkpt" checkpoint
   !---------------------------------------------------------------------------
      do iqoi = 1,nqoi
 
-        !----------------------------------------------------------------
-        ! Obtain the most up-to-date values of the QoI 
-        !----------------------------------------------------------------
-        allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) ))
+        ! Allocate memory for tmp arrays. This has to be done inside the iqoi
+        ! loop as different QoIs might have different numbers of vertical levels
 
+        allocate( new     ( pcols,cnd_diag_info%qoi_nver(iqoi) ))
+        allocate( new_x_dp( pcols,cnd_diag_info%qoi_nver(iqoi) ))
+
+        !------------------------------------------------------------------------
+        ! Obtain the most up-to-date values of the QoI (not yet multiplied by dp)
+        !------------------------------------------------------------------------
         call get_values( new,                                &! out
                          trim(cnd_diag_info%qoi_name(iqoi)), &! in
-                         cnd_diag_info%qoi_x_dp(iqoi),       &! in
                          state, pbuf, cam_in, cam_out )       ! in
 
         !----------------------------------------------------------------
-        ! The current implementation is such that the same set of 
-        ! checkpoints and QoIs are monitored for all different sampling
-        ! conditions. Now that we have obtain the QoI values and/or increments 
-        ! at checkpoint iqoi, we save the same set of values under all   
-        ! conditions. When conditional sampling is applied later,
-        ! the different copies will likely be sampled differently.
-        ! In the future, if we decide to allow for different QoIs and/or
-        ! checkpoints under different sampling conditions, then
-        ! the loops in this subroutine will need to be reworked.
-        !---------------------------------------------------------------
-        if (cnd_diag_info%l_output_state) then
-           do icnd = 1,ncnd
-              diag%cnd(icnd)%qoi(iqoi)% val(1:ncol,:,ichkpt) = new(1:ncol,:)
-           end do
-        end if
+        ! Save the QoI and its increment to corresponding
+        ! components of the diag data structure. Because the QoI and 
+        ! increment might need to be multiplied by dp (pressure layer 
+        ! thickness) if requested by user, and the request might be 
+        ! different for different sampling conditions, we have to 
+        ! loop over different conditions
+        !----------------------------------------------------------------
+        do icnd = 1,ncnd
 
-        !--------------------------------------------------------------
-        ! Calculate increments if requested by user
-        !--------------------------------------------------------------
-        if (cnd_diag_info%l_output_incrm) then
+           x_dp = cnd_diag_info% x_dp(icnd,iqoi,ichkpt)
 
-           icnd = 1
-           inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
-           old => diag%cnd(icnd)%qoi(iqoi)% old
+           !-----------------------------------------------------------------
+           ! mutiply the new QoI values by dp and save in tmp array new_x_dp
+           !-----------------------------------------------------------------
+           call multiply_by_dp( new, state, x_dp, new_x_dp )! in, in, in, out 
 
-           if (nstep > 1) then 
-              inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
+           !---------------------------------------------------------------------
+           ! save the QoI (possibly multiplied by dp) to the diag data structure
+           !---------------------------------------------------------------------
+           if (cnd_diag_info%l_output_state) then
+              diag%cnd(icnd)%qoi(iqoi)% val(:,:,ichkpt) = new_x_dp(:,:) 
            end if
 
-           old(1:ncol,:) = new(1:ncol,:)
+           !--------------------------------------------------------------
+           ! calculate and save the inrements, possibly multiplied by dp 
+           !--------------------------------------------------------------
+           if (cnd_diag_info%l_output_incrm) then
 
-           ! Save increments for other sampling conditions; update "old" value
+              old_x_dp => diag%cnd(icnd)%qoi(iqoi)% old
 
-           do icnd = 2,ncnd
-              if (nstep > 1) then 
-                 diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
+              ! calculate increments
+
+              if (nstep>1) then 
+                 inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
+                 inc(1:ncol,:) = new_x_dp(1:ncol,:) - old_x_dp(1:ncol,:)
               end if
-              diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:) = new(1:ncol,:)
-           end do
-          
-        end if ! l_output_incrm
+
+              ! Save the current value of QoI as "old" for next checkpoint
+
+              old_x_dp(1:ncol,:) = new_x_dp(1:ncol,:)
+
+           end if ! l_output_incrm
+           !----------------------
+
+        end do ! icnd
 
         ! Calculations done for this QoI. Clean up.
-        deallocate( new )
+        deallocate(new)
+        deallocate(new_x_dp)
 
      end do ! iqoi = 1,nqoi
-  end if ! ichkpt > 0
+  end if    ! ichkpt > 0
 
   !=======================================================
   ! Evaluate sampling condition if this is cnd_eval_chkpt 
@@ -180,10 +187,9 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         !---------------------------------
         ! Get metric values and set flags 
         !---------------------------------
-        metric => diag%cnd(icnd)%metric  ;  mult_by_dp = NODP
+        metric => diag%cnd(icnd)%metric
         call get_values( metric,                                &! out
                          trim(cnd_diag_info%metric_name(icnd)), &! in
-                         mult_by_dp,                            &! in
                          state, pbuf, cam_in, cam_out )          ! in
 
         flag => diag%cnd(icnd)%flag
@@ -205,12 +211,12 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
      end if !right chkpt
   end do    !icnd
 
-  !-------------------------------------------------------------------------------
-  ! Apply conditional sampling, then send QoIs to history buffer
+  !=======================================================================
+  ! Apply conditional sampling, then send QoIs to history buffer.
   ! (Do this only when nstep > 2, because the sampling time window might 
   ! involve some checkpints from the previous nstep,
-  ! and valid increments are available only from nstep = 2.)
-  !-------------------------------------------------------------------------------
+  ! and valid increments are available only from nstep = 2 onwards)
+  !=======================================================================
   if (nstep > 2) then
   do icnd = 1,ncnd
 
@@ -322,7 +328,7 @@ end subroutine apply_masking
 
 
 !========================================================
-subroutine get_values( arrayout, varname, mult_by_dp, state, pbuf, cam_in, cam_out )
+subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   use physics_types,  only: physics_state
   use camsrfexch,     only: cam_in_t, cam_out_t
@@ -332,7 +338,6 @@ subroutine get_values( arrayout, varname, mult_by_dp, state, pbuf, cam_in, cam_o
 
   real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
-  integer,            intent(in)    :: mult_by_dp
   type(physics_state),intent(in)    :: state
   type(physics_buffer_desc), pointer:: pbuf(:)
   type(cam_in_t),     intent(in)    :: cam_in
@@ -350,9 +355,9 @@ subroutine get_values( arrayout, varname, mult_by_dp, state, pbuf, cam_in, cam_o
   !--------------------------------------------------------------------------------
   ! If the requested variable is one of the advected tracers, get it from state%q
   !--------------------------------------------------------------------------------
-  ! cnst_get_ind returns the index of a tracer in the host
-  ! model's advected tracer array. If not found, it will return
-  ! and index value of -1.
+  ! cnst_get_ind returns the index of a tracer in the host  model's advected 
+  ! tracer array. If variable is not found on the tracer list, and index value 
+  ! of -1 will be returned
 
   call cnst_get_ind(trim(adjustl(varname)),idx, abort=.false.)  !in, out, in
 
@@ -438,19 +443,41 @@ subroutine get_values( arrayout, varname, mult_by_dp, state, pbuf, cam_in, cam_o
 
   end if !whether the requested variable is a tracer field
 
-  !-----------------------------------------------------------------------------------
-  ! Multiply the output array by dp (pressure layer thickness) if requested
-  !-----------------------------------------------------------------------------------
-  select case (mult_by_dp)
-  case (PDEL)
-     arrayout(1:ncol,:) = arrayout(1:ncol,:) * state%pdel(1:ncol,:)
-
-  case (PDELDRY)
-     arrayout(1:ncol,:) = arrayout(1:ncol,:) * state%pdeldry(1:ncol,:)
-  end select
-
 end subroutine get_values
 
+!==============================================================
+subroutine multiply_by_dp( arrayin, state, x_dp, arrayout )
+
+  use physics_types,   only: physics_state
+  use conditional_diag,only: PDEL,PDELDRY,NODP
+
+  real(r8),           intent(out) :: arrayin (:,:)
+  type(physics_state),intent(in)  :: state
+  integer,            intent(in)  :: x_dp 
+  real(r8),           intent(out) :: arrayout(:,:)
+
+  integer :: ncol
+  character(len=*),parameter :: subname = 'conditional_diag_main:multiply_by_dp'
+
+  ncol = state%ncol
+
+  select case (x_dp)
+  case (PDEL)
+     arrayout(1:ncol,:) = arrayin(1:ncol,:) * state%pdel(1:ncol,:)
+
+  case (PDELDRY)
+     arrayout(1:ncol,:) = arrayin(1:ncol,:) * state%pdeldry(1:ncol,:)
+
+  case (NODP)
+     arrayout(1:ncol,:) = arrayin(1:ncol,:)
+
+  case default
+     call endrun(subname//': unexpected value of x_dp')
+  end select
+
+end subroutine multiply_by_dp
+
+!==============================================================
 subroutine get_flags( metric, icnd, ncol, cnd_diag_info, flag )
 
   real(r8),              intent(in) :: metric(:,:)
