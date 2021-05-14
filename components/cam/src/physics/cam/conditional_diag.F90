@@ -315,7 +315,15 @@ subroutine cnd_diag_readnl(nlfile)
          ! ... for QoIs
 
          do ii = 1,nqoi
-            if (qoi_x_dp(ii)/=PDEL .and. qoi_x_dp(ii)/=PDELDRY) qoi_x_dp(ii) = NODP
+
+            if ( qoi_x_dp(ii)/=PDEL     .and. &
+                 qoi_x_dp(ii)/=PDEL+100 .and. &
+                 qoi_x_dp(ii)/=PDELDRY  .and. &
+                 qoi_x_dp(ii)/=PDELDRY+100    ) then
+
+               qoi_x_dp(ii) = NODP
+            end if
+
             if (qoi_nver(ii)/=pver) qoi_x_dp(ii) = NODP
          end do
 
@@ -564,18 +572,18 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
         do iqoi = 1,nqoi
 
            !---------------------------------------------------------------------------
-           ! If user has explicitly switched off multiplication by dp for a Qoi, then
-           ! turn off the multiplication for that QoI at all checkpoints under the 
-           ! current sampling condition
+           ! If user chose NODP, PDEL, or PDELDRY for this QoI, then take that value
            !---------------------------------------------------------------------------
-           if (qoi_x_dp(iqoi)==NODP) then
+           select case ( qoi_x_dp(iqoi) )
+           case (NODP,PDEL,PDELDRY)
 
-              x_dp_out(icnd,iqoi,:) = NODP
+              x_dp_out(icnd,iqoi,:) = qoi_x_dp(iqoi) 
 
-           !--------------------------------------------------------------------
-           ! Otherwise, qoi_x_dp(iqoi) is expected to be either PDEL or PDELDRY
-           !--------------------------------------------------------------------
-           else if ( qoi_x_dp(iqoi)==PDEL .or. qoi_x_dp(iqoi)==PDELDRY ) then
+           !---------------------------------------------------------------------------------
+           ! If user set qoi_x_dp(iqoi) to PDEL+100 or PDELDRY+100, then use PDEL or PDELDRY
+           ! but give precedence to chkpt_x_dp.
+           !---------------------------------------------------------------------------------
+           case ( PDEL+100 .or. PDELDRY+100 ) then
 
               !--------------------------------------------------------------
               ! Loop through all checkpoints. If chkpt_x_dp(ichkpt) has been 
@@ -585,15 +593,15 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
                  if (chkpt_x_dp(ichkpt)/=(-1)) then
                     x_dp_out(icnd,iqoi,ichkpt) = chkpt_x_dp(ichkpt)
                  else
-                    x_dp_out(icnd,iqoi,ichkpt) = qoi_x_dp(iqoi)
+                    x_dp_out(icnd,iqoi,ichkpt) = qoi_x_dp(iqoi) - 100
                  end if
               end do ! ichkpt
 
-           else
+           case default 
            !-----------------------------------------------------------------------
            ! Subroutine cnd_diag_readnl is supposed to have set the default value
            ! of qoi_x_dp to NODP, so we do not expect values other than
-           ! NODP, PDEL, or PDELDRY.
+           ! NODP, PDEL(+100), or PDELDRY(+100).
            !-----------------------------------------------------------------------
               write(msg,'(a,i2,a,i2,a)') "qoi_x_dp(",iqoi,") =",qoi_x_dp(iqoi),' is unexpected'
               call endrun(trim(msg))
