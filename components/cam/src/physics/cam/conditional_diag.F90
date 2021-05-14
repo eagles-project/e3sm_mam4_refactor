@@ -314,20 +314,20 @@ subroutine cnd_diag_readnl(nlfile)
          ! ... for QoIs
 
          do ii = 1,nqoi
-            if (qoi_x_dp(ii)/=DELP .and. qoi_x_dp(ii)/=DELPDRY) qoi_x_dp(ii) = NODP
+            if (qoi_x_dp(ii)/=PDEL .and. qoi_x_dp(ii)/=PDELDRY) qoi_x_dp(ii) = NODP
             if (qoi_nver(ii)/=pver) qoi_x_dp(ii) = NODP
          end do
 
          ! ... for all QoIs under a condition 
 
          do ii = 1,ncnd
-            if (cnd_x_dp(ii)/=DELP .and. cnd_x_dp(ii)/=DELPDRY .and. cnd_x_dp(ii)/=NODP ) cnd_x_dp(ii) = UNSET
+            if (cnd_x_dp(ii)/=PDEL .and. cnd_x_dp(ii)/=PDELDRY .and. cnd_x_dp(ii)/=NODP ) cnd_x_dp(ii) = UNSET
          end do
 
          ! ... for checkpoints
 
-         do ii = 1,ncchkpt
-            if (chkpt_x_dp(ii)/=DELP .and. chkpt_x_dp(ii)/=DELPDRY) chkpt_x_dp(ii) = UNSET
+         do ii = 1,nchkpt
+            if (chkpt_x_dp(ii)/=PDEL .and. chkpt_x_dp(ii)/=PDELDRY) chkpt_x_dp(ii) = UNSET
          end do
 
          !---------------------------------------------------------------------------------
@@ -489,10 +489,10 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)'==========================================================='
 
       write(iulog,*)
-      write(iulog,'(4x,2x,a12,a6,6a12)')'metric','nlev','cmpr_type','threshold','tolerance', &
+      write(iulog,'(4x,2x,a15,a6,6a15)')'metric','nlev','cmpr_type','threshold','tolerance', &
                                         'cnd_eval_chkpt','cnd_end_chkpt', 'mult by dp'
       do ii = 1,cnd_diag_info%ncnd
-         write(iulog,'(i4.3,2x,a12,i6,i12,2e12.2,2a12,i12)') ii,                             &
+         write(iulog,'(i4.3,2x,a15,i6,i15,2e15.2,2a15,i15)') ii,                             &
                                                 adjustr(cnd_diag_info% metric_name(ii)),     &
                                                         cnd_diag_info% metric_nver(ii),      &
                                                         cnd_diag_info% metric_cmpr_type(ii), &
@@ -505,16 +505,16 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,2a12)') 'qoi_chkpt','mult by dp'
+      write(iulog,'(4x,2a15)') 'qoi_chkpt','mult by dp'
       do ii = 1,cnd_diag_info%nchkpt
-         write(iulog,'(i4.3,a12,i12)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii)), cnd_diag_info%chkpt_x_dp(ii)
+         write(iulog,'(i4.3,a15,i15)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii)), cnd_diag_info%chkpt_x_dp(ii)
       end do
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a12,a6,a12)')'QoI_name','nlev', 'mult by dp'
+      write(iulog,'(4x,a15,a6,a15)')'QoI_name','nlev', 'mult by dp'
       do ii = 1,cnd_diag_info%nqoi
-         write(iulog,'(i4.3,a12,i6,i12)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), cnd_diag_info%qoi_x_dp(ii)
+         write(iulog,'(i4.3,a15,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), cnd_diag_info%qoi_x_dp(ii)
       end do
       write(iulog,*)
 
