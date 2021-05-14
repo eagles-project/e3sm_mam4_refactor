@@ -520,11 +520,10 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,*)
       write(iulog,*)'      "multiply by dp" selections sorted by sampling condition'
-      write(iulog,*)
       do icnd = 1,ncnd
          write(iulog,*)
          write(iulog,'(a,i3.3)') 'condition ',icnd
-         write(iulog,'(10x,20a10)') cnd_diag_info%qoi_name(:)
+         write(iulog,'(10x,20a10)') ( adjustr(cnd_diag_info%qoi_name(ii)), ii=1,nqoi )
          do ichkpt = 1,nchkpt
          write(iulog,'(a10,20i10)') adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), cnd_diag_info%x_dp(icnd,:,ichkpt)
          end do
