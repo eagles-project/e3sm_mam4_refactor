@@ -58,7 +58,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: icnd, ichkpt, ii, iqoi
   integer :: ncol, lchnk
   integer :: nstep
-  integer :: mult_by_dp
+  integer :: x_dp
 
   real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old_x_dp(:,:)
   real(r8),allocatable :: new(:,:), new_x_dp(:,:)

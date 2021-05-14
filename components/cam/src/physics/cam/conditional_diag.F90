@@ -170,7 +170,7 @@ subroutine cnd_diag_readnl(nlfile)
    ! Local variables
    character(len=*), parameter :: subname = 'cnd_diag_readnl'
 
-   integer :: ncnd, nchkpt, nqoi, ntape, ii
+   integer :: ncnd, nchkpt, nqoi, ntape, ii, icnd, ichkpt
 
    ! Local variables for reading namelist
 
@@ -462,7 +462,7 @@ subroutine cnd_diag_readnl(nlfile)
    allocate( cnd_diag_info% x_dp(ncnd,nqoi,nchkpt), stat=ierr)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% x_dp')
 
-   call set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_xdp, cnd_diag_info%x_dp )! in, in, in, out
+   call set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, cnd_diag_info%x_dp )! in, in, in, out
 
    ! output to history tape(s)
 
@@ -494,21 +494,21 @@ subroutine cnd_diag_readnl(nlfile)
                                                         cnd_diag_info% metric_tolerance(ii), &
                                                 adjustr(cnd_diag_info% cnd_eval_chkpt(ii)),  &
                                                 adjustr(cnd_diag_info% cnd_end_chkpt(ii)),   &
-                                                        cnd_diag_info% cnd_x_dp(ii)
+                                                        cnd_x_dp(ii)
       end do
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,'(4x,2a15)') 'qoi_chkpt','mult by dp'
       do ii = 1,cnd_diag_info%nchkpt
-         write(iulog,'(i4.3,a15,i15)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii)), cnd_diag_info%chkpt_x_dp(ii)
+         write(iulog,'(i4.3,a15,i15)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii)), chkpt_x_dp(ii)
       end do
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,'(4x,a15,a6,a15)')'QoI_name','nlev', 'mult by dp'
       do ii = 1,cnd_diag_info%nqoi
-         write(iulog,'(i4.3,a15,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), cnd_diag_info%qoi_x_dp(ii)
+         write(iulog,'(i4.3,a15,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii)
       end do
       write(iulog,*)
 
@@ -519,11 +519,11 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,'(a,12i5)')' hist_tape_with_all_output = ',hist_tape_with_all_output(1:ntape)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,*)
-      write(iulog,*)'      "multiply by dp" selections'
+      write(iulog,*)'      "multiply by dp" selections sorted by sampling condition'
       write(iulog,*)
       do icnd = 1,ncnd
          write(iulog,*)
-         write(iulog,*) 'condition',icnd
+         write(iulog,'(a,i3.3)') 'condition ',icnd
          write(iulog,'(10x,20a10)') cnd_diag_info%qoi_name(:)
          do ichkpt = 1,nchkpt
          write(iulog,'(a10,20i10)') adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), cnd_diag_info%x_dp(icnd,:,ichkpt)
@@ -537,21 +537,17 @@ subroutine cnd_diag_readnl(nlfile)
 end subroutine cnd_diag_readnl
 
 !===============================================================
-subroutine set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_x_dp, x_dp_out )
+subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_out )
 
+   integer,intent(in) :: ncnd, nqoi, nchkpt
    integer,intent(in) ::   cnd_x_dp(:)
    integer,intent(in) ::   qoi_x_dp(:)
    integer,intent(in) :: chkpt_x_dp(:)
    integer,intent(out) ::  x_dp_out(:,:,:)
 
-   integer :: ncnd, nqoi, nchkpt
    integer :: icnd, iqoi, ichkpt
 
    character(len=256) :: msg
-
-   ncnd   = size(cnd_x_dp)
-   nqoi   = size(qoi_x_dp)
-   nchkpt = size(chkpt_x_dp)
 
   do icnd = 1,ncnd
      !------------------------------------------------------------------------------------
@@ -577,10 +573,10 @@ subroutine set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_x_dp, x_dp_out )
 
               x_dp_out(icnd,iqoi,:) = NODP
 
-           !------------------------------------------------------------------
-           ! Otherwise, qoi_x_dp(iqoi) is expected to be either PDEL or PDELP
-           !------------------------------------------------------------------
-           else if (qoi_x_dp(iqoi)==PDEL .or. qoi_x_dp(iqoi)==PDELP)
+           !--------------------------------------------------------------------
+           ! Otherwise, qoi_x_dp(iqoi) is expected to be either PDEL or PDELDRY
+           !--------------------------------------------------------------------
+           else if ( qoi_x_dp(iqoi)==PDEL .or. qoi_x_dp(iqoi)==PDELDRY ) then
 
               !--------------------------------------------------------------
               ! Loop through all checkpoints. If chkpt_x_dp(ichkpt) has been 
@@ -598,7 +594,7 @@ subroutine set_x_dp( cnd_x_dp, qoi_x_dp, chkpt_x_dp, x_dp_out )
            !-----------------------------------------------------------------------
            ! Subroutine cnd_diag_readnl is supposed to have set the default value
            ! of qoi_x_dp to NODP, so we do not expect values other than
-           ! NODP, PDEL, or PDELP.
+           ! NODP, PDEL, or PDELDRY.
            !-----------------------------------------------------------------------
               write(msg,'(a,i2,a,i2,a)') "qoi_x_dp(",iqoi,") =",qoi_x_dp(iqoi),' is unexpected'
               call endrun(trim(msg))
