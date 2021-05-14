@@ -583,7 +583,7 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
            ! If user set qoi_x_dp(iqoi) to PDEL+100 or PDELDRY+100, then use PDEL or PDELDRY
            ! but give precedence to chkpt_x_dp.
            !---------------------------------------------------------------------------------
-           case ( PDEL+100 .or. PDELDRY+100 ) then
+           case ( PDEL+100, PDELDRY+100 )
 
               !--------------------------------------------------------------
               ! Loop through all checkpoints. If chkpt_x_dp(ichkpt) has been 
@@ -606,7 +606,7 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
               write(msg,'(a,i2,a,i2,a)') "qoi_x_dp(",iqoi,") =",qoi_x_dp(iqoi),' is unexpected'
               call endrun(trim(msg))
 
-           end if ! qoi_x_dp(iqoi)
+           end select ! qoi_x_dp(iqoi)
         end do    ! iqoi
 
      end if ! cnd_x_dp(icnd)==NODP
