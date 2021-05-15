@@ -221,7 +221,7 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
    write(icnd_str,'(i2.2)') icnd
 
    fld_name_in_output = 'cnd'//icnd_str//'_'// &
-                        trim(cnd_diag_info%qoi_name(iqoi))//xdp//'_'// &
+                        trim(cnd_diag_info%qoi_name(iqoi))//trim(xdp)//'_'// &
                         trim(cnd_diag_info%qoi_chkpt(ichkpt))//suff
 
 end subroutine get_fld_name_for_output 
