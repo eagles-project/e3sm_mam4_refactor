@@ -34,7 +34,8 @@ subroutine cnd_diag_output_init(pver, cnd_diag_info)
 !          - the various QoIs (and their increments if requested) to which 
 !            conditional sampling is applied. Per user's choice, 
 !            these QoIs and increments might be monitored at various checkpoints
-!            in each time step.
+!            in each time step and might be multiplied with the pressure layer
+!            thickness.
 !-----------------------------------------------------------------------------------
   use cam_history_support, only: max_fieldname_len, horiz_only
   use cam_history,         only: addfld, add_default
@@ -196,6 +197,7 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
                                     fld_name_in_output      )!out
 
    use cam_history_support, only: max_fieldname_len
+   use conditional_diag,    only: NODP
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
@@ -203,12 +205,23 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
 
    character(len=max_fieldname_len),intent(out) :: fld_name_in_output 
 
-   character(len=2) :: icnd_str ! condition index as a string
+   character(len=2) :: icnd_str   ! condition index as a string
+   character(len=2) :: xdp        ! suffix
+
+   ! If the field will be multiplied by dp, append "dp" to the QoI name
+
+   if (cnd_diag_info%x_dp(icnd,iqoi,ichkpt)/=NODP) then
+      xdp = 'dp'
+   else
+      xdp = ''
+   end if
+
+   ! Now construct the full name of the variable in output file
 
    write(icnd_str,'(i2.2)') icnd
 
    fld_name_in_output = 'cnd'//icnd_str//'_'// &
-                        trim(cnd_diag_info%qoi_name(iqoi))//'_'// &
+                        trim(cnd_diag_info%qoi_name(iqoi))//xdp//'_'// &
                         trim(cnd_diag_info%qoi_chkpt(ichkpt))//suff
 
 end subroutine get_fld_name_for_output 
