@@ -2544,7 +2544,7 @@ end subroutine clubb_init_cnst
    
    endif
    
-   call cnd_diag_checkpoint(diag, 'MADIAG'//char_macmic_it, state1, pbuf, cam_in, cam_out) 
+   call cnd_diag_checkpoint(diag, 'MACDIAG'//char_macmic_it, state1, pbuf, cam_in, cam_out)
 
    return
 #endif
