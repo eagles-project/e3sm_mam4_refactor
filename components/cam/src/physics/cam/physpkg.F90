@@ -1591,8 +1591,6 @@ if (l_vdiff) then
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
 
-       call cnd_diag_checkpoint( diag, 'VDFSFC', state, pbuf, cam_in, cam_out )
-
     else
 
        call t_startf('vertical_diffusion_tend')
@@ -1610,12 +1608,12 @@ if (l_vdiff) then
 
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('vertical_diffusion_tend')
-
-       call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )
     
     endif
 
 end if ! l_vdiff
+
+    call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )
 
 if (l_rayleigh) then
     !===================================================
@@ -1683,7 +1681,10 @@ if (l_gw_drag) then
     ! Check energy integrals
     call check_energy_chng(state, tend, "gwdrag", nstep, ztodt, zero, zero, zero, zero)
     call t_stopf('gw_tend')
+end if ! l_gw_drag
+    call cnd_diag_checkpoint( diag, 'GWDRAG', state, pbuf, cam_in, cam_out )
 
+if (l_gw_drag) then
     ! QBO relaxation
     call qbo_relax(state, pbuf, ptend)
     call physics_update(state, ptend, ztodt, tend)
@@ -1711,7 +1712,7 @@ if (l_gw_drag) then
     call t_stopf  ( 'iondrag' )
 
 end if ! l_gw_drag
-    call cnd_diag_checkpoint( diag, 'GWDRAG', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'IONDRAG', state, pbuf, cam_in, cam_out )
 
     !===================================================
     ! Update Nudging values, if needed
@@ -2703,6 +2704,8 @@ if (l_tracer_aero) then
    endif
 end if ! l_tracer_aero
 
+    call cnd_diag_checkpoint( diag, 'AEWETDEP', state, pbuf, cam_in, cam_out )
+
 !<songxl 2011-9-20---------------------------------
    if(trigmem)then
       do k=1,pver
@@ -2740,7 +2743,7 @@ end if ! l_tracer_aero
 
     call t_stopf('bc_cld_diag_history_write')
 
-    call cnd_diag_checkpoint( diag, 'AEWETDEP', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'CLDDIAG', state, pbuf, cam_in, cam_out )
 
 
 if (l_rad) then
