@@ -1950,6 +1950,8 @@ subroutine tphysbc (ztodt,               &
     integer :: macmic_it                       ! iteration variables
     real(r8) :: cld_macmic_ztodt               ! modified timestep
 
+    character(len=2) :: char_macmic_it
+
     ! physics buffer fields to compute tendencies for stratiform package
     integer itim_old, ifld
     real(r8), pointer, dimension(:,:) :: cld        ! cloud fraction
@@ -2455,6 +2457,8 @@ end if
 
        do macmic_it = 1, cld_macmic_num_steps
 
+          write(char_macmic_it,'(i2.2)') macmic_it
+
           if (micro_do_icesupersat) then 
 
             !===================================================
@@ -2550,6 +2554,7 @@ end if
           endif
 
           call t_stopf('macrop_tend')
+          call cnd_diag_checkpoint( diag, 'CLDMAC'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
           !===================================================
           ! Calculate cloud microphysics 
@@ -2574,6 +2579,7 @@ end if
             call t_stopf('microp_aero_run')
 
           endif
+          call cnd_diag_checkpoint( diag, 'CLDAER'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
           call t_startf('microp_tend')
 
@@ -2624,6 +2630,8 @@ end if
           snow_sed_macmic(:ncol) = snow_sed_macmic(:ncol) + snow_sed(:ncol)
           prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
+
+          call cnd_diag_checkpoint( diag, 'CLDMIC'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
        end do ! end substepping over macrophysics/microphysics
 
