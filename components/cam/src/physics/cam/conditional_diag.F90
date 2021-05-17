@@ -54,7 +54,7 @@ module conditional_diag
 
   ! fillvalue for cells that are masked out 
 
-  real(r8),parameter, public :: FILLVALUE = -9E36._r8
+  real(r8),parameter, public :: FILLVALUE = -9E36_r8
 
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
