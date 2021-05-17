@@ -1458,9 +1458,6 @@ subroutine tphysac (ztodt,   cam_in,  &
                      )
     !----------------------------------------------------------------------------
 
-    call cnd_diag_checkpoint( diag, 'MCTCPL', state, pbuf, cam_in, cam_out )
-    !----------------------------------------------------------------------------
-
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
     if (phys_do_flux_avg()) then 
        call flux_avg_run(state, cam_in,  pbuf, nstep, ztodt)
@@ -1469,6 +1466,9 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! Validate the physics state.
     if (state_debug_checks) &
          call physics_state_check(state, name="before tphysac")
+
+    call cnd_diag_checkpoint( diag, 'MCTCPL', state, pbuf, cam_in, cam_out )
+    !----------------------------------------------------------------------------
 
     call t_startf('tphysac_init')
     ! Associate pointers with physics buffer fields
@@ -1511,6 +1511,8 @@ if (l_tracer_aero) then
     end if
 
 end if ! l_tracer_aero
+
+    call cnd_diag_checkpoint( diag, 'CHEMEMIS', state, pbuf, cam_in, cam_out )
 
     ! get nstep and zero array for energy checker
     zero = 0._r8
