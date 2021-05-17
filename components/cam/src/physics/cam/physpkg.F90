@@ -2751,7 +2751,7 @@ end if ! l_tracer_aero
 
     call t_stopf('bc_cld_diag_history_write')
 
-    call cnd_diag_checkpoint( diag, 'CLDDIAG', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'PBCDIAG', state, pbuf, cam_in, cam_out )
 
 
 if (l_rad) then
