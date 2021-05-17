@@ -245,7 +245,7 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
 
    write(icnd_str,'(i2.2)') icnd
 
-   fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//suff// &
+   fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//trim(suff)// &
                              ' at '//trim(cnd_diag_info%qoi_chkpt(ichkpt))// &
                              ' sampled under condition '//icnd_str// &
                              ' ('//trim(cnd_diag_info%metric_name(icnd))//')' 
