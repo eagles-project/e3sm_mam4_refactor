@@ -52,6 +52,10 @@ module conditional_diag
   integer, parameter, public :: PDEL    = 1
   integer, parameter, public :: PDELDRY = 2
 
+  ! fillvalue for cells that are masked out 
+
+  real(r8),parameter, public :: FILLVALUE = -9E36._r8
+
   !-------------------------------------------------------------------------------
   ! Derived type for metadata
   !-------------------------------------------------------------------------------

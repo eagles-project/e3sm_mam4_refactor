@@ -24,10 +24,6 @@ module conditional_diag_main
   real(r8),parameter :: ON  = 1._r8
   real(r8),parameter :: OFF = 0._r8
 
-  ! fillvalue for cells that are masked out 
-
-  real(r8),parameter :: FILLVALUE = 0._r8
-
 contains
 
 !======================================================
@@ -42,7 +38,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   use camsrfexch,       only: cam_in_t, cam_out_t
   use physics_buffer,   only: physics_buffer_desc
 
-  use conditional_diag,    only: cnd_diag_t
+  use conditional_diag,    only: cnd_diag_t, FILLVALUE
   use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
                                            get_fld_name_for_output
 
@@ -242,7 +238,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         if (cnd_diag_info%l_output_state) then        
            do iqoi = 1,nqoi
 
-              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val ) 
+              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val, FILLVALUE ) 
   
               do ichkpt = 1,nchkpt
                  call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
@@ -257,7 +253,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         if (cnd_diag_info%l_output_incrm) then        
            do iqoi = 1,nqoi
 
-              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc ) 
+              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc, FILLVALUE ) 
 
               do ichkpt = 1,nchkpt
                  call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
@@ -274,10 +270,11 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 end subroutine cnd_diag_checkpoint
 
 !==================================================================
-subroutine apply_masking( flag, array )
+subroutine apply_masking( flag, array, fillvalue )
 
     real(r8),intent(in)    ::  flag(:,:)
     real(r8),intent(inout) :: array(:,:,:)
+    real(r8),intent(in)    :: fillvalue
 
     integer :: kk             ! vertical level index for a loop
     integer :: flag_nver      ! # of vertical levels the flag array has
@@ -295,14 +292,14 @@ subroutine apply_masking( flag, array )
     ! for all checkpoints
 
        do ichkpt = 1,nchkpt
-          where(flag(:,:).eq.OFF) array(:,:,ichkpt) = FILLVALUE 
+          where(flag(:,:).eq.OFF) array(:,:,ichkpt) = fillvalue 
        end do
 
     elseif (flag_nver == 1 .and. array_nver > 1) then 
     ! apply the same masking to all vertical levels and checkpoints
 
        do icol = 1,pcols
-          if (flag(icol,1).eq.OFF) array(icol,:,:) = FILLVALUE
+          if (flag(icol,1).eq.OFF) array(icol,:,:) = fillvalue
        end do
 
     elseif (flag_nver > 1 .and. array_nver == 1) then
@@ -312,7 +309,7 @@ subroutine apply_masking( flag, array )
 
        do icol = 1,pcols
           if (all( flag(icol,:).eq.OFF )) then
-             array(icol,1,:) = FILLVALUE
+             array(icol,1,:) = fillvalue
           end if
        end do
 
