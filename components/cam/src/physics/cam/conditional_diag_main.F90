@@ -254,7 +254,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
              do iqoi = 1,nqoi
                 call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val, FILLVALUE )
              end do
-           end do
+           end if
 
            ! Send QoI values to history buffer
 
@@ -281,10 +281,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
            ! Send QoI increments to history buffer
 
            do iqoi = 1,nqoi
-              do ichkpt = 1,nchkpt
-                 call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ichkpt), pcols, lchnk )
-              end do
+             do ichkpt = 1,nchkpt
+                call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
+                call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ichkpt), pcols, lchnk )
+             end do
            end do
 
         end if

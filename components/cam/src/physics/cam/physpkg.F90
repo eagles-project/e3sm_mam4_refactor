@@ -1645,7 +1645,7 @@ if (l_tracer_aero) then
     call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
     call t_stopf('aero_drydep')
-    call cnd_diag_checkpoint( diag, 'AEDRYDEP', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'AERDRYRM', state, pbuf, cam_in, cam_out )
 
    ! CARMA microphysics
    !
@@ -2714,7 +2714,7 @@ if (l_tracer_aero) then
    endif
 end if ! l_tracer_aero
 
-    call cnd_diag_checkpoint( diag, 'AEWETDEP', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'AERWETRM', state, pbuf, cam_in, cam_out )
 
 !<songxl 2011-9-20---------------------------------
    if(trigmem)then

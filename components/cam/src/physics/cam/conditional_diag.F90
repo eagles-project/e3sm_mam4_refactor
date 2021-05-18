@@ -292,8 +292,9 @@ subroutine cnd_diag_readnl(nlfile)
             ! - metric_cmpr_type and metric_threshold will no longer
             !   be needed; set them to some values to avoid program abort.
 
-                metric_cmpr_type(ii) = GT
-                metric_threshold(ii) = 0._wp
+                metric_cmpr_type(ii) = 0
+                metric_threshold(ii) = 1._r8
+                metric_tolerance(ii) = 1._r8
 
             ! - if user did not specify cnd_end_chkpt(ii), set it to where most of
             !   the standard model output variables are sent to history buffer.
@@ -525,7 +526,7 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,'(4x,2x,a15,a6,6a15)')'metric','nlev','cmpr_type','threshold','tolerance', &
-                                        'cnd_eval_chkpt','cnd_end_chkpt', 'mult by dp'
+                                        'cnd_eval_chkpt','cnd_end_chkpt', 'mult_by_dp'
       do ii = 1,cnd_diag_info%ncnd
          write(iulog,'(i4.3,2x,a15,i6,i15,2e15.2,2a15,i15)') ii,                             &
                                                 adjustr(cnd_diag_info% metric_name(ii)),     &
@@ -540,14 +541,14 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,2a15)') 'qoi_chkpt','mult by dp'
+      write(iulog,'(4x,2a15)') 'qoi_chkpt','mult_by_dp'
       do ii = 1,cnd_diag_info%nchkpt
          write(iulog,'(i4.3,a15,i15)') ii, adjustr(cnd_diag_info%qoi_chkpt(ii)), chkpt_x_dp(ii)
       end do
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a15,a6,a15)')'QoI_name','nlev', 'mult by dp'
+      write(iulog,'(4x,a15,a6,a15)')'QoI_name','nlev', 'mult_by_dp'
       do ii = 1,cnd_diag_info%nqoi
          write(iulog,'(i4.3,a15,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii)
       end do
