@@ -75,24 +75,23 @@ subroutine cnd_diag_output_init(pver, cnd_diag_info)
 
      ! Add the 2 variables to the master list of possible output variables.
      ! The arguments of an addfld call are: (1) variable name, 
-     ! (2) vertical dimension name, (3) avg. flag, (4) unit, (5) long_name,
-     ! and (6) fill_value (optional).
+     ! (2) vertical dimension name, (3) avg. flag, (4) unit, (5) long_name.
      ! Units are set to blank right now; we could add a namelist variable
      ! to let the user provide the info. 
 
      if (cnd_diag_info%metric_nver(icnd)==1) then
 
-       call addfld(trim(output_fld_name ), horiz_only, 'A',' ','Metric used in conditional sampling',fill_value=FILLVALUE)
+       call addfld(trim(output_fld_name ), horiz_only, 'A',' ','Metric used in conditional sampling')
        call addfld(trim(output_fld_name2), horiz_only, 'A',' ','Flags  used in conditional sampling')
 
      elseif(cnd_diag_info%metric_nver(icnd)==pver) then
 
-       call addfld(trim(output_fld_name ), (/'lev'/),  'A',' ','Metric used in conditional sampling',fill_value=FILLVALUE)
+       call addfld(trim(output_fld_name ), (/'lev'/),  'A',' ','Metric used in conditional sampling')
        call addfld(trim(output_fld_name2), (/'lev'/),  'A',' ','Flags  used in conditional sampling')
 
      elseif(cnd_diag_info%metric_nver(icnd)==pver+1) then
 
-       call addfld(trim(output_fld_name ), (/'ilev'/), 'A',' ','Metric used in conditional sampling',fill_value=FILLVALUE)
+       call addfld(trim(output_fld_name ), (/'ilev'/), 'A',' ','Metric used in conditional sampling')
        call addfld(trim(output_fld_name2), (/'ilev'/), 'A',' ','Flags  used in conditional sampling')
 
      else 
@@ -144,13 +143,13 @@ subroutine cnd_diag_output_init(pver, cnd_diag_info)
            ! to let the user provide the info. 
 
            if (cnd_diag_info%qoi_nver(iqoi)==1) then
-              call addfld(trim(output_fld_name), horiz_only, 'A',' ',trim(fld_long_name),fill_value=FILLVALUE) 
+              call addfld(trim(output_fld_name), horiz_only, 'A',' ',trim(fld_long_name)) 
 
            elseif (cnd_diag_info%qoi_nver(iqoi)==pver) then
-              call addfld(trim(output_fld_name), (/'lev'/),  'A',' ',trim(fld_long_name),fill_value=FILLVALUE) 
+              call addfld(trim(output_fld_name), (/'lev'/),  'A',' ',trim(fld_long_name)) 
 
            elseif (cnd_diag_info%qoi_nver(iqoi)==pver+1) then
-              call addfld(trim(output_fld_name), (/'ilev'/), 'A',' ',trim(fld_long_name),fill_value=FILLVALUE) 
+              call addfld(trim(output_fld_name), (/'ilev'/), 'A',' ',trim(fld_long_name)) 
            else
               call endrun(subname//': invalid number of vertical levels for '//cnd_diag_info%qoi_name(iqoi))
            end if
