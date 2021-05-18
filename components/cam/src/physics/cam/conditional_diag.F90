@@ -278,6 +278,35 @@ subroutine cnd_diag_readnl(nlfile)
       !----------------------------------------------------------------------
       else
 
+         do ii = 1,ncnd
+            if (trim(adjustl(metric_name(ii)))=='ALL') then
+
+            ! Metric name 'ALL' is interpreted as selecting all grid cells.
+            ! In this case, the metric will be set to a constant field of 1 and
+            ! the flags will be set to ON.
+
+            ! - set metric_nver(ii) to 1 to save memory
+
+                metric_nver(ii) = 1
+
+            ! - metric_cmpr_type and metric_threshold will no longer
+            !   be needed; set them to some values to avoid program abort.
+
+                metric_cmpr_type(ii) = GT
+                metric_threshold(ii) = 0._wp
+
+            ! - if user did not specify cnd_end_chkpt(ii), set it to where most of
+            !   the standard model output variables are sent to history buffer.
+
+                if ( cnd_end_chkpt(ii) == ' ' ) cnd_end_chkpt(ii) = 'PBCDIAG'
+
+            ! - cnd_eval_chkpt is no longer needed; set to cnd_end_chkpt.
+
+                cnd_eval_chkpt(ii) = cnd_end_chkpt(ii)
+
+            end if
+         end do
+
          if (any( metric_nver     (1:ncnd) <= 0   )) call endrun(subname//' error: need positive metric_nver for each metric_name')
          if (any( metric_cmpr_type(1:ncnd) == -99 )) call endrun(subname//' error: need valid metric_cmpr_type for each metric_name')
          if (any( isnan(metric_threshold(1:ncnd)) )) call endrun(subname//' error: need valid metric_threshold for each metric_name')

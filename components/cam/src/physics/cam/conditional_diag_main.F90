@@ -184,17 +184,30 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         ! Get metric values and set flags 
         !---------------------------------
         metric => diag%cnd(icnd)%metric
-        call get_values( metric,                                &! out
-                         trim(cnd_diag_info%metric_name(icnd)), &! in
-                         state, pbuf, cam_in, cam_out )          ! in
+        flag   => diag%cnd(icnd)%flag
 
-        flag => diag%cnd(icnd)%flag
-        call get_flags( metric, icnd, ncol, cnd_diag_info, flag )
+        !----------------------------------------------------------------
+        ! The special metric name "ALL" is used to select all grid cells.
 
-        !--------------------------------------
-        ! Apply conditional sampling to metric
-        !--------------------------------------
-        where(flag.eq.OFF)  metric = FILLVALUE
+        if (trim(cnd_diag_info%metric_name(icnd)).eq.'ALL') then
+
+           metric = 1._r8
+           flag   = ON
+
+        !------------------------------------------
+        else ! If NOT selecting all grid cells...
+
+           call get_values( metric,                                &! out
+                            trim(cnd_diag_info%metric_name(icnd)), &! in
+                            state, pbuf, cam_in, cam_out )          ! in
+
+           call get_flags( metric, icnd, ncol, cnd_diag_info, flag )
+
+           ! Apply conditional sampling to metric
+
+           where(flag.eq.OFF)  metric = FILLVALUE
+
+        end if
 
         !----------------------------------------------------
         ! Send both metric and flag values to history buffer
@@ -233,34 +246,47 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         ! different actions are taken depending on the vertical 
         ! dimension sizes of the metric and the QoIs.
         !----------------------------------------------------------------
-        ! Apply to QoI values
-
         if (cnd_diag_info%l_output_state) then        
-           do iqoi = 1,nqoi
 
-              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val, FILLVALUE ) 
-  
-              do ichkpt = 1,nchkpt
-                 call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
-                 call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ichkpt), pcols, lchnk )
-              end do
+           ! Apply conditional sampling to QoI values
 
+           if (trim(cnd_diag_info%metric_name(icnd)).ne.'ALL') then
+             do iqoi = 1,nqoi
+                call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%val, FILLVALUE )
+             end do
            end do
+
+           ! Send QoI values to history buffer
+
+           do iqoi = 1,nqoi
+             do ichkpt = 1,nchkpt
+                call get_fld_name_for_output( '', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
+                call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%val(:,:,ichkpt), pcols, lchnk )
+             end do
+           end do
+
         end if
 
-        ! QoI increments
+        !------------
+        if (cnd_diag_info%l_output_incrm) then
 
-        if (cnd_diag_info%l_output_incrm) then        
+           ! Apply conditional sampling to QoI increments
+
+           if (trim(cnd_diag_info%metric_name(icnd)).ne.'ALL') then
+             do iqoi = 1,nqoi
+                call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc, FILLVALUE )
+             end do
+           end if
+
+           ! Send QoI increments to history buffer
+
            do iqoi = 1,nqoi
-
-              call apply_masking( flag, diag%cnd(icnd)%qoi(iqoi)%inc, FILLVALUE ) 
-
               do ichkpt = 1,nchkpt
                  call get_fld_name_for_output( '_inc', cnd_diag_info, icnd, iqoi, ichkpt, outfldname)
                  call outfld( trim(outfldname), diag%cnd(icnd)%qoi(iqoi)%inc(:,:,ichkpt), pcols, lchnk )
               end do
-
            end do
+
         end if
 
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
