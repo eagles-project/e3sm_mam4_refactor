@@ -119,7 +119,7 @@ contains
 
      ! Dimension information
 
-     nver = cnd_diag_info%qoi_nver(iqoi)
+     nver = cnd_diag_info%qoi_nver_save(iqoi)
 
      if ( nver == 1) then
         ndims = hdimcnt
@@ -133,7 +133,7 @@ contains
         dimids_local(ndims) = pverp_id
 
      else
-        call endrun(subname//': check cnd_diag_info%qoi_nver')
+        call endrun(subname//': check cnd_diag_info%qoi_nver_save')
      end if
 
      ! Add to restart file the variables containing QoIs at various checkpoints 
@@ -310,7 +310,7 @@ contains
   !----------------------------------------------------------
   do iqoi = 1,nqoi
 
-     nver = cnd_diag_info%qoi_nver(iqoi)
+     nver = cnd_diag_info%qoi_nver_save(iqoi)
 
      if (nver==1) then
 
@@ -624,7 +624,7 @@ contains
   !---------------------------------------------------------
   do iqoi = 1,nqoi
 
-     nver = cnd_diag_info%qoi_nver(iqoi)
+     nver = cnd_diag_info%qoi_nver_save(iqoi)
 
      if (nver==1) then
 

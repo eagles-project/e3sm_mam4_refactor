@@ -101,16 +101,18 @@ module conditional_diag
 
     ! QoIs to be monitored. Each QoI can have 1, pver, or pver+1 vertical levels
     integer                                   :: nqoi = 0
-    character(len=qoiname_maxlen),allocatable :: qoi_name(:)     ! shape = (nqoi)
-    integer,allocatable                       :: qoi_nver(:)     ! shape = (nqoi); # of vertical levels
+    character(len=qoiname_maxlen),allocatable :: qoi_name(:)       ! shape = (nqoi)
+    integer,allocatable                       :: qoi_nver(:)       ! shape = (nqoi); # of vertical levels of the QoI
+    integer,allocatable                       :: qoi_nver_save(:)  ! shape = (nqoi); # of vertical levels of the QoI
+                                                                   ! if no vertical integral is requested; 1 otherwise.
 
     ! Active checkpoints at which the QoI will be monitored 
     integer                                      :: nchkpt = 0     ! total # of active checkpoints
     character(len=chkptname_maxlen), allocatable :: qoi_chkpt(:)   ! checkpoints at which QoIs will be monitored
 
     ! "Multiply by dp" options
-    integer,allocatable :: x_dp(:,:,:)  ! shape = (ncnd,nqoi,nchkpt); whether QoIs at each checkpoint under each condition 
-                                        ! should be multiplied by dp, and if so, wet or dry.
+    integer,allocatable :: x_dp(:,:)  ! shape = (nqoi,nchkpt); whether QoIs at each checkpoint and checkpoint 
+                                      ! should be multiplied by dp, and if so, wet or dry.
 
 
   end type cnd_diag_info_t
@@ -123,9 +125,9 @@ module conditional_diag
 
   type snapshots_and_increments_t
 
-    real(r8), allocatable :: val(:,:,:) ! shape = (pcols,info%qoi_nver(iqoi),info%nchkpt) QoI values at active checkpoints
-    real(r8), allocatable :: inc(:,:,:) ! shape = (pcols,info%qoi_nver(iqoi),info%nchkpt) QoI increments between adjacent active checkpoints
-    real(r8), allocatable :: old(:,:)   ! shape = (pcols,info%qoi_nver(iqoi)) QoI values at the previous active checkpoint
+    real(r8), allocatable :: val(:,:,:) ! shape = (pcols,info%qoi_nver_save(iqoi),info%nchkpt) QoI (or vert. integral) values at active checkpoints
+    real(r8), allocatable :: inc(:,:,:) ! shape = (pcols,info%qoi_nver_save(iqoi),info%nchkpt) QoI (or vert. integral) increments between adjacent active checkpoints
+    real(r8), allocatable :: old(:,:)   ! shape = (pcols,info%qoi_nver_save(iqoi)) QoI (or vert. integral) values at the previous active checkpoint
 
   end type snapshots_and_increments_t
 
@@ -195,7 +197,6 @@ subroutine cnd_diag_readnl(nlfile)
    integer                         :: qoi_nver (nqoi_max)
 
    integer ::   qoi_x_dp(nqoi_max)
-   integer ::   cnd_x_dp(ncnd_max)
    integer :: chkpt_x_dp(nchkpt_max)
 
    logical :: l_output_state, l_output_incrm
@@ -207,7 +208,7 @@ subroutine cnd_diag_readnl(nlfile)
             metric_cmpr_type, metric_threshold, metric_tolerance, &
             cnd_eval_chkpt, cnd_end_chkpt,  & 
             qoi_chkpt, qoi_name, qoi_nver,  &
-            qoi_x_dp, cnd_x_dp, chkpt_x_dp, &
+            qoi_x_dp, chkpt_x_dp, &
             l_output_state, l_output_incrm, &
             hist_tape_with_all_output
 
@@ -228,7 +229,6 @@ subroutine cnd_diag_readnl(nlfile)
    qoi_chkpt(:) = ' '
 
      qoi_x_dp(:) = NODP
-     cnd_x_dp(:) = UNSET 
    chkpt_x_dp(:) = UNSET
 
    l_output_state = .false.
@@ -350,6 +350,8 @@ subroutine cnd_diag_readnl(nlfile)
 
          do ii = 1,nqoi
 
+            ! Set user-provided unexpected values to NODP
+
             if ( qoi_x_dp(ii)/=PDEL     .and. &
                  qoi_x_dp(ii)/=PDEL+100 .and. &
                  qoi_x_dp(ii)/=PDELDRY  .and. &
@@ -358,13 +360,11 @@ subroutine cnd_diag_readnl(nlfile)
                qoi_x_dp(ii) = NODP
             end if
 
+            ! Multiplication by dp can only be applied to QoIs defined at layer midpoints
+            ! or as layer averages. Force selection to be NODP for other types of QoIs.
+
             if (qoi_nver(ii)/=pver) qoi_x_dp(ii) = NODP
-         end do
 
-         ! ... for all QoIs under a condition 
-
-         do ii = 1,ncnd
-            if (cnd_x_dp(ii)/=NODP ) cnd_x_dp(ii) = UNSET
          end do
 
          ! ... for checkpoints
@@ -435,7 +435,6 @@ subroutine cnd_diag_readnl(nlfile)
    call mpibcast(qoi_nver,  nqoi_max,                   mpiint,  0, mpicom)
 
    call mpibcast(  qoi_x_dp,   nqoi_max, mpiint,  0, mpicom)
-   call mpibcast(  cnd_x_dp,   ncnd_max, mpiint,  0, mpicom)
    call mpibcast(chkpt_x_dp, nchkpt_max, mpiint,  0, mpicom)
 
    call mpibcast(l_output_state, 1, mpilog, 0, mpicom)
@@ -501,10 +500,24 @@ subroutine cnd_diag_readnl(nlfile)
 
    ! "multiply by dp" selections
    
-   allocate( cnd_diag_info% x_dp(ncnd,nqoi,nchkpt), stat=ierr)
+   allocate( cnd_diag_info% x_dp(nqoi,nchkpt), stat=ierr)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% x_dp')
 
-   call set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, cnd_diag_info%x_dp )! in, in, in, out
+   call set_x_dp( nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, cnd_diag_info%x_dp )! in, ..., in, out
+
+   ! qoi_nver_save(ii) is the # of vertical levels on which the ii-th QoI and/or its increment
+   ! will be saved in the data structure for output. qoi_nver_save(ii) will be 1 if 
+   ! vertical integral is requested by the user by choosing an appropriate value for qoi_x_dp(ii).
+   ! Otherwise  qoi_nver_save(ii) ==  qoi_nver(ii).
+
+   allocate( cnd_diag_info% qoi_nver_save(nqoi), stat=ierr)
+   if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_nver_save')
+
+   where (qoi_x_dp(:)==NODP)
+      cnd_diag_info%qoi_nver_save = cnd_diag_info%qoi_nver
+   else
+      cnd_diag_info%qoi_nver_save = 1
+   end where
 
    ! output to history tape(s)
 
@@ -526,7 +539,7 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,'(4x,2x,a15,a6,6a15)')'metric','nlev','cmpr_type','threshold','tolerance', &
-                                        'cnd_eval_chkpt','cnd_end_chkpt', 'mult_by_dp'
+                                        'cnd_eval_chkpt','cnd_end_chkpt' 
       do ii = 1,cnd_diag_info%ncnd
          write(iulog,'(i4.3,2x,a15,i6,i15,2e15.2,2a15,i15)') ii,                             &
                                                 adjustr(cnd_diag_info% metric_name(ii)),     &
@@ -535,8 +548,7 @@ subroutine cnd_diag_readnl(nlfile)
                                                         cnd_diag_info% metric_threshold(ii), &
                                                         cnd_diag_info% metric_tolerance(ii), &
                                                 adjustr(cnd_diag_info% cnd_eval_chkpt(ii)),  &
-                                                adjustr(cnd_diag_info% cnd_end_chkpt(ii)),   &
-                                                        cnd_x_dp(ii)
+                                                adjustr(cnd_diag_info% cnd_end_chkpt(ii))
       end do
 
       write(iulog,*)
@@ -548,9 +560,11 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a15,a6,a15)')'QoI_name','nlev', 'mult_by_dp'
+      write(iulog,'(4x,a15,a6,a15,a6)')'QoI_name','nlev', 'mult_by_dp', 'nlev_save'
       do ii = 1,cnd_diag_info%nqoi
-         write(iulog,'(i4.3,a15,i6,i15)') ii, adjustr(cnd_diag_info%qoi_name(ii)), cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii)
+         write(iulog,'(i4.3,a15,i6,i15,i6)') ii, adjustr(cnd_diag_info%qoi_name(ii)),  &
+                                             cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii), &
+                                             cnd_diag_info%qoi_nver_save(ii)
       end do
       write(iulog,*)
 
@@ -561,14 +575,11 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,'(a,12i5)')' hist_tape_with_all_output = ',hist_tape_with_all_output(1:ntape)
       write(iulog,*)'--------------------------------------------------'
       write(iulog,*)
-      write(iulog,*)'      "multiply by dp" selections sorted by sampling condition'
-      do icnd = 1,ncnd
-         write(iulog,*)
-         write(iulog,'(a,i3.3)') 'condition ',icnd
-         write(iulog,'(10x,20a10)') ( adjustr(cnd_diag_info%qoi_name(ii)), ii=1,nqoi )
-         do ichkpt = 1,nchkpt
-         write(iulog,'(a10,20i10)') adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), cnd_diag_info%x_dp(icnd,:,ichkpt)
-         end do
+      write(iulog,*)'      "multiply by dp" selections, final'
+      write(iulog,*)
+      write(iulog,'(10x,20a10)') ( adjustr(cnd_diag_info%qoi_name(ii)), ii=1,nqoi )
+      do ichkpt = 1,nchkpt
+      write(iulog,'(a10,20i10)')   adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), ( cnd_diag_info%x_dp(ii,ichkpt), ii=1,nqoi )
       end do
       write(iulog,*)'==========================================================='
       write(iulog,*)
@@ -578,31 +589,17 @@ subroutine cnd_diag_readnl(nlfile)
 end subroutine cnd_diag_readnl
 
 !===============================================================
-subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_out )
+subroutine set_x_dp( nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_out )
 
-   integer,intent(in) :: ncnd, nqoi, nchkpt
-   integer,intent(in) ::   cnd_x_dp(:)
+   integer,intent(in) :: nqoi, nchkpt
    integer,intent(in) ::   qoi_x_dp(:)
    integer,intent(in) :: chkpt_x_dp(:)
-   integer,intent(out) ::  x_dp_out(:,:,:)
+   integer,intent(out) ::  x_dp_out(:,:)
 
    integer :: icnd, iqoi, ichkpt
 
    character(len=256) :: msg
 
-  do icnd = 1,ncnd
-     !------------------------------------------------------------------------------------
-     ! If user has explicitly switched off multiplication by dp for a condition, then
-     ! turn off the multiplication for all QoIs and QoI_checkpoints under that condition
-     !------------------------------------------------------------------------------------
-     if ( cnd_x_dp(icnd)==NODP ) then
-
-        x_dp_out(icnd,:,:) = NODP
-
-     !--------------------------------------------------------------------------------------------
-     ! Otherwise, make selection for each QoI at each checkpoint based on qoi_x_dp and chkpt_x_dp
-     !--------------------------------------------------------------------------------------------
-     else
         do iqoi = 1,nqoi
 
            !---------------------------------------------------------------------------
@@ -611,7 +608,7 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
            select case ( qoi_x_dp(iqoi) )
            case (NODP,PDEL,PDELDRY)
 
-              x_dp_out(icnd,iqoi,:) = qoi_x_dp(iqoi) 
+              x_dp_out(iqoi,:) = qoi_x_dp(iqoi) 
 
            !---------------------------------------------------------------------------------
            ! If user set qoi_x_dp(iqoi) to PDEL+100 or PDELDRY+100, then use PDEL or PDELDRY
@@ -625,9 +622,9 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
               !--------------------------------------------------------------
               do ichkpt = 1,nchkpt
                  if (chkpt_x_dp(ichkpt)/=(-1)) then
-                    x_dp_out(icnd,iqoi,ichkpt) = chkpt_x_dp(ichkpt)
+                    x_dp_out(iqoi,ichkpt) = chkpt_x_dp(ichkpt)
                  else
-                    x_dp_out(icnd,iqoi,ichkpt) = qoi_x_dp(iqoi) - 100
+                    x_dp_out(iqoi,ichkpt) = qoi_x_dp(iqoi) - 100
                  end if
               end do ! ichkpt
 
@@ -642,9 +639,6 @@ subroutine set_x_dp( ncnd, cnd_x_dp, nqoi, qoi_x_dp, nchkpt, chkpt_x_dp, x_dp_ou
 
            end select ! qoi_x_dp(iqoi)
         end do    ! iqoi
-
-     end if ! cnd_x_dp(icnd)==NODP
-  end do    ! icnd
 
 end subroutine set_x_dp
 
@@ -721,7 +715,7 @@ subroutine single_chunk_cnd_diag_alloc( diag, lchnk, psetcols, cnd_diag_info )
                                   cnd_diag_info%metric_nver(icnd), &
                                   cnd_diag_info%nchkpt,            &
                                   cnd_diag_info%nqoi,              &
-                                  cnd_diag_info%qoi_nver,          &
+                                  cnd_diag_info%qoi_nver_save,     &
                                   cnd_diag_info%l_output_state,    &
                                   cnd_diag_info%l_output_incrm,    &
                                   psetcols                         )
@@ -733,14 +727,14 @@ end subroutine single_chunk_cnd_diag_alloc
 !-----------------------------------------------------------------------------
 ! Allocate memory for metrics and diagnostics for a single sampling condition
 !-----------------------------------------------------------------------------
-subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
+subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver_save, &
                                    l_output_state, l_output_incrm, psetcols )
 
   type(metric_and_qois_t), intent(inout) :: cnd
 
   integer, intent(in) :: metric_nver, nchkpt
   integer, intent(in) :: nqoi
-  integer, intent(in) :: qoi_nver(nqoi)
+  integer, intent(in) :: qoi_nver_save(nqoi)
   logical, intent(in) :: l_output_state
   logical, intent(in) :: l_output_incrm
   integer, intent(in) :: psetcols
@@ -769,7 +763,7 @@ subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
      if (l_output_state) then
       do iqoi = 1, nqoi
 
-        allocate( cnd%qoi(iqoi)% val(psetcols,qoi_nver(iqoi),nchkpt), stat=ierr)
+        allocate( cnd%qoi(iqoi)% val(psetcols,qoi_nver_save(iqoi),nchkpt), stat=ierr)
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi% val')
 
         cnd%qoi(iqoi)% val(:,:,:) = 0._r8
@@ -781,10 +775,10 @@ subroutine metrics_and_qois_alloc( cnd, metric_nver, nchkpt, nqoi, qoi_nver, &
      if (l_output_incrm) then
       do iqoi = 1, nqoi
 
-        allocate( cnd%qoi(iqoi)% old(psetcols,qoi_nver(iqoi)), stat=ierr)
+        allocate( cnd%qoi(iqoi)% old(psetcols,qoi_nver_save(iqoi)), stat=ierr)
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi% old')
 
-        allocate( cnd%qoi(iqoi)% inc(psetcols,qoi_nver(iqoi),nchkpt), stat=ierr)
+        allocate( cnd%qoi(iqoi)% inc(psetcols,qoi_nver_save(iqoi),nchkpt), stat=ierr)
         if ( ierr /= 0 ) call endrun(subname//': allocation of cnd%qoi% inc')
 
         cnd%qoi(iqoi)% old(:,:)   = 0._r8

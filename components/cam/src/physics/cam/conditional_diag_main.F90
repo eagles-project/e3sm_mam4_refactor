@@ -38,7 +38,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   use camsrfexch,       only: cam_in_t, cam_out_t
   use physics_buffer,   only: physics_buffer_desc
 
-  use conditional_diag,    only: cnd_diag_t, FILLVALUE
+  use conditional_diag,    only: cnd_diag_t, FILLVALUE, qoiname_maxlen
   use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
                                            get_fld_name_for_output
 
@@ -55,9 +55,12 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: ncol, lchnk
   integer :: nstep
   integer :: x_dp
+  character(len=qoiname_maxlen) :: qoi_name
 
-  real(r8),pointer :: metric(:,:), flag(:,:), inc(:,:), old_x_dp(:,:)
-  real(r8),allocatable :: new(:,:), new_x_dp(:,:)
+  real(r8) :: new3d(pcols,pver)
+
+  real(r8),pointer     :: metric(:,:), flag(:,:), inc(:,:), old(:,:)
+  real(r8),allocatable :: new(:,:)
 
   character(len=max_fieldname_len) :: outfldname, flag_name_out, metric_name_out
 
@@ -97,75 +100,83 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   if (ichkpt>0) then 
   !---------------------------------------------------------------------------
   ! This checkpoint is active for QoI monitoring. Obtain the QoI values 
-  ! and/or their increments if needed, and save to variable "diag". 
+  ! and/or their increments if needed, and save to the "diag" data structure. 
   ! Note that here we only obtain and save the QoIs and/or increments.
   ! Conditional sampling won't be applied until the "cnd_end_chkpt" checkpoint
   !---------------------------------------------------------------------------
      do iqoi = 1,nqoi
 
-        ! Allocate memory for tmp arrays. This has to be done inside the iqoi
+        qoi_name = cnd_diag_info% qoi_name(iqoi)
+        x_dp     = cnd_diag_info% x_dp(iqoi,ichkpt)
+
+        ! Allocate memory for tmp array. This has to be done inside the iqoi
         ! loop as different QoIs might have different numbers of vertical levels
 
-        allocate( new     ( pcols,cnd_diag_info%qoi_nver(iqoi) ))
-        allocate( new_x_dp( pcols,cnd_diag_info%qoi_nver(iqoi) ))
+        allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) ))
 
         !------------------------------------------------------------------------
-        ! Obtain the most up-to-date values of the QoI (not yet multiplied by dp)
+        ! Obtain the most up-to-date values of the QoI or its vertical integral
         !------------------------------------------------------------------------
-        call get_values( new,                                &! out
-                         trim(cnd_diag_info%qoi_name(iqoi)), &! in
-                         state, pbuf, cam_in, cam_out )       ! in
+        if (x_dp==NODP) then ! get the new QoI values
 
-        !----------------------------------------------------------------
-        ! Save the QoI and its increment to corresponding
-        ! components of the diag data structure. Because the QoI and 
-        ! increment might need to be multiplied by dp (pressure layer 
-        ! thickness) if requested by user, and the request might be 
-        ! different for different sampling conditions, we have to 
-        ! loop over different conditions
-        !----------------------------------------------------------------
-        do icnd = 1,ncnd
+           call get_values( new, trim(qoi_name), state, pbuf, cam_in, cam_out ) !out, in, ... ,in
 
-           x_dp = cnd_diag_info% x_dp(icnd,iqoi,ichkpt)
+        else ! get the vertical integral of the new QoI values
 
-           !-----------------------------------------------------------------
-           ! mutiply the new QoI values by dp and save in tmp array new_x_dp
-           !-----------------------------------------------------------------
-           call multiply_by_dp( new, state, x_dp, new_x_dp )! in, in, in, out 
+           call get_values( new3d, trim(qoi_name), state, pbuf, cam_in, cam_out ) !out, in, ... ,in
+           call mass_wtd_vert_intg( new, new3d, state, x_dp ) !out, in, in, in
 
-           !---------------------------------------------------------------------
-           ! save the QoI (possibly multiplied by dp) to the diag data structure
-           !---------------------------------------------------------------------
-           if (cnd_diag_info%l_output_state) then
-              diag%cnd(icnd)%qoi(iqoi)% val(:,:,ichkpt) = new_x_dp(:,:) 
+        end if
+        !-----------------------------------------------------------------------------------------
+        ! Save the QoI and its increment to corresponding components of the "diag" data structure
+        !-----------------------------------------------------------------------------------------
+        ! The current implementation is such that the same set of checkpoints and QoIs are 
+        ! monitored for all different sampling conditions. Below, the same QoI values 
+        ! and/or increments are copied to all conditions. When conditional sampling is applied 
+        ! later, the different copies will likely be sampled differently. In the future, if we 
+        ! decide to allow for different QoIs and/or checkpoints under different sampling 
+        ! conditions, then the loops in this subroutine will need to be reworked.
+        !--------------------------------------------------------------------------
+        ! Save the QoI 
+
+        if (cnd_diag_info%l_output_state) then
+           do icnd = 1,ncnd
+              diag%cnd(icnd)%qoi(iqoi)% val(1:ncol,:,ichkpt) = new(1:ncol,:) 
+           end do
+        end if
+
+        !-------------------------------
+        ! Calculate and save inrements
+
+        if (cnd_diag_info%l_output_incrm) then
+
+           icnd = 1
+           old => diag%cnd(icnd)%qoi(iqoi)% old
+
+           if (nstep>1) then 
+              inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
+              inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
            end if
 
-           !--------------------------------------------------------------
-           ! calculate and save the inrements, possibly multiplied by dp 
-           !--------------------------------------------------------------
-           if (cnd_diag_info%l_output_incrm) then
+           ! Save the current value of QoI as "old" for next checkpoint
 
-              old_x_dp => diag%cnd(icnd)%qoi(iqoi)% old
+           old(1:ncol,:) = new(1:ncol,:)
 
-              ! calculate increments
+           ! Save increments for other sampling conditions; update "old" value
 
-              if (nstep>1) then 
-                 inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
-                 inc(1:ncol,:) = new_x_dp(1:ncol,:) - old_x_dp(1:ncol,:)
-              end if
+           do icnd = 2,ncnd
 
-              ! Save the current value of QoI as "old" for next checkpoint
+              diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:) = new(1:ncol,:)
+              if (nstep > 1) &
+              diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
 
-              old_x_dp(1:ncol,:) = new_x_dp(1:ncol,:)
+           end do
 
-           end if ! l_output_incrm
-           !----------------------
-
-        end do ! icnd
+        end if !l_output_incrm
+        !----------------------
 
         ! Calculations done for this QoI. Clean up.
         deallocate(new)
-        deallocate(new_x_dp)
 
      end do ! iqoi = 1,nqoi
   end if    ! ichkpt > 0
@@ -469,36 +480,43 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 end subroutine get_values
 
 !==============================================================
-subroutine multiply_by_dp( arrayin, state, x_dp, arrayout )
+subroutine mass_wtd_vert_intg( arrayout, arrayin, state, x_dp )
 
   use physics_types,   only: physics_state
   use conditional_diag,only: PDEL,PDELDRY,NODP
+  use physconst,       only: gravit
+  use ppgrid,          only: pcols, pver
 
-  real(r8),           intent(out) :: arrayin (:,:)
+  real(r8),           intent(out) :: arrayout(:,:)
+  real(r8),           intent(in)  :: arrayin (:,:)
   type(physics_state),intent(in)  :: state
   integer,            intent(in)  :: x_dp 
-  real(r8),           intent(out) :: arrayout(:,:)
+
+  real(r8) :: tmp(ncols,pver)
 
   integer :: ncol
-  character(len=*),parameter :: subname = 'conditional_diag_main:multiply_by_dp'
+  character(len=*),parameter :: subname = 'conditional_diag_main: mass_wtd_vert_intg'
 
   ncol = state%ncol
 
+  ! Multiply by the appropriate dp (dry or wet)
+
   select case (x_dp)
   case (PDEL)
-     arrayout(1:ncol,:) = arrayin(1:ncol,:) * state%pdel(1:ncol,:)
+     tmp(1:ncol,:) = arrayin(1:ncol,:) * state%pdel(1:ncol,:)
 
   case (PDELDRY)
-     arrayout(1:ncol,:) = arrayin(1:ncol,:) * state%pdeldry(1:ncol,:)
-
-  case (NODP)
-     arrayout(1:ncol,:) = arrayin(1:ncol,:)
+     tmp(1:ncol,:) = arrayin(1:ncol,:) * state%pdeldry(1:ncol,:)
 
   case default
      call endrun(subname//': unexpected value of x_dp')
   end select
 
-end subroutine multiply_by_dp
+  ! Vertical sum divided by gravit
+
+  arrayout(1:ncol,1) = sum( tmp(1:ncol,:), 2 )/gravit
+
+end subroutine mass_wtd_vert_intg 
 
 !==============================================================
 subroutine get_flags( metric, icnd, ncol, cnd_diag_info, flag )

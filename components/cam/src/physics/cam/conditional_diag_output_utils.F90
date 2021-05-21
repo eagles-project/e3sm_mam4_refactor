@@ -142,13 +142,13 @@ subroutine cnd_diag_output_init(pver, cnd_diag_info)
            ! Units are set to blank right now; we could add a namelist variable
            ! to let the user provide the info. 
 
-           if (cnd_diag_info%qoi_nver(iqoi)==1) then
+           if (cnd_diag_info%qoi_nver_save(iqoi)==1) then
               call addfld(trim(output_fld_name), horiz_only, 'A',' ',trim(fld_long_name)) 
 
-           elseif (cnd_diag_info%qoi_nver(iqoi)==pver) then
+           elseif (cnd_diag_info%qoi_nver_save(iqoi)==pver) then
               call addfld(trim(output_fld_name), (/'lev'/),  'A',' ',trim(fld_long_name)) 
 
-           elseif (cnd_diag_info%qoi_nver(iqoi)==pver+1) then
+           elseif (cnd_diag_info%qoi_nver_save(iqoi)==pver+1) then
               call addfld(trim(output_fld_name), (/'ilev'/), 'A',' ',trim(fld_long_name)) 
            else
               call endrun(subname//': invalid number of vertical levels for '//cnd_diag_info%qoi_name(iqoi))
@@ -207,14 +207,14 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
    character(len=max_fieldname_len),intent(out) :: fld_name_in_output 
 
    character(len=2) :: icnd_str   ! condition index as a string
-   character(len=2) :: xdp        ! suffix
+   character(len=2) :: vint       ! suffix
 
    ! If the field will be multiplied by dp, append "dp" to the QoI name
 
-   if (cnd_diag_info%x_dp(icnd,iqoi,ichkpt)/=NODP) then
-      xdp = 'dp'
+   if (cnd_diag_info%x_dp(iqoi,ichkpt)/=NODP) then
+      vint = 'vint'
    else
-      xdp = ''
+      vint = ''
    end if
 
    ! Now construct the full name of the variable in output file
@@ -222,7 +222,7 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
    write(icnd_str,'(i2.2)') icnd
 
    fld_name_in_output = 'cnd'//icnd_str//'_'// &
-                        trim(cnd_diag_info%qoi_name(iqoi))//trim(xdp)//'_'// &
+                        trim(cnd_diag_info%qoi_name(iqoi))//trim(vint)//'_'// &
                         trim(cnd_diag_info%qoi_chkpt(ichkpt))//suff
 
 end subroutine get_fld_name_for_output 
