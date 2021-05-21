@@ -513,9 +513,9 @@ subroutine cnd_diag_readnl(nlfile)
    allocate( cnd_diag_info% qoi_nver_save(nqoi), stat=ierr)
    if ( ierr /= 0 ) call endrun(subname//': allocation of cnd_diag_info% qoi_nver_save')
 
-   where (qoi_x_dp(:)==NODP)
+   where (qoi_x_dp(1:nqoi)==NODP)
       cnd_diag_info%qoi_nver_save = cnd_diag_info%qoi_nver
-   else
+   elsewhere
       cnd_diag_info%qoi_nver_save = 1
    end where
 
@@ -533,14 +533,23 @@ subroutine cnd_diag_readnl(nlfile)
    !-----------------------------------------------
    if (masterproc) then
 
-      write(iulog,*)'==========================================================='
-      write(iulog,*)'       *** Conditional diagnostics requested ***'
-      write(iulog,*)'==========================================================='
+      write(iulog,*)
+      write(iulog,*)'==================================================================================================='
+      write(iulog,*)'                         *** Conditional diagnostics requested ***'
+      write(iulog,*)'==================================================================================================='
 
       write(iulog,*)
       write(iulog,'(4x,2x,a15,a6,6a15)')'metric','nlev','cmpr_type','threshold','tolerance', &
                                         'cnd_eval_chkpt','cnd_end_chkpt' 
       do ii = 1,cnd_diag_info%ncnd
+       if (trim(cnd_diag_info% metric_name(ii))=='ALL') then
+
+         write(iulog,'(i4.3,2x,a15,a6,a15,2a15,  2a15,a15)') ii,                             &
+                                                adjustr(cnd_diag_info% metric_name(ii)),     &
+                                                        '-','-','-','-',                     &
+                                                adjustr(cnd_diag_info% cnd_eval_chkpt(ii)),  &
+                                                adjustr(cnd_diag_info% cnd_end_chkpt(ii))
+       else
          write(iulog,'(i4.3,2x,a15,i6,i15,2e15.2,2a15,i15)') ii,                             &
                                                 adjustr(cnd_diag_info% metric_name(ii)),     &
                                                         cnd_diag_info% metric_nver(ii),      &
@@ -549,6 +558,7 @@ subroutine cnd_diag_readnl(nlfile)
                                                         cnd_diag_info% metric_tolerance(ii), &
                                                 adjustr(cnd_diag_info% cnd_eval_chkpt(ii)),  &
                                                 adjustr(cnd_diag_info% cnd_end_chkpt(ii))
+       end if
       end do
 
       write(iulog,*)
@@ -560,11 +570,11 @@ subroutine cnd_diag_readnl(nlfile)
 
       write(iulog,*)
       write(iulog,*)'--------------------------------------------------'
-      write(iulog,'(4x,a15,a6,a15,a6)')'QoI_name','nlev', 'mult_by_dp', 'nlev_save'
+      write(iulog,'(4x,a15,a6,a15,a12)')'QoI_name','nlev', 'mult_by_dp', 'nlev_save'
       do ii = 1,cnd_diag_info%nqoi
-         write(iulog,'(i4.3,a15,i6,i15,i6)') ii, adjustr(cnd_diag_info%qoi_name(ii)),  &
-                                             cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii), &
-                                             cnd_diag_info%qoi_nver_save(ii)
+         write(iulog,'(i4.3,a15,i6,i15,i12)') ii, adjustr(cnd_diag_info%qoi_name(ii)),  &
+                                              cnd_diag_info%qoi_nver(ii), qoi_x_dp(ii), &
+                                              cnd_diag_info%qoi_nver_save(ii)
       end do
       write(iulog,*)
 
@@ -579,9 +589,9 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)
       write(iulog,'(10x,20a10)') ( adjustr(cnd_diag_info%qoi_name(ii)), ii=1,nqoi )
       do ichkpt = 1,nchkpt
-      write(iulog,'(a10,20i10)')   adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), ( cnd_diag_info%x_dp(ii,ichkpt), ii=1,nqoi )
+         write(iulog,'(a10,20i10)') adjustr(cnd_diag_info%qoi_chkpt(ichkpt)), ( cnd_diag_info%x_dp(ii,ichkpt), ii=1,nqoi )
       end do
-      write(iulog,*)'==========================================================='
+      write(iulog,*)'==================================================================================================='
       write(iulog,*)
 
   end if  ! masterproc

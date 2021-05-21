@@ -209,10 +209,10 @@ subroutine get_fld_name_for_output( suff, cnd_diag_info,    &!in
    character(len=2) :: icnd_str   ! condition index as a string
    character(len=2) :: vint       ! suffix
 
-   ! If the field will be multiplied by dp, append "dp" to the QoI name
+   ! If the field will be vertically integrated, append "_v" to the QoI name
 
    if (cnd_diag_info%x_dp(iqoi,ichkpt)/=NODP) then
-      vint = 'vint'
+      vint = '_v'
    else
       vint = ''
    end if
@@ -233,6 +233,7 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
                                         fld_long_name_in_output )!out
 
    use cam_history_support, only: max_fieldname_len
+   use conditional_diag,    only: NODP
 
    character(len=*),      intent(in)  :: suff
    type(cnd_diag_info_t), intent(in)  :: cnd_diag_info
@@ -241,10 +242,19 @@ subroutine get_fld_longname_for_output( suff, cnd_diag_info,    &!in
    character(len=256),intent(out)     :: fld_long_name_in_output 
 
    character(len=2) :: icnd_str ! condition index as a string
+   character(len=2) :: vint       ! suffix
+
+   ! If the field will be vertically integrated, append "_v" to the QoI name
+
+   if (cnd_diag_info%x_dp(iqoi,ichkpt)/=NODP) then
+      vint = '_v'
+   else
+      vint = ''
+   end if
 
    write(icnd_str,'(i2.2)') icnd
 
-   fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//trim(suff)// &
+   fld_long_name_in_output = trim(cnd_diag_info%qoi_name(iqoi))//trim(vint)//trim(suff)// &
                              ' at '//trim(cnd_diag_info%qoi_chkpt(ichkpt))// &
                              ' sampled under condition '//icnd_str// &
                              ' ('//trim(cnd_diag_info%metric_name(icnd))//')' 

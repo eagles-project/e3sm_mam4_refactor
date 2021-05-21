@@ -30,7 +30,7 @@ contains
 subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
   use time_manager,        only: get_nstep
-  use ppgrid,              only: pcols
+  use ppgrid,              only: pcols, pver
   use cam_history_support, only: max_fieldname_len
   use cam_history,         only: outfld
 
@@ -38,7 +38,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   use camsrfexch,       only: cam_in_t, cam_out_t
   use physics_buffer,   only: physics_buffer_desc
 
-  use conditional_diag,    only: cnd_diag_t, FILLVALUE, qoiname_maxlen
+  use conditional_diag,    only: cnd_diag_t, FILLVALUE, NODP
   use conditional_diag_output_utils, only: get_metric_and_flag_names_for_output, &
                                            get_fld_name_for_output
 
@@ -55,7 +55,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   integer :: ncol, lchnk
   integer :: nstep
   integer :: x_dp
-  character(len=qoiname_maxlen) :: qoi_name
+  character(len=20) :: qoi_name
 
   real(r8) :: new3d(pcols,pver)
 
@@ -112,7 +112,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
         ! Allocate memory for tmp array. This has to be done inside the iqoi
         ! loop as different QoIs might have different numbers of vertical levels
 
-        allocate( new( pcols,cnd_diag_info%qoi_nver(iqoi) ))
+        allocate( new( pcols,cnd_diag_info%qoi_nver_save(iqoi) ))
 
         !------------------------------------------------------------------------
         ! Obtain the most up-to-date values of the QoI or its vertical integral
@@ -492,7 +492,7 @@ subroutine mass_wtd_vert_intg( arrayout, arrayin, state, x_dp )
   type(physics_state),intent(in)  :: state
   integer,            intent(in)  :: x_dp 
 
-  real(r8) :: tmp(ncols,pver)
+  real(r8) :: tmp(pcols,pver)
 
   integer :: ncol
   character(len=*),parameter :: subname = 'conditional_diag_main: mass_wtd_vert_intg'
