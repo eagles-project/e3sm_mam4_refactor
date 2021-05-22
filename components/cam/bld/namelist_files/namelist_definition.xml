@@ -1318,13 +1318,6 @@ if so, wet or dry.
 Default: none
 </entry>
 
-<entry id="cnd_x_dp" type="integer(10)"  category="history"
-       group="conditional_diag_nl" valid_values="" >
-Whether all QoIs under a condition should be multiplied by dp 
-for output if applicable; if so, wet or dry.
-Default: none
-</entry>
-
 <entry id="chkpt_x_dp" type="integer(99)"  category="history"
        group="conditional_diag_nl" valid_values="" >
 Whether QoIs at a checkpoint should be multiplied by dp 
