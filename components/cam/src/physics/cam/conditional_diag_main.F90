@@ -368,7 +368,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
   use time_manager,   only: get_nstep
-  use constituents,   only: cnst_get_ind, pcnst
+  use constituents,   only: cnst_get_ind, pcnst, sflxnam
 
   real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname

@@ -539,14 +539,14 @@ subroutine cnd_diag_readnl(nlfile)
       write(iulog,*)'==============================================================================='
 
       write(iulog,*)
-      write(iulog,'(4x,,a12,a6,6a15)')'metric','nlev','cmpr_type','threshold','tolerance', &
-                                        'cnd_eval_chkpt','cnd_end_chkpt' 
+      write(iulog,'(4x,a12,a6,a12,2a12,2a17)') 'metric','nlev','cmpr_type','threshold','tolerance', &
+                                               'cnd_eval_chkpt','cnd_end_chkpt' 
       do ii = 1,cnd_diag_info%ncnd
        if (trim(cnd_diag_info% metric_name(ii))=='ALL') then
 
          write(iulog,'(i4.3,a12,a6,a12,2a12,  2a17)') ii,                                 &
                                              adjustr(cnd_diag_info% metric_name(ii)),     &
-                                                     '-','-','-','-','-'                  &
+                                                     '-','-','-','-','-',                 &
                                              adjustr(cnd_diag_info% cnd_end_chkpt(ii))
        else
          write(iulog,'(i4.3,a12,i6,i12,2e12.2,2a17)') ii,                                 &
