@@ -445,16 +445,16 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('PS')
            arrayout(1:ncol,1) = state%ps(1:ncol)
 
-        case('PHIS')
-           arrayout(1:ncol,1) = state%phis(1:ncol)
+        !case('PHIS')
+        !   arrayout(1:ncol,1) = state%phis(1:ncol)
 
         !------ cam_in -------
 
         case('U10')
            arrayout(1:ncol,1) = cam_in%u10(1:ncol)
 
-        case('LANDFRAC')
-           arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
+        !case('LANDFRAC')
+        !   arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
 
         !------ cam_out -------
 
@@ -483,11 +483,11 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('NSTEP')
            arrayout(1:ncol,:) = get_nstep()
 
-        case('LAT')
-           arrayout(1:ncol,1) = state%lat(1:ncol)
+        !case('LAT')
+        !   arrayout(1:ncol,1) = state%lat(1:ncol)
 
-        case('LON')
-           arrayout(1:ncol,1) = state%lon(1:ncol)
+        !case('LON')
+        !   arrayout(1:ncol,1) = state%lon(1:ncol)
 
         case default
            call endrun(subname//': unknow varname - '//trim(varname))
