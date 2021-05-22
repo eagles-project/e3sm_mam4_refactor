@@ -368,7 +368,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
   use time_manager,   only: get_nstep
-  use constituents,   only: cnst_get_ind
+  use constituents,   only: cnst_get_ind, pcnst
 
   real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
@@ -382,7 +382,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
-  integer :: ncol, idx
+  integer :: ncol, idx, m
 
   ncol = state%ncol
 
@@ -399,83 +399,102 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
      arrayout(1:ncol,:) = state%q(1:ncol,:,idx)
 
   else
-  !----------------------
-  ! Non-tracer variables
-  !----------------------
-  select case (trim(adjustl(varname)))
-  case('T')
-     arrayout(1:ncol,:) = state%t(1:ncol,:)
+  !--------------------------------------------------------------------------------
+  ! If the requested variable is the surface flux of an advected tracer, get it
+  ! from cam_in%cflx
+  !--------------------------------------------------------------------------------
+     do m = 1,pcnst
+        if (trim(adjustl(varname)).eq.trim(sflxnam(m))) then
+           idx = m ; exit
+        end if
+     end do
 
-  case('U')
-     arrayout(1:ncol,:) = state%u(1:ncol,:)
+     if (idx /= -1) then ! This variable is the surface flux of an advected tracer
+        arrayout(1:ncol,1) = cam_in%cflx(1:ncol,idx)
 
-  case('V')
-     arrayout(1:ncol,:) = state%v(1:ncol,:)
+     else
+     !---------------------------------------
+     ! Non-tracer and non-sfc-flux variables
+     !---------------------------------------
 
-  case('OMEGA')
-     arrayout(1:ncol,:) = state%omega(1:ncol,:)
+        select case (trim(adjustl(varname)))
+        case('T')
+           arrayout(1:ncol,:) = state%t(1:ncol,:)
 
-  case('PMID')
-     arrayout(1:ncol,:) = state%pmid(1:ncol,:)
+        case('U')
+           arrayout(1:ncol,:) = state%u(1:ncol,:)
 
-  case('PINT')
-     arrayout(1:ncol,:) = state%pint(1:ncol,:)
+        case('V')
+           arrayout(1:ncol,:) = state%v(1:ncol,:)
 
-  case('ZM')
-     arrayout(1:ncol,:) = state%zm(1:ncol,:)
+        case('OMEGA')
+           arrayout(1:ncol,:) = state%omega(1:ncol,:)
 
-  case('ZI')
-     arrayout(1:ncol,:) = state%zi(1:ncol,:)
+        case('PMID')
+           arrayout(1:ncol,:) = state%pmid(1:ncol,:)
 
-  case('PS')
-     arrayout(1:ncol,1) = state%ps(1:ncol)
+        case('PINT')
+           arrayout(1:ncol,:) = state%pint(1:ncol,:)
 
-  case('PHIS')
-     arrayout(1:ncol,1) = state%phis(1:ncol)
+        case('ZM')
+           arrayout(1:ncol,:) = state%zm(1:ncol,:)
 
-  !------ cam_in -------
+        case('ZI')
+           arrayout(1:ncol,:) = state%zi(1:ncol,:)
 
-  case('LANDFRAC')
-     arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
+        case('PS')
+           arrayout(1:ncol,1) = state%ps(1:ncol)
 
-  !------ cam_out -------
+        case('PHIS')
+           arrayout(1:ncol,1) = state%phis(1:ncol)
 
-  case('FLDS')
-     arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
+        !------ cam_in -------
 
-  !------ pbuf -------
+        case('U10')
+           arrayout(1:ncol,1) = cam_in%u10(1:ncol)
 
-  case('PBLH')
-      idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
-      arrayout(:,1) = ptr1d
+        case('LANDFRAC')
+           arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
 
-  case('CLD')
-      idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
-      arrayout(:,:) = ptr2d
+        !------ cam_out -------
 
- !elseif (varname.eq.'QSATW') then
- !   call qsatw()
+        case('FLDS')
+           arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
 
- !elseif (varname.eq.'CAPE') then
- !   call cape()
+        !------ pbuf -------
 
-  !-----------------------------------------------------------------------------------
-  ! The following were added mostly for testing of the conditional diag functionality
-  !-----------------------------------------------------------------------------------
-  case('NSTEP')
-     arrayout(1:ncol,:) = get_nstep()
+        case('PBLH')
+            idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
+            arrayout(:,1) = ptr1d
 
-  case('LAT')
-     arrayout(1:ncol,1) = state%lat(1:ncol)
+        case('CLD')
+            idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
 
-  case('LON')
-     arrayout(1:ncol,1) = state%lon(1:ncol)
+        !case ('QSATW') then
+        !   call qsatw()
 
-  case default 
-     call endrun(subname//': unknow varname - '//trim(varname))
-  end select
+        !case ('CAPE') then
+        !   call cape()
 
-  end if !whether the requested variable is a tracer field
+        !-----------------------------------------------------------------------------------
+        ! The following were added mostly for testing of the conditional diag functionality
+        !-----------------------------------------------------------------------------------
+        case('NSTEP')
+           arrayout(1:ncol,:) = get_nstep()
+
+        case('LAT')
+           arrayout(1:ncol,1) = state%lat(1:ncol)
+
+        case('LON')
+           arrayout(1:ncol,1) = state%lon(1:ncol)
+
+        case default
+           call endrun(subname//': unknow varname - '//trim(varname))
+        end select
+
+     end if !whether the requested variable is the surface flux of a tracer
+  end if    !whether the requested variable is a tracer field
 
 end subroutine get_values
 
