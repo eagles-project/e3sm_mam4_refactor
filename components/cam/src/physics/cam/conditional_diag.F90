@@ -296,10 +296,18 @@ subroutine cnd_diag_readnl(nlfile)
                 metric_threshold(ii) = 1._r8
                 metric_tolerance(ii) = 1._r8
 
-            ! - if user did not specify cnd_end_chkpt(ii), set it to where most of
-            !   the standard model output variables are sent to history buffer.
+            ! - if user did not specify cnd_end_chkpt(ii), set it to 
+            !   the non-empty cnd_eval_chkpt(ii), or - if cnd_eval_chkpt(ii)
+            !   is also unspecified - to where most of the standard model output 
+            !   variables are sent to history buffer.
 
-                if ( cnd_end_chkpt(ii) == ' ' ) cnd_end_chkpt(ii) = 'PBCDIAG'
+                if ( cnd_end_chkpt(ii) == ' ' ) then 
+                   if ( cnd_eval_chkpt(ii) /= ' ' ) then 
+                      cnd_end_chkpt(ii) = cnd_eval_chkpt(ii) 
+                   else
+                      cnd_end_chkpt(ii) = 'PBCDIAG'
+                   end if
+                end if
 
             ! - cnd_eval_chkpt is no longer needed; set to cnd_end_chkpt.
 
