@@ -364,6 +364,7 @@ end subroutine apply_masking
 !========================================================
 subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
+  use ppgrid,         only: pcols,pver
   use physics_types,  only: physics_state
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
@@ -379,6 +380,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   real(r8),pointer :: ptr2d(:,:)
   real(r8),pointer :: ptr1d(:)
+
+  real(r8) :: tmp(pcols,pver)
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
@@ -471,8 +474,25 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        !case ('QSATW') then
-        !   call qsatw()
+        !------ other physical quantities -------
+
+        case ('QSATW') then
+          call qsat_water (state%t(:ncol,:), state%pmid(:ncol,:), &
+                               tmp(:ncol,:),   arrayout(:ncol,:)  )
+
+        case ('QSSATW') then
+          call supersat_q_water( ncol, pver, state%t(:ncol,:),            &
+                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &
+                                 arrayout(:ncol,:)  )
+
+        case ('RHW') then
+          call relhum_water_percent( ncol, pver, state%t(:ncol,:),            &
+                                     state%pmid(:ncol,:), state%q(:ncol,:,1), &
+                                     arrayout(:ncol,:)  )
+        case ('RHI') then
+          call relhum_ice_percent( ncol, pver, state%t(:ncol,:),            &
+                                   state%pmid(:ncol,:), state%q(:ncol,:,1), &
+                                   arrayout(:ncol,:)  )
 
         !case ('CAPE') then
         !   call cape()
