@@ -1,3 +1,11 @@
+module misc_diagnostics
+
+use shr_kind_mod,   only: r8 => shr_kind_r8
+
+public
+
+contains
+
 subroutine supersat_q_water( ncol, pver, tair, pair, qv, qssatw )
 
   use wv_saturation, only: qsat_water
@@ -70,3 +78,5 @@ subroutine relhum_ice_percent( ncol, pver, tair, pair, qv,  rhi_percent )
   rhi_percent = 100._r8* qv/qsatw* esl/esi
 
 end subroutine relhum_ice_percent
+
+end module misc_diagnostics

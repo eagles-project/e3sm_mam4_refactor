@@ -370,6 +370,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
   use time_manager,   only: get_nstep
   use constituents,   only: cnst_get_ind, pcnst, sflxnam
+  use misc_diagnostics
+  use wv_saturation, only: qsat_water
 
   real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
@@ -476,20 +478,20 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
         !------ other physical quantities -------
 
-        case ('QSATW') then
+        case ('QSATW')
           call qsat_water (state%t(:ncol,:), state%pmid(:ncol,:), &
                                tmp(:ncol,:),   arrayout(:ncol,:)  )
 
-        case ('QSSATW') then
+        case ('QSSATW')
           call supersat_q_water( ncol, pver, state%t(:ncol,:),            &
                                  state%pmid(:ncol,:), state%q(:ncol,:,1), &
                                  arrayout(:ncol,:)  )
 
-        case ('RHW') then
+        case ('RHW')
           call relhum_water_percent( ncol, pver, state%t(:ncol,:),            &
                                      state%pmid(:ncol,:), state%q(:ncol,:,1), &
                                      arrayout(:ncol,:)  )
-        case ('RHI') then
+        case ('RHI')
           call relhum_ice_percent( ncol, pver, state%t(:ncol,:),            &
                                    state%pmid(:ncol,:), state%q(:ncol,:,1), &
                                    arrayout(:ncol,:)  )
