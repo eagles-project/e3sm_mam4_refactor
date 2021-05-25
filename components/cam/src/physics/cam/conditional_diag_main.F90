@@ -487,6 +487,11 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
                                  state%pmid(:ncol,:), state%q(:ncol,:,1), &
                                  arrayout(:ncol,:)  )
 
+        case ('QSSATI')
+          call supersat_q_ice(   ncol, pver, state%t(:ncol,:),            &
+                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &
+                                 arrayout(:ncol,:)  )
+
         case ('RHW')
           call relhum_water_percent( ncol, pver, state%t(:ncol,:),            &
                                      state%pmid(:ncol,:), state%q(:ncol,:,1), &
