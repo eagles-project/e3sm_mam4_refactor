@@ -82,12 +82,14 @@
       <value compset="_EAM%MMF*-AQUA"         >-aquaplanet </value>
       <value compset="_EAM%MMF*-RCE"          >-aquaplanet -rce </value>
 
+      <value compset="_EAM%MMF1-SCM"          >-scam</value>
+
       <!--  -->
       <value compset="GEOS_EAM"       >-offline_dyn</value>
       <value compset="GEOS_EAM"      >-nlev 56</value>
       <value compset="_EAM.*_BGC%B"   >-co2_cycle</value>
       <value compset="EAM%SCAM"   >-scam</value>
-      <value compset="AR97_EAM"   >-phys default -scam -nlev 72 -clubb_sgs -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates</value>
+      <!-- <value compset="AR97_EAM"   >-phys default -scam -nlev 72 -clubb_sgs -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates</value> -->
       <value compset="_EAM.%L60"      >-nlev 60</value>
       <value compset="_ELM%[^_]*BC"     >-bc_dep_to_snow_updates</value>
 
@@ -152,7 +154,7 @@
       <value compset="_EAM%SMA7"       >2000_cam5_trop_strat_mam7</value>
       <value compset="GEOS_EAM%SMA3"   >sd_cam5_trop_strat_mam3</value>
       <value compset="AR95_EAM"     >scam_arm95</value>
-      <value compset="AR97_EAM"     >scam_arm97</value>
+      <!-- <value compset="AR97_EAM"     >scam_arm97</value> -->
       <value compset="SCAM_EAM"        >scam_generic</value>
       <value compset="PIPD_EAM"        >1850-PD_cam5</value>
       <!-- Aqua planet -->
@@ -166,6 +168,7 @@
       <value compset="2000(?:SOI)?_EAM%MMF2"    >2000_cam5_av1c-04p2-MMF-2mom</value>
       <value compset="_EAM%MMF*-RCE"    >RCEMIP_EAMv1</value>
       <value compset="_EAM%MMF*-AQUA"   >aquaplanet_MMF-1mom</value>
+      <value compset="_EAM%MMF1-SCM"    >mmf-scm_arm97</value>
     </values>
 
     <group>run_component_cam</group>
