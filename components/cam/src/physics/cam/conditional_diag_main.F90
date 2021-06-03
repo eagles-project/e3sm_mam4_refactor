@@ -65,7 +65,12 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   character(len=max_fieldname_len) :: outfldname, flag_name_out, metric_name_out
 
   !---------------------------------------------------------------------------
-  if (cnd_diag_info%ncnd == 0) return  ! no conditional diagnostics requested 
+  call t_startf('cnd_diag_checkpoint')
+  if (cnd_diag_info%ncnd == 0) then ! no conditional diagnostics requested 
+     call t_stopf('cnd_diag_checkpoint')
+     return
+  else
+  !---------------------------------------------------------------------------
 
   ncnd   = cnd_diag_info%ncnd
   nchkpt = cnd_diag_info%nchkpt
@@ -303,6 +308,8 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
   end if ! nstep > 2
+
+  call t_stopf('cnd_diag_checkpoint')
 
 end subroutine cnd_diag_checkpoint
 
