@@ -29,6 +29,7 @@ contains
 !======================================================
 subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
+  use perf_mod,            only: t_startf, t_stopf
   use time_manager,        only: get_nstep
   use ppgrid,              only: pcols, pver
   use cam_history_support, only: max_fieldname_len
@@ -67,8 +68,10 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   !---------------------------------------------------------------------------
   call t_startf('cnd_diag_checkpoint')
   if (cnd_diag_info%ncnd == 0) then ! no conditional diagnostics requested 
+
      call t_stopf('cnd_diag_checkpoint')
      return
+
   else
   !---------------------------------------------------------------------------
 
@@ -310,6 +313,8 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
   end if ! nstep > 2
 
   call t_stopf('cnd_diag_checkpoint')
+
+  end if ! cnd_diag_info%ncnd == 0
 
 end subroutine cnd_diag_checkpoint
 
