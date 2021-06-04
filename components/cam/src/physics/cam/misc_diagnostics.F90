@@ -2,9 +2,48 @@ module misc_diagnostics
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
 
+implicit none
 public
 
 contains
+
+
+!----------------------------------
+! saturation specific humidity wrt ice.
+! The calculation in this subroutine follows 
+! what is used in the model for 
+!  - history output
+!  - ice nucleation parameterization
+! 
+subroutine qsat_ice( ncol, pver, tair, pair, qsati )
+
+  use wv_saturation, only: qsat_water, svp_ice
+
+  integer, intent(in)  :: ncol, pver
+
+  real(r8),intent(in)  :: tair(ncol,pver)
+  real(r8),intent(in)  :: pair(ncol,pver)
+
+  real(r8),intent(out) :: qsati(ncol,pver)
+
+  real(r8) :: qsatw(ncol,pver)
+  real(r8) ::   esl(ncol,pver)
+  real(r8) ::   esi(ncol,pver)
+
+  integer :: i,k
+
+  call qsat_water( tair, pair, esl, qsatw )
+
+  do i=1,ncol
+  do k=1,pver
+     esi(i,k)=svp_ice(tair(i,k))
+  end do
+  end do
+
+  qsati = qsatw*esi/esl
+
+end subroutine qsat_ice
+!----------------------------------
 
 subroutine supersat_q_water( ncol, pver, tair, pair, qv, qssatw )
 
@@ -42,6 +81,8 @@ subroutine supersat_q_ice( ncol, pver, tair, pair, qv, qssati )
   real(r8) :: qsatw(ncol,pver)
   real(r8) ::   esl(ncol,pver)
   real(r8) ::   esi(ncol,pver)
+
+  integer :: i,k
 
   call qsat_water( tair, pair, esl, qsatw )
 

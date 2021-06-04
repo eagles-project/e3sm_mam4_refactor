@@ -491,27 +491,44 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         !------ other physical quantities -------
 
         case ('QSATW')
-          call qsat_water (state%t(:ncol,:), state%pmid(:ncol,:), &
-                               tmp(:ncol,:),   arrayout(:ncol,:)  )
+          call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
+                               tmp(:ncol,:),   arrayout(:ncol,:)  )! out
 
-        case ('QSSATW')
-          call supersat_q_water( ncol, pver, state%t(:ncol,:),            &
-                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &
-                                 arrayout(:ncol,:)  )
+        case ('QSATI')
+          call qsat_ice( ncol, pver, state%t(:ncol,:), state%pmid(:ncol,:), &! in
+                         arrayout(:ncol,:)                                  )! out
 
-        case ('QSSATI')
-          call supersat_q_ice(   ncol, pver, state%t(:ncol,:),            &
-                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &
-                                 arrayout(:ncol,:)  )
+        case ('QSATWINV') ! 1./qsat_water
+
+          call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
+                               tmp(:ncol,:),   arrayout(:ncol,:)  )! out
+          arrayout(:ncol,:) = 1._r8/arrayout(:ncol,:)
+
+        case ('QSATIINV') ! 1./qsat_ice
+
+          call qsat_ice( ncol, pver, state%t(:ncol,:), state%pmid(:ncol,:), arrayout(:ncol,:) )! 4x in, 1x out
+          arrayout(:ncol,:) = 1._r8/arrayout(:ncol,:)
+
+        case ('QSSATW')  ! supersaturation w.r.t. water in terms of mixing ratio
+
+          call supersat_q_water( ncol, pver, state%t(:ncol,:),            &! in
+                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &! in
+                                 arrayout(:ncol,:)  )                      ! out
+
+        case ('QSSATI')  ! supersaturation w.r.t. ice in terms of mixing ratio
+
+          call supersat_q_ice(   ncol, pver, state%t(:ncol,:),            &! in
+                                 state%pmid(:ncol,:), state%q(:ncol,:,1), &! in
+                                 arrayout(:ncol,:)  )                      ! out
 
         case ('RHW')
-          call relhum_water_percent( ncol, pver, state%t(:ncol,:),            &
-                                     state%pmid(:ncol,:), state%q(:ncol,:,1), &
-                                     arrayout(:ncol,:)  )
+          call relhum_water_percent( ncol, pver, state%t(:ncol,:),            &! in
+                                     state%pmid(:ncol,:), state%q(:ncol,:,1), &! in
+                                     arrayout(:ncol,:)  )                      ! out
         case ('RHI')
-          call relhum_ice_percent( ncol, pver, state%t(:ncol,:),            &
-                                   state%pmid(:ncol,:), state%q(:ncol,:,1), &
-                                   arrayout(:ncol,:)  )
+          call relhum_ice_percent( ncol, pver, state%t(:ncol,:),            &! in
+                                   state%pmid(:ncol,:), state%q(:ncol,:,1), &! in
+                                   arrayout(:ncol,:)  )                      ! out
 
         !case ('CAPE') then
         !   call cape()
