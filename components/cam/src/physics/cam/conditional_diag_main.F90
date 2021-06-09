@@ -430,9 +430,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         arrayout(1:ncol,1) = cam_in%cflx(1:ncol,idx)
 
      else
-     !---------------------------------------
+     !============================================================================
      ! Non-tracer and non-sfc-flux variables
-     !---------------------------------------
+     !============================================================================
 
         select case (trim(adjustl(varname)))
         case('T')
@@ -462,23 +462,53 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('PS')
            arrayout(1:ncol,1) = state%ps(1:ncol)
 
-        !case('PHIS')
-        !   arrayout(1:ncol,1) = state%phis(1:ncol)
+        !---------
+        ! cam_in 
+        !---------
 
-        !------ cam_in -------
+        case('LWUP')
+           arrayout(1:ncol,1) = cam_in%lwup(1:ncol)
+
+        case('LHF')
+           arrayout(1:ncol,1) = cam_in%lhf(1:ncol)
+
+        case('SHF')
+           arrayout(1:ncol,1) = cam_in%shf(1:ncol)
+
+        case('WSX')
+           arrayout(1:ncol,1) = cam_in%wsx(1:ncol)
+
+        case('WSY')
+           arrayout(1:ncol,1) = cam_in%wsy(1:ncol)
+
+        case('TREF')
+           arrayout(1:ncol,1) = cam_in%(1:ncol)
+
+        case('QREF')
+           arrayout(1:ncol,1) = cam_in%(1:ncol)
 
         case('U10')
            arrayout(1:ncol,1) = cam_in%u10(1:ncol)
 
-        !case('LANDFRAC')
-        !   arrayout(1:ncol,1) = cam_in%landfrac(1:ncol)
+        case('TS')
+           arrayout(1:ncol,1) = cam_in%(1:ncol)
 
-        !------ cam_out -------
+        case('SST')
+           arrayout(1:ncol,1) = cam_in%(1:ncol)
 
-        case('FLDS')
+        !----------
+        ! cam_out
+        !----------
+
+        case('FLWDS')
            arrayout(1:ncol,1) = cam_out%flwds(1:ncol)
 
-        !------ pbuf -------
+        case('NETSW')
+           arrayout(1:ncol,1) = cam_out%netsw(1:ncol)
+
+        !----------
+        ! pbuf
+        !----------
 
         case('PBLH')
             idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
@@ -488,7 +518,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        !------ other physical quantities -------
+        !------------------------------------------------------
+        ! physical quantities that need to be calculated here 
+        !------------------------------------------------------
 
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
@@ -497,17 +529,6 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case ('QSATI')
           call qsat_ice( ncol, pver, state%t(:ncol,:), state%pmid(:ncol,:), &! in
                          arrayout(:ncol,:)                                  )! out
-
-        case ('QSATWINV') ! 1./qsat_water
-
-          call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
-                               tmp(:ncol,:),   arrayout(:ncol,:)  )! out
-          arrayout(:ncol,:) = 1._r8/arrayout(:ncol,:)
-
-        case ('QSATIINV') ! 1./qsat_ice
-
-          call qsat_ice( ncol, pver, state%t(:ncol,:), state%pmid(:ncol,:), arrayout(:ncol,:) )! 4x in, 1x out
-          arrayout(:ncol,:) = 1._r8/arrayout(:ncol,:)
 
         case ('QSSATW')  ! supersaturation w.r.t. water in terms of mixing ratio
 
