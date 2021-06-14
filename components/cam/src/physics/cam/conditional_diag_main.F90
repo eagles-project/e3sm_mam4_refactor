@@ -482,19 +482,19 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
            arrayout(1:ncol,1) = cam_in%wsy(1:ncol)
 
         case('TREF')
-           arrayout(1:ncol,1) = cam_in%(1:ncol)
+           arrayout(1:ncol,1) = cam_in%tref(1:ncol)
 
         case('QREF')
-           arrayout(1:ncol,1) = cam_in%(1:ncol)
+           arrayout(1:ncol,1) = cam_in%qref(1:ncol)
 
         case('U10')
            arrayout(1:ncol,1) = cam_in%u10(1:ncol)
 
         case('TS')
-           arrayout(1:ncol,1) = cam_in%(1:ncol)
+           arrayout(1:ncol,1) = cam_in%ts(1:ncol)
 
         case('SST')
-           arrayout(1:ncol,1) = cam_in%(1:ncol)
+           arrayout(1:ncol,1) = cam_in%sst(1:ncol)
 
         !----------
         ! cam_out
