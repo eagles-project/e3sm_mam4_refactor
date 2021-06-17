@@ -119,7 +119,7 @@ subroutine phys_register
     !            A. Gettelman, Nov 2010 - put micro/macro physics into separate routines
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer,     only: pbuf_init_time,dyn_time_lvls
+    use physics_buffer,     only: pbuf_init_time, dyn_time_lvls
     use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use spmd_utils,         only: masterproc
@@ -1172,6 +1172,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     use cam_diagnostics,only: diag_deallocate, diag_surf
     use comsrf,         only: trefmxav, trefmnav, sgh, sgh30, fsds 
+    use comsrf,         only: fsns, fsnt, flns, flnt
     use physconst,      only: stebol, latvap
     use carma_intr,     only: carma_accumulate_stats
 #if ( defined OFFLINE_DYN )
@@ -1264,7 +1265,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
        call tphysac(ztodt, cam_in(c),  &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
             phys_state(c), phys_tend(c), phys_buffer_chunk,&
-            fsds(1,c))
+            fsds(1,c), fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c))
     end do                    ! Chunk loop
 
     !call t_adj_detailf(-1)
@@ -1323,7 +1324,7 @@ end subroutine phys_final
 subroutine tphysac (ztodt,   cam_in,  &
        sgh,     sgh30,                                     &
        cam_out,  state,   tend,    pbuf,            &
-       fsds    )
+       fsds, fsns, fsnt, flns, flnt   )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -1340,7 +1341,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! Author: CCM1, CMS Contact: J. Truesdale
     ! 
     !-----------------------------------------------------------------------
-    use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx, dyn_time_lvls
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use chemistry,          only: chem_is_active, chem_timestep_tend, chem_emissions
     use cam_diagnostics,    only: diag_phys_tend_writeout
@@ -1378,6 +1379,8 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use radiation,          only: get_saved_qrl_qrs
+    use radheat,            only: radheat_tend_add_subtract
 
     implicit none
 
@@ -1386,6 +1389,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     !
     real(r8), intent(in) :: ztodt                  ! Two times model timestep (2 delta-t)
     real(r8), intent(in) :: fsds(pcols)            ! down solar flux
+
+    real(r8), intent(in) :: fsns(pcols)            ! Surface solar absorbed flux
+    real(r8), intent(in) :: fsnt(pcols)            ! Net column abs solar flux at model top
+    real(r8), intent(in) :: flns(pcols)            ! Srf longwave cooling (up-down) flux
+    real(r8), intent(in) :: flnt(pcols)            ! Net outgoing lw flux at model top
+
     real(r8), intent(in) :: sgh(pcols)             ! Std. deviation of orography for gwd
     real(r8), intent(in) :: sgh30(pcols)           ! Std. deviation of 30s orography for tms
 
@@ -1448,6 +1457,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     logical :: l_rayleigh
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
+    logical :: l_rad
+
+    integer :: radheat_cpl_opt
+    real(r8):: zqrl(pcols,pver) ! longwave heating
+    real(r8):: zqrs(pcols,pver) ! shortwave heating
+    real(r8):: net_flx(pcols)
 
     !
     !-----------------------------------------------------------------------
@@ -1464,6 +1479,8 @@ subroutine tphysac (ztodt,   cam_in,  &
                       ,l_rayleigh_out         = l_rayleigh         &
                       ,l_gw_drag_out          = l_gw_drag          &
                       ,l_ac_energy_chk_out    = l_ac_energy_chk    &
+                      ,l_rad_out              = l_rad              &
+                      ,radheat_cpl_opt_out    = radheat_cpl_opt    &
                      )
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1704,6 +1721,30 @@ if (l_gw_drag) then
 
 end if ! l_gw_drag
 
+if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
+! Undo the radiative heating applied after radiative_tend:
+! (Will be added back again before macmic in the next call of tphysbc.) 
+
+    call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
+    call radheat_tend_add_subtract( -1._r8, state, ptend,               &! in, in, out
+                                    zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
+                                    net_flx                             )! out
+
+    tend%flx_net(:ncol) = tend%flx_net(:ncol) + net_flx(:ncol) ! Set net flux used by spectral dycores
+    call physics_update(state, ptend, ztodt, tend)
+    call check_energy_chng(state, tend, "radheat_subtract_before_dyn", nstep, ztodt, &
+                           zero, zero, zero, net_flx)
+
+end if ! l_rad
+
+    !===================================================
+    ! Update Nudging values, if needed
+    !===================================================
+    if((Nudge_Model).and.(Nudge_ON)) then
+      call nudging_timestep_tend(state,ptend)
+      call physics_update(state,ptend,ztodt,tend)
+    endif
+
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -1767,14 +1808,6 @@ end if ! l_ac_energy_chk
        if (labort) then
           call endrun ('TPHYSAC error:  grid contains non-ocean point')
        endif
-    endif
-
-    !===================================================
-    ! Update Nudging values, if needed
-    !===================================================
-    if((Nudge_Model).and.(Nudge_ON)) then
-      call nudging_timestep_tend(state,ptend)
-      call physics_update(state,ptend,ztodt,tend)
     endif
 
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
@@ -1861,7 +1894,8 @@ subroutine tphysbc (ztodt,               &
     use aero_model,      only: aero_model_wetdep
     use carma_intr,      only: carma_wetdep_tend, carma_timestep_tend
     use carma_flags_mod, only: carma_do_detrain, carma_do_cldice, carma_do_cldliq,  carma_do_wetdep
-    use radiation,       only: radiation_tend
+    use radiation,       only: radiation_tend, get_saved_qrl_qrs
+    use radheat,         only: radheat_tend_add_subtract
     use cloud_diagnostics, only: cloud_diagnostics_calc
     use perf_mod
     use mo_gas_phase_chemdr,only: map2chm
@@ -2056,6 +2090,12 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:,:) :: ni_after_macmic
     !Shixuan Zhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
 
+    ! Added for revised radiation coupling 
+    integer :: radheat_cpl_opt
+    real(r8):: zqrl(pcols,pver) ! longwave heating
+    real(r8):: zqrs(pcols,pver) ! shortwave heating
+    ! Added for revised radiation coupling
+
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
@@ -2068,6 +2108,7 @@ subroutine tphysbc (ztodt,               &
                       ,l_rad_out              = l_rad              &
                       ,l_dribble_tend_into_macmic_loop_out   = l_dribble_tend_into_macmic_loop &
                       ,dribble_start_step_out                = dribble_start_step &
+                      ,radheat_cpl_opt_out = radheat_cpl_opt &
                       )
     
     !-----------------------------------------------------------------------
@@ -2410,6 +2451,19 @@ if (l_tracer_aero) then
 
 end if
 
+if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then 
+! apply radiative heating calculated in the previous time step
+
+    call get_saved_qrl_qrs( state, pbuf, zqrl, zqrs )
+    call radheat_tend_add_subtract( 1._r8, state, ptend,                &! in, in, out
+                                    zqrl, zqrs, fsns, fsnt, flns, flnt, &! in
+                                    net_flx                             )! out
+
+    tend%flx_net(:ncol) = net_flx(:ncol) ! Set net flux used by spectral dycores
+    call physics_update(state, ptend, ztodt, tend)
+    call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
+                           zero, zero, zero, net_flx)
+end if
 
     if( microp_scheme == 'RK' ) then
 
@@ -2835,12 +2889,30 @@ if (l_rad) then
          fsns,    fsnt, flns,    flnt,  &
          fsds, net_flx,is_cmip6_volc)
 
+  if (radheat_cpl_opt == 1 ) then
+    ! QRL, QRS and various fluxes have been saved in pbuf or comsrf. Do not apply the tendencies yet.
+
+    call physics_ptend_dealloc(ptend)
+
+    ptend%name  = "default"
+    ptend%lq(:) = .false.
+    ptend%ls    = .false.
+    ptend%lu    = .false.
+    ptend%lv    = .false.
+    ptend%psetcols = 0
+
+  else
+    ! Update temperature, dry static energy, geopotential height etc.
+    ! and register net flux. 
+
     ! Set net flux used by spectral dycores
     do i=1,ncol
        tend%flx_net(i) = net_flx(i)
     end do
     call physics_update(state, ptend, ztodt, tend)
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
+
+  end if
 
     call t_stopf('radiation')
 
