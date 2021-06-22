@@ -1908,6 +1908,7 @@ subroutine tphysbc (ztodt,               &
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
+    use nudging,         only: Nudge_Model,Nudge_Loc_PhysOut,nudging_calc_tend
 
     implicit none
 
@@ -2865,6 +2866,13 @@ end if ! l_tracer_aero
     call diag_conv(state, ztodt, pbuf)
 
     call t_stopf('bc_history_write')
+
+    !===================================
+    ! Update Nudging tendency if needed
+    !===================================
+    if (Nudge_Model .and. Nudge_Loc_PhysOut) then
+       call nudging_calc_tend(state)
+    endif
 
     !===================================================
     ! Write cloud diagnostics on history file
