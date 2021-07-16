@@ -97,6 +97,8 @@ module conv_water
    rei_idx      = pbuf_get_index('REI')
 
    ! Convective cloud water variables.
+   call addfld ('LS_ICWMR', (/ 'lev' /), 'A', 'kg/kg', 'Large-scale in-cloud water mixing ratio '                   )
+   call addfld ('CU_ICWMR', (/ 'lev' /), 'A', 'kg/kg', 'Convection in-cloud water mixing ratio '                   )
    call addfld ('ICIMRCU', (/ 'lev' /), 'A', 'kg/kg', 'Convection in-cloud ice mixing ratio '                   )
    call addfld ('ICLMRCU', (/ 'lev' /), 'A', 'kg/kg', 'Convection in-cloud liquid mixing ratio '                )
    call addfld ('ICIMRTOT', (/ 'lev' /), 'A', 'kg/kg', 'Total in-cloud ice mixing ratio '                        )
@@ -167,6 +169,10 @@ module conv_water
    real(r8) :: conv_liq(pcols,pver)               ! Convective contributions to IC cloud liquid
    real(r8) :: tot_ice(pcols,pver)                ! Total IC ice
    real(r8) :: tot_liq(pcols,pver)                ! Total IC liquid
+  
+   !dummy array to save the variable
+   real(r8) :: dum1(pcols,pver)                ! Total IC ice
+   real(r8) :: dum2(pcols,pver)                ! Total IC liquid
 
    integer  :: i,k,itim_old                       ! Lon, lev indices buff stuff.
    real(r8) :: cu_icwmr                           ! Convective  water for this grid-box.   
@@ -318,6 +324,8 @@ module conv_water
 
       totg_ice(i,k) = tot0_frac * tot_icwmr * wrk1
       totg_liq(i,k) = tot0_frac * tot_icwmr * (1._r8-wrk1)
+      dum1(i,k)     = ls_icwmr
+      dum2(i,k)     = cu_icwmr
 
    end do
    end do
@@ -331,6 +339,8 @@ module conv_water
 
   ! Output convective IC WMRs
    
+   call outfld( 'LS_ICWMR', dum1  , pcols, lchnk )
+   call outfld( 'CU_ICWMR', dum2  , pcols, lchnk )
    call outfld( 'ICLMRCU ', conv_liq  , pcols, lchnk )
    call outfld( 'ICIMRCU ', conv_ice  , pcols, lchnk )
    call outfld( 'ICLMRTOT', tot_liq   , pcols, lchnk )

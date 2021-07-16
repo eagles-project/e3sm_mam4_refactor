@@ -756,8 +756,14 @@ end subroutine clubb_init_cnst
     call addfld ('DPDLFT', (/ 'lev' /),  'A',        'K/s', 'T-tendency due to deep convective detrainment') 
     call addfld ('RELVAR', (/ 'lev' /),  'A',        '-', 'Relative cloud water variance')
     call addfld ('RELVARC', (/ 'lev' /),  'A',        '-', 'Relative cloud water variance', flag_xyfill=.true.,fill_value=fillvalue)
+    call addfld ('AST', (/ 'lev' /), 'A',       '1', 'Stratus cloud fraction')
+    call addfld ('ALST', (/ 'lev' /), 'A',   '1', 'Stratus Liquid cloud fraction')
+    call addfld ('AIST', (/ 'lev' /), 'A',   '1', 'Stratus ICE cloud fraction')
     call addfld ('CONCLD', (/ 'lev' /),  'A',        'fraction', 'Convective cloud cover')
     call addfld ('CMELIQ', (/ 'lev' /),  'A',        'kg/kg/s', 'Rate of cond-evap of liq within the cloud')
+    call addfld ('DP_FRAC_CLUBB', (/ 'lev' /),  'A',        'fraction', 'Deep convection cloud fraction')
+    call addfld ('CMFMCDZM_CLUBB', (/ 'ilev' /),'A','kg/m2/s','Convection mass flux from ZM deep ')
+    call addfld ('ICWMRDP_CLUBB', (/ 'lev' /), 'A', 'kg/kg', 'Deep Convection in-cloud water mixing ratio ')
 
     !  Initialize statistics, below are dummy variables
     dum1 = 300._r8
@@ -823,8 +829,15 @@ end subroutine clubb_init_cnst
        call add_default('QT',               1, ' ')
        call add_default('CONCLD',           1, ' ')
     else 
+       call add_default('CLOUDCOVER_CLUBB', 1, ' ')
        call add_default('CLOUDFRAC_CLUBB',  1, ' ')
+       call add_default('AST',              1, ' ')
+       call add_default('ALST',             1, ' ')
+       call add_default('AIST',             1, ' ')
        call add_default('CONCLD',           1, ' ')
+       call add_default('DP_FRAC_CLUBB',    1, ' ')
+       call add_default('CMFMCDZM_CLUBB',   1, ' ')
+       call add_default('ICWMRDP_CLUBB',    1, ' ')
     end if
 
     if (history_amwg) then
@@ -2486,6 +2499,12 @@ end subroutine clubb_init_cnst
    call outfld( 'QT',               qt_output,               pcols, lchnk )
    call outfld( 'SL',               sl_output,               pcols, lchnk )
    call outfld( 'CONCLD',           concld,                  pcols, lchnk )
+   call outfld( 'AST',              ast,                     pcols, lchnk )
+   call outfld( 'AIST',             aist,                    pcols, lchnk )
+   call outfld( 'ALST',             alst,                    pcols, lchnk )
+   call outfld( 'DP_FRAC_CLUBB',    deepcu,                  pcols, lchnk )
+   call outfld( 'CMFMCDZM_CLUBB',   cmfmc,                   pcols, lchnk )
+   call outfld( 'ICWMRDP_CLUBB',    dp_icwmr,                pcols, lchnk )
 
    !  Output CLUBB history here
    if (l_stats) then 
