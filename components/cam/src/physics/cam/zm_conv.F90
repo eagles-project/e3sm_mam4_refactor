@@ -36,6 +36,8 @@ module zm_conv
   public convtran                 ! convective transport
   public momtran                  ! convective momentum transport
   public trigmem                  ! true if convective memory
+  public buoyan_dilute            ! subroutine that calculates CAPE
+  public limcnv                   ! top interface level limit for convection
 
 !
 ! Private data

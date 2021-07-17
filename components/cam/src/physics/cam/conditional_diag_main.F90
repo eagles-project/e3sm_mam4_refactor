@@ -518,9 +518,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        !------------------------------------------------------
-        ! physical quantities that need to be calculated here 
-        !------------------------------------------------------
+        !-----------------------------------------------------------
+        ! physical quantities that need to be calculated on the fly 
+        !-----------------------------------------------------------
 
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
@@ -551,8 +551,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
                                    state%pmid(:ncol,:), state%q(:ncol,:,1), &! in
                                    arrayout(:ncol,:)  )                      ! out
 
-        !case ('CAPE') then
-        !   call cape()
+        case ('CAPE')
+          call compute_cape( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
 
         !-----------------------------------------------------------------------------------
         ! The following were added mostly for testing of the conditional diag functionality
