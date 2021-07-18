@@ -11,7 +11,7 @@ module conditional_diag_main
 
   public cnd_diag_checkpoint
 
-  ! comparison types used in defining sampling condition
+  ! types of comparison used in defining sampling condition
 
   integer, parameter :: GE  =  2
   integer, parameter :: GT  =  1
@@ -24,6 +24,10 @@ module conditional_diag_main
   real(r8),parameter :: ON  = 1._r8
   real(r8),parameter :: OFF = 0._r8
 
+  ! start time step for increment calculation
+
+  integer,parameter :: NS0INC = 3 ! start time step for increment calculation
+  integer,parameter :: NS0SMP = 4 ! start time step for conditional sampling
 contains
 
 !======================================================
@@ -84,12 +88,12 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
   nstep  = get_nstep()  ! current time step. Later in this routine, we
                         ! - save QoI values starting from the first step.
-                        ! - do increment calculation when nstep > 1.
+                        ! - do increment calculation when nstep >= NS0INC.
                         ! - evaluate sampling metrics starting from the first step.
                         ! - do conditional sampling and outfld calls only when 
-                        !   nstep > 2, because the sampling time window might 
+                        !   nstep >= NS0SMP, because the sampling time window might 
                         !   involve some checkpints from the previous nstep,
-                        !   and valid increments are available only from nstep = 2.
+                        !   and valid increments are available only from nstep >= NS0INC.
 
   !=======================================
   ! Obtain QoI values and/or increments
@@ -161,7 +165,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
            icnd = 1
            old => diag%cnd(icnd)%qoi(iqoi)% old
 
-           if (nstep>1) then 
+           if (nstep >= NS0INC) then 
               inc => diag%cnd(icnd)%qoi(iqoi)% inc(:,:,ichkpt)
               inc(1:ncol,:) = new(1:ncol,:) - old(1:ncol,:)
            end if
@@ -175,7 +179,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
            do icnd = 2,ncnd
 
               diag%cnd(icnd)%qoi(iqoi)% old(1:ncol,:) = new(1:ncol,:)
-              if (nstep > 1) &
+              if (nstep >= NS0INC) &
               diag%cnd(icnd)%qoi(iqoi)% inc(1:ncol,:,ichkpt) = inc(1:ncol,:)
 
            end do
@@ -241,11 +245,11 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
   !=======================================================================
   ! Apply conditional sampling, then send QoIs to history buffer.
-  ! (Do this only when nstep > 2, because the sampling time window might 
+  ! (Do this only when nstep >= NS0SMP, because the sampling time window might 
   ! involve some checkpints from the previous nstep,
-  ! and valid increments are available only from nstep = 2 onwards)
+  ! and valid increments are available only from nstep = NS0INC onwards)
   !=======================================================================
-  if (nstep > 2) then
+  if (nstep >= NS0SMP) then
   do icnd = 1,ncnd
 
      ! Check if conditional sampling needs to be completed at this checkpoint.
@@ -310,7 +314,7 @@ subroutine cnd_diag_checkpoint( diag, this_chkpt, state, pbuf, cam_in, cam_out )
 
      end if  !trim(this_chkpt).eq.trim(cnd_diag_info% cnd_end_chkpt(icnd))
   end do ! icnd = 1,ncnd
-  end if ! nstep > 2
+  end if ! nstep >= NS0SMP
 
   call t_stopf('cnd_diag_checkpoint')
 
