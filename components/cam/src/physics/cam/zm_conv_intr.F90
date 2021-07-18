@@ -143,6 +143,12 @@ subroutine zm_conv_init(pref_edge)
     call addfld ('ZMDQ',(/ 'lev' /), 'A','kg/kg/s','Q tendency - Zhang-McFarlane moist convection')
     call addfld ('ZMDICE',(/ 'lev' /), 'A','kg/kg/s','Cloud ice tendency - Zhang-McFarlane convection')
     call addfld ('ZMDLIQ',(/ 'lev' /), 'A','kg/kg/s','Cloud liq tendency - Zhang-McFarlane convection')
+
+    call addfld ('ZMT',(/ 'lev' /), 'A','K/s','T - after Zhang-McFarlane moist convection')
+    call addfld ('ZMQ',(/ 'lev' /), 'A','kg/kg/s','Q - after Zhang-McFarlane moist convection')
+    call addfld ('ZMICE',(/ 'lev' /), 'A','kg/kg/s','Cloud ice - after Zhang-McFarlane convection')
+    call addfld ('ZMLIQ',(/ 'lev' /), 'A','kg/kg/s','Cloud liq - after Zhang-McFarlane convection')
+
     call addfld ('EVAPTZM',(/ 'lev' /), 'A','K/s','T tendency - Evaporation/snow prod from Zhang convection')
     call addfld ('FZSNTZM',(/ 'lev' /), 'A','K/s','T tendency - Rain to snow conversion from Zhang convection')
     call addfld ('EVSNTZM',(/ 'lev' /), 'A','K/s','T tendency - Snow to rain prod from Zhang convection')

@@ -2374,6 +2374,11 @@ end if
 
     call physics_update(state, ptend, ztodt, tend)
 
+    call outfld('ZMT',   state%t, pcols, lchnk   )
+    call outfld('ZMQ',   state%q(1,1,1), pcols, lchnk   )
+    call outfld('ZMLIQ', state%q(1,1,ixcldliq), pcols, lchnk   )
+    call outfld('ZMICE', state%q(1,1,ixcldice), pcols, lchnk   )
+
     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp )
     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp )
     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh )
