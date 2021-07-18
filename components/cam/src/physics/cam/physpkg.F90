@@ -1593,6 +1593,7 @@ if (l_vdiff) then
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
 
+       call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
     else
 
        call t_startf('vertical_diffusion_tend')
@@ -1611,11 +1612,11 @@ if (l_vdiff) then
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('vertical_diffusion_tend')
     
+       call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )
     endif
 
 end if ! l_vdiff
 
-    call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )
 
 if (l_rayleigh) then
     !===================================================
