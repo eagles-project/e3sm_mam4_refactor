@@ -166,7 +166,6 @@ subroutine phys_register
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
     use output_aerocom_aie, only: output_aerocom_aie_register, do_aerocom_ind3
-    use conditional_diag_output_utils, only: cnd_diag_output_init
 
     !---------------------------Local variables-----------------------------
     !
