@@ -20,6 +20,8 @@ module physpkg
        physics_ptend, physics_tend_init,    &
        physics_type_alloc, physics_ptend_dealloc,&
        physics_state_alloc, physics_state_dealloc, physics_tend_alloc, physics_tend_dealloc
+  use conditional_diag, only: cnd_diag_t, cnd_diag_info
+  use conditional_diag_main, only: cnd_diag_checkpoint
   use physics_update_mod,  only: physics_update, physics_update_init, hist_vars, nvars_prtrb_hist, get_var
   use phys_grid,        only: get_ncols_p
   use phys_gmean,       only: gmean_mass
@@ -164,6 +166,7 @@ subroutine phys_register
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
     use output_aerocom_aie, only: output_aerocom_aie_register, do_aerocom_ind3
+    use conditional_diag_output_utils, only: cnd_diag_output_init
 
     !---------------------------Local variables-----------------------------
     !
@@ -740,6 +743,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use rad_solar_var,      only: rad_solar_var_init
     use nudging,            only: Nudge_Model,nudging_init
     use output_aerocom_aie, only: output_aerocom_aie_init, do_aerocom_ind3
+    use conditional_diag_output_utils, only: cnd_diag_output_init
 
 
     ! Input/output arguments
@@ -788,6 +792,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     call aoa_tracers_init()
 
     teout_idx = pbuf_get_index( 'TEOUT')
+
+    ! addfld and add_default calls for conditional diagnostics
+
+    call cnd_diag_output_init( pver, cnd_diag_info )
 
     ! For adiabatic or ideal physics don't need to initialize any of the
     ! parameterizations below:
@@ -937,7 +945,7 @@ end subroutine phys_init
   !-----------------------------------------------------------------------
   !
 
-subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
+subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phys_diag )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -971,6 +979,8 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     type(physics_buffer_desc), pointer, dimension(:,:) :: pbuf2d
     type(cam_in_t),                     dimension(begchunk:endchunk) :: cam_in
     type(cam_out_t),                    dimension(begchunk:endchunk) :: cam_out
+    type(cnd_diag_t),    intent(inout), dimension(begchunk:endchunk) :: phys_diag
+
     !-----------------------------------------------------------------------
     !
     !---------------------------Local workspace-----------------------------
@@ -1055,7 +1065,7 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
           call t_stopf ('diag_physvar_ic')
 
           call tphysbc (ztodt, fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c), phys_state(c),        &
-                       phys_tend(c), phys_buffer_chunk,  fsds(1,c), landm(1,c),          &
+                       phys_tend(c), phys_buffer_chunk,  phys_diag(c), fsds(1,c), landm(1,c),          &
                        sgh(1,c), sgh30(1,c), cam_out(c), cam_in(c) )
 
        end do
@@ -1158,7 +1168,7 @@ end subroutine phys_run1_adiabatic_or_ideal
   !
 
 subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
-       cam_in )
+       cam_in, phys_diag )
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -1194,6 +1204,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     type(cam_out_t),     intent(inout), dimension(begchunk:endchunk) :: cam_out
     type(cam_in_t),      intent(inout), dimension(begchunk:endchunk) :: cam_in
+    type(cnd_diag_t),    intent(inout), dimension(begchunk:endchunk) :: phys_diag
     !
     !-----------------------------------------------------------------------
     !---------------------------Local workspace-----------------------------
@@ -1264,7 +1275,7 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
        call tphysac(ztodt, cam_in(c),  &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
-            phys_state(c), phys_tend(c), phys_buffer_chunk,&
+            phys_state(c), phys_tend(c), phys_buffer_chunk, phys_diag(c),  &
             fsds(1,c), fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c))
     end do                    ! Chunk loop
 
@@ -1292,7 +1303,7 @@ end subroutine phys_run2
   !----------------------------------------------------------------------- 
   !
 
-subroutine phys_final( phys_state, phys_tend, pbuf2d )
+subroutine phys_final( phys_state, phys_tend, pbuf2d, phys_diag )
     use physics_buffer, only : physics_buffer_desc, pbuf_deallocate
     use chemistry, only : chem_final
     use carma_intr, only : carma_final
@@ -1307,6 +1318,7 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     type(physics_state), pointer :: phys_state(:)
     type(physics_tend ), pointer :: phys_tend(:)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+    type(cnd_diag_t),    pointer :: phys_diag(:)
 
     if(associated(pbuf2d)) then
        call pbuf_deallocate(pbuf2d,'global')
@@ -1314,6 +1326,7 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     end if
     deallocate(phys_state)
     deallocate(phys_tend)
+    deallocate(phys_diag)
     call chem_final
     call carma_final
     call wv_sat_final
@@ -1321,9 +1334,9 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
 end subroutine phys_final
 
 
-subroutine tphysac (ztodt,   cam_in,  &
-       sgh,     sgh30,                                     &
-       cam_out,  state,   tend,    pbuf,            &
+subroutine tphysac (ztodt,   cam_in,               &
+       sgh,     sgh30,                             &
+       cam_out,  state,   tend,    pbuf,  diag,    &
        fsds, fsns, fsnt, flns, flnt   )
     !----------------------------------------------------------------------- 
     ! 
@@ -1403,6 +1416,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     type(physics_state), intent(inout) :: state
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
+    type(cnd_diag_t),    intent(inout) :: diag
 
 
     type(check_tracers_data):: tracerint             ! tracer mass integrals and cummulative boundary fluxes
@@ -1492,6 +1506,9 @@ subroutine tphysac (ztodt,   cam_in,  &
     if (state_debug_checks) &
          call physics_state_check(state, name="before tphysac")
 
+    call cnd_diag_checkpoint( diag, 'MCTCPL', state, pbuf, cam_in, cam_out )
+    !----------------------------------------------------------------------------
+
     call t_startf('tphysac_init')
     ! Associate pointers with physics buffer fields
     itim_old = pbuf_old_tim_idx()
@@ -1534,6 +1551,8 @@ if (l_tracer_aero) then
 
 end if ! l_tracer_aero
 
+    call cnd_diag_checkpoint( diag, 'CHEMEMIS', state, pbuf, cam_in, cam_out )
+
     ! get nstep and zero array for energy checker
     zero = 0._r8
     nstep = get_nstep()
@@ -1560,6 +1579,8 @@ end if ! l_tracer_aero
 
     call t_stopf('tphysac_init')
 
+    call cnd_diag_checkpoint( diag, 'PACINI', state, pbuf, cam_in, cam_out )
+
 if (l_tracer_aero) then
     !===================================================
     ! Source/sink terms for advected tracers.
@@ -1577,6 +1598,8 @@ if (l_tracer_aero) then
     call check_tracers_chng(state, tracerint, "aoa_tracers_timestep_tend", nstep, ztodt,   &
          cam_in%cflx)
 
+    call cnd_diag_checkpoint( diag, 'TRACER', state, pbuf, cam_in, cam_out )
+
     ! Chemistry calculation
     if (chem_is_active()) then
        call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, &
@@ -1587,6 +1610,8 @@ if (l_tracer_aero) then
        call check_tracers_chng(state, tracerint, "chem_timestep_tend", nstep, ztodt, &
             cam_in%cflx)
     end if
+    call cnd_diag_checkpoint( diag, 'CHEM', state, pbuf, cam_in, cam_out )
+
     call t_stopf('adv_tracer_src_snk')
 
 end if ! l_tracer_aero
@@ -1607,6 +1632,7 @@ if (l_vdiff) then
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
 
+       call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
     else
 
        call t_startf('vertical_diffusion_tend')
@@ -1624,7 +1650,8 @@ if (l_vdiff) then
 
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('vertical_diffusion_tend')
-    
+
+       call cnd_diag_checkpoint( diag, 'VDIFF', state, pbuf, cam_in, cam_out )   
     endif
 
 end if ! l_vdiff
@@ -1648,6 +1675,7 @@ if (l_rayleigh) then
     call check_tracers_chng(state, tracerint, "vdiff", nstep, ztodt, cam_in%cflx)
 
 end if ! l_rayleigh
+    call cnd_diag_checkpoint( diag, 'RAYLEIGH', state, pbuf, cam_in, cam_out )
 
 if (l_tracer_aero) then
 
@@ -1656,6 +1684,7 @@ if (l_tracer_aero) then
     call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
     call t_stopf('aero_drydep')
+    call cnd_diag_checkpoint( diag, 'AERDRYRM', state, pbuf, cam_in, cam_out )
 
    ! CARMA microphysics
    !
@@ -1672,6 +1701,7 @@ if (l_tracer_aero) then
      call check_energy_chng(state, tend, "carma_tend", nstep, ztodt, zero, zero, zero, zero)
      call t_stopf('carma_timestep_tend')
    end if
+   call cnd_diag_checkpoint( diag, 'CARMAA', state, pbuf, cam_in, cam_out )
 
     !---------------------------------------------------------------------------------
     !	... enforce charge neutrality
@@ -1692,7 +1722,10 @@ if (l_gw_drag) then
     ! Check energy integrals
     call check_energy_chng(state, tend, "gwdrag", nstep, ztodt, zero, zero, zero, zero)
     call t_stopf('gw_tend')
+end if ! l_gw_drag
+    call cnd_diag_checkpoint( diag, 'GWDRAG', state, pbuf, cam_in, cam_out )
 
+if (l_gw_drag) then
     ! QBO relaxation
     call qbo_relax(state, pbuf, ptend)
     call physics_update(state, ptend, ztodt, tend)
@@ -1720,6 +1753,7 @@ if (l_gw_drag) then
     call t_stopf  ( 'iondrag' )
 
 end if ! l_gw_drag
+    call cnd_diag_checkpoint( diag, 'IONDRAG', state, pbuf, cam_in, cam_out )
 
 if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
 ! Undo the radiative heating applied after radiative_tend:
@@ -1736,6 +1770,7 @@ if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
                            zero, zero, zero, net_flx)
 
 end if ! l_rad
+    call cnd_diag_checkpoint( diag, 'RADCPL2', state, pbuf, cam_in, cam_out )
 
     !===================================================
     ! Update Nudging values, if needed
@@ -1744,6 +1779,7 @@ end if ! l_rad
       call nudging_timestep_tend(state,ptend)
       call physics_update(state,ptend,ztodt,tend)
     endif
+    call cnd_diag_checkpoint( diag, 'NDG', state, pbuf, cam_in, cam_out )
 
 if (l_ac_energy_chk) then
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -1799,6 +1835,7 @@ if (l_ac_energy_chk) then
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 end if ! l_ac_energy_chk
 
+    call cnd_diag_checkpoint( diag, 'DRYWET', state, pbuf, cam_in, cam_out )
 
     if (aqua_planet) then
        labort = .false.
@@ -1834,11 +1871,13 @@ end if ! l_ac_energy_chk
     end do
     water_vap_ac_2d(:ncol) = ftem(:ncol,1)
 
+    call cnd_diag_checkpoint( diag, 'PACEND', state, pbuf, cam_in, cam_out )
+
 end subroutine tphysac
 
-subroutine tphysbc (ztodt,               &
+subroutine tphysbc (ztodt,                          &
        fsns,    fsnt,    flns,    flnt,    state,   &
-       tend,    pbuf,     fsds,    landm,            &
+       tend,    pbuf,    diag,    fsds,    landm,   &
        sgh, sgh30, cam_out, cam_in )
     !----------------------------------------------------------------------- 
     ! 
@@ -1928,6 +1967,7 @@ subroutine tphysbc (ztodt,               &
     type(physics_state), intent(inout) :: state
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
+    type(cnd_diag_t),    intent(inout) :: diag
 
     type(cam_out_t),     intent(inout) :: cam_out
     type(cam_in_t),      intent(in)    :: cam_in
@@ -1967,6 +2007,8 @@ subroutine tphysbc (ztodt,               &
     ! for macro/micro co-substepping
     integer :: macmic_it                       ! iteration variables
     real(r8) :: cld_macmic_ztodt               ! modified timestep
+
+    character(len=2) :: char_macmic_it
 
     ! physics buffer fields to compute tendencies for stratiform package
     integer itim_old, ifld
@@ -2111,7 +2153,10 @@ subroutine tphysbc (ztodt,               &
                       ,dribble_start_step_out                = dribble_start_step &
                       ,radheat_cpl_opt_out = radheat_cpl_opt &
                       )
-    
+  
+    !-----------------------------------------------------------------------
+    call cnd_diag_checkpoint( diag, 'DYNEND', state, pbuf, cam_in, cam_out )
+  
     !-----------------------------------------------------------------------
     call t_startf('bc_init')
 
@@ -2326,6 +2371,7 @@ if (l_bc_energy_fix) then
     call t_stopf('energy_fixer')
 
 end if
+    call cnd_diag_checkpoint( diag, 'PBCINI', state, pbuf, cam_in, cam_out )
     !
     !===================================================
     ! Dry adjustment
@@ -2353,6 +2399,8 @@ if (l_dry_adj) then
     call t_stopf('dry_adjustment')
 
 end if
+    call cnd_diag_checkpoint( diag, 'DRYADJ', state, pbuf, cam_in, cam_out )
+
     !
     !===================================================
     ! Moist convection
@@ -2374,7 +2422,7 @@ end if
 
     call physics_update(state, ptend, ztodt, tend)
 
-    call outfld('ZMT',   state%t, pcols, lchnk   )
+    call outfld('ZMT',   state%t, pcols, lchnk   )  
     call outfld('ZMQ',   state%q(1,1,1), pcols, lchnk   )
     call outfld('ZMLIQ', state%q(1,1,ixcldliq), pcols, lchnk   )
     call outfld('ZMICE', state%q(1,1,ixcldice), pcols, lchnk   )
@@ -2399,6 +2447,8 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
+    call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
+
     !
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
     !
@@ -2415,6 +2465,8 @@ end if
     call check_energy_chng(state, tend, "convect_shallow", nstep, ztodt, zero, flx_cnd, snow_sh, zero)
 
     call check_tracers_chng(state, tracerint, "convect_shallow", nstep, ztodt, zero_tracers)
+
+    call cnd_diag_checkpoint( diag, 'SHCU', state, pbuf, cam_in, cam_out )
 
     call t_stopf('moist_convection')
 
@@ -2456,6 +2508,7 @@ if (l_tracer_aero) then
     call t_stopf('carma_timestep_tend')
 
 end if
+    call cnd_diag_checkpoint( diag, 'CARMA', state, pbuf, cam_in, cam_out )
 
 if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then 
 ! apply radiative heating calculated in the previous time step
@@ -2470,6 +2523,7 @@ if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then
     call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
                            zero, zero, zero, net_flx)
 end if
+    call cnd_diag_checkpoint( diag, 'RADCPL1', state, pbuf, cam_in, cam_out )
 
     if( microp_scheme == 'RK' ) then
 
@@ -2571,8 +2625,11 @@ end if
 
        end if
 
+       call cnd_diag_checkpoint( diag, 'DRIB', state, pbuf, cam_in, cam_out )
 
        do macmic_it = 1, cld_macmic_num_steps
+
+          write(char_macmic_it,'(i2.2)') macmic_it
 
           !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
           if (l_dribble) then
@@ -2652,8 +2709,8 @@ end if
              !    CLUBB call (PBL, shallow convection, macrophysics)
              ! =====================================================  
    
-             call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
-                cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+             call clubb_tend_cam(state,ptend,pbuf,diag,cld_macmic_ztodt,&
+                cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, &
                 dlf, det_s, det_ice, lcldo)
 
                 !  Since we "added" the reserved liquid back in this routine, we need 
@@ -2677,6 +2734,7 @@ end if
           endif
 
           call t_stopf('macrop_tend')
+          call cnd_diag_checkpoint( diag, 'CLDMAC'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
           !===================================================
           ! Calculate cloud microphysics 
@@ -2701,6 +2759,7 @@ end if
             call t_stopf('microp_aero_run')
 
           endif
+          call cnd_diag_checkpoint( diag, 'CLDAER'//char_macmic_it, state, pbuf, cam_in, cam_out )
 
           call t_startf('microp_tend')
 
@@ -2752,6 +2811,8 @@ end if
           prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
+          call cnd_diag_checkpoint( diag, 'CLDMIC'//char_macmic_it, state, pbuf, cam_in, cam_out )
+
        end do ! end substepping over macrophysics/microphysics
 
        prec_sed(:ncol) = prec_sed_macmic(:ncol)/cld_macmic_num_steps
@@ -2786,6 +2847,9 @@ end if
        end if
 
      end if ! l_st_mic
+
+     call cnd_diag_checkpoint( diag, 'STCLD', state, pbuf, cam_in, cam_out )
+     !---------------------------------------------------------------------
 
 if (l_tracer_aero) then
 
@@ -2852,6 +2916,8 @@ if (l_tracer_aero) then
    endif
 end if ! l_tracer_aero
 
+    call cnd_diag_checkpoint( diag, 'AERWETRM', state, pbuf, cam_in, cam_out )
+
 !<songxl 2011-9-20---------------------------------
    if(trigmem)then
       do k=1,pver
@@ -2888,6 +2954,8 @@ end if ! l_tracer_aero
     call cloud_diagnostics_calc(state, pbuf)
 
     call t_stopf('bc_cld_diag_history_write')
+
+    call cnd_diag_checkpoint( diag, 'PBCDIAG', state, pbuf, cam_in, cam_out )
 
 if (l_rad) then
     !===================================================
@@ -2930,6 +2998,7 @@ if (l_rad) then
     call t_stopf('radiation')
 
 end if ! l_rad
+    call cnd_diag_checkpoint( diag, 'RAD', state, pbuf, cam_in, cam_out )
 
     if(do_aerocom_ind3) then
        call cloud_top_aerocom(state, pbuf) 
@@ -2949,6 +3018,8 @@ end if ! l_rad
     call t_startf('diag_export')
     call diag_export(cam_out)
     call t_stopf('diag_export')
+
+    call cnd_diag_checkpoint( diag, 'PBCEND', state, pbuf, cam_in, cam_out )
 
 end subroutine tphysbc
 

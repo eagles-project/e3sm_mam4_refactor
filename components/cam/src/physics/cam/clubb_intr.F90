@@ -899,8 +899,8 @@ end subroutine clubb_init_cnst
   ! =============================================================================== !
 
    subroutine clubb_tend_cam( &
-                              state,   ptend_all,   pbuf,     hdtime, &
-                              cmfmc,   cam_in,   sgh30, & 
+                              state,   ptend_all,   pbuf,  diag, hdtime, &
+                              cmfmc,   cam_in, cam_out,  sgh30, &
                               macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
 
 !-------------------------------------------------------------------------------
@@ -925,12 +925,15 @@ end subroutine clubb_init_cnst
 
    use ppgrid,         only: pver, pverp, pcols
    use constituents,   only: cnst_get_ind
-   use camsrfexch,     only: cam_in_t
+   use camsrfexch,     only: cam_in_t, cam_out_t
    use ref_pres,       only: top_lev => trop_cloud_top_lev  
    use time_manager,   only: is_first_step   
    use cam_abortutils, only: endrun
    use wv_saturation,  only: qsat
    use micro_mg_cam,   only: micro_mg_version
+
+   use conditional_diag,      only: cnd_diag_t
+   use conditional_diag_main, only: cnd_diag_checkpoint
       
 #ifdef CLUBB_SGS
    use hb_diff,                   only: pblintd
@@ -971,6 +974,9 @@ end subroutine clubb_init_cnst
    real(r8),            intent(in)    :: sgh30(pcols)             ! std deviation of orography              [m]
    integer,             intent(in)    :: cld_macmic_num_steps     ! number of mac-mic iterations
    integer,             intent(in)    :: macmic_it                ! number of mac-mic iterations
+
+   type(cnd_diag_t),    intent(inout) :: diag                     ! conditionally sampled fields
+   type(cam_out_t),     intent(in)    :: cam_out
     
    ! ---------------------- !
    ! Input-Output Auguments !
@@ -1229,11 +1235,19 @@ end subroutine clubb_init_cnst
    
    integer :: ixorg
 
+   character(len=2) :: char_macmic_it
+
    intrinsic :: selected_real_kind, max
 
 #endif
    det_s(:)   = 0.0_r8
    det_ice(:) = 0.0_r8
+
+   if (macmic_it > 99) then
+      call endrun('clubb_tend_cam:  macmic_it > 99. Revise checkpoint name when calling cnd_diag_checkpoint.')
+   end if
+   write(char_macmic_it,'(i2.2)') macmic_it
+
 #ifdef CLUBB_SGS
 
    !-----------------------------------------------------------------------------------------------!
@@ -1382,6 +1396,8 @@ end subroutine clubb_init_cnst
      call outfld( 'NITENDICE', initend, pcols, lchnk )
    
    endif
+
+   call cnd_diag_checkpoint(diag, 'ICEMAC'//char_macmic_it, state1, pbuf, cam_in, cam_out)
 
    !  Determine CLUBB time step and make it sub-step friendly
    !  For now we want CLUBB time step to be 5 min since that is 
@@ -2145,6 +2161,8 @@ end subroutine clubb_init_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
 
+   call cnd_diag_checkpoint(diag, 'CLUBB'//char_macmic_it, state1, pbuf, cam_in, cam_out)
+
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ ! 
    ! ------------------------------------------------------------ !
@@ -2214,6 +2232,8 @@ end subroutine clubb_init_cnst
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
+
+   call cnd_diag_checkpoint(diag, 'CUDET'//char_macmic_it, state1, pbuf, cam_in, cam_out)
 
    ! ------------------------------------------------- !
    ! Diagnose relative cloud water variance            !
@@ -2542,7 +2562,9 @@ end subroutine clubb_init_cnst
       enddo
    
    endif
-   
+ 
+   call cnd_diag_checkpoint(diag, 'MACDIAG'//char_macmic_it, state1, pbuf, cam_in, cam_out)
+  
    return
 #endif
   end subroutine clubb_tend_cam
