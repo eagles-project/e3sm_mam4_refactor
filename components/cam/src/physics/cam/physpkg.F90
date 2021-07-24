@@ -1769,7 +1769,7 @@ if (l_rad .and. (radheat_cpl_opt == 2) .and. (nstep > dyn_time_lvls-1) ) then
                            zero, zero, zero, net_flx)
 
 end if ! l_rad
-    call cnd_diag_checkpoint( diag, 'RADCPL2', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'BFZM_NRAD', state, pbuf, cam_in, cam_out )
 
     !===================================================
     ! Update Nudging values, if needed
@@ -2522,7 +2522,7 @@ if (l_rad .and. (radheat_cpl_opt > 0) .and. (nstep > dyn_time_lvls-1) ) then
     call check_energy_chng(state, tend, "radheat_add_before_macmic", nstep, ztodt, &
                            zero, zero, zero, net_flx)
 end if
-    call cnd_diag_checkpoint( diag, 'RADCPL1', state, pbuf, cam_in, cam_out )
+    call cnd_diag_checkpoint( diag, 'BFMACMIC_RAD', state, pbuf, cam_in, cam_out )
 
     if( microp_scheme == 'RK' ) then
 
@@ -2624,7 +2624,7 @@ end if
 
        end if
 
-       call cnd_diag_checkpoint( diag, 'DRIB', state, pbuf, cam_in, cam_out )
+       call cnd_diag_checkpoint( diag, 'BF_MACMIC', state, pbuf, cam_in, cam_out )
 
        do macmic_it = 1, cld_macmic_num_steps
 
