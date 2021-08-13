@@ -48,6 +48,11 @@ module zm_conv_intr
               qm1_idx       !qm1 index in physics buffer
 !>songxl 2014-05-20------------------
 
+   integer :: Q_old_4CAPE_idx
+   integer :: T_old_4CAPE_idx
+   integer :: Q_fixed_4CAPE_idx
+   integer :: T_fixed_4CAPE_idx
+
 !  indices for fields in the physics buffer
    integer  ::    cld_idx          = 0    
    integer  ::    icwmrdp_idx      = 0     
@@ -98,6 +103,20 @@ subroutine zm_conv_register
     call pbuf_add_field('QM1', 'global', dtype_r8,(/pcols,pver/), qm1_idx) 
 !  endif
 !>songxl 2014-05-20-------------
+
+! Variables for Q and T profiles for CAPE budget decomposition.
+! The difference between "old" and "fixed" is that 
+!  - the "fixed" values will be updated once per physics time step after the deep convection
+!    parameterization. 
+!  - the "old" values might get updated multiple times per physics time step, after
+!    different parameterizations, if the user is using the conditional diagnostics tool
+!    and monitoring multiple checkpoints within each physics time step.
+
+    call pbuf_add_field('Q_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), Q_old_4CAPE_idx) 
+    call pbuf_add_field('T_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), T_old_4CAPE_idx) 
+
+    call pbuf_add_field('Q_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), Q_fixed_4CAPE_idx) 
+    call pbuf_add_field('T_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), T_fixed_4CAPE_idx) 
 
 end subroutine zm_conv_register
 

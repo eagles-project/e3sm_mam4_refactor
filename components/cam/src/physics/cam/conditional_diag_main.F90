@@ -558,6 +558,12 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case ('CAPE')
           call compute_cape( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
 
+        case ('CAPE_PCL')
+          call compute_cape_pcl( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
+
+        case ('DCAPE_ENV')
+          call compute_dcape_env( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
+
         !-----------------------------------------------------------------------------------
         ! The following were added mostly for testing of the conditional diag functionality
         !-----------------------------------------------------------------------------------

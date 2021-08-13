@@ -1964,6 +1964,9 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:,:) :: tm1   ! intermediate T between n and n-1 time step
     real(r8), pointer, dimension(:,:) :: qm1   ! intermediate q between n and n-1 time step
 !>songxl 2011-09-20----------------------------
+    
+    real(r8), pointer :: ptr2d(:,:)
+    integer :: idx
 
     ! physics buffer fields for total energy and mass adjustment
     real(r8), pointer, dimension(:  ) :: teout
@@ -2075,6 +2078,13 @@ subroutine tphysbc (ztodt,               &
                       )
     
     !-----------------------------------------------------------------------
+    if (is_first_step) then
+       idx = pbuf_get_index('Q_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
+       idx = pbuf_get_index('T_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
+       idx = pbuf_get_index('Q_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
+       idx = pbuf_get_index('T_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
+    end if
+
     call cnd_diag_checkpoint( diag, 'DYNEND', state, pbuf, cam_in, cam_out )
 
     !------------------------
@@ -2362,6 +2372,11 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
+    ! save T, Q profiles for CAPE-related diagnostics
+    idx = pbuf_get_index('Q_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
+    idx = pbuf_get_index('T_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
+
+    ! checkpoint for conditional diagnostics
     call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
 
     !------------------------------------------------------------------------------

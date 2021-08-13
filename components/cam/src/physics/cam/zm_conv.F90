@@ -3179,11 +3179,12 @@ subroutine q1q2_pjr(lchnk   , &
 end subroutine q1q2_pjr
 
 subroutine buoyan_dilute(lchnk   ,ncol    , &
-                  q       ,t       ,p       ,z       ,pf      , &
+                  q_in    ,t_in    ,p       ,z       ,pf      , &
                   tp      ,qstp    ,tl      ,rl      ,cape    , &
                   pblt    ,lcl     ,lel     ,lon     ,mx      , &
                   rd      ,grav    ,cp      ,msg     , &
-                  tpert   )
+                  tpert,                               &
+                  l_find_lnch_lvl_in, q_mx, t_mx   )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -3217,8 +3218,8 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
    integer, intent(in) :: lchnk                 ! chunk identifier
    integer, intent(in) :: ncol                  ! number of atmospheric columns
 
-   real(r8), intent(in) :: q(pcols,pver)        ! spec. humidity
-   real(r8), intent(in) :: t(pcols,pver)        ! temperature
+   real(r8), intent(in) :: q_in(pcols,pver)     ! spec. humidity
+   real(r8), intent(in) :: t_in(pcols,pver)     ! temperature
    real(r8), intent(in) :: p(pcols,pver)        ! pressure
    real(r8), intent(in) :: z(pcols,pver)        ! height
    real(r8), intent(in) :: pf(pcols,pver+1)     ! pressure at interfaces
@@ -3234,10 +3235,24 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
    integer lcl(pcols)        !
    integer lel(pcols)        !
    integer lon(pcols)        ! level of onset of deep convection
+
+! input/output argument
+
    integer mx(pcols)         ! level of max moist static energy
+! 
+!  optional arguments
+!
+   logical,  intent(in),    optional :: l_find_lnch_lvl_in
+   real(r8), intent(inout), optional :: q_mx(pcols)
+   real(r8), intent(inout), optional :: t_mx(pcols)
 !
 !--------------------------Local Variables------------------------------
 !
+   logical l_find_lnch_lvl
+
+   real(r8) q(pcols,pver)     ! spec. humidity
+   real(r8) t(pcols,pver)     ! temperature
+
    real(r8) capeten(pcols,num_cin)     ! provisional value of cape
    real(r8) tv(pcols,pver)       !
    real(r8) tpv(pcols,pver)      !
@@ -3271,9 +3286,54 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 #ifdef PERGRO
    real(r8) rhd
 #endif
-!
-!-----------------------------------------------------------------------
-!
+!------------------------------------------------------------------------------------
+! Assign value to local logical variable l_find_lnch_lvl
+!  - l_find_lnch_lvl = .true.: this subroutine will identify launching level 
+!    using the incoming temperature and specific humidity profiles.
+!  - l_find_lnch_lvl = .false.: the buoyancy calculation in this subroutine
+!    will use previously identified launching level and the corresponding T and q.
+!------------------------------------------------------------------------------------
+  if (PRESENT(l_find_lnch_lvl_in)) then
+     l_find_lnch_lvl = l_find_lnch_lvl_in
+  else
+     l_find_lnch_lvl = .true.
+  end if
+
+  if ( (l_find_lnch_lvl = .false.) .and. &
+       ( (.not.PRESENT(t_mx)) .or.       &
+         (.not.PRESENT(q_mx))     )      ) then
+     call endrun('buoyan_dilute :: l_find_lnch_lvl = .f. but t_mx or q_mx is not provided')
+  end if
+
+!------------------------------------------------------------------------------------
+! Copy the incoming temperature and specific humidity values to work arrays. 
+! The latter will be used in the buoyancy calculation.
+! When l_find_lnch_lev = .false., the work arrays will contain different 
+! T and q values at the previously identified launching level
+!-----------------------------------------------------------------------------------
+   t(:,:) = t_in(:,:)
+   q(:,:) = q_in(:,:)
+
+   if (l_find_lnch_lvl) then ! initialize array mx
+
+      mx(:ncol) = lon(:ncol)
+
+   else
+   ! If l_find_lnch_lvl = .false., we expect 
+   ! (1) the array mx contains previously identified launching level index, and 
+   ! (2) the arrays q_mx and t_mx contain q and T values at the old launching level 
+   !     at the time when the old launching level was identified. 
+   ! Copy the old T and q values to the work array for buoyancy calculation
+
+     do i=1,ncol
+       q(i,mx(i)) = q_mx(i)
+       t(i,mx(i)) = t_mx(i)
+     end do
+
+   end if
+
+!----------------------------------------------
+
    do n = 1,num_cin
       do i = 1,ncol
          lelten(i,n) = pver
@@ -3285,10 +3345,10 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
       lon(i) = pver
       knt(i) = 0
       lel(i) = pver
-      mx(i) = lon(i)
       cape(i) = 0._r8
       hmax(i) = 0._r8
    end do
+
 
    tp(:ncol,:) = t(:ncol,:)
    qstp(:ncol,:) = q(:ncol,:)
@@ -3330,6 +3390,17 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
    end do
 #endif
 
+!--------------------------------------
+! Save launching level T, q for output
+!--------------------------------------
+  if ( l_find_lnch_lvl .and. PRESENT(q_mx) .and. PRESENT(t_mx) ) then
+     do i=1,ncol
+        q_mx(i) = q(i,mx(i))
+        t_mx(i) = t(i,mx(i))
+     end do
+  end if
+
+!-----------------------------------------------------------------------------------
 ! LCL dilute calculation - initialize to mx(i)
 ! Determine lcl in parcel_dilute and get pl,tl after parcel_dilute
 ! Original code actually sets LCL as level above wher condensate forms.
