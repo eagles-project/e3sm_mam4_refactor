@@ -412,8 +412,8 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
   ! Update the "old" temperature and specific humidity values in pbuf
   ! for next call
   !---------------------------------------------------------------------
-  temp_old(:ncol) = temp_new(:ncol)
-    qv_old(:ncol) =   qv_new(:ncol)
+  temp_old(:ncol,:) = temp_new(:ncol,:)
+    qv_old(:ncol,:) =   qv_new(:ncol,:)
 
  end subroutine compute_dcape_env
 !---------------------------

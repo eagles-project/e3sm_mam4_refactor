@@ -3299,9 +3299,9 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
      l_find_lnch_lvl = .true.
   end if
 
-  if ( (l_find_lnch_lvl = .false.) .and. &
-       ( (.not.PRESENT(t_mx)) .or.       &
-         (.not.PRESENT(q_mx))     )      ) then
+  if ( (.not.l_find_lnch_lvl) .and.  &
+       ( (.not.PRESENT(t_mx)) .or.   &
+         (.not.PRESENT(q_mx))     )  ) then
      call endrun('buoyan_dilute :: l_find_lnch_lvl = .f. but t_mx or q_mx is not provided')
   end if
 

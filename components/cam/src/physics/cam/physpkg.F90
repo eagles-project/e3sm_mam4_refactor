@@ -2078,7 +2078,7 @@ subroutine tphysbc (ztodt,               &
                       )
     
     !-----------------------------------------------------------------------
-    if (is_first_step) then
+    if (is_first_step()) then
        idx = pbuf_get_index('Q_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
        idx = pbuf_get_index('T_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
        idx = pbuf_get_index('Q_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
