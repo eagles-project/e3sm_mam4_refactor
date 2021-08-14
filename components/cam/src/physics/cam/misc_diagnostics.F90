@@ -262,7 +262,7 @@ subroutine compute_cape( state, pbuf, pcols, pver, arrayout )
   !----------------------
   ! Pack info for output
   !----------------------
-  kk = 0
+  kk = 0      ; arrayout = 0._r8
   kk = kk + 1 ; arrayout(:ncol,kk) = zcape(:ncol)
   kk = kk + 1 ; arrayout(:ncol,kk) = zmaxi(:ncol)
   kk = kk + 1 ; arrayout(:ncol,kk) = zq_mx(:ncol)
