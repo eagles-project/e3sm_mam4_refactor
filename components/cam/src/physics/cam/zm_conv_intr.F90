@@ -68,7 +68,7 @@ subroutine zm_conv_register
 ! Purpose: register fields with the physics buffer
 !----------------------------------------
 
-  use physics_buffer, only : pbuf_add_field, dtype_r8
+  use physics_buffer, only : pbuf_add_field, dtype_r8, dtype_i4
 
   implicit none
 
