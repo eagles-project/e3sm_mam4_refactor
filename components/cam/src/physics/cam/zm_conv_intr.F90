@@ -107,6 +107,8 @@ subroutine zm_conv_register
 !    different parameterizations, if the user is using the conditional diagnostics tool
 !    and monitoring multiple checkpoints within each physics time step.
 
+    call pbuf_add_field('maxi_old_4CAPE', 'global', dtype_i4,(/pcols/), idx) 
+
     call pbuf_add_field('Q_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
     call pbuf_add_field('T_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
 
