@@ -418,6 +418,169 @@ subroutine compute_dCAPEe( state, pbuf, pcols, pver, dCAPEe )
  end subroutine compute_dCAPEe
 !---------------------------
 
+subroutine compute_dCAPEp( state, pbuf, pcols, pver, dCAPEp )
+!-------------------------------------------------------------------------------------------
+! Purpose: compute dCAPEp, the change in convecitve available potential energy
+!          caused by parcel property change (i.e. assuming fixed environment).
+! History: first version by Hui Wan and Xiaoliang Song, 2021-08
+!-------------------------------------------------------------------------------------------
+
+  use physics_types,  only: physics_state
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
+  use physconst,      only: cpair, gravit, rair, latvap
+  use zm_conv,        only: buoyan_dilute, limcnv
+
+  type(physics_state),intent(in),target:: state
+  type(physics_buffer_desc),pointer    :: pbuf(:)
+  integer,                  intent(in) :: pver
+  integer,                  intent(in) :: pcols
+  real(r8),                 intent(out) :: dCAPEp(pcols)
+
+  ! local variables used for providing the same input to two calls of subroutine buoyan_dilute
+
+  real(r8) :: pmid_in_hPa(pcols,pver)
+  real(r8) :: pint_in_hPa(pcols,pver+1)
+
+  real(r8) ::   zs(pcols)
+  real(r8) :: pblt(pcols)
+  real(r8) :: zmid_above_sealevel(pcols,pver)
+
+  real(r8),pointer :: tpert(:), pblh(:)
+
+  integer :: idx, kk, lchnk, ncol, msg
+
+  real(r8),pointer ::    qv_new(:,:)  ! new qv   from current state
+  real(r8),pointer ::  temp_new(:,:)  ! new temp from current state
+
+  ! variables that distinguish the two calls of buoyan_dilute 
+
+  logical :: l_find_lnch_lvl    ! whether or not to let buoyan_dilute find new launching level
+
+  integer  :: zmaxi_new(pcols)  ! index of launching level in new environment 
+  real(r8) ::  q_mx_new(pcols)  ! new specific humidity at new launching level
+  real(r8) ::  t_mx_new(pcols)  ! new temperature       at new launching level
+
+  real(r8),pointer :: q_mx_old(:)  ! old qv   at launching level from pbuf
+  real(r8),pointer :: t_mx_old(:)  ! old temp at launching level from pbuf
+
+
+  ! variables returned by buoyan_dilute but not needed here
+
+  real(r8) ::   ztp(pcols,pver) ! parcel temperatures.
+  real(r8) :: zqstp(pcols,pver) ! grid slice of parcel temp. saturation mixing ratio.
+  real(r8) ::   ztl(pcols)      ! parcel temperature at lcl.
+  integer  ::  zlcl(pcols)      ! base level index of deep cumulus convection.
+  integer  ::  zlel(pcols)      ! index of highest theoretical convective plume.
+  integer  ::  zlon(pcols)      ! index of onset level for deep convection.
+
+  real(r8) ::  cape_new_pcl_new_env(pcols) ! cape in new environment (assuming new launching level and new parcel properties) 
+  real(r8) ::  cape_old_pcl_new_env(pcols) ! cape in new environment (assuming new launching level and old parcel properties) 
+
+  !----------------------------------------------------------------------- 
+  ncol  = state%ncol
+  lchnk = state%lchnk
+
+  !--------------------------------------------------------------
+  ! Temperature and specific humidity in new and old environment
+  !--------------------------------------------------------------
+  qv_new   => state%q(:,:,1)
+  temp_new => state%t
+
+  idx = pbuf_get_index('Q_mx_old_4CAPE')  ; call pbuf_get_field( pbuf, idx, q_mx_old )
+  idx = pbuf_get_index('T_mx_old_4CAPE')  ; call pbuf_get_field( pbuf, idx, t_mx_old )
+
+  !-----------------------------------
+  ! Pressure (in the new environment)
+  !-----------------------------------
+  pmid_in_hPa(1:ncol,:) = state%pmid(1:ncol,:) * 0.01_r8
+  pint_in_hPa(1:ncol,:) = state%pint(1:ncol,:) * 0.01_r8
+
+  !-----------------------------------
+  ! Some time-independent quantities 
+  !-----------------------------------
+  msg = limcnv - 1  ! limcnv is the top interface level limit for convection
+
+  idx = pbuf_get_index('tpert') ; call pbuf_get_field( pbuf, idx, tpert )
+
+  ! Surface elevation (m) is needed to calculate height above sea level (m) 
+  ! Note that zm (and zi) stored in state are height above surface. 
+  ! The layer midpoint height provided to buoyan_dilute is height above sea level. 
+
+  zs(1:ncol) = state%phis(1:ncol)/gravit
+
+  !------------------------------------------
+  ! Height above sea level at layer midpoints
+  !------------------------------------------
+  do kk = 1,pver
+     zmid_above_sealevel(1:ncol,kk) = state%zm(1:ncol,kk)+zs(1:ncol)
+  end do
+
+  !--------------------------
+  ! layer index for PBL top
+  !--------------------------
+  idx = pbuf_get_index('pblh')  ; call pbuf_get_field( pbuf, idx, pblh )
+
+  pblt(:) = pver
+  do kk = pver-1, msg+1, -1
+     where( abs(zmid_above_sealevel(:ncol,kk)-zs(:ncol)-pblh(:ncol))   &
+            < (state%zi(:ncol,kk)-state%zi(:ncol,kk+1))*0.5_r8       ) & 
+     pblt(:ncol) = kk
+  end do
+
+  !------------------------------------------------------------------------
+  ! Calculate CAPE using the new state; also return launching level index
+  ! and T, qv values at (new) launching level
+  !------------------------------------------------------------------------
+  l_find_lnch_lvl = .true.
+  call buoyan_dilute(lchnk ,ncol,                      &! in
+                     qv_new, temp_new,                 &! in  !!
+                     pmid_in_hPa, zmid_above_sealevel, &! in
+                     pint_in_hPa,                      &! in
+                     ztp, zqstp, ztl,                  &! out
+                     latvap,                           &! in
+                     cape_new_pcl_new_env,             &! out !!
+                     pblt,                             &! in
+                     zlcl, zlel, zlon,                 &! out
+                     zmaxi_new,                        &! out !!
+                     rair, gravit, cpair, msg, tpert,  &! in
+                     l_find_lnch_lvl,                  &! in  !!
+                     q_mx_new, t_mx_new                )! out !!
+
+  !---------------------------------------------------------------------
+  ! Calculate CAPE using 
+  !  - an old state (T, qv profiles)
+  !  - newly diagnosed launching level and parcel T, qv
+  !---------------------------------------------------------------------
+  l_find_lnch_lvl = .false.
+  call buoyan_dilute(lchnk ,ncol,                      &! in
+                     qv_new, temp_new,                 &! in  !!!
+                     pmid_in_hPa, zmid_above_sealevel, &! in
+                     pint_in_hPa,                      &! in
+                     ztp, zqstp, ztl,                  &! out
+                     latvap,                           &! in
+                     cape_old_pcl_new_env,             &! out !!!
+                     pblt,                             &! in
+                     zlcl, zlel, zlon,                 &! out
+                     zmaxi_new,                        &! in  !!!
+                     rair, gravit, cpair, msg, tpert,  &! in
+                     l_find_lnch_lvl,                  &! in  !!!
+                     q_mx_old, t_mx_old                )! in  !!!
+
+  !---------------------------------------------------------------------
+  ! Calculate CAPE difference caused by environment change
+  !---------------------------------------------------------------------
+  dCAPEp(:ncol) = cape_new_pcl_new_env(:ncol) - cape_old_pcl_new_env(:ncol)
+
+  !----------------------------------------------------------------------------------
+  ! Update the "old" launching level temperature and specific humidity values in pbuf
+  ! for next call
+  !----------------------------------------------------------------------------------
+  t_mx_old(:ncol) = t_mx_new(:ncol)
+  q_mx_old(:ncol) = q_mx_new(:ncol)
+
+ end subroutine compute_dCAPEp
+!---------------------------
+
 subroutine compute_CAPEeFpN( state, pbuf, pcols, pver, cape_eFpN )
 !-------------------------------------------------------------------------------------------
 ! Purpose: compute cape_eFpN, the convecitve available potential energy

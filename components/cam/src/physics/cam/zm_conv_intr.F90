@@ -48,11 +48,6 @@ module zm_conv_intr
               qm1_idx       !qm1 index in physics buffer
 !>songxl 2014-05-20------------------
 
-   integer :: Q_old_4CAPE_idx
-   integer :: T_old_4CAPE_idx
-   integer :: Q_fixed_4CAPE_idx
-   integer :: T_fixed_4CAPE_idx
-
 !  indices for fields in the physics buffer
    integer  ::    cld_idx          = 0    
    integer  ::    icwmrdp_idx      = 0     
@@ -112,11 +107,14 @@ subroutine zm_conv_register
 !    different parameterizations, if the user is using the conditional diagnostics tool
 !    and monitoring multiple checkpoints within each physics time step.
 
-    call pbuf_add_field('Q_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), Q_old_4CAPE_idx) 
-    call pbuf_add_field('T_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), T_old_4CAPE_idx) 
+    call pbuf_add_field('Q_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
+    call pbuf_add_field('T_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
 
-    call pbuf_add_field('Q_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), Q_fixed_4CAPE_idx) 
-    call pbuf_add_field('T_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), T_fixed_4CAPE_idx) 
+    call pbuf_add_field('Q_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
+    call pbuf_add_field('T_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
+
+    call pbuf_add_field('Q_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
+    call pbuf_add_field('T_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
 
 end subroutine zm_conv_register
 

@@ -1966,6 +1966,7 @@ subroutine tphysbc (ztodt,               &
 !>songxl 2011-09-20----------------------------
     
     real(r8), pointer :: ptr2d(:,:)
+    real(r8), pointer :: ptr1d(:)
     integer :: idx
 
     ! physics buffer fields for total energy and mass adjustment
@@ -2081,8 +2082,12 @@ subroutine tphysbc (ztodt,               &
     if (is_first_step()) then
        idx = pbuf_get_index('Q_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
        idx = pbuf_get_index('T_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
+
        idx = pbuf_get_index('Q_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
        idx = pbuf_get_index('T_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
+
+       idx = pbuf_get_index('Q_mx_old_4CAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%q(:,pver,1)
+       idx = pbuf_get_index('T_mx_old_4CAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%T(:,pver)
     end if
 
     call cnd_diag_checkpoint( diag, 'DYNEND', state, pbuf, cam_in, cam_out )

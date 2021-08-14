@@ -564,6 +564,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case ('dCAPEe')
           call compute_dCAPEe( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
 
+        case ('dCAPEp')
+          call compute_dCAPEp( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
+
         !-----------------------------------------------------------------------------------
         ! The following were added mostly for testing of the conditional diag functionality
         !-----------------------------------------------------------------------------------
