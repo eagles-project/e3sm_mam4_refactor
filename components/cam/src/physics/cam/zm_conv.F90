@@ -3316,7 +3316,7 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 
    if (l_find_lnch_lvl) then ! initialize array mx
 
-      mx(:ncol) = lon(:ncol)
+      mx(:) = pver 
 
    else
    ! If l_find_lnch_lvl = .false., we expect 
