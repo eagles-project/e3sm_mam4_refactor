@@ -254,9 +254,9 @@ subroutine compute_cape( state, pbuf, pcols, pver, cape )
  end subroutine compute_cape
 !---------------------------
 
-subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
+subroutine compute_dCAPEe( state, pbuf, pcols, pver, dCAPEe )
 !-------------------------------------------------------------------------------------------
-! Purpose: compute dCAPE_env, the change in convecitve available potential energy
+! Purpose: compute dCAPEe, the change in convecitve available potential energy
 !          caused by environment change (i.e. assuming fixed parcel property)
 !          using subroutine buoyan_dilute from the ZM deep convection
 !          parameterization (module file zm_conv.F90)
@@ -272,7 +272,7 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
   type(physics_buffer_desc),pointer    :: pbuf(:)
   integer,                  intent(in) :: pver
   integer,                  intent(in) :: pcols
-  real(r8),                 intent(out) :: dcape_env(pcols)
+  real(r8),                 intent(out) :: dCAPEe(pcols)
 
   ! local variables used for providing the same input to two calls of subroutine buoyan_dilute
 
@@ -310,8 +310,8 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
   integer  ::  zlel(pcols)      ! index of highest theoretical convective plume.
   integer  ::  zlon(pcols)      ! index of onset level for deep convection.
 
-  real(r8) ::  cape_new(pcols)        ! cape in new environment (assuming new launching level and parcel properties) 
-  real(r8) ::  cape_in_old_env(pcols) ! cape in old environment (assuming new launching level and parcel properties) 
+  real(r8) ::  cape_new_pcl_new_env(pcols) ! cape in new environment (assuming new launching level and parcel properties) 
+  real(r8) ::  cape_new_pcl_old_env(pcols) ! cape in old environment (assuming new launching level and parcel properties) 
 
   !----------------------------------------------------------------------- 
   ncol  = state%ncol
@@ -375,7 +375,7 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
                      pint_in_hPa,                      &! in
                      ztp, zqstp, ztl,                  &! out
                      latvap,                           &! in
-                     cape_new,                         &! out !!
+                     cape_new_pcl_new_env,             &! out !!
                      pblt,                             &! in
                      zlcl, zlel, zlon,                 &! out
                      zmaxi_new,                        &! out !!
@@ -395,7 +395,7 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
                      pint_in_hPa,                      &! in
                      ztp, zqstp, ztl,                  &! out
                      latvap,                           &! in
-                     cape_in_old_env,                  &! out !!!
+                     cape_new_pcl_old_env,             &! out !!!
                      pblt,                             &! in
                      zlcl, zlel, zlon,                 &! out
                      zmaxi_new,                        &! in  !!!
@@ -406,7 +406,7 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
   !---------------------------------------------------------------------
   ! Calculate CAPE difference caused by environment change
   !---------------------------------------------------------------------
-  dcape_env(:ncol) = cape_new(:ncol) - cape_in_old_env(:ncol)
+  dCAPEe(:ncol) = cape_new_pcl_new_env(:ncol) - cape_new_pcl_old_env(:ncol)
 
   !---------------------------------------------------------------------
   ! Update the "old" temperature and specific humidity values in pbuf
@@ -415,13 +415,13 @@ subroutine compute_dcape_env( state, pbuf, pcols, pver, dcape_env )
   temp_old(:ncol,:) = temp_new(:ncol,:)
     qv_old(:ncol,:) =   qv_new(:ncol,:)
 
- end subroutine compute_dcape_env
+ end subroutine compute_dCAPEe
 !---------------------------
 
-subroutine compute_cape_pcl( state, pbuf, pcols, pver, cape_pcl )
+subroutine compute_CAPEeFpN( state, pbuf, pcols, pver, cape_eFpN )
 !-------------------------------------------------------------------------------------------
-! Purpose: compute CAPE_pcl, the convecitve available potential energy
-!          assuming fixed environment but evolving parcel property.
+! Purpose: compute cape_eFpN, the convecitve available potential energy
+!          assuming fixed environment but new (evolving) parcel property.
 ! History: first version by Hui Wan and Xiaoliang Song, 2021-08
 !-------------------------------------------------------------------------------------------
 
@@ -434,7 +434,7 @@ subroutine compute_cape_pcl( state, pbuf, pcols, pver, cape_pcl )
   type(physics_buffer_desc),pointer    :: pbuf(:)
   integer,                  intent(in) :: pver
   integer,                  intent(in) :: pcols
-  real(r8),                 intent(out) :: cape_pcl(pcols)
+  real(r8),                 intent(out) :: cape_eFpN(pcols)
 
   ! local variables used for providing the same input to two calls of subroutine buoyan_dilute
 
@@ -556,7 +556,7 @@ subroutine compute_cape_pcl( state, pbuf, pcols, pver, cape_pcl )
                      pint_in_hPa,                      &! in
                      ztp, zqstp, ztl,                  &! out
                      latvap,                           &! in
-                     cape_pcl,                         &! out !!!
+                     cape_eFpN,                        &! out !!!
                      pblt,                             &! in
                      zlcl, zlel, zlon,                 &! out
                      zmaxi_new,                        &! in  !!!
@@ -564,7 +564,7 @@ subroutine compute_cape_pcl( state, pbuf, pcols, pver, cape_pcl )
                      l_find_lnch_lvl,                  &! in  !!!
                      zq_mx_new, zt_mx_new              )! in  !!!
 
- end subroutine compute_cape_pcl
+ end subroutine compute_CAPEeFpN
 !--------------------------------
 
 
