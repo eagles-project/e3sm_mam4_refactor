@@ -556,7 +556,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
                                    arrayout(:ncol,:)  )                      ! out
 
         case ('CAPE')
-          call compute_cape( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out
+          call compute_cape( state, pbuf, pcols, pver, arrayout(:,:) ) ! in, in, in, out
 
         case ('CAPEeFpN')
           call compute_CAPEeFpN( state, pbuf, pcols, pver, arrayout(:,1) ) ! in, in, in, out

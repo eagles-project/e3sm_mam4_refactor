@@ -156,7 +156,7 @@ subroutine relhum_ice_percent( ncol, pver, tair, pair, qv,  rhi_percent )
 
 end subroutine relhum_ice_percent
 
-subroutine compute_cape( state, pbuf, pcols, pver, cape )
+subroutine compute_cape( state, pbuf, pcols, pver, arrayout )
 !----------------------------------------------------------------------
 ! Purpose: compute CAPE (convecitve available potential energy)
 !          using subroutine buoyan_dilute from the ZM deep convection
@@ -173,7 +173,8 @@ subroutine compute_cape( state, pbuf, pcols, pver, cape )
   type(physics_buffer_desc),pointer    :: pbuf(:)
   integer,                  intent(in) :: pver
   integer,                  intent(in) :: pcols
-  real(r8),                intent(out) :: cape(pcols)
+  real(r8),                intent(out) :: arrayout(pcols,pver)
+
 
   ! local variables used for providing input to subroutine buoyan_dilute
 
@@ -199,7 +200,13 @@ subroutine compute_cape( state, pbuf, pcols, pver, cape )
   integer  ::  zlcl(pcols)      ! base level index of deep cumulus convection.
   integer  ::  zlel(pcols)      ! index of highest theoretical convective plume.
   integer  ::  zlon(pcols)      ! index of onset level for deep convection.
+
+  ! variables returned by buoyan_dilute and passed to output
+
   integer  :: zmaxi(pcols)      ! index of level with largest moist static energy.
+  real(r8) :: zcape(pcols)      ! cape
+  real(r8) :: zq_mx(pcols)      ! specific humidity at level with largest moist static energy. 
+  real(r8) :: zt_mx(pcols)      ! temperature       at level with largest moist static energy. 
 
   !----------------------------------------------------------------------- 
   ncol  = state%ncol
@@ -247,9 +254,20 @@ subroutine compute_cape( state, pbuf, pcols, pver, cape )
                      pmid_in_hPa, zmid_above_sealevel, &! in
                      pint_in_hPa,                      &! in
                      ztp, zqstp, ztl,                  &! out
-                     latvap, cape, pblt,               &! in, out, in
+                     latvap, zcape, pblt,              &! in, out, in
                      zlcl, zlel, zlon, zmaxi,          &! out
-                     rair, gravit, cpair, msg, tpert   )! in
+                     rair, gravit, cpair, msg, tpert,  &! in
+                     .true., zq_mx, zt_mx              )! in, out, out
+
+  !----------------------
+  ! Pack info for output
+  !----------------------
+  kk = 0
+  kk = kk + 1 ; arrayout(:ncol,kk) = zcape(:ncol)
+  kk = kk + 1 ; arrayout(:ncol,kk) = zmaxi(:ncol)
+  kk = kk + 1 ; arrayout(:ncol,kk) = zq_mx(:ncol)
+  kk = kk + 1 ; arrayout(:ncol,kk) = zt_mx(:ncol)
+  kk = kk + 1 ; arrayout(:ncol,kk) =  pblt(:ncol)
 
  end subroutine compute_cape
 !---------------------------
