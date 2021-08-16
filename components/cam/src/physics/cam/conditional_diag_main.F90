@@ -556,16 +556,16 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
                                    arrayout(:ncol,:)  )                      ! out
 
         case ('CAPE')
-          call compute_cape_diags( state, pbuf, pcols, pver, 0, arrayout(:,1) ) ! in, in, in, out
+          call compute_cape_diags( state, pbuf, pcols, pver, iCAPE_NEW_PCL_NEW_ENV, arrayout(:,1) ) ! 5xin, 1xout
 
         case ('CAPEp')
-          call compute_cape_diags( state, pbuf, pcols, pver, 1, arrayout(:,1) ) ! in, in, in, out
+          call compute_cape_diags( state, pbuf, pcols, pver, iCAPE_NEW_PCL_FIXED_ENV, arrayout(:,1) ) ! 5xin, 1xout
 
         case ('dCAPEe')
-          call compute_cape_diags( state, pbuf, pcols, pver, 2, arrayout(:,1) ) ! in, in, in, out
+          call compute_cape_diags( state, pbuf, pcols, pver, idCAPEe, arrayout(:,1) ) ! 5xin, 1xout
 
         case ('dCAPEp')
-          call compute_cape_diags( state, pbuf, pcols, pver, 3, arrayout(:,1) ) ! in, in, in, out
+          call compute_cape_diags( state, pbuf, pcols, pver, idCAPEp, arrayout(:,1) ) ! 5xin, 1xout
 
         !-----------------------------------------------------------------------------------
         ! The following were added mostly for testing of the conditional diag functionality
