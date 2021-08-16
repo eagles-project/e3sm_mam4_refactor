@@ -2379,12 +2379,12 @@ end if
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
 
+    ! checkpoint for conditional diagnostics
+    call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
+
     ! save T, Q profiles for CAPE-related diagnostics
     idx = pbuf_get_index('Q_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
     idx = pbuf_get_index('T_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
-
-    ! checkpoint for conditional diagnostics
-    call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
 
     !------------------------------------------------------------------------------
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
