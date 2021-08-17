@@ -540,6 +540,16 @@
       <mask>WC14to60E2r3</mask>
     </model_grid>
 
+    <model_grid alias="TL319_r05_WC14to60E2r3" compset="(DATM|XATM|SATM)">
+      <grid name="atm">TL319</grid>
+      <grid name="lnd">r05</grid>
+      <grid name="ocnice">WC14to60E2r3</grid>
+      <grid name="rof">r05</grid>
+      <grid name="glc">null</grid>
+      <grid name="wav">null</grid>
+      <mask>WC14to60E2r3</mask>
+    </model_grid>
+
     <model_grid alias="TL319_r0125_WC14to60E2r3" compset="(DATM|XATM|SATM)">
       <grid name="atm">TL319</grid>
       <grid name="lnd">r0125</grid>
