@@ -22,6 +22,8 @@ set_source_files_properties(${F90_SRC} PROPERTIES COMPILE_FLAGS "${CPPDEFS} ${FF
 
 # Set YAKL compiler flags
 include(${YAKL_HOME}/yakl_utils.cmake)
+
+# Have to quote the list of files in order to pass it into a macro
 yakl_process_cxx_source_files("${CXX_SRC}")
 message(STATUS "YAKL Flags: ${YAKL_COMPILER_FLAGS}")
 
