@@ -1559,8 +1559,6 @@ if (l_tracer_aero) then
     call check_tracers_chng(state, tracerint, "aoa_tracers_timestep_tend", nstep, ztodt,   &
          cam_in%cflx)
 
-    call cnd_diag_checkpoint( diag, 'TRACER', state, pbuf, cam_in, cam_out )
-
     ! Chemistry calculation
     if (chem_is_active()) then
        call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, &
@@ -1571,11 +1569,12 @@ if (l_tracer_aero) then
        call check_tracers_chng(state, tracerint, "chem_timestep_tend", nstep, ztodt, &
             cam_in%cflx)
     end if
-    call cnd_diag_checkpoint( diag, 'CHEM', state, pbuf, cam_in, cam_out )
 
     call t_stopf('adv_tracer_src_snk')
 
 end if ! l_tracer_aero
+
+    call cnd_diag_checkpoint( diag, 'CHEM', state, pbuf, cam_in, cam_out )
 
 if (l_vdiff) then
     !===================================================
