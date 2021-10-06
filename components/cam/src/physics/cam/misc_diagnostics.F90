@@ -5,6 +5,11 @@ use shr_kind_mod,   only: r8 => shr_kind_r8
 implicit none
 public
 
+integer, parameter :: iCAPE_NEW_PCL_NEW_ENV   = 0
+integer, parameter :: iCAPE_NEW_PCL_FIXED_ENV = 1
+integer, parameter :: idCAPEe                 = 2
+integer, parameter :: idCAPEp                 = 3
+
 contains
 
 
@@ -222,6 +227,7 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
   integer  ::  zlon(pcols)      ! index of onset level for deep convection.
 
   real(r8) ::  cape_new_pcl_new_env(pcols) ! cape in new environment (assuming new launching level and parcel properties) 
+  real(r8) ::  cape_new_pcl_fixed_env(pcols) ! cape in fixed environment (assuming new launching level and parcel properties) 
   real(r8) ::  cape_new_pcl_old_env(pcols) ! cape in old environment (assuming new launching level and parcel properties) 
   real(r8) ::  cape_old_pcl_new_env(pcols) ! cape in new environment (assuming old launching level and parcel properties) 
 
@@ -236,15 +242,16 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
   temp_new => state%t
 
   select case(iopt)
-  case(1)
+
+  case(iCAPE_NEW_PCL_FIXED_ENV)
     idx = pbuf_get_index('Q_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx,   qv_old )
     idx = pbuf_get_index('T_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, temp_old )
 
-  case(2)
+  case(idCAPEe)
     idx = pbuf_get_index('Q_old_4CAPE')    ; call pbuf_get_field( pbuf, idx,   qv_old )
     idx = pbuf_get_index('T_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, temp_old )
 
-  case(3)
+  case(idCAPEp)
     idx = pbuf_get_index('Q_mx_old_4CAPE')  ; call pbuf_get_field( pbuf, idx, q_mx_old )
     idx = pbuf_get_index('T_mx_old_4CAPE')  ; call pbuf_get_field( pbuf, idx, t_mx_old )
     idx = pbuf_get_index('maxi_old_4CAPE')  ; call pbuf_get_field( pbuf, idx, maxi_old )
@@ -309,13 +316,13 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
                      q_mx_new, t_mx_new                )! out !!
 
   select case (iopt)
-  case(0)
+  case(iCAPE_NEW_PCL_NEW_ENV)
   !---------------------------------------------------------------------
   ! Output is new CAPE. Copy to out1d and we are done.
   !---------------------------------------------------------------------
      out1d(:ncol) = cape_new_pcl_new_env(:ncol)
  
-  case(1) 
+  case(iCAPE_NEW_PCL_FIXED_ENV) 
   !---------------------------------------------------------------------
   ! Calculate CAPE using 
   !  - a fixed old state (T, qv profiles)
@@ -328,7 +335,7 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
                        pint_in_hPa,                      &! in
                        ztp, zqstp, ztl,                  &! out
                        latvap,                           &! in
-                       cape_new_pcl_old_env,             &! out !!!
+                       cape_new_pcl_fixed_env,           &! out !!!
                        pblt,                             &! in
                        zlcl, zlel, zlon,                 &! out
                        maxi_new,                         &! in  !!!
@@ -337,11 +344,11 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
                        q_mx_new, t_mx_new                )! in  !!!
 
     ! Result to be passed to calling routine is CAPEp (CAPE with fixed env but evolving parcle property)
-    out1d = cape_new_pcl_old_env
+    out1d = cape_new_pcl_fixed_env
   
     ! No need to anything in pbuf
  
-  case(2) 
+  case(idCAPEe) 
   !---------------------------------------------------------------------
   ! Calculate CAPE using 
   !  - an old state that evolves within a time step 
@@ -371,7 +378,7 @@ subroutine compute_cape_diags( state, pbuf, pcols, pver, iopt, out1d )
     temp_old(:ncol,:) = temp_new(:ncol,:)
       qv_old(:ncol,:) =   qv_new(:ncol,:)
 
-  case(3) 
+  case(idCAPEp) 
   !---------------------------------------------------------------------
   ! Calculate CAPE using 
   !  - new state (T, qv profiles)
