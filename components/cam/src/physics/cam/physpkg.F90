@@ -2081,15 +2081,10 @@ subroutine tphysbc (ztodt,               &
     
     !-----------------------------------------------------------------------
     if (is_first_step()) then
-       idx = pbuf_get_index('Q_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
-       idx = pbuf_get_index('T_fixed_4CAPE')  ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
-
-       idx = pbuf_get_index('Q_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
-       idx = pbuf_get_index('T_old_4CAPE')    ; call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
-
-       idx = pbuf_get_index('Q_mx_old_4CAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%q(:,pver,1)
-       idx = pbuf_get_index('T_mx_old_4CAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%T(:,pver)
-       idx = pbuf_get_index('maxi_old_4CAPE') ; call pbuf_get_field( pbuf, idx, iptr1d); iptr1d= pver
+       idx = pbuf_get_index('CAPE_old_4dCAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = 0._r8 
+       idx = pbuf_get_index('Q_mx_old_4dCAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%q(:,pver,1)
+       idx = pbuf_get_index('T_mx_old_4dCAPE') ; call pbuf_get_field( pbuf, idx, ptr1d ); ptr1d = state%T(:,pver)
+       idx = pbuf_get_index('maxi_old_4dCAPE') ; call pbuf_get_field( pbuf, idx, iptr1d); iptr1d= pver
     end if
 
     call cnd_diag_checkpoint( diag, 'DYNEND', state, pbuf, cam_in, cam_out )
@@ -2381,10 +2376,6 @@ end if
 
     ! checkpoint for conditional diagnostics
     call cnd_diag_checkpoint( diag, 'DEEPCU', state, pbuf, cam_in, cam_out )
-
-    ! save T, Q profiles for CAPE-related diagnostics
-    idx = pbuf_get_index('Q_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%q(:,:,1)
-    idx = pbuf_get_index('T_fixed_4CAPE'); call pbuf_get_field( pbuf, idx, ptr2d ); ptr2d = state%T(:,:)
 
     !------------------------------------------------------------------------------
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection

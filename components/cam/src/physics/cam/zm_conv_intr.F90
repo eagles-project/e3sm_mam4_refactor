@@ -99,24 +99,12 @@ subroutine zm_conv_register
 !  endif
 !>songxl 2014-05-20-------------
 
-! Variables for Q and T profiles for CAPE budget decomposition.
-! The difference between "old" and "fixed" is that 
-!  - the "fixed" values will be updated once per physics time step after the deep convection
-!    parameterization. 
-!  - the "old" values might get updated multiple times per physics time step, after
-!    different parameterizations, if the user is using the conditional diagnostics tool
-!    and monitoring multiple checkpoints within each physics time step.
+! Variables for dCAPE diagnosis and decomposition
 
-    call pbuf_add_field('maxi_old_4CAPE', 'global', dtype_i4,(/pcols/), idx) 
-
-    call pbuf_add_field('Q_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
-    call pbuf_add_field('T_mx_old_4CAPE', 'global', dtype_r8,(/pcols/), idx) 
-
-    call pbuf_add_field('Q_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
-    call pbuf_add_field('T_old_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
-
-    call pbuf_add_field('Q_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
-    call pbuf_add_field('T_fixed_4CAPE', 'global', dtype_r8,(/pcols,pver/), idx) 
+    call pbuf_add_field('CAPE_old_4dCAPE', 'global', dtype_r8,(/pcols/), idx) 
+    call pbuf_add_field('maxi_old_4dCAPE', 'global', dtype_i4,(/pcols/), idx) 
+    call pbuf_add_field('Q_mx_old_4dCAPE', 'global', dtype_r8,(/pcols/), idx) 
+    call pbuf_add_field('T_mx_old_4dCAPE', 'global', dtype_r8,(/pcols/), idx) 
 
 end subroutine zm_conv_register
 
