@@ -163,6 +163,7 @@ subroutine zm_conv_init(pref_edge)
     
     call addfld ('CMFMCDZM',(/ 'ilev' /),'A','kg/m2/s','Convection mass flux from ZM deep ')
     call addfld ('PRECCDZM',horiz_only,    'A','m/s','Convective precipitation rate from ZM deep')
+    call addfld ('PRECCZM0',horiz_only,    'A','m/s','Convective precipitation rate from ZM deep, before zm_conv_evap')
 
     call addfld ('PCONVB',horiz_only , 'A','Pa'    ,'convection base pressure')
     call addfld ('PCONVT',horiz_only , 'A','Pa'    ,'convection top  pressure')
@@ -486,6 +487,8 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
     end do
     call outfld('PCONVT  ',pcont          ,pcols   ,lchnk   )
     call outfld('PCONVB  ',pconb          ,pcols   ,lchnk   )
+
+    call outfld('PRECCZM0  ',prec,  pcols   ,lchnk   ) ! total prec from ZM, before zm_conv_evap
 
   call physics_ptend_init(ptend_all, state%psetcols, 'zm_conv_tend')
 
