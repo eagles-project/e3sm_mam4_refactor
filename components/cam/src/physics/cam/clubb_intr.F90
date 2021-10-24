@@ -74,6 +74,8 @@ module clubb_intr
       theta0   = 300._r8, &             ! Reference temperature                     [K]
       ts_nudge = 86400._r8, &           ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._r8
+
+  public :: p0_clubb
       
   real(r8), parameter :: &
       host_dx = 100000._r8, &           ! Host model deltax [m]
@@ -980,7 +982,7 @@ end subroutine clubb_init_cnst
    type(cam_out_t),     intent(in)    :: cam_out
 
    real(r8),intent(in) :: thlm_forcing_in(pcols,pver)
-   real(r8),intent(in) ::  rlm_forcing_in(pcols,pver)
+   real(r8),intent(in) ::  rtm_forcing_in(pcols,pver)
    real(r8),intent(in) ::   um_forcing_in(pcols,pver)
    real(r8),intent(in) ::   vm_forcing_in(pcols,pver)
 

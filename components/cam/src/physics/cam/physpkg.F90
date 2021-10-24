@@ -254,7 +254,7 @@ subroutine phys_register
           call pbuf_add_field(  'QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field('THLM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'THLM_Aft_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field( 'RTM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'UM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'VM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)

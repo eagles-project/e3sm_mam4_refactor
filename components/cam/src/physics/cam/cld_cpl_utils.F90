@@ -33,7 +33,7 @@ contains
    type(physics_ptend),intent(out) :: ptend_dribble
 
    real(r8),intent(out) :: thlm_forcing(pcols,pver)
-   real(r8),intent(out) ::  rlm_forcing(pcols,pver)
+   real(r8),intent(out) ::  rtm_forcing(pcols,pver)
    real(r8),intent(out) ::   um_forcing(pcols,pver)
    real(r8),intent(out) ::   vm_forcing(pcols,pver)
 
@@ -58,7 +58,7 @@ contains
     real(r8), pointer, dimension(:,:) ::  vtm_after_macmic
 
     real(r8) :: thlm_current(pcols,pver)
-    real(r8) ::  rlm_current(pcols,pver)
+    real(r8) ::  rtm_current(pcols,pver)
     real(r8) ::   um_current(pcols,pver)
     real(r8) ::   vm_current(pcols,pver)
 
@@ -136,9 +136,9 @@ contains
       !==================================================================================================================
       ! thlm: calculate tendency (thlm_forcing), theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
 
-      ifld = pbuf_get_index('thlm_After_MACMIC'); call pbuf_get_field(pbuf, ifld, thlm_after_macmic )
+      ifld = pbuf_get_index('THLM_Aft_MACMIC'); call pbuf_get_field(pbuf, ifld, thlm_after_macmic )
 
-      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:per) )**(rair/cpair) &
+      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
                                   - (latvap/cpair)*state%q(:ncol,:pver,ixcldliq)
 
       thlm_forcing(:ncol,:pver) = ( thlm_current(:ncol,:pver) - thlm_after_macmic(:ncol,:pver))/ztodt
@@ -146,11 +146,11 @@ contains
       !------------------------------------------------------------
       ! rtm: calculate tendency (rtm_forcing), rtm:  rt = qv + ql
 
-      ifld = pbuf_get_index('rtm_After_MACMIC'); call pbuf_get_field(pbuf, ifld, rtm_after_macmic )
+      ifld = pbuf_get_index('RTM_After_MACMIC'); call pbuf_get_field(pbuf, ifld, rtm_after_macmic )
 
-      rtm_current(:ncol,:pver) = state%q(:ncol,pver,ixq) + state%q(:ncol,:pver,ixcldliq) 
+      rtm_current(:ncol,:pver) = state%q(:ncol,:pver,ixq) + state%q(:ncol,:pver,ixcldliq) 
 
-      rtm_forcing(:ncol,:pver) = ( rtm_new(:ncol,:pver) - rtm_after_macmic(:ncol,:pver))/ztodt
+      rtm_forcing(:ncol,:pver) = ( rtm_current(:ncol,:pver) - rtm_after_macmic(:ncol,:pver))/ztodt
 
       !-----------------------------------------------
       ! revert s, T, q, ql in "state" to old values
@@ -247,9 +247,9 @@ contains
    integer :: ixcldliq, ixcldice, ixnumliq, ixnumice, ixq
 
    real(r8) :: thlm_current(pcols,pver)
-   real(r8) ::  rlm_current(pcols,pver)
+   real(r8) ::  rtm_current(pcols,pver)
 
-   char(len=20) :: varname
+   character(len=20) :: varname
 
    !---------------------
    ncol = state%ncol
@@ -294,15 +294,15 @@ contains
 
       ! theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
 
-      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:per) )**(rair/cpair) &
+      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
                                   - (latvap/cpair)*state%q(:ncol,:pver,ixcldliq)
 
-      varname = 'THLM_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
+      varname = 'THLM_Aft_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
       ptr2d(:ncol,:pver) = thlm_current(:ncol,:pver)
 
       ! rt = qv + ql
 
-      rtm_current(:ncol,:pver) = state%q(:ncol,pver,ixq) + state%q(:ncol,:pver,ixcldliq)
+      rtm_current(:ncol,:pver) = state%q(:ncol,:pver,ixq) + state%q(:ncol,:pver,ixcldliq)
 
       varname = 'RTM_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
       ptr2d(:ncol,:pver) = rtm_current(:ncol,:pver)
