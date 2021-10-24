@@ -164,11 +164,13 @@ subroutine phys_register
     !-----------------------------------------------------------------------
 
     integer :: nmodes
+    integer :: cld_cpl_opt
 
     call phys_getopts(shallow_scheme_out       = shallow_scheme, &
                       macrop_scheme_out        = macrop_scheme,   &
                       microp_scheme_out        = microp_scheme,   &
                       cld_macmic_num_steps_out = cld_macmic_num_steps, &
+                      cld_cpl_opt_out          = cld_cpl_opt,      &
                       do_clubb_sgs_out         = do_clubb_sgs,     &
                       do_aerocom_ind3_out      = do_aerocom_ind3,  &
                       use_subcol_microp_out    = use_subcol_microp, &
@@ -242,15 +244,21 @@ subroutine phys_register
          call pbuf_register_subcol('SNOW_SED', 'phys_register', snow_sed_idx)
        end if
 
-       ! ShixuanZhang & HuiWan (2020/07)
-       ! Save the relevant prognostic variables in pbuf for the tendency dribbling in cloud physics paramterization 
-       call pbuf_add_field('S_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('T_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('Q_After_MACMIC' ,  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('QL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       call pbuf_add_field('NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+       ! Add fields to pbuf for alternative coupling between macmic subycles and rest of model 
+
+       if (cld_cpl_opt > 0) then  ! not using the default sequential splitting method
+          call pbuf_add_field(   'S_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(   'T_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(   'Q_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'QL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field('THLM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field( 'RTM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'UM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+          call pbuf_add_field(  'VM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
+       end if
 
     ! Who should add FRACIS? 
     ! -- It does not seem that aero_intr should add it since FRACIS is used in convection
@@ -1907,7 +1915,7 @@ subroutine tphysbc (ztodt,                          &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale,physics_ptend_copy
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
     use cam_history,     only: outfld, fieldname_len
-    use physconst,       only: cpair, latvap, gravit, rga
+    use physconst,       only: cpair, latvap, gravit, rga, rair
     use constituents,    only: pcnst, qmin, cnst_get_ind
     use convect_deep,    only: convect_deep_tend, convect_deep_tend_2, deep_scheme_does_scav_trans
     use time_manager,    only: is_first_step, get_nstep
@@ -1928,7 +1936,7 @@ subroutine tphysbc (ztodt,                          &
     use perf_mod
     use mo_gas_phase_chemdr,only: map2chm
     use clybry_fam,         only: clybry_fam_adj
-    use clubb_intr,      only: clubb_tend_cam
+    use clubb_intr,      only: clubb_tend_cam, p0_clubb
     use sslt_rebin,      only: sslt_rebin_adv
     use tropopause,      only: tropopause_output
     use output_aerocom_aie, only: do_aerocom_ind3, cloud_top_aerocom
@@ -2106,14 +2114,17 @@ subroutine tphysbc (ztodt,                          &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
-    !ShixuanZhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+    !-- start: for alternative coupling between macmic subcycles and rest of model 
     type(physics_ptend)   :: ptend_dribble                    ! local array to save tendencies to be dribbled into macmic subcyles
     integer               :: cld_cpl_opt                      ! scheme for coupling macmic subcycles with the rest of EAM
     integer               :: dribble_start_step               ! namelist variable, specifying which step the dribbling start  
     logical               :: l_dribble                        ! local variabel to determine if tendency dribbling is applied in macmic loop
-
     integer               :: ixnumliq, ixnumice               ! constituent indices for cloud liquid and ice number concentration.
-    !Shixuan Zhang & HuiWan (2020/07): added for a test of using tendency dribbling in cloud physics parameterizations 
+    real(r8) :: thlm_forcing(pcols,pver)
+    real(r8) ::  rtm_forcing(pcols,pver)
+    real(r8) ::   um_forcing(pcols,pver)
+    real(r8) ::   vm_forcing(pcols,pver)
+    !-- end: for alternative coupling between macmic subcycles and rest of model 
 
     ! Added for revised radiation coupling 
     integer :: radheat_cpl_opt
@@ -2542,7 +2553,13 @@ end if
        !-----------------------------------------------------------------------------------
        l_dribble = ( cld_cpl_opt > 0 ) .and. ( nstep >= dribble_start_step )
        if ( l_dribble ) then
-          call set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, ptend_dribble)
+          call set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0_clubb, rair, cpair, latvap, &
+                                         ptend_dribble, thlm_forcing, rtm_forcing, um_forcing, vm_forcing )
+       else
+          thlm_forcing(:,:) = 0._r8
+           rtm_forcing(:,:) = 0._r8
+            um_forcing(:,:) = 0._r8
+            vm_forcing(:,:) = 0._r8
        end if
        !-----------------------------------------------------------------------------------
 
@@ -2630,6 +2647,7 @@ end if
              ! =====================================================  
    
              call clubb_tend_cam(state,ptend,pbuf,diag,cld_macmic_ztodt,&
+                thlm_forcing, rtm_forcing, um_forcing, vm_forcing,      &
                 cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, &
                 dlf, det_s, det_ice, lcldo)
 
@@ -2750,8 +2768,8 @@ end if
          call physics_ptend_dealloc(ptend_dribble)
        end if
 
-       if ( cld_cpl_opt > 0 ) then
-          call save_state_snapshot_to_pbuf(state, pbuf)
+       if ( cld_cpl_opt > 0 .and. (nstep >= dribble_start_step-1) ) then
+          call save_state_snapshot_to_pbuf(state, pbuf, cld_cpl_opt, p0_clubb, rair, cpair, latvap)
        end if
        !----------------------------------------------------------------------
 

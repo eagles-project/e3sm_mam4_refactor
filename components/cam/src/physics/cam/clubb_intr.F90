@@ -900,6 +900,7 @@ end subroutine clubb_init_cnst
 
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,  diag, hdtime, &
+                              thlm_forcing_in, rtm_forcing_in, um_forcing_in, vm_forcing_in, &
                               cmfmc,   cam_in, cam_out,  sgh30, &
                               macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
 
@@ -977,6 +978,12 @@ end subroutine clubb_init_cnst
 
    type(cnd_diag_t),    intent(inout) :: diag                     ! conditionally sampled fields
    type(cam_out_t),     intent(in)    :: cam_out
+
+   real(r8),intent(in) :: thlm_forcing_in(pcols,pver)
+   real(r8),intent(in) ::  rlm_forcing_in(pcols,pver)
+   real(r8),intent(in) ::   um_forcing_in(pcols,pver)
+   real(r8),intent(in) ::   vm_forcing_in(pcols,pver)
+
     
    ! ---------------------- !
    ! Input-Output Auguments !
@@ -1690,13 +1697,19 @@ end subroutine clubb_init_cnst
          wpedsclrp_sfc(ixind) = 0._r8
       enddo 
 
-      !  Define forcings from CAM to CLUBB as zero for momentum and thermo,
-      !  forcings already applied through CAM
-      thlm_forcing(1:pverp) = 0._r8
-      rtm_forcing(1:pverp)  = 0._r8
-      um_forcing(1:pverp)   = 0._r8
-      vm_forcing(1:pverp)   = 0._r8
- 
+      !  Transfer forcings from CAM to CLUBB 
+      do k=1,pver
+         thlm_forcing(k+1) = thlm_forcing_in(i,pver-k+1)
+          rtm_forcing(k+1) =  rtm_forcing_in(i,pver-k+1)
+           um_forcing(k+1) =   um_forcing_in(i,pver-k+1)
+           vm_forcing(k+1) =   vm_forcing_in(i,pver-k+1)
+      end do
+         thlm_forcing(1) = thlm_forcing(2)
+          rtm_forcing(1) =  rtm_forcing(2)
+           um_forcing(1) =   um_forcing(2)
+           vm_forcing(1) =   vm_forcing(2)
+
+      ! higher-order moments 
       wprtp_forcing(1:pverp)   = 0._r8
       wpthlp_forcing(1:pverp)  = 0._r8
       rtp2_forcing(1:pverp)    = 0._r8
