@@ -89,7 +89,7 @@ contains
       ! s, T, q, and cloud condensate calculate tendencies to be dirbbled and revert state to old snapshot
       !=====================================================================================================
       ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
-      ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
+     !ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
       ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
       ifld = pbuf_get_index('QI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, qi_after_macmic )
@@ -117,7 +117,7 @@ contains
       ! Reset state back to the snapshot at old time step  
 
       state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
-      state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
+     !state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldice) = qi_after_macmic(:ncol,:pver)
@@ -156,33 +156,38 @@ contains
       ! revert s, T, q, ql in "state" to old values
       !-----------------------------------------------
       ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
-      ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
+     !ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
       ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
 
       state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
-      state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
+     !state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
 
       !==================================================================================
-      ! CLUBB does not deal with qi, ni, nl, so these will have to be dribbled for now
+      ! CLUBB does not deal with qi, ni, nl, so these will have to be dribbled for now.
+      ! Also, s and qv are reverted back to old values, we need to re-diagnose T and geopotential height,
+      ! for which we set ls = .true. with zero s tendency in ptend_dribble.
       !==================================================================================
-      ifld = pbuf_get_index('QI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, qi_after_macmic )
-      ifld = pbuf_get_index('NL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, nl_after_macmic )
-      ifld = pbuf_get_index('NI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ni_after_macmic )
-
-      ! Calculate tendencies to be dribbled, and save in ptend_dribble
+      ! Calculate condensate tendencies to be dribbled, and save in ptend_dribble
 
       lq(:)        = .FALSE.
       lq(ixcldice) = .TRUE.
       lq(ixnumliq) = .TRUE.
       lq(ixnumice) = .TRUE.
 
-      call physics_ptend_init(ptend_dribble, state%psetcols, 'macmic_dribble_tend', ls= .false., lq=lq)
+      call physics_ptend_init(ptend_dribble, state%psetcols, 'macmic_dribble_tend', ls=.true., lq=lq)
 
+      ptend_dribble%s(:ncol,:pver) = 0._r8
+
+      ifld = pbuf_get_index('QI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, qi_after_macmic )
       ptend_dribble%q(:ncol,:pver,ixcldice) = (state%q(:ncol,:pver,ixcldice) -  qi_after_macmic(:ncol,:pver))  / ztodt
+
+      ifld = pbuf_get_index('NL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, nl_after_macmic )
       ptend_dribble%q(:ncol,:pver,ixnumliq) = (state%q(:ncol,:pver,ixnumliq) -  nl_after_macmic(:ncol,:pver))  / ztodt
+
+      ifld = pbuf_get_index('NI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ni_after_macmic )
       ptend_dribble%q(:ncol,:pver,ixnumice) = (state%q(:ncol,:pver,ixnumice) -  ni_after_macmic(:ncol,:pver))  / ztodt
 
       ! Reset state back to the snapshot at old time step  
@@ -264,8 +269,8 @@ contains
    varname = 'S_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    ptr2d(:ncol,:pver) = state%s(:ncol,:pver)
 
-   varname = 'T_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
-   ptr2d(:ncol,:pver) = state%t(:ncol,:pver)
+  !varname = 'T_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
+  !ptr2d(:ncol,:pver) = state%t(:ncol,:pver)
 
    varname = 'Q_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    ptr2d(:ncol,:pver) = state%q(:ncol,:pver,ixq)
