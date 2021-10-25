@@ -902,7 +902,7 @@ end subroutine clubb_init_cnst
 
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,  diag, hdtime, &
-                              thlm_forcing_in, rtm_forcing_in, um_forcing_in, vm_forcing_in, &
+                              thlm_forcing_host, rtm_forcing_host, um_forcing_host, vm_forcing_host, &
                               cmfmc,   cam_in, cam_out,  sgh30, &
                               macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
 
@@ -981,10 +981,10 @@ end subroutine clubb_init_cnst
    type(cnd_diag_t),    intent(inout) :: diag                     ! conditionally sampled fields
    type(cam_out_t),     intent(in)    :: cam_out
 
-   real(r8),intent(in) :: thlm_forcing_in(pcols,pver)
-   real(r8),intent(in) ::  rtm_forcing_in(pcols,pver)
-   real(r8),intent(in) ::   um_forcing_in(pcols,pver)
-   real(r8),intent(in) ::   vm_forcing_in(pcols,pver)
+   real(r8),intent(in) :: thlm_forcing_host(pcols,pver)
+   real(r8),intent(in) ::  rtm_forcing_host(pcols,pver)
+   real(r8),intent(in) ::   um_forcing_host(pcols,pver)
+   real(r8),intent(in) ::   vm_forcing_host(pcols,pver)
 
     
    ! ---------------------- !
@@ -1701,10 +1701,10 @@ end subroutine clubb_init_cnst
 
       !  Transfer forcings from CAM to CLUBB 
       do k=1,pver
-         thlm_forcing(k+1) = thlm_forcing_in(i,pver-k+1)
-          rtm_forcing(k+1) =  rtm_forcing_in(i,pver-k+1)
-           um_forcing(k+1) =   um_forcing_in(i,pver-k+1)
-           vm_forcing(k+1) =   vm_forcing_in(i,pver-k+1)
+         thlm_forcing(k+1) = thlm_forcing_host(i,pver-k+1)
+          rtm_forcing(k+1) =  rtm_forcing_host(i,pver-k+1)
+           um_forcing(k+1) =   um_forcing_host(i,pver-k+1)
+           vm_forcing(k+1) =   vm_forcing_host(i,pver-k+1)
       end do
          thlm_forcing(1) = thlm_forcing(2)
           rtm_forcing(1) =  rtm_forcing(2)

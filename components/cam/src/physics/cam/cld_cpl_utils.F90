@@ -16,10 +16,10 @@ module cld_cpl_utils
 
 contains
 
-   subroutine set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0, rair, cpair, latvap, &
+   subroutine set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0, rair, cpair, latvap, tend, &
                                         ptend_dribble, thlm_forcing, rtm_forcing, um_forcing, vm_forcing )
 
-   use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
+   use physics_types,    only: physics_state, physics_ptend, physics_ptend_init, physics_tend
    use physics_buffer,   only: physics_buffer_desc, pbuf_get_field
    use physics_buffer,   only: pbuf_get_index
    use constituents,     only: pcnst, cnst_get_ind
@@ -30,7 +30,8 @@ contains
    integer, intent(in) :: cld_cpl_opt                    ! scheme identifier 
    real(r8),intent(in) :: ztodt, p0, rair, cpair, latvap
 
-   type(physics_ptend),intent(out) :: ptend_dribble
+   type(physics_tend ),intent(inout) :: tend
+   type(physics_ptend),intent(out)   :: ptend_dribble
 
    real(r8),intent(out) :: thlm_forcing(pcols,pver)
    real(r8),intent(out) ::  rtm_forcing(pcols,pver)
@@ -152,10 +153,23 @@ contains
 
       rtm_forcing(:ncol,:pver) = ( rtm_current(:ncol,:pver) - rtm_after_macmic(:ncol,:pver))/ztodt
 
-      !-----------------------------------------------
-      ! revert s, T, q, ql in "state" to old values
-      !-----------------------------------------------
+      !--------------------------------------------------------------------------------------------
+      ! Subtract T tendency from variable "tend".
+      ! This is needed because "call physics_update()" in tphysbc after "call clubb_tend_cam" 
+      ! has an actual argument "tend", meaning that this "call physics_update()" not only updates 
+      ! the model state but also accumulate tendencies in "tend". When the forcing method is used,
+      ! the out-of-mac-mic tendencies will be included in the ptend returned by 
+      ! "call clubb_tend_cam". To avoid double-counting, we need to subtract the
+      ! out-of-mac-mic tendencies here.
+      !--------------------------------------------------------------------------------------------
       ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
+
+      tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) &
+                              - ( state%s(:ncol,:pver) - s_after_macmic(:ncol,:pver) )/ztodt/cpair
+
+      !-----------------------------------------------
+      ! Revert s, q, ql in "state" to old values
+      !-----------------------------------------------
      !ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
       ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
@@ -164,6 +178,23 @@ contains
      !state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
+
+      !==================================================================================
+      ! u and v: 
+      !==================================================================================
+      ! Use isolated sequential splitting between macmic subcycles and rest of model.
+      ! No dribbling. Forcing terms for CLUBB are set to zero because the state has
+      ! already been updated.
+      !-----------------------------------------------------------------------------------
+      um_forcing(:,:) = 0._r8
+      vm_forcing(:,:) = 0._r8
+
+      !----------------------------------------------------------
+      ! PLACE HOLDER: if applying forcing method to u, v, then 
+      ! - calculate um_forcing, vm_forcing
+      ! - subtract from tend%dudt and tend%dvdt
+      ! - revert state%u and state%v to old values
+      !----------------------------------------------------------
 
       !==================================================================================
       ! CLUBB does not deal with qi, ni, nl, so these will have to be dribbled for now.
@@ -196,14 +227,6 @@ contains
       state%q(:ncol,:pver,ixnumliq) = nl_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixnumice) = ni_after_macmic(:ncol,:pver)
 
-      !==================================================================================
-      ! u and v: 
-      ! Use isolated sequential splitting between macmic subcycles and rest of model.
-      ! No dribbling. Forcing terms for CLUBB are set to zero because the state has
-      ! already been updated.
-      !==================================================================================
-      um_forcing(:,:) = 0._r8
-      vm_forcing(:,:) = 0._r8
 
    case default
       call endrun('set_state_and_tendencies: choice of cld_cpl_opt not yet supported.') 

@@ -2553,7 +2553,7 @@ end if
        !-----------------------------------------------------------------------------------
        l_dribble = ( cld_cpl_opt > 0 ) .and. ( nstep >= dribble_start_step )
        if ( l_dribble ) then
-          call set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0_clubb, rair, cpair, latvap, &
+          call set_state_and_tendencies( state, pbuf, cld_cpl_opt, ztodt, p0_clubb, rair, cpair, latvap, tend, &
                                          ptend_dribble, thlm_forcing, rtm_forcing, um_forcing, vm_forcing )
        else
           thlm_forcing(:,:) = 0._r8
