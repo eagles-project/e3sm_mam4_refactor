@@ -928,6 +928,9 @@
     <environment_variables>
       <env name="PERL5LIB">/nfs/gce/projects/climate/software/perl5/lib/perl5</env>
     </environment_variables>
+    <environment_variables compiler="gnu" mpilib="mpich">
+      <env name="ADIOS2_DIR">/nfs/gce/projects/climate/software/adios2/2.7.0/mpich-3.4.2/gcc-8.3.0</env>
+    </environment_variables>
   </machine>
 
   <machine MACH="sandiatoss3">
