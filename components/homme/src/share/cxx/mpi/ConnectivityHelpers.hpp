@@ -105,6 +105,7 @@ using ArrayGP = Kokkos::Array<GaussPoint,NP>;
 // and more.
 struct ConnectionHelpers {
 
+  KOKKOS_FORCEINLINE_FUNCTION
   ConnectionHelpers () {}
 
   ConnectionHelpers& operator= (const ConnectionHelpers& src) { return *this; }

@@ -357,10 +357,19 @@ void BoundaryExchange::pack_and_send ()
     auto send_3d_buffers = m_send_3d_buffers;
     const auto num_3d_fields = m_num_3d_fields;
     if (OnGpu<ExecSpace>::value) {
+#ifndef KOKKOS_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE
+      // NOTE: if RDC is ON, helpers declared here can trigger an Internal Compiler Error.
+      //       Since RDC is OFF for production runs (for perf reasons), and we only use it
+      //       to speed up compilation in debug runs, it's ok to move helpers inside the
+      //       kernel, even if it causes perf issues (e.g., more register usage).
       const ConnectionHelpers helpers;
+#endif
       Kokkos::parallel_for(
         Kokkos::RangePolicy<ExecSpace>(0, m_num_elems*m_num_3d_fields*NUM_CONNECTIONS*NUM_LEV),
         KOKKOS_LAMBDA(const int it) {
+#ifdef KOKKOS_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE
+          const ConnectionHelpers helpers;
+#endif
           const int ie = it / (num_3d_fields*NUM_CONNECTIONS*NUM_LEV);
           const int ifield = (it / (NUM_CONNECTIONS*NUM_LEV)) % num_3d_fields;
           const int iconn = (it / NUM_LEV) % NUM_CONNECTIONS;
@@ -430,10 +439,19 @@ void BoundaryExchange::pack_and_send ()
     auto send_buffers = m_send_3d_int_buffers;
     const auto num_fields = m_num_3d_int_fields;
     if (OnGpu<ExecSpace>::value) {
+#ifndef KOKKOS_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE
+      // NOTE: if RDC is ON, helpers declared here can trigger an Internal Compiler Error.
+      //       Since RDC is OFF for production runs (for perf reasons), and we only use it
+      //       to speed up compilation in debug runs, it's ok to move helpers inside the
+      //       kernel, even if it causes perf issues (e.g., more register usage).
       const ConnectionHelpers helpers;
+#endif
       Kokkos::parallel_for(
         Kokkos::RangePolicy<ExecSpace>(0, m_num_elems*num_fields*NUM_CONNECTIONS*NUM_LEV_P),
         KOKKOS_LAMBDA(const int it) {
+#ifdef KOKKOS_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE
+          const ConnectionHelpers helpers;
+#endif
           const int ie = it / (num_fields*NUM_CONNECTIONS*NUM_LEV_P);
           const int ifield = (it / (NUM_CONNECTIONS*NUM_LEV_P)) % num_fields;
           const int iconn = (it / NUM_LEV_P) % NUM_CONNECTIONS;
