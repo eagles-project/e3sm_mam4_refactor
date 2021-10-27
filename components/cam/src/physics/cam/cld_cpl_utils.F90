@@ -10,7 +10,8 @@ module cld_cpl_utils
   integer,parameter :: DRIB_UV   = 12
   integer,parameter :: DRIB_TQUV = 13
 
-  integer,parameter :: FORC_TQ   = 21
+  integer,parameter :: FORC_TQ_dTdt   = 211
+  integer,parameter :: FORC_TQ_dsdt   = 212
   integer,parameter :: FORC_UV   = 22
   integer,parameter :: FORC_TQUV = 23
 
@@ -82,19 +83,18 @@ contains
    !=============================================
    case(DRIB_TQ)
 
-      !=====================================================================
-      ! thlm forcing and rtm forcing to be passed to CLUBB are set to zero
-      !=====================================================================
+      !--------------------------------------------------------------------
+      ! Thlm forcing and rtm forcing to be passed to CLUBB are set to zero
+      !--------------------------------------------------------------------
       thlm_forcing(:,:) = 0._r8
        rtm_forcing(:,:) = 0._r8
         um_forcing(:,:) = 0._r8
         vm_forcing(:,:) = 0._r8
 
-      !=====================================================================================================
-      ! s, T, q, and cloud condensate calculate tendencies to be dirbbled and revert state to old snapshot
-      !=====================================================================================================
+      !---------------------------------------------------------------------------------------------------------
+      ! For s, T, q, and cloud condensate, calculate tendencies to be dribbled and revert state to old snapshot
+      !---------------------------------------------------------------------------------------------------------
       ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
-     !ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
       ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
       ifld = pbuf_get_index('QI_After_MACMIC'); call pbuf_get_field(pbuf, ifld, qi_after_macmic )
@@ -119,10 +119,9 @@ contains
       ptend_dribble%q(:ncol,:pver,ixnumliq) = (state%q(:ncol,:pver,ixnumliq) -  nl_after_macmic(:ncol,:pver))  / ztodt
       ptend_dribble%q(:ncol,:pver,ixnumice) = (state%q(:ncol,:pver,ixnumice) -  ni_after_macmic(:ncol,:pver))  / ztodt
 
-      ! Reset state back to the snapshot at old time step  
+      ! Reset state back to an old snapshot
 
       state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
-     !state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldice) = qi_after_macmic(:ncol,:pver)
@@ -132,48 +131,62 @@ contains
    !================
    ! Forcing method 
    !================
-   case (FORC_TQ) 
+   case (FORC_TQ_dTdt,FORC_TQ_dsdt) 
 
+      !==================================================================================================================
+      ! Thlm and rtm in CLUBB correspond to s (T), q, ql in host model.
+      ! Need to calculate tendencies of thlm and rtm resulting from rest of the model,
+      ! and revert s, q, ql to an old state (the corresponding old thlm and rtm will be calculated in clubb_tend_cam.
+      !==================================================================================================================
       ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
       ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
 
+      !-------------------------------
+      ! Tendency/forcing calculation
+      !-------------------------------
       dTdt(:ncol,:pver) = ( state%t(:ncol,:pver)          -  t_after_macmic(:ncol,:pver) )/ztodt
       dqdt(:ncol,:pver) = ( state%q(:ncol,:pver,ixq)      -  q_after_macmic(:ncol,:pver) )/ztodt
      dqldt(:ncol,:pver) = ( state%q(:ncol,:pver,ixcldliq) - ql_after_macmic(:ncol,:pver) )/ztodt
-      !--------------------------------------------------------------------------------------------
-      ! Subtract T tendency from variable "tend".
-      ! This is needed because "call physics_update()" in tphysbc after "call clubb_tend_cam" 
-      ! has an actual argument "tend", meaning that this "call physics_update()" not only updates 
-      ! the model state but also accumulate tendencies in "tend". When the forcing method is used,
-      ! the out-of-mac-mic tendencies will be included in the ptend returned by 
-      ! "call clubb_tend_cam". To avoid double-counting, we need to subtract the
-      ! out-of-mac-mic tendencies here.
-      !--------------------------------------------------------------------------------------------
-      tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
 
-      !==================================================================================================================
-      ! thlm and rtm in CLUBB correspond to s, T, q, ql in host model.
-      ! Need to calculate tendencies of thlm and rtm resulting from rest of the model,
-      ! and revert s, T, q, ql to an old state (the corresponding old thlm and rtm will be calculated in clubb_tend_cam.
-      !==================================================================================================================
-      ! thlm: calculate tendency (thlm_forcing), theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
+      ! Recall that thlm = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
 
       thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
                                  - dqldt(:ncol,:pver)* (latvap/cpair)
 
-      ! rtm: calculate tendency (rtm_forcing), rtm:  rt = qv + ql
+      ! Recall that rtm = q + ql
 
       rtm_forcing(:ncol,:pver) = dqldt(:ncol,:pver) + dqdt(:ncol,:pver)
 
       !-----------------------------------------------
-      ! Revert s, q, ql in "state" to old values
+      ! Revert q, ql in "state" to old values
       !-----------------------------------------------
-      ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
-     !state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
-      state%s(:ncol,:pver)          =  state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
+
+      !--------------------------------------------------------------------------------------------
+      ! Subtract s or T tendency from variable "tend".
+      ! (This is needed because "call physics_update()" in tphysbc after "call clubb_tend_cam" 
+      ! has an actual argument "tend", meaning that this "call physics_update()" not only updates 
+      ! the model state but also accumulate tendencies in "tend". When the forcing method is used,
+      ! the out-of-mac-mic tendencies will be included in the ptend returned by 
+      ! "call clubb_tend_cam". To avoid double-counting, we need to subtract the
+      ! out-of-mac-mic tendencies here.)
+      ! Then revert s to an old snapshot.
+      !--------------------------------------------------------------------------------------------
+
+      if (cld_cpl_opt==FORC_TQ_dTdt) then
+
+         tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
+           state%s(:ncol,:pver) =   state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
+
+      elseif(cld_cpl_opt==FORC_TQ_dsdt) then
+
+         ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
+         tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - (state%s(:ncol,:pver)-s_after_macmic(:ncol,:pver))/ztodt/cpair
+           state%s(:ncol,:pver) = s_after_macmic(:ncol,:pver)
+
+      end if
 
       !==================================================================================
       ! u and v: 
