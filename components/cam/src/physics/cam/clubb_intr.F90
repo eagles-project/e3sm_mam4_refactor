@@ -1706,10 +1706,10 @@ end subroutine clubb_init_cnst
            um_forcing(k+1) =   um_forcing_host(i,pver-k+1)
            vm_forcing(k+1) =   vm_forcing_host(i,pver-k+1)
       end do
-         thlm_forcing(1) = thlm_forcing(2)
-          rtm_forcing(1) =  rtm_forcing(2)
-           um_forcing(1) =   um_forcing(2)
-           vm_forcing(1) =   vm_forcing(2)
+         thlm_forcing(1) = 0._r8 !thlm_forcing(2)
+          rtm_forcing(1) = 0._r8 ! rtm_forcing(2)
+           um_forcing(1) = 0._r8 !  um_forcing(2)
+           vm_forcing(1) = 0._r8 !  vm_forcing(2)
 
       ! higher-order moments 
       wprtp_forcing(1:pverp)   = 0._r8

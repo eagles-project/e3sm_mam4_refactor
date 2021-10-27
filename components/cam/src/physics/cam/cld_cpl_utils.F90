@@ -63,6 +63,10 @@ contains
     real(r8) ::   um_current(pcols,pver)
     real(r8) ::   vm_current(pcols,pver)
 
+    real(r8) ::   dTdt(pcols,pver)
+    real(r8) ::  dqldt(pcols,pver)
+    real(r8) ::   dqdt(pcols,pver)
+
    !-----------------------------------------------
    ncol = state%ncol
 
@@ -130,29 +134,13 @@ contains
    !================
    case (FORC_TQ) 
 
-      !==================================================================================================================
-      ! thlm and rtm in CLUBB correspond to s, T, q, ql in host model.
-      ! Need to calculate tendencies of thlm and rtm resulting from rest of the model,
-      ! and revert s, T, q, ql to an old state (the corresponding old thlm and rtm will be calculated in clubb_tend_cam.
-      !==================================================================================================================
-      ! thlm: calculate tendency (thlm_forcing), theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
+      ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
+      ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
+      ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
 
-      ifld = pbuf_get_index('THLM_Aft_MACMIC'); call pbuf_get_field(pbuf, ifld, thlm_after_macmic )
-
-      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
-                                  - (latvap/cpair)*state%q(:ncol,:pver,ixcldliq)
-
-      thlm_forcing(:ncol,:pver) = ( thlm_current(:ncol,:pver) - thlm_after_macmic(:ncol,:pver))/ztodt
-
-      !------------------------------------------------------------
-      ! rtm: calculate tendency (rtm_forcing), rtm:  rt = qv + ql
-
-      ifld = pbuf_get_index('RTM_After_MACMIC'); call pbuf_get_field(pbuf, ifld, rtm_after_macmic )
-
-      rtm_current(:ncol,:pver) = state%q(:ncol,:pver,ixq) + state%q(:ncol,:pver,ixcldliq) 
-
-      rtm_forcing(:ncol,:pver) = ( rtm_current(:ncol,:pver) - rtm_after_macmic(:ncol,:pver))/ztodt
-
+      dTdt(:ncol,:pver) = ( state%t(:ncol,:pver)          -  t_after_macmic(:ncol,:pver) )/ztodt
+      dqdt(:ncol,:pver) = ( state%q(:ncol,:pver,ixq)      -  q_after_macmic(:ncol,:pver) )/ztodt
+     dqldt(:ncol,:pver) = ( state%q(:ncol,:pver,ixcldliq) - ql_after_macmic(:ncol,:pver) )/ztodt
       !--------------------------------------------------------------------------------------------
       ! Subtract T tendency from variable "tend".
       ! This is needed because "call physics_update()" in tphysbc after "call clubb_tend_cam" 
@@ -162,20 +150,28 @@ contains
       ! "call clubb_tend_cam". To avoid double-counting, we need to subtract the
       ! out-of-mac-mic tendencies here.
       !--------------------------------------------------------------------------------------------
-      ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
+      tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
 
-      tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) &
-                              - ( state%s(:ncol,:pver) - s_after_macmic(:ncol,:pver) )/ztodt/cpair
+      !==================================================================================================================
+      ! thlm and rtm in CLUBB correspond to s, T, q, ql in host model.
+      ! Need to calculate tendencies of thlm and rtm resulting from rest of the model,
+      ! and revert s, T, q, ql to an old state (the corresponding old thlm and rtm will be calculated in clubb_tend_cam.
+      !==================================================================================================================
+      ! thlm: calculate tendency (thlm_forcing), theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
+
+      thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
+                                 - dqldt(:ncol,:pver)* (latvap/cpair)
+
+      ! rtm: calculate tendency (rtm_forcing), rtm:  rt = qv + ql
+
+      rtm_forcing(:ncol,:pver) = dqldt(:ncol,:pver) + dqdt(:ncol,:pver)
 
       !-----------------------------------------------
       ! Revert s, q, ql in "state" to old values
       !-----------------------------------------------
-     !ifld = pbuf_get_index( 'T_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  t_after_macmic )
-      ifld = pbuf_get_index( 'Q_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
-      ifld = pbuf_get_index('QL_After_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
-
-      state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
-     !state%t(:ncol,:pver)          =  t_after_macmic(:ncol,:pver)
+      ifld = pbuf_get_index( 'S_After_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
+     !state%s(:ncol,:pver)          =  s_after_macmic(:ncol,:pver)
+      state%s(:ncol,:pver)          =  state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
       state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
 
@@ -292,8 +288,8 @@ contains
    varname = 'S_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    ptr2d(:ncol,:pver) = state%s(:ncol,:pver)
 
-  !varname = 'T_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
-  !ptr2d(:ncol,:pver) = state%t(:ncol,:pver)
+   varname = 'T_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
+   ptr2d(:ncol,:pver) = state%t(:ncol,:pver)
 
    varname = 'Q_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    ptr2d(:ncol,:pver) = state%q(:ncol,:pver,ixq)
@@ -312,30 +308,6 @@ contains
    varname = 'NI_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    call cnst_get_ind('NUMICE', ixnumice)
    ptr2d(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
-
-   ! Save theta_l and rt.
-   ! Because T, q, and ql likely have changed during microphsics calculation,
-   ! we need to re-diagnose theta_l and rt instead of saving the values
-   ! that came out of the last call of CLUBB.
-
-   if (cld_cpl_opt == FORC_TQ .or. cld_cpl_opt == FORC_TQUV) then
-
-      ! theta_l = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
-
-      thlm_current(:ncol,:pver) = state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
-                                  - (latvap/cpair)*state%q(:ncol,:pver,ixcldliq)
-
-      varname = 'THLM_Aft_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
-      ptr2d(:ncol,:pver) = thlm_current(:ncol,:pver)
-
-      ! rt = qv + ql
-
-      rtm_current(:ncol,:pver) = state%q(:ncol,:pver,ixq) + state%q(:ncol,:pver,ixcldliq)
-
-      varname = 'RTM_After_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
-      ptr2d(:ncol,:pver) = rtm_current(:ncol,:pver)
-
-   end if
 
    ! Save u and v
 
