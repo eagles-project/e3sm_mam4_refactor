@@ -254,8 +254,6 @@ subroutine phys_register
           call pbuf_add_field(  'QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'THLM_Aft_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field( 'RTM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'UM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
           call pbuf_add_field(  'VM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
        end if
@@ -2126,6 +2124,8 @@ subroutine tphysbc (ztodt,                          &
     real(r8) ::   vm_forcing(pcols,pver)
     !-- end: for alternative coupling between macmic subcycles and rest of model 
 
+    integer :: clubb_intr_efix_opt
+
     ! Added for revised radiation coupling 
     integer :: radheat_cpl_opt
     real(r8):: zqrl(pcols,pver) ! longwave heating
@@ -2142,6 +2142,7 @@ subroutine tphysbc (ztodt,                          &
                       ,l_st_mac_out           = l_st_mac           &
                       ,l_st_mic_out           = l_st_mic           &
                       ,l_rad_out              = l_rad              &
+                      ,clubb_intr_efix_opt_out= clubb_intr_efix_opt &
                       ,cld_cpl_opt_out        = cld_cpl_opt        &
                       ,dribble_start_step_out = dribble_start_step &
                       ,radheat_cpl_opt_out = radheat_cpl_opt &
@@ -2647,7 +2648,7 @@ end if
              ! =====================================================  
    
              call clubb_tend_cam(state,ptend,pbuf,diag,cld_macmic_ztodt,&
-                thlm_forcing, rtm_forcing, um_forcing, vm_forcing,      &
+                clubb_intr_efix_opt, thlm_forcing, rtm_forcing, um_forcing, vm_forcing,      &
                 cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, &
                 dlf, det_s, det_ice, lcldo)
 

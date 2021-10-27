@@ -902,6 +902,7 @@ end subroutine clubb_init_cnst
 
    subroutine clubb_tend_cam( &
                               state,   ptend_all,   pbuf,  diag, hdtime, &
+                              clubb_intr_efix_opt, &
                               thlm_forcing_host, rtm_forcing_host, um_forcing_host, vm_forcing_host, &
                               cmfmc,   cam_in, cam_out,  sgh30, &
                               macmic_it, cld_macmic_num_steps,dlf, det_s, det_ice, alst_o)
@@ -981,6 +982,7 @@ end subroutine clubb_init_cnst
    type(cnd_diag_t),    intent(inout) :: diag                     ! conditionally sampled fields
    type(cam_out_t),     intent(in)    :: cam_out
 
+   integer, intent(in) :: clubb_intr_efix_opt
    real(r8),intent(in) :: thlm_forcing_host(pcols,pver)
    real(r8),intent(in) ::  rtm_forcing_host(pcols,pver)
    real(r8),intent(in) ::   um_forcing_host(pcols,pver)
@@ -2065,7 +2067,14 @@ end subroutine clubb_init_cnst
       enddo
 
       ! Compute the disbalance of total energy, over depth where CLUBB is active
-      se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
+      select case(clubb_intr_efix_opt)
+      case(0) ! conserve the total energy as defined in CAM/EAM
+        se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
+      case(1) ! compensate loss of grid box mean kinetic energy by heating
+        se_dis = (ke_a(i) - ke_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
+      case default
+        call endrun('clubb_tend_cam: unexpected choice of clubb_intr_efix_opt')
+      end select
 
       ! Apply this fixer throughout the column evenly, but only at layers where
       ! CLUBB is active.

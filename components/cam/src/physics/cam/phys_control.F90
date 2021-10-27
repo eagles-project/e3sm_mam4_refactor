@@ -160,6 +160,10 @@ integer  :: cld_cpl_opt = 0         ! 0 = default: isolated sequential splitting
                                     ! 1 = dribbling
                                     ! 2 = forcing method
 
+! Options for energy fixer in module clubb_intr
+integer  :: clubb_intr_efix_opt = 0 ! 0 = preserve total energy as in default EAMv1
+                                    ! 1 = compensate loss of kinetic energy by heating
+
 !When and where to apply radiative heating (Hui Wan, Feb 2021)
 integer :: radheat_cpl_opt = 0  ! EAMv1. Apply tendencies after radiation_tend
 
@@ -197,7 +201,7 @@ subroutine phys_ctl_readnl(nlfile)
       convproc_do_gas, convproc_method_activate, liqcf_fix, regen_fix, demott_ice_nuc, pergro_mods, pergro_test_active, &
       mam_amicphys_optaa, n_so4_monolayers_pcage,micro_mg_accre_enhan_fac, &
       l_tracer_aero, l_vdiff, l_rayleigh, l_gw_drag, l_ac_energy_chk, &
-      cld_cpl_opt, dribble_start_step, radheat_cpl_opt, &
+      clubb_intr_efix_opt, cld_cpl_opt, dribble_start_step, radheat_cpl_opt, &
       l_bc_energy_fix, l_dry_adj, l_st_mac, l_st_mic, l_rad, prc_coef1,prc_exp,prc_exp1,cld_sed,mg_prc_coeff_fix, &
       rrtmg_temp_fix
    !-----------------------------------------------------------------------------
@@ -279,6 +283,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(l_st_mac,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_st_mic,                        1 , mpilog,  0, mpicom)
    call mpibcast(l_rad,                           1 , mpilog,  0, mpicom)
+   call mpibcast(clubb_intr_efix_opt,             1 , mpiint,  0, mpicom)
    call mpibcast(cld_cpl_opt,                     1 , mpiint,  0, mpicom)
    call mpibcast(dribble_start_step,              1 , mpiint,  0, mpicom)
    call mpibcast(radheat_cpl_opt,                 1 , mpiint,  0, mpicom)
@@ -433,7 +438,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         convproc_do_gas_out, convproc_method_activate_out, mam_amicphys_optaa_out, n_so4_monolayers_pcage_out, &
                         micro_mg_accre_enhan_fac_out, liqcf_fix_out, regen_fix_out,demott_ice_nuc_out, pergro_mods_out, pergro_test_active_out &
                        ,l_tracer_aero_out, l_vdiff_out, l_rayleigh_out, l_gw_drag_out, l_ac_energy_chk_out  &
-                       ,cld_cpl_opt_out, dribble_start_step_out, radheat_cpl_opt_out &
+                       ,clubb_intr_efix_opt_out, cld_cpl_opt_out, dribble_start_step_out, radheat_cpl_opt_out &
                        ,l_bc_energy_fix_out, l_dry_adj_out, l_st_mac_out, l_st_mic_out, l_rad_out  &
                        ,prc_coef1_out,prc_exp_out,prc_exp1_out, cld_sed_out,mg_prc_coeff_fix_out,rrtmg_temp_fix_out)
 
@@ -503,6 +508,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: l_st_mac_out
    logical,           intent(out), optional :: l_st_mic_out
    logical,           intent(out), optional :: l_rad_out
+   integer,           intent(out), optional :: clubb_intr_efix_opt_out
    integer,           intent(out), optional :: cld_cpl_opt_out
    integer,           intent(out), optional :: dribble_start_step_out
    integer,           intent(out), optional :: radheat_cpl_opt_out
@@ -571,6 +577,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(l_st_mac_out            ) ) l_st_mac_out          = l_st_mac
    if ( present(l_st_mic_out            ) ) l_st_mic_out          = l_st_mic
    if ( present(l_rad_out               ) ) l_rad_out             = l_rad
+   if ( present(clubb_intr_efix_opt_out ) ) clubb_intr_efix_opt_out = clubb_intr_efix_opt
    if ( present(cld_cpl_opt_out         ) ) cld_cpl_opt_out       = cld_cpl_opt
    if ( present(dribble_start_step_out  ) ) dribble_start_step_out = dribble_start_step
    if ( present(radheat_cpl_opt_out     ) ) radheat_cpl_opt_out      = radheat_cpl_opt
