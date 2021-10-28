@@ -155,6 +155,7 @@ subroutine phys_register
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
     use output_aerocom_aie, only: output_aerocom_aie_register, do_aerocom_ind3
+    use cld_cpl_utils,      only: cld_cpl_register
 
     !---------------------------Local variables-----------------------------
     !
@@ -245,18 +246,7 @@ subroutine phys_register
        end if
 
        ! Add fields to pbuf for alternative coupling between macmic subycles and rest of model 
-
-       if (cld_cpl_opt > 0) then  ! not using the default sequential splitting method
-          call pbuf_add_field(   'S_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(   'T_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(   'Q_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'QL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'QI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'NL_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'NI_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'UM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-          call pbuf_add_field(  'VM_After_MACMIC',  'global', dtype_r8, (/pcols,pver/), idxtmp)
-       end if
+       call cld_cpl_register( cld_cpl_opt )
 
     ! Who should add FRACIS? 
     ! -- It does not seem that aero_intr should add it since FRACIS is used in convection
