@@ -36,6 +36,7 @@ contains
         call pbuf_add_field(   'NI_AFT_MACMIC', 'global', dtype_r8, (/pcols,pver/), idxtmp)
         call pbuf_add_field(   'UM_AFT_MACMIC', 'global', dtype_r8, (/pcols,pver/), idxtmp)
         call pbuf_add_field(   'VM_AFT_MACMIC', 'global', dtype_r8, (/pcols,pver/), idxtmp)
+        call pbuf_add_field( 'PMID_AFT_MACMIC', 'global', dtype_r8, (/pcols,pver/), idxtmp)
         call pbuf_add_field( 'THLM_AFT_MACMIC', 'global', dtype_r8, (/pcols,pver/), idxtmp)
      end if
 
@@ -82,6 +83,7 @@ contains
     real(r8), pointer, dimension(:,:) :: thlm_after_macmic
     real(r8), pointer, dimension(:,:) ::   um_after_macmic
     real(r8), pointer, dimension(:,:) ::   vm_after_macmic
+    real(r8), pointer, dimension(:,:) :: pmid_after_macmic
 
     real(r8) :: thlm_current(pcols,pver)
     real(r8) ::   um_current(pcols,pver)
@@ -154,7 +156,8 @@ contains
    !================
    ! Forcing method 
    !================
-   case (FORC_TQ_dTdt,FORC_TQ_dsdt) 
+  !case (FORC_TQ_dTdt,FORC_TQ_dsdt) 
+   case (211,212,213,214,215) 
 
       !==================================================================================================================
       ! Thlm and rtm in CLUBB correspond to s (T), q, ql in host model.
@@ -165,9 +168,9 @@ contains
       ifld = pbuf_get_index( 'Q_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld,  q_after_macmic )
       ifld = pbuf_get_index('QL_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, ql_after_macmic )
 
-      !-------------------------------
-      ! Tendency/forcing calculation
-      !-------------------------------
+      !---------------------------------------
+      ! Tendency/forcing calculation for rtm 
+      !---------------------------------------
        dqdt(:ncol,:pver) = ( state%q(:ncol,:pver,ixq)      -  q_after_macmic(:ncol,:pver) )/ztodt
       dqldt(:ncol,:pver) = ( state%q(:ncol,:pver,ixcldliq) - ql_after_macmic(:ncol,:pver) )/ztodt
 
@@ -175,32 +178,10 @@ contains
 
       rtm_forcing(:ncol,:pver) = dqldt(:ncol,:pver) + dqdt(:ncol,:pver)
 
+      !---------------------------------------
+      ! Tendency/forcing calculation for thlm 
+      !---------------------------------------
       ! thlm = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
-
-    ! if (cld_cpl_opt == FORC_TQ_dTdt) then
-
-    !    dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
-    !    thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
-    !                               - dqldt(:ncol,:pver)* (latvap/cpair)
-
-    ! elseif (cld_cpl_opt == FORC_TQ_dsdt) then
-
-         ifld = pbuf_get_index('THLM_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, thlm_after_macmic )
-
-         thlm_current(:ncol,:pver) =  state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
-                                    - state%q(:ncol,:pver,ixcldliq)* (latvap/cpair)
-
-         thlm_forcing(:ncol,:pver) = ( thlm_current(:ncol,:pver) - thlm_after_macmic(:ncol,:pver) )/ztodt
-
-    ! end if
-
-
-      !-----------------------------------------------
-      ! Revert q, ql in "state" to old values
-      !-----------------------------------------------
-      state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
-      state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
-
       !--------------------------------------------------------------------------------------------
       ! Subtract s or T tendency from variable "tend".
       ! (This is needed because "call physics_update()" in tphysbc after "call clubb_tend_cam" 
@@ -212,18 +193,74 @@ contains
       ! Then revert s to an old snapshot.
       !--------------------------------------------------------------------------------------------
 
-      if (cld_cpl_opt==FORC_TQ_dTdt) then
+      select case(cld_cpl_opt)
+      case(211) 
+
+         dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
+
+         thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
+                                    - dqldt(:ncol,:pver)* (latvap/cpair)
 
          tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
            state%s(:ncol,:pver) =   state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
 
-      elseif(cld_cpl_opt==FORC_TQ_dsdt) then
+      case(212)
+
+         dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
+
+         ifld = pbuf_get_index('PMID_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, pmid_after_macmic )
+         thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/pmid_after_macmic(:ncol,:pver) )**(rair/cpair) &
+                                    - dqldt(:ncol,:pver)* (latvap/cpair)
+
+         tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
+           state%s(:ncol,:pver) =   state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
+
+      case(213)
+
+         dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
+
+         ifld = pbuf_get_index('PMID_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, pmid_after_macmic )
+         thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/pmid_after_macmic(:ncol,:pver) )**(rair/cpair) !&
+                                  ! - dqldt(:ncol,:pver)* (latvap/cpair)
+
+         tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
+           state%s(:ncol,:pver) =   state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
+
+      case(214)
+
+         dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
+
+         ifld = pbuf_get_index('PMID_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, pmid_after_macmic )
+         thlm_forcing(:ncol,:pver) =   dTdt(:ncol,:pver) * ( p0/pmid_after_macmic(:ncol,:pver) )**(rair/cpair) &
+                                    - dqldt(:ncol,:pver)* (latvap/cpair)
+
 
          ifld = pbuf_get_index( 'S_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
          tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - (state%s(:ncol,:pver)-s_after_macmic(:ncol,:pver))/ztodt/cpair
            state%s(:ncol,:pver) = s_after_macmic(:ncol,:pver)
 
-      end if
+      case(215)
+
+         ifld = pbuf_get_index('THLM_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, thlm_after_macmic )
+
+         thlm_current(:ncol,:pver) =  state%t(:ncol,:pver) * ( p0/state%pmid(:ncol,:pver) )**(rair/cpair) &
+                                    - state%q(:ncol,:pver,ixcldliq)* (latvap/cpair)
+
+         thlm_forcing(:ncol,:pver) = ( thlm_current(:ncol,:pver) - thlm_after_macmic(:ncol,:pver) )/ztodt
+
+         ifld = pbuf_get_index( 'S_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld,  s_after_macmic )
+         tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - (state%s(:ncol,:pver)-s_after_macmic(:ncol,:pver))/ztodt/cpair
+           state%s(:ncol,:pver) = s_after_macmic(:ncol,:pver)
+
+      case default
+         call endrun('set_state_and_tendencies: unrecognized value for cld_cpl_opt')
+      end select
+
+      !-----------------------------------------------
+      ! Revert q, ql in "state" to old values
+      !-----------------------------------------------
+      state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
+      state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
 
       !==================================================================================
       ! u and v: 
@@ -357,6 +394,9 @@ contains
    varname = 'NI_AFT_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
    call cnst_get_ind('NUMICE', ixnumice)
    ptr2d(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+
+   varname = 'PMID_AFT_MACMIC'; call pbuf_get_field(pbuf, pbuf_get_index(trim(varname)), ptr2d)
+   ptr2d(:ncol,:pver) = state%pmid(:ncol,:pver)
 
    ! Save thlm = T* (p0/p)**(Rair/Cpair) - (Lv/Cpair)*ql
 
