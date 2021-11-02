@@ -66,10 +66,11 @@ contains
 
     real(r8), parameter :: rad2deg = 180.0 / SHR_CONST_PI
     type(element_t), pointer :: elem(:)
-    real(r8), allocatable :: tmp(:,:,:)    ! (npsp,nlev,nelemd)
-    real(r8), allocatable :: qtmp(:,:)     ! (npsp*nelemd,nlev)
+    real(r8), allocatable :: tmp(:,:,:)    ! (npsq,nlev,nelemd)
+    real(r8), allocatable :: qtmp(:,:)     ! (npsq*nelemd,nlev)
     real(r8) :: ps(np,np)     
-    logical,  allocatable :: tmpmask(:,:)  ! (npsp,nlev,nelemd) unique grid val
+    logical,  allocatable :: tmpmask(:,:)  ! (npsq,nlev,nelemd) unique grid val
+    real(r8), allocatable :: tmp2d(:,:)    ! (npsq,nelemd)
     real(r8), allocatable :: phis_tmp(:,:) ! (nphys_sq,nelemd)
     integer :: nphys_sq                    ! # of fv physics columns per element
     integer :: ie, k, t
@@ -116,6 +117,8 @@ contains
     end if
     allocate(tmp(npsq,nlev,nelemd))
     tmp = 0.0_r8
+    allocate(tmp2d(npsq,nelemd))
+    tmp2d = 0.0_r8
     allocate(qtmp(npsq*nelemd,nlev))
 
     if (fv_nphys>0) then
@@ -421,11 +424,11 @@ contains
     end if
 
     fieldname = 'PS'
-    tmp(:,1,:) = 0.0_r8
+    tmp2d = 0.0_r8
 
     call t_startf('read_inidat_infld')
     call infld(fieldname, ncid_ini, ncol_name,      &
-         1, npsq, 1, nelemd, tmp(:,1,:), found, gridname=grid_name)
+         1, npsq, 1, nelemd, tmp2d, found, gridname=grid_name)
     call t_stopf('read_inidat_infld')
 
     if(.not. found) then
@@ -436,7 +439,7 @@ contains
     allocate(tmpmask(npsq,nelemd))
     tmpmask = (reshape(ldof, (/npsq,nelemd/)) /= 0)
 
-    if(minval(tmp(:,1,:), mask=tmpmask) < 10000._r8) then
+    if(minval(tmp2d, mask=tmpmask) < 10000._r8) then
        call endrun('Problem reading ps field')
     end if
     deallocate(tmpmask)
@@ -446,7 +449,7 @@ contains
           indx = 1
           do j = 1, np
              do i = 1, np
-                elem(ie)%state%ps_v(i,j,tl) = tmp(indx,1,ie)
+                elem(ie)%state%ps_v(i,j,tl) = tmp2d(indx,ie)
                 if (single_column) elem(ie)%state%ps_v(i,j,tl) = tmp(indx_scm,1,ie_scm)
                 indx = indx + 1
              end do
@@ -455,16 +458,16 @@ contains
 
     read_pg_grid = .false.
     if ( (ideal_phys .or. aqua_planet)) then
-       tmp(:,1,:) = 0._r8
+       tmp2d = 0._r8
        if (fv_nphys > 0) phis_tmp(:,:) = 0._r8
     else    
       fieldname = 'PHIS'
-      tmp(:,1,:) = 0.0_r8
+      tmp2d = 0.0_r8
       if (fv_nphys == 0) then
 
          call t_startf('read_inidat_infld')
          call infld(fieldname, ncid_topo, ncol_name,      &
-              1, npsq, 1, nelemd, tmp(:,1,:), found, gridname=grid_name)
+              1, npsq, 1, nelemd, tmp2d, found, gridname=grid_name)
          call t_stopf('read_inidat_infld')
 
       else
@@ -473,7 +476,7 @@ contains
 
          call t_startf('read_inidat_infld')
          call infld(trim(fieldname) // '_d', ncid_topo, ncol_name, &
-              1, npsq, 1, nelemd, tmp(:,1,:), found, gridname=grid_name)
+              1, npsq, 1, nelemd, tmp2d, found, gridname=grid_name)
          call t_stopf('read_inidat_infld')
 
          if (found) then
@@ -508,8 +511,8 @@ contains
          indx = 1
          do j = 1, np
             do i = 1, np
-               elem(ie)%state%phis(i,j) = tmp(indx,1,ie)
-               if (single_column) elem(ie)%state%phis(i,j) = tmp(indx_scm,1,ie_scm)
+               elem(ie)%state%phis(i,j) = tmp2d(indx,ie)
+               if (single_column) elem(ie)%state%phis(i,j) = tmp2d(indx_scm,ie_scm)
                indx = indx + 1
             end do
          end do
@@ -602,6 +605,7 @@ contains
     end do
 
     deallocate(tmp)
+    deallocate(tmp2d)
 
   end subroutine read_inidat
 
