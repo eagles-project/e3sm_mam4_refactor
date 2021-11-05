@@ -34,6 +34,7 @@ module lnd2atmMod
   use SoilHydrologyType    , only : soilhydrology_type 
   use spmdmod          , only: masterproc
   use elm_varctl     , only : iulog
+  use SedFluxType          , only : sedflux_type
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -140,7 +141,8 @@ contains
        atm2lnd_vars, surfalb_vars, frictionvel_vars, &
        energyflux_vars, &
        solarabs_vars, drydepvel_vars, &
-       vocemis_vars, dust_vars, ch4_vars, soilhydrology_vars, lnd2atm_vars)
+       vocemis_vars, dust_vars, ch4_vars, soilhydrology_vars, &
+       sedflux_vaars, lnd2atm_vars)
     !
     ! !DESCRIPTION:
     ! Compute lnd2atm_vars component of gridcell derived type
@@ -161,7 +163,8 @@ contains
     type(dust_type)        , intent(in)     :: dust_vars
     type(ch4_type)         , intent(in)     :: ch4_vars
     type(soilhydrology_type), intent(in)    :: soilhydrology_vars
-    type(lnd2atm_type)     , intent(inout)  :: lnd2atm_vars
+    type(sedflux_type)     , intent(in)     :: sedflux_vars
+    type(lnd2atm_type)     , intent(inout)  :: lnd2atm_vars 
     !
     ! !LOCAL VARIABLES:
     integer :: g, lvl             ! index
@@ -423,7 +426,6 @@ contains
        tws(g) = tws(g) + atm2lnd_vars%volr_grc(g) / grc_pp%area(g) * 1.e-3_r8
     enddo
 
-
     call c2g( bounds, &
          t_grnd    (bounds%begc:bounds%endc)   , &
          t_grnd_grc(bounds%begg:bounds%endg)   , &
@@ -452,7 +454,11 @@ contains
 
     end do
 
-    end associate
+    call c2g( bounds, &
+         sedflux_vars%sed_yld_col (bounds%begc:bounds%endc), &
+         lnd2atm_vars%qflx_rofmud_grc   (bounds%begg:bounds%endg), &
+         c2l_scale_type= 'urbanf', l2g_scale_type='unity' )
+
   end subroutine lnd2atm
 
 

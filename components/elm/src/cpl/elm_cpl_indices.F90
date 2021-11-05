@@ -32,6 +32,7 @@ module elm_cpl_indices
   integer, public ::index_l2x_Flrl_Tqsur      ! lnd->rtm input surface runoff temperature
   integer, public ::index_l2x_Flrl_Tqsub      ! lnd->rtm input subsurface runoff temperature
   integer, public ::index_l2x_coszen_str      ! lnd->rtm cosine of zenith  
+  integer, public ::index_l2x_Flrl_rofmud     ! lnd->rtm input sediment yield fluxes
   integer, public ::index_l2x_Sl_t            ! temperature
   integer, public ::index_l2x_Sl_tref         ! 2m reference temperature
   integer, public ::index_l2x_Sl_qref         ! 2m reference specific humidity
@@ -180,6 +181,7 @@ contains
     index_l2x_Flrl_Tqsur    = mct_avect_indexra(l2x,'Flrl_Tqsur')
     index_l2x_Flrl_Tqsub    = mct_avect_indexra(l2x,'Flrl_Tqsub')
     index_l2x_coszen_str	= mct_avect_indexra(l2x,'coszen_str')	
+    index_l2x_Flrl_rofmud   = mct_avect_indexra(l2x,'Flrl_rofmud')
     index_l2x_Sl_t          = mct_avect_indexra(l2x,'Sl_t')
     index_l2x_Sl_snowh      = mct_avect_indexra(l2x,'Sl_snowh')
     index_l2x_Sl_avsdr      = mct_avect_indexra(l2x,'Sl_avsdr')
