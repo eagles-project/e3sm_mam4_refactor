@@ -1372,6 +1372,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     use qbo,                only: qbo_relax
     use iondrag,            only: iondrag_calc, do_waccm_ions
     use clubb_intr,         only: clubb_surface
+    use sfc_cpl_opt,        only: sfc_flx_tend
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
@@ -1612,9 +1613,9 @@ if (l_vdiff) then
     !   surface fluxes need to be updated here for constituents 
     if (do_clubb_sgs) then
 
-       call clubb_surface ( state, ptend, ztodt, cam_in, surfric, obklen)
-       
-       ! Update surface flux constituents 
+       call clubb_surface(state, cam_in, surfric, obklen)
+      
+       call sfc_flx_tend(state, cam_in, ptend, ztodt) 
        call physics_update(state, ptend, ztodt, tend)
 
        call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )

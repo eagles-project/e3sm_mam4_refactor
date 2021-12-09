@@ -2597,7 +2597,7 @@ end subroutine clubb_init_cnst
   !                                                                                 !
   ! =============================================================================== !
   
-    subroutine clubb_surface (state, ptend, ztodt, cam_in, ustar, obklen)
+    subroutine clubb_surface (state, cam_in, ustar, obklen)
     
 !-------------------------------------------------------------------------------
 ! Description: Provide the obukov length and the surface friction velocity 
@@ -2628,13 +2628,13 @@ end subroutine clubb_init_cnst
     type(physics_state), intent(in)     :: state                ! Physics state variables
     type(cam_in_t),      intent(in)     :: cam_in
     
-    real(r8),            intent(in)     :: ztodt                ! 2 delta-t        [ s ] 
+  ! real(r8),            intent(in)     :: ztodt                ! 2 delta-t        [ s ] 
 
     ! ---------------- !
     ! Output Auguments !
     ! ---------------- !
     
-    type(physics_ptend), intent(out)    :: ptend                ! Individual parameterization tendencies
+  ! type(physics_ptend), intent(out)    :: ptend                ! Individual parameterization tendencies
     real(r8),            intent(out)    :: obklen(pcols)        ! Obukhov length [ m ]
     real(r8),            intent(out)    :: ustar(pcols)         ! Surface friction velocity [ m/s ]
     
@@ -2653,12 +2653,12 @@ end subroutine clubb_init_cnst
     real(r8) :: kinwat                                          ! kinematic surface vapor flux
     real(r8) :: kbfs                                            ! kinematic surface buoyancy flux
     real(r8) :: tmp1(pcols)
-    real(r8) :: rztodt                                          ! 1./ztodt
+ !  real(r8) :: rztodt                                          ! 1./ztodt
     integer  :: m
     integer  :: ixq
     real(r8) :: rrho                                            ! Inverse air density
     
-    logical  :: lq(pcnst)
+ !  logical  :: lq(pcnst)
 
 #endif
     obklen(pcols) = 0.0_r8
@@ -2672,8 +2672,8 @@ end subroutine clubb_init_cnst
 
     call cnst_get_ind('Q',ixq)
     
-    lq(:) = .TRUE.
-    call physics_ptend_init(ptend, state%psetcols, 'clubb_srf', lq=lq)
+  ! lq(:) = .TRUE.
+  ! call physics_ptend_init(ptend, state%psetcols, 'clubb_srf', lq=lq)
     
     ncol = state%ncol
     
@@ -2691,15 +2691,15 @@ end subroutine clubb_init_cnst
                         kinheat, kinwat, kbfs, obklen(i) )
     enddo
 
-    rztodt                 = 1._r8/ztodt
-    ptend%q(:ncol,:pver,:) = state%q(:ncol,:pver,:)
-    tmp1(:ncol)            = ztodt * gravit * state%rpdel(:ncol,pver)
+ !  rztodt                 = 1._r8/ztodt
+ !  ptend%q(:ncol,:pver,:) = state%q(:ncol,:pver,:)
+ !  tmp1(:ncol)            = ztodt * gravit * state%rpdel(:ncol,pver)
 
-    do m = 2, pcnst
-      ptend%q(:ncol,pver,m) = ptend%q(:ncol,pver,m) + tmp1(:ncol) * cam_in%cflx(:ncol,m)
-    enddo
-    
-    ptend%q(:ncol,:pver,:) = (ptend%q(:ncol,:pver,:) - state%q(:ncol,:pver,:)) * rztodt
+ !  do m = 2, pcnst
+ !    ptend%q(:ncol,pver,m) = ptend%q(:ncol,pver,m) + tmp1(:ncol) * cam_in%cflx(:ncol,m)
+ !  enddo
+ !  
+ !  ptend%q(:ncol,:pver,:) = (ptend%q(:ncol,:pver,:) - state%q(:ncol,:pver,:)) * rztodt
     
     return
 
