@@ -157,7 +157,7 @@ contains
    ! Forcing method 
    !================
   !case (FORC_TQ_dTdt,FORC_TQ_dsdt) 
-   case (211,212,213,214,215) 
+   case (211,212,213,214,215,216) 
 
       !==================================================================================================================
       ! Thlm and rtm in CLUBB correspond to s (T), q, ql in host model.
@@ -178,6 +178,9 @@ contains
 
       rtm_forcing(:ncol,:pver) = dqldt(:ncol,:pver) + dqdt(:ncol,:pver)
 
+      if (cld_cpl_opt==216) then
+      rtm_forcing(:ncol,:pver) = 0._r8
+      end if
       !---------------------------------------
       ! Tendency/forcing calculation for thlm 
       !---------------------------------------
@@ -215,7 +218,7 @@ contains
          tend%dtdt(:ncol,:pver) = tend%dtdt(:ncol,:pver) - dTdt(:ncol,:pver) 
            state%s(:ncol,:pver) =   state%s(:ncol,:pver) - cpair*dTdt(:ncol,:pver)*ztodt
 
-      case(213)
+      case(213,216)
 
          dTdt(:ncol,:pver) = ( state%t(:ncol,:pver) - t_after_macmic(:ncol,:pver) )/ztodt
 
@@ -256,12 +259,6 @@ contains
          call endrun('set_state_and_tendencies: unrecognized value for cld_cpl_opt')
       end select
 
-      !-----------------------------------------------
-      ! Revert q, ql in "state" to old values
-      !-----------------------------------------------
-      state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
-      state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
-
       !==================================================================================
       ! u and v: 
       !==================================================================================
@@ -291,9 +288,19 @@ contains
       lq(ixnumliq) = .TRUE.
       lq(ixnumice) = .TRUE.
 
+      if (cld_cpl_opt==216) then
+         lq(ixq) = .true.
+         lq(ixcldliq) = .true.
+      end if
+
       call physics_ptend_init(ptend_dribble, state%psetcols, 'macmic_dribble_tend', ls=.true., lq=lq)
 
       ptend_dribble%s(:ncol,:pver) = 0._r8
+
+      if (cld_cpl_opt==216) then
+      ptend_dribble%q(:ncol,:pver,ixq)      = (state%q(:ncol,:pver,ixq)      -   q_after_macmic(:ncol,:pver))  / ztodt
+      ptend_dribble%q(:ncol,:pver,ixcldliq) = (state%q(:ncol,:pver,ixcldliq) -  ql_after_macmic(:ncol,:pver))  / ztodt
+      end if
 
       ifld = pbuf_get_index('QI_AFT_MACMIC'); call pbuf_get_field(pbuf, ifld, qi_after_macmic )
       ptend_dribble%q(:ncol,:pver,ixcldice) = (state%q(:ncol,:pver,ixcldice) -  qi_after_macmic(:ncol,:pver))  / ztodt
@@ -310,6 +317,11 @@ contains
       state%q(:ncol,:pver,ixnumliq) = nl_after_macmic(:ncol,:pver)
       state%q(:ncol,:pver,ixnumice) = ni_after_macmic(:ncol,:pver)
 
+      !-----------------------------------------------
+      ! Revert q, ql in "state" to old values
+      !-----------------------------------------------
+      state%q(:ncol,:pver,ixq)      =  q_after_macmic(:ncol,:pver)
+      state%q(:ncol,:pver,ixcldliq) = ql_after_macmic(:ncol,:pver)
 
    case default
       call endrun('set_state_and_tendencies: choice of cld_cpl_opt not yet supported.') 
