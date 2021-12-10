@@ -271,6 +271,7 @@ contains
    use metdata,             only: metdata_readnl
 #endif
    use radiation,           only: radiation_readnl
+   use conditional_diag,    only: cnd_diag_readnl
 
 !---------------------------Arguments-----------------------------------
 
@@ -516,6 +517,9 @@ contains
 #if ( defined OFFLINE_DYN )
    call metdata_readnl(nlfilename)
 #endif
+
+   ! Read conditional diag namelist
+   call cnd_diag_readnl(nlfilename)
 
    ! Read radiation namelist
    call radiation_readnl(nlfilename, dtime_in=dtime)
