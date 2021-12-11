@@ -414,7 +414,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   ! tracer array. If variable is not found on the tracer list, and index value 
   ! of -1 will be returned
 
-  call cnst_get_ind(trim(adjustl(varname)),idx, abort=.false.)  !in, out, in
+  call cnst_get_ind(trim(adjustl(varname)),idx, abrtf=.false.)  !in, out, in
 
   if (idx /= -1) then ! This variable is a tracer field
      arrayout(1:ncol,:) = state%q(1:ncol,:,idx)
@@ -523,40 +523,24 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index('tke')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        case('UPWP')
-            idx = pbuf_get_index('UPWP')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+        case('UPWP','VPWP','WPTHVP','WP2THVP','RTPTHVP','THLPTHVP','THLM','RTM')
+            idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        case('VPWP')
-            idx = pbuf_get_index('VPWP')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+        case('UP2','VP2','WP2','WP3','RTP2','THLP2','WPTHLP','WPRTP','RTPTHLP')
+            idx = pbuf_get_index(trim(adjustl(varname))//'_nadv')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
         ! cloud frations
 
-        case('CLD')
-            idx = pbuf_get_index('CLD')  ; call pbuf_get_field( pbuf, idx, ptr2d )
-            arrayout(:,:) = ptr2d
-
-        case('AST')
-            idx = pbuf_get_index('AST')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+        case('CLD','AST','ALST','AIST','CONCLD')
+            idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
         ! cloud microphysic
 
-        case('DEI')
-            idx = pbuf_get_index('DEI')  ; call pbuf_get_field( pbuf, idx, ptr2d )
-            arrayout(:,:) = ptr2d
-
-        case('DES')
-            idx = pbuf_get_index('DES')  ; call pbuf_get_field( pbuf, idx, ptr2d )
-            arrayout(:,:) = ptr2d
-
-        case('MU')
-            idx = pbuf_get_index('MU')  ; call pbuf_get_field( pbuf, idx, ptr2d )
-            arrayout(:,:) = ptr2d
-
-        case('LAMBDAC')
-            idx = pbuf_get_index('LAMBDAC')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+        case('DEI','DES','MU','LAMBDAC')
+            idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
         !-----------------------------------------------------------
