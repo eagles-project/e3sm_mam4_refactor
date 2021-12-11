@@ -1372,7 +1372,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     use qbo,                only: qbo_relax
     use iondrag,            only: iondrag_calc, do_waccm_ions
     use clubb_intr,         only: clubb_surface
-    use sfc_cpl_opt,        only: sfc_flx_tend
+    use sfc_cpl_opt,        only: cflx_tend
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
@@ -1464,6 +1464,7 @@ subroutine tphysac (ztodt,   cam_in,               &
     real(r8):: zqrs(pcols,pver) ! shortwave heating
     real(r8):: net_flx(pcols)
 
+    integer :: cflx_cpl_opt
     !
     !-----------------------------------------------------------------------
     !
@@ -1481,6 +1482,7 @@ subroutine tphysac (ztodt,   cam_in,               &
                       ,l_ac_energy_chk_out    = l_ac_energy_chk    &
                       ,l_rad_out              = l_rad              &
                       ,radheat_cpl_opt_out    = radheat_cpl_opt    &
+                      ,   cflx_cpl_opt_out    =    cflx_cpl_opt    &
                      )
 
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
@@ -1614,10 +1616,13 @@ if (l_vdiff) then
     if (do_clubb_sgs) then
 
        call clubb_surface(state, cam_in, surfric, obklen)
-      
-       call sfc_flx_tend(state, cam_in, ptend, ztodt) 
-       call physics_update(state, ptend, ztodt, tend)
+     
+       if (cflx_cpl_opt.eq.1) then 
+          call cflx_tend(state, cam_in, ptend) 
+          call physics_update(state, ptend, ztodt, tend)
+       end if
 
+       call cnd_diag_checkpoint( diag, 'CFLX1', state, pbuf, cam_in, cam_out )
        call cnd_diag_checkpoint( diag, 'CFLXAPP', state, pbuf, cam_in, cam_out )
     else
 
@@ -1935,6 +1940,7 @@ subroutine tphysbc (ztodt,                          &
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
     use nudging,         only: Nudge_Model,Nudge_Loc_PhysOut,nudging_calc_tend
     use cld_cpl_utils,   only: set_state_and_tendencies, save_state_snapshot_to_pbuf
+    use sfc_cpl_opt,     only: cflx_tend
 
     implicit none
 
@@ -2123,6 +2129,8 @@ subroutine tphysbc (ztodt,                          &
     real(r8):: zqrs(pcols,pver) ! shortwave heating
     ! Added for revised radiation coupling
 
+    integer :: cflx_cpl_opt
+
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
@@ -2137,6 +2145,7 @@ subroutine tphysbc (ztodt,                          &
                       ,cld_cpl_opt_out        = cld_cpl_opt        &
                       ,dribble_start_step_out = dribble_start_step &
                       ,radheat_cpl_opt_out = radheat_cpl_opt &
+                      ,   cflx_cpl_opt_out =    cflx_cpl_opt &
                       )
   
     !-----------------------------------------------------------------------
@@ -2553,9 +2562,18 @@ end if
             um_forcing(:,:) = 0._r8
             vm_forcing(:,:) = 0._r8
        end if
-       !-----------------------------------------------------------------------------------
-
        call cnd_diag_checkpoint( diag, 'BF_MACMIC', state, pbuf, cam_in, cam_out )
+
+       !-----------------------------------------------------------------------------------
+       ! cflx option 2: isolated sequential splitting with revised sequence 
+
+       if (cflx_cpl_opt.eq.2) then
+          call cflx_tend(state, cam_in, ptend)
+          call physics_update(state, ptend, ztodt)
+       end if
+       call cnd_diag_checkpoint( diag, 'CFLX2', state, pbuf, cam_in, cam_out )
+       !--------------
+
 
        do macmic_it = 1, cld_macmic_num_steps
 
@@ -2567,6 +2585,16 @@ end if
             call physics_update(state, ptend, cld_macmic_ztodt)
 
           end if
+
+          !--------------------------
+          ! cflx option 3: dribbling
+
+          if (cflx_cpl_opt.eq.3) then
+             call cflx_tend(state, cam_in, ptend)
+             call physics_update(state, ptend, cld_macmic_ztodt)
+          end if
+          call cnd_diag_checkpoint( diag, 'CFLX3_'//char_macmic_it, state, pbuf, cam_in, cam_out )
+          !--------------
 
           if (micro_do_icesupersat) then 
 

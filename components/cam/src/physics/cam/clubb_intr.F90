@@ -2613,7 +2613,7 @@ end subroutine clubb_init_cnst
 !   None
 !-------------------------------------------------------------------------------
 
-    use physics_types,          only: physics_state, physics_ptend, physics_ptend_init
+    use physics_types,          only: physics_state !, physics_ptend, physics_ptend_init
     use physconst,              only: gravit, zvir, latvap
     use ppgrid,                 only: pver, pcols
     use constituents,           only: pcnst, cnst_get_ind
