@@ -555,7 +555,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
         ! Misc. cloud microphysics quantities
 
-        case('DEI','DES','MU','LAMBDAC')
+        case('AWNC','AWNI','FREQL','FREQI',  'DEI','DES','MU','LAMBDAC' )
+
             idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 

@@ -175,6 +175,8 @@ integer :: &
    ls_flxsnw_idx,      &
    relvar_idx,         &
    cmeliq_idx,         &
+   awnc_idx,freql_idx, &
+   awni_idx,freqi_idx, &
    accre_enhan_idx
 
 ! Fields needed as inputs to COSP
@@ -576,6 +578,11 @@ subroutine micro_mg_cam_register
      call pbuf_add_field('NSNOW',   'global',dtype_r8,(/pcols,pver/), nsnow_idx)
   end if
    
+  ! Adding variables to pbuf so that CondiDiag can track their evolution within a time step
+  call pbuf_add_field('AWNC', 'global',dtype_r8,(/pcols,pver/), awnc_idx)
+  call pbuf_add_field('AWNI', 'global',dtype_r8,(/pcols,pver/), awni_idx)
+  call pbuf_add_field('FREQL','global',dtype_r8,(/pcols,pver/), freql_idx)
+  call pbuf_add_field('FREQI','global',dtype_r8,(/pcols,pver/), freqi_idx)
 
 end subroutine micro_mg_cam_register
 
@@ -1414,10 +1421,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    ! Averaging arrays for effective radius and number....
    real(r8) :: efiout_grid(pcols,pver)
    real(r8) :: efcout_grid(pcols,pver)
-   real(r8) :: ncout_grid(pcols,pver)
-   real(r8) :: niout_grid(pcols,pver)
-   real(r8) :: freqi_grid(pcols,pver)
-   real(r8) :: freql_grid(pcols,pver)
+   real(r8), pointer :: ncout_grid(:,:)
+   real(r8), pointer :: niout_grid(:,:)
+   real(r8), pointer :: freqi_grid(:,:)
+   real(r8), pointer :: freql_grid(:,:)
 
    real(r8) :: cdnumc_grid(pcols)           ! Vertically-integrated droplet concentration
    real(r8) :: icimrst_grid_out(pcols,pver) ! In stratus ice mixing ratio
@@ -2865,6 +2872,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    ! --------------------- !
    ! History Output Fields !
    ! --------------------- !
+   call pbuf_get_field(pbuf, awnc_idx, ncout_grid)
+   call pbuf_get_field(pbuf, awni_idx, niout_grid)
+   call pbuf_get_field(pbuf, freql_idx,freql_grid)
+   call pbuf_get_field(pbuf, freqi_idx,freqi_grid)
 
    ! Column droplet concentration
    cdnumc_grid(:ngrdcol) = sum(nc_grid(:ngrdcol,top_lev:pver) * &
@@ -2873,10 +2884,12 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    ! Averaging for new output fields
    efcout_grid      = 0._r8
    efiout_grid      = 0._r8
+
    ncout_grid       = 0._r8
    niout_grid       = 0._r8
    freql_grid       = 0._r8
    freqi_grid       = 0._r8
+
    icwmrst_grid_out = 0._r8
    icimrst_grid_out = 0._r8
 
