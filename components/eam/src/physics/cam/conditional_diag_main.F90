@@ -531,13 +531,29 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index(trim(adjustl(varname))//'_nadv')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        ! cloud frations
+        ! Total cloud frations (stratiform + deep convection).
+        ! CLD is a pbuf variable. CLOUD is a history output variable which gets its value from CLD.
 
-        case('CLD','AST','ALST','AIST','CONCLD')
+        case('CLD','CLOUD')
+            idx = pbuf_get_index('AST')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
+        ! Stratiform liquid/ice cloud fraction and deep convection.
+
+        case('ALST','AIST','CONCLD')
             idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
-        ! cloud microphysic
+        ! Stratiform cloud fractions. 
+        ! AST is a pbuf variable name; liqcldf and icecldf are two variables used 
+        ! for calculating in-cloud properties in subroutine micro_mg_cam_tend (where 
+        ! they get their values from AST)
+
+        case('AST','liqcldf','icecldf')
+            idx = pbuf_get_index('AST')  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
+        ! Misc. cloud microphysics quantities
 
         case('DEI','DES','MU','LAMBDAC')
             idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
