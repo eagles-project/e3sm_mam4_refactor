@@ -229,8 +229,8 @@ qoi_chkpt   = 'CLDMIC01',
               'CLDMIC06',
 !
 !
-qoi_name = 'UP2','VP2','WP2','WP3','CLD'
-qoi_nver =  72,   72,   72,   72,   72
+qoi_name = 'UP2','VP2','WP2','WP3','CLD','NUMLIQ','NUMICE','num_a1','num_a2','num_a3','num_a4'
+qoi_nver =  72,   72,   72,   72,   72,   72,      72,     72,      72,      72,      72
 !
 l_output_state = .true.
 l_output_incrm = .false.
