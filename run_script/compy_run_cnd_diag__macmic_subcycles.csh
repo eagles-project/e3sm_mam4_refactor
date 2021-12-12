@@ -20,16 +20,6 @@ setenv BRANCH zhan391/atm/e3sm_cond_diag_ec03cdd285
 if ($fetch_code > 0) then
 
    cd ${CODE_ROOT}
- # git git@github.com:E3SM-Project/E3SM.git $CCSM_TAG
-
- # # Setup git hooks
- # rm -rf .git/hooks
- # git clone git@github.com:E3SM-Project/E3SM-Hooks.git .git/hooks
- # git config commit.template .git/hooks/commit.template
- # git checkout ${BRANCH}
- # # Bring in all submodule components
- # git submodule update --init --recursive
-
    git clone -b ${BRANCH} --recursive git@github.com:E3SM-Project/E3SM.git ${CCSM_TAG}
 
 endif
@@ -150,7 +140,7 @@ if ($compile_model > 0 || $run_model > 0) then
    cd $CASE_ROOT
 
 #  ./xmlchange -file env_build.xml -id DEBUG       -val 'TRUE'
-#  ./xmlchange -file env_build.xml -id PIO_VERSION -val '1'
+   ./xmlchange -file env_build.xml -id PIO_VERSION -val '1'
 
 
    if ($compile_model > 0) then # Build the model
@@ -189,7 +179,6 @@ cd $CASE_ROOT
 if ( $RESUBMIT > 0 ) then
   ./xmlchange  -file env_run.xml  -id  RESUBMIT           -val $RESUBMIT
 endif 
- 
 if ( $MODEL_START_TYPE  == "initial" ) then
 
   ./xmlchange  -file env_run.xml  -id  RUN_TYPE           -val 'startup'
@@ -220,7 +209,7 @@ cat <<EOF >! user_nl_eam
 !...................
 ! conditional diag
 !...................
-metric_name    = 'ALL',
+metric_name = 'ALL',
 qoi_chkpt   = 'CLDMIC01',
               'CLDMIC02',
               'CLDMIC03',
@@ -228,9 +217,8 @@ qoi_chkpt   = 'CLDMIC01',
               'CLDMIC05',
               'CLDMIC06',
 !
-!
-qoi_name = 'UP2','VP2','WP2','WP3','CLD','NUMLIQ','NUMICE','num_a1','num_a2','num_a3','num_a4'
-qoi_nver =  72,   72,   72,   72,   72,   72,      72,     72,      72,      72,      72
+qoi_name = 'UP2','VP2','WP2','WP3','CLOUD','FREQL','AWNC','CCN3','num_a1','num_a2','num_a3','num_a4'
+qoi_nver =  72,   72,   72,   72,   72,     72,     72,     72,      72,      72,      72,   72
 !
 l_output_state = .true.
 l_output_incrm = .false.

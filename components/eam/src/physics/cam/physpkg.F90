@@ -46,6 +46,7 @@ module physpkg
                                     modal_aero_calcsize_reg
   use modal_aero_wateruptake, only: modal_aero_wateruptake_init, &
                                     modal_aero_wateruptake_reg
+  use ndrop,                  only: psat
 
   implicit none
   private
@@ -59,6 +60,7 @@ module physpkg
   integer ::  cldiceini_idx      = 0 
   integer ::  static_ener_ac_idx = 0
   integer ::  water_vap_ac_idx   = 0
+  integer ::  ccn_idx            = 0
 
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
@@ -256,6 +258,9 @@ subroutine phys_register
           call modal_aero_calcsize_reg()
           call modal_aero_wateruptake_reg()
        endif
+
+       ! Add variables to pbuf so that CondiDiag can track their evolution within a time step
+       call pbuf_add_field('CCN','global',dtype_r8,(/pcols,pver,psat/), ccn_idx)
 
        ! register chemical constituents including aerosols ...
        call chem_register(species_class)

@@ -387,7 +387,8 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
   use time_manager,   only: get_nstep
   use constituents,   only: cnst_get_ind, pcnst, sflxnam
   use misc_diagnostics
-  use wv_saturation, only: qsat_water
+  use wv_saturation,  only: qsat_water
+  use ndrop,          only: psat
 
   real(r8),           intent(out)   :: arrayout(:,:)
   character(len=*),   intent(in)    :: varname
@@ -403,10 +404,13 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
 
   character(len=*),parameter :: subname = 'conditional_diag_main:get_values'
 
+  character(len=:), allocatable :: var_requested
+  integer :: iccn
+
   integer :: ncol, idx, m
 
   ncol = state%ncol
-
+  
   !--------------------------------------------------------------------------------
   ! If the requested variable is one of the advected tracers, get it from state%q
   !--------------------------------------------------------------------------------
@@ -510,11 +514,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         case('NETSW')
            arrayout(1:ncol,1) = cam_out%netsw(1:ncol)
 
-        !----------
-        ! pbuf
-        !----------
-        ! PBL/turbulence
-
+        !---------------------------------------------------------------------------
+        ! From pbuf: PBL/turbulence
+        !---------------------------------------------------------------------------
         case('PBLH')
             idx = pbuf_get_index('pblh') ; call pbuf_get_field( pbuf, idx, ptr1d )
             arrayout(:,1) = ptr1d
@@ -531,6 +533,9 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
             idx = pbuf_get_index(trim(adjustl(varname))//'_nadv')  ; call pbuf_get_field( pbuf, idx, ptr2d )
             arrayout(:,:) = ptr2d
 
+        !---------------------------------------------------------------------------
+        ! From pbuf: cloud microphysics
+        !---------------------------------------------------------------------------
         ! Total cloud frations (stratiform + deep convection).
         ! CLD is a pbuf variable. CLOUD is a history output variable which gets its value from CLD.
 
@@ -556,14 +561,28 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         ! Misc. cloud microphysics quantities
 
         case('AWNC','AWNI','FREQL','FREQI',  'DEI','DES','MU','LAMBDAC' )
-
             idx = pbuf_get_index(trim(adjustl(varname)))  ; call pbuf_get_field( pbuf, idx, ptr2d )
+            arrayout(:,:) = ptr2d
+
+        !---------------------------------------------------------------------------
+        ! From pbuf: CCN diagnosed in subroutine ndropmixnuc in ndrop.F90
+        !---------------------------------------------------------------------------
+        ! CCN at various supersaturation values are packed in one 3D array in pbuf.
+        ! So, we need to first clarify which CCN is requested, and then retrieve it.
+
+        case('CCN1','CCN2','CCN3','CCN4','CCN5','CCN6')
+
+            var_requested = trim(adjustl(varname))
+            read(var_requested(4:4),'(i1)') iccn 
+            if (iccn>psat) call endrun(subname//': unsupported varname - '//trim(varname))
+
+            idx = pbuf_get_index('CCN')  
+            call pbuf_get_field( pbuf, idx, ptr2d, start=(/1,1,iccn/), kount=(/pcols,pver,1/) )
             arrayout(:,:) = ptr2d
 
         !-----------------------------------------------------------
         ! physical quantities that need to be calculated on the fly 
         !-----------------------------------------------------------
-
         case ('QSATW')
           call qsat_water( state%t(:ncol,:), state%pmid(:ncol,:), &! in
                                tmp(:ncol,:),   arrayout(:ncol,:)  )! out
@@ -609,7 +628,7 @@ subroutine get_values( arrayout, varname, state, pbuf, cam_in, cam_out )
         !   arrayout(1:ncol,1) = state%lon(1:ncol)
 
         case default
-           call endrun(subname//': unknow varname - '//trim(varname))
+           call endrun(subname//': unknown varname - '//trim(varname))
         end select
 
      end if !whether the requested variable is the surface flux of a tracer

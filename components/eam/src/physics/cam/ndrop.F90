@@ -37,6 +37,7 @@ private
 save
 
 public ndrop_init, dropmixnuc, activate_modal
+public psat
 
 real(r8), allocatable :: alogsig(:)     ! natl log of geometric standard dev of aerosol
 real(r8), allocatable :: exp45logsig(:)
@@ -292,8 +293,6 @@ subroutine ndrop_init
      end do
    endif
 
-
-
 end subroutine ndrop_init
 
 !===============================================================================
@@ -429,6 +428,9 @@ subroutine dropmixnuc( &
    real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
    integer :: ccn3d_idx  
    real(r8), pointer :: ccn3d(:, :) 
+
+   integer :: ccn_idx    = -1
+   real(r8), pointer :: ccn_in_pbuf(:,:,:)
 
 !+++ AeroCOM IND3 output
    real(r8) :: ccn3col(pcols), ccn4col(pcols)
@@ -1096,6 +1098,13 @@ subroutine dropmixnuc( &
    do l = 1, psat
       call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
    enddo
+
+   !--- save ccn values to pbuf for CondiDiag ---
+
+   ccn_idx = pbuf_get_index('CCN')
+   call pbuf_get_field(pbuf, ccn_idx, ccn_in_pbuf)
+   ccn_in_pbuf(:ncol,:,:) = ccn(:ncol,:,:)
+   !---
 
    if(do_aerocom_ind3) then 
       ccn3d(:ncol, :) = ccn(:ncol, :, 4)

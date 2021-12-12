@@ -1,3 +1,14 @@
+;-------------------------------------------------------------------------
+; Plot zonal averages of CondiDiag output.
+; One QoI on each page. First panel shows the QoI at checkpoint CLDMIC01.
+; Other panels show differences between two adjacent checkpoints.
+; Before running this script, make sure you have remapped the E3SM output 
+; to lat-lon grid, e.g., using the script remap_to_latlon.bash in the 
+; same directory.
+;-------------------------------------------------------------------------
+; Hui Wan (2021-12-11)
+;-------------------------------------------------------------------------
+
 begin
 
   daytag = "05"
@@ -6,7 +17,7 @@ begin
   data_path = "/compyfs/wanh895/scidac_scratch/macmic_subcycles_compy_F2010_ne30pg2_r05_oECv3_CondiDiag_for_MichaelBrunke/run/"
   data_file = "macmic_subcycles_compy_F2010_ne30pg2_r05_oECv3_CondiDiag_for_MichaelBrunke.eam.h0.0001-01-"+daytag+"-00000.latlon.nc"
 
-  QoIs      = (/"CLD","UP2","VP2","WP2","WP3","NUMLIQ","NUMICE","num_a1","num_a2","num_a3","num_a4"/)
+  QoIs      = (/"CLOUD","FREQL","AWNC","CCN3","UP2","VP2","WP2","WP3","num_a1","num_a2","num_a3","num_a4"/)
   chkpts    = (/"CLDMIC01","CLDMIC02","CLDMIC03","CLDMIC04","CLDMIC05","CLDMIC06"/)
   cndprefix = "cnd01" 
 
@@ -53,6 +64,7 @@ begin
      resp = True
      resp@gsnMaximize = True
      gsn_panel(wks, plot,(/3,2/),resp)
+
   end do
 
  
