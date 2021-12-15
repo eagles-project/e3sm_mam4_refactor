@@ -530,7 +530,6 @@ contains
       ! package. Also move most of this to cospsimulator package to handle itself,
       ! rather than relying on radiation driver handling this logic. Too much
       ! duplicate code.
-      !if (docosp) call cospsimulator_intr_init()
       if (docosp) then
          ! Initialization for the simulator package.
          call cospsimulator_intr_init
@@ -1152,7 +1151,6 @@ contains
 
       ! Radiative fluxes
       type(fluxes_t) :: fluxes_allsky, fluxes_clrsky
-      !type(fluxes_t) :: fluxes_allsky, fluxes_clrsky
 
       ! Zero-array for cloud properties if not diagnosed by microphysics
       real(r8), target, dimension(pcols,pver) :: zeros
