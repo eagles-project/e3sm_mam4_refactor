@@ -1068,7 +1068,11 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phy
           call t_stopf ('diag_physvar_ic')
 
           call tphysbc (ztodt, fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c), phys_state(c),        &
+<<<<<<< HEAD
                        phys_tend(c), phys_buffer_chunk,  fsds(1,c),                       &
+=======
+                       phys_tend(c), phys_buffer_chunk, phys_diag(c), fsds(1,c), landm(1,c),     &
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
                        sgh(1,c), sgh30(1,c), cam_out(c), cam_in(c) )
 
           call system_clock(count=end_chnk_cnt, count_rate=sysclock_rate, count_max=sysclock_max)
@@ -1885,7 +1889,11 @@ end subroutine tphysac
 
 subroutine tphysbc (ztodt,               &
        fsns,    fsnt,    flns,    flnt,    state,   &
+<<<<<<< HEAD
        tend,    pbuf,     fsds,   diag,    &
+=======
+       tend,    pbuf,    diag,    fsds,    landm,   &
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
        sgh, sgh30, cam_out, cam_in )
     !----------------------------------------------------------------------- 
     ! 
@@ -2437,8 +2445,11 @@ if (l_tracer_aero) then
     
 end if
 
+<<<<<<< HEAD
     call cnd_diag_checkpoint( diag, 'CARMA', state, pbuf, cam_in, cam_out )
 
+=======
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
     if( microp_scheme == 'RK' ) then
 
      if (l_st_mac.or.l_st_mic) then
@@ -2548,7 +2559,11 @@ end if
              ! =====================================================  
    
              call clubb_tend_cam(state,ptend,pbuf,diag,cld_macmic_ztodt,&
+<<<<<<< HEAD
                 cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+=======
+                cmfmc, cam_in, cam_out, sgh30, macmic_it, cld_macmic_num_steps, &
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
                 dlf, det_s, det_ice, lcldo)
 
                 !  Since we "added" the reserved liquid back in this routine, we need 

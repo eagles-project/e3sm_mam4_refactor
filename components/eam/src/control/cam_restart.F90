@@ -413,9 +413,13 @@ end subroutine restart_printopts
    ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
    call ref_pres_init()
 
+<<<<<<< HEAD
    call t_startf('read_restart_physics')
    call read_restart_physics( File, cam_in, cam_out, pbuf2d, phys_diag )
    call t_stopf('read_restart_physics')
+=======
+   call read_restart_physics( File, cam_in, cam_out, pbuf2d, phys_diag )
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
 
    if (nlres .and. .not.lbrnch) then
       call t_startf('read_restart_history')

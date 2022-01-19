@@ -172,9 +172,13 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
 
    else
 
+<<<<<<< HEAD
       call t_startf('cam_read_restart')
       call cam_read_restart ( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, phys_diag, stop_ymd, stop_tod, NLFileName=filein )
       call t_stopf('cam_read_restart')
+=======
+      call cam_read_restart ( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, phys_diag, stop_ymd, stop_tod, NLFileName=filein )
+>>>>>>> ddf5034cbd086ec17f42186ecd00d2b1e083fb0e
 
      ! Commented out the hub2atm_alloc call as it overwrite cam_in, which is undesirable. The fields in cam_in are necessary for getting BFB restarts
 	 ! There are no side effects of commenting out this call as this call allocates cam_in and cam_in allocation has already been done in cam_init
