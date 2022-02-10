@@ -38,8 +38,10 @@ CONTAINS
 subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
                         pmid    ,aer_lw_abs,cld       ,tauc_lw,       &
                         qrl     ,qrlc      ,                          &
-                        flns    ,flnt      ,flnsc     ,flntc  ,flwds, &
-                        flut    ,flutc     ,fnl       ,fcnl   ,fldsc,clm_rand_seed, &
+                        flns    ,flnt      ,flntoa    ,               &
+                        flnsc   ,flntc     ,flntoac   ,flwds  ,       &
+                        fldt    ,fldtoa    ,                          &
+                        flut    ,flutoa    ,flutc     ,fnl       ,fcnl   ,fldsc,clm_rand_seed, &
                         lu      ,ld        )
 
 !-----------------------------------------------------------------------
@@ -76,9 +78,14 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    real(r8), intent(out) :: qrlc(pcols,pver)     ! Clearsky longwave heating rate
    real(r8), intent(out) :: flns(pcols)          ! Surface cooling flux
    real(r8), intent(out) :: flnt(pcols)          ! Net outgoing flux
+   real(r8), intent(out) :: flntoa(pcols)        ! Net outgoing flux at top of atmosphere
+   real(r8), intent(out) :: fldt(pcols)          ! Downwelling flux
+   real(r8), intent(out) :: fldtoa(pcols)        ! Downwelling flux at top of atmosphere
    real(r8), intent(out) :: flut(pcols)          ! Upward flux at top of model
+   real(r8), intent(out) :: flutoa(pcols)        ! Upward flux at top of atmosphere
    real(r8), intent(out) :: flnsc(pcols)         ! Clear sky surface cooing
    real(r8), intent(out) :: flntc(pcols)         ! Net clear sky outgoing flux
+   real(r8), intent(out) :: flntoac(pcols)       ! Net clear sky outgoing flux at top of atmosphere
    real(r8), intent(out) :: flutc(pcols)         ! Upward clear-sky flux at top of model
    real(r8), intent(out) :: flwds(pcols)         ! Down longwave flux at surface
    real(r8), intent(out) :: fldsc(pcols)         ! Down longwave clear flux at surface
@@ -243,8 +250,13 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    flnsc(:ncol) = uflxc(:ncol,1) - dflxc(:ncol,1)
    flnt(:ncol)  = uflx (:ncol,rrtmg_levs) - dflx (:ncol,rrtmg_levs)
    flntc(:ncol) = uflxc(:ncol,rrtmg_levs) - dflxc(:ncol,rrtmg_levs)
+   flntoa(:ncol)  = uflx (:ncol,rrtmg_levs+1) - dflx (:ncol,rrtmg_levs+1)
+   flntoac(:ncol) = uflxc(:ncol,rrtmg_levs+1) - dflxc(:ncol,rrtmg_levs+1)
    flut(:ncol)  = uflx (:ncol,rrtmg_levs)
+   flutoa(:ncol)  = uflx (:ncol,rrtmg_levs+1)
    flutc(:ncol) = uflxc(:ncol,rrtmg_levs)
+   fldt(:ncol)  = dflx (:ncol,rrtmg_levs)
+   fldtoa(:ncol)  = dflx (:ncol,rrtmg_levs+1)
 
    !
    ! Reverse vertical indexing here for CAM arrays to go from top to bottom.

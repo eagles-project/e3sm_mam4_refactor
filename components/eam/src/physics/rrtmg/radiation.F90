@@ -699,12 +699,22 @@ end function radiation_nextsw_cday
                       sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLNT'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at top of model', &
                       sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FLNTOA'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLUT'//diag(icall), horiz_only,    'A',    'W/m2', 'Upwelling longwave flux at top of model', &
                       sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLUTC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky upwelling longwave flux at top of model', &
                       sampling_seq='rad_lwsw', flag_xyfill=.true., &
                       standard_name='toa_outgoing_longwave_flux_assuming_clear_sky')
           call addfld('FLNTC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky net longwave flux at top of model', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FLNTOAC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky net longwave flux at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FLUTOA'//diag(icall), horiz_only,    'A',    'W/m2', 'Upwelling longwave flux at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FLDT'//diag(icall), horiz_only,    'A',    'W/m2', 'Downwelling longwave flux at top of model', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FLDTOA'//diag(icall), horiz_only,    'A',    'W/m2', 'Downwelling longwave flux at top of atmosphere', &
                       sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('LWCF'//diag(icall), horiz_only,    'A',    'W/m2', 'Longwave cloud forcing', &
                       sampling_seq='rad_lwsw', flag_xyfill=.true., &
@@ -1002,10 +1012,15 @@ end function radiation_nextsw_cday
     real(r8) fsnsc(pcols)         ! Clear sky surface abs solar flux
     real(r8) fsdsc(pcols)         ! Clear sky surface downwelling solar flux
     real(r8) flut(pcols)          ! Upward flux at top of model
+    real(r8) fldt(pcols)          ! Downward flux at top of model
+    real(r8) fldtoa(pcols)        ! Downward flux at top of atmosphere
+    real(r8) flutoa(pcols)        ! Upward flux at top of atmosphere
     real(r8) lwcf(pcols)          ! longwave cloud forcing
     real(r8) swcf(pcols)          ! shortwave cloud forcing
     real(r8) flutc(pcols)         ! Upward Clear Sky flux at top of model
+    real(r8) flntoa(pcols)        ! Net lw flux at top of atmosphere
     real(r8) flntc(pcols)         ! Clear sky lw flux at model top
+    real(r8) flntoac(pcols)       ! Clear sky lw flux at top of atmosphere
     real(r8) flnsc(pcols)         ! Clear sky lw flux at srf (up-down)
     real(r8) fldsc(pcols)         ! Clear sky lw flux at srf (down)
     real(r8) fln200(pcols)        ! net longwave flux interpolated to 200 mb
@@ -1464,8 +1479,10 @@ end function radiation_nextsw_cday
                        lchnk,        ncol,         num_rrtmg_levs,  r_state,                     &
                        state%pmid,   aer_lw_abs,   cldfprime,       c_cld_lw_abs,                &
                        qrl,          qrlc,                                                       &
-                       flns,         flnt,         flnsc,           flntc,        cam_out%flwds, &
-                       flut,         flutc,        fnl,             fcnl,         fldsc,         &
+                       flns,         flnt,         flntoa,                                       &
+                       flnsc,        flntc,        flntoac,         cam_out%flwds,               &
+                       fldt ,        fldtoa,                                                     &
+                       flut,         flutoa,       flutc,        fnl,             fcnl,         fldsc,         &
                        clm_seed,     lu,           ld                                            )
                   call t_stopf ('rad_rrtmg_lw')
 
@@ -1481,8 +1498,13 @@ end function radiation_nextsw_cday
                   call outfld('QRLC'//diag(icall),qrlc(:ncol,:)/cpair,ncol,lchnk)
                   call outfld('FLNT'//diag(icall),flnt  ,pcols,lchnk)
                   call outfld('FLUT'//diag(icall),flut  ,pcols,lchnk)
-                  call outfld('FLUTC'//diag(icall),flutc ,pcols,lchnk)
+                  call outfld('FLUTOA'//diag(icall),flutoa  ,pcols,lchnk)
+                  call outfld('FLDT'//diag(icall),fldt  ,pcols,lchnk)
+                  call outfld('FLDTOA'//diag(icall),fldtoa  ,pcols,lchnk)
+                  call outfld('FLNTOA'//diag(icall),flntoa  ,pcols,lchnk)
                   call outfld('FLNTC'//diag(icall),flntc ,pcols,lchnk)
+                  call outfld('FLUTC'//diag(icall),flutc ,pcols,lchnk)
+                  call outfld('FLNTOAC'//diag(icall),flntoac ,pcols,lchnk)
                   call outfld('FLNS'//diag(icall),flns  ,pcols,lchnk)
                   
                   call outfld('FLDSC'//diag(icall),fldsc ,pcols,lchnk)
