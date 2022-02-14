@@ -334,11 +334,7 @@ MODULE MOSART_physics_mod
           end if
        enddo
        
-<<<<<<< HEAD
        if (Tctl%RoutingMethod == 2 ) then
-=======
-       if (Tctl%RoutingMethod == 4 ) then
->>>>>>> ELM and MOSART changes for sediment transport
           ! retrieve water depth in downstream channels
           call mct_aVect_zero(avsrc_dnstrm)
           cnt = 0
@@ -373,8 +369,6 @@ MODULE MOSART_physics_mod
              enddo
           enddo
 
-<<<<<<< HEAD
-=======
           ! retrieve concentration of BGC in downstream channels
           call mct_aVect_zero(avsrc_dnstrm)
           cnt = 0
@@ -394,7 +388,6 @@ MODULE MOSART_physics_mod
              end do
           enddo
 
->>>>>>> ELM and MOSART changes for sediment transport
           ! retrieve total inflow in downstream channels
           call mct_aVect_zero(avsrc_dnstrm)
           cnt = 0
@@ -435,31 +428,13 @@ MODULE MOSART_physics_mod
        if (TUnit%euler_calc(nt)) then
        do iunit=rtmCTL%begr,rtmCTL%endr
           if(TUnit%mask(iunit) > 0) then
-<<<<<<< HEAD
-=======
                                                                           
->>>>>>> ELM and MOSART changes for sediment transport
              temp_erout = 0._r8
              temp_haout = 0._r8
              temp_Tr = 0._r8
              if(Tctl%RoutingMethod==1) then  ! local stepping method only applicable for kinamatic wave routing method
                  numSubSteps = TUnit%numDT_r(iunit)
                  localDeltaT = Tctl%DeltaT/Tctl%DLevelH2R/numSubSteps
-<<<<<<< HEAD
-                 do k=1,numSubSteps
-                    call mainchannelRouting(iunit,nt,localDeltaT)    
-                    TRunoff%wr(iunit,nt) = TRunoff%wr(iunit,nt) + TRunoff%dwr(iunit,nt) * localDeltaT
-                    !! check for negative channel storage
-                    !if(TRunoff%wr(iunit,1) < -1.e-10) then
-                    !   write(iulog,*) 'Negative channel storage! ', iunit, TRunoff%wr(iunit,1), TRunoff%erin(iunit,1), TRunoff%erout(iunit,1), rtmCTL%nUp(iunit)
-                    !   call shr_sys_abort('mosart: negative channel storage')
-                    !end if
-                    call UpdateState_mainchannel(iunit,nt)
-                    temp_erout = temp_erout + TRunoff%erout(iunit,nt) ! erout here might be inflow to some downstream subbasin, so treat it differently than erlateral
-                 end do
-             elseif(Tctl%RoutingMethod==2) then ! diffusion wave routing method
-                 numSubSteps = 20 ! now set as 20, could be adjusted as needed.
-=======
                  TRunoff%rslp_energy(iunit) = TUnit%rslp(iunit)
                  do k=1,numSubSteps
                     call mainchannelRouting(iunit,nt,localDeltaT)    
@@ -472,26 +447,17 @@ MODULE MOSART_physics_mod
                     call UpdateState_mainchannel(iunit,nt)
                     temp_erout = temp_erout + TRunoff%erout(iunit,nt) ! erout here might be inflow to some downstream subbasin, so treat it differently than erlateral
                  end do
-             elseif(Tctl%RoutingMethod==4) then
-                 numSubSteps = 1 
->>>>>>> ELM and MOSART changes for sediment transport
+             elseif(Tctl%RoutingMethod==2) then
+                 numSubSteps = 20 ! now set as 20, could be adjusted as needed. (base kept TZ)
                  localDeltaT = Tctl%DeltaT/Tctl%DLevelH2R/numSubSteps
                  TRunoff%rslp_energy(iunit) = CRRSLP(iunit)
                  do k=1,numSubSteps
                     call Leapfrog(iunit,nt,localDeltaT)  ! note updating wr and other states are done in Leapfrog
-<<<<<<< HEAD
-                    !! check for negative channel storage
-                    !if(TRunoff%wr(iunit,1) < -1.e-10) then
-                    !   write(iulog,*) 'Negative channel storage! ', iunit, TRunoff%wr(iunit,1), TRunoff%erin(iunit,1), TRunoff%erout(iunit,1), rtmCTL%nUp(iunit)
-                    !   call shr_sys_abort('mosart: negative channel storage')
-                    !end if
-=======
                     ! check for negative channel storage
                     if(TRunoff%wr(iunit,1) < -1.e-10) then
                        write(iulog,*) 'Negative channel storage! ', iunit, TRunoff%wr(iunit,1), TRunoff%erin(iunit,1), TRunoff%erout(iunit,1), rtmCTL%nUp(iunit)
                        call shr_sys_abort('mosart: negative channel storage')
                     end if
->>>>>>> ELM and MOSART changes for sediment transport
                     temp_erout = temp_erout + TRunoff%erout(iunit,nt) ! erout here might be inflow to some downstream subbasin, so treat it differently than erlateral
                  end do
              end if
@@ -572,7 +538,6 @@ MODULE MOSART_physics_mod
 
        end do ! iunit
        endif  ! euler_calc
-<<<<<<< HEAD
        end do ! nt       
        if (inundflag) then
             ! Channel -- floodplain exchange computation :      
@@ -593,8 +558,6 @@ MODULE MOSART_physics_mod
             ! Aggregate net floodplain storage change from subcycle to timestep 
               TRunoff%se_rf = TRunoff%se_rf + TRunoff%netchange
         end if                   
-=======
-       end do ! nt
        !! the treatment of mud and san is special since these two are interacting with each other
        !do nt=nmud,nt_nsan ! sediment transport
        if (sediflag .and. TUnit%euler_calc(nt_nmud)) then
@@ -618,7 +581,7 @@ MODULE MOSART_physics_mod
                     TRunoff%erexchange(iunit,nt_nmud) = TRunoff%erexchange(iunit,nt_nmud) + TSedi%ermb_r(iunit)
                     TRunoff%erexchange(iunit,nt_nsan) = TRunoff%erexchange(iunit,nt_nsan) + TSedi%ersb_r(iunit)
                  end do
-             elseif(Tctl%RoutingMethod==4) then
+             elseif(Tctl%RoutingMethod==2) then
                  numSubSteps = 1
                  localDeltaT = Tctl%DeltaT/Tctl%DLevelH2R/numSubSteps
                  do k=1,numSubSteps
@@ -669,7 +632,6 @@ MODULE MOSART_physics_mod
        end do ! iunit
        endif  ! euler_calc
 
->>>>>>> ELM and MOSART changes for sediment transport
        negchan = min(negchan, minval(TRunoff%wr(:,:)))
        call t_stopf('mosartr_chanroute') 
     end do  ! DLevelH2R
@@ -971,55 +933,6 @@ MODULE MOSART_physics_mod
        TRunoff%vr(iunit,nt) = 0._r8
        TRunoff%erout(iunit,nt) = -TRunoff%erin(iunit,nt)-TRunoff%erlateral(iunit,nt)
     else
-<<<<<<< HEAD
-       !TODO. If this channel is at basin outlet (downstream is ocean), use the KW method
-	   if(rtmCTL%mask(iunit) .eq. 3) then 
-          call Routing_KW(iunit, nt, theDeltaT)
-       else         
-          if(TRunoff%rslp_energy(iunit) >= TINYVALUE) then ! flow is from current channel to downstream
-            TRunoff%vr(iunit,nt) = CRVRMAN(TRunoff%rslp_energy(iunit), TUnit%nr(iunit), TRunoff%rr(iunit,nt))
-            TRunoff%erout(iunit,nt) = -TRunoff%vr(iunit,nt) * TRunoff%mr(iunit,nt)
-            if(TRunoff%erin(iunit,nt)*theDeltaT + TRunoff%wr(iunit,nt) <= TINYVALUE) then! much negative inflow from upstream, 
-               TRunoff%vr(iunit,nt) = 0._r8
-               TRunoff%erout(iunit,nt) = 0._r8
-            elseif(TRunoff%erout(iunit,nt) <= -TINYVALUE .and. TRunoff%wr(iunit,nt) + &
-               (TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%erout(iunit,nt)) * theDeltaT < TINYVALUE) then
-               TRunoff%erout(iunit,nt) = -(TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%wr(iunit,nt)*0.95_r8 / theDeltaT)
-               if(TRunoff%mr(iunit,nt) > TINYVALUE) then
-                  TRunoff%vr(iunit,nt) = -TRunoff%erout(iunit,nt) / TRunoff%mr(iunit,nt)
-               end if
-            end if
-          elseif(TRunoff%rslp_energy(iunit) <= -TINYVALUE) then ! flow is from downstream to current channel
-             TRunoff%vr(iunit,nt) = -CRVRMAN(abs(TRunoff%rslp_energy(iunit)), TUnit%nr(iunit), TRunoff%rr(iunit,nt))
-             TRunoff%erout(iunit,nt) = -TRunoff%vr(iunit,nt) * TRunoff%mr(iunit,nt)
-             if(rtmCTL%nUp_dstrm(iunit) > 1) then
-                 if(TRunoff%erin_dstrm(iunit,nt)*theDeltaT + TRunoff%wr_dstrm(iunit,nt)/rtmCTL%nUp_dstrm(iunit) <= TINYVALUE) then! much negative inflow from upstream,
-                     TRunoff%vr(iunit,nt) = 0._r8
-                     TRunoff%erout(iunit,nt) = 0._r8
-                 elseif(TRunoff%erout(iunit,nt) >= TINYVALUE .and. TRunoff%wr_dstrm(iunit,nt)/rtmCTL%nUp_dstrm(iunit)- TRunoff%erout(iunit,nt) * theDeltaT < TINYVALUE) then
-                    TRunoff%erout(iunit,nt) = TRunoff%wr_dstrm(iunit,nt)*0.95_r8 / theDeltaT / rtmCTL%nUp_dstrm(iunit)
-                   if(TRunoff%mr(iunit,nt) > TINYVALUE) then
-                       TRunoff%vr(iunit,nt) = -TRunoff%erout(iunit,nt) / TRunoff%mr(iunit,nt)
-                    end if
-                 end if    
-             else
-                 if(TRunoff%erin_dstrm(iunit,nt)*theDeltaT + TRunoff%wr_dstrm(iunit,nt) <= TINYVALUE) then! much negative inflow from upstream,
-                     TRunoff%vr(iunit,nt) = 0._r8
-                     TRunoff%erout(iunit,nt) = 0._r8
-                 elseif(TRunoff%erout(iunit,nt) >= TINYVALUE .and. TRunoff%wr_dstrm(iunit,nt) &
-                   - TRunoff%erout(iunit,nt) * theDeltaT < TINYVALUE) then
-                    TRunoff%erout(iunit,nt) = TRunoff%wr_dstrm(iunit,nt)*0.95_r8 / theDeltaT
-                   if(TRunoff%mr(iunit,nt) > TINYVALUE) then
-                       TRunoff%vr(iunit,nt) = -TRunoff%erout(iunit,nt) / TRunoff%mr(iunit,nt)
-                    end if
-                 end if
-             end if                 
-             !TRunoff%vr(iunit,nt) = 0._r8
-             !TRunoff%erout(iunit,nt) = 0._r8
-          else  ! no flow between current channel and downstream
-            TRunoff%vr(iunit,nt) = 0._r8
-            TRunoff%erout(iunit,nt) = 0._r8
-=======
        if(rtmCTL%mask(iunit) .eq. 3) then !If this channel is at basin outlet (downstream is ocean), use the KW method
           call Routing_KW(iunit, nt, theDeltaT)
        else
@@ -1084,7 +997,6 @@ MODULE MOSART_physics_mod
             else
               TRunoff%erout(iunit,nt) = 0._r8
             end if
->>>>>>> ELM and MOSART changes for sediment transport
           end if
        end if  
     end if
@@ -1498,8 +1410,6 @@ MODULE MOSART_physics_mod
   end subroutine Leapfrog
 
 !-----------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 
 
   subroutine Leapfrog_sed(iunit_, deltaT_)
@@ -1566,7 +1476,6 @@ MODULE MOSART_physics_mod
   
 !-----------------------------------------------------------------------
 
->>>>>>> ELM and MOSART changes for sediment transport
   subroutine createFile(nio, fname)
   ! !DESCRIPTION: create a new file. if a file with the same name exists, delete it then create a new one
     implicit none

@@ -393,7 +393,6 @@ module RunoffMod
      real(r8), pointer :: conc_r(:,:)  ! MOSART main channel concentration of tracers such as sediment, C,N,P (kg/m**3)
      real(r8), pointer :: wr_al(:,:)   ! MOSART main channel active layer storage (kg for mud and sand sediment)
      real(r8), pointer :: dwr_al(:,:)   ! change of MOSART main channel active layer storage (kg for mud and sand sediment)
-     real(r8), pointer :: rslp_energy(:)! energy slope of channel water surface [-]
      real(r8), pointer :: wr_dstrm(:,:)  ! Downstream-channel water volume  (to 
                                              ! constrain large upward flow from downstream channel to current channel ) (m^3 or kg).
      real(r8), pointer :: yr_dstrm(:)  ! Downstream-channel water depth (m).

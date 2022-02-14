@@ -227,7 +227,7 @@ MODULE MOSART_sediment_mod
         TRunoff%erout(iunit,nt_nsan) = -seout
         TRunoff%erout(iunit,nt_nmud) = -meout
         ! in case diffusion wave method is used, account for the mass balance caused by backwater effects
-        if(Tctl%RoutingMethod == 4) then
+        if(Tctl%RoutingMethod == 2) then
         do nt=nt_nmud,nt_nsan
 
             if(TRunoff%rslp_energy(iunit) >= TINYVALUE_s) then ! flow is from current channel to downstream

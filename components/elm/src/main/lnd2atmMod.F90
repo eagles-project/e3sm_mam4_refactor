@@ -142,7 +142,7 @@ contains
        energyflux_vars, &
        solarabs_vars, drydepvel_vars, &
        vocemis_vars, dust_vars, ch4_vars, soilhydrology_vars, &
-       sedflux_vaars, lnd2atm_vars)
+       sedflux_vars, lnd2atm_vars)
     !
     ! !DESCRIPTION:
     ! Compute lnd2atm_vars component of gridcell derived type
@@ -458,7 +458,8 @@ contains
          sedflux_vars%sed_yld_col (bounds%begc:bounds%endc), &
          lnd2atm_vars%qflx_rofmud_grc   (bounds%begg:bounds%endg), &
          c2l_scale_type= 'urbanf', l2g_scale_type='unity' )
-
+         
+    end associate
   end subroutine lnd2atm
 
 

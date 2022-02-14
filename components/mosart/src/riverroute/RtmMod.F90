@@ -1923,7 +1923,6 @@ contains
             rtmCTL%inundff(nr) = 0._r8
             rtmCTL%inundffunit(nr) = 0._r8
           end if
-
         end if
       end do
 
@@ -1944,11 +1943,7 @@ contains
         TRunoff%ff_ini(:) = rtmCTL%inundff(:)
         TRunoff%ffunit_ini(:) = rtmCTL%inundffunit(:)    
       end if
-
     end if
-!#endif
-
-<<<<<<< HEAD
 
  do nt = 1,nt_rtm
       do nr = rtmCTL%begr,rtmCTL%endr
@@ -1965,67 +1960,6 @@ contains
         
       enddo
  enddo
-=======
-    if (inundflag) then
-       do nr = rtmCTL%begr, rtmCTL%endr
-          !if ( TUnit%mask( nr ) .gt. 0 ) then
-          if ( rtmCTL%mask(nr) .eq. 1 .or. rtmCTL%mask(nr) .eq. 3 ) then   ! 1--Land; 3--Basin outlet (downstream is ocean).
-
-             ! Calculate water depth in subnetwork (tributary channels) : 
-             if (Tunit%tlen(nr) == 0.0_r8 .or. Tunit%twidth(nr) == 0.0_r8) then
-                TRunoff%yt( nr, 1 ) = 0.0_r8
-             else
-                TRunoff%yt( nr, 1 ) = TRunoff%wt( nr, 1 ) / TUnit%tlen( nr ) / TUnit%twidth( nr )
-             endif
-             ! Calculate water depth in main channel :
-             if (Tunit%rlen(nr) == 0.0_r8 .or. Tunit%rwidth(nr) == 0.0_r8) then
-                TRunoff%yr( nr, 1 ) = 0.0_r8
-             else
-                TRunoff%yr( nr, 1 ) = TRunoff%wr( nr, 1 ) / TUnit%rlen( nr ) / TUnit%rwidth( nr )
-             endif
-          end if
-       end do
-
-       if ( Tctl%OPT_inund == 1 ) then
-          do nr = rtmCTL%begr, rtmCTL%endr
-             !if ( TUnit%mask( nr ) .gt. 0 ) then
-             if ( rtmCTL%mask(nr) .eq. 1 .or. rtmCTL%mask(nr) .eq. 3 ) then   ! 1--Land; 3--Basin outlet (downstream is ocean).
-
-                ! Total water volume within a computation unit :
-                rtmCTL%volr(nr,1) = TRunoff%wt(nr,1) + TRunoff%wr(nr,1) + TRunoff%wh(nr,1)*rtmCTL%area(nr)*TUnit%frac(nr)     ! times "TUnit%frac( nr )" or not ?
-                if ( Tctl%OPT_inund .eq. 1 ) then
-                   rtmCTL%volr(nr,1) = rtmCTL%volr(nr,1) + TRunoff%wf_ini( nr )
-                endif
-             end if
-          end do
-       else
-          do nr = rtmCTL%begr, rtmCTL%endr
-             !if ( TUnit%mask( nr ) .gt. 0 ) then
-             if ( rtmCTL%mask(nr) .eq. 1 .or. rtmCTL%mask(nr) .eq. 3 ) then   ! 1--Land; 3--Basin outlet (downstream is ocean).
-
-                ! Total water volume within a computation unit :
-                rtmCTL%volr(nr,1) = TRunoff%wt(nr,1) + TRunoff%wr(nr,1) + TRunoff%wh(nr,1)*rtmCTL%area(nr)*TUnit%frac(nr)     ! times "TUnit%frac( nr )" or not ?
-             end if
-          end do
-       endif
-    else
-       do nt = 1,nt_rtm
-          do nr = rtmCTL%begr,rtmCTL%endr
-             call UpdateState_hillslope(nr,nt)
-             call UpdateState_subnetwork(nr,nt)
-             call UpdateState_mainchannel(nr,nt)
-             if(sediflag) then
-                rtmCTL%volr(nr,nt) = (TRunoff%wt(nr,nt) + TRunoff%wr(nr,nt) + &
-                     TRunoff%wh(nr,nt)*rtmCTL%area(nr)+ &
-                     TRunoff%wt_al(nr,nt) + TRunoff%wr_al(nr,nt))
-             else
-                rtmCTL%volr(nr,nt) = (TRunoff%wt(nr,nt) + TRunoff%wr(nr,nt) + &
-                     TRunoff%wh(nr,nt)*rtmCTL%area(nr))
-             end if
-          enddo
-       enddo
-    endif
->>>>>>> ELM and MOSART changes for sediment transport
 
     call t_stopf('mosarti_restart')
 
@@ -4319,11 +4253,7 @@ contains
      allocate (TPara%c_twid(begr:endr))
      TPara%c_twid = 1.0_r8
 
-<<<<<<< HEAD
      if ( Tctl%RoutingMethod == 2 ) then       ! Use diffusion wave method in channel routing computation.
-=======
-     if ( Tctl%RoutingMethod == 4 ) then       ! Use diffusion wave method in channel routing computation.
->>>>>>> ELM and MOSART changes for sediment transport
         allocate (TRunoff%rslp_energy(begr:endr))
         TRunoff%rslp_energy = 0.0_r8
         
@@ -4333,12 +4263,9 @@ contains
         allocate (TRunoff%yr_dstrm(begr:endr))
         TRunoff%yr_dstrm = 0.0_r8    
 
-<<<<<<< HEAD
-=======
         allocate (TRunoff%conc_r_dstrm(begr:endr,nt_rtm))
         TRunoff%conc_r_dstrm = 0.0_r8 
 
->>>>>>> ELM and MOSART changes for sediment transport
         allocate (TRunoff%erin_dstrm(begr:endr,nt_rtm))
         TRunoff%erin_dstrm = 0.0_r8 
 
@@ -4352,11 +4279,7 @@ contains
             enddo
         enddo
      end if
-<<<<<<< HEAD
-   
-=======
-
->>>>>>> ELM and MOSART changes for sediment transport
+     
      if (inundflag) then
         !allocate (TRunoff%wr_ini(begr:endr))
         !TRunoff%wr_ini = 0.0
@@ -4600,11 +4523,8 @@ contains
   end if  ! endr >= begr
 
   ! retrieve the downstream channel attributes after some post-processing above
-<<<<<<< HEAD
+
   if (Tctl%RoutingMethod == 2 ) then       ! Use diffusion wave method in channel routing computation.
-=======
-  if (Tctl%RoutingMethod == 4 ) then       ! Use diffusion wave method in channel routing computation.
->>>>>>> ELM and MOSART changes for sediment transport
      allocate (TUnit%rlen_dstrm(begr:endr))
      allocate (TUnit%rslp_dstrm(begr:endr))
 
