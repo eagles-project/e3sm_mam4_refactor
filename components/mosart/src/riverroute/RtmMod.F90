@@ -43,7 +43,7 @@ module RtmMod
   use MOSART_physics_mod, only : updatestate_hillslope, updatestate_subnetwork, &
                                  updatestate_mainchannel
   use MOSART_BGC_type,  only : TSedi, TSedi_para, MOSART_sediment_init
-  use MOSART_RES_type,  only : Tres, MOSART_reservoir_init
+  use MOSART_RES_type,  only : Tres, MOSART_reservoir_init, Tres_para
   use MOSART_sediment_IO_mod
 !#ifdef INCLUDE_WRM
   use WRM_type_mod    , only : ctlSubwWRM, WRMUnit, StorWater
@@ -3926,7 +3926,7 @@ contains
             if ( TUnit%areaTotal(n) .le. 0._r8 ) then
               write( iulog, * ) trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 for n=', n
 
-              call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 ')
+             ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 ') !! Tian
             end if
 
             if ( TUnit%nh(n) .le. 0._r8 ) then
@@ -3946,9 +3946,9 @@ contains
             end if
 
             if ( TUnit%tslp(n) .LT. 0._r8 ) then
-              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 for n=', n
+              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 for n=', n, TUnit%tslp(n)
 
-              call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 ')
+              ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 ') !!Tian
             end if
 
             if ( TUnit%twidth(n) .le. 0._r8 ) then

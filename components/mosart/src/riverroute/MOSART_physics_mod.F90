@@ -558,7 +558,7 @@ MODULE MOSART_physics_mod
             ! Aggregate net floodplain storage change from subcycle to timestep 
               TRunoff%se_rf = TRunoff%se_rf + TRunoff%netchange
         end if                   
-       !! the treatment of mud and san is special since these two are interacting with each other
+       !! the mud and sand processes are treated together
        !do nt=nmud,nt_nsan ! sediment transport
        if (sediflag .and. TUnit%euler_calc(nt_nmud)) then
        do iunit=rtmCTL%begr,rtmCTL%endr
@@ -610,6 +610,7 @@ MODULE MOSART_physics_mod
           endif
           
 !#ifdef INCLUDE_WRM
+          !! Assume that reservoir regulation will only affect suspended load by changing the flow conditions, but do not directly affect sediment flux or storage
           if (sediflag .and. wrmflag) then
              localDeltaT = Tctl%DeltaT/Tctl%DLevelH2R
              do nt=nt_nmud,nt_nsan
@@ -617,13 +618,24 @@ MODULE MOSART_physics_mod
                 TRunoff%flow(iunit,nt) = TRunoff%flow(iunit,nt) + TRunoff%erout(iunit,nt)
              enddo
                 
-             call res_trapping(iunit,nt_nmud)
-             Tres%wres(iunit,nt_nmud) = Tres%wres(iunit,nt_nmud) + Tres%dwres(iunit,nt_nmud) * localDeltaT
-             call res_trapping(iunit,nt_nsan)
-             Tres%wres(iunit,nt_nsan) = Tres%wres(iunit,nt_nsan) + Tres%dwres(iunit,nt_nsan) * localDeltaT
+             ! first round of trapping, for those main channel reservoirs that both regulate flow and trap sediment
+             if(Tres_para%Eff_trapping(iunit)>TINYVALUE) then			 
+               call res_trapping(iunit,nt_nmud)
+               Tres%wres(iunit,nt_nmud) = Tres%wres(iunit,nt_nmud) + Tres%dwres(iunit,nt_nmud) * localDeltaT
+               call res_trapping(iunit,nt_nsan)
+               Tres%wres(iunit,nt_nsan) = Tres%wres(iunit,nt_nsan) + Tres%dwres(iunit,nt_nsan) * localDeltaT
+             end if
+
+           !! TODO: second round of trapping, for those main-channel reservoirs that trap sediment only
+           !if(Tres_para%Eff_trapping_r(iunit)>TINYVALUE) then			 
+           !    call res_trapping_r(iunit,nt_nmud)
+           !    Tres%wres(iunit,nt_nmud) = Tres%wres(iunit,nt_nmud) + Tres%dwres(iunit,nt_nmud) * localDeltaT
+           !    call res_trapping_r(iunit,nt_nsan)
+           !    Tres%wres(iunit,nt_nsan) = Tres%wres(iunit,nt_nsan) + Tres%dwres(iunit,nt_nsan) * localDeltaT
+           !end if
               
              do nt=nt_nmud,nt_nsan
-               TRunoff%erowm_regf(iunit,nt) = TRunoff%erowm_regf(iunit,nt) + - TRunoff%erout(iunit,nt)
+               TRunoff%erowm_regf(iunit,nt) = TRunoff%erowm_regf(iunit,nt) - TRunoff%erout(iunit,nt)
                TRunoff%flow(iunit,nt) = TRunoff%flow(iunit,nt) - TRunoff%erout(iunit,nt)
              enddo
           end if                 
@@ -735,6 +747,10 @@ MODULE MOSART_physics_mod
     end if
     TRunoff%dwh(iunit,nt) = (TRunoff%qsur(iunit,nt) + TRunoff%ehout(iunit,nt)) 
 
+    if(isnan(TRunoff%wh(iunit,nt)) .or. isnan(TRunoff%dwh(iunit,nt))) then
+      write(unit=2101,fmt="(i10, 3(e15.4), 2(f12.4))") iunit, TRunoff%qsur(iunit,nt), TRunoff%ehout(iunit,nt), TRunoff%yh(iunit,nt), TUnit%hslpsqrt(iunit), TUnit%nh(iunit) 
+    end if
+
   end subroutine hillslopeRouting
 
 !-----------------------------------------------------------------------
@@ -829,7 +845,7 @@ MODULE MOSART_physics_mod
               TRunoff%erout(iunit,nt) = -TRunoff%vr(iunit,nt) * TRunoff%mr(iunit,nt)
               if(-TRunoff%erout(iunit,nt) > TINYVALUE .and. TRunoff%wr(iunit,nt) + &
                  (TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%erout(iunit,nt)) * theDeltaT < TINYVALUE) then
-                 TRunoff%erout(iunit,nt) = -(TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%wr(iunit,nt) / theDeltaT)
+                 TRunoff%erout(iunit,nt) = -(TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%wr(iunit,nt)*0.95_r8 / theDeltaT)
                  if(TRunoff%mr(iunit,nt) > 0._r8) then
                     TRunoff%vr(iunit,nt) = -TRunoff%erout(iunit,nt) / TRunoff%mr(iunit,nt)
                  end if
@@ -838,7 +854,7 @@ MODULE MOSART_physics_mod
               TRunoff%erout(iunit,nt) = TRunoff%conc_r(iunit,nt) * TRunoff%erout(iunit,nt_nliq)
               if(-TRunoff%erout(iunit,nt) > TINYVALUE .and. TRunoff%wr(iunit,nt) + &
                  (TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%erout(iunit,nt)) * theDeltaT < TINYVALUE) then
-                 TRunoff%erout(iunit,nt) = -(TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%wr(iunit,nt) / theDeltaT)
+                 TRunoff%erout(iunit,nt) = -(TRunoff%erlateral(iunit,nt) + TRunoff%erin(iunit,nt) + TRunoff%wr(iunit,nt)*0.95_r8 / theDeltaT)
               end if
           end if
        end if
