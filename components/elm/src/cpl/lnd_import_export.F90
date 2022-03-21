@@ -29,6 +29,7 @@ contains
     ! !USES:
     use elm_varctl       , only: co2_type, co2_ppmv, iulog, use_c13, create_glacier_mec_landunit, &
                                  metdata_type, metdata_bypass, metdata_biases, co2_file, aero_file, use_atm_downscaling_to_topunit
+    use elm_varctl       , only: ldomain_subed, subnum_str
     use elm_varctl       , only: const_climate_hist, add_temperature, add_co2, use_cn, use_fates
     use elm_varctl       , only: startdate_add_temperature, startdate_add_co2
     use elm_varcon       , only: rair, o2_molar_const, c13ratio
@@ -131,6 +132,7 @@ contains
     real(r8) :: mrss ,mrss0 , mrss1      ! resident size (current memory use)
     character(*), parameter :: FormatR = '(A,": =============== ", A31,F12.3,1x,  " ===============")'
     double precision :: t0, t1
+    character(len=4) :: numstr
 
     data caldaym / 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 /    
 
@@ -352,9 +354,17 @@ contains
           inquire(file=trim(metdata_biases), exist=use_sitedata)
 
           !get grid lat/lon information, zone mappings
-          inquire(file=trim(metdata_bypass) // '/zone_mappings.txt', exist=has_zonefile)
+          if (ldomain_subed) then
+              inquire(file=trim(metdata_bypass) // '/' // trim(subnum_str) // '/zone_mappings.txt', exist=has_zonefile)
+          else
+              inquire(file=trim(metdata_bypass) // '/zone_mappings.txt', exist=has_zonefile)
+          endif
           if (has_zonefile) then
-            open(unit=13, file=trim(metdata_bypass) // '/zone_mappings.txt')
+              if (ldomain_subed) then
+                  open(unit=13, file=trim(metdata_bypass) // '/' // trim(subnum_str) // '/zone_mappings.txt')
+              else
+                  open(unit=13, file=trim(metdata_bypass) // '/zone_mappings.txt')
+              endif
           else if (atm2lnd_vars%metsource .ne. 2) then
             call endrun( sub//' ERROR: Zone mapping file does not exist for cpl_bypass' )
           end if
@@ -437,6 +447,14 @@ contains
                 else if (use_daymet .and. (index(metdata_type, 'daymet4') .gt. 0) ) then
                    !daymet v4 with GSWP3 v2 for NA with user-defined zone-mappings.txt
                     metdata_fname = 'GSWP3_daymet4_' // trim(metvars(v)) // '_1980-2014_z' // zst(2:3) // '.nc'
+                    if (ldomain_subed) then
+                        if (trim(subnum_str)=='') then
+                            write(numstr, '(I4)') 1000+ztoget
+                        else
+                            numstr = subnum_str(3:6)
+                        endif
+                        metdata_fname = 'GSWP3_daymet4_' // trim(metvars(v)) // '_1980-2014_z' // numstr(2:4) // '.nc'
+                    endif
                 else if (use_daymet .and. ztoget .ge. 16 .and. ztoget .le. 20) then 
                     metdata_fname = 'GSWP3v1_Daymet_' // trim(metvars(v)) // '_1980-2010_z' // zst(2:3) // '.nc'
                 end if
@@ -448,8 +466,18 @@ contains
 #ifdef TPROF
             call t_startf("cplbypass_metdata_read")
 #endif
-            ierr = nf90_open(trim(metdata_bypass) // '/' // trim(metdata_fname), NF90_NOWRITE, met_ncids(v))
-            if (ierr .ne. 0) call endrun(msg=' ERROR: Failed to open cpl_bypass input meteorology file' // &
+
+            if (ldomain_subed) then
+               if (trim(subnum_str)=='') then
+                   write(numstr, '(I4)') 1000+ztoget
+               else
+                   numstr = subnum_str(3:6)
+               endif
+               ierr = nf90_open(trim(metdata_bypass) // '/sub' // numstr(2:4) // '/' // trim(metdata_fname), NF90_NOWRITE, met_ncids(v))
+            else
+               ierr = nf90_open(trim(metdata_bypass) // '/' // trim(metdata_fname), NF90_NOWRITE, met_ncids(v))
+            endif
+            if (ierr .ne. 0) call endrun(msg=' ERROR: Failed to open cpl_bypass input meteorology file ' // &
                trim(metdata_bypass) // '/' // trim(metdata_fname) )
        
             !get timestep information

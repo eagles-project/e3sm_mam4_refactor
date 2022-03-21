@@ -5,6 +5,7 @@ module elm_initializeMod
   !
   use shr_kind_mod     , only : r8 => shr_kind_r8
   use spmdMod          , only : masterproc, iam
+  use spmdMod          , only : npes
   use shr_sys_mod      , only : shr_sys_flush
   use shr_log_mod      , only : errMsg => shr_log_errMsg
   use decompMod        , only : bounds_type, get_proc_bounds, get_proc_clumps, get_clump_bounds
@@ -81,7 +82,9 @@ contains
     use filterMod                 , only: allocFilters
     use reweightMod               , only: reweight_wrapup
     use ELMFatesInterfaceMod      , only: ELMFatesGlobals
-    use topounit_varcon           , only: max_topounits, has_topounit, topounit_varcon_init    
+    use topounit_varcon           , only: max_topounits, has_topounit, topounit_varcon_init
+    use elm_varctl                , only: metdata_bypass, ldomain_subed, subnum_str, fname_len, ni_sum, nj_sum
+    use spmdMod
     !
     ! !LOCAL VARIABLES:
     integer           :: ier                     ! error status
@@ -104,7 +107,12 @@ contains
     integer           :: maxEdges                ! max number of edges/neighbors
     integer           :: nclumps                 ! number of clumps on this processor
     integer           :: nc                      ! clump index
+    integer ,pointer  :: amask_loc(:)            ! local land mask
+    character(len=fname_len) :: fatmlndfrc_loc   ! local land domain name
+    character(len=fname_len) :: fsurdat_loc      ! local land domain name
+    character(len=4)  :: numstr
     character(len=32) :: subname = 'initialize1' ! subroutine name
+
     !-----------------------------------------------------------------------
 
     call t_startf('elm_init1')
@@ -143,7 +151,47 @@ contains
        write(iulog,*) 'Attempting to read global land mask from ',trim(fatmlndfrc)
        call shr_sys_flush(iulog)
     endif
+
     call surfrd_get_globmask(filename=fatmlndfrc, mask=amask, ni=ni, nj=nj)
+
+    ! the following is required in case data not-subzoned.
+    ni_sum = ni
+    nj_sum = nj
+#ifdef CPL_BYPASS
+    ! with high-res land model, sud-domains, surfdatas, and metdata are all under one sub-directories
+    ! under 'metdata_bypass' folder
+    inquire(file=trim(metdata_bypass) // '/sub001/zone_mappings.txt', exist=ldomain_subed)
+#ifdef LDOMAIN_SUB
+    if (ldomain_subed) then
+       write(numstr, '(I4)') 1001+iam
+       subnum_str = 'sub' // numstr(2:4)
+
+       fatmlndfrc_loc = trim(metdata_bypass) // '/' // subnum_str // '/domain.nc'
+       fsurdat_loc = trim(metdata_bypass) // '/' // subnum_str // '/surfdata.nc'
+       call surfrd_get_globmask(filename=trim(fatmlndfrc_loc), mask=amask_loc, ni=ni, nj=nj)
+
+       call mpi_barrier(mpicom,ier)
+       ! HERE, it's assumed that 1-D domain and each appendable by 'ni' only
+       call mpi_allreduce(ni,ni_sum,1,MPI_INTEGER,MPI_SUM,mpicom,ier)
+       nj_sum = nj
+
+       allocate(amask(ni_sum*nj_sum))
+       amask(:)=0
+       call mpi_gather(amask_loc, ni*nj, MPI_INTEGER, &
+                       amask, ni*nj, MPI_INTEGER, 0, mpicom, ier)
+       call mpi_bcast(amask, ni_sum*nj_sum, MPI_INTEGER, 0, mpicom, ier)
+
+       ! replace the global inputs with 'iam' associated ones (NOT YET work)
+       fatmlndfrc = trim(fatmlndfrc_loc)
+       fsurdat = trim(fsurdat_loc)
+
+       deallocate(amask_loc)
+
+       call mpi_barrier(mpicom, ier)
+
+    end if
+#endif
+#endif
 
     ! Exit early if no valid land points
     if ( all(amask == 0) )then
@@ -173,7 +221,8 @@ contains
 
     select case (trim(domain_decomp_type))
     case ("round_robin")
-       call decompInit_lnd(ni, nj, amask)
+       !call decompInit_lnd(ni, nj, amask)
+       call decompInit_lnd(ni_sum, nj_sum, amask)
        deallocate(amask)
     case ("graph_partitioning")
        call decompInit_lnd_using_gp(ni, nj, cellsOnCell, nCells_loc, maxEdges, amask)

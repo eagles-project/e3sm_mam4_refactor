@@ -462,6 +462,12 @@ module elm_varctl
    character(len=fname_len), public :: metdata_biases = ' '    ! met biases files for CPL_BYPASS mode
    character(len=fname_len), public :: co2_file       = ' '    ! co2 file for CPL_BYPASS mode
    character(len=fname_len), public :: aero_file      = ' '    ! aerosol deposition file for CPL_BYPASS mode
+   ! for high-res ELM, together with cpl_bypass option only
+   logical                 , public :: ldomain_subed  = .False.! land domain sub-zoned for CPL_BYPASS mode
+   character(len=6)        , public :: subnum_str     = ' '    ! such as 'sub0001'
+   integer                 , public :: ni_sum         = 1
+   integer                 , public :: nj_sum         = 1
+
 
   !$acc declare create(use_fates)
 
