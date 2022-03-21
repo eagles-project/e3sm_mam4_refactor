@@ -3924,7 +3924,7 @@ contains
             end if
 
             if ( TUnit%areaTotal(n) .le. 0._r8 ) then
-              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 for n=', n
+             ! write( iulog, * ) trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 for n=', n
 
              ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%areaTotal(n) <= 0 ') !! Tian
             end if
@@ -3935,9 +3935,9 @@ contains
             end if
 
             if ( TUnit%hslp(n) .LT. 0._r8 ) then
-              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%hslp(n) < 0 for n=', n
-
-              call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%hslp(n) < 0 ')
+             ! write( iulog, * ) trim( subname ) // ' ERROR: TUnit%hslp(n) < 0 for n=', n
+               TUnit%hslp(n) = 0.0001 !!
+             ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%hslp(n) < 0 ')
             end if
 
             if ( TUnit%gxr(n) .LT. 0._r8 ) then
@@ -3946,8 +3946,8 @@ contains
             end if
 
             if ( TUnit%tslp(n) .LT. 0._r8 ) then
-              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 for n=', n, TUnit%tslp(n)
-
+              ! write( iulog, * ) trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 for n=', n, TUnit%tslp(n)
+              TUnit%tslp(n) = 0.0001 !!
               ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%tslp(n) < 0 ') !!Tian
             end if
 
@@ -3967,9 +3967,9 @@ contains
             end if
 
             if ( TUnit%rslp(n) .LT. 0._r8 ) then
-              write( iulog, * ) trim( subname ) // ' ERROR: TUnit%rslp(n) < 0 for n=', n
-
-              call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%rslp(n) < 0 ')
+             ! write( iulog, * ) trim( subname ) // ' ERROR: TUnit%rslp(n) < 0 for n=', n
+              TUnit%rslp(n) = 0.0001!!
+             ! call shr_sys_abort( trim( subname ) // ' ERROR: TUnit%rslp(n) < 0 ') !!Tian
             end if
 
             if ( TUnit%rwidth(n) .le. 0._r8 ) then

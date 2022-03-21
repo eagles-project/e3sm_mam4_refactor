@@ -170,7 +170,7 @@ contains
     if (co2_type == 'prognostic' .and. index_x2l_Sa_co2prog == 0) then
        call endrun( sub//' ERROR: must have nonzero index_x2l_Sa_co2prog for co2_type equal to prognostic' )
     else if (co2_type == 'diagnostic' .and. index_x2l_Sa_co2diag == 0) then
-       call endrun( sub//' ERROR: must have nonzero index_x2l_Sa_co2diag for co2_type equal to diagnostic' )
+      ! call endrun( sub//' ERROR: must have nonzero index_x2l_Sa_co2diag for co2_type equal to diagnostic' ) !!Tian
     end if
 
     ! Note that the precipitation fluxes received  from the coupler
