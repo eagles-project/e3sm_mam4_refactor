@@ -54,6 +54,7 @@ contains
    use shr_pio_mod      , only : shr_pio_getiotype
    use shr_nl_mod       , only : shr_nl_find_group_name
    use shr_log_mod      , only : errMsg => shr_log_errMsg
+   use elm_varctl       , only : ni_sum, nj_sum
    !
    ! arguments
    implicit none
@@ -120,7 +121,8 @@ contains
         pio_iotype=shr_pio_getiotype(inst_name),   &
         mpicom=mpicom, compid=comp_id,             &
         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_elm,    &
-        nxg=ldomain%ni, nyg=ldomain%nj,            &
+        !nxg=ldomain%ni, nyg=ldomain%nj,            &
+        nxg=ni_sum, nyg=nj_sum,                    &
         yearFirst=stream_year_first_pdep,          &
         yearLast=stream_year_last_pdep,            &
         yearAlign=model_year_align_pdep,           &

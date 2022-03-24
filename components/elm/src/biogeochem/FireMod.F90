@@ -1471,6 +1471,7 @@ contains
    use elm_nlUtilsMod   , only : find_nlgroup_name
    use ndepStreamMod    , only : elm_domain_mct
    use histFileMod      , only : hist_addfld1d
+   use elm_varctl       , only : ni_sum, nj_sum
    !
    ! !ARGUMENTS:
    implicit none
@@ -1542,7 +1543,8 @@ contains
         pio_iotype=shr_pio_getiotype(inst_name),       &
         mpicom=mpicom, compid=comp_id,                 &
         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_elm,        &
-        nxg=ldomain%ni, nyg=ldomain%nj,                &
+        !nxg=ldomain%ni, nyg=ldomain%nj,                &
+        nxg=ni_sum, nyg=nj_sum,                        &
         yearFirst=stream_year_first_popdens,           &
         yearLast=stream_year_last_popdens,             &
         yearAlign=model_year_align_popdens,            &
@@ -1622,6 +1624,7 @@ subroutine lnfm_init( bounds )
   use elm_nlUtilsMod   , only : find_nlgroup_name
   use ndepStreamMod    , only : elm_domain_mct
   use histFileMod      , only : hist_addfld1d
+  use elm_varctl       , only : ni_sum, nj_sum
   !
   ! !ARGUMENTS:
   implicit none
@@ -1693,7 +1696,8 @@ subroutine lnfm_init( bounds )
         pio_iotype=shr_pio_getiotype(inst_name),      &
         mpicom=mpicom, compid=comp_id,                &
         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_elm,       &
-        nxg=ldomain%ni, nyg=ldomain%nj,               &
+        !nxg=ldomain%ni, nyg=ldomain%nj,                &
+        nxg=ni_sum, nyg=nj_sum,                       &
         yearFirst=stream_year_first_lightng,          &
         yearLast=stream_year_last_lightng,            &
         yearAlign=model_year_align_lightng,           &

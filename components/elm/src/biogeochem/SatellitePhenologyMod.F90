@@ -83,6 +83,7 @@ contains
     use histFileMod      , only : hist_addfld1d
     use shr_stream_mod   , only : shr_stream_file_null
     use shr_string_mod   , only : shr_string_listCreateField
+    use elm_varctl       , only : ni_sum, nj_sum
     !
     ! !ARGUMENTS:
     implicit none
@@ -164,7 +165,8 @@ contains
          pio_iotype=shr_pio_getiotype(inst_name),      &
          mpicom=mpicom, compid=comp_id,                &
          gsmap=gsmap_lnd_gdc2glo, ggrid=dom_elm,       &
-         nxg=ldomain%ni, nyg=ldomain%nj,               &
+        !nxg=ldomain%ni, nyg=ldomain%nj,                &
+         nxg=ni_sum, nyg=nj_sum,                       &
          yearFirst=stream_year_first_lai,              &
          yearLast=stream_year_last_lai,                &
          yearAlign=model_year_align_lai,               &
