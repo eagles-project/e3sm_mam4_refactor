@@ -33,6 +33,8 @@ module histFileMod
   use PRTGenericMod          , only : nelements_fates  => num_elements
   use TopounitType      , only : top_pp
   use topounit_varcon   , only: max_topounits, has_topounit
+  use elm_varctl        , only : ldomain_subed, subnum_str
+  use spmdMod           , only : iam
 
   !
   implicit none
@@ -2909,6 +2911,193 @@ contains
 
   end subroutine hfields_write
 
+
+  !-----------------------------------------------------------------------
+  subroutine hfields_write_ncf90(t, filename)
+    !
+    ! !DESCRIPTION:
+    ! Write history tape.  Issue the call to write the variable.
+    ! By directly using netcdf4-fortran, instead by PIO2 as in subroutine 'hfields_write'
+    !
+    ! !USES:
+    use decompMod , only : ldecomp
+    use domainMod , only : ldomain
+    use netcdf                       ! netcdf-fortran lib modules
+    !
+    ! !ARGUMENTS:
+    integer, intent(in) :: t                    ! tape index
+    character(len=*), intent(in) :: filename    !
+    !
+    ! !LOCAL VARIABLES:
+    integer :: f                         ! field index
+    integer :: g,c,l,topo,p              ! indices
+    integer :: beg1d_out                 ! on-node 1d hbuf pointer start index
+    integer :: end1d_out                 ! on-node 1d hbuf pointer end index
+    integer :: num1d_out                 ! size of hbuf first dimension (overall all nodes)
+    integer :: num2d                     ! hbuf second dimension size
+    integer :: nt                        ! time index
+    integer :: ier                       ! error status
+    integer :: numdims                   ! number of dimensions
+    character(len=1)         :: avgflag  ! time averaging flag
+    character(len=max_chars) :: long_name! long name
+    character(len=max_chars) :: standard_name! standard name
+    character(len=max_chars) :: units    ! units
+    character(len=max_namlen):: varname  ! variable name
+    character(len=32) :: avgstr          ! time averaging type
+    character(len=hist_dim_name_length)  :: type1d_out      ! history output 1d type
+    character(len=hist_dim_name_length)  :: type2d          ! history output 2d type
+    character(len=32) :: dim1name        ! temporary
+    character(len=32) :: dim2name        ! temporary
+    real(r8), pointer :: histo(:,:)      ! temporary
+    real(r8), pointer :: hist1do(:)      ! temporary
+    real(r8), pointer :: rgarr(:)        ! temporary
+    real(r8), pointer :: rtarr(:)        ! temporary
+    real(r8), pointer :: rcarr(:)        ! temporary
+    real(r8), pointer :: rlarr(:)        ! temporary
+    real(r8), pointer :: rparr(:)        ! temporary
+    integer , pointer :: igarr(:)        ! temporary
+    integer , pointer :: itarr(:)        ! temporary
+    integer , pointer :: icarr(:)        ! temporary
+    integer , pointer :: ilarr(:)        ! temporary
+    integer , pointer :: iparr(:)        ! temporary
+    type(bounds_type) :: bounds
+    integer :: nfid                      ! local nc file id
+    integer :: varid                     ! local nc file variable id
+
+
+    character(len=*),parameter :: subname = 'hfields_write_ncf90'
+!-----------------------------------------------------------------------
+    call get_proc_bounds(bounds)
+
+    ier = nf90_open(trim(filename), NF90_WRITE, nfid)
+
+    ! Write 1d topological info
+
+    if (.not. tape(t)%dov2xy .and. tape(t)%ntimes==1) then
+      ! Determine bounds
+
+       allocate(&
+            rgarr(bounds%begg:bounds%endg),&
+            rtarr(bounds%begt:bounds%endt),&
+            rlarr(bounds%begl:bounds%endl),&
+            rcarr(bounds%begc:bounds%endc),&
+            rparr(bounds%begp:bounds%endp),&
+            stat=ier)
+       if (ier /= 0) then
+          call endrun(msg=' hfields_1dinfo allocation error of rarrs'//errMsg(__FILE__, __LINE__))
+       end if
+
+       allocate(&
+            igarr(bounds%begg:bounds%endg),&
+            itarr(bounds%begt:bounds%endt),&
+            ilarr(bounds%begl:bounds%endl),&
+            icarr(bounds%begc:bounds%endc),&
+            iparr(bounds%begp:bounds%endp),stat=ier)
+       if (ier /= 0) then
+          call endrun(msg=' hfields_1dinfo allocation error of iarrs'//errMsg(__FILE__, __LINE__))
+       end if
+
+       ! Write gridcell info
+
+       ier = nf90_inq_varid(nfid, 'grid1d_lon', varid)
+       ier = nf90_put_var(nfid, varid, grc_pp%londeg)
+       ier = nf90_inq_varid(nfid, 'grid1d_lat', varid)
+       ier = nf90_put_var(nfid, varid, grc_pp%latdeg)
+       do g = bounds%begg,bounds%endg
+         igarr(g)= mod(ldecomp%gdc2glo(g)-1,ldomain%ni) + 1
+       enddo
+       ier = nf90_inq_varid(nfid, 'grid1d_ixy', varid)
+       ier = nf90_put_var(nfid, varid, igarr)
+       do g = bounds%begg,bounds%endg
+         igarr(g)= (ldecomp%gdc2glo(g) - 1)/ldomain%ni + 1
+       enddo
+       ier = nf90_inq_varid(nfid, 'grid1d_jxy', varid)
+       ier = nf90_put_var(nfid, varid, igarr)
+
+       ! Write topounit info
+
+       do topo = bounds%begt,bounds%endt
+         rtarr(topo) = grc_pp%londeg(top_pp%gridcell(topo))
+       enddo
+       ier = nf90_inq_varid(nfid, 'top1d_lon', varid)
+       ier = nf90_put_var(nfid, varid, rtarr)
+       do topo = bounds%begt,bounds%endt
+         rtarr(topo) = grc_pp%latdeg(top_pp%gridcell(topo))
+       enddo
+       ier = nf90_inq_varid(nfid, 'topo1d_lat', varid)
+       ier = nf90_put_var(nfid, varid, rtarr)
+       do topo= bounds%begt,bounds%endt
+         itarr(topo) = mod(ldecomp%gdc2glo(top_pp%gridcell(topo))-1,ldomain%ni) + 1
+       enddo
+       ier = nf90_inq_varid(nfid, 'ltopo1d_ixy', varid)
+       ier = nf90_put_var(nfid, varid, itarr)
+       do topo = bounds%begt,bounds%endt
+         itarr(topo) = (ldecomp%gdc2glo(top_pp%gridcell(topo))-1)/ldomain%ni + 1
+       enddo
+       ier = nf90_inq_varid(nfid, 'ltopo1d_jxy', varid)
+       ier = nf90_put_var(nfid, varid, itarr)
+       ier = nf90_inq_varid(nfid, 'topo1d_wtgcell', varid)
+       ier = nf90_put_var(nfid, varid, top_pp%wtgcell)
+
+       deallocate(rgarr,rtarr,rlarr,rcarr,rparr)
+       deallocate(igarr,itarr,ilarr,icarr,iparr)
+
+     end if
+
+    ! Define time-dependent variables create variables and attributes for field list
+
+    do f = 1,tape(t)%nflds
+
+       ! Set history field variables
+
+       varname    = tape(t)%hlist(f)%field%name
+       long_name  = tape(t)%hlist(f)%field%long_name
+       standard_name  = tape(t)%hlist(f)%field%standard_name
+       units      = tape(t)%hlist(f)%field%units
+       avgflag    = tape(t)%hlist(f)%avgflag
+       type1d_out = tape(t)%hlist(f)%field%type1d_out
+       beg1d_out  = tape(t)%hlist(f)%field%beg1d_out
+       end1d_out  = tape(t)%hlist(f)%field%end1d_out
+       num1d_out  = tape(t)%hlist(f)%field%num1d_out
+       type2d     = tape(t)%hlist(f)%field%type2d
+       numdims    = tape(t)%hlist(f)%field%numdims
+       num2d      = tape(t)%hlist(f)%field%num2d
+       nt         = tape(t)%ntimes
+
+       ! Determine output buffer
+
+       histo => tape(t)%hlist(f)%hbuf
+
+       ! Allocate dynamic memory
+
+       if (numdims == 1) then
+             allocate(hist1do(beg1d_out:end1d_out), stat=ier)
+             if (ier /= 0) then
+                write(iulog,*) trim(subname),' ERROR: allocation'
+                call endrun(msg=errMsg(__FILE__, __LINE__))
+             end if
+             hist1do(beg1d_out:end1d_out) = histo(beg1d_out:end1d_out,1)
+        end if
+
+        ! Write history output.
+        ier = nf90_inq_varid(nfid, varname, varid)
+        if (numdims == 1) then
+          ier = nf90_put_var(nfid, varid, hist1do, start=(/1,nt/))
+        else
+          ier = nf90_put_var(nfid, varid, histo, start=(/1,1,nt/))
+        end if
+
+        ! Deallocate dynamic memory
+
+        if (numdims == 1) then
+             deallocate(hist1do)
+        end if
+
+    end do
+    ier = nf90_close(nfid)
+
+  end subroutine hfields_write_ncf90
+
   !-----------------------------------------------------------------------
   subroutine hfields_1dinfo(t, mode)
     !
@@ -2917,7 +3106,7 @@ contains
     !
     ! !USES:
     use decompMod   , only : ldecomp
-    use domainMod   , only : ldomain, ldomain
+    use domainMod   , only : ldomain
     !
     ! !ARGUMENTS:
     integer, intent(in) :: t                ! tape index
@@ -3295,6 +3484,8 @@ contains
     use elm_varcon      , only : secspday
     use perf_mod        , only : t_startf, t_stopf
     use elm_varpar      , only : nlevgrnd
+    use spmdMod
+    use fileutils       , only : cpyfil
     !
     ! !ARGUMENTS:
     logical, intent(in) :: rstwr    ! true => write restart file this step
@@ -3322,6 +3513,7 @@ contains
     integer :: mcsecm1                    ! nstep-1 time of day [seconds]
     real(r8):: time                       ! current time
     character(len=256) :: str             ! global attribute string
+    character(len=256) :: master_fname    ! master output file name
     logical :: if_stop                    ! true => last time step of run
     logical, save :: do_3Dtconst = .true. ! true => write out 3D time-constant data
     character(len=*),parameter :: subname = 'hist_htapes_wrapup'
@@ -3388,7 +3580,18 @@ contains
                 write(iulog,*) trim(subname),' : Creating history file ', trim(locfnh(t)), &
                      ' at nstep = ',get_nstep()
                 write(iulog,*)'calling htape_create for file t = ',t
+
+#if defined CPL_BYPASS && defined LDOMAIN_SUB
+                ! for copying master pio nc file' data structure to sub-domain's
+                master_fname = locfnh(t)
+#endif
+
              endif
+
+#if defined CPL_BYPASS && defined LDOMAIN_SUB
+             call mpi_bcast (master_fname,len(master_fname),MPI_CHARACTER, 0, mpicom, ier)
+#endif
+
              call htape_create (t)
 
              ! Define time-constant field variables
@@ -3437,6 +3640,24 @@ contains
           ! Write history time samples
           call t_startf('hist_htapes_wrapup_write')
           call hfields_write(t, mode='write')
+
+#if defined CPL_BYPASS && defined LDOMAIN_SUB
+          call ncd_pio_closefile(nfid(t))   ! have to flush out data by closeing pio nc file for copying below, then open it again
+          call mpi_barrier(mpicom, ier)
+
+          ! with high-res modeling, sub-directories created for local rank output
+          if (ldomain_subed .and. (.not. masterproc)) then
+              ! make a copy of local rank due to define only on master rank
+              if (tape(t)%ntimes == 1) then
+                 call cpyfil(master_fname, locfnh(t))
+              end if
+
+              ! over-write the data portion of local rank nc file by directly call netcdf-fortran libs
+              call hfields_write_ncf90(t, locfnh(t))
+          end if
+
+          call ncd_pio_openfile (nfid(t), trim(locfnh(t)), ncd_write) ! open that closed pio nc file again after copying. Otherwise error for next time-interval writing
+#endif
           call t_stopf('hist_htapes_wrapup_write')
 
           ! Zero necessary history buffers
@@ -3463,7 +3684,7 @@ contains
                      trim(locfnh(t)),' at nstep = ', get_nstep()
                 write(iulog,*)
              endif
-	     call ncd_pio_closefile(nfid(t))
+             call ncd_pio_closefile(nfid(t))
              if (.not.if_stop .and. (tape(t)%ntimes/=tape(t)%mfilt)) then
                 call ncd_pio_openfile (nfid(t), trim(locfnh(t)), ncd_write)
              end if
@@ -4386,6 +4607,16 @@ contains
    write(hist_index,'(i1.1)') hist_file - 1
    set_hist_filename = "./"//trim(caseid)//".elm"//trim(inst_suffix)//&
                        ".h"//hist_index//"."//trim(cdate)//".nc"
+
+#ifdef CPL_BYPASS
+#ifdef LDOMAIN_SUB
+   ! with high-res modeling, sub-directories created for local rank output
+   if (ldomain_subed) then
+       set_hist_filename = "./"//subnum_str// "_"//trim(caseid)//".elm"//trim(inst_suffix)//&
+                       ".h"//hist_index//"."//trim(cdate)//".nc"
+   endif
+#endif
+#endif
 
   end function set_hist_filename
 

@@ -485,6 +485,7 @@ module UrbanParamsType
              write(iulog,*)trim(subname), 'ldomain%ni,ni,= ',ldomain%ni,ni
              write(iulog,*)trim(subname), 'ldomain%nj,nj,= ',ldomain%nj,nj
              write(iulog,*)trim(subname), 'ldomain%ns,ns,= ',ldomain%ns,ns
+             if (isgrid2d) &
              call endrun(msg=errmsg(__FILE__, __LINE__))
           end if
        else
