@@ -1,7 +1,6 @@
 if (NOT DEBUG)
-  string(APPEND CFLAGS " -O2")
+  string(APPEND CFLAGS " -O2 -Mvect=nosimd")
   string(APPEND FFLAGS " -O2 -DSUMMITDEV_PGI")
-  string(APPEND CXXFLAGS " -O2")
 endif()
 if (COMP_NAME STREQUAL eam)
   string(APPEND FFLAGS " -Mnovect")
