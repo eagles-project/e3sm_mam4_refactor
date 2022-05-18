@@ -173,6 +173,13 @@ void post_timeloop() {
   auto &crm_output_q_vt_ls      = :: crm_output_q_vt_ls;
   auto &t_vt_tend               = :: t_vt_tend;
   auto &q_vt_tend               = :: q_vt_tend;
+#ifdef MMF_VT_MOM
+  auto &crm_output_u_vt_tend    = :: crm_output_u_vt_tend;
+  auto &crm_input_u_vt          = :: crm_input_u_vt;
+  auto &u_vt                    = :: u_vt;
+  auto &crm_output_u_vt_ls      = :: crm_output_u_vt_ls;
+  auto &u_vt_tend               = :: u_vt_tend;
+#endif
   auto &use_VT                  = :: use_VT;
  
 
@@ -312,9 +319,15 @@ void post_timeloop() {
         int l = plev-(k+1);
         crm_output_t_vt_tend(k,icrm) = ( t_vt(l,icrm) - crm_input_t_vt(k,icrm) ) * icrm_run_time;
         crm_output_q_vt_tend(k,icrm) = ( q_vt(l,icrm) - crm_input_q_vt(k,icrm) ) * icrm_run_time;
+#ifdef MMF_VT_MOM
+        crm_output_u_vt_tend(k,icrm) = ( u_vt(l,icrm) - crm_input_u_vt(k,icrm) ) * icrm_run_time;
+#endif
       } else {
         crm_output_t_vt_tend(k,icrm) = 0.0;
         crm_output_q_vt_tend(k,icrm) = 0.0;
+#ifdef MMF_VT_MOM
+        crm_output_u_vt_tend(k,icrm) = 0.0;
+#endif
       }
     }
   });
@@ -348,6 +361,9 @@ void post_timeloop() {
     if (use_VT) {
       crm_output_t_vt_tend(k,icrm) = 0.;
       crm_output_q_vt_tend(k,icrm) = 0.;
+#ifdef MMF_VT_MOM
+      crm_output_u_vt_tend(k,icrm) = 0.;
+#endif
     }
   });
 
@@ -566,6 +582,9 @@ void post_timeloop() {
     if (use_VT) {
       crm_output_t_vt_ls   (l,icrm) = t_vt_tend(k,icrm);
       crm_output_q_vt_ls   (l,icrm) = q_vt_tend(k,icrm);
+#ifdef MMF_VT_MOM
+      crm_output_u_vt_ls   (l,icrm) = u_vt_tend(k,icrm);
+#endif
     }
   });
 

@@ -155,6 +155,11 @@ void pre_timeloop() {
   auto &q_vt_tend               = :: q_vt_tend;
   auto &t_vt                    = :: t_vt;
   auto &q_vt                    = :: q_vt;
+  #ifdef MMF_VT_MOM
+  auto &crm_input_u_vt          = :: crm_input_u_vt;
+  auto &u_vt_tend               = :: u_vt_tend;
+  auto &u_vt                    = :: u_vt;
+  #endif
   auto &use_VT                  = :: use_VT;
   
 
@@ -409,6 +414,9 @@ void pre_timeloop() {
       // variance transport input forcing
       t_vt_tend(k,icrm) = ( crm_input_t_vt(l,icrm) - t_vt(k,icrm) )*idt_gl ;
       q_vt_tend(k,icrm) = ( crm_input_q_vt(l,icrm) - q_vt(k,icrm) )*idt_gl ;
+#ifdef MMF_VT_MOM
+      u_vt_tend(k,icrm) = ( crm_input_u_vt(l,icrm) - u_vt(k,icrm) )*idt_gl ;
+#endif
     }
   });
 

@@ -30,6 +30,9 @@ module cpp_interface_mod
                    crm_output_clhgh, crm_output_clmed, crm_output_cllow, &
                    crm_output_sltend, crm_output_qltend, crm_output_qcltend, crm_output_qiltend, &
                    crm_output_t_vt_tend, crm_output_q_vt_tend, crm_output_t_vt_ls, crm_output_q_vt_ls, &
+#ifdef MMF_VT_MOM
+                   crm_input_u_vt, crm_output_u_vt_tend, crm_output_u_vt_ls, &
+#endif
 #ifdef MMF_MOMENTUM_FEEDBACK
                    crm_output_ultend, crm_output_vltend, &
 #endif 
@@ -73,6 +76,9 @@ module cpp_interface_mod
                                       crm_output_clhgh, crm_output_clmed, crm_output_cllow, &
                                       crm_output_sltend, crm_output_qltend, crm_output_qcltend, &
                                       crm_output_t_vt_tend, crm_output_q_vt_tend, crm_output_t_vt_ls, crm_output_q_vt_ls, &
+#ifdef MMF_VT_MOM
+                                      crm_input_u_vt, crm_output_u_vt_tend, crm_output_u_vt_ls, &
+#endif
 #ifdef MMF_MOMENTUM_FEEDBACK
                                       crm_output_ultend, crm_output_vltend, &
 #endif

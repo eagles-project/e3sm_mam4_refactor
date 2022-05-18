@@ -47,6 +47,9 @@ module crm_input_module
 
       real(crm_rknd), allocatable :: t_vt(:,:)           ! CRM input of variance used for forcing tendency
       real(crm_rknd), allocatable :: q_vt(:,:)           ! CRM input of variance used for forcing tendency
+#ifdef MMF_VT_MOM
+      real(crm_rknd), allocatable :: u_vt(:,:)           ! CRM input of variance used for forcing tendency
+#endif
 
    end type crm_input_type
    !------------------------------------------------------------------------------------------------
@@ -121,6 +124,10 @@ contains
       if (.not. allocated(input%q_vt)) allocate(input%q_vt(ncrms,nlev))
       call prefetch(input%t_vt)
       call prefetch(input%q_vt)
+#ifdef MMF_VT_MOM
+      if (.not. allocated(input%u_vt)) allocate(input%u_vt(ncrms,nlev))
+      call prefetch(input%u_vt)
+#endif
 
       ! Initialize
       input%zmid    = 0
@@ -159,7 +166,9 @@ contains
 
       input%t_vt = 0
       input%q_vt = 0
-
+#ifdef MMF_VT_MOM
+      input%u_vt = 0
+#endif
    end subroutine crm_input_initialize
    !------------------------------------------------------------------------------------------------
    subroutine crm_input_finalize(input, MMF_microphysics_scheme)
@@ -202,7 +211,9 @@ contains
 
       if (allocated(input%t_vt)) deallocate(input%t_vt)
       if (allocated(input%q_vt)) deallocate(input%q_vt)
-
+#ifdef MMF_VT_MOM
+      if (allocated(input%u_vt)) deallocate(input%u_vt)
+#endif
    end subroutine crm_input_finalize 
 
 end module crm_input_module

@@ -90,6 +90,10 @@ module crm_output_module
       real(crm_rknd), allocatable :: q_vt_tend (:,:)       ! CRM output tendency for QT  variance transport
       real(crm_rknd), allocatable :: t_vt_ls   (:,:)       ! large-scale LSE variance transport tendency from GCM
       real(crm_rknd), allocatable :: q_vt_ls   (:,:)       ! large-scale QT  variance transport tendency from GCM
+#ifdef MMF_VT_MOM
+      real(crm_rknd), allocatable :: u_vt_tend (:,:)       ! CRM output tendency for U variance transport
+      real(crm_rknd), allocatable :: u_vt_ls   (:,:)       ! large-scale U variance transport tendency from GCM
+#endif
 
       ! These are all time and spatial averages, on the GCM grid
       real(crm_rknd), allocatable :: cld   (:,:)      ! cloud fraction
@@ -253,6 +257,10 @@ contains
       if (.not. allocated(output%q_vt_tend))  allocate(output%q_vt_tend(ncol,nlev))
       if (.not. allocated(output%t_vt_ls  ))  allocate(output%t_vt_ls  (ncol,nlev))
       if (.not. allocated(output%q_vt_ls  ))  allocate(output%q_vt_ls  (ncol,nlev))
+#ifdef MMF_VT_MOM
+      if (.not. allocated(output%u_vt_tend))  allocate(output%u_vt_tend(ncol,nlev))
+      if (.not. allocated(output%u_vt_ls  ))  allocate(output%u_vt_ls  (ncol,nlev))
+#endif
 
       if (.not. allocated(output%cld   )) allocate(output%cld   (ncol,nlev))  ! cloud fraction
       if (.not. allocated(output%gicewp)) allocate(output%gicewp(ncol,nlev))  ! ice water path
@@ -304,6 +312,10 @@ contains
       call prefetch(output%q_vt_tend )
       call prefetch(output%t_vt_ls   )
       call prefetch(output%q_vt_ls   )
+#ifdef MMF_VT_MOM
+      call prefetch(output%u_vt_tend )
+      call prefetch(output%u_vt_ls   )
+#endif
 
       call prefetch(output%cld    )
       call prefetch(output%gicewp )
@@ -418,6 +430,10 @@ contains
       output%q_vt_tend = 0
       output%t_vt_ls   = 0
       output%q_vt_ls   = 0
+#ifdef MMF_VT_MOM
+      output%u_vt_tend = 0
+      output%u_vt_ls   = 0
+#endif
 
       output%cld    = 0
       output%gicewp = 0
@@ -539,6 +555,10 @@ contains
       if (allocated(output%q_vt_tend)) deallocate(output%q_vt_tend)
       if (allocated(output%t_vt_ls))   deallocate(output%t_vt_ls)
       if (allocated(output%q_vt_ls))   deallocate(output%q_vt_ls)
+#ifdef MMF_VT_MOM
+      if (allocated(output%u_vt_tend)) deallocate(output%u_vt_tend)
+      if (allocated(output%u_vt_ls))   deallocate(output%u_vt_ls)
+#endif
 
       if (allocated(output%cld)) deallocate(output%cld)
       if (allocated(output%gicewp)) deallocate(output%gicewp)

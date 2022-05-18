@@ -108,10 +108,18 @@ void VT_diagnose() {
   auto &t_vt         = :: t_vt;
   auto &q_vt         = :: q_vt;
   auto &ncrms        = :: ncrms;
+#ifdef MMF_VT_MOM
+  auto &u            = :: u;
+  auto &u_vt_pert    = :: u_vt_pert;
+  auto &u_vt         = :: u_vt;
+#endif
 
   // local variables
   real2d t_mean("t_mean", nzm, ncrms);
   real2d q_mean("q_mean", nzm, ncrms);
+#ifdef MMF_VT_MOM
+  real2d u_mean("u_mean", nzm, ncrms);
+#endif
 
   //----------------------------------------------------------------------------
   // calculate horizontal mean
@@ -123,6 +131,10 @@ void VT_diagnose() {
       q_mean(k,icrm) = 0.0;
       t_vt(k,icrm) = 0.0;
       q_vt(k,icrm) = 0.0;
+#ifdef MMF_VT_MOM
+      u_mean(k,icrm) = 0.0;
+      u_vt(k,icrm) = 0.0;
+#endif
   });
 
   // do k = 1,nzm
@@ -132,6 +144,9 @@ void VT_diagnose() {
   parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_DEVICE_LAMBDA (int k, int j, int i, int icrm) {
     yakl::atomicAdd( t_mean(k,icrm) , t(k,j+offy_s,i+offx_s,icrm) );
     yakl::atomicAdd( q_mean(k,icrm) , qv(k,j,i,icrm) + qcl(k,j,i,icrm) + qci(k,j,i,icrm) );
+#ifdef MMF_VT_MOM
+    yakl::atomicAdd( u_mean(k,icrm) , u(k,j+offy_u,i+offx_u,icrm) );
+#endif
   });
 
   // do k = 1,nzm
@@ -139,6 +154,9 @@ void VT_diagnose() {
   parallel_for( SimpleBounds<2>(nzm,ncrms) , YAKL_LAMBDA (int k, int icrm) {
       t_mean(k,icrm) = t_mean(k,icrm) * factor_xy ;
       q_mean(k,icrm) = q_mean(k,icrm) * factor_xy ;
+#ifdef MMF_VT_MOM
+      u_mean(k,icrm) = u_mean(k,icrm) * factor_xy ;
+#endif
   });
 
   //----------------------------------------------------------------------------
@@ -149,6 +167,9 @@ void VT_diagnose() {
 
     real4d tmp_t("tmp_t", nzm, ny, nx, ncrms);
     real4d tmp_q("tmp_q", nzm, ny, nx, ncrms);
+#ifdef MMF_VT_MOM
+    real4d tmp_u("tmp_u", nzm, ny, nx, ncrms);
+#endif
 
     // do k = 1,nzm
     //   do j = 1,ny
@@ -159,10 +180,17 @@ void VT_diagnose() {
       tmp_q(k,j,i,icrm) = qv(k,j,i,icrm) + qcl(k,j,i,icrm) + qci(k,j,i,icrm);
       tmp_t(k,j,i,icrm) = tmp_t(k,j,i,icrm) - t_mean(k,icrm);
       tmp_q(k,j,i,icrm) = tmp_q(k,j,i,icrm) - q_mean(k,icrm);
+#ifdef MMF_VT_MOM
+      tmp_u(k,j,i,icrm) = u(k,j+offy_u,i+offx_u,icrm);
+      tmp_u(k,j,i,icrm) = tmp_u(k,j,i,icrm) - u_mean(k,icrm);
+#endif
     });
 
     VT_filter( VT_wn_max, tmp_t, t_vt_pert );
     VT_filter( VT_wn_max, tmp_q, q_vt_pert );
+#ifdef MMF_VT_MOM
+    VT_filter( VT_wn_max, tmp_u, u_vt_pert );
+#endif
 
   } else { // use total variance
 
@@ -173,6 +201,9 @@ void VT_diagnose() {
     parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
       t_vt_pert(k,j,i,icrm) = t(k,j+offy_s,i+offx_s,icrm) - t_mean(k,icrm);
       q_vt_pert(k,j,i,icrm) = qv(k,j,i,icrm) + qcl(k,j,i,icrm) + qci(k,j,i,icrm) - q_mean(k,icrm);
+#ifdef MMF_VT_MOM
+      u_vt_pert(k,j,i,icrm) = u(k,j+offy_u,i+offx_u,icrm) - u_mean(k,icrm);
+#endif
     });
     
   }
@@ -188,6 +219,9 @@ void VT_diagnose() {
   parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_DEVICE_LAMBDA (int k, int j, int i, int icrm) {
     yakl::atomicAdd( t_vt(k,icrm) , t_vt_pert(k,j,i,icrm) * t_vt_pert(k,j,i,icrm) );
     yakl::atomicAdd( q_vt(k,icrm) , q_vt_pert(k,j,i,icrm) * q_vt_pert(k,j,i,icrm) );
+#ifdef MMF_VT_MOM
+    yakl::atomicAdd( u_vt(k,icrm) , u_vt_pert(k,j,i,icrm) * u_vt_pert(k,j,i,icrm) );
+#endif
   });
 
 
@@ -196,6 +230,9 @@ void VT_diagnose() {
   parallel_for( SimpleBounds<2>(nzm,ncrms) , YAKL_LAMBDA (int k, int icrm) {
     t_vt(k,icrm) = t_vt(k,icrm) * factor_xy ;
     q_vt(k,icrm) = q_vt(k,icrm) * factor_xy ;
+#ifdef MMF_VT_MOM
+    u_vt(k,icrm) = u_vt(k,icrm) * factor_xy ;
+#endif
   });
 
   //----------------------------------------------------------------------------
@@ -216,10 +253,19 @@ void VT_forcing() {
   auto &q_vt        = :: q_vt;
   auto &ncrms       = :: ncrms;
   auto &dtn         = :: dtn;
+#ifdef MMF_VT_MOM
+  auto &u           = :: u;
+  auto &u_vt_pert   = :: u_vt_pert;
+  auto &u_vt        = :: u_vt;
+  auto &u_vt_tend   = :: u_vt_tend;
+#endif
 
   // local variables
   real2d t_pert_scale("t_pert_scale", nzm, ncrms);
   real2d q_pert_scale("q_pert_scale", nzm, ncrms);
+#ifdef MMF_VT_MOM
+  real2d u_pert_scale("u_pert_scale", nzm, ncrms);
+#endif
 
   int idx_qt = index_water_vapor;
 
@@ -253,6 +299,14 @@ void VT_forcing() {
     // enforce maximum scaling
     t_pert_scale(k,icrm) = min( t_pert_scale(k,icrm), pert_scale_max );
     q_pert_scale(k,icrm) = min( q_pert_scale(k,icrm), pert_scale_max );
+#ifdef MMF_VT_MOM
+    u_pert_scale(k,icrm) = 1.0;
+    real tmp_u_scale = -1.0;
+    if (u_vt(k,icrm)>0.0) { tmp_u_scale = 1.0 + dtn * u_vt_tend(k,icrm) / u_vt(k,icrm); }
+    if (tmp_u_scale>0.0) { u_pert_scale(k,icrm) = sqrt( tmp_u_scale ); }
+    u_pert_scale(k,icrm) = max( u_pert_scale(k,icrm), pert_scale_min );
+    u_pert_scale(k,icrm) = min( u_pert_scale(k,icrm), pert_scale_max );
+#endif
   });
 
   //----------------------------------------------------------------------------
@@ -262,12 +316,40 @@ void VT_forcing() {
   //   do j = 1,ny
   //     do i = 1,nx
   //       do icrm = 1,ncrms
+#ifdef MMF_VT_TEST
+
+  // Special test mode to use specific combinations
+  // of tracers for variance feedback tests
+  // assumes that MMF_VT_MOM is defined
+  parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
+#ifdef MMF_VT_USE_T
+    real ttend_loc = ( t_pert_scale(k,icrm) * t_vt_pert(k,j,i,icrm) - t_vt_pert(k,j,i,icrm) ) / dtn;
+    t(k,j+offy_s,i+offx_s,icrm) = t(k,j+offy_s,i+offx_s,icrm) + ttend_loc * dtn;
+#endif
+#ifdef MMF_VT_USE_U
+    real utend_loc = ( u_pert_scale(k,icrm) * u_vt_pert(k,j,i,icrm) - u_vt_pert(k,j,i,icrm) ) / dtn;
+    u(k,j+offy_u,i+offx_u,icrm) = u(k,j+offy_u,i+offx_u,icrm) + utend_loc * dtn;
+#endif
+#ifdef MMF_VT_USE_Q
+    real qtend_loc = ( q_pert_scale(k,icrm) * q_vt_pert(k,j,i,icrm) - q_vt_pert(k,j,i,icrm) ) / dtn;
+    micro_field(idx_qt,k,j+offy_s,i+offx_s,icrm) = micro_field(idx_qt,k,j+offy_s,i+offx_s,icrm) + qtend_loc * dtn;
+#endif
+  });
+
+#else
+
   parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
     real ttend_loc = ( t_pert_scale(k,icrm) * t_vt_pert(k,j,i,icrm) - t_vt_pert(k,j,i,icrm) ) / dtn;
     real qtend_loc = ( q_pert_scale(k,icrm) * q_vt_pert(k,j,i,icrm) - q_vt_pert(k,j,i,icrm) ) / dtn;
     t(k,j+offy_s,i+offx_s,icrm)                  = t(k,j+offy_s,i+offx_s,icrm)                  + ttend_loc * dtn;
     micro_field(idx_qt,k,j+offy_s,i+offx_s,icrm) = micro_field(idx_qt,k,j+offy_s,i+offx_s,icrm) + qtend_loc * dtn;
+#ifdef MMF_VT_MOM
+    real utend_loc = ( u_pert_scale(k,icrm) * u_vt_pert(k,j,i,icrm) - u_vt_pert(k,j,i,icrm) ) / dtn;
+    u(k,j+offy_u,i+offx_u,icrm) = u(k,j+offy_u,i+offx_u,icrm) + utend_loc * dtn;
+#endif
   });
+
+#endif
 
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
