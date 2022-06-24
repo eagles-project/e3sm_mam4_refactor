@@ -16,6 +16,7 @@ module fileutils
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: get_filename  !Returns filename given full pathname
   public :: opnfil        !Open local unformatted or formatted file
+  public :: cpyfil        !Open local unformatted or formatted file
   public :: getfil        !Obtain local copy of file
   public :: relavu        !Close and release Fortran unit no longer in use
   public :: getavu        !Get next available Fortran unit number
@@ -143,6 +144,41 @@ contains
     end if
 
   end subroutine opnfil
+
+!------------------------------------------------------------------------
+  subroutine cpyfil (locfn, locfn_copy)
+    !
+    ! !DESCRIPTION:
+    ! Copy file locfn to locfn_copy
+    use shr_file_mod, only : shr_file_put
+
+    implicit none
+    !
+    ! !ARGUMENTS:
+    character(len=*), intent(in):: locfn       !file name
+    character(len=*), intent(in):: locfn_copy  !file name
+    !
+    ! !LOCAL VARIABLES:
+    integer ioe             !error return from fortran open
+    !------------------------------------------------------------------------
+
+    if (len_trim(locfn) == 0) then
+       write(iulog,*)'(OPNFIL): local filename has zero length'
+       call shr_sys_abort
+    endif
+
+    call shr_file_put(ioe, trim(locfn), "cp:" // trim(locfn_copy),remove=.false.)
+
+    if (ioe /= 0) then
+       write(iulog,*)'(OPNFIL): failed to copy file ',trim(locfn),        &
+            &     ' to:  ', trim(locfn_copy)
+       call shr_sys_abort
+    else if ( masterproc )then
+       write(iulog,*)'(OPNFIL): Successfully copied file ',trim(locfn),   &
+            &     ' to:  ', trim(locfn_copy)
+    end if
+
+  end subroutine cpyfil
 
   !------------------------------------------------------------------------
   integer function getavu()
