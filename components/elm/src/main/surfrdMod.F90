@@ -20,6 +20,7 @@ module surfrdMod
   use pio
   use spmdMod       
   use topounit_varcon , only : max_topounits, has_topounit  
+  use netcdf
   
   !
   ! !PUBLIC TYPES:
@@ -70,6 +71,7 @@ contains
     integer :: n,i,j               ! index 
     integer :: ier                 ! error status
     type(file_desc_t)  :: ncid     ! netcdf id
+    integer :: nfid
     type(var_desc_t)   :: vardesc  ! variable descriptor
     character(len=256) :: varname  ! variable name
     character(len=256) :: locfn    ! local file name
@@ -91,6 +93,47 @@ contains
     end if
 
     call getfil( filename, locfn, 0 )
+
+#if 0
+!#if defined CPL_BYPASS && defined LDOMAIN_SUB
+    ier = nf90_open(trim(locfn), NF90_NOWRITE, nfid)
+
+    ier = nf90_inq_dimid(nfid, "ni", dimid)
+    ier = nf90_inquire_dimension(nfid, dimid, len = ni)
+    ier = nf90_inq_dimid(nfid, "nj", dimid)
+    ier = nf90_inquire_dimension(nfid, dimid, len = nj)
+    ns = ni*nj
+    if (ni>1 .and. nj>1) isgrid2d = .true.
+    if (masterproc) then
+       write(iulog,*)'lat/lon grid flag (isgrid2d) is ',isgrid2d
+    end if
+
+    allocate(mask(ns))
+    mask(:) = 1
+
+    ier = nf90_inq_varid(nfid, 'LANDMASK', varid)
+    if (ier /= 0) ier = nf90_inq_varid(nfid, 'mask', varid)
+    if (isgrid2d) then
+       allocate(idata2d(ni,nj))
+       idata2d(:,:) = 1
+       ier = nf90_get_var(nfid, varid, idata2d)
+       if (ier == 0) then
+          do j = 1,nj
+          do i = 1,ni
+             n = (j-1)*ni + i
+             mask(n) = idata2d(i,j)
+          enddo
+          enddo
+       end if
+       deallocate(idata2d)
+    else
+       ier = nf90_get_var(nfid, varid, mask)
+    end if
+    if (ier /= 0) call endrun( msg=' ERROR: landmask not on fatmlndfrc file'//errMsg(__FILE__, __LINE__))
+
+    ier = nf90_close(nfid)
+
+#else
     call ncd_pio_openfile (ncid, trim(locfn), 0)
 
     ! Determine dimensions and if grid file is 2d or 1d
@@ -128,6 +171,8 @@ contains
     if (.not. readvar) call endrun( msg=' ERROR: landmask not on fatmlndfrc file'//errMsg(__FILE__, __LINE__))
 
     call ncd_pio_closefile(ncid)
+
+#endif
 
   end subroutine surfrd_get_globmask
 
