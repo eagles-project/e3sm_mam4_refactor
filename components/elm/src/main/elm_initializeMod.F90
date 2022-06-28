@@ -83,7 +83,7 @@ contains
     use reweightMod               , only: reweight_wrapup
     use ELMFatesInterfaceMod      , only: ELMFatesGlobals
     use topounit_varcon           , only: max_topounits, has_topounit, topounit_varcon_init
-    use elm_varctl                , only: metdata_bypass, ldomain_subed, subnum_str, fname_len, ni_sum, nj_sum
+    use elm_varctl                , only: metdata_bypass, ldomain_subed, metdata_subed, subnum_str, fname_len, ni_sum, nj_sum
     use spmdMod
     !
     ! !LOCAL VARIABLES:
@@ -108,8 +108,6 @@ contains
     integer           :: nclumps                 ! number of clumps on this processor
     integer           :: nc                      ! clump index
     integer ,pointer  :: amask_loc(:)            ! local land mask
-    character(len=fname_len) :: fatmlndfrc_loc   ! local land domain name
-    character(len=fname_len) :: fsurdat_loc      ! local land domain name
     character(len=4)  :: numstr
     character(len=32) :: subname = 'initialize1' ! subroutine name
 
@@ -157,18 +155,27 @@ contains
     ! the following is required in case data not-subzoned.
     ni_sum = ni
     nj_sum = nj
-#ifdef CPL_BYPASS
-    ! with high-res land model, sud-domains, surfdatas, and metdata are all under one sub-directories
+
+    ldomain_subed = .false.
+    metdata_subed = .false.
+#if defined CPL_BYPASS && defined LDOMAIN_SUB
+    ! with high-res land model, sud-domains, surfdatas, and/or metdata are all under one sub-directories
     ! under 'metdata_bypass' folder
-    inquire(file=trim(metdata_bypass) // '/sub001/zone_mappings.txt', exist=ldomain_subed)
-#ifdef LDOMAIN_SUB
-    if (ldomain_subed) then
+    if(index(fatmlndfrc, 'sub001') .gt. 0) ldomain_subed = .true.
+    inquire(file=trim(metdata_bypass) // '/sub001/zone_mappings.txt', exist=metdata_subed)
+
+    if (ldomain_subed .or. metdata_subed) then
+       ! note: those two may not be both '.true.', upon how metdata zoned and placed.
+       !       But, if ldomain_subed = .true., then metdata_subed = .true.
        write(numstr, '(I4)') 1001+iam
        subnum_str = 'sub' // numstr(2:4)
-
-       fatmlndfrc_loc = trim(metdata_bypass) // '/' // subnum_str // '/domain.nc'
-       fsurdat_loc = trim(metdata_bypass) // '/' // subnum_str // '/surfdata.nc'
-       call surfrd_get_globmask(filename=trim(fatmlndfrc_loc), mask=amask_loc, ni=ni, nj=nj)
+    end if
+!
+#if 0
+    if (ldomain_subed) then
+       fatmlndfrc = trim(metdata_bypass) // '/' // subnum_str // '/domain.nc'
+       fsurdat = trim(metdata_bypass) // '/' // subnum_str // '/surfdata.nc'
+       call surfrd_get_globmask(filename=trim(fatmlndfrc), mask=amask_loc, ni=ni, nj=nj)
 
        call mpi_barrier(mpicom,ier)
        ! HERE, it's assumed that 1-D domain and each appendable by 'ni' only
@@ -182,14 +189,13 @@ contains
        call mpi_bcast(amask, ni_sum*nj_sum, MPI_INTEGER, 0, mpicom, ier)
 
        ! replace the global inputs with 'iam' associated ones (NOT YET work)
-       fatmlndfrc = trim(fatmlndfrc_loc)
-       fsurdat = trim(fsurdat_loc)
 
        deallocate(amask_loc)
 
        call mpi_barrier(mpicom, ier)
-
     end if
+#else
+    ldomain_subed = .false.   ! in case
 #endif
 #endif
 
