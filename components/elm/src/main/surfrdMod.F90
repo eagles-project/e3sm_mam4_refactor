@@ -854,6 +854,11 @@ contains
          end do
        enddo
     enddo
+    where (pcturb_tot <= 0._r8)
+       urban_valid = .false.
+    elsewhere
+       urban_valid = .true.
+    end where
 
     if (create_glacier_mec_landunit) then          ! call ncd_io_gs_int2d
 
