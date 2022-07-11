@@ -1525,6 +1525,10 @@ subroutine tphysac (ztodt,   cam_in,  &
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
 
+    ! Numerical schemes for process coupling
+
+    integer :: cflx_cpl_opt   ! When to apply surface tracer fluxes
+
     !
     !-----------------------------------------------------------------------
     !
@@ -1536,6 +1540,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     call phys_getopts( do_clubb_sgs_out       = do_clubb_sgs, &
                        state_debug_checks_out = state_debug_checks &
                       ,deep_scheme_out        = deep_scheme        &
+                      ,cflx_cpl_opt_out       = cflx_cpl_opt       &
                       ,l_tracer_aero_out      = l_tracer_aero      &
                       ,l_vdiff_out            = l_vdiff            &
                       ,l_rayleigh_out         = l_rayleigh         &
@@ -1662,9 +1667,11 @@ end if ! l_tracer_aero
        ! Calculate surface friction velocity (ustar) and Obukhov length
        call clubb_surface ( state, cam_in, surfric, obklen)
 
-       ! Diagnose tracer mixing ratio tendencies from surface fluxes, then update the mixing ratios
-       call cflx_tend( state, cam_in, ztodt, ptend)
-       call physics_update(state, ptend, ztodt, tend)
+       if (cflx_cpl_opt==1) then
+          ! Diagnose tracer mixing ratio tendencies from surface fluxes, then update the mixing ratios
+          call cflx_tend( state, cam_in, ztodt, ptend)
+          call physics_update(state, ptend, ztodt, tend)
+       end if
 
     else
     if (l_vdiff) then
@@ -1928,6 +1935,8 @@ subroutine tphysbc (ztodt,               &
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
     use nudging,         only: Nudge_Model,Nudge_Loc_PhysOut,nudging_calc_tend
 
+    use cflx,            only: cflx_tend
+
     implicit none
 
     !
@@ -2082,12 +2091,18 @@ subroutine tphysbc (ztodt,               &
     logical :: l_rad
     !HuiWan (2014/15): added for a short-term time step convergence test ==
 
+    ! Numerical schemes for process coupling
+
+    integer :: cflx_cpl_opt   ! When to apply surface tracer fluxes
+
+    !--------------------------------------------------------------------
 
     call phys_getopts( microp_scheme_out      = microp_scheme, &
                        macrop_scheme_out      = macrop_scheme, &
                        use_subcol_microp_out  = use_subcol_microp, &
                        deep_scheme_out        = deep_scheme,       &
                        state_debug_checks_out = state_debug_checks &
+                      ,cflx_cpl_opt_out       = cflx_cpl_opt       &
                       ,l_bc_energy_fix_out    = l_bc_energy_fix    &
                       ,l_dry_adj_out          = l_dry_adj          &
                       ,l_tracer_aero_out      = l_tracer_aero      &
@@ -2419,6 +2434,17 @@ end if
      end if !l_st_mac
 
     elseif( microp_scheme == 'MG' ) then
+
+       !---------------------------------------------------------------------------------------
+       ! Apply surface tracer fluxes to update tracer mixing ratios before turbulent tranport
+       !---------------------------------------------------------------------------------------
+       if (cflx_cpl_opt==2) then
+          ! Diagnose tracer mixing ratio tendencies from surface fluxes, then update the mixing ratios
+          call cflx_tend( state, cam_in, ztodt, ptend)
+          call physics_update(state, ptend, ztodt, tend)
+       end if
+
+       !-------------------------------------------------------------------
        ! Start co-substepping of macrophysics and microphysics
        cld_macmic_ztodt = ztodt/cld_macmic_num_steps
 
