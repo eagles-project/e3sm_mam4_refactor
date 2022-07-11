@@ -1486,6 +1486,8 @@ contains
       write(1000+iam,FormatR) 'cplbypass_dataload - done', ' memory current usage (MB)  = ', mrss
 
       write(1000+iam,*) 'cplbypass_dataload - done in mpi-walltime of ', t1 - t0
+      write(1000+iam,*) '--------------------------------------------------'
+      write(1000+iam,*) ' '
     endif
 #endif
 

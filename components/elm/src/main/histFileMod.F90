@@ -40,6 +40,9 @@ module histFileMod
   implicit none
   save
   private
+
+  include 'mpif.h'
+
   !
   ! !PUBLIC TYPES:
   !
@@ -3486,6 +3489,10 @@ contains
     use elm_varpar      , only : nlevgrnd
     use spmdMod
     use fileutils       , only : cpyfil
+#ifdef TPROF
+    use shr_mem_mod      , only : shr_mem_init, shr_mem_getusage
+    use shr_mpi_mod      , only : shr_mpi_min, shr_mpi_max
+#endif
     !
     ! !ARGUMENTS:
     logical, intent(in) :: rstwr    ! true => write restart file this step
@@ -3516,6 +3523,12 @@ contains
     character(len=256) :: master_fname    ! master output file name
     logical :: if_stop                    ! true => last time step of run
     logical, save :: do_3Dtconst = .true. ! true => write out 3D time-constant data
+#ifdef TPROF
+    real(r8) :: msize,msize0, msize1     ! memory size (high water)
+    real(r8) :: mrss ,mrss0 , mrss1      ! resident size (current memory use)
+    character(*), parameter :: FormatR = '(A,": =============== ", A31,F12.3,1x,  " ===============")'
+    double precision :: t0, t1
+#endif
     character(len=*),parameter :: subname = 'hist_htapes_wrapup'
     !-----------------------------------------------------------------------
 
@@ -3639,7 +3652,21 @@ contains
 
           ! Write history time samples
           call t_startf('hist_htapes_wrapup_write')
+
+#ifdef TPROF
+      t0 = MPI_Wtime()
+      call shr_mem_getusage(msize,mrss)
+      write(1000+iam,*) ' '
+      write(1000+iam,*) '@timestep: ', nstep
+      write(1000+iam,FormatR) 'hist write - begining: ', ' memory highwater  (MB)     = ', msize
+      write(1000+iam,FormatR) 'hist write - begining: ', ' memory current usage (MB)  = ', mrss
+#endif
+
+#if 0
+          call hfields_write_ncf90(t, locfnh(t))
+#else
           call hfields_write(t, mode='write')
+#endif
 
 #if defined CPL_BYPASS && defined LDOMAIN_SUB
           call ncd_pio_closefile(nfid(t))   ! have to flush out data by closeing pio nc file for copying below, then open it again
@@ -3658,6 +3685,16 @@ contains
 
           call ncd_pio_openfile (nfid(t), trim(locfnh(t)), ncd_write) ! open that closed pio nc file again after copying. Otherwise error for next time-interval writing
 #endif
+
+#ifdef TPROF
+          t1 = MPI_Wtime()
+          call shr_mem_getusage(msize,mrss)
+          write(1000+iam,*) ' '
+          write(1000+iam,FormatR) 'hist write - done: ', ' memory highwater  (MB)     = ', msize
+          write(1000+iam,FormatR) 'hist write - done: ', ' memory current usage (MB)  = ', mrss
+          write(1000+iam,*) 'hist write - done in mpi-walltime of ', t1 - t0, ' ON Tape: ', t
+#endif
+
           call t_stopf('hist_htapes_wrapup_write')
 
           ! Zero necessary history buffers
