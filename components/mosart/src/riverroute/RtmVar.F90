@@ -30,6 +30,7 @@ module RtmVar
   logical, public :: wrmflag = .false.                 ! water management model flag
   logical, public :: inundflag = .false.               ! inundation model flag
   logical, public :: use_lnd_rof_two_way = .false.     ! land river two way coupling flag
+  logical, public :: use_linear_inund    = .false.     ! use linear model to estimate inundation fraction
   logical, public :: sediflag = .false.                ! sediment model flag
   logical, public :: heatflag = .false.                ! heat model flag
   logical, public :: rstraflag = .false.               ! reservoir stratification module flag
