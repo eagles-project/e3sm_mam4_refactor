@@ -12,7 +12,7 @@ module dynSubgridDriverMod
   use shr_kind_mod           , only : r8 => shr_kind_r8
   use dynSubgridControlMod, only : get_flanduse_timeseries
   use dynSubgridControlMod, only : get_do_transient_pfts, get_do_transient_crops
-  use dynSubgridControlMod, only : get_do_harvest
+  use dynSubgridControlMod, only : get_do_harvest, get_do_transient_erosion
   use dynPriorWeightsMod  , only : prior_weights_type
   use dynPatchStateUpdaterMod      , only : patch_state_updater_type
   use dynColumnStateUpdaterMod     , only : column_state_updater_type
@@ -24,6 +24,7 @@ module dynSubgridDriverMod
   use PhotosynthesisType  , only : photosyns_type
   use SoilHydrologyType   , only : soilhydrology_type
   use SoilStateType       , only : soilstate_type
+  use SedFluxType         , only : sedflux_type
   use glc2lndMod          , only : glc2lnd_type
   use dynLandunitAreaMod  , only : update_landunit_weights
   use CropType            , only : crop_type
@@ -59,7 +60,8 @@ module dynSubgridDriverMod
 contains
 
   !-----------------------------------------------------------------------
-  subroutine dynSubgrid_init(bounds, glc2lnd_vars, crop_vars)
+  subroutine dynSubgrid_init(bounds, glc2lnd_vars, crop_vars, &
+       soilstate_vars, sedflux_vars)
     !
     ! !DESCRIPTION:
     ! Determine initial subgrid weights for prescribed transient Patches and/or
@@ -76,11 +78,14 @@ contains
     use dynpftFileMod     , only : dynpft_init
     use dynHarvestMod     , only : dynHarvest_init
     use dynpftFileMod     , only : dynpft_interp
+    use dynErosionMod     , only : dynErosion_init, dynErosion_interp
     !
     ! !ARGUMENTS:
     type(bounds_type) , intent(in)    :: bounds  ! processor-level bounds
     type(glc2lnd_type), intent(inout) :: glc2lnd_vars
     type(crop_type)   , intent(inout) :: crop_vars
+    type(soilstate_type), intent(inout) :: soilstate_vars
+    type(sedflux_type), intent(inout) :: sedflux_vars
     !
     ! !LOCAL VARIABLES:
     integer           :: nclumps      ! number of clumps on this processor
@@ -107,6 +112,11 @@ contains
        call dynHarvest_init(bounds, harvest_filename=get_flanduse_timeseries())
     end if
 
+    ! Initialize stuff for transient ELM-Erosion parameters
+    if (get_do_transient_erosion()) then
+       call dynErosion_init(bounds, dynErosion_filename=get_flanduse_timeseries())
+    end if
+
     ! Initialize stuff for prescribed transient crops
     if (get_do_transient_crops()) then
        call dyncrop_init(bounds, dyncrop_filename=get_flanduse_timeseries())
@@ -125,6 +135,10 @@ contains
        call dyncrop_interp(bounds, crop_vars)
     end if
 
+    if (get_do_transient_erosion()) then
+       call dynErosion_interp(bounds, soilstate_vars, sedflux_vars) 
+    end if
+
     !$OMP PARALLEL DO PRIVATE (nc, bounds_clump)
     do nc = 1, nclumps
        call get_clump_bounds(nc, bounds_clump)
@@ -140,7 +154,7 @@ contains
        energyflux_vars, canopystate_vars, photosyns_vars, cnstate_vars, &
        veg_cs, c13_veg_cs, c14_veg_cs, &
        col_cs, c13_col_cs, c14_col_cs, col_cf, &
-       grc_cs, grc_cf, glc2lnd_vars, crop_vars)
+       grc_cs, grc_cf, glc2lnd_vars, crop_vars, sedflux_vars)
     !
     ! !DESCRIPTION:
     ! Update subgrid weights for prescribed transient Patches and/or dynamic
@@ -161,6 +175,7 @@ contains
     use dynConsBiogeochemMod , only : dyn_cnbal_patch, dyn_cnbal_column
     use dynpftFileMod        , only : dynpft_interp
     use dynHarvestMod        , only : dynHarvest_interp_harvest_types
+    use dynErosionMod        , only : dynErosion_interp
     use dynEDMod             , only : dyn_ED
     use reweightMod          , only : reweight_wrapup
     use subgridWeightsMod    , only : compute_higher_order_weights, set_subgrid_diagnostic_fields
@@ -175,7 +190,7 @@ contains
     ! !ARGUMENTS:
     type(bounds_type)        , intent(in)    :: bounds_proc  ! processor-level bounds
     type(urbanparams_type)   , intent(in)    :: urbanparams_vars
-    type(soilstate_type)     , intent(in)    :: soilstate_vars
+    type(soilstate_type)     , intent(inout) :: soilstate_vars
     type(soilhydrology_type) , intent(inout) :: soilhydrology_vars
     type(lakestate_type)     , intent(in)    :: lakestate_vars
     type(energyflux_type)    , intent(inout) :: energyflux_vars
@@ -194,6 +209,7 @@ contains
     type(glc2lnd_type)       , intent(inout) :: glc2lnd_vars
 
     type(crop_type)          , intent(inout) :: crop_vars
+    type(sedflux_type)       , intent(inout) :: sedflux_vars
 
     !
     ! !LOCAL VARIABLES:
@@ -242,6 +258,10 @@ contains
 
     if (get_do_harvest()) then
        call dynHarvest_interp_harvest_types(bounds_proc)
+    end if
+
+    if (get_do_transient_erosion()) then
+       call dynErosion_interp(bounds_proc, soilstate_vars, sedflux_vars)
     end if
 
     ! ==========================================================================
