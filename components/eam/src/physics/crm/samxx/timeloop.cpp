@@ -1,7 +1,7 @@
 
 #include "timeloop.h"
 
-#ifdef MMF_LAGRANGIAN_RAD
+#ifdef MMF_RAD_SORT
 void update_sort_idx() {
   YAKL_SCOPE( t                        , :: t );
   YAKL_SCOPE( qv                       , :: qv  );
@@ -82,7 +82,16 @@ void timeloop() {
   YAKL_SCOPE( ncrms                    , :: ncrms );
   YAKL_SCOPE( na                       , :: na );
   YAKL_SCOPE( dt3                      , :: dt3 );
-#ifdef MMF_LAGRANGIAN_RAD
+#ifdef MMF_RAD_SORT
+  YAKL_SCOPE( CF3D                     , :: CF3D );
+  YAKL_SCOPE( crm_rad_temperature      , :: crm_rad_temperature );
+  YAKL_SCOPE( tabs                     , :: tabs );
+  YAKL_SCOPE( crm_rad_qv               , :: crm_rad_qv );
+  YAKL_SCOPE( crm_rad_qc               , :: crm_rad_qc );
+  YAKL_SCOPE( crm_rad_qi               , :: crm_rad_qi );
+  YAKL_SCOPE( crm_rad_cld              , :: crm_rad_cld );
+  YAKL_SCOPE( crm_clear_rh             , :: crm_clear_rh );
+  YAKL_SCOPE( crm_clear_rh_cnt         , :: crm_clear_rh_cnt );
   // YAKL_SCOPE( sort_q                   , :: sort_q );
   YAKL_SCOPE( sort_i                   , :: sort_i );
   YAKL_SCOPE( sort_j                   , :: sort_j );
@@ -137,7 +146,12 @@ void timeloop() {
       //       Large-scale and surface forcing:
       forcing();
 
-#ifdef MMF_LAGRANGIAN_RAD
+      // Apply radiative tendency
+      // for (int k=0; k<nzm; k++) {
+      //   for (int j=0; j<ny; j++) {
+      //     for (int i=0; i<nx; i++) {
+      //       for (int icrm=0; icrm<ncrms; icrm++) {
+#ifdef MMF_RAD_SORT
       parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
         int i_rad = i / (nx/crm_nx_rad);
         int j_rad = j / (ny/crm_ny_rad);
@@ -147,16 +161,12 @@ void timeloop() {
         t(k,jj,ii,icrm) = t(k,jj,ii,icrm) + crm_rad_qrad(k,j_rad,i_rad,icrm)*dtn;
       });
 #else
-
-      // Apply radiative tendency
-      // for (int k=0; k<nzm; k++) {
-      //   for (int j=0; j<ny; j++) {
-      //     for (int i=0; i<nx; i++) {
-      //       for (int icrm=0; icrm<ncrms; icrm++) {
       parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
         int i_rad = i / (nx/crm_nx_rad);
         int j_rad = j / (ny/crm_ny_rad);
-        t(k,j+offy_s,i+offx_s,icrm) = t(k,j+offy_s,i+offx_s,icrm) + crm_rad_qrad(k,j_rad,i_rad,icrm)*dtn;
+        int ii = i+offx_s;
+        int jj = j+offy_s;
+        t(k,jj,ii,icrm) = t(k,jj,ii,icrm) + crm_rad_qrad(k,j_rad,i_rad,icrm)*dtn;
       });
 #endif
       //----------------------------------------------------------
@@ -278,7 +288,7 @@ void timeloop() {
 
     post_icycle();
 
-#ifdef MMF_LAGRANGIAN_RAD
+#ifdef MMF_RAD_SORT
   update_sort_idx();
 
   // average output rad data
@@ -290,9 +300,7 @@ void timeloop() {
     int jj = sort_j(idx,icrm);
     int i_rad = i / (nx/crm_nx_rad);
     int j_rad = j / (ny/crm_ny_rad);
-    for (int k=0; k<nzm; k++) {
-      real qsat_tmp;
-      real rh_tmp;
+    // for (int k=0; k<nzm; k++) {
       yakl::atomicAdd(crm_rad_temperature(k,j_rad,i_rad,icrm) , tabs(k,jj,ii,icrm));
       real tmp = max(0.0,qv(k,jj,ii,icrm));
       yakl::atomicAdd(crm_rad_qv(k,j_rad,i_rad,icrm) , tmp);
@@ -301,13 +309,37 @@ void timeloop() {
       if (qcl(k,jj,ii,icrm) + qci(k,jj,ii,icrm) > 0) {
         yakl::atomicAdd(crm_rad_cld(k,j_rad,i_rad,icrm) , CF3D(k,jj,ii,icrm));
       } else {
+        real qsat_tmp;
         qsatw_crm(tabs(k,jj,ii,icrm),pres(k,icrm),qsat_tmp);
-        rh_tmp = qv(k,jj,ii,icrm)/qsat_tmp;
+        real rh_tmp = qv(k,jj,ii,icrm)/qsat_tmp;
         yakl::atomicAdd(crm_clear_rh(k,icrm) , rh_tmp);
         yakl::atomicAdd(crm_clear_rh_cnt(k,icrm),1);
       }
-    }
+    // }
   });
+// #else
+//   parallel_for( SimpleBounds<4>(nzm,ny,nx,ncrms) , YAKL_LAMBDA (int k, int j, int i, int icrm) {
+//     // Reduced radiation method allows for fewer radiation calculations
+//     // by collecting statistics and doing radiation over column groups
+//     int i_rad = i / (nx/crm_nx_rad);
+//     int j_rad = j / (ny/crm_ny_rad);
+//     real qsat_tmp;
+//     real rh_tmp;
+
+//     yakl::atomicAdd(crm_rad_temperature(k,j_rad,i_rad,icrm) , tabs(k,j,i,icrm));
+//     real tmp = max(0.0,qv(k,j,i,icrm));
+//     yakl::atomicAdd(crm_rad_qv(k,j_rad,i_rad,icrm) , tmp);
+//     yakl::atomicAdd(crm_rad_qc(k,j_rad,i_rad,icrm) , qcl(k,j,i,icrm));
+//     yakl::atomicAdd(crm_rad_qi(k,j_rad,i_rad,icrm) , qci(k,j,i,icrm));
+//     if (qcl(k,j,i,icrm) + qci(k,j,i,icrm) > 0) {
+//       yakl::atomicAdd(crm_rad_cld(k,j_rad,i_rad,icrm) , CF3D(k,j,i,icrm));
+//     } else {
+//       qsatw_crm(tabs(k,j,i,icrm),pres(k,icrm),qsat_tmp);
+//       rh_tmp = qv(k,j,i,icrm)/qsat_tmp;
+//       yakl::atomicAdd(crm_clear_rh(k,icrm) , rh_tmp);
+//       yakl::atomicAdd(crm_clear_rh_cnt(k,icrm),1);
+//     }
+//   });
 #endif
 
   } while (nstep < nstop);
