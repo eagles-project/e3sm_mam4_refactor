@@ -160,14 +160,7 @@ module ocn_time_integration
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_timestep_init(domain, dt, err)!{{{
-
-      !-----------------------------------------------------------------
-      ! Input variables
-      !-----------------------------------------------------------------
-
-      real (kind=RKIND), intent(in) :: &
-         dt              !< [in] time step (sec)
+   subroutine ocn_timestep_init(domain, err)!{{{
 
       !-----------------------------------------------------------------
       ! Input/Output variables
@@ -202,7 +195,7 @@ module ocn_time_integration
 
       case ('split_implicit')
          timeIntegratorChoice = timeIntSemiImplicit
-         call ocn_time_integration_si_init(domain, dt)
+         call ocn_time_integration_si_init(domain)
 
       case ('RK4')
          timeIntegratorChoice = timeIntRK4
