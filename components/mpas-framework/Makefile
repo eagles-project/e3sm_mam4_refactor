@@ -157,11 +157,15 @@ pgi-summit:
 	"LDFLAGS_DEBUG = -O0 -g -Ktrap=divz,fp,inv,ovf -traceback" \
 	"FFLAGS_OMP = -mp" \
 	"CFLAGS_OMP = -mp" \
+	"FFLAGS_CUBLAS = -cudalib=cublas -cuda" \
 	"PICFLAG = -fpic" \
 	"BUILD_TARGET = $(@)" \
 	"CORE = $(CORE)" \
 	"DEBUG = $(DEBUG)" \
 	"USE_PAPI = $(USE_PAPI)" \
+	"USE_MAGMA = $(USE_MAGMA)" \
+	"USE_CUBLAS = $(USE_CUBLAS)" \
+	"USE_GPUAWARE = $(USE_GPUAWARE)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
 	"USE_SHTNS = $(USE_SHTNS)" \
@@ -694,13 +698,32 @@ ifeq "$(OPENMP)" "true"
 	LDFLAGS += $(FFLAGS_OMP)
 endif #OPENMP IF
 
+ifeq "$(USE_MAGMA)" "true"
+	LIBS += -L$(MAGMADIR)/lib -lmagma
+	FCINCLUDES += -I${MAGMADIR}/include
+	override CPPFLAGS += "-DUSE_MAGMA"
+	override FFLAGS_ACC += -Dmagma_devptr_t='integer(kind=8)' -Mcudalib=cublas
+endif
+
+ifeq "$(USE_CUBLAS)" "true"
+	override FFLAGS_ACC = -acc -Minfo=accel -gpu=cc70
+	FFLAGS += $(FFLAGS_CUBLAS)
+	CFLAGS += $(CFLAGS_CUBLAS)
+	override CPPFLAGS += "-DUSE_CUBLAS"
+	LDFLAGS += $(FFLAGS_CUBLAS)
+endif #USE_CUBLAS IF
+
 ifeq "$(OPENACC)" "true"
-        FFLAGS += $(FFLAGS_ACC)
-        CFLAGS += $(CFLAGS_ACC)
-        CXXFLAGS += $(CFLAGS_ACC)
-        override CPPFLAGS += "-DMPAS_OPENACC"
-        LDFLAGS += $(FFLAGS_ACC)
+	FFLAGS += $(FFLAGS_ACC)
+	CFLAGS += $(CFLAGS_ACC)
+	CXXFLAGS += $(CFLAGS_ACC)
+	override CPPFLAGS += "-DMPAS_OPENACC"
+	LDFLAGS += $(FFLAGS_ACC)
 endif #OPENACC IF
+
+ifeq "$(USE_GPUAWARE)" "true"
+	override CPPFLAGS += "-DUSE_GPUAWARE"
+endif #USE_GPUAWARE
 
 ifeq "$(OPENMP_OFFLOAD)" "true"
 	FFLAGS += $(FFLAGS_GPU)
@@ -810,6 +833,18 @@ ifeq "$(OPENACC)" "true"
 	OPENACC_MESSAGE="MPAS was built with OpenACC accelerator support enabled."
 else
 	OPENACC_MESSAGE="MPAS was built without OpenACC accelerator support."
+endif
+
+ifeq "$(USE_MAGMA)" "true"
+	MAGMA_MESSAGE="MPAS was built with MAGMA library for split_implicit."
+endif
+
+ifeq "$(USE_CUBLAS)" "true"
+	CUBLAS_MESSAGE="MPAS was built with CUBLAS library."
+endif
+
+ifeq "$(USE_GPUAWARE)" "true"
+	GPUAWARE_MESSAGE="GPU-aware MPI is enabled."
 endif
 
 ifeq "$(USE_SHTNS)" "true"
@@ -1053,6 +1088,9 @@ endif
 	@echo $(GEN_F90_MESSAGE)
 	@echo $(TIMER_MESSAGE)
 	@echo $(PIO_MESSAGE)
+	@echo $(MAGMA_MESSAGE)
+	@echo $(CUBLAS_MESSAGE)
+	@echo $(GPUAWARE_MESSAGE)
 	@echo $(SHTNS_MESSAGE)
 	@echo "*******************************************************************************"
 clean:
