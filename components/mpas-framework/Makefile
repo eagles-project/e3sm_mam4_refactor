@@ -840,11 +840,11 @@ ifeq "$(USE_MAGMA)" "true"
 endif
 
 ifeq "$(USE_CUBLAS)" "true"
-	CUBLAS_MESSAGE="MPAS was built with CUBLAS library."
+	CUBLAS_MESSAGE="MPAS was built with CUBLAS library for split_implicit."
 endif
 
 ifeq "$(USE_GPUAWARE)" "true"
-	GPUAWARE_MESSAGE="GPU-aware MPI is enabled."
+	GPUAWARE_MESSAGE="GPU-aware MPI is enabled for split_implicit."
 endif
 
 ifeq "$(USE_SHTNS)" "true"
@@ -1088,9 +1088,15 @@ endif
 	@echo $(GEN_F90_MESSAGE)
 	@echo $(TIMER_MESSAGE)
 	@echo $(PIO_MESSAGE)
+ifeq "$(USE_MAGMA)" "true"
 	@echo $(MAGMA_MESSAGE)
+endif
+ifeq "$(USE_CUBLAS)" "true"
 	@echo $(CUBLAS_MESSAGE)
+endif
+ifeq "$(USE_GPUAWARE)" "true"
 	@echo $(GPUAWARE_MESSAGE)
+endif
 	@echo $(SHTNS_MESSAGE)
 	@echo "*******************************************************************************"
 clean:

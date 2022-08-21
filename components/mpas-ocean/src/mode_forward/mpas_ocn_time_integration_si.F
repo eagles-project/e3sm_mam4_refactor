@@ -307,7 +307,7 @@ module ocn_time_integration_si
          tracersGroupCur,      &! old, new tracer arrays
          tracersGroupNew
 
-      integer, pointer :: &
+      integer :: &
          startIndex, endIndex, &! start, end index for tracer groups
          indexSalinity          ! tracer index for salinity
 
@@ -471,6 +471,7 @@ module ocn_time_integration_si
                                           lowFreqDivergenceTend)
 
       call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracersNew, 2)
+
 
       if (config_transport_tests_flow_id > 0) then
         ! This is a transport test. Write advection velocity from prescribed
@@ -722,6 +723,7 @@ module ocn_time_integration_si
            call mpas_dmpar_field_halo_exch(domain, 'relativeVorticity')
          end if
          call mpas_timer_stop("si halo diag")
+
 
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          !  Stage 1: Baroclinic velocity (3D) prediction, explicit with
@@ -1994,6 +1996,7 @@ module ocn_time_integration_si
 
          call mpas_timer_stop("si btr vel")
 
+
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          ! Stage 3: Tracer, density, pressure, vert velocity prediction
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3071,7 +3074,7 @@ module ocn_time_integration_si
          ierr,           &! local error flag
          cell1, cell2     ! neighbor cell indices across edge
 
-      integer, dimension(:), pointer :: nCellsArray, nEdgesArray,     &
+      integer, dimension(:), pointer :: &
          minLevelEdgeBot, maxLevelEdgeTop, minLevelCell, maxLevelCell
 
       integer, dimension(:,:), pointer :: cellsOnEdge
@@ -3165,11 +3168,10 @@ module ocn_time_integration_si
 
       call mpas_pool_get_dimension(block % dimensions, 'nVertLevels', &
                                                         nVertLevels)
-
-      call mpas_pool_get_dimension(block % dimensions, 'nCellsArray', &
-                                                        nCellsArray)
-      call mpas_pool_get_dimension(block % dimensions, 'nEdgesArray', &
-                                                        nEdgesArray)
+      call mpas_pool_get_dimension(block % dimensions, 'nCells', &
+                                                        nCells)
+      call mpas_pool_get_dimension(block % dimensions, 'nEdges', &
+                                                        nEdges)
 
       call mpas_pool_get_array(statePool, 'layerThickness', &
                                            layerThickness, 1)
@@ -3179,7 +3181,6 @@ module ocn_time_integration_si
                                            normalBarotropicVelocity, 1)
       call mpas_pool_get_array(statePool, 'normalBaroclinicVelocity', &
                                            normalBaroclinicVelocity, 1)
-
       call mpas_pool_get_array(meshPool, 'refBottomDepth', &
                                           refBottomDepth)
       call mpas_pool_get_array(meshPool, 'cellsOnEdge', &
@@ -3195,21 +3196,18 @@ module ocn_time_integration_si
 
       call mpas_pool_get_array(statePool, 'ssh', ssh, 2)
 
-      nCells = nCellsArray(config_num_halos)
-      nEdges = nEdgesArray(config_num_halos+1)
-
       if ( .not. config_do_restart ) then
 
       ! Compute barotropic velocity at first timestep
       ! This is only done upon start-up.
          if (config_filter_btr_mode) then
-            do iCell = 1, nCells
+            do iCell = 1, nCellsAll
                layerThickness(minLevelCell(iCell),iCell) = &
                   refBottomDepth(minLevelCell(iCell))
             enddo
          endif
 
-         do iEdge = 1, nEdges
+         do iEdge = 1, nEdgesAll
             cell1 = cellsOnEdge(1,iEdge)
             cell2 = cellsOnEdge(2,iEdge)
             kmax  = maxLevelEdgeTop(iEdge)
@@ -3272,16 +3270,14 @@ module ocn_time_integration_si
 
       endif ! .not. config_do_restart
 
-      nCells = nCellsArray(1)
-
       ! Compute the root mean square of areaCell 
       ! for the solver tolerance
-      local_num_cells = nCells
+      local_num_cells = nCellsOwned
       call mpas_dmpar_sum_real(domain % dminfo, local_num_cells, &
                                total_num_cells)
 
       local_area_sum = 0.0_RKIND
-      do iCell = 1,nCells
+      do iCell = 1,nCellsOwned
         local_area_sum = local_area_sum + areaCell(iCell)**2.0
       end do
 
@@ -3309,7 +3305,7 @@ module ocn_time_integration_si
       ! If ISMF is detected, the split-implicit barotropic mode solver
       ! will solve a 'quasi-linear' barotropic system for the more 
       ! stable solver convergence.
-      do iCell = 1, nCells
+      do iCell = 1, nCellsOwned
          k = maxLevelCell(iCell)
          zTop(k:nVertLevels,iCell) = -bottomDepth(iCell)      &
                                      +layerThickness(k,iCell)
@@ -3354,7 +3350,6 @@ module ocn_time_integration_si
          nSiLargeIter = config_n_btr_si_large_iter
          dt_si = dt_si / real(nSiLargeIter)
       endif
-
 
       ! Computation of coefficients which will be used in the SI solver
       R1_alpha1s_g_dts = 1.0_RKIND/((alpha1**2.0_RKIND) &
