@@ -3781,7 +3781,12 @@ module mpas_io_streams
                      else
                         if (local_useMissingValMask .and. &
                             ASSOCIATED( field_1dreal_ptr % missingValueMask1D )) then
-                           allocate(real1d_temp_small(ownedSize))
+                           allocate(real1d_temp_small(ownedSize),stat=io_err)
+                           if (io_err /= 0) then
+                              call mpas_log_write('real1d_temp_small: $i', intArgs=(/ownedSize/) )
+                              if (present(ierr)) ierr = MPAS_IO_ERR
+                              return
+                           end if
                            real1d_temp_small = field_1dreal_ptr % array(1:ownedSize)
                            call mpas_mask_field(field_1dreal_ptr, &
                               field_1dreal_ptr % missingValueMask1D, real1d_temp_small)
@@ -3852,7 +3857,13 @@ module mpas_io_streams
                      if (field_cursor % real2dField % isVarArray) then
                         if (local_useMissingValMask .and. &
                             ASSOCIATED( field_2dreal_ptr % missingValueMask1D )) then
-                           allocate(real2d_temp_small(1,ownedSize))
+                           allocate(real2d_temp_small(1,ownedSize),stat=io_err)
+                           if (io_err /= 0) then
+                              call mpas_log_write('real2d_temp_small: $i', intArgs=(/ownedSize/) )
+                              if (present(ierr)) ierr = MPAS_IO_ERR
+                              return
+                           end if
+
                            real2d_temp_small(1,:) = field_2dreal_ptr % array(j,1:ownedSize)
                            call mpas_mask_field(field_2dreal_ptr, &
                               field_2dreal_ptr % missingValueMask1D, real2d_temp_small)
@@ -3865,7 +3876,12 @@ module mpas_io_streams
                         if (local_useMissingValMask) then
                            if (ASSOCIATED( field_2dreal_ptr % missingValueMask2D )) then
                               allocate(real2d_temp_small(field_cursor % real2dField % dimSizes(1), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real2d_temp_small: $i', intArgs=(/field_cursor % real2dField % dimSizes(1)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
                               real2d_temp_small = field_2dreal_ptr % array(:,1:ownedSize)
                               call mpas_mask_field(field_2dreal_ptr, &
                                  field_2dreal_ptr % missingValueMask2D, real2d_temp_small)
@@ -3873,7 +3889,12 @@ module mpas_io_streams
                               deallocate(real2d_temp_small)
                            elseif (ASSOCIATED( field_2dreal_ptr % missingValueMask1D )) then
                               allocate(real2d_temp_small(field_cursor % real2dField % dimSizes(1), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real2d_temp_small: $i', intArgs=(/field_cursor % real2dField % dimSizes(1)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
                               real2d_temp_small = field_2dreal_ptr % array(:,1:ownedSize)
                               call mpas_mask_field(field_2dreal_ptr, &
                                  field_2dreal_ptr % missingValueMask1D, real2d_temp_small)
@@ -3955,7 +3976,13 @@ module mpas_io_streams
                            if (ASSOCIATED( field_3dreal_ptr % missingValueMask2D )) then
                               allocate(real3d_temp_small(1, &
                                                          field_cursor % real3dField % dimSizes(2), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real3d_temp_small: $i', intArgs=(/field_cursor % real3dField % dimSizes(2)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real3d_temp_small(1,:,:) = field_3dreal_ptr % array(j,:,1:ownedSize)
                               call mpas_mask_field(field_3dreal_ptr, &
                                  field_3dreal_ptr % missingValueMask2D, real3d_temp_small)
@@ -3964,7 +3991,13 @@ module mpas_io_streams
                            elseif (ASSOCIATED( field_3dreal_ptr % missingValueMask1D )) then
                               allocate(real3d_temp_small(1, &
                                                          field_cursor % real3dField % dimSizes(2), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real3d_temp_small: $i', intArgs=(/field_cursor % real3dField % dimSizes(2)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real3d_temp_small(1,:,:) = field_3dreal_ptr % array(j,:,1:ownedSize)
                               call mpas_mask_field(field_3dreal_ptr, &
                                  field_3dreal_ptr % missingValueMask1D, real3d_temp_small)
@@ -3981,7 +4014,14 @@ module mpas_io_streams
                            if (ASSOCIATED( field_3dreal_ptr % missingValueMask3D )) then
                               allocate(real3d_temp_small(field_cursor % real3dField % dimSizes(1), &
                                                          field_cursor % real3dField % dimSizes(2), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real3d_temp_small: $i', intArgs=(/field_cursor % real3dField % dimSizes(1)* &
+                                                                                        field_cursor % real3dField % dimSizes(2)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real3d_temp_small = field_3dreal_ptr % array(:,:,1:ownedSize)
                               call mpas_mask_field(field_3dreal_ptr, &
                                  field_3dreal_ptr % missingValueMask3D, real3d_temp_small)
@@ -3991,7 +4031,14 @@ module mpas_io_streams
                               deallocate(real3d_temp_small)
                               allocate(real3d_temp_small(field_cursor % real3dField % dimSizes(1), &
                                                          field_cursor % real3dField % dimSizes(2), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real3d_temp_small: $i', intArgs=(/field_cursor % real3dField % dimSizes(1)* &
+                                                                                        field_cursor % real3dField % dimSizes(2)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real3d_temp_small = field_3dreal_ptr % array(:,:,1:ownedSize)
                               call mpas_mask_field(field_3dreal_ptr, &
                                  field_3dreal_ptr % missingValueMask2D, real3d_temp_small)
@@ -4000,7 +4047,14 @@ module mpas_io_streams
                            elseif (ASSOCIATED( field_3dreal_ptr % missingValueMask1D )) then
                               allocate(real3d_temp_small(field_cursor % real3dField % dimSizes(1), &
                                                          field_cursor % real3dField % dimSizes(2), &
-                                                         ownedSize))
+                                                         ownedSize),stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real3d_temp_small: $i', intArgs=(/field_cursor % real3dField % dimSizes(1)* &
+                                                                                        field_cursor % real3dField % dimSizes(2)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real3d_temp_small = field_3dreal_ptr % array(:,:,1:ownedSize)
                               call mpas_mask_field(field_3dreal_ptr, &
                                  field_3dreal_ptr % missingValueMask1D, real3d_temp_small)
@@ -4083,7 +4137,14 @@ module mpas_io_streams
                               allocate(real4d_temp_small(1, &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(2)* &
+                                                                                        field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small(1,:,:,:) = field_4dreal_ptr % array(j,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask3D, real4d_temp_small)
@@ -4093,7 +4154,14 @@ module mpas_io_streams
                               allocate(real4d_temp_small(1, &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(2)* &
+                                                                                        field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small(1,:,:,:) = field_4dreal_ptr % array(j,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask2D, real4d_temp_small)
@@ -4103,7 +4171,14 @@ module mpas_io_streams
                               allocate(real4d_temp_small(1, &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('(real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(2)* &
+                                                                                         field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small(1,:,:,:) = field_4dreal_ptr % array(j,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask1D, real4d_temp_small)
@@ -4121,7 +4196,15 @@ module mpas_io_streams
                               allocate(real4d_temp_small(field_cursor % real4dField % dimSizes(1), &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('(real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(1)* &
+                                                                                         field_cursor % real4dField % dimSizes(2)* &
+                                                                                         field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small = field_4dreal_ptr % array(:,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask3D, real4d_temp_small)
@@ -4131,7 +4214,15 @@ module mpas_io_streams
                               allocate(real4d_temp_small(field_cursor % real4dField % dimSizes(1), &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('(real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(1)* &
+                                                                                         field_cursor % real4dField % dimSizes(2)* &
+                                                                                         field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small = field_4dreal_ptr % array(:,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask2D, real4d_temp_small)
@@ -4141,7 +4232,15 @@ module mpas_io_streams
                               allocate(real4d_temp_small(field_cursor % real4dField % dimSizes(1), &
                                                          field_cursor % real4dField % dimSizes(2), &
                                                          field_cursor % real4dField % dimSizes(3), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('(real4d_temp_small: $i', intArgs=(/field_cursor % real4dField % dimSizes(1)* &
+                                                                                         field_cursor % real4dField % dimSizes(2)* &
+                                                                                         field_cursor % real4dField % dimSizes(3)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real4d_temp_small = field_4dreal_ptr % array(:,:,:,1:ownedSize)
                               call mpas_mask_field(field_4dreal_ptr, &
                                  field_4dreal_ptr % missingValueMask1D, real4d_temp_small)
@@ -4227,7 +4326,15 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small(1,:,:,:,:) = field_5dreal_ptr % array(j,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask3D, real5d_temp_small)
@@ -4238,7 +4345,15 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small(1,:,:,:,:) = field_5dreal_ptr % array(j,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask2D, real5d_temp_small)
@@ -4249,7 +4364,15 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small(1,:,:,:,:) = field_5dreal_ptr % array(j,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask1D, real5d_temp_small)
@@ -4268,7 +4391,16 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(1)* &
+                                                                                        field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small = field_5dreal_ptr % array(:,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask3D, real5d_temp_small)
@@ -4279,7 +4411,16 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(1)* &
+                                                                                        field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small = field_5dreal_ptr % array(:,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask2D, real5d_temp_small)
@@ -4290,7 +4431,16 @@ module mpas_io_streams
                                                          field_cursor % real5dField % dimSizes(2), &
                                                          field_cursor % real5dField % dimSizes(3), &
                                                          field_cursor % real5dField % dimSizes(4), &
-                                                         ownedSize))
+                                                         ownedSize), stat=io_err)
+                              if (io_err /= 0) then
+                                 call mpas_log_write('real5d_temp_small: $i', intArgs=(/field_cursor % real5dField % dimSizes(1)* &
+                                                                                        field_cursor % real5dField % dimSizes(2)* &
+                                                                                        field_cursor % real5dField % dimSizes(3)* &
+                                                                                        field_cursor % real5dField % dimSizes(4)*ownedSize/) )
+                                 if (present(ierr)) ierr = MPAS_IO_ERR
+                                 return
+                              end if
+
                               real5d_temp_small = field_5dreal_ptr % array(:,:,:,:,1:ownedSize)
                               call mpas_mask_field(field_5dreal_ptr, &
                                  field_5dreal_ptr % missingValueMask1D, real5d_temp_small)
