@@ -245,81 +245,129 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
 
    ! Local variables:
    integer  i, k
-   real(r8) convfw         ! used in fallspeed calculation; taken from findmcnew
+   real(r8) sumppr_all(pcols,pver)! precipitation rate in all vertical levels (kg/m2-s)
+   real(r8) lprec(pcols,pver)              ! local production rate of precip (kg/m2/s)
+   real(r8) sumppr_cu_all(pcols,pver)! same as sumppr_all but for conv.precip. calculated but not used
+   real(r8) lprec_cu(pcols,pver)             ! Local production rate of convective precip (kg/m2/s)
+   real(r8) sumppr_st_all(pcols,pver)! same as sumppr_all but for strat.precip. calculated but not used
+   real(r8) lprec_st(pcols,pver)             ! Local production rate of stratiform precip (kg/m2/s)
+   ! -----------------------------------------------------------------------
+
+   !calculate local precipitation rate 
+   do i=1,ncol
+      do k=1,pver
+         ! refactoring: this maybe a bug: why there is no evapc in lprec calculation?
+         lprec(i,k) = pdel(i,k)/gravit*(prain(i,k)+cmfdqr(i,k)-evapr(i,k)) 
+         lprec_cu(i,k)  = (pdel(i,k)/gravit)*(cmfdqr(i,k)-evapc(i,k))
+         lprec_st(i,k)  = (pdel(i,k)/gravit)*(prain(i,k)-evapr(i,k))
+      end do
+   end do
+
+
+   call calc_cldv(ncol, cldt, lprec, .true., cldv, sumppr_all)
+   call calc_cldv(ncol, cldcu, lprec_cu, .false., cldvcu, sumppr_cu_all)
+   call calc_cldv(ncol, cldst, lprec_st, .false., cldvst, sumppr_st_all)
+
+   ! calculate rain mixing ratio
+   call rain_mix_ratio(t, pmid, sumppr_all, ncol, rain)
+
+end subroutine clddiag
+
+subroutine calc_cldv(ncol, cld, lprec, is_tot_cld, cldv, sumppr_all)
+   ! ------------------------------------------------------------------------------------
+   ! Calculate cloudy volume which is occupied by rain or cloud water as
+   ! the max between the local cloud amount or the
+   ! sum above of (cloud*positive precip production)      sum total precip from
+   ! above
+   !              ----------------------------------   x
+   !              ------------------------
+   ! sum above of     (positive precip           )        sum positive precip
+   ! from above
+   ! ------------------------------------------------------------------------------------
+   ! Input arguments:
+   real(r8), intent(in) :: cld(pcols,pver)        ! cloud fraction
+   real(r8), intent(in) :: lprec(pcols,pver)     ! local production rate of precip (kg/m2/s)
+   integer, intent(in) :: ncol
+   logical, intent(in) :: is_tot_cld
+
+   ! Output arguments:
+   real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water
+   real(r8), intent(out) :: sumppr_all(pcols,pver)    ! sum of precipitation rate above each layer, for calling rain_mix_ratio use
+
+   ! Local variables:
+   integer  i,k
    real(r8) sumppr(pcols)        ! precipitation rate (kg/m2-s)
    real(r8) sumpppr(pcols)       ! sum of positive precips from above
    real(r8) cldv1(pcols)         ! precip weighted cloud fraction from above
-   real(r8) lprec                ! local production rate of precip (kg/m2/s)
    real(r8) lprecp               ! local production rate of precip (kg/m2/s) if positive
-   real(r8) rho                  ! air density
-   real(r8) vfall
-   real(r8) sumppr_cu(pcols)     ! Convective precipitation rate (kg/m2-s)
-   real(r8) sumpppr_cu(pcols)    ! Sum of positive convective precips from above
-   real(r8) cldv1_cu(pcols)      ! Convective precip weighted convective cloud fraction from above
-   real(r8) lprec_cu             ! Local production rate of convective precip (kg/m2/s)
-   real(r8) lprecp_cu            ! Local production rate of convective precip (kg/m2/s) if positive
-   real(r8) sumppr_st(pcols)     ! Stratiform precipitation rate (kg/m2-s)
-   real(r8) sumpppr_st(pcols)    ! Sum of positive stratiform precips from above
-   real(r8) cldv1_st(pcols)      ! Stratiform precip weighted stratiform cloud fraction from above
-   real(r8) lprec_st             ! Local production rate of stratiform precip (kg/m2/s)
-   real(r8) lprecp_st            ! Local production rate of stratiform precip (kg/m2/s) if positive
-   ! -----------------------------------------------------------------------
 
-   convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
+
+   ! initiate variables
    do i=1,ncol
       sumppr(i) = 0._r8
       cldv1(i) = 0._r8
-      sumpppr(i) = 1.e-36_r8
-      sumppr_cu(i)  = 0._r8
-      cldv1_cu(i)   = 0._r8
-      sumpppr_cu(i) = 1.e-36_r8
-      sumppr_st(i)  = 0._r8
-      cldv1_st(i)   = 0._r8
-      sumpppr_st(i) = 1.e-36_r8
+      sumpppr(i) = 1.e-36_r8   ! not 0 because it will be divided
    end do
 
    do k = 1,pver
       do i = 1,ncol
-         cldv(i,k) = &
-            max(min(1._r8, &
-            cldv1(i)/sumpppr(i) &
-            )*sumppr(i)/sumpppr(i), &
-            cldt(i,k) &
-            )
-         lprec = pdel(i,k)/gravit &
-            *(prain(i,k)+cmfdqr(i,k)-evapr(i,k))
-         lprecp = max(lprec,1.e-30_r8)
-         cldv1(i) = cldv1(i)  + cldt(i,k)*lprecp
-         sumppr(i) = sumppr(i) + lprec
-         sumpppr(i) = sumpppr(i) + lprecp
-
-         ! For convective precipitation volume at the top interface of each layer. Neglect the current layer.
-         cldvcu(i,k)   = max(min(1._r8,cldv1_cu(i)/sumpppr_cu(i))*(sumppr_cu(i)/sumpppr_cu(i)),0._r8)
-         lprec_cu      = (pdel(i,k)/gravit)*(cmfdqr(i,k)-evapc(i,k))
-         lprecp_cu     = max(lprec_cu,1.e-30_r8)
-         cldv1_cu(i)   = cldv1_cu(i) + cldcu(i,k)*lprecp_cu
-         sumppr_cu(i)  = sumppr_cu(i) + lprec_cu
-         sumpppr_cu(i) = sumpppr_cu(i) + lprecp_cu
-
-         ! For stratiform precipitation volume at the top interface of each layer. Neglect the current layer.
-         cldvst(i,k)   = max(min(1._r8,cldv1_st(i)/sumpppr_st(i))*(sumppr_st(i)/sumpppr_st(i)),0._r8)
-         lprec_st      = (pdel(i,k)/gravit)*(prain(i,k)-evapr(i,k))
-         lprecp_st     = max(lprec_st,1.e-30_r8)
-         cldv1_st(i)   = cldv1_st(i) + cldst(i,k)*lprecp_st
-         sumppr_st(i)  = sumppr_st(i) + lprec_st
-         sumpppr_st(i) = sumpppr_st(i) + lprecp_st
-
-         rain(i,k) = 0._r8
-         if(t(i,k) .gt. tmelt) then
-            rho = pmid(i,k)/(rair*t(i,k))
-            vfall = convfw/sqrt(rho)
-            rain(i,k) = sumppr(i)/(rho*vfall)
-            if (rain(i,k).lt.1.e-14_r8) rain(i,k) = 0._r8
+         if (is_tot_cld) then 
+             cldv(i,k) = max(min(1._r8,cldv1(i)/sumpppr(i))*sumppr(i)/sumpppr(i),cld(i,k))
+         else
+             ! For convective and stratiform precipitation volume at the top interface of each layer. 
+             ! Neglect the current layer.
+             cldv(i,k) = max(min(1._r8,cldv1(i)/sumpppr(i))*(sumppr(i)/sumpppr(i)),0._r8)
          endif
-      end do
-   end do
+         lprecp = max(lprec(i,k), 1.e-30_r8)
+         cldv1(i) = cldv1(i)  + cld(i,k)*lprecp
+         sumppr(i) = sumppr(i) + lprec(i,k)
+         sumppr_all(i,k) = sumppr(i)      ! save all sumppr to callrain_mix_ratio
+         sumpppr(i) = sumpppr(i) + lprecp
+      enddo
+   enddo
 
-end subroutine clddiag
+end subroutine calc_cldv
+
+subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
+      !-----------------------------------------------------------------------
+      ! Purpose:
+      ! calculate rain mixing ratio from precipitation rate above.
+      !
+      ! extracted from clddiag subroutine
+      ! modified by Shuaiqi Tang in 9/22/2022
+      !-----------------------------------------------------------------------
+
+   ! Input arguments:
+   real(r8), intent(in) :: t(pcols,pver)        ! temperature (K)
+   real(r8), intent(in) :: pmid(pcols,pver)     ! pressure at layer midpoints
+   real(r8), intent(in) :: sumppr(pcols,pver)    ! sum of precipitation rate above each layer
+   integer, intent(in) :: ncol
+   
+   ! Output arguments:
+   real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain (kg/kg)
+
+   ! Local variables:
+   integer  i,k
+   real(r8) convfw               ! constant used in fallspeed calculation; taken from findmcnew
+   real(r8) rho                  ! air density
+   real(r8) vfall
+
+   ! define the constant convfw. taken from findmcnew, do not find the reference
+   ! of the equation  -- by Shuaiqi when refactoring
+   convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
+
+   do k = 1,pver
+     do i = 1,ncol
+       rain(i,k) = 0._r8
+       if (t(i,k) .gt. tmelt) then
+          rho = pmid(i,k) / (rair*t(i,k))
+          vfall = convfw/sqrt(rho)
+          rain(i,k) = sumppr(i,k) / (rho*vfall)
+          if (rain(i,k) .lt. 1.e-14_r8)   rain(i,k) = 0._r8
+       endif
+     enddo
+   enddo
+end subroutine rain_mix_ratio
 
 !==============================================================================
 
