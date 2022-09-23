@@ -183,7 +183,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   inputs%totcond(:ncol,:) = state%q(:ncol,:,ixcldliq) + state%q(:ncol,:,ixcldice)
 
   call clddiag( state%t,     state%pmid,   state%pdel,   inputs%cmfdqr, inputs%evapc, &
-               inputs%cldt,  inputs%cldcu,       cldst,  inputs%qme,    inputs%evapr, &
+               inputs%cldt,  inputs%cldcu,       cldst,  inputs%evapr, &
                inputs%prain, inputs%cldv, inputs%cldvcu, inputs%cldvst,       rainmr, &
                 state%ncol )
 
@@ -209,7 +209,7 @@ subroutine wetdep_inputs_unset(inputs)
 end subroutine wetdep_inputs_unset
 
 subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
-                   cldt, cldcu, cldst, cme, evapr, &
+                   cldt, cldcu, cldst, evapr, &
                    prain, cldv, cldvcu, cldvst, rain, &
                    ncol)
 
@@ -232,7 +232,6 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8), intent(in) :: cldt(pcols,pver)    ! total cloud fraction
    real(r8), intent(in) :: cldcu(pcols,pver)    ! Cumulus cloud fraction
    real(r8), intent(in) :: cldst(pcols,pver)    ! Stratus cloud fraction
-   real(r8), intent(in) :: cme(pcols,pver)      ! rate of cond-evap within the cloud
    real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation (kg/kg/s)
    real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation (kg/kg/s)
    integer, intent(in) :: ncol
