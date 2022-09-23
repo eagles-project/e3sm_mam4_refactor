@@ -70,6 +70,16 @@ _TESTS = {
             )
         },
 
+    "eagles_mam" : {
+        "tests"   : (
+            "SMS_D.ne4_oQU240.F2010",
+            "ERS.ne4_oQU240.F2010",
+            "PET.ne4_oQU240.F2010",
+            "PEM.ne4_oQU240.F2010"
+            )
+        },
+
+
     "e3sm_atm_developer" : {
         "inherit" : ("eam_theta_pg2"),
         "tests"   : (
