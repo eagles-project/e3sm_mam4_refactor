@@ -86,7 +86,7 @@ main() {
     echo 'Wait till the baseline directory is generated ...'
     while [ ! -d $baseline_dir/$baseline_test_id/$test_name.$grid.$compset.compy_$compiler ]
     do
-        echo -n '#'
+        echo -n '.'
         sleep 2
     done
 
@@ -108,7 +108,7 @@ main() {
     echo 'Check if generate baseline directory is there ....'
     while [ ! -d $generate_dir ]
     do
-        echo -n '#'
+        echo -n '.'
         sleep 2
     done
 
@@ -123,14 +123,14 @@ main() {
     do
         #see if TestStatus file exists
         if [ ! -f "$status_file" ]; then
-            echo -n '#'
+            echo -n '.'
             sleep 2
             continue
         fi
 
         baseline_generated=`cat $status_file |grep GENERATE |grep PASS|wc -l`
         sleep 15
-        echo -n '#'
+        echo -n '.'
     done
 
     newline && time_elapsed_min
