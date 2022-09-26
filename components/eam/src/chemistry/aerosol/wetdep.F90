@@ -12,6 +12,7 @@ use physconst,    only: gravit, rair, tmelt
 use phys_control, only: cam_physpkg_is
 use cam_logfile,  only: iulog
 use cam_abortutils, only: endrun
+use yaml_input_file_io
 
 implicit none
 save
@@ -185,7 +186,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   call clddiag( state%t,     state%pmid,   state%pdel,   inputs%cmfdqr, inputs%evapc, &
                inputs%cldt,  inputs%cldcu,       cldst,  inputs%qme,    inputs%evapr, &
                inputs%prain, inputs%cldv, inputs%cldvcu, inputs%cldvst,       rainmr, &
-                state%ncol )
+                state%ncol, state%lchnk )
 
 end subroutine wetdep_inputs_set
 
@@ -211,7 +212,7 @@ end subroutine wetdep_inputs_unset
 subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
                    cldt, cldcu, cldst, cme, evapr, &
                    prain, cldv, cldvcu, cldvst, rain, &
-                   ncol)
+                   ncol, lchnk)
 
    ! ------------------------------------------------------------------------------------ 
    ! Estimate the cloudy volume which is occupied by rain or cloud water as
@@ -235,7 +236,7 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8), intent(in) :: cme(pcols,pver)      ! rate of cond-evap within the cloud
    real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation (kg/kg/s)
    real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation (kg/kg/s)
-   integer, intent(in) :: ncol
+   integer, intent(in) :: ncol, lchnk
 
    ! Output arguments:
    real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water 
@@ -244,7 +245,7 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain (kg/kg)
 
    ! Local variables:
-   integer  i, k
+   integer  i, k, unitn
    real(r8) convfw         ! used in fallspeed calculation; taken from findmcnew
    real(r8) sumppr(pcols)        ! precipitation rate (kg/m2-s)
    real(r8) sumpppr(pcols)       ! sum of positive precips from above
@@ -264,6 +265,29 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8) lprec_st             ! Local production rate of stratiform precip (kg/m2/s)
    real(r8) lprecp_st            ! Local production rate of stratiform precip (kg/m2/s) if positive
    ! -----------------------------------------------------------------------
+   ! YAML file input generation code- DO NOT PORT to C++
+   if(icolprnt(lchnk) > 0) then
+
+      unitn = getunit() !get a unused unti number
+      open( unitn, file='clddiag_output.yaml', action='write', position='append') !open file to write in append mode
+
+      write(unitn,*)'input:'
+
+      !print all inputs one-by-one at column "i"
+      i = icolprnt(lchnk) !column to write data
+      call write_var_with_levs(unitn,'temperature',pver,t(i,:))
+      call write_var_with_levs(unitn,'pmid',   pver,pmid(i,:))
+      call write_var_with_levs(unitn,'pdel',   pver,pdel(i,:))
+      call write_var_with_levs(unitn,'cmfdqr', pver,cmfdqr(i,:))
+      call write_var_with_levs(unitn,'evapc',  pver,evapc(i,:))
+      call write_var_with_levs(unitn,'cldt',   pver,cldt(i,:))
+      call write_var_with_levs(unitn,'cldcu',  pver,cldcu(i,:))
+      call write_var_with_levs(unitn,'cldst',  pver,cldst(i,:))
+      call write_var_with_levs(unitn,'evapr',  pver,evapr(i,:))
+      call write_var_with_levs(unitn,'prain',  pver,prain(i,:))
+   endif
+   ! END - YAML file input generation code- DO NOT PORT to C++
+
 
    convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
    do i=1,ncol
@@ -318,6 +342,24 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
          endif
       end do
    end do
+
+   ! YAML file output generation code- DO NOT PORT to C++
+   if(icolprnt(lchnk) > 0) then
+
+      write(unitn,*)'output:'
+
+      !print all outputs one-by-one at column "i"
+      i = icolprnt(lchnk)
+      call write_var_with_levs(unitn,'cldv',   pver,cldv(i,:))
+      call write_var_with_levs(unitn,'cldvcu', pver,cldvcu(i,:))
+      call write_var_with_levs(unitn,'cldvst', pver,cldvst(i,:))
+      call write_var_with_levs(unitn,'rain',   pver,rain(i,:))
+
+      !close file
+      close(unitn)
+      call freeunit(unitn)
+   endif
+   ! END - YAML file output generation code- DO NOT PORT to C++
 
 end subroutine clddiag
 
