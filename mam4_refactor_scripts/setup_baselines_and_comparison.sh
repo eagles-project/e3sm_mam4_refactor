@@ -99,7 +99,7 @@ main() {
 
     newline && time_elapsed_min
     echo '-------------------------------------------------------------------'
-    echo "Generate directory is: $generate_dir"
+    echo "Generate baseline directory is: $generate_dir"
     echo "Comparison directory is: $comparison_dir"
     echo '-------------------------------------------------------------------'
 
@@ -116,6 +116,7 @@ main() {
     cd $generate_dir
 
     baseline_generated=0
+    baseline_failed=0
     newline && time_elapsed_min
     #loop until baseline_generated variable catched "GENERATE" and "PASS" in the $status file
     echo "Checking for $status_file and baselines..."
@@ -127,7 +128,14 @@ main() {
             sleep 2
             continue
         fi
-
+        baseline_failed=`cat $status_file |grep FAIL |wc -l`
+        if [ $baseline_failed != 0 ]; then
+            newline
+            echo 'Baseline Generation FAILED; exiting...'
+            echo "Generate baseline directory is: $generate_dir"
+            newline
+            exit -1
+        fi
         baseline_generated=`cat $status_file |grep GENERATE |grep PASS|wc -l`
         sleep 15
         echo -n '.'
@@ -183,7 +191,7 @@ while getopts ":t:" opt; do
   case $opt in
     t) test_id="$OPTARG"
     ;;
-    \?) echo "Invalid option -$OPTARG" >&2
+    \?) echo "Invalid option -$OPTARG; please set test_id using -t command line option" >&2
     exit 1
     ;;
   esac
@@ -194,6 +202,11 @@ while getopts ":t:" opt; do
     ;;
   esac
 done
+
+if [ -z "${test_id}" ]; then
+    echo "Test_id is not set, please set it using -t command line option"
+    exit 1
+fi
 
 #capture start time to compute time elapsed in minutes
 starttime=$(date +%s)
