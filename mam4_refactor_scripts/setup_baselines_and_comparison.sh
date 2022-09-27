@@ -204,7 +204,7 @@ while getopts ":t:" opt; do
 done
 
 if [ -z "${test_id}" ]; then
-    echo "Test_id is not set, please set it using -t command line option"
+    echo "test_id is not set, please set it using -t command line option"
     exit 1
 fi
 
