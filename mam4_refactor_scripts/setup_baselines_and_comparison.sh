@@ -73,6 +73,7 @@ main() {
     if [ ! -f $script_name ]; then
         echo "$script_name does not exist. Have you initialized submodules? "
         echo "Current directory is:" `pwd`
+        newline
         exit -1 #exit if it is wrong directory or file doesn't exist
     fi
 
@@ -145,7 +146,19 @@ main() {
 
     echo 'Baselines have been generated, submiting comparison run..'
 
-    cd $compare_dir
+    cd $comparison_dir
+
+    echo 'Find out if case.submit script has been generated...'
+    while [ ! -f case.submit ]
+    do
+        sleep 2
+        echo "Waiting for case.submit script in dir:"`pwd`
+        echo "Manually quit this script if it takes long and"
+        echo "cd into $comparison_dir and issue ./case.submit manually"
+        newline
+        echo 'Warning:This may become an infinite loop...'
+        newline
+    done
 
     ./case.submit > /dev/null #submit run
 
