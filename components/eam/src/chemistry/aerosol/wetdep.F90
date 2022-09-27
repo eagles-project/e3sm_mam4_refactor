@@ -266,9 +266,9 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8) lprecp_st            ! Local production rate of stratiform precip (kg/m2/s) if positive
    ! -----------------------------------------------------------------------
    ! YAML file input generation code- DO NOT PORT to C++
-   if(icolprnt(lchnk) > 0) then
+   if(icolprnt(lchnk) > 0) then ! if this column exists in lchnk
 
-      unitn = getunit() !get a unused unti number
+      unitn = getunit() !get a unused unit number to write
       open( unitn, file='clddiag_output.yaml', action='write', position='append') !open file to write in append mode
 
       write(unitn,*)'input:'
@@ -344,12 +344,12 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    end do
 
    ! YAML file output generation code- DO NOT PORT to C++
-   if(icolprnt(lchnk) > 0) then
+   if(icolprnt(lchnk) > 0) then ! if this column exists in lchnk
 
       write(unitn,*)'output:'
 
       !print all outputs one-by-one at column "i"
-      i = icolprnt(lchnk)
+      i = icolprnt(lchnk) !get column number
       call write_var_with_levs(unitn,'cldv',   pver,cldv(i,:))
       call write_var_with_levs(unitn,'cldvcu', pver,cldvcu(i,:))
       call write_var_with_levs(unitn,'cldvst', pver,cldvst(i,:))

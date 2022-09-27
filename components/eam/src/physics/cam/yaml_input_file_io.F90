@@ -2,7 +2,7 @@ module yaml_input_file_io
 
   !Following two module are not used here but they are added for convenience so that
   !we just need to include yaml_input_file_io to get access to icolprnt, getunit
-  !and freeunit it may be a bad practice but we are doing it here for temporary
+  !and freeunit. It may be a bad practice but we are doing it here for temporary
   !refactoring work
 
   use module_perturb, only: icolprnt
@@ -54,8 +54,7 @@ contains
 
     subroutine is_file_open(unit)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D field in a YAML file format
-    !for a given column
+    !Purpose: Check if the file is open or not
     !------------------------------------------------------------------
       integer, intent(in) :: unit
 
