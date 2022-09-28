@@ -26,7 +26,7 @@ main() {
     compiler="intel"
 
     #scratch directory path
-    scratch_dir="/compyfs/sing201/e3sm_scratch"
+    scratch_dir="/compyfs/$USER/e3sm_scratch"
 
     #baseline directory path
     baseline_dir="/compyfs/e3sm_baselines/$compiler"
