@@ -13,6 +13,7 @@ use phys_control, only: cam_physpkg_is
 use cam_logfile,  only: iulog
 use cam_abortutils, only: endrun
 use yaml_input_file_io
+use phys_grid,     only: phys_grid_find_col, get_rlat_p, get_rlon_p
 
 implicit none
 save
@@ -278,7 +279,7 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
            unit_input, unit_output) !intent-out
 
 
-      !start by adding an input string
+      !start by adding an input header
       call write_input_header(unit_input, unit_output)
 
       call write_var_with_levs(unit_input, unit_output,'temperature',pver,t(i,:))
@@ -292,6 +293,7 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
       call write_var_with_levs(unit_input, unit_output,'evapr',  pver,evapr(i,:))
       call write_var_with_levs(unit_input, unit_output,'prain',  pver,prain(i,:))
 
+      !close just the input file, leave output file open
       close(unit_input)
       call freeunit(unit_input)
    endif
@@ -349,12 +351,17 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
             rain(i,k) = sumppr(i)/(rho*vfall)
             if (rain(i,k).lt.1.e-14_r8) rain(i,k) = 0._r8
          endif
+         if (cldvst(i,k) .ne.0.0_r8 .and. cldvcu(i,k) .ne. 0.0_r8 .and. cldv(i,k) .ne. 0.0_r8) then
+            WRiTE(102,*)'Lat, Lon:', get_rlat_p(lchnk, i)*57.296_r8, get_rlon_p(lchnk, i)*57.296_r8, &
+                 cldvst(i,k), cldvcu(i,k),cldv(i,k)
+         endif
       end do
    end do
 
    ! YAML file output generation code- DO NOT PORT to C++
    if(icolprnt(lchnk) > 0) then ! if this column exists in lchnk
 
+      !write output header
       call write_output_header(unit_output)
 
       !print all outputs one-by-one at column "i"
@@ -365,7 +372,7 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
       call write_output_var_with_levs(unit_output,'cldvst', pver,cldvst(i,:))
       call write_output_var_with_levs(unit_output,'rain',   pver,rain(i,:))
 
-      !close file
+      !close the output file
       close(unit_output)
       call freeunit(unit_output)
    endif
