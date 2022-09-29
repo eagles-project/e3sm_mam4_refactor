@@ -146,7 +146,7 @@ contains
     call is_file_open(unit_output)
 
     write(unit_input,'(A)')'input:'
-    write(unit_input,'(A)')'  enumerate:'
+    write(unit_input,'(A)')'  enumerated:'
 
 
     write(unit_output,'(A)')'# Object is just a dynamic container that stores input/output data.'
