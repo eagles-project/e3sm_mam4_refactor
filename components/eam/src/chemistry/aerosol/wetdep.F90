@@ -225,64 +225,65 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    ! ------------------------------------------------------------------------------------
 
    ! Input arguments:
-   real(r8), intent(in) :: t(pcols,pver)        ! temperature (K)
-   real(r8), intent(in) :: pmid(pcols,pver)     ! pressure at layer midpoints(Pa)
-   real(r8), intent(in) :: pdel(pcols,pver)     ! pressure difference across layers (Pa)
-   real(r8), intent(in) :: cmfdqr(pcols,pver)   ! dq/dt due to convective rainout (kg/kg/s)
-   real(r8), intent(in) :: evapc(pcols,pver)    ! Evaporation rate of convective precipitation ( >= 0 ) (kg/kg/s)
-   real(r8), intent(in) :: cldt(pcols,pver)    ! total cloud fraction (fraction)
-   real(r8), intent(in) :: cldcu(pcols,pver)    ! Cumulus cloud fraction (fraction)
-   real(r8), intent(in) :: cldst(pcols,pver)    ! Stratus cloud fraction (fraction)
-   real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation (kg/kg/s)
-   real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation (kg/kg/s)
-   integer, intent(in) :: ncol
+   real(r8), intent(in) :: t(pcols,pver)        ! temperature [K]
+   real(r8), intent(in) :: pmid(pcols,pver)     ! pressure at layer midpoints[Pa]
+   real(r8), intent(in) :: pdel(pcols,pver)     ! pressure difference across layers [Pa]
+   real(r8), intent(in) :: cmfdqr(pcols,pver)   ! dq/dt due to convective rainout [kg/kg/s]
+   real(r8), intent(in) :: evapc(pcols,pver)    ! Evaporation rate of convective precipitation ( >= 0 ) [kg/kg/s]
+   real(r8), intent(in) :: cldt(pcols,pver)     ! total cloud fraction [fraction, unitless]
+   real(r8), intent(in) :: cldcu(pcols,pver)    ! Cumulus cloud fraction [fraction, unitless]
+   real(r8), intent(in) :: cldst(pcols,pver)    ! Stratus cloud fraction [fraction, unitless]
+   real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation [kg/kg/s]
+   real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation [kg/kg/s]
+   integer,  intent(in) :: ncol
 
    ! Output arguments:
-   real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water (fraction)
-   real(r8), intent(out) :: cldvcu(pcols,pver)   ! Convective precipitation volume (fraction)
-   real(r8), intent(out) :: cldvst(pcols,pver)   ! Stratiform precipitation volume (fraction)
-   real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain (kg/kg)
+   real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water [fraction, unitless]
+   real(r8), intent(out) :: cldvcu(pcols,pver)   ! Convective precipitation volume [fraction, unitless]
+   real(r8), intent(out) :: cldvst(pcols,pver)   ! Stratiform precipitation volume [fraction, unitless]
+   real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain [kg/kg]
 
    ! Local variables:
    integer  i, k
-   real(r8) sumppr_all(pcols,pver)! precipitation rate in all vertical levels (kg/m2/s)
-   real(r8) lprec(pcols,pver)              ! local production rate of precip (kg/m2/s)
-   real(r8) sumppr_cu_all(pcols,pver)! same as sumppr_all but for conv.precip. calculated but not used
-   real(r8) lprec_cu(pcols,pver)             ! Local production rate of convective precip (kg/m2/s)
-   real(r8) sumppr_st_all(pcols,pver)! same as sumppr_all but for strat.precip. calculated but not used
-   real(r8) lprec_st(pcols,pver)             ! Local production rate of stratiform precip (kg/m2/s)
+   real(r8) sumppr_all(pcols,pver)    ! precipitation rate in all vertical levels [kg/m2/s]
+   real(r8) lprec(pcols,pver)         ! local production rate of precip [kg/m2/s]
+   real(r8) sumppr_cu_all(pcols,pver) ! same as sumppr_all but for conv.precip. calculated but not used
+   real(r8) lprec_cu(pcols,pver)      ! Local production rate of convective precip [kg/m2/s]
+   real(r8) sumppr_st_all(pcols,pver) ! same as sumppr_all but for strat.precip. calculated but not used
+   real(r8) lprec_st(pcols,pver)      ! Local production rate of stratiform precip [kg/m2/s]
    ! -----------------------------------------------------------------------
 
-   !calculate local precipitation rate 
+   !calculate local precipitation rate
    !FIXME: Possible bug: why there is no evapc in lprec calculation?
    call local_precip_production(ncol, pdel, prain+cmfdqr, evapr, lprec)
    call local_precip_production(ncol, pdel, cmfdqr, evapc, lprec_cu)
    call local_precip_production(ncol, pdel, prain, evapr, lprec_st)
 
    ! calculate cloud volume occupied by rain or cloud water
-   call calculate_cloudy_volume(ncol, cldt, lprec, .true., cldv, sumppr_all)
-   call calculate_cloudy_volume(ncol, cldcu, lprec_cu, .false., cldvcu, sumppr_cu_all)
-   call calculate_cloudy_volume(ncol, cldst, lprec_st, .false., cldvst, sumppr_st_all)
+   call calculate_cloudy_volume(ncol, cldt, lprec, .true., cldv, sumppr_all) !total
+   call calculate_cloudy_volume(ncol, cldcu, lprec_cu, .false., cldvcu, sumppr_cu_all) !convective
+   call calculate_cloudy_volume(ncol, cldst, lprec_st, .false., cldvst, sumppr_st_all) !stratiform
 
    ! calculate rain mixing ratio
    call rain_mix_ratio(t, pmid, sumppr_all, ncol, rain)
 
 end subroutine clddiag
 
+
 subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
     !----------------------------------------------------------------------------
-    ! calculate local precipitation generation rate (kg/m2/s) from 
+    ! calculate local precipitation generation rate (kg/m2/s) from
     ! source (condensation) and sink (evaporation) terms
     !----------------------------------------------------------------------------
     ! Input arguments:
-    real(r8), intent(in) :: pdel(pcols,pver)        ! pressure difference across layers (Pa)
-    real(r8), intent(in) :: source_term(pcols,pver)  ! precipitation source term rate (condensation) (kg/kg/s)
-    real(r8), intent(in) :: sink_term(pcols,pver)  ! precipitation sink term rate (evaporation) (kg/kg/s)
-    integer, intent(in) :: ncol
+    real(r8), intent(in) :: pdel(pcols,pver)        ! pressure difference across layers [Pa]
+    real(r8), intent(in) :: source_term(pcols,pver) ! precipitation source term rate (condensation) [kg/kg/s]
+    real(r8), intent(in) :: sink_term(pcols,pver)   ! precipitation sink term rate (evaporation) [kg/kg/s]
+    integer,  intent(in) :: ncol
 
     ! Output arguments:
-    real(r8), intent(out) :: lprec(pcols,pver)     ! local production rate of precip (kg/m2/s)
-  
+    real(r8), intent(out) :: lprec(pcols,pver)     ! local production rate of precip [kg/m2/s]
+
     ! Local variables:
     integer  i, k
 
@@ -290,8 +291,8 @@ subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
     do i=1,ncol
        do k=1,pver
           lprec(i,k)  = (pdel(i,k)/gravit)*(source_term(i,k)-sink_term(i,k))
-       end do
-    end do
+       enddo
+    enddo
 
 end subroutine local_precip_production
 
@@ -308,21 +309,21 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    ! from above
    ! ------------------------------------------------------------------------------------
    ! Input arguments:
-   real(r8), intent(in) :: cld(pcols,pver)        ! cloud fraction (fraction)
-   real(r8), intent(in) :: lprec(pcols,pver)     ! local production rate of precip (kg/m2/s)
+   real(r8), intent(in) :: cld(pcols,pver)   ! cloud fraction [fraction, unitless]
+   real(r8), intent(in) :: lprec(pcols,pver) ! local production rate of precip [kg/m2/s]
    integer, intent(in) :: ncol
    logical, intent(in) :: is_tot_cld
 
    ! Output arguments:
-   real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water (fraction)
-   real(r8), intent(out) :: sumppr_all(pcols,pver)    ! sum of precipitation rate above each layer, for calling rain_mix_ratio use (kg/m2/s)
+   real(r8), intent(out) :: cldv(pcols,pver)       ! fraction occupied by rain or cloud water [fraction, unitless]
+   real(r8), intent(out) :: sumppr_all(pcols,pver) ! sum of precipitation rate above each layer, for calling rain_mix_ratio use [kg/m2/s]
 
    ! Local variables:
    integer  i,k
-   real(r8) sumppr(pcols)        ! precipitation rate (kg/m2/s)
+   real(r8) sumppr(pcols)        ! precipitation rate [kg/m2/s]
    real(r8) sumpppr(pcols)       ! sum of positive precips from above
-   real(r8) cldv1(pcols)         ! precip weighted cloud fraction from above (kg/m2/s)
-   real(r8) lprecp               ! local production rate of precip (kg/m2/s) if positive
+   real(r8) cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
+   real(r8) lprecp               ! local production rate of precip [kg/m2/s] if positive
 
 
    ! initiate variables
@@ -330,11 +331,11 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
       sumppr(i) = 0._r8
       cldv1(i) = 0._r8
       sumpppr(i) = 1.e-36_r8   ! not 0 because it will be divided
-   end do
+   enddo
 
    do k = 1,pver
       do i = 1,ncol
-         if (is_tot_cld) then 
+         if (is_tot_cld) then
              cldv(i,k) = max(min(1._r8,cldv1(i)/sumpppr(i))*sumppr(i)/sumpppr(i),cld(i,k))
          else
              ! For convective and stratiform precipitation volume at the top interface of each layer. 
@@ -349,7 +350,8 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
       enddo
    enddo
 
-end subroutine calculate_cloudy_volume 
+end subroutine calculate_cloudy_volume
+
 
 subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
       !-----------------------------------------------------------------------
@@ -361,25 +363,25 @@ subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
       !-----------------------------------------------------------------------
 
    ! Input arguments:
-   real(r8), intent(in) :: t(pcols,pver)        ! temperature (K)
-   real(r8), intent(in) :: pmid(pcols,pver)     ! pressure at layer midpoints (Pa)
-   real(r8), intent(in) :: sumppr(pcols,pver)    ! sum of precipitation rate above each layer (kg/m2/s)
-   integer, intent(in) :: ncol
-   
+   real(r8), intent(in) :: t(pcols,pver)      ! temperature [K]
+   real(r8), intent(in) :: pmid(pcols,pver)   ! pressure at layer midpoints [Pa]
+   real(r8), intent(in) :: sumppr(pcols,pver) ! sum of precipitation rate above each layer [kg/m2/s]
+   integer,  intent(in) :: ncol
+
    ! Output arguments:
-   real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain (kg/kg)
+   real(r8), intent(out) :: rain(pcols,pver) ! mixing ratio of rain [kg/kg]
 
    ! Local variables:
    integer  i,k
-   ! constant used in fallspeed calculation; taken from findmcnew
-   real(r8) convfw
-   real(r8) rho                  ! air density
-   real(r8) vfall
+
+   ! constants used in fallspeed calculation; taken from findmcnew
+   real(r8) :: convfw
+   real(r8) :: rho     !air density
+   real(r8) :: vfall
 
    ! define the constant convfw. taken from findmcnew, do not find the reference
    ! of the equation  -- by Shuaiqi when refactoring
    convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
-
    do k = 1,pver
      do i = 1,ncol
        rain(i,k) = 0._r8
@@ -391,6 +393,7 @@ subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
        endif
      enddo
    enddo
+
 end subroutine rain_mix_ratio
 
 !==============================================================================
