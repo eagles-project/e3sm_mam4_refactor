@@ -1,8 +1,8 @@
-! This is an example code which shows how to use YAML file generation API
-! Since all the code is temporary, we will stick with the practice of
-! specifying minimal code required to accomplish the task.
+  ! This is an example code which shows how to use YAML file generation API
+  ! Since all the code is temporary, we will stick with the practice of
+  ! specifying minimal code required to accomplish the task.
 
-!------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
   !make all function available using the "use" statement
   !Include the following statement at the top of the module
   !(No need to specify "only")
@@ -65,6 +65,7 @@
        !start by adding an input header
        call write_input_header(unit_input, unit_output)
 
+       !now add all the input variables
        call write_var_with_levs(unit_input, unit_output,'temperature',pver,t(i,:))
        !...Rest of the variables go here....
 
@@ -78,9 +79,9 @@
 
 
     ! Subroutine's internal code sits here and does all the computations.
-    ! After all the calculations are done, capture the output as show in the code below
+    ! After all the calculations are done, capture the output as shows in the code below
     !...
-    !.... Code
+    !.... subrioutine code
     !....
 
     !------------------------------------------------------------------------------------------------------------
@@ -94,6 +95,7 @@
       !print all outputs one-by-one at column "i"
       i = icolprnt(lchnk) !get column number
 
+      !add all the output variables here
       call write_output_var_with_levs(unit_output,'cldv',   pver,cldv(i,:))
       !Rest of the output variable go here...
 
