@@ -32,14 +32,14 @@ main() {
     baseline_dir="/compyfs/e3sm_baselines/$compiler"
 
     test_name="SMS_D_Ln5_P32x1"
-    grid="ne4_oQU240"
+    grid="ne4pg2_oQU480"
     compset="F2010"
     project="esmd"
 
     #test_id for the test is obtained from the command line arg
 
     #baseline test_id (must be different from the test_id above; you can simply add "base_" infront of test_id if you like)
-    baseline_test_id="base_"$test_id
+    baseline_test_id="base_$USER"$test_id
 
     #Test_Id for the comparison simulation(must be different from the test_ids above; you can simply add "comp_" infront of test_id if you like)
     comparison_test_id="comp_"$test_id
