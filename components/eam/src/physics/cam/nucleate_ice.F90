@@ -460,9 +460,14 @@ end subroutine hetero
 
 !===============================================================================
 
-subroutine hf(T,ww,RH,Na,Ni)
+subroutine hf(Temperature, w_vlc, RH, Na, Ni)
 
-      real(r8), intent(in)  :: T, ww, RH, Na
+!-------------------------------------------------------------------------------
+! Calculate number of ice crystals by homogeneous freezing (Ni) based on
+! Liu & Penner (2005), Meteorol. Z.
+!-------------------------------------------------------------------------------
+
+      real(r8), intent(in)  :: Temperature, w_vlc, RH, Na
       real(r8), intent(out) :: Ni
 
 !---------------------------------------------------------------------
@@ -492,19 +497,18 @@ subroutine hf(T,ww,RH,Na,Ni)
       real(r8) A2_fast, B2_fast, B4_slow
       real(r8) lnw, regm, RHw 
 
-
-      lnw = log(ww)
+      lnw = log(w_vlc)
       Ni = 0.0_r8
 
-      call calculate_RHw_hf(T, lnw, RHw)
+      call calculate_RHw_hf(Temperature, lnw, RHw)
 
-      if((T.le.-37.0_r8) .and. ((RH*subgrid).ge.RHw)) then
+      if((Temperature.le.-37.0_r8) .and. ((RH*subgrid).ge.RHw)) then
 
         regm = 6.07_r8*lnw-55.0_r8
 
-        if(T.ge.regm) then    ! fast-growth regime
+        if(Temperature.ge.regm) then    ! fast-growth regime
 
-          if(T.gt.-64.0_r8) then
+          if(Temperature.gt.-64.0_r8) then
             A2_fast=A21_fast
             B2_fast=B21_fast
           else
@@ -512,13 +516,13 @@ subroutine hf(T,ww,RH,Na,Ni)
             B2_fast=B22_fast
           endif
 
-          call calculate_Ni_hf(A1_fast, B1_fast, C1_fast, A2_fast, B2_fast, C2_fast, T, lnw, Na, Ni)
+          call calculate_Ni_hf(A1_fast, B1_fast, C1_fast, A2_fast, B2_fast, C2_fast, Temperature, lnw, Na, Ni)
 
         else       ! slow-growth regime
  
           B4_slow = B2_slow + B3_slow*lnw   
 
-          call calculate_Ni_hf(A1_slow, B1_slow, C1_slow, A2_slow, B4_slow, C2_slow, T, lnw, Na, Ni)
+          call calculate_Ni_hf(A1_slow, B1_slow, C1_slow, A2_slow, B4_slow, C2_slow, Temperature, lnw, Na, Ni)
 
         endif
 
@@ -528,33 +532,43 @@ end subroutine hf
 
 !===============================================================================
 
-subroutine calculate_RHw_hf(T, lnw, RHw)
+subroutine calculate_RHw_hf(Temperature, lnw, RHw)
 
-   real(r8), intent(in)  :: T, lnw
+!-------------------------------------------------------------------------------
+! Calculate threshold relative humidity with respective to water (RHw) based on
+! Eq. 3.1 in Liu & Penner (2005), Meteorol. Z.
+!-------------------------------------------------------------------------------
+
+   real(r8), intent(in)  :: Temperature, lnw
    real(r8), intent(out) :: RHw
 
-   real(r8) A, B, C
+   real(r8) A_coef, B_coef, C_coef
  
-   A = 6.0e-4_r8*lnw + 6.6e-3_r8
-   B = 6.0e-2_r8*lnw + 1.052_r8
-   C = 1.68_r8  *lnw + 129.35_r8
+   A_coef = 6.0e-4_r8*lnw + 6.6e-3_r8
+   B_coef = 6.0e-2_r8*lnw + 1.052_r8
+   C_coef = 1.68_r8  *lnw + 129.35_r8
    
-   RHw=(A*T*T+B*T+C)*0.01_r8
+   RHw = (A_coef*Temperature*Temperature + B_coef*Temperature + C_coef)*0.01_r8
 
 end subroutine
 
 
-subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, T, lnw, Na, Ni)
+subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, Temperature, lnw, Na, Ni)
    
+!-------------------------------------------------------------------------------
+! Calculate number of ice crystals (Ni) based on
+! Eq. 3.3 in Liu & Penner (2005), Meteorol. Z.
+!-------------------------------------------------------------------------------
+
    real(r8), intent(in)  :: A1, B1, C1
    real(r8), intent(in)  :: A2, B2, C2
-   real(r8), intent(in)  :: T, lnw, Na
+   real(r8), intent(in)  :: Temperature, lnw, Na
    real(r8), intent(out) :: Ni
    
    real(r8) k1, k2
 
-   k1 = exp(A2 + B2*T + C2*lnw)   
-   k2 = A1 + B1*T + C1*lnw
+   k1 = exp(A2 + B2*Temperature + C2*lnw)   
+   k2 = A1 + B1*Temperature + C1*lnw
 
    Ni = k1*Na**(k2)
    Ni = min(Ni,Na)
