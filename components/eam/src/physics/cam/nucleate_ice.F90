@@ -465,47 +465,42 @@ subroutine hf(T,ww,RH,Na,Ni)
       real(r8), intent(in)  :: T, ww, RH, Na
       real(r8), intent(out) :: Ni
 
-      real(r8)    A1_fast,A21_fast,A22_fast,B1_fast,B21_fast,B22_fast
-      real(r8)    A2_fast,B2_fast
-      real(r8)    C1_fast,C2_fast,k1_fast,k2_fast
-      real(r8)    A1_slow,A2_slow,B1_slow,B2_slow,B3_slow
-      real(r8)    C1_slow,C2_slow,k1_slow,k2_slow
-      real(r8)    regm
-      real(r8)    A,B,C
-      real(r8)    RHw
-
 !---------------------------------------------------------------------
 ! parameters
+!---------------------------------------------------------------------
 
-      A1_fast  =0.0231_r8
-      A21_fast =-1.6387_r8  !(T>-64 deg)
-      A22_fast =-6.045_r8   !(T<=-64 deg)
-      B1_fast  =-0.008_r8
-      B21_fast =-0.042_r8   !(T>-64 deg)
-      B22_fast =-0.112_r8   !(T<=-64 deg)
-      C1_fast  =0.0739_r8
-      C2_fast  =1.2372_r8
+      real(r8), parameter :: A1_fast  =  0.0231_r8
+      real(r8), parameter :: A21_fast = -1.6387_r8  !(T>-64 deg)
+      real(r8), parameter :: A22_fast = -6.045_r8   !(T<=-64 deg)
+      real(r8), parameter :: B1_fast  = -0.008_r8
+      real(r8), parameter :: B21_fast = -0.042_r8   !(T>-64 deg)
+      real(r8), parameter :: B22_fast = -0.112_r8   !(T<=-64 deg)
+      real(r8), parameter :: C1_fast  =  0.0739_r8
+      real(r8), parameter :: C2_fast  =  1.2372_r8
 
-      A1_slow  =-0.3949_r8
-      A2_slow  =1.282_r8
-      B1_slow  =-0.0156_r8
-      B2_slow  =0.0111_r8
-      B3_slow  =0.0217_r8
-      C1_slow  =0.120_r8
-      C2_slow  =2.312_r8
+      real(r8), parameter :: A1_slow  = -0.3949_r8
+      real(r8), parameter :: A2_slow  =  1.282_r8
+      real(r8), parameter :: B1_slow  = -0.0156_r8
+      real(r8), parameter :: B2_slow  =  0.0111_r8
+      real(r8), parameter :: B3_slow  =  0.0217_r8
+      real(r8), parameter :: C1_slow  =  0.120_r8
+      real(r8), parameter :: C2_slow  =  2.312_r8
 
+!---------------------------------------------------------------------
+! local variables
+!---------------------------------------------------------------------
+      real(r8) A2_fast, B2_fast, B4_slow
+      real(r8) lnw, regm, RHw 
+
+
+      lnw = log(ww)
       Ni = 0.0_r8
 
-!----------------------------
-!RHw parameters
-      A = 6.0e-4_r8*log(ww)+6.6e-3_r8
-      B = 6.0e-2_r8*log(ww)+1.052_r8
-      C = 1.68_r8  *log(ww)+129.35_r8
-      RHw=(A*T*T+B*T+C)*0.01_r8
+      call calculate_RHw_hf(T, lnw, RHw)
 
       if((T.le.-37.0_r8) .and. ((RH*subgrid).ge.RHw)) then
 
-        regm = 6.07_r8*log(ww)-55.0_r8
+        regm = 6.07_r8*lnw-55.0_r8
 
         if(T.ge.regm) then    ! fast-growth regime
 
@@ -517,27 +512,54 @@ subroutine hf(T,ww,RH,Na,Ni)
             B2_fast=B22_fast
           endif
 
-          k1_fast = exp(A2_fast + B2_fast*T + C2_fast*log(ww))
-          k2_fast = A1_fast+B1_fast*T+C1_fast*log(ww)
-
-          Ni = k1_fast*Na**(k2_fast)
-          Ni = min(Ni,Na)
+          call calculate_Ni_hf(A1_fast, B1_fast, C1_fast, A2_fast, B2_fast, C2_fast, T, lnw, Na, Ni)
 
         else       ! slow-growth regime
+ 
+          B4_slow = B2_slow + B3_slow*lnw   
 
-          k1_slow = exp(A2_slow + (B2_slow+B3_slow*log(ww))*T + C2_slow*log(ww))
-          k2_slow = A1_slow+B1_slow*T+C1_slow*log(ww)
-
-          Ni = k1_slow*Na**(k2_slow)
-          Ni = min(Ni,Na)
+          call calculate_Ni_hf(A1_slow, B1_slow, C1_slow, A2_slow, B4_slow, C2_slow, T, lnw, Na, Ni)
 
         endif
 
-      end if
+      endif
 
 end subroutine hf
 
 !===============================================================================
+
+subroutine calculate_RHw_hf(T, lnw, RHw)
+
+   real(r8), intent(in)  :: T, lnw
+   real(r8), intent(out) :: RHw
+
+   real(r8) A, B, C
+ 
+   A = 6.0e-4_r8*lnw + 6.6e-3_r8
+   B = 6.0e-2_r8*lnw + 1.052_r8
+   C = 1.68_r8  *lnw + 129.35_r8
+   
+   RHw=(A*T*T+B*T+C)*0.01_r8
+
+end subroutine
+
+
+subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, T, lnw, Na, Ni)
+   
+   real(r8), intent(in)  :: A1, B1, C1
+   real(r8), intent(in)  :: A2, B2, C2
+   real(r8), intent(in)  :: T, lnw, Na
+   real(r8), intent(out) :: Ni
+   
+   real(r8) k1, k2
+
+   k1 = exp(A2 + B2*T + C2*lnw)   
+   k2 = A1 + B1*T + C1*lnw
+
+   Ni = k1*Na**(k2)
+   Ni = min(Ni,Na)
+
+end subroutine
 
 SUBROUTINE Vpreice(P_in, T_in, R_in, C_in, S_in, V_out)
 
