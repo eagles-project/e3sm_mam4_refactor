@@ -969,9 +969,9 @@ subroutine dropmixnuc( &
                  + raercol_cw(pver,mm,nsav)*(nact(pver,m) - taumix_internal_pver_inv)
             srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
          end do
+!! BJG 10/3 remove two arguments of "zero" to explmix here and elsewhere, since have no impact on output.
          call explmix(  &
             qcld, srcn, ekkp, ekkm, overlapp,  &
-!! BJG            overlapm, qncld, zero, zero, pver, &
             overlapm, qncld, pver, &
             dtmix, .false.)
 
@@ -996,13 +996,11 @@ subroutine dropmixnuc( &
 
             call explmix( &
                raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
-!! BJG               overlapm, raercol_cw(:,mm,nsav), zero, zero, pver,   &
                overlapm, raercol_cw(:,mm,nsav), pver,   &
                dtmix, .false.)
 
             call explmix( &
                raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
-!! BJG               overlapm, raercol(:,mm,nsav), zero, flxconv, pver, &
                overlapm, raercol(:,mm,nsav), pver, &
                dtmix, .true., raercol_cw(:,mm,nsav))
 
@@ -1020,13 +1018,11 @@ subroutine dropmixnuc( &
 
                call explmix( &
                   raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
-!!                  overlapm, raercol_cw(:,mm,nsav), zero, zero, pver,   &  BJG
                   overlapm, raercol_cw(:,mm,nsav), pver,   & 
                   dtmix, .false.)
 
                call explmix( &
                   raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
-!! BJG                 overlapm, raercol(:,mm,nsav), zero, flxconv, pver, &
                   overlapm, raercol(:,mm,nsav), pver, &
                   dtmix, .true., raercol_cw(:,mm,nsav))
 
@@ -1173,7 +1169,6 @@ end subroutine dropmixnuc
 !===============================================================================
 
 subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
-!!   qold, surfrate, flxconv, pver, dt, is_unact, qactold )  BJG 9/30
    qold, pver, dt, is_unact, qactold ) 
 
    !  explicit integration of droplet/aerosol mixing
@@ -1181,29 +1176,25 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 
 
    integer, intent(in) :: pver ! number of levels
-   real(r8), intent(out) :: q(pver) ! NUMBER / MASS mixing ratio to be updated  (# or kg / KG AIR)  BJG
-   real(r8), intent(in) :: qold(pver) ! NUMBER / MASS mixing ratio from previous time step (# or kg / KG AIR) BJG
-   real(r8), intent(in) :: src(pver) ! source due to activation/nucleation ( #/(kg air)/s or kg/(kg air)/s )
-   real(r8), intent(in) :: ekkp(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface
+   real(r8), intent(out) :: q(pver) ! number / mass mixing ratio to be updated  (# or kg / (kg air))  
+   real(r8), intent(in) :: qold(pver) ! number / mass mixing ratio from previous time step (# or kg / (kg air)) 
+   real(r8), intent(in) :: src(pver) ! source due to activation/nucleation ( #/(kg air)/s or kg/(kg air)/s )  
+   real(r8), intent(in) :: ekkp(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface (overall units /s) 
    ! below layer k  (k,k+1 interface)
-   real(r8), intent(in) :: ekkm(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface
+   real(r8), intent(in) :: ekkm(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface (overall units /s) 
    ! above layer k  (k,k+1 interface)
-   real(r8), intent(in) :: overlapp(pver) ! cloud overlap below (FRAC 0-1)
-   real(r8), intent(in) :: overlapm(pver) ! cloud overlap above (FRAC 0-1)
-!  BELOW IS ALWAYS ZERO, SO IT CAN BE REMOVED  BJG 9/30
-!!   real(r8), intent(in) :: surfrate ! surface exchange rate (/s)
-!  BELOW IS ALWAYS ZERO, SO IT CAN BE REMOVED  BJG 9/30
-!!   real(r8), intent(in) :: flxconv ! convergence of flux from surface  
+   real(r8), intent(in) :: overlapp(pver) ! cloud overlap below (fraction 0-1) 
+   real(r8), intent(in) :: overlapm(pver) ! cloud overlap above (fraction 0-1) 
    real(r8), intent(in) :: dt ! time step (s)
    logical, intent(in) :: is_unact ! true if this is an unactivated species
-   real(r8), intent(in),optional :: qactold(pver)
-   ! mixing ratio of ACTIVATED species from previous step
+   real(r8), intent(in),optional :: qactold(pver) 
+   ! number / mass mixing ratio of ACTIVATED species from previous step (# or kg / (kg air)) 
    ! *** this should only be present
    !     if the current species is unactivated number/sfc/mass
 
    integer k,kp1,km1
 
-!! move if branch inside loop to simplify BJG 9/30   if ( is_unact ) then
+!! move if branch inside k loop loop to simplify BJG 9/30   
       !     the qactold*(1-overlap) terms are resuspension of activated material
       do k=top_lev,pver
          kp1=min(k+1,pver)
@@ -1224,35 +1215,19 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
          !           write(iulog,*)'q=',q(k),' in explmix'
          q(k)=max(q(k),0._r8)
          !        endif
-      end do
+      enddo
 
       !     diffusion loss at base of lowest layer
+!!  Remove (commented out) line below, since surfrate and flxconv are always zero,
+!!  and also remove these as arguments to this subroutine 
 !!      q(pver)=q(pver)-surfrate*qold(pver)*dt+flxconv*dt   BJG 9/30
       !        force to non-negative
       !        if(q(pver)<-1.e-30)then
       !           write(iulog,*)'q=',q(pver),' in explmix'
-      q(pver)=max(q(pver),0._r8)
+!!  Remove (commented out) line below, since redundant with last pass of loop
+!!      q(pver)=max(q(pver),0._r8)  BJG 10/3
       !        endif
-!!   else
-!!      do k=top_lev,pver
-!!         kp1=min(k+1,pver)
-!!         km1=max(k-1,top_lev)
-!!   BJG      q(k) = qold(k) + dt*(src(k) + ekkp(k)*(overlapp(k)*qold(kp1)-qold(k)) +      &
-!!   BJG          ekkm(k)*(overlapm(k)*qold(km1)-qold(k)) )
-         !        force to non-negative
-         !        if(q(k)<-1.e-30)then
-         !           write(iulog,*)'q=',q(k),' in explmix'
-!!         q(k)=max(q(k),0._r8)
-         !        endif
-!!      end do
-      !     diffusion loss at base of lowest layer
-!!      q(pver)=q(pver)-surfrate*qold(pver)*dt+flxconv*dt BJG 9/30
-      !        force to non-negative
-      !        if(q(pver)<-1.e-30)then
-      !           write(iulog,*)'q=',q(pver),' in explmix'
-!!      q(pver)=max(q(pver),0._r8)
 
-!!   end if
 
 end subroutine explmix
 
