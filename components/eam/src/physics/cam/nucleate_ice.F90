@@ -467,8 +467,11 @@ subroutine hf(Temperature, w_vlc, RH, Na, Ni)
 ! Liu & Penner (2005), Meteorol. Z.
 !-------------------------------------------------------------------------------
 
-      real(r8), intent(in)  :: Temperature, w_vlc, RH, Na
-      real(r8), intent(out) :: Ni
+      real(r8), intent(in)  :: Temperature     ! [C] temperature
+      real(r8), intent(in)  :: w_vlc           ! [m/s] vertical velocity
+      real(r8), intent(in)  :: RH              ! unitless relative humidity
+      real(r8), intent(in)  :: Na              ! [#/cm^3] aerosol number concentrations 
+      real(r8), intent(out) :: Ni              ! [#/cm^3] ice number concentrations
 
 !---------------------------------------------------------------------
 ! parameters
@@ -539,8 +542,9 @@ subroutine calculate_RHw_hf(Temperature, lnw, RHw)
 ! Eq. 3.1 in Liu & Penner (2005), Meteorol. Z.
 !-------------------------------------------------------------------------------
 
-   real(r8), intent(in)  :: Temperature, lnw
-   real(r8), intent(out) :: RHw
+   real(r8), intent(in)  :: Temperature     ! [C] temperature
+   real(r8), intent(in)  :: lnw             ! ln of vertical velocity
+   real(r8), intent(out) :: RHw             ! relative humidity threshold 
 
    real(r8) A_coef, B_coef, C_coef
  
@@ -560,10 +564,12 @@ subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, Temperature, lnw, Na, Ni)
 ! Eq. 3.3 in Liu & Penner (2005), Meteorol. Z.
 !-------------------------------------------------------------------------------
 
-   real(r8), intent(in)  :: A1, B1, C1
-   real(r8), intent(in)  :: A2, B2, C2
-   real(r8), intent(in)  :: Temperature, lnw, Na
-   real(r8), intent(out) :: Ni
+   real(r8), intent(in)  :: A1, B1, C1     ! Coefficients        
+   real(r8), intent(in)  :: A2, B2, C2     ! Coefficients
+   real(r8), intent(in)  :: Temperature    ! [C] temperature
+   real(r8), intent(in)  :: lnw            ! ln of vertical velocity
+   real(r8), intent(in)  :: Na             ! [#/cm3] aerosol number concentrations
+   real(r8), intent(out) :: Ni             ! [#/cm3] ice number concentrations
    
    real(r8) k1, k2
 
