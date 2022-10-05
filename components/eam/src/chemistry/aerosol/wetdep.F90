@@ -122,7 +122,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
 
   ! assign variables, some of them are in "state" and "inputs"
   ! in state
-  real(r8) :: t(pcols,pver)        ! temperature [K]
+  real(r8) :: temperature(pcols,pver)        ! temperature [K]
   real(r8) :: q_liq(pcols,pver)    ! liquid water mixing ratio[kg/kg]
   real(r8) :: q_ice(pcols,pver)    ! ice water mixing ratio [kg/kg]
   real(r8) :: pmid(pcols,pver)     ! pressure at layer midpoints[Pa]
@@ -200,7 +200,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
 
   ! assign all variables from state and inputs
   ncol = state%ncol
-  t = state%t
+  temperature = state%t
   q_liq = state%q(:,:,ixcldliq)
   q_ice = state%q(:,:,ixcldice)
   pmid = state%pmid
@@ -235,7 +235,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   totcond(:ncol,:) = q_liq(:ncol,:) + q_ice(:ncol,:)
 
   ! calculate cldv, cldvcu and cldvst
-  call clddiag( t,     pmid,   pdel,   cmfdqr, evapc, &
+  call clddiag( temperature,     pmid,   pdel,   cmfdqr, evapc, &
                cldt,  cldcu,       cldst,  evapr, &
                prain, cldv, cldvcu, cldvst, rainmr, &
                 ncol )
