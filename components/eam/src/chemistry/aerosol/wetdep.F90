@@ -1153,12 +1153,12 @@ jstrcnv_loop_aa: &
 !     Options of assuming log-normal or marshall-palmer raindrop size distribution
 !
       function flux_precnum_vs_flux_prec_mpln( flux_prec, jstrcnv )
-      real(r8) :: flux_precnum_vs_flux_prec_mpln
-      real(r8), intent(in) :: flux_prec
+      real(r8) :: flux_precnum_vs_flux_prec_mpln  ! [drops/m^2/s]
+      real(r8), intent(in) :: flux_prec     ! [drops/m^2/s]
       integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
 
       real(r8) :: a0, a1
-      real(r8) :: x, y
+      real(r8) :: x_var, y_var
 
       if (jstrcnv <= 1) then
         ! marshall-palmer distribution
@@ -1171,12 +1171,12 @@ jstrcnv_loop_aa: &
       endif
 
       if (flux_prec >= 1.0e-36_r8) then
-         x = log( flux_prec )
-         y = exp( a0 + a1*x )
+         x_var = log( flux_prec )
+         y_var = exp( a0 + a1*x_var )
       else
-         y = 0.0_r8
+         y_var = 0.0_r8
       endif
-      flux_precnum_vs_flux_prec_mpln = y
+      flux_precnum_vs_flux_prec_mpln = y_var
 
       return
       end function flux_precnum_vs_flux_prec_mpln
@@ -1189,12 +1189,12 @@ jstrcnv_loop_aa: &
 ! and not to the layer immediately above fluxes
 
       function faer_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
-      real(r8) :: faer_resusp_vs_fprec_evap_mpln
-      real(r8), intent(in) :: fprec_evap
+      real(r8) :: faer_resusp_vs_fprec_evap_mpln ! [fraction]
+      real(r8), intent(in) :: fprec_evap ! [fraction]
       integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
 
       real(r8) :: a01, a02, a03, a04, a05, a06, a07, a08, a09, x_lox_lin, y_lox_lin
-      real(r8) :: x, y
+      real(r8) :: x_var, y_var
 
       if (jstrcnv <= 1) then
         ! marshall-palmer distribution
@@ -1224,14 +1224,14 @@ jstrcnv_loop_aa: &
         y_lox_lin =  6.2227889828044350E-04_r8
       endif
 
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
+      x_var = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      if (x_var < x_lox_lin) then
+         y_var = y_lox_lin * (x_var/x_lox_lin)
       else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
+         y_var = x_var*( a01 + x_var*( a02 + x_var*( a03 + x_var*( a04 + x_var*( a05 &
+           + x_var*( a06 + x_var*( a07 + x_var*( a08 + x_var*a09 ))))))))
       endif
-      faer_resusp_vs_fprec_evap_mpln = y
+      faer_resusp_vs_fprec_evap_mpln = y_var
 
       return
       end function faer_resusp_vs_fprec_evap_mpln
@@ -1243,12 +1243,12 @@ jstrcnv_loop_aa: &
 ! note that these fractions are relative to the cloud-base fluxes,
 ! and not to the layer immediately above fluxes
       function fprecn_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
-      real(r8) :: fprecn_resusp_vs_fprec_evap_mpln
-      real(r8), intent(in) :: fprec_evap
+      real(r8) :: fprecn_resusp_vs_fprec_evap_mpln  ! [fraction]
+      real(r8), intent(in) :: fprec_evap     ! [fraction]
       integer,  intent(in) :: jstrcnv  ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
 
       real(r8) :: a01, a02, a03, a04, a05, a06, a07, a08, a09, x_lox_lin, y_lox_lin
-      real(r8) :: x, y
+      real(r8) :: x_var, y_var
 
       if (jstrcnv <= 1) then
         !marshall-palmer distribution
@@ -1278,14 +1278,14 @@ jstrcnv_loop_aa: &
         y_lox_lin =  2.7247994766566485E-02_r8
       endif
 
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
+      x_var = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      if (x_var < x_lox_lin) then
+         y_var = y_lox_lin * (x_var/x_lox_lin)
       else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
+         y_var = x_var*( a01 + x_var*( a02 + x_var*( a03 + x_var*( a04 + x_var*( a05 &
+           + x_var*( a06 + x_var*( a07 + x_var*( a08 + x_var*a09 ))))))))
       endif
-      fprecn_resusp_vs_fprec_evap_mpln = y
+      fprecn_resusp_vs_fprec_evap_mpln = y_var
 
       return
       end function fprecn_resusp_vs_fprec_evap_mpln
