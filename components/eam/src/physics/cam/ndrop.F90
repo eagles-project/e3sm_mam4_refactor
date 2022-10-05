@@ -1175,19 +1175,19 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 
 
    integer, intent(in) :: pver ! number of levels
-   real(r8), intent(out) :: q(pver) ! [# or kg / kg] number / mass mixing ratio to be updated 
-   real(r8), intent(in) :: qold(pver) ! [# or kg / kg] number / mass mixing ratio from previous time step
-   real(r8), intent(in) :: src(pver) ! [# or kg / (kg-s)] source due to activation/nucleation
-   real(r8), intent(in) :: ekkp(pver) ! [/s] zn*zs*density*diffusivity (kg/m3 m2/s) at interface 
+   real(r8), intent(out) :: q(pver) ! number / mass mixing ratio to be updated [# or kg / kg] 
+   real(r8), intent(in) :: qold(pver) ! number / mass mixing ratio from previous time step [# or kg / kg] 
+   real(r8), intent(in) :: src(pver) ! source due to activation/nucleation [# or kg / (kg-s)]
+   real(r8), intent(in) :: ekkp(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface [/s]
    ! below layer k  (k,k+1 interface)
-   real(r8), intent(in) :: ekkm(pver) ! [/s] zn*zs*density*diffusivity (kg/m3 m2/s) at interface
+   real(r8), intent(in) :: ekkm(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface [/s]
    ! above layer k  (k,k+1 interface)
-   real(r8), intent(in) :: overlapp(pver) ! [fraction] cloud overlap below
-   real(r8), intent(in) :: overlapm(pver) ! [fraction] cloud overlap above
-   real(r8), intent(in) :: dt ! [s] time step 
+   real(r8), intent(in) :: overlapp(pver) ! cloud overlap below [fraction]
+   real(r8), intent(in) :: overlapm(pver) ! cloud overlap above [fraction]
+   real(r8), intent(in) :: dt ! time step [s] 
    logical, intent(in) :: is_unact ! true if this is an unactivated species
-   real(r8), intent(in),optional :: qactold(pver) 
-   ! [# or kg / kg] number / mass mixing ratio of ACTIVATED species from previous step
+   real(r8), intent(in),optional :: qactold(pver) ! [# or kg / kg] 
+   ! number / mass mixing ratio of ACTIVATED species from previous step
    ! *** this should only be present
    !     if the current species is unactivated number/sfc/mass
 
@@ -1207,6 +1207,7 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
             q(k) = qold(k) + dt*(src(k) + ekkp(k)*(overlapp(k)*qold(kp1)-qold(k)) +      &
                ekkm(k)*(overlapm(k)*qold(km1)-qold(k)) )
          endif
+
          !        force to non-negative
          q(k)=max(q(k),0._r8)
       enddo
