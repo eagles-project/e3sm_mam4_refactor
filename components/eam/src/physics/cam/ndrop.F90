@@ -1208,10 +1208,7 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
                ekkm(k)*(overlapm(k)*qold(km1)-qold(k)) )
          endif
          !        force to non-negative
-         !        if(q(k)<-1.e-30)then
-         !           write(iulog,*)'q=',q(k),' in explmix'
          q(k)=max(q(k),0._r8)
-         !        endif
       enddo
 
 end subroutine explmix
