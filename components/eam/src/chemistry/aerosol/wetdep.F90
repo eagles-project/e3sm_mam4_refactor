@@ -1149,267 +1149,146 @@ jstrcnv_loop_aa: &
 
 
 !==============================================================================
+!     flux_precnum_vs_flux_prec_mp = precipitation number flux at the cloud base [drops/m^2/s]
+!     Options of assuming log-normal or marshall-palmer raindrop size distribution
+!
       function flux_precnum_vs_flux_prec_mpln( flux_prec, jstrcnv )
       real(r8) :: flux_precnum_vs_flux_prec_mpln
       real(r8), intent(in) :: flux_prec
-      integer,  intent(in) :: jstrcnv
+      integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
+
+      real(r8) :: a0, a1
+      real(r8) :: x, y
 
       if (jstrcnv <= 1) then
-         flux_precnum_vs_flux_prec_mpln = flux_precnum_vs_flux_prec_mp( flux_prec )
+        ! marshall-palmer distribution
+        a0 =  1.0885896550304022E+01_r8
+        a1 =  4.3660645528167907E-01_r8
       else
-         flux_precnum_vs_flux_prec_mpln = flux_precnum_vs_flux_prec_ln( flux_prec )
-      end if
+        ! log-normal distribution
+        a0 =  9.9067806476181524E+00_r8
+        a1 =  4.2690709912134056E-01_r8
+      endif
+
+      if (flux_prec >= 1.0e-36_r8) then
+         x = log( flux_prec )
+         y = exp( a0 + a1*x )
+      else
+         y = 0.0_r8
+      endif
+      flux_precnum_vs_flux_prec_mpln = y
 
       return
       end function flux_precnum_vs_flux_prec_mpln
 
 
 !==============================================================================
+! corresponding fraction of precipitation-borne aerosol flux that is resuspended
+! Options of assuming log-normal or marshall-palmer raindrop size distribution
+! note that these fractions are relative to the cloud-base fluxes,
+! and not to the layer immediately above fluxes
+
       function faer_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
       real(r8) :: faer_resusp_vs_fprec_evap_mpln
       real(r8), intent(in) :: fprec_evap
-      integer,  intent(in) :: jstrcnv
+      integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
+
+      real(r8) :: a01, a02, a03, a04, a05, a06, a07, a08, a09, x_lox_lin, y_lox_lin
+      real(r8) :: x, y
 
       if (jstrcnv <= 1) then
-         faer_resusp_vs_fprec_evap_mpln = faer_resusp_vs_fprec_evap_mp( fprec_evap )
+        ! marshall-palmer distribution
+        a01 =  8.6591133737322856E-02_r8
+        a02 = -1.7389168499601941E+00_r8
+        a03 =  2.7401882373663732E+01_r8
+        a04 = -1.5861714653209464E+02_r8
+        a05 =  5.1338179363011193E+02_r8
+        a06 = -9.6835933124501412E+02_r8
+        a07 =  1.0588489932213311E+03_r8
+        a08 = -6.2184513459217271E+02_r8
+        a09 =  1.5184126886039758E+02_r8
+        x_lox_lin =  5.0000000000000003E-02_r8
+        y_lox_lin =  2.5622471203221014E-03_r8
       else
-         faer_resusp_vs_fprec_evap_mpln = faer_resusp_vs_fprec_evap_ln( fprec_evap )
-      end if
+        ! log-normal distribution
+        a01 =  6.1944215103685640E-02_r8
+        a02 = -2.0095166685965378E+00_r8
+        a03 =  2.3882460251821236E+01_r8
+        a04 = -1.2695611774753374E+02_r8
+        a05 =  4.0086943562320101E+02_r8
+        a06 = -7.4954272875943707E+02_r8
+        a07 =  8.1701055892023624E+02_r8
+        a08 = -4.7941894659538502E+02_r8
+        a09 =  1.1710291076059025E+02_r8
+        x_lox_lin =  1.0000000000000001E-01_r8
+        y_lox_lin =  6.2227889828044350E-04_r8
+      endif
+
+      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      if (x < x_lox_lin) then
+         y = y_lox_lin * (x/x_lox_lin)
+      else
+         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
+           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
+      endif
+      faer_resusp_vs_fprec_evap_mpln = y
 
       return
       end function faer_resusp_vs_fprec_evap_mpln
 
 
 !==============================================================================
+! Rain number evaporation fraction
+! Options of assuming log-normal or marshall-palmer raindrop size distribution
+! note that these fractions are relative to the cloud-base fluxes,
+! and not to the layer immediately above fluxes
       function fprecn_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
       real(r8) :: fprecn_resusp_vs_fprec_evap_mpln
       real(r8), intent(in) :: fprec_evap
-      integer,  intent(in) :: jstrcnv
+      integer,  intent(in) :: jstrcnv  ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
+
+      real(r8) :: a01, a02, a03, a04, a05, a06, a07, a08, a09, x_lox_lin, y_lox_lin
+      real(r8) :: x, y
 
       if (jstrcnv <= 1) then
-         fprecn_resusp_vs_fprec_evap_mpln = fprecn_resusp_vs_fprec_evap_mp( fprec_evap )
+        !marshall-palmer distribution
+        a01 =  4.5461070198414655E+00_r8
+        a02 = -3.0381753620077529E+01_r8
+        a03 =  1.7959619926085665E+02_r8
+        a04 = -6.7152282193785618E+02_r8
+        a05 =  1.5651931323557126E+03_r8
+        a06 = -2.2743927701175126E+03_r8
+        a07 =  2.0004645897056735E+03_r8
+        a08 = -9.7351466279626209E+02_r8
+        a09 =  2.0101198012962413E+02_r8
+        x_lox_lin =  5.0000000000000003E-02_r8
+        y_lox_lin =  1.7005858490684875E-01_r8
       else
-         fprecn_resusp_vs_fprec_evap_mpln = fprecn_resusp_vs_fprec_evap_ln( fprec_evap )
-      end if
+        ! log-normal distribution
+        a01 = -5.2335291116884175E-02_r8
+        a02 =  2.7203158069178226E+00_r8
+        a03 =  9.4730878152409375E+00_r8
+        a04 = -5.0573187592544798E+01_r8
+        a05 =  9.4732631441282862E+01_r8
+        a06 = -8.8265926556465814E+01_r8
+        a07 =  3.5247835268269142E+01_r8
+        a08 =  1.5404586576716444E+00_r8
+        a09 = -3.8228795492549068E+00_r8
+        x_lox_lin =  1.0000000000000001E-01_r8
+        y_lox_lin =  2.7247994766566485E-02_r8
+      endif
+
+      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      if (x < x_lox_lin) then
+         y = y_lox_lin * (x/x_lox_lin)
+      else
+         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
+           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
+      endif
+      fprecn_resusp_vs_fprec_evap_mpln = y
 
       return
       end function fprecn_resusp_vs_fprec_evap_mpln
-
-
-!==============================================================================
-      function flux_precnum_vs_flux_prec_mp( flux_prec )
-!
-!  flux_prec = precipitation mass flux at the cloud base (kg/m^2/s)
-!  flux_precnum_vs_flux_prec_mp = precipitation number flux
-!     at the cloud base (drops/m^2/s), assuming marshall-palmer raindrop size distribution
-!
-!
-      real(r8) :: flux_precnum_vs_flux_prec_mp
-      real(r8), intent(in) :: flux_prec
-
-      real(r8), parameter :: a0 =  1.0885896550304022E+01_r8
-      real(r8), parameter :: a1 =  4.3660645528167907E-01_r8
-
-      real(r8) :: x, y
-   
-      if (flux_prec >= 1.0e-36_r8) then
-         x = log( flux_prec )
-         y = exp( a0 + a1*x )    
-      else
-         y = 0.0_r8
-      end if
-      flux_precnum_vs_flux_prec_mp = y
-
-      return
-      end function flux_precnum_vs_flux_prec_mp
-
-
-!==============================================================================
-      function flux_precnum_vs_flux_prec_ln( flux_prec )
-!
-!  flux_prec = precipitation mass flux at the cloud base (kg/m^2/s)
-!  flux_precnum_vs_flux_prec_ln = precipitation number flux
-!     at the cloud base (drops/m^2/s), assuming log-normal raindrop size distribution
-!
-!
-      real(r8) :: flux_precnum_vs_flux_prec_ln
-      real(r8), intent(in) :: flux_prec
-
-      real(r8), parameter :: a0 =  9.9067806476181524E+00_r8
-      real(r8), parameter :: a1 =  4.2690709912134056E-01_r8
-
-      real(r8) :: x, y
-   
-      if (flux_prec >= 1.0e-36_r8) then
-         x = log( flux_prec )
-         y = exp( a0 + a1*x )    
-      else
-         y = 0.0_r8
-      end if
-      flux_precnum_vs_flux_prec_ln = y
-
-      return
-      end function flux_precnum_vs_flux_prec_ln
-
-
-!==============================================================================
-      function faer_resusp_vs_fprec_evap_mp( fprec_evap )
-!
-!  fprec_evap = fraction of precipitation flux that has evaporated (below cloud base)
-!  faer_resusp_vs_fprec_evap_mp = corresponding fraction of precipitation-borne aerosol
-!     flux that is resuspended, assuming marshall-palmer raindrop size distribution
-!
-!  note that these fractions are relative to the cloud-base fluxes,
-!      and not to the layer immediately above fluxes
-!
-      real(r8) :: faer_resusp_vs_fprec_evap_mp
-      real(r8), intent(in) :: fprec_evap
-
-      real(r8), parameter :: a01 =  8.6591133737322856E-02_r8
-      real(r8), parameter :: a02 = -1.7389168499601941E+00_r8
-      real(r8), parameter :: a03 =  2.7401882373663732E+01_r8
-      real(r8), parameter :: a04 = -1.5861714653209464E+02_r8
-      real(r8), parameter :: a05 =  5.1338179363011193E+02_r8
-      real(r8), parameter :: a06 = -9.6835933124501412E+02_r8
-      real(r8), parameter :: a07 =  1.0588489932213311E+03_r8
-      real(r8), parameter :: a08 = -6.2184513459217271E+02_r8
-      real(r8), parameter :: a09 =  1.5184126886039758E+02_r8
-      real(r8), parameter :: x_lox_lin =  5.0000000000000003E-02_r8
-      real(r8), parameter :: y_lox_lin =  2.5622471203221014E-03_r8
-
-      real(r8) :: x, y
-
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
-      else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
-      end if
-      faer_resusp_vs_fprec_evap_mp = y
-
-      return
-      end function faer_resusp_vs_fprec_evap_mp
-
-
-!==============================================================================
-      function faer_resusp_vs_fprec_evap_ln( fprec_evap )
-!
-!  fprec_evap = fraction of precipitation flux that has evaporated (below cloud base)
-!  faer_resusp_vs_fprec_evap_ln = corresponding fraction of precipitation-borne aerosol
-!     flux that is resuspended, assuming log-normal raindrop size distribution
-!
-!  note that these fractions are relative to the cloud-base fluxes,
-!      and not to the layer immediately above fluxes
-!
-      real(r8) :: faer_resusp_vs_fprec_evap_ln
-      real(r8), intent(in) :: fprec_evap
-
-      real(r8), parameter :: a01 =  6.1944215103685640E-02_r8
-      real(r8), parameter :: a02 = -2.0095166685965378E+00_r8
-      real(r8), parameter :: a03 =  2.3882460251821236E+01_r8
-      real(r8), parameter :: a04 = -1.2695611774753374E+02_r8
-      real(r8), parameter :: a05 =  4.0086943562320101E+02_r8
-      real(r8), parameter :: a06 = -7.4954272875943707E+02_r8
-      real(r8), parameter :: a07 =  8.1701055892023624E+02_r8
-      real(r8), parameter :: a08 = -4.7941894659538502E+02_r8
-      real(r8), parameter :: a09 =  1.1710291076059025E+02_r8
-      real(r8), parameter :: x_lox_lin =  1.0000000000000001E-01_r8
-      real(r8), parameter :: y_lox_lin =  6.2227889828044350E-04_r8
-
-      real(r8) :: x, y
-
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
-      else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
-      end if
-      faer_resusp_vs_fprec_evap_ln = y
-
-      return
-      end function faer_resusp_vs_fprec_evap_ln
-
-
-!==============================================================================
-      function fprecn_resusp_vs_fprec_evap_mp( fprec_evap )
-!
-!  fprec_evap = fraction of precipitation flux that has evaporated (below cloud base)
-!  fprecn_resusp_vs_fprec_evap_mp = Rain number evaporation fraction, 
-!                                  assuming marshall-palmer raindrop size distribution
-!
-!  note that these fractions are relative to the cloud-base fluxes,
-!      and not to the layer immediately above fluxes
-!
-      real(r8) :: fprecn_resusp_vs_fprec_evap_mp
-      real(r8), intent(in) :: fprec_evap
-
-      real(r8), parameter :: a01 =  4.5461070198414655E+00_r8
-      real(r8), parameter :: a02 = -3.0381753620077529E+01_r8
-      real(r8), parameter :: a03 =  1.7959619926085665E+02_r8
-      real(r8), parameter :: a04 = -6.7152282193785618E+02_r8
-      real(r8), parameter :: a05 =  1.5651931323557126E+03_r8
-      real(r8), parameter :: a06 = -2.2743927701175126E+03_r8
-      real(r8), parameter :: a07 =  2.0004645897056735E+03_r8
-      real(r8), parameter :: a08 = -9.7351466279626209E+02_r8
-      real(r8), parameter :: a09 =  2.0101198012962413E+02_r8
-      real(r8), parameter :: x_lox_lin =  5.0000000000000003E-02_r8
-      real(r8), parameter :: y_lox_lin =  1.7005858490684875E-01_r8
-
-      real(r8) :: x, y
-
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
-      else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
-      end if
-      fprecn_resusp_vs_fprec_evap_mp = y
-
-      return
-      end function fprecn_resusp_vs_fprec_evap_mp
-
-
-!==============================================================================
-      function fprecn_resusp_vs_fprec_evap_ln( fprec_evap )
-!
-!  fprec_evap = fraction of precipitation flux that has evaporated (below cloud base)
-!  fprecn_resusp_vs_fprec_evap_ln = Rain number evaporation fraction, 
-!                                  assuming log-normal raindrop size distribution
-!
-!  note that these fractions are relative to the cloud-base fluxes,
-!      and not to the layer immediately above fluxes
-!
-      real(r8) :: fprecn_resusp_vs_fprec_evap_ln
-      real(r8), intent(in) :: fprec_evap
-
-      real(r8), parameter :: a01 = -5.2335291116884175E-02_r8
-      real(r8), parameter :: a02 =  2.7203158069178226E+00_r8
-      real(r8), parameter :: a03 =  9.4730878152409375E+00_r8
-      real(r8), parameter :: a04 = -5.0573187592544798E+01_r8
-      real(r8), parameter :: a05 =  9.4732631441282862E+01_r8
-      real(r8), parameter :: a06 = -8.8265926556465814E+01_r8
-      real(r8), parameter :: a07 =  3.5247835268269142E+01_r8
-      real(r8), parameter :: a08 =  1.5404586576716444E+00_r8
-      real(r8), parameter :: a09 = -3.8228795492549068E+00_r8
-      real(r8), parameter :: x_lox_lin =  1.0000000000000001E-01_r8
-      real(r8), parameter :: y_lox_lin =  2.7247994766566485E-02_r8
-
-      real(r8) :: x, y
-
-      x = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
-      if (x < x_lox_lin) then
-         y = y_lox_lin * (x/x_lox_lin)
-      else
-         y = x*( a01 + x*( a02 + x*( a03 + x*( a04 + x*( a05 &
-           + x*( a06 + x*( a07 + x*( a08 + x*a09 ))))))))
-      end if
-      fprecn_resusp_vs_fprec_evap_ln = y
-
-      return
-      end function fprecn_resusp_vs_fprec_evap_ln
 
 
 !==============================================================================
