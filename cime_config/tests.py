@@ -72,10 +72,11 @@ _TESTS = {
 
     "eagles_mam" : {
         "tests"   : (
-            "SMS_D.ne4_oQU240.F2010",
-            "ERS.ne4_oQU240.F2010",
-            "PET.ne4_oQU240.F2010",
-            "PEM.ne4_oQU240.F2010"
+            "SMS_D.ne4pg2_oQU480.F2010",
+            "SMS_D_Ln5_P32x1.ne4pg2_oQU480.F2010",
+            "ERS.ne4pg2_oQU480.F2010",
+            "PET.ne4pg2_oQU480.F2010",
+            "PEM_P64x1.ne4pg2_oQU480.F2010"
             )
         },
 
