@@ -547,7 +547,6 @@ subroutine ma_convproc_dp_intr(                &
    integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
-   integer :: itmpveca(pcols), itmpvecb(pcols)
    integer :: k, kaa, kbb, kk
    integer :: l, ll, lchnk, lun
    integer :: lat_ndx(pcols), lon_ndx(pcols)
@@ -617,8 +616,6 @@ subroutine ma_convproc_dp_intr(                &
    end do
 
 
-! set itmpveca=1 for the 2 "strong convection" grid points, -1 otherwise
-! set itmpveca=associated index to the gathered arrays
    call get_lat_all_p(  lchnk, pcols, lat_ndx )
    call get_lon_all_p(  lchnk, pcols, lon_ndx )
    call get_rlat_all_p( lchnk, pcols, lat_deg )
@@ -626,8 +623,6 @@ subroutine ma_convproc_dp_intr(                &
    lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
    lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
 
-   itmpveca(:) = -1
-   itmpvecb(:) = -1
 
 
 ! change profiles of first 4 gases
@@ -674,7 +669,7 @@ subroutine ma_convproc_dp_intr(                &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
                      species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        itmpveca                            )
+                     lun                                             )
 !                    ed,         dp,         dsubcld,    jt,         &   
 
 
@@ -750,7 +745,6 @@ subroutine ma_convproc_sh_intr(                 &
    integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
-   integer :: itmpveca(pcols), itmpveca2(pcols)
    integer :: k, kaa, kbb, kcc, kk
    integer :: l, ll, lchnk, lun
    integer :: lat_ndx(pcols), lon_ndx(pcols)
@@ -935,16 +929,12 @@ subroutine ma_convproc_sh_intr(                 &
    end do
 
 
-! set itmpveca=1 for the 2 "strong convection" grid points, -1 otherwise
-! set itmpveca=associated index to the gathered arrays
    call get_lat_all_p(  lchnk, pcols, lat_ndx )
    call get_lon_all_p(  lchnk, pcols, lon_ndx )
    call get_rlat_all_p( lchnk, pcols, lat_deg )
    call get_rlon_all_p( lchnk, pcols, lon_deg )
    lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
    lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
-
-   itmpveca(:) = -1
 
 
 ! change profiles of first 4 gases
@@ -978,8 +968,6 @@ subroutine ma_convproc_sh_intr(                 &
 !                    concld,     icwmr1,     cmfdqrzh,   fracice,    &
 !                    dqdt,       doconvproc, nsrflx,     qsrflx      )
 
-   itmpveca2 = itmpveca
-!  itmpveca2 = -1
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
@@ -992,7 +980,7 @@ subroutine ma_convproc_sh_intr(                 &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
                      species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        itmpveca2                           )
+                     lun                                             )
 
 
 
@@ -1022,7 +1010,7 @@ subroutine ma_convproc_tend(                                           &
                      dqdt,       doconvproc, nsrflx,     qsrflx,     &
                      species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        idiag_in                            )
+                     lun                                             )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -1132,7 +1120,6 @@ subroutine ma_convproc_tend(                                           &
    real(r8), intent(out):: xx_wcldbase(pcols)
    real(r8), intent(out):: xx_kcldbase(pcols)
    integer,  intent(in) :: lun               ! unit number for diagnostic output
-   integer,  intent(in) :: idiag_in(pcols)   ! flag for diagnostic output
 
 
 !--------------------------Local Variables------------------------------
@@ -1142,7 +1129,6 @@ subroutine ma_convproc_tend(                                           &
 
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
-   integer :: idiag_act       ! Work index
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
    integer :: ipass_calc_updraft
    integer :: j, jtsub        ! Work index
@@ -1477,10 +1463,6 @@ ipass_calc_updraft_loop: &
       do ipass_calc_updraft = 1, npass_calc_updraft
 
 
-      if (idiag_in(icol) > 0) &
-         write(lun,'(/a,3x,a,1x,i9,5i5)') 'qakr - convtype,lchnk,i,jt,mx,jtsub,ipass=', &
-            trim(convtype), lchnk, icol, jt(i), mx(i), jtsub, ipass_calc_updraft
-
       qsrflx_i(:,:) = 0.0
       dqdt_i(:,:) = 0.0
 
@@ -1647,19 +1629,14 @@ k_loop_main_bb: &
 !                 end if
                end if
 
-               idiag_act = idiag_in(icol)
                if ( do_act_this_lev ) then
                   kactcntb = kactcntb + 1
-                  if ((kactcntb == 1) .and. (idiag_act > 0)) then
-                     write(lun,'(/a,i9,2i4)') &
-                        'qaku act_conv lchnk,i,jtsub', lchnk, icol, jtsub
-                  end if
 
                   call ma_activate_convproc_method2(                    &
                      conu(:,k),  dconudt_activa(:,k),                   &
                      f_ent,      dt_u(k),             wup(k),           &
                      t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                     pcnst_extd, lun,                 idiag_act,        &
+                     pcnst_extd, lun,                                   &
                      lchnk,      icol,                k,                &
                      kactfirst,  ipass_calc_updraft                     )
                end if
@@ -1739,16 +1716,6 @@ k_loop_main_bb: &
 ! when doing updraft calcs twice, only need to go this far on the first pass
       if ( (ipass_calc_updraft == 1) .and. &
            (npass_calc_updraft == 2) ) cycle ipass_calc_updraft_loop
-
-      if (idiag_in(icol) > 0) then
-         ! do wet removal diagnostics here 
-         do k = kbot, ktop, -1
-            if (mu_p_eudp(k) > mbsth) &
-               write(lun,'(a,i9,3i4,1p,6e10.3)') &
-                  'qakr - l,i,k,jt; cdt, cldfrac, icwmr, rprd, ...', lchnk, icol, k, jtsub, &
-                  cdt(k), cldfrac_i(k), icwmr(icol,k), rprd(icol,k), dp(i,k), mu_p_eudp(k)
-         end do
-      end if
 
 
 ! Compute downdraft mixing ratios from cloudtop to cloudbase
@@ -1873,26 +1840,6 @@ k_loop_main_cc: &
             sumaqchem(m) = sumaqchem(m) + fa_u_dp*dconudt_aqchem(m,k)
             sumwetdep(m) = sumwetdep(m) + fa_u_dp*dconudt_wetdep(m,k)
 
-            if ( idiag_in(icol)>0 .and. k==26 .and. &
-                 (m==16 .or. m==23 .or. m==16+pcnst .or. m==23+pcnst) ) then
-               if (m==16) &
-               write(lun,'(a,i9,4i4,1p,22x,   2x,11x,  2x,6e11.3)') &
-                  'qakww0-'//convtype(1:4), lchnk, icol, k, -1, jtsub, &
-                  dtsub*mu_i(k+1)/dp_i(k), dtsub*mu_i(k)/dp_i(k), dtsub*eudp(k)/dp_i(k), &
-                  dtsub*md_i(k+1)/dp_i(k), dtsub*md_i(k)/dp_i(k), dtsub*eddp(k)/dp_i(k) 
-
-               write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,6e11.3)') &
-                  'qakww1-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-                  const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k), &
-                  dtsub*fluxin/dp_i(k), -dtsub*fluxout/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_aqchem(m,k)/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_activa(m,k)/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_wetdep(m,k)/dp_i(k)
-               write(lun,'(a,i9,4i4,1p,22x,   2x,11x,  2x,6e11.3)') &
-                  'qakww1-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-                  dtsub*tmpveca(1:6)/dp_i(k)
-            end if
-
             end if   ! "(doconvproc_extd(m))"
          end do      ! "m = 2,ncnst_extd"
       end do k_loop_main_cc ! "k = ktop, kbot"
@@ -1903,42 +1850,15 @@ k_loop_main_cc: &
                                   dcondt_prevap_hist,                      & ! REASTER 08/05/2015
                                   rprd,   evapc,          dp_i,            &
                                   icol,   ktop,           pcnst_extd,      &
-                                  lun,    idiag_in(icol), lchnk,           &
+                                  lun,    lchnk,                           &
                                   doconvproc_extd,                         &
                                   species_class, mam_prevap_resusp_optaa   ) ! REASTER 08/05/2015
-      if ( idiag_in(icol)>0 ) then
-         k = 26
-         do m = 16, 23, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww2-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-         do m = 16+pcnst, 23+pcnst, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww2-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-      end if
-
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
 !    pairs to account any (or total) resuspension of convective-cloudborne aerosol
       call ma_resuspend_convproc( dcondt, dcondt_resusp,   &
                                   const, dp_i, ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
-      if ( idiag_in(icol)>0 ) then
-         k = 26
-         do m = 16, 23, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww3-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-         do m = 16+pcnst, 23+pcnst, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww3-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-      end if
 
 
 ! calculate new column-tendency variables
@@ -2032,124 +1952,6 @@ k_loop_main_cc: &
       end do ! m
 
 
-! diagnostic output of profiles before
-      if (idiag_in(icol) > 0) then
-         write(lun, '(/3a,i9,2i4)' ) 'qakr-', trim(convtype), ' - lchnk,i,jtsub', lchnk, icol, jtsub
-         n = 1
-
-         do j = 1, 2
-            if (j == 1) then
-               write(lun, '(4a,i4)' ) &
-                  'qakr-', trim(convtype), ' - k, mu,md; then mode-1 ', &
-                  'numb & numbcw for q, const, conu, cond, delq(a/c/ac noresu)', jtsub
-            else
-               write(lun, '(/4a,i4)' ) &
-                  'qakr-', trim(convtype), ' - k, mu,md; then mode-1 ', &
-                  'mass & masscw for q, const, conu, cond, delq(a/c/ac noresu)', jtsub
-            end if
-
-            do k = 10, pver
-               tmpveca(:) = 0.0
-               do ll = 1, nspec_amode(n)
-                  if (j == 1) then
-                     la = numptr_amode(n)
-                     lc = numptr_amode(n) + pcnst
-                  else
-                     la = lmassptr_amode(ll,n)
-                     lc = lmassptr_amode(ll,n) + pcnst
-                  end if
-                  tmpveca(1)  = tmpveca(1) + q_i(k,la)
-                  tmpveca(2)  = tmpveca(2) + const(la,k)
-                  tmpveca(3)  = tmpveca(3) + const(lc,k)
-                  tmpveca(4)  = tmpveca(4) + conu( la,k)
-                  tmpveca(5)  = tmpveca(5) + conu( lc,k)
-                  tmpveca(6)  = tmpveca(6) + cond( la,k)
-                  tmpveca(7)  = tmpveca(7) + cond( lc,k)
-                  tmpveca(8)  = tmpveca(8) + (dcondt(la,k)-dcondt_resusp(la,k))*dtsub
-                  tmpveca(9)  = tmpveca(9) + (dcondt(lc,k)-dcondt_resusp(lc,k))*dtsub
-                  tmpveca(10) = tmpveca(8) + tmpveca(9)
-                  if (j == 1) exit
-               end do ! ll
-               if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-               write(lun, '(a,i3,1p,2e10.2, e11.2, 3(2x,2e9.2), 2x,3e10.2 )' ) 'qakr', k, &
-                  mu_i(k), md_i(k), tmpveca(1:10)
-            end do ! k
-         end do ! j
-
-         if (pcnst < 0) then
-         write(lun, '(/a,i4)' ) &
-            'qakr - name; burden; qsrflx tot, activa,resusp,aqchem,wetdep,resid', jtsub
-         do m = 2, ncnst
-            if ( .not. doconvproc(m) ) cycle
-            tmpveca(1) = sum(    q_i(:,m)*dp_i(:) ) * hund_ovr_g
-            tmpveca(2) = sum( dqdt_i(:,m)*dp_i(:) ) * hund_ovr_g
-            tmpveca(3:6) = qsrflx_i(m,1:4)
-            tmpveca(7) = tmpveca(2) - sum( tmpveca(3:6) )
-            write(lun, '(2a,1p,2(2x,e11.3),2x,4e11.3,2x,e11.3)' ) &
-               'qakr  ', cnst_name_extd(m)(1:10), tmpveca(1:7)
-         end do ! m
-         end if ! (pcnst < 0) then
-
-         write(lun, '(/3a,i4)' ) 'qakr-', trim(convtype), &
-            ' - name; burden; sumchng3, sumactiva,resusp,aqchem,wetdep, resid,resid*dt/burden', jtsub
-!        write(lun, '(/2a)' ) &
-!           'qakr - name;  burden;  sumchng3;  ', &
-!           'sumactiva,resusp,aqchem,wetdep,prevap;  resid,resid*dtsub/burden'
-         tmpb = 0.0_r8
-         do m = 2, pcnst
-            if ( .not. doconvproc_extd(m) ) cycle
-
-            tmpmata(:,:) = 0.0
-            do j = 1, 3
-               l = m
-               if (j == 3) l = m + pcnst
-               if ( .not. doconvproc_extd(l) ) cycle
-
-               if (j == 1) then
-                  tmpmata(1,j) = sum(    q_i(:,l)*dp_i(:) ) * hund_ovr_g
-                  tmpmata(2,j) = sum( dqdt_i(:,l)*dp_i(:) ) * hund_ovr_g
-                  tmpmata(3:7,j) = qsrflx_i(l,1:5)
-               else
-                  tmpmata(1,j) = sum( const(l,1:pver)*dp_i(1:pver) ) * hund_ovr_g
-                  tmpmata(2,j) = sumchng3( l) * hund_ovr_g
-                  tmpmata(3,j) = sumactiva(l) * hund_ovr_g
-                  tmpmata(4,j) = sumresusp(l) * hund_ovr_g
-                  tmpmata(5,j) = sumaqchem(l) * hund_ovr_g
-                  tmpmata(6,j) = sumwetdep(l) * hund_ovr_g
-                  tmpmata(7,j) = sumprevap(l) * hund_ovr_g
-               end if
-            end do ! j
-
-            tmpmata(3:7,2) = tmpmata(3:7,2) - tmpmata(3:7,3)  ! because lc values were added onto la
-            do j = 1, 3
-               tmpmata(8,j) = tmpmata(2,j) - sum( tmpmata(3:7,j) )  ! residual
-               tmpa = max( tmpmata(1,min(j,2)), 1.0e-20_r8 )
-               tmpmata(9,j) = tmpmata(8,j) * dtsub / tmpa
-               if (abs(tmpmata(9,j)) > tmpb) then
-                  tmpb = abs(tmpmata(9,j))
-               end if
-            end do
-
-!           write(lun, '(/2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr1 ', cnst_name_extd(m)(1:10), tmpmata(1:6,1), tmpmata(8:9,1)
-            write(lun, '(/2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr1 ', cnst_name_extd(m)(1:10), tmpmata(1:9,1)
-!           write(lun, '( 2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr2 ', cnst_name_extd(m)(1:10), tmpmata(1:6,2), tmpmata(8:9,2)
-            write(lun, '( 2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr2 ', cnst_name_extd(m)(1:10), tmpmata(1:9,2)
-            if ( .not. doconvproc_extd(l) ) cycle
-!           write(lun, '( 2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr3 ', cnst_name_cw(m)(1:10), tmpmata(1:6,3), tmpmata(8:9,3)
-            write(lun, '( 2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr3 ', cnst_name_cw(m)(1:10), tmpmata(1:9,3)
-         end do ! m
-         write(lun, '(/3a,2i4,1p,e11.2)' ) 'qakr-', trim(convtype), &
-            ' - max(resid*dt/burden)', jtsub, tmpb
-
-      end if ! (idiag_in(icol) > 0) then
-
-
       if (jtsub < ntsub) then
          ! update the q_i for the next interation of the jtsub loop
          do m = 2, ncnst
@@ -2179,7 +1981,7 @@ end subroutine ma_convproc_tend
               dcondt_prevap_hist,                              & ! REASTER 08/05/2015
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
-              lun,     idiag_prevap,  lchnk,                   &
+              lun,     lchnk,                                  &
               doconvproc_extd,                                 &
               species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
@@ -2236,7 +2038,6 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_prevap ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
@@ -2266,7 +2067,7 @@ end subroutine ma_convproc_tend
            dcondt_prevap_hist,                              &
            rprd,    evapc,         dp_i,                    &
            icol,    ktop,          pcnst_extd,              &
-           lun,     idiag_prevap,  lchnk,                   &
+           lun,     lchnk,                                  &
            doconvproc_extd,                                 &
            species_class, mam_prevap_resusp_optaa           )
       return
@@ -2299,10 +2100,6 @@ end subroutine ma_convproc_tend
    pr_flux = 0.0_r8
    wd_flux(:) = 0.0_r8
 
-   if (idiag_prevap > 0) then
-      write(lun,'(a,i9,i4,5x,a)') 'qakx - lchnk,i', lchnk, icol, &
-         '// k; pr_flux old,new; delprod,devap; mode-1 numb wetdep,prevap; mass ...'
-   end if
 
    do k = ktop, pver
       tmpdp = dp_i(k)
@@ -2346,22 +2143,6 @@ end subroutine ma_convproc_tend
 
       pr_flux = max( 0.0_r8, pr_flux-del_pr_flux_evap )
 
-      if (idiag_prevap > 0) then
-         n = 1
-         l = numptrcw_amode(n) + pcnst
-         tmpa = dcondt_wetdep(l,k)
-         tmpb = dcondt_prevap(l,k)
-         tmpc = 0.0_r8
-         tmpd = 0.0_r8
-         do ll = 1, nspec_amode(n)
-            l = lmassptrcw_amode(ll,n) + pcnst
-            tmpc = tmpc + dcondt_wetdep(l,k)
-            tmpd = tmpd + dcondt_prevap(l,k)
-         end do
-         write(lun,'(a,i4,1p,4(2x,2e10.2))') 'qakx', k, &
-            pr_flux_old, pr_flux, del_pr_flux_prod, -del_pr_flux_evap, &
-            -tmpa, tmpb, -tmpc, tmpd
-      end if
    end do ! k
 
    return
@@ -2375,7 +2156,7 @@ end subroutine ma_convproc_tend
               dcondt_prevap_hist,                              & ! REASTER 08/05/2015
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
-              lun,     idiag_prevap,  lchnk,                   &
+              lun,     lchnk,                                  &
               doconvproc_extd,                                 &
               species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
@@ -2438,7 +2219,6 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_prevap ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
@@ -2495,10 +2275,6 @@ end subroutine ma_convproc_tend
    pr_flux_base = 0.0_r8
    wd_flux(:) = 0.0_r8
 
-   if (idiag_prevap > 0) then
-      write(lun,'(a,i9,i4,5x,a)') 'qakx - lchnk,i', lchnk, icol, &
-         '// k; pr_flux old,new; delprod,devap; mode-1 numb wetdep,prevap; mass ...'
-   end if
 
    do k = ktop, pver
       tmpdp = dp_i(k)
@@ -2598,23 +2374,6 @@ end subroutine ma_convproc_tend
 
       end do ! m = 2, pcnst_extd
 
-      if (idiag_prevap > 0) then
-         n = 1
-         l = numptrcw_amode(n) + pcnst
-         tmpa = dcondt_wetdep(l,k)
-         tmpb = dcondt_prevap(l,k)
-         tmpc = 0.0_r8
-         tmpd = 0.0_r8
-         do ll = 1, nspec_amode(n)
-            l = lmassptrcw_amode(ll,n) + pcnst
-            tmpc = tmpc + dcondt_wetdep(l,k)
-            tmpd = tmpd + dcondt_prevap(l,k)
-         end do
-         write(lun,'(a,i4,1p,4(2x,2e10.2))') 'qakx', k, &
-            pr_flux_old, pr_flux, del_pr_flux_prod, -del_pr_flux_evap, &
-            -tmpa, tmpb, -tmpc, tmpd
-      end if
-
    end do ! k
 
    return
@@ -2626,7 +2385,7 @@ end subroutine ma_convproc_tend
               conu,       dconudt,              &
               f_ent,      dt_u,      wup,       &
               tair,       rhoair,    fracice,   &
-              pcnst_extd, lun,       idiag_act, &
+              pcnst_extd, lun,                  &
               lchnk,      i,         k,         &
               kactfirst,  ipass_calc_updraft    )
 !-----------------------------------------------------------------------
@@ -2700,7 +2459,6 @@ end subroutine ma_convproc_tend
    real(r8), intent(in)    :: fracice ! Fraction of ice within the cloud
                                      ! used as in-cloud wet removal rate
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_act ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
    integer,  intent(in)    :: i      ! column index
    integer,  intent(in)    :: k      ! level index
@@ -2861,22 +2619,6 @@ end subroutine ma_convproc_tend
          fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed               )
    end if
 
-
-! diagnostic output for testing/development
-   if (idiag_act > 0) then
-      n = min( ntot_amode, 3 )
-      write(lun, '(a,i3,2f6.3, 1p,2(2x,3e10.2), 0p,3(2x,3f6.3) )' ) &
-         'qaku k,w,qn,qm,hy,fn,fm', k, wup, wbar, &
-         naerosol(1:n)/rhoair, vaerosol(1:n)*1.8e3/rhoair, &
-         hygro(1:n), fn(1:n), fm(1:n)
-         ! convert naer, vaer to number and (approx) mass TMRs
-   end if
-!   if (lun > 0) then
-!      write(lun,9560) (fn(n), n=1,ntot_amode)
-!      write(lun,9570) (fm(n), n=1,ntot_amode)
-!9560  format( 'fnact values       ', 6(1pe11.3) )
-!9570  format( 'fmact values       ', 6(1pe11.3) )
-!   end if
 
       
 ! apply the activation fractions to the updraft aerosol mixing ratios
