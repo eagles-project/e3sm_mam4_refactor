@@ -1,5 +1,15 @@
 #!/bin/sh
 
+#===========#===========#===========#===========#===========#===========#===========#===========
+# USAGE:
+# 1. This script can be launched from anywhere as it doesn't depend on the local directory
+# 2. Issue command:
+#           $bash  compare_baselines_all_tests.sh -b <branch-to-test> -t <temporary-directory-name>
+
+# 3. The command above will create a temporary directory, clone the code and launch the comparison
+#    tests
+#===========#===========#===========#===========#===========#===========#===========#===========
+
 main() {
 
 
@@ -14,6 +24,9 @@ scratch_dir="/compyfs/$USER/e3sm_scratch/" #scratch directory to clone the code 
 
 #===================================================================
 #===================================================================
+
+newline && time_elapsed_min
+echo "Testing branch:$branch_name"
 
 #cd into the scratch directory
 cd $scratch_dir
@@ -94,9 +107,6 @@ while getopts ":b:t:" opt; do
     \?) echo "Invalid option -$OPTARG; please set branch name using -b command line option" >&2
     exit 1
     ;;
-#  esac
-
-#  case $opt in
     t) temp_dir="$OPTARG"
     ;;
     \?) echo "Invalid option -$OPTARG; please set temp directory name using -t command line option" >&2
@@ -110,7 +120,7 @@ while getopts ":b:t:" opt; do
     ;;
   esac
 done
-echo $branch_name
+
 if [ -z "${branch_name}" ]; then
     echo "branch name is not set, please set it using -b command line option"
     exit 1
