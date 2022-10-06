@@ -31,7 +31,6 @@ module modal_aero_convproc
 ! Public methods
 
    public :: &
-      ma_convproc_register,         &!
       ma_convproc_init,             &!
       ma_convproc_intr               !
 
@@ -76,22 +75,6 @@ module modal_aero_convproc
 
 !=========================================================================================
   contains
-
-
-!=========================================================================================
-subroutine ma_convproc_register
-
-!----------------------------------------
-! Purpose: register fields with the physics buffer
-!----------------------------------------
-
-  use physics_buffer, only:  pbuf_add_field
-
-  implicit none
-
-  integer idx
-
-end subroutine ma_convproc_register
 
 
 
