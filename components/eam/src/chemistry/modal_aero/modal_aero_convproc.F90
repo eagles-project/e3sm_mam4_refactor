@@ -247,7 +247,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 
 ! Local variables
    integer, parameter :: nsrflx = 6        ! last dimension of qsrflx ! REASTER 08/05/2015
-   integer  :: i, ii, itmpa
+   integer  :: i, ii 
    integer  :: k
    integer  :: l, ll, lchnk
    integer  :: n, ncol, nstep
@@ -550,10 +550,7 @@ subroutine ma_convproc_dp_intr(                &
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
 ! Local variables
-   integer, parameter :: idiag_aa = -1  ! controls diagnostic output at 2 selected grid points
-   integer, parameter :: idiag_gg = -1  ! controls using special profiles for gases at these grid points
-
-   integer :: i, ii, itmpa
+   integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: itmpveca(pcols), itmpvecb(pcols)
@@ -635,155 +632,14 @@ subroutine ma_convproc_dp_intr(                &
    lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
    lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
 
-   itmpa = 0
    itmpveca(:) = -1
    itmpvecb(:) = -1
-
-   if (idiag_aa > 0) then
-   do i = 1, ncol
-!     if (lat_ndx(i) /= 48) cycle
-!     if ( (lon_ndx(i) /=  40) .and. &
-!          (lon_ndx(i) /= 116) ) cycle
-      if ( (lchnk == 146 .and. i == 10) .or. &
-           (lchnk == 765 .and. i == 14) ) then
-         continue
-      else
-         cycle
-      end if
-
-      itmpa = itmpa + 1
-      itmpveca(i) = 1
-      do ii = 1, lengath
-         if (ideep(ii) == i) itmpvecb(i) = ii
-      end do
-      write(lun,'(a)')
-      write(lun,'(a,i9,7i5,2f6.1)') &
-         'qakn lchnk, ncol, i, lat_ndx, lon_ndx, itmpveca/b, nstep, lat, lon', &
-         lchnk, ncol, i, lat_ndx(i), lon_ndx(i), itmpveca(i), itmpvecb(i), nstep, &
-         lat_deg(i), lon_deg(i)
-   end do ! i
-   end if ! (idiag_aa > 0)
 
 
 ! change profiles of first 4 gases
    call cnst_get_ind('H2O2',   ixh2o2)
    call cnst_get_ind('so4_a1', ixso4_a1)
    call cnst_get_ind('bc_a1',  ixbc_a1)
-
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   if (itmpa .gt. 0) then
-      write(lun,'(a,2i4,1p,e12.4,i9,i5)') 'qako ixh2o2, ixso4_a1, dt, lchnk, nstep ', &
-         ixh2o2, ixso4_a1, dt, lchnk, nstep
-   end if
-   if (ixh2o2   < 6 .or. ixh2o2   > pcnst-4) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixh2o2" )
-   if (ixso4_a1 < 6 .or. ixso4_a1 > pcnst) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixso4_a1" )
-   if (ixbc_a1  < 6 .or. ixbc_a1  > pcnst) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixbc_a1" )
-
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      kbb = pver - 5*(ll-1) ; kbb = max( kbb, 1 )
-      kaa = kbb -4          ; kaa = max( kaa, 1 )
-      qaa(1:ncol,:,l) = 0.0_r8
-!     qaa(1:ncol,kaa:kbb,l) = 1.0e-9_r8  ! qaa holds "modified q" before convtran
-      qaa(1:ncol,kaa:kbb,l) = 1.0_r8  ! qaa holds "modified q" before convtran
-   end do
-   dotend(ixh2o2:ixh2o2+3) = .true.  ! for initial testing
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-
-! output profiles of some conv cloud variables
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = itmpvecb(i) ; kaa = 11 ; kbb = pver
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakq lchnk, i, lat_ndx, lon_ndx, nstep                 ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep
-      write(lun,'(2a)') &
-         'qakq zi and fracis(so4_a1); mu and md; sum(eu+du), sum(ed); ', &
-         'eu, du, ed; wup, dp_frac, icwmrdp (in-cld, grid-av), rprddp*dt'
-
-      tmpveca(:) = 0.0 ; tmpvecb(:) = 0.0
-      if (ii > 0) then
-         k = pver
-         tmpveca(k) = hund_ovr_g*(eu(ii,k)-du(ii,k))*dp(ii,k)
-         do k = pver-1, 1, -1
-            tmpveca(k) = tmpveca(k+1) + hund_ovr_g*(eu(ii,k)-du(ii,k))*dp(ii,k)
-         end do
-         do k = 2, pver
-            tmpvecb(k) = tmpvecb(k-1) - hund_ovr_g*ed(ii,k-1)*dp(ii,k-1)
-         end do
-      end if
-
-      tmpvecc(1:pver) = dp_frac(i,1:pver)
-      do k = pver, 3, -1
-         if (tmpvecc(k) < 1.0e-4_r8) then
-            do kk = k-1, 1, -1
-               if (tmpvecc(kk) >= 1.0e-4_r8) then
-                  tmpvecc(k) = tmpvecc(kk) 
-                  exit
-               end if
-            end do
-         end if
-         tmpvecc(k) = max( tmpvecc(k), 1.0e-4_r8 ) 
-      end do
-
-      tmpa = 0.0 ; tmpb = 0.0
-      tmpc = 0.0 ; tmpd = 0.0
-      tmpe = 0.0 ; tmpf = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k) ; tmpb = hund_ovr_g*md(ii,k)
-            tmpc = hund_ovr_g*eu(ii,k) ; tmpd = hund_ovr_g*du(ii,k)
-            tmpe = hund_ovr_g*ed(ii,k)
-            tmpf = tmpa / ( (state%pmid(i,k)/(state%t(i,k)*rair)) * tmpvecc(k) )
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 4e11.3, 2x,2e11.3, 2x,3e11.3, &
-              &2x,2e10.3, 2x,3e10.3)') 'qakq', k, &
-            state%zi(i,k+1), fracis(i,k,ixso4_a1), tmpa, tmpb, &
-            tmpveca(k), tmpvecb(k), tmpc, tmpd, tmpe, &
-            tmpf, dp_frac(i,k), icwmrdp(i,k), &
-            icwmrdp(i,k)*dp_frac(i,k), rprddp(i,k)*dt
-      end do
-
-      tmpa = 0.0 ; tmpb = 0.0 ; tmpc = 0.0
-      if (ii > 0) then
-         do k = pver-5, pver
-            tmpd = hund_ovr_g*eu(ii,k)*dp(ii,k)
-            tmpa = tmpa + tmpd*fracis(i,k,ixso4_a1)
-            tmpb = tmpb + tmpd*fracis(i,k,ixbc_a1)
-            tmpc = tmpc + tmpd
-         end do
-         tmpa = tmpa/ max(tmpc,1.0e-35_r8)
-         tmpb = tmpb/ max(tmpc,1.0e-35_r8)
-      end if
-      write(lun,'(a,3i10,1p,3e10.2,2x,a)') 'qakq111222', &
-         nstep, lchnk, i, tmpa, tmpb, tmpc, &
-         'nstep, lchnk, i, k25:30-avg fracis(so4_a1), fracis(bc_a1), eu*dp'
-
-      write(lun,'(/2a)') &
-         'qakq --- numb and mass for modes 1-3'
-      do k = 10, pver
-         do n = 1, ntot_amode
-            tmpveca(n) = qaa(i,k,numptr_amode(n))
-            tmpvecb(n) = 0.0_r8
-            do ll = 1, nspec_amode(n)
-               tmpvecb(n) = tmpvecb(n) + qaa(i,k,lmassptr_amode(ll,n))
-            end do
-         end do
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 7(2x,2e10.2))' ) 'qakq ---', k, &
-            (tmpveca(l), tmpvecb(l), l=1,min(ntot_amode,7))
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
 
 
 !
@@ -826,72 +682,6 @@ subroutine ma_convproc_dp_intr(                &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun,        itmpveca                            )
 !                    ed,         dp,         dsubcld,    jt,         &   
-
-
-
-! set qbb = "modified q" with convtran tendency applied,
-! and set tendencies to zero
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      qbb(1:ncol,:,l) = qaa(1:ncol,:,l) + dqdt(1:ncol,:,l)*dt
-      dqdt(1:ncol,:,l) = 0.0  ! set tendency to zero
-   end do
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-! output profiles of the "modified" gases
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = itmpvecb(i) ; kaa = 11 ; kbb = pver
-      tmpa = 0.0
-      if (ii > 0) then
-         tmpa = 0.0
-         tmpa = hund_ovr_g * sum(mu(ii,kaa:kbb)) / (kbb-kaa+1)
-      end if
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakp lchnk, i, lat_ndx, lon_ndx, nstep, mu-avg, dsubcld', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep, tmpa, dsubcld(ii)
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'qakp zi and fracis(so4_a1); mu and md; gases 1-4'
-
-      tmpa = 0.0 ; tmpb = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = 0.0
-            tmpa = hund_ovr_g*mu(ii,k) ; tmpb = hund_ovr_g*md(ii,k)
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p,4e11.3,5(2x,2e10.3))') 'qakp', k, &
-            state%zi(i,k+1), fracis(i,k,ixso4_a1), tmpa, tmpb, &
-            (qaa(i,k,l), (qbb(i,k,l)-qaa(i,k,l)), l=ixh2o2,ixh2o2+3)
-      end do
-
-      tmpveca(:) = 0.0 ; tmpa = 0.0
-      if (ii > 0) then
-         do l = ixh2o2, ixh2o2+3
-            tmpa = sum( dpdry(ii,:) )
-            tmpveca(l) = sum( dpdry(ii,:) * (qbb(i,:,l)-qaa(i,:,l)) )
-            tmpveca(l) = tmpveca(l) / max( tmpa, 1.0e-10_r8 )
-         end do
-      end if
-      write(lun,'(a,i4,1p,e11.3,33x,5(12x,e10.3))') 'qakp', -1, &
-         tmpa, (tmpveca(l), l=ixh2o2,ixh2o2+3)
-
-      k = 26
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakt lchnk, i, k, nstep // l, qold, qnew', &
-         lchnk, i, k, nstep
-      do l = ixh2o2, pcnst
-         tmpa = qaa(i,k,l) + dt*dqdt(i,k,l) 
-         if (tmpa .le. -1.0e-14_r8) write(lun,'(2a,i4,1p,2e12.4)') &
-            'qakt ', cnst_name(l)(1:8), l, qaa(i,k,l), tmpa
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
 
 
    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, lchnk )
@@ -963,11 +753,7 @@ subroutine ma_convproc_sh_intr(                 &
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
 ! Local variables
-   integer, parameter :: idiag_aa = -1  ! controls diagnostic output at 2 selected grid points
-   integer, parameter :: idiag_gg = -1  ! controls using special profiles for gases at these grid points
-
-   integer :: i, ii, itmpa
-   integer :: ido_20000_block_now
+   integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: itmpveca(pcols), itmpveca2(pcols)
@@ -1164,151 +950,13 @@ subroutine ma_convproc_sh_intr(                 &
    lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
    lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
 
-   itmpa = 0
    itmpveca(:) = -1
-
-   if (idiag_aa > 0) then
-   do i = 1, ncol
-!     if (lat_ndx(i) /= 50) cycle
-!     if ( (lon_ndx(i) /=  30) .and. &
-!          (lon_ndx(i) /= 139) ) cycle
-      if ( (lchnk == 146 .and. i == 10) .or. &
-           (lchnk == 765 .and. i == 14) ) then
-         continue
-      else
-         cycle
-      end if
-
-      itmpa = itmpa + 1
-      itmpveca(i) = 1
-      write(lun,'(a)')
-      write(lun,'(a,i9,6i5,2f6.1)') &
-         'sqakn lchnk, ncol, i, lat_ndx, lon_ndx, itmpveca, nstep, lat, lon', &
-         lchnk, ncol, i, lat_ndx(i), lon_ndx(i), itmpveca(i), nstep, &
-         lat_deg(i), lon_deg(i)
-   end do ! i
-   end if ! (idiag_aa > 0)
 
 
 ! change profiles of first 4 gases
    call cnst_get_ind('H2O2',   ixh2o2)
    call cnst_get_ind('so4_a1', ixso4_a1)
    call cnst_get_ind('bc_a1',  ixbc_a1)
-
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   if (itmpa .gt. 0) then
-      write(lun,'(a,2i4,1p,e12.4,i9,i5)') 'sqako ixh2o2, ixso4_a1, dt, lchnk, nstep ', &
-         ixh2o2, ixso4_a1, dt, lchnk, nstep
-   end if
-   if (ixh2o2   < 6 .or. ixh2o2   > pcnst-4) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixh2o2" )
-   if (ixso4_a1 < 6 .or. ixso4_a1 > pcnst) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixso4_a1" )
-   if (ixbc_a1  < 6 .or. ixbc_a1  > pcnst) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixbc_a1" )
-
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      kbb = pver - 5*(ll-1) ; kbb = max( kbb, 1 )
-      kaa = kbb -4          ; kaa = max( kaa, 1 )
-      ! qaa holds "modified q" before convtran
-      qaa(1:ncol,:,l) = 0.0_r8
-      do k = kaa, kbb
-        qaa(1:ncol,k,l) = 1.0e-9_r8*(0.9_r8 - 0.1_r8*(kbb-k))
-      end do
-
-      kbb = pver - 1 - 5*(ll-1)
-      kaa = kbb - 4          ; kaa = max( kaa, 1 )
-      kcc = kbb + 4          ; kcc = min( kcc, pver )
-      qaa(1:ncol,:,l) = 0.0_r8
-      do k = kaa, kcc
-         qaa(1:ncol,k,l) = max( 0.0_r8, 1.0e-9_r8*(0.9_r8 - 0.2_r8*abs(kbb-k)) )
-      end do
-   end do
-   dotend(ixh2o2:ixh2o2+3) = .true.  ! for initial testing
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-
-! output profiles of some conv cloud variables
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   ido_20000_block_now = -77
-   ido_20000_block_now = 1
-20000 if (ido_20000_block_now > 0) then
-
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = i ; kaa = 11 ; kbb = pver
-
-      tmpveca(:) = 0.0
-      if (ii > 0) then
-         k = pver
-         tmpveca(k) = hund_ovr_g*(eu(ii,k)-du(ii,k))*dpdry(ii,k)
-         do k = pver-1, 1, -1
-            tmpveca(k) = tmpveca(k+1) + hund_ovr_g*(eu(ii,k)-du(ii,k))*dpdry(ii,k)
-         end do
-      end if
-
-      tmpvecc(1:pver) = sh_frac(i,1:pver)
-      do k = pver, 3, -1
-         if (tmpvecc(k) < 1.0e-4_r8) then
-            do kk = k-1, 1, -1
-               if (tmpvecc(kk) >= 1.0e-4_r8) then
-                  tmpvecc(k) = tmpvecc(kk) 
-                  exit
-               end if
-            end do
-         end if
-         tmpvecc(k) = max( tmpvecc(k), 1.0e-4_r8 ) 
-      end do
-
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'sqakq lchnk, i, lat_ndx, lon_ndx, nstep                 ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep
-      write(lun,'(2a)') &
-         'sqakq zi; mu; sum(eu+du); ', &
-         'eu, du; wup, sh_frac; icwmrsh (in-cld, grid-av), rprdsh*dt'
-
-      tmpa = 0.0 ; tmpc = 0.0
-      tmpd = 0.0 ; tmpf = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k)
-            tmpc = hund_ovr_g*eu(ii,k) ; tmpd = hund_ovr_g*du(ii,k)
-            tmpf = tmpa / ( (state%pmid(i,k)/(state%t(i,k)*rair)) * tmpvecc(k) )
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 2e11.3, 2x,e11.3, 2x,2e11.3, &
-              &2x,2e10.3, 2x,3e10.3)') 'sqakq', k, &
-            state%zi(i,k+1), tmpa, &
-            tmpveca(k),    tmpc, tmpd, &
-            tmpf, sh_frac(i,k),    icwmrsh(i,k), &
-            icwmrsh(i,k)*sh_frac(i,k), rprdsh(i,k)*dt
-      end do
-
-      write(lun,'(/2a)') &
-         'sqakq --- numb and mass for modes 1-3'
-      do k = 10, pver
-!        exit
-         do n = 1, ntot_amode
-            tmpveca(n) = qaa(i,k,numptr_amode(n))
-            tmpvecb(n) = 0.0_r8
-            do ll = 1, nspec_amode(n)
-               tmpvecb(n) = tmpvecb(n) + qaa(i,k,lmassptr_amode(ll,n))
-            end do
-         end do
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 7(2x,2e10.2))' ) 'sqakq ---', k, &
-            (tmpveca(l), tmpvecb(l), l=1,min(ntot_amode,7))
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
-
-   end if ! (ido_20000_block_now > 0) then
-   if (ido_20000_block_now == 77) goto 40000
-
 
 !
 ! do ma_convproc_tend call
@@ -1352,79 +1000,6 @@ subroutine ma_convproc_sh_intr(                 &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun,        itmpveca2                           )
 
-
-
-! set qbb = "modified q" with convtran tendency applied,
-! and set tendencies to zero
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      qbb(1:ncol,:,l) = qaa(1:ncol,:,l) + dqdt(1:ncol,:,l)*dt
-      dqdt(1:ncol,:,l) = 0.0  ! set tendency to zero
-   end do
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-! output profiles of the "modified" gases
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = i ; kaa = 11 ; kbb = pver
-      tmpa = 0.0
-      if (ii > 0) then
-         tmpa = 0.0
-         tmpa = hund_ovr_g * sum(mu(ii,kaa:kbb)) / (kbb-kaa+1)
-      end if
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'sqakp lchnk, i, lat_ndx, lon_ndx, nstep, mu-avg ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep, tmpa
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'sqakp zi and mu; eu and du ; gases 1-4'
-
-      tmpa = 0.0 ; tmpb = 0.0 ; tmpc = 0.0 
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k)
-            tmpb = hund_ovr_g*eu(ii,k)
-            tmpc = hund_ovr_g*du(ii,k)
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i3,1p,2e11.3,(2x,2e10.3),4(e11.1,e10.2))') 'sqakp', k, &
-            state%zi(i,k+1), tmpa, tmpb, tmpc, &
-            (qaa(i,k,l)*1.0e9, (qbb(i,k,l)-qaa(i,k,l))*1.0e9, l=ixh2o2,ixh2o2+3)
-      end do
-
-      tmpveca(:) = 0.0 ; tmpa = 0.0
-      if (ii > 0) then
-         do l = ixh2o2, ixh2o2+3
-            tmpa = sum( dpdry(ii,:) )
-            tmpveca(l) = sum( dpdry(ii,:) * (qbb(i,:,l)-qaa(i,:,l)) )
-            tmpveca(l) = tmpveca(l) / max( tmpa, 1.0e-10_r8 )
-         end do
-      end if
-      write(lun,'(a,i3,1p,e11.3,11x,22x,4(11x,e10.2))') 'sqakp', -1, &
-         tmpa, (tmpveca(l), l=ixh2o2,ixh2o2+3)
-
-      k = 26
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'sqakt lchnk, i, k, nstep // l, qold, qnew', &
-         lchnk, i, k, nstep
-      do l = ixh2o2, pcnst
-         tmpa = qaa(i,k,l) + dt*dqdt(i,k,l) 
-         if (tmpa .le. -1.0e-14_r8) write(lun,'(2a,i4,1p,2e12.4)') &
-            'sqakt ', cnst_name(l)(1:8), l, qaa(i,k,l), tmpa
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
-
-
-   if (ido_20000_block_now == -77) then
-      ido_20000_block_now = 77
-      goto 20000
-   end if
-40000 continue
 
 
 !  if (maxg_minval <= pver) write(lun,'(i3.3,i9,a)') &
@@ -1576,7 +1151,6 @@ subroutine ma_convproc_tend(                                           &
    integer :: idiag_act       ! Work index
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
    integer :: ipass_calc_updraft
-   integer :: itmpa, itmpb    ! Work variable
    integer :: j, jtsub        ! Work index
    integer :: k               ! Work index
    integer :: kactcnt         ! Counter for no. of levels having activation
@@ -2450,63 +2024,6 @@ k_loop_main_cc: &
       end do ! m
 
 
-! do checks for mass conservation
-! do not expect errors > 1.0e-14, but use a conservative 1.0e-10 here,
-! as an error of this size is still not a big concern
-      relerr_cut = 1.0e-10
-      if (nerr < nerrmax) then
-         merr = 0
-         if (courantmax > (1.0_r8 + 1.0e-6_r8)) then
-            write(lun,9161) '-', trim(convtype), courantmax
-            merr = merr + 1
-         end if
-         do m = 2, ncnst_extd
-            if (doconvproc_extd(m)) then
-               itmpa = 0
-               ! sumflux should be ~=0.0 because fluxout of one layer cancels
-               !    fluxin to adjacent layer
-               tmpa = sumflux(m)
-               tmpb = max( maxflux(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '1', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 1
-               end if
-               ! sumflux2 involve environment fluxes and entrainment/detrainment
-               !    to up/downdrafts, and it should be equal to sumchng,
-               !    and so (sumflux2 - sumsrce) should be ~=0.0
-               tmpa = sumflux2(m) - sumsrce(m)
-               tmpb = max( maxflux2(m), maxsrce(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '2', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 10
-               end if
-               ! sunchng = sumflux + sumsrce, so (sumchng - sumsrc) should be ~=0.0
-               tmpa = sumchng(m) - sumsrce(m)
-               tmpb = max( maxflux(m), maxsrce(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '3', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 100
-               end if
-               ! sumchng3 = sumchng + sumresusp + sumprevap, 
-               !    so tmpa (below) should be ~=0.0
-               tmpa = sumchng3(m) - (sumsrce(m) + sumresusp(m) + sumprevap(m))
-               tmpb = max( maxflux(m), maxsrce(m), maxresusp(m), maxprevap(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '4', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 1000
-               end if
-
-               if (itmpa > 0) merr = merr + 1
-            end if
-         end do ! m
-         if (merr > 0) write(lun,9181) convtype, lchnk, icol, i, jt(i), mx(i)
-         nerr = nerr + merr
-         if (nerr >= nerrmax) write(lun,9171) nerr
-      end if ! (nerr < nerrmax) then
-
-9151 format( '*** ma_convproc_tend error, massbal', a, 1x, i5,1x,a, &
-             ' -- maxflux, sumflux, relerr =', 3(1pe14.6) )
-9161 format( '*** ma_convproc_tend error, courantmax', 2a, 3x, 1pe14.6 )
 9171 format( '*** ma_convproc_tend error, stopping messages after nerr =', i10 )
 
 9181 format( '*** ma_convproc_tend error -- convtype, lchnk, icol, il, jt, mx =  ', a,2x,5(1x,i10) )
@@ -2644,7 +2161,6 @@ k_loop_main_cc: &
 !           'qakr - name;  burden;  sumchng3;  ', &
 !           'sumactiva,resusp,aqchem,wetdep,prevap;  resid,resid*dtsub/burden'
          tmpb = 0.0_r8
-         itmpb = 0
          do m = 2, pcnst
             if ( .not. doconvproc_extd(m) ) cycle
 
@@ -2676,7 +2192,6 @@ k_loop_main_cc: &
                tmpmata(9,j) = tmpmata(8,j) * dtsub / tmpa
                if (abs(tmpmata(9,j)) > tmpb) then
                   tmpb = abs(tmpmata(9,j))
-                  itmpb = m
                end if
             end do
 
@@ -2695,7 +2210,7 @@ k_loop_main_cc: &
                'qakr3 ', cnst_name_cw(m)(1:10), tmpmata(1:9,3)
          end do ! m
          write(lun, '(/3a,2i4,1p,e11.2)' ) 'qakr-', trim(convtype), &
-            ' - max(resid*dt/burden)', jtsub, itmpb, tmpb
+            ' - max(resid*dt/burden)', jtsub, tmpb
 
       end if ! (idiag_in(icol) > 0) then
 
