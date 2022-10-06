@@ -68,7 +68,7 @@ cd cime/scripts
 newline && time_elapsed_min
 echo "Launch Tests:"
 ./create_test eagles_mam -c -b mam4_org_v2_baselines -t comp_${temp_dir}_mam4_org_v2_baselines \
-    -p esmd -r $scratch_dir/$temp_dir -j 4 > /dev/null
+    -p esmd -r $scratch_dir/$temp_dir -j 4 --output-root $scratch_dir/$temp_dir > /dev/null
 
 newline && time_elapsed_min
 
@@ -135,7 +135,7 @@ fi
 if_dir_exists_then_exit () {
     if [ -d $1 ]; then
         echo "$1 directory already exists. Please remove it or choose a different temporary directory to proceed"
-        exit -1
+        exit 1
     fi
 }
 
