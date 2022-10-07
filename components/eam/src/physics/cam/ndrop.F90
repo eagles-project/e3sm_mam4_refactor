@@ -1625,44 +1625,54 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    real(r8), intent(in)  :: eta(nmode)
    real(r8), intent(out) :: smax ! maximum supersaturation
    integer  :: m  ! mode index
-   real(r8) :: sum, g1, g2, g1sqrt, g2sqrt
+!   real(r8) :: sum, g1, g2, g1sqrt, g2sqrt
+   real(r8) :: sum, g1, g2
+   logical  :: lweak  !  whether forcing is sufficiently weak or not
 
-   do m=1,nmode
-      if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
+!   do m=1,nmode
+!      if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
          !            weak forcing. essentially none activated
-         smax=1.e-20_r8
-      else
+!         smax=1.e-20_r8
+!      else
          !            significant activation of this mode. calc activation all modes.
-         go to 1
-      endif
-   enddo
+!         go to 1
+!      endif
+!   enddo
 
-   return
+!   return
 
-1  continue
+!1  continue
 
    sum=0
+   lweak = .true.
    do m=1,nmode
-      if(eta(m).gt.1.e-20_r8)then
-         g1=zeta(m)/eta(m)
-         g1sqrt=sqrt(g1)
-         !BSINGH - repeated "g1=g1sqrt*g1" is a bug. Following code fixes this bug.
-         !BSINGH - This flag is added to maintain b4b result with the default code.
-         if(.not. fix_g1_err_ndrop) then
-            g1=g1sqrt*g1
+!      if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
+      if(zeta(m).le.1.e5_r8*eta(m).and.smc(m)*smc(m).le.1.e5_r8*eta(m))then
+         lweak = .false.
+         if(eta(m).gt.1.e-20_r8)then
+!         g1=zeta(m)/eta(m)
+!         g1sqrt=sqrt(g1)
+!  BJG remove option to not enforce bug fix (g1 = g1sqrt*gq)
+!         if(.not. fix_g1_err_ndrop) then
+!            g1=g1sqrt*g1
+!         endif
+!         g1=g1sqrt*g1
+            g1 = (zeta(m)/eta(m)) * sqrt(zeta(m)/eta(m))
+            g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta(m))) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta(m)))
+!         g2sqrt=sqrt(g2)
+!         g2=g2sqrt*g2
+            sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
+         else
+            sum=1.e20_r8
          endif
-         !BSINGH -ENDS
-         g1=g1sqrt*g1
-         g2=smc(m)/sqrt(eta(m)+3._r8*zeta(m))
-         g2sqrt=sqrt(g2)
-         g2=g2sqrt*g2
-         sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
-      else
-         sum=1.e20_r8
       endif
    enddo
 
-   smax=1._r8/sqrt(sum)
+   if(lweak) then
+      smax=1.e-20_r8   
+   else
+      smax=1._r8/sqrt(sum)
+   endif
 
 end subroutine maxsat
 
