@@ -2262,7 +2262,7 @@ do_lphase2_conditional: &
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                           &
             nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr, aerdepwetis,        &
             mu, md, du, eu, ed, dp, dsubcld, jt, maxg, ideep, lengath,  &
-            species_class, mam_prevap_resusp_optaa,                     &
+            species_class,                                              &
             history_aero_prevap_resusp                                  )
        call t_stopf('ma_convproc')       
     endif
