@@ -67,7 +67,6 @@ module modal_aero_convproc
 !
 
    logical, private :: convproc_do_gas, convproc_do_aer
-   logical, private :: convproc_prevap_resusp_fixaa = .false. ! REASTER 08/05/2015
    !  convproc_method_fixaa - see explanation in subr. ma_convproc_tend(                                           &
 
 !=========================================================================================
@@ -267,9 +266,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !
 ! Initialize
 !
-
-! apply this minor fix when doing resuspend to coarse mode
-   if (mam_prevap_resusp_optaa >= 30) convproc_prevap_resusp_fixaa = .true.
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -1376,8 +1372,9 @@ i_loop_main_aa: &
 !    but that is now fixed
 ! this was a minor bug with quite minor affects on the aerosol, 
 !    because convective precip evap is (or used to be) much less than stratiform precip evap )
-      kbot_prevap = kbot
-      if ( convproc_prevap_resusp_fixaa ) kbot_prevap = pver
+!      kbot_prevap = kbot
+! apply this minor fix when doing resuspend to coarse mode      
+      kbot_prevap = pver
 ! REASTER 08/05/2015 END
       mu_i(:) = 0.0
       md_i(:) = 0.0
@@ -2071,81 +2068,8 @@ end subroutine ma_convproc_tend
            doconvproc_extd,                                 &
            species_class, mam_prevap_resusp_optaa           )
       return
-   else if ( mam_prevap_resusp_optaa /=   0 .and. &
-             mam_prevap_resusp_optaa /=  10 .and. &
-             mam_prevap_resusp_optaa /=  11 .and. &
-             mam_prevap_resusp_optaa /=  20 .and. &
-             mam_prevap_resusp_optaa /=  21 ) then
-      write(msg,'(a,2(1x,i10))') &
-         'ma_precpevap_convproc - bad mam_prevap_resusp_optaa =', &
-         mam_prevap_resusp_optaa
-      call endrun( msg )
    end if
 
-!
-! *** note use of non-standard units
-!
-! precip
-!    tmpdp = dp_i is mb
-!    rprd and evapc are kgwtr/kgair/s
-!    pr_flux = tmpdp*rprd is mb*kgwtr/kgair/s
-! this works ok because the only important thing is fdel_pr_flux_evap which is dimensionless
-!
-! precip-borne aerosol
-!    dcondt_wetdep is kgaero/kgair/s
-!    wd_flux = tmpdp*dcondt_wetdep is mb*kgaero/kgair/s
-!    dcondt_prevap = del_wd_flux_evap/tmpdp is kgaero/kgair/s
-! so this works ok too
-!
-   pr_flux = 0.0_r8
-   wd_flux(:) = 0.0_r8
-
-
-   do k = ktop, pver
-      tmpdp = dp_i(k)
-
-      pr_flux_old = pr_flux
-      del_pr_flux_prod = tmpdp*max(0.0_r8, rprd(icol,k))
-      pr_flux = pr_flux_old + del_pr_flux_prod
-
-      del_pr_flux_evap = min( pr_flux, tmpdp*max(0.0_r8, evapc(icol,k)) )
-      fdel_pr_flux_evap = del_pr_flux_evap / max(pr_flux, 1.0e-35_r8)
-
-      if ( mam_prevap_resusp_optaa <= 0 ) then
-         fdel_pr_flux_evap = 0.0_r8  ! REASTER 08/05/2015 - turn off resuspension from precip evap
-      end if
-
-      do m = 2, pcnst_extd
-         if ( doconvproc_extd(m) ) then
-
-            ! dcondt_wetdep(m,k) is negative (or zero), so use -dcondt_wetdep(m,k) here
-            wd_flux(m) = wd_flux(m) + tmpdp*max(0.0_r8, -dcondt_wetdep(m,k)) 
-            del_wd_flux_evap = wd_flux(m)*fdel_pr_flux_evap
-
-! REASTER 08/05/2015 BEGIN
-!           wd_flux(m) = max( 0.0_r8, wd_flux(m)-del_wd_flux_evap )
-
-!           dcondt_prevap(m,k) = del_wd_flux_evap/tmpdp
-!           dcondt(m,k) = dcondt(m,k) + dcondt_prevap(m,k)
-
-            ! do this for mam_prevap_resusp_optaa = 0,10,11,20,21
-            ! (also for trace gases when mam_prevap_resusp_opt = ???,
-            !  but currently modal_aero_convproc does not do trace gases)
-            dcondt_prevap_hist(m,k) = del_wd_flux_evap/tmpdp
-            dcondt_prevap(m,k) = del_wd_flux_evap/tmpdp
-            dcondt(m,k) = dcondt(m,k) + dcondt_prevap(m,k)
-
-            wd_flux(m) = max( 0.0_r8, wd_flux(m)-del_wd_flux_evap )
-
-         end if ! ( doconvproc_extd(m) ) then
-      end do ! m = 2, pcnst_extd
-! REASTER 08/05/2015 END
-
-      pr_flux = max( 0.0_r8, pr_flux-del_pr_flux_evap )
-
-   end do ! k
-
-   return
    end subroutine ma_precpevap_convproc
 
 
