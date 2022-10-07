@@ -169,7 +169,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
                            mu, md, du, eu,                          &
                            ed, dp, dsubcld,                         &
                            jt, maxg, ideep, lengath, species_class, &
-                           mam_prevap_resusp_optaa,                 &
                            history_aero_prevap_resusp               )
 !----------------------------------------------------------------------- 
 ! 
@@ -234,7 +233,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
    logical,  intent(in)    :: history_aero_prevap_resusp
 
 
@@ -336,7 +334,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      ed, dp, dsubcld,                          &
      jt, maxg, ideep, lengath,                 &
      qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 
 
 ! apply deep conv processing tendency and prepare for shallow conv processing
@@ -393,7 +391,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
      cmfmcsh, sh_e_ed_ratio,                   &
      qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 
 
 ! apply shallow conv processing tendency
@@ -473,7 +471,7 @@ subroutine ma_convproc_dp_intr(                &
      ed, dp, dsubcld,                          &
      jt, maxg, ideep, lengath,                 &
      q, dqdt, dotend, nsrflx, qsrflx,          &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -535,7 +533,6 @@ subroutine ma_convproc_dp_intr(                &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
 
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
@@ -643,16 +640,6 @@ subroutine ma_convproc_dp_intr(                &
 ! so need to pass both rprddp and dlfdp to ma_convproc_tend
 !
 
-!  tine ma_convproc_tend(                                            &
-!                    convtype,                                       &
-!                    lchnk,      ncnst,      nstep,      dt,         &
-!                    t,          pmid,       pdel,       q,          &   
-!                    mu,         md,         du,         eu,         &   
-!                    ed,         dp,         dsubcld,    jt,         &   
-!                    mx,         ideep,      il1g,       il2g,       &       
-!                    concld,     icwmr1,     cmfdqrzh,   fracice,    &
-!                    dqdt,       doconvproc, nsrflx,     qsrflx      )
-
    call ma_convproc_tend(                                            &
                      'deep',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
@@ -663,7 +650,7 @@ subroutine ma_convproc_dp_intr(                &
                      dp_frac,    icwmrdp,    rprddp,     evapcdp,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 !                    ed,         dp,         dsubcld,    jt,         &   
@@ -684,7 +671,7 @@ subroutine ma_convproc_sh_intr(                 &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  &
      cmfmcsh, sh_e_ed_ratio,                    &
      q, dqdt, dotend, nsrflx, qsrflx,           &
-     species_class, mam_prevap_resusp_optaa     )
+     species_class  )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -733,7 +720,6 @@ subroutine ma_convproc_sh_intr(                 &
    real(r8), intent(in)    :: cmfmcsh(pcols,pverp) ! Shallow conv mass flux (kg/m2/s)
    real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
 
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
@@ -954,16 +940,6 @@ subroutine ma_convproc_sh_intr(                 &
 ! so need to pass both rprddp and dlfdp to ma_convproc_tend
 !
 
-!  tine ma_convproc_tend(                                            &
-!                    convtype,                                       &
-!                    lchnk,      ncnst,      nstep,      dt,         &
-!                    t,          pmid,       pdel,       q,          &   
-!                    mu,         md,         du,         eu,         &   
-!                    ed,         dp,         dsubcld,    jt,         &   
-!                    mx,         ideep,      il1g,       il2g,       &       
-!                    concld,     icwmr1,     cmfdqrzh,   fracice,    &
-!                    dqdt,       doconvproc, nsrflx,     qsrflx      )
-
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
@@ -974,7 +950,7 @@ subroutine ma_convproc_sh_intr(                 &
                      sh_frac,    icwmrsh,    rprdsh,     evapcsh,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 
@@ -1004,7 +980,7 @@ subroutine ma_convproc_tend(                                           &
                      cldfrac,    icwmr,      rprd,       evapc,      &
                      fracice,                                        &
                      dqdt,       doconvproc, nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 
@@ -1111,7 +1087,6 @@ subroutine ma_convproc_tend(                                           &
                               !  5 = actual precip-evap resuspension (what actually is applied to a species)
                               !  6 = pseudo precip-evap resuspension (for history file) ! REASTER 08/05/2015
    integer,  intent(in) :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in) :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
    real(r8), intent(out):: xx_mfup_max(pcols)
    real(r8), intent(out):: xx_wcldbase(pcols)
    real(r8), intent(out):: xx_kcldbase(pcols)
@@ -1849,7 +1824,7 @@ k_loop_main_cc: &
                                   icol,   ktop,           pcnst_extd,      &
                                   lun,    lchnk,                           &
                                   doconvproc_extd,                         &
-                                  species_class, mam_prevap_resusp_optaa   ) ! REASTER 08/05/2015
+                                  species_class ) ! REASTER 08/05/2015
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
@@ -1980,7 +1955,7 @@ end subroutine ma_convproc_tend
               icol,    ktop,          pcnst_extd,              &
               lun,     lchnk,                                  &
               doconvproc_extd,                                 &
-              species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
+              species_class      ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2039,7 +2014,6 @@ end subroutine ma_convproc_tend
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
    integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in)    :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -2058,7 +2032,6 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
 
 
-   if ( mam_prevap_resusp_optaa == 30 ) then
       call ma_precpevap30_convproc(                         &
            dcondt,  dcondt_wetdep, dcondt_prevap,           &
            dcondt_prevap_hist,                              &
@@ -2066,9 +2039,8 @@ end subroutine ma_convproc_tend
            icol,    ktop,          pcnst_extd,              &
            lun,     lchnk,                                  &
            doconvproc_extd,                                 &
-           species_class, mam_prevap_resusp_optaa           )
+           species_class        )
       return
-   end if
 
    end subroutine ma_precpevap_convproc
 
@@ -2082,7 +2054,7 @@ end subroutine ma_convproc_tend
               icol,    ktop,          pcnst_extd,              &
               lun,     lchnk,                                  &
               doconvproc_extd,                                 &
-              species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
+              species_class           ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2147,7 +2119,6 @@ end subroutine ma_convproc_tend
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
    integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in)    :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
 
 !-----------------------------------------------------------------------
 ! local variables
