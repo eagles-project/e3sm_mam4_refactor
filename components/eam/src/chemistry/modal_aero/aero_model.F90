@@ -186,7 +186,7 @@ contains
     use cam_history,     only: addfld, horiz_only, add_default
     use phys_control,    only: phys_getopts
     use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
-    use modal_aero_data, only: cnst_name_cw, rain_evap_to_coarse_aero
+    use modal_aero_data, only: cnst_name_cw
     use modal_aero_initialize_data, only: modal_aero_initialize
     use modal_aero_convproc, only: deepconv_wetdep_history
     use rad_constituents,           only: rad_cnst_get_info

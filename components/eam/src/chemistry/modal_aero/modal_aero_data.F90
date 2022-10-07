@@ -25,8 +25,9 @@
 
 #if (( defined MODAL_AERO_3MODE ) || ( defined MODAL_AERO_4MODE ) || ( defined MODAL_AERO_4MODE_MOM )) && ( defined RAIN_EVAP_TO_COARSE_AERO )
     logical, parameter :: rain_evap_to_coarse_aero = .true.
+! C++ porting: remove code when rain_evap_to_coarse_aero = .false.
 #else
-    logical, parameter :: rain_evap_to_coarse_aero = .false.
+!    logical, parameter :: rain_evap_to_coarse_aero = .false.
 #endif
 
     ! carbonaceous species counters - will eventually be set by configuration options
@@ -259,7 +260,8 @@
 
 
       ! REASTER 08/04/2015 - used in precip evap resuspension to coarse mode
-      integer :: mam_prevap_resusp_optaa = 10
+      integer :: mam_prevap_resusp_optaa = 30
+! C++ porting: remove code when mam_prevap_resusp_optaa is not 30
 !     0 = no resuspension
 !    10 = original mam method with resus_fix=.false.       (so4_a1 --> so4_a1, so4_c1 --> so4_c1) 
 !    20 = original mam method with resus_fix=.true.        (so4_a1 & so4_c1 --> so4_a1)
