@@ -54,12 +54,6 @@ module modal_aero_convproc
 !  method2_activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
    real(r8), parameter :: method2_activate_smaxmax = 0.003_r8
 
-!  method_reduce_actfrac = 1 -- multiply activation fractions by factor_reduce_actfrac
-!                               (this works ok with convproc_method_activate = 1 but not for ... = 2)
-!                        = 2 -- do 2 iterations to get an overall reduction by factor_reduce_actfrac
-!                               (this works ok with convproc_method_activate = 1 or 2)
-!                        = other -- do nothing involving reduce_actfrac
-   integer, parameter  :: method_reduce_actfrac = 0
    real(r8), parameter :: factor_reduce_actfrac = 0.5_r8
 
 !
@@ -142,17 +136,10 @@ subroutine ma_convproc_init
       method1_activate_nlayers
    write(*,'(a,1pe12.4)') 'ma_convproc_init - method2_activate_smaxmax      = ', &
       method2_activate_smaxmax
-   write(*,'(a,i12)')     'ma_convproc_init - method_reduce_actfrac         = ', &
-      method_reduce_actfrac
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
       factor_reduce_actfrac
 
    npass_calc_updraft = 1
-   if ( (method_reduce_actfrac == 2)      .and. &
-        (factor_reduce_actfrac >= 0.0_r8) .and. &
-        (factor_reduce_actfrac <= 1.0_r8) ) npass_calc_updraft = 2
-   write(*,'(a,i12)')     'ma_convproc_init - npass_calc_updraft            = ', &
-      npass_calc_updraft
 
    return
 end subroutine ma_convproc_init
@@ -1101,7 +1088,6 @@ subroutine ma_convproc_tend(                                           &
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
-   integer :: ipass_calc_updraft
    integer :: j, jtsub        ! Work index
    integer :: k               ! Work index
    integer :: kactcnt         ! Counter for no. of levels having activation
@@ -1419,20 +1405,11 @@ i_loop_main_aa: &
       q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
 
 !
-!   when method_reduce_actfrac = 2, need to do the updraft calc twice
-!   (1st to get non-adjusted activation amount, 2nd to apply reduction factor)
       npass_calc_updraft = 1
-      if ( (method_reduce_actfrac == 2)      .and. &
-           (factor_reduce_actfrac >= 0.0_r8) .and. &
-           (factor_reduce_actfrac <= 1.0_r8) ) npass_calc_updraft = 2
 
 
 jtsub_loop_main_aa: &
       do jtsub = 1, ntsub
-
-
-ipass_calc_updraft_loop: &
-      do ipass_calc_updraft = 1, npass_calc_updraft
 
 
       qsrflx_i(:,:) = 0.0
@@ -1450,8 +1427,8 @@ ipass_calc_updraft_loop: &
       dcondt_prevap_hist(:,:) = 0.0 ! REASTER 08/05/2015
       dconudt_aqchem(:,:) = 0.0
       dconudt_wetdep(:,:) = 0.0
-! only initialize the activation tendency on ipass=1
-      if (ipass_calc_updraft == 1) dconudt_activa(:,:) = 0.0
+! initialize the activation tendency 
+      dconudt_activa(:,:) = 0.0
 
 ! initialize mixing ratio arrays (chat, const, conu, cond)
       do m = 2, ncnst
@@ -1610,7 +1587,7 @@ k_loop_main_bb: &
                      t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
                      pcnst_extd, lun,                                   &
                      lchnk,      icol,                k,                &
-                     kactfirst,  ipass_calc_updraft                     )
+                     kactfirst        )
                end if
 
 
@@ -1685,9 +1662,6 @@ k_loop_main_bb: &
          end if    ! "(mu_p_eudp(k) > mbsth)"
       end do k_loop_main_bb ! "k = kbot, ktop, -1"
 
-! when doing updraft calcs twice, only need to go this far on the first pass
-      if ( (ipass_calc_updraft == 1) .and. &
-           (npass_calc_updraft == 2) ) cycle ipass_calc_updraft_loop
 
 
 ! Compute downdraft mixing ratios from cloudtop to cloudbase
@@ -1935,7 +1909,6 @@ k_loop_main_cc: &
          end do ! m
       end if
 
-      end do ipass_calc_updraft_loop
 
       end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
 
@@ -2282,7 +2255,7 @@ end subroutine ma_convproc_tend
               tair,       rhoair,    fracice,   &
               pcnst_extd, lun,                  &
               lchnk,      i,         k,         &
-              kactfirst,  ipass_calc_updraft    )
+              kactfirst    )
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2358,7 +2331,6 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: i      ! column index
    integer,  intent(in)    :: k      ! level index
    integer,  intent(in)    :: kactfirst ! k at cloud base
-   integer,  intent(in)    :: ipass_calc_updraft
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -2385,35 +2357,6 @@ end subroutine ma_convproc_tend
 
 !-----------------------------------------------------------------------
 
-
-! when ipass_calc_updraft == 2, apply the activation tendencies
-!    from pass 1, but multiplied by factor_reduce_actfrac
-! (can only have ipass_calc_updraft == 2 when method_reduce_actfrac = 2)
-   if (ipass_calc_updraft == 2) then
-
-   dt_u_inv = 1.0_r8/dt_u
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-         end if
-
-         delact = dconudt(lc)*dt_u * factor_reduce_actfrac
-         delact = min( delact, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
-   return
-
-   end if ! (ipass_calc_updraft == 2)
 
 
 ! check f_ent > 0
@@ -2531,10 +2474,6 @@ end subroutine ma_convproc_tend
             tmp_fact = fm(n)
          end if
 
-         if ( (method_reduce_actfrac == 1)      .and. &
-              (factor_reduce_actfrac >= 0.0_r8) .and. &
-              (factor_reduce_actfrac <  1.0_r8) )     &
-              tmp_fact = tmp_fact * factor_reduce_actfrac
 
          delact = min( conu(la)*tmp_fact, conu(la) )
          delact = max( delact, 0.0_r8 )
