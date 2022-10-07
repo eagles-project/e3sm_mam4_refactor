@@ -483,7 +483,6 @@ subroutine ma_convproc_dp_intr(                &
    use error_messages, only: alloc_err	
 
    use physconst,      only: gravit, rair
-   use phys_grid,      only: get_lat_all_p, get_lon_all_p, get_rlat_all_p, get_rlon_all_p
 
    use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
@@ -529,12 +528,10 @@ subroutine ma_convproc_dp_intr(                &
    integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: k, kaa, kbb, kk
    integer :: l, ll, lchnk, lun
-   integer :: lat_ndx(pcols), lon_ndx(pcols)
    integer :: n, ncol, nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: lat_deg(pcols), lon_deg(pcols)
    real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
    real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
    real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
@@ -594,14 +591,6 @@ subroutine ma_convproc_dp_intr(                &
          if (convproc_do_gas) dotend(l) = .true.
       end if
    end do
-
-
-   call get_lat_all_p(  lchnk, pcols, lat_ndx )
-   call get_lon_all_p(  lchnk, pcols, lon_ndx )
-   call get_rlat_all_p( lchnk, pcols, lat_deg )
-   call get_rlon_all_p( lchnk, pcols, lon_deg )
-   lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
-   lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
 
 
 
@@ -683,7 +672,6 @@ subroutine ma_convproc_sh_intr(                 &
    use error_messages, only: alloc_err	
 
    use physconst,      only: gravit, rair
-   use phys_grid,      only: get_lat_all_p, get_lon_all_p, get_rlat_all_p, get_rlon_all_p
 
    use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
@@ -716,13 +704,11 @@ subroutine ma_convproc_sh_intr(                 &
    integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: k, kaa, kbb, kcc, kk
    integer :: l, ll, lchnk, lun
-   integer :: lat_ndx(pcols), lon_ndx(pcols)
    integer :: maxg_minval
    integer :: n, ncol, nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: lat_deg(pcols), lon_deg(pcols)
    real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
    real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
    real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
@@ -897,13 +883,6 @@ subroutine ma_convproc_sh_intr(                 &
       end if
    end do
 
-
-   call get_lat_all_p(  lchnk, pcols, lat_ndx )
-   call get_lon_all_p(  lchnk, pcols, lon_ndx )
-   call get_rlat_all_p( lchnk, pcols, lat_deg )
-   call get_rlon_all_p( lchnk, pcols, lon_deg )
-   lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
-   lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
 
 
 ! change profiles of first 4 gases
