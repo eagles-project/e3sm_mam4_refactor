@@ -2392,25 +2392,6 @@ end subroutine ma_convproc_tend
       naerosol(n) = min( naerosol(n),   &
                          vaerosol(n)*voltonumblo_amode(n) )
 
-! diagnostic output for testing/development
-!      if (lun > 0) then
-!         if (n == 1) then
-!            write(lun,9500)
-!            write(lun,9510) (cnst_name(l), conu(l), l=1,pcnst_extd)
-!            write(lun,9520) tair, rhoaircgs, airconcgs
-!         end if
-!         write(lun,9530) n, ntype(n), vaerosol
-!         write(lun,9540) naerosol(n), tmp*airconcgs, &
-!                         voltonumbhi_amode(n), voltonumblo_amode(n)
-!         write(lun,9550) (maerosol(l,n), l=1,ntype(n))
-!9500     format( / 'activate_conv output -- conu values' )
-!9510     format( 3( a, 1pe11.3, 4x ) )
-!9520     format( 'ta, rhoa, acon     ', 3(1pe11.3) )
-!9530     format( 'n, ntype, sg, vol  ', i6, i5, 2(1pe11.3) )
-!9540     format( 'num, num0, v2nhi&lo', 4(1pe11.3) )
-!9550     format( 'masses             ', 6(1pe11.3) )
-!      end if
-
    end do
 
 
@@ -2421,24 +2402,6 @@ end subroutine ma_convproc_tend
    wminf = wbar
    wmaxf = wbar
 
-!  -ubroutine activate_modal(                                &
-!        wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,      &
-!        na, pmode, nmode, volume, sigman, hygro,            &
-!        fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed )
-!     real(r8) wbar          ! grid cell mean vertical velocity (m/s)
-!     real(r8) sigw          ! subgrid standard deviation of vertical vel (m/s)
-!     real(r8) wdiab         ! diabatic vertical velocity (0 if adiabatic)
-!     real(r8) wminf         ! minimum updraft velocity for integration (m/s)
-!     real(r8) wmaxf         ! maximum updraft velocity for integration (m/s)
-!     real(r8) tair          ! air temperature (K)
-!     real(r8) rhoair        ! air density (kg/m3)
-!     real(r8) na(pmode)     ! aerosol number concentration (/m3)
-!     integer pmode          ! dimension of modes
-!     integer nmode          ! number of aerosol modes
-!     real(r8) volume(pmode) ! aerosol volume concentration (m3/m3)
-!     real(r8) sigman(pmode) ! geometric standard deviation of aerosol size distribution
-!     real(r8) hygro(pmode)  ! hygroscopicity of aerosol mode
-!     real(r8), optional :: smax_prescribed  ! prescribed max. supersaturation for secondary activation
    if (k == kactfirst) then
 ! at cloud base - do primary activation
       call activate_modal(                                                 &
@@ -2574,18 +2537,6 @@ end subroutine ma_convproc_tend
             qdota = dcondt(la,k)
             qdotc = dcondt(lc,k)
             qdotac = qdota + qdotc
-
-! mirage2 approach
-!           qa = max( const(la,k), 0.0_r8 )
-!           qc = max( const(lc,k), 0.0_r8 )
-!           qac = qa + qc
-!           if (qac <= 0.0) then
-!              dcondt(la,k) = qdotac
-!              dcondt(lc,k) = 0.0
-!           else
-!              dcondt(la,k) = qdotac*(qa/qac)
-!              dcondt(lc,k) = qdotac*(qc/qac)
-!           end if
 
 ! cam5 approach
             dcondt(la,k) = qdotac
