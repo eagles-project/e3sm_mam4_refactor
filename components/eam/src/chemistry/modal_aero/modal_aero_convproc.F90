@@ -31,7 +31,6 @@ module modal_aero_convproc
 ! Public methods
 
    public :: &
-      ma_convproc_register,         &!
       ma_convproc_init,             &!
       ma_convproc_intr               !
 
@@ -55,12 +54,6 @@ module modal_aero_convproc
 !  method2_activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
    real(r8), parameter :: method2_activate_smaxmax = 0.003_r8
 
-!  method_reduce_actfrac = 1 -- multiply activation fractions by factor_reduce_actfrac
-!                               (this works ok with convproc_method_activate = 1 but not for ... = 2)
-!                        = 2 -- do 2 iterations to get an overall reduction by factor_reduce_actfrac
-!                               (this works ok with convproc_method_activate = 1 or 2)
-!                        = other -- do nothing involving reduce_actfrac
-   integer, parameter  :: method_reduce_actfrac = 0
    real(r8), parameter :: factor_reduce_actfrac = 0.5_r8
 
 !
@@ -68,30 +61,10 @@ module modal_aero_convproc
 !
 
    logical, private :: convproc_do_gas, convproc_do_aer
-   logical, private :: convproc_prevap_resusp_fixaa = .false. ! REASTER 08/05/2015
    !  convproc_method_fixaa - see explanation in subr. ma_convproc_tend(                                           &
-   integer, private :: convproc_method_activate
-   !  convproc_method_activate - 1=apply abdulrazzak-ghan to entrained aerosols for lowest nlayers
-   !                             2=do secondary activation with prescribed supersat
 
 !=========================================================================================
   contains
-
-
-!=========================================================================================
-subroutine ma_convproc_register
-
-!----------------------------------------
-! Purpose: register fields with the physics buffer
-!----------------------------------------
-
-  use physics_buffer, only:  pbuf_add_field
-
-  implicit none
-
-  integer idx
-
-end subroutine ma_convproc_register
 
 
 
@@ -121,8 +94,7 @@ subroutine ma_convproc_init
 !
     call phys_getopts( history_aerosol_out=history_aerosol, &
         convproc_do_aer_out = convproc_do_aer, &
-        convproc_do_gas_out = convproc_do_gas, &
-        convproc_method_activate_out = convproc_method_activate )
+        convproc_do_gas_out = convproc_do_gas  )
 
     call addfld(      'SH_MFUP_MAX', horiz_only, 'A', 'kg/m2', &
                       'Shallow conv. column-max updraft mass flux' )
@@ -160,23 +132,14 @@ subroutine ma_convproc_init
       use_cwaer_for_activate_maxsat
    write(*,'(a,l12)')     'ma_convproc_init - apply_convproc_tend_to_ptend  = ', &
       apply_convproc_tend_to_ptend
-   write(*,'(a,i12)')     'ma_convproc_init - convproc_method_activate      = ', &
-      convproc_method_activate
    write(*,'(a,i12)')     'ma_convproc_init - method1_activate_nlayers      = ', &
       method1_activate_nlayers
    write(*,'(a,1pe12.4)') 'ma_convproc_init - method2_activate_smaxmax      = ', &
       method2_activate_smaxmax
-   write(*,'(a,i12)')     'ma_convproc_init - method_reduce_actfrac         = ', &
-      method_reduce_actfrac
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
       factor_reduce_actfrac
 
    npass_calc_updraft = 1
-   if ( (method_reduce_actfrac == 2)      .and. &
-        (factor_reduce_actfrac >= 0.0_r8) .and. &
-        (factor_reduce_actfrac <= 1.0_r8) ) npass_calc_updraft = 2
-   write(*,'(a,i12)')     'ma_convproc_init - npass_calc_updraft            = ', &
-      npass_calc_updraft
 
    return
 end subroutine ma_convproc_init
@@ -193,7 +156,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
                            mu, md, du, eu,                          &
                            ed, dp, dsubcld,                         &
                            jt, maxg, ideep, lengath, species_class, &
-                           mam_prevap_resusp_optaa,                 &
                            history_aero_prevap_resusp               )
 !----------------------------------------------------------------------- 
 ! 
@@ -258,13 +220,12 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
    logical,  intent(in)    :: history_aero_prevap_resusp
 
 
 ! Local variables
    integer, parameter :: nsrflx = 6        ! last dimension of qsrflx ! REASTER 08/05/2015
-   integer  :: i, ii, itmpa
+   integer  :: i, ii 
    integer  :: k
    integer  :: l, ll, lchnk
    integer  :: n, ncol, nstep
@@ -290,9 +251,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !
 ! Initialize
 !
-
-! apply this minor fix when doing resuspend to coarse mode
-   if (mam_prevap_resusp_optaa >= 30) convproc_prevap_resusp_fixaa = .true.
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -363,7 +321,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      ed, dp, dsubcld,                          &
      jt, maxg, ideep, lengath,                 &
      qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 
 
 ! apply deep conv processing tendency and prepare for shallow conv processing
@@ -420,7 +378,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
      cmfmcsh, sh_e_ed_ratio,                   &
      qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 
 
 ! apply shallow conv processing tendency
@@ -500,7 +458,7 @@ subroutine ma_convproc_dp_intr(                &
      ed, dp, dsubcld,                          &
      jt, maxg, ideep, lengath,                 &
      q, dqdt, dotend, nsrflx, qsrflx,          &
-     species_class, mam_prevap_resusp_optaa    )
+     species_class )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -525,7 +483,6 @@ subroutine ma_convproc_dp_intr(                &
    use error_messages, only: alloc_err	
 
    use physconst,      only: gravit, rair
-   use phys_grid,      only: get_lat_all_p, get_lon_all_p, get_rlat_all_p, get_rlon_all_p
 
    use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
@@ -562,26 +519,19 @@ subroutine ma_convproc_dp_intr(                &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
 
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
 ! Local variables
-   integer, parameter :: idiag_aa = -1  ! controls diagnostic output at 2 selected grid points
-   integer, parameter :: idiag_gg = -1  ! controls using special profiles for gases at these grid points
-
-   integer :: i, ii, itmpa
+   integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
-   integer :: itmpveca(pcols), itmpvecb(pcols)
    integer :: k, kaa, kbb, kk
    integer :: l, ll, lchnk, lun
-   integer :: lat_ndx(pcols), lon_ndx(pcols)
    integer :: n, ncol, nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: lat_deg(pcols), lon_deg(pcols)
    real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
    real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
    real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
@@ -643,164 +593,11 @@ subroutine ma_convproc_dp_intr(                &
    end do
 
 
-! set itmpveca=1 for the 2 "strong convection" grid points, -1 otherwise
-! set itmpveca=associated index to the gathered arrays
-   call get_lat_all_p(  lchnk, pcols, lat_ndx )
-   call get_lon_all_p(  lchnk, pcols, lon_ndx )
-   call get_rlat_all_p( lchnk, pcols, lat_deg )
-   call get_rlon_all_p( lchnk, pcols, lon_deg )
-   lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
-   lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
-
-   itmpa = 0
-   itmpveca(:) = -1
-   itmpvecb(:) = -1
-
-   if (idiag_aa > 0) then
-   do i = 1, ncol
-!     if (lat_ndx(i) /= 48) cycle
-!     if ( (lon_ndx(i) /=  40) .and. &
-!          (lon_ndx(i) /= 116) ) cycle
-      if ( (lchnk == 146 .and. i == 10) .or. &
-           (lchnk == 765 .and. i == 14) ) then
-         continue
-      else
-         cycle
-      end if
-
-      itmpa = itmpa + 1
-      itmpveca(i) = 1
-      do ii = 1, lengath
-         if (ideep(ii) == i) itmpvecb(i) = ii
-      end do
-      write(lun,'(a)')
-      write(lun,'(a,i9,7i5,2f6.1)') &
-         'qakn lchnk, ncol, i, lat_ndx, lon_ndx, itmpveca/b, nstep, lat, lon', &
-         lchnk, ncol, i, lat_ndx(i), lon_ndx(i), itmpveca(i), itmpvecb(i), nstep, &
-         lat_deg(i), lon_deg(i)
-   end do ! i
-   end if ! (idiag_aa > 0)
-
 
 ! change profiles of first 4 gases
    call cnst_get_ind('H2O2',   ixh2o2)
    call cnst_get_ind('so4_a1', ixso4_a1)
    call cnst_get_ind('bc_a1',  ixbc_a1)
-
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   if (itmpa .gt. 0) then
-      write(lun,'(a,2i4,1p,e12.4,i9,i5)') 'qako ixh2o2, ixso4_a1, dt, lchnk, nstep ', &
-         ixh2o2, ixso4_a1, dt, lchnk, nstep
-   end if
-   if (ixh2o2   < 6 .or. ixh2o2   > pcnst-4) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixh2o2" )
-   if (ixso4_a1 < 6 .or. ixso4_a1 > pcnst) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixso4_a1" )
-   if (ixbc_a1  < 6 .or. ixbc_a1  > pcnst) &
-      call endrun( "*** ma_convproc_dp_intr -- bad ixbc_a1" )
-
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      kbb = pver - 5*(ll-1) ; kbb = max( kbb, 1 )
-      kaa = kbb -4          ; kaa = max( kaa, 1 )
-      qaa(1:ncol,:,l) = 0.0_r8
-!     qaa(1:ncol,kaa:kbb,l) = 1.0e-9_r8  ! qaa holds "modified q" before convtran
-      qaa(1:ncol,kaa:kbb,l) = 1.0_r8  ! qaa holds "modified q" before convtran
-   end do
-   dotend(ixh2o2:ixh2o2+3) = .true.  ! for initial testing
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-
-! output profiles of some conv cloud variables
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = itmpvecb(i) ; kaa = 11 ; kbb = pver
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakq lchnk, i, lat_ndx, lon_ndx, nstep                 ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep
-      write(lun,'(2a)') &
-         'qakq zi and fracis(so4_a1); mu and md; sum(eu+du), sum(ed); ', &
-         'eu, du, ed; wup, dp_frac, icwmrdp (in-cld, grid-av), rprddp*dt'
-
-      tmpveca(:) = 0.0 ; tmpvecb(:) = 0.0
-      if (ii > 0) then
-         k = pver
-         tmpveca(k) = hund_ovr_g*(eu(ii,k)-du(ii,k))*dp(ii,k)
-         do k = pver-1, 1, -1
-            tmpveca(k) = tmpveca(k+1) + hund_ovr_g*(eu(ii,k)-du(ii,k))*dp(ii,k)
-         end do
-         do k = 2, pver
-            tmpvecb(k) = tmpvecb(k-1) - hund_ovr_g*ed(ii,k-1)*dp(ii,k-1)
-         end do
-      end if
-
-      tmpvecc(1:pver) = dp_frac(i,1:pver)
-      do k = pver, 3, -1
-         if (tmpvecc(k) < 1.0e-4_r8) then
-            do kk = k-1, 1, -1
-               if (tmpvecc(kk) >= 1.0e-4_r8) then
-                  tmpvecc(k) = tmpvecc(kk) 
-                  exit
-               end if
-            end do
-         end if
-         tmpvecc(k) = max( tmpvecc(k), 1.0e-4_r8 ) 
-      end do
-
-      tmpa = 0.0 ; tmpb = 0.0
-      tmpc = 0.0 ; tmpd = 0.0
-      tmpe = 0.0 ; tmpf = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k) ; tmpb = hund_ovr_g*md(ii,k)
-            tmpc = hund_ovr_g*eu(ii,k) ; tmpd = hund_ovr_g*du(ii,k)
-            tmpe = hund_ovr_g*ed(ii,k)
-            tmpf = tmpa / ( (state%pmid(i,k)/(state%t(i,k)*rair)) * tmpvecc(k) )
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 4e11.3, 2x,2e11.3, 2x,3e11.3, &
-              &2x,2e10.3, 2x,3e10.3)') 'qakq', k, &
-            state%zi(i,k+1), fracis(i,k,ixso4_a1), tmpa, tmpb, &
-            tmpveca(k), tmpvecb(k), tmpc, tmpd, tmpe, &
-            tmpf, dp_frac(i,k), icwmrdp(i,k), &
-            icwmrdp(i,k)*dp_frac(i,k), rprddp(i,k)*dt
-      end do
-
-      tmpa = 0.0 ; tmpb = 0.0 ; tmpc = 0.0
-      if (ii > 0) then
-         do k = pver-5, pver
-            tmpd = hund_ovr_g*eu(ii,k)*dp(ii,k)
-            tmpa = tmpa + tmpd*fracis(i,k,ixso4_a1)
-            tmpb = tmpb + tmpd*fracis(i,k,ixbc_a1)
-            tmpc = tmpc + tmpd
-         end do
-         tmpa = tmpa/ max(tmpc,1.0e-35_r8)
-         tmpb = tmpb/ max(tmpc,1.0e-35_r8)
-      end if
-      write(lun,'(a,3i10,1p,3e10.2,2x,a)') 'qakq111222', &
-         nstep, lchnk, i, tmpa, tmpb, tmpc, &
-         'nstep, lchnk, i, k25:30-avg fracis(so4_a1), fracis(bc_a1), eu*dp'
-
-      write(lun,'(/2a)') &
-         'qakq --- numb and mass for modes 1-3'
-      do k = 10, pver
-         do n = 1, ntot_amode
-            tmpveca(n) = qaa(i,k,numptr_amode(n))
-            tmpvecb(n) = 0.0_r8
-            do ll = 1, nspec_amode(n)
-               tmpvecb(n) = tmpvecb(n) + qaa(i,k,lmassptr_amode(ll,n))
-            end do
-         end do
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 7(2x,2e10.2))' ) 'qakq ---', k, &
-            (tmpveca(l), tmpvecb(l), l=1,min(ntot_amode,7))
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
 
 
 !
@@ -819,16 +616,6 @@ subroutine ma_convproc_dp_intr(                &
 ! so need to pass both rprddp and dlfdp to ma_convproc_tend
 !
 
-!  tine ma_convproc_tend(                                            &
-!                    convtype,                                       &
-!                    lchnk,      ncnst,      nstep,      dt,         &
-!                    t,          pmid,       pdel,       q,          &   
-!                    mu,         md,         du,         eu,         &   
-!                    ed,         dp,         dsubcld,    jt,         &   
-!                    mx,         ideep,      il1g,       il2g,       &       
-!                    concld,     icwmr1,     cmfdqrzh,   fracice,    &
-!                    dqdt,       doconvproc, nsrflx,     qsrflx      )
-
    call ma_convproc_tend(                                            &
                      'deep',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
@@ -839,76 +626,10 @@ subroutine ma_convproc_dp_intr(                &
                      dp_frac,    icwmrdp,    rprddp,     evapcdp,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        itmpveca                            )
+                     lun                                             )
 !                    ed,         dp,         dsubcld,    jt,         &   
-
-
-
-! set qbb = "modified q" with convtran tendency applied,
-! and set tendencies to zero
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      qbb(1:ncol,:,l) = qaa(1:ncol,:,l) + dqdt(1:ncol,:,l)*dt
-      dqdt(1:ncol,:,l) = 0.0  ! set tendency to zero
-   end do
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-! output profiles of the "modified" gases
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = itmpvecb(i) ; kaa = 11 ; kbb = pver
-      tmpa = 0.0
-      if (ii > 0) then
-         tmpa = 0.0
-         tmpa = hund_ovr_g * sum(mu(ii,kaa:kbb)) / (kbb-kaa+1)
-      end if
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakp lchnk, i, lat_ndx, lon_ndx, nstep, mu-avg, dsubcld', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep, tmpa, dsubcld(ii)
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'qakp zi and fracis(so4_a1); mu and md; gases 1-4'
-
-      tmpa = 0.0 ; tmpb = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = 0.0
-            tmpa = hund_ovr_g*mu(ii,k) ; tmpb = hund_ovr_g*md(ii,k)
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p,4e11.3,5(2x,2e10.3))') 'qakp', k, &
-            state%zi(i,k+1), fracis(i,k,ixso4_a1), tmpa, tmpb, &
-            (qaa(i,k,l), (qbb(i,k,l)-qaa(i,k,l)), l=ixh2o2,ixh2o2+3)
-      end do
-
-      tmpveca(:) = 0.0 ; tmpa = 0.0
-      if (ii > 0) then
-         do l = ixh2o2, ixh2o2+3
-            tmpa = sum( dpdry(ii,:) )
-            tmpveca(l) = sum( dpdry(ii,:) * (qbb(i,:,l)-qaa(i,:,l)) )
-            tmpveca(l) = tmpveca(l) / max( tmpa, 1.0e-10_r8 )
-         end do
-      end if
-      write(lun,'(a,i4,1p,e11.3,33x,5(12x,e10.3))') 'qakp', -1, &
-         tmpa, (tmpveca(l), l=ixh2o2,ixh2o2+3)
-
-      k = 26
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'qakt lchnk, i, k, nstep // l, qold, qnew', &
-         lchnk, i, k, nstep
-      do l = ixh2o2, pcnst
-         tmpa = qaa(i,k,l) + dt*dqdt(i,k,l) 
-         if (tmpa .le. -1.0e-14_r8) write(lun,'(2a,i4,1p,2e12.4)') &
-            'qakt ', cnst_name(l)(1:8), l, qaa(i,k,l), tmpa
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
 
 
    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, lchnk )
@@ -926,7 +647,7 @@ subroutine ma_convproc_sh_intr(                 &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  &
      cmfmcsh, sh_e_ed_ratio,                    &
      q, dqdt, dotend, nsrflx, qsrflx,           &
-     species_class, mam_prevap_resusp_optaa     )
+     species_class  )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -951,7 +672,6 @@ subroutine ma_convproc_sh_intr(                 &
    use error_messages, only: alloc_err	
 
    use physconst,      only: gravit, rair
-   use phys_grid,      only: get_lat_all_p, get_lon_all_p, get_rlat_all_p, get_rlon_all_p
 
    use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
@@ -975,28 +695,20 @@ subroutine ma_convproc_sh_intr(                 &
    real(r8), intent(in)    :: cmfmcsh(pcols,pverp) ! Shallow conv mass flux (kg/m2/s)
    real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
    integer,  intent(in)    :: species_class(:)
-   integer,  intent(in)    :: mam_prevap_resusp_optaa
 
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
 ! Local variables
-   integer, parameter :: idiag_aa = -1  ! controls diagnostic output at 2 selected grid points
-   integer, parameter :: idiag_gg = -1  ! controls using special profiles for gases at these grid points
-
-   integer :: i, ii, itmpa
-   integer :: ido_20000_block_now
+   integer :: i, ii
    integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
    integer :: ixh2o2, ixbc_a1, ixso4_a1
-   integer :: itmpveca(pcols), itmpveca2(pcols)
    integer :: k, kaa, kbb, kcc, kk
    integer :: l, ll, lchnk, lun
-   integer :: lat_ndx(pcols), lon_ndx(pcols)
    integer :: maxg_minval
    integer :: n, ncol, nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: lat_deg(pcols), lon_deg(pcols)
    real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
    real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
    real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
@@ -1172,160 +884,11 @@ subroutine ma_convproc_sh_intr(                 &
    end do
 
 
-! set itmpveca=1 for the 2 "strong convection" grid points, -1 otherwise
-! set itmpveca=associated index to the gathered arrays
-   call get_lat_all_p(  lchnk, pcols, lat_ndx )
-   call get_lon_all_p(  lchnk, pcols, lon_ndx )
-   call get_rlat_all_p( lchnk, pcols, lat_deg )
-   call get_rlon_all_p( lchnk, pcols, lon_deg )
-   lat_deg(1:ncol) = lat_deg(1:ncol) *180.0/3.1415926536
-   lon_deg(1:ncol) = lon_deg(1:ncol) *180.0/3.1415926536
-
-   itmpa = 0
-   itmpveca(:) = -1
-
-   if (idiag_aa > 0) then
-   do i = 1, ncol
-!     if (lat_ndx(i) /= 50) cycle
-!     if ( (lon_ndx(i) /=  30) .and. &
-!          (lon_ndx(i) /= 139) ) cycle
-      if ( (lchnk == 146 .and. i == 10) .or. &
-           (lchnk == 765 .and. i == 14) ) then
-         continue
-      else
-         cycle
-      end if
-
-      itmpa = itmpa + 1
-      itmpveca(i) = 1
-      write(lun,'(a)')
-      write(lun,'(a,i9,6i5,2f6.1)') &
-         'sqakn lchnk, ncol, i, lat_ndx, lon_ndx, itmpveca, nstep, lat, lon', &
-         lchnk, ncol, i, lat_ndx(i), lon_ndx(i), itmpveca(i), nstep, &
-         lat_deg(i), lon_deg(i)
-   end do ! i
-   end if ! (idiag_aa > 0)
-
 
 ! change profiles of first 4 gases
    call cnst_get_ind('H2O2',   ixh2o2)
    call cnst_get_ind('so4_a1', ixso4_a1)
    call cnst_get_ind('bc_a1',  ixbc_a1)
-
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   if (itmpa .gt. 0) then
-      write(lun,'(a,2i4,1p,e12.4,i9,i5)') 'sqako ixh2o2, ixso4_a1, dt, lchnk, nstep ', &
-         ixh2o2, ixso4_a1, dt, lchnk, nstep
-   end if
-   if (ixh2o2   < 6 .or. ixh2o2   > pcnst-4) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixh2o2" )
-   if (ixso4_a1 < 6 .or. ixso4_a1 > pcnst) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixso4_a1" )
-   if (ixbc_a1  < 6 .or. ixbc_a1  > pcnst) &
-      call endrun( "*** ma_convproc_sh_intr -- bad ixbc_a1" )
-
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      kbb = pver - 5*(ll-1) ; kbb = max( kbb, 1 )
-      kaa = kbb -4          ; kaa = max( kaa, 1 )
-      ! qaa holds "modified q" before convtran
-      qaa(1:ncol,:,l) = 0.0_r8
-      do k = kaa, kbb
-        qaa(1:ncol,k,l) = 1.0e-9_r8*(0.9_r8 - 0.1_r8*(kbb-k))
-      end do
-
-      kbb = pver - 1 - 5*(ll-1)
-      kaa = kbb - 4          ; kaa = max( kaa, 1 )
-      kcc = kbb + 4          ; kcc = min( kcc, pver )
-      qaa(1:ncol,:,l) = 0.0_r8
-      do k = kaa, kcc
-         qaa(1:ncol,k,l) = max( 0.0_r8, 1.0e-9_r8*(0.9_r8 - 0.2_r8*abs(kbb-k)) )
-      end do
-   end do
-   dotend(ixh2o2:ixh2o2+3) = .true.  ! for initial testing
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-
-! output profiles of some conv cloud variables
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   ido_20000_block_now = -77
-   ido_20000_block_now = 1
-20000 if (ido_20000_block_now > 0) then
-
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = i ; kaa = 11 ; kbb = pver
-
-      tmpveca(:) = 0.0
-      if (ii > 0) then
-         k = pver
-         tmpveca(k) = hund_ovr_g*(eu(ii,k)-du(ii,k))*dpdry(ii,k)
-         do k = pver-1, 1, -1
-            tmpveca(k) = tmpveca(k+1) + hund_ovr_g*(eu(ii,k)-du(ii,k))*dpdry(ii,k)
-         end do
-      end if
-
-      tmpvecc(1:pver) = sh_frac(i,1:pver)
-      do k = pver, 3, -1
-         if (tmpvecc(k) < 1.0e-4_r8) then
-            do kk = k-1, 1, -1
-               if (tmpvecc(kk) >= 1.0e-4_r8) then
-                  tmpvecc(k) = tmpvecc(kk) 
-                  exit
-               end if
-            end do
-         end if
-         tmpvecc(k) = max( tmpvecc(k), 1.0e-4_r8 ) 
-      end do
-
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'sqakq lchnk, i, lat_ndx, lon_ndx, nstep                 ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep
-      write(lun,'(2a)') &
-         'sqakq zi; mu; sum(eu+du); ', &
-         'eu, du; wup, sh_frac; icwmrsh (in-cld, grid-av), rprdsh*dt'
-
-      tmpa = 0.0 ; tmpc = 0.0
-      tmpd = 0.0 ; tmpf = 0.0
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k)
-            tmpc = hund_ovr_g*eu(ii,k) ; tmpd = hund_ovr_g*du(ii,k)
-            tmpf = tmpa / ( (state%pmid(i,k)/(state%t(i,k)*rair)) * tmpvecc(k) )
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 2e11.3, 2x,e11.3, 2x,2e11.3, &
-              &2x,2e10.3, 2x,3e10.3)') 'sqakq', k, &
-            state%zi(i,k+1), tmpa, &
-            tmpveca(k),    tmpc, tmpd, &
-            tmpf, sh_frac(i,k),    icwmrsh(i,k), &
-            icwmrsh(i,k)*sh_frac(i,k), rprdsh(i,k)*dt
-      end do
-
-      write(lun,'(/2a)') &
-         'sqakq --- numb and mass for modes 1-3'
-      do k = 10, pver
-!        exit
-         do n = 1, ntot_amode
-            tmpveca(n) = qaa(i,k,numptr_amode(n))
-            tmpvecb(n) = 0.0_r8
-            do ll = 1, nspec_amode(n)
-               tmpvecb(n) = tmpvecb(n) + qaa(i,k,lmassptr_amode(ll,n))
-            end do
-         end do
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i4,1p, 7(2x,2e10.2))' ) 'sqakq ---', k, &
-            (tmpveca(l), tmpvecb(l), l=1,min(ntot_amode,7))
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
-
-   end if ! (ido_20000_block_now > 0) then
-   if (ido_20000_block_now == 77) goto 40000
-
 
 !
 ! do ma_convproc_tend call
@@ -1343,18 +906,6 @@ subroutine ma_convproc_sh_intr(                 &
 ! so need to pass both rprddp and dlfdp to ma_convproc_tend
 !
 
-!  tine ma_convproc_tend(                                            &
-!                    convtype,                                       &
-!                    lchnk,      ncnst,      nstep,      dt,         &
-!                    t,          pmid,       pdel,       q,          &   
-!                    mu,         md,         du,         eu,         &   
-!                    ed,         dp,         dsubcld,    jt,         &   
-!                    mx,         ideep,      il1g,       il2g,       &       
-!                    concld,     icwmr1,     cmfdqrzh,   fracice,    &
-!                    dqdt,       doconvproc, nsrflx,     qsrflx      )
-
-   itmpveca2 = itmpveca
-!  itmpveca2 = -1
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
@@ -1365,83 +916,10 @@ subroutine ma_convproc_sh_intr(                 &
                      sh_frac,    icwmrsh,    rprdsh,     evapcsh,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        itmpveca2                           )
+                     lun                                             )
 
-
-
-! set qbb = "modified q" with convtran tendency applied,
-! and set tendencies to zero
-   if (idiag_aa > 0 .and. idiag_gg > 0) then
-   do ll = 1, 4
-      l = ixh2o2 + (ll-1)
-      qbb(1:ncol,:,l) = qaa(1:ncol,:,l) + dqdt(1:ncol,:,l)*dt
-      dqdt(1:ncol,:,l) = 0.0  ! set tendency to zero
-   end do
-   end if ! (idiag_aa > 0 .and. idiag_gg > 0)
-
-! output profiles of the "modified" gases
-! (when idiag_aa <= 0, itmpa == 0, and this is inactive)
-   if (itmpa > 0) then
-   do i = 1, ncol
-      if (itmpveca(i) <= 0) cycle
-
-      ii = i ; kaa = 11 ; kbb = pver
-      tmpa = 0.0
-      if (ii > 0) then
-         tmpa = 0.0
-         tmpa = hund_ovr_g * sum(mu(ii,kaa:kbb)) / (kbb-kaa+1)
-      end if
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'sqakp lchnk, i, lat_ndx, lon_ndx, nstep, mu-avg ', &
-         lchnk, i, lat_ndx(i), lon_ndx(i), nstep, tmpa
-      write(lun,'(a,i9,4i5,1p,e12.4)') &
-         'sqakp zi and mu; eu and du ; gases 1-4'
-
-      tmpa = 0.0 ; tmpb = 0.0 ; tmpc = 0.0 
-      do k = 10, pver
-         if (ii > 0) then
-            tmpa = hund_ovr_g*mu(ii,k)
-            tmpb = hund_ovr_g*eu(ii,k)
-            tmpc = hund_ovr_g*du(ii,k)
-         end if
-         if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-         write(lun,'(a,i3,1p,2e11.3,(2x,2e10.3),4(e11.1,e10.2))') 'sqakp', k, &
-            state%zi(i,k+1), tmpa, tmpb, tmpc, &
-            (qaa(i,k,l)*1.0e9, (qbb(i,k,l)-qaa(i,k,l))*1.0e9, l=ixh2o2,ixh2o2+3)
-      end do
-
-      tmpveca(:) = 0.0 ; tmpa = 0.0
-      if (ii > 0) then
-         do l = ixh2o2, ixh2o2+3
-            tmpa = sum( dpdry(ii,:) )
-            tmpveca(l) = sum( dpdry(ii,:) * (qbb(i,:,l)-qaa(i,:,l)) )
-            tmpveca(l) = tmpveca(l) / max( tmpa, 1.0e-10_r8 )
-         end do
-      end if
-      write(lun,'(a,i3,1p,e11.3,11x,22x,4(11x,e10.2))') 'sqakp', -1, &
-         tmpa, (tmpveca(l), l=ixh2o2,ixh2o2+3)
-
-      k = 26
-      write(lun,'(a,i9,4i5,1p,2e12.4)') &
-         'sqakt lchnk, i, k, nstep // l, qold, qnew', &
-         lchnk, i, k, nstep
-      do l = ixh2o2, pcnst
-         tmpa = qaa(i,k,l) + dt*dqdt(i,k,l) 
-         if (tmpa .le. -1.0e-14_r8) write(lun,'(2a,i4,1p,2e12.4)') &
-            'sqakt ', cnst_name(l)(1:8), l, qaa(i,k,l), tmpa
-      end do
-
-   end do ! i
-   end if ! (itmpa > 0)
-
-
-   if (ido_20000_block_now == -77) then
-      ido_20000_block_now = 77
-      goto 20000
-   end if
-40000 continue
 
 
 !  if (maxg_minval <= pver) write(lun,'(i3.3,i9,a)') &
@@ -1468,9 +946,9 @@ subroutine ma_convproc_tend(                                           &
                      cldfrac,    icwmr,      rprd,       evapc,      &
                      fracice,                                        &
                      dqdt,       doconvproc, nsrflx,     qsrflx,     &
-                     species_class, mam_prevap_resusp_optaa,         & ! REASTER 08/05/2015
+                     species_class,                                  & ! REASTER 08/05/2015
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun,        idiag_in                            )
+                     lun                                             )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -1575,12 +1053,10 @@ subroutine ma_convproc_tend(                                           &
                               !  5 = actual precip-evap resuspension (what actually is applied to a species)
                               !  6 = pseudo precip-evap resuspension (for history file) ! REASTER 08/05/2015
    integer,  intent(in) :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in) :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
    real(r8), intent(out):: xx_mfup_max(pcols)
    real(r8), intent(out):: xx_wcldbase(pcols)
    real(r8), intent(out):: xx_kcldbase(pcols)
    integer,  intent(in) :: lun               ! unit number for diagnostic output
-   integer,  intent(in) :: idiag_in(pcols)   ! flag for diagnostic output
 
 
 !--------------------------Local Variables------------------------------
@@ -1590,10 +1066,7 @@ subroutine ma_convproc_tend(                                           &
 
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
-   integer :: idiag_act       ! Work index
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
-   integer :: ipass_calc_updraft
-   integer :: itmpa, itmpb    ! Work variable
    integer :: j, jtsub        ! Work index
    integer :: k               ! Work index
    integer :: kactcnt         ! Counter for no. of levels having activation
@@ -1839,8 +1312,9 @@ i_loop_main_aa: &
 !    but that is now fixed
 ! this was a minor bug with quite minor affects on the aerosol, 
 !    because convective precip evap is (or used to be) much less than stratiform precip evap )
-      kbot_prevap = kbot
-      if ( convproc_prevap_resusp_fixaa ) kbot_prevap = pver
+!      kbot_prevap = kbot
+! apply this minor fix when doing resuspend to coarse mode      
+      kbot_prevap = pver
 ! REASTER 08/05/2015 END
       mu_i(:) = 0.0
       md_i(:) = 0.0
@@ -1910,25 +1384,12 @@ i_loop_main_aa: &
       q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
 
 !
-!   when method_reduce_actfrac = 2, need to do the updraft calc twice
-!   (1st to get non-adjusted activation amount, 2nd to apply reduction factor)
       npass_calc_updraft = 1
-      if ( (method_reduce_actfrac == 2)      .and. &
-           (factor_reduce_actfrac >= 0.0_r8) .and. &
-           (factor_reduce_actfrac <= 1.0_r8) ) npass_calc_updraft = 2
 
 
 jtsub_loop_main_aa: &
       do jtsub = 1, ntsub
 
-
-ipass_calc_updraft_loop: &
-      do ipass_calc_updraft = 1, npass_calc_updraft
-
-
-      if (idiag_in(icol) > 0) &
-         write(lun,'(/a,3x,a,1x,i9,5i5)') 'qakr - convtype,lchnk,i,jt,mx,jtsub,ipass=', &
-            trim(convtype), lchnk, icol, jt(i), mx(i), jtsub, ipass_calc_updraft
 
       qsrflx_i(:,:) = 0.0
       dqdt_i(:,:) = 0.0
@@ -1945,8 +1406,8 @@ ipass_calc_updraft_loop: &
       dcondt_prevap_hist(:,:) = 0.0 ! REASTER 08/05/2015
       dconudt_aqchem(:,:) = 0.0
       dconudt_wetdep(:,:) = 0.0
-! only initialize the activation tendency on ipass=1
-      if (ipass_calc_updraft == 1) dconudt_activa(:,:) = 0.0
+! initialize the activation tendency 
+      dconudt_activa(:,:) = 0.0
 
 ! initialize mixing ratio arrays (chat, const, conu, cond)
       do m = 2, ncnst
@@ -2069,64 +1530,6 @@ k_loop_main_bb: &
             clw_cut = 1.0e-6
 
 
-            if (convproc_method_activate <= 1) then
-! aerosol activation - method 1
-!    skip levels that are completely glaciated (fracice(icol,k) == 1.0)
-!    when kactcnt=1 (first/lowest layer with cloud water) apply 
-!       activatation to the entire updraft
-!    when kactcnt>1 apply activatation to the amount entrained at this level
-               if ((icwmr(icol,k) > clw_cut) .and. (fracice(icol,k) < 1.0)) then
-                  kactcnt = kactcnt + 1
-
-                  idiag_act = idiag_in(icol)
-                  if ((kactcnt == 1) .or. (f_ent > 0.0_r8)) then
-                     kactcntb = kactcntb + 1
-                     if ((kactcntb == 1) .and. (idiag_act > 0)) then
-                        write(lun,'(/a,i9,2i4)') &
-                           'qaku act_conv lchnk,i,jtsub', lchnk, icol, jtsub
-                     end if
-                  end if
-
-                  if (kactcnt == 1) then
-                     ! diagnostic fields
-                     ! xx_wcldbase = w at first cloudy layer, estimated from mu and cldfrac
-                     xx_wcldbase(icol) = (mu_i(kp1) + mu_i(k))*0.5_r8*hund_ovr_g &
-                         / (rhoair_i(k) * (cldfrac_i(k)*0.5_r8))
-                     xx_kcldbase(icol) = k
-
-                     kactfirst = k
-                     tmpa = 1.0
-                     call ma_activate_convproc(                            &
-                        conu(:,k),  dconudt_activa(:,k), conu(:,k),        &
-                        tmpa,       dt_u(k),             wup(k),           &
-                        t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                        pcnst_extd, lun,                 idiag_act,        &
-                        lchnk,      icol,                k,                &
-                        ipass_calc_updraft                                 )
-                  else if (f_ent > 0.0_r8) then
-                     ! current layer is above cloud base (=first layer with activation)
-                     !    only allow activation at k = kactfirst thru kactfirst-(method1_activate_nlayers-1)
-                     if (k >= kactfirst-(method1_activate_nlayers-1)) then
-                        call ma_activate_convproc(                            &
-                           conu(:,k),  dconudt_activa(:,k), const(:,k),       &
-                           f_ent,      dt_u(k),             wup(k),           &
-                           t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                           pcnst_extd, lun,                 idiag_act,        &
-                           lchnk,      icol,                k,                &
-                           ipass_calc_updraft                                 )
-                     end if
-                  end if
-! the following was for cam2 shallow convection (hack),
-! but is not appropriate for cam5 (uwshcu)
-!                 else if ((kactcnt > 0) .and. (iconvtype /= 1)) then
-! !    for shallow conv, when you move from activation occuring to 
-! !       not occuring, reset kactcnt=0, because the hack scheme can
-! !       produce multiple "1.5 layer clouds" separated by clear air
-!                    kactcnt = 0
-!                 end if
-               end if ! ((icwmr(icol,k) > clw_cut) .and. (fracice(icol,k) < 1.0)) then
-
-            else ! (convproc_method_activate >= 2)
 ! aerosol activation - method 2
 !    skip levels that are completely glaciated (fracice(icol,k) == 1.0)
 !    when kactcnt=1 (first/lowest layer with cloud water) 
@@ -2154,24 +1557,18 @@ k_loop_main_bb: &
 !                 end if
                end if
 
-               idiag_act = idiag_in(icol)
                if ( do_act_this_lev ) then
                   kactcntb = kactcntb + 1
-                  if ((kactcntb == 1) .and. (idiag_act > 0)) then
-                     write(lun,'(/a,i9,2i4)') &
-                        'qaku act_conv lchnk,i,jtsub', lchnk, icol, jtsub
-                  end if
 
                   call ma_activate_convproc_method2(                    &
                      conu(:,k),  dconudt_activa(:,k),                   &
                      f_ent,      dt_u(k),             wup(k),           &
                      t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                     pcnst_extd, lun,                 idiag_act,        &
+                     pcnst_extd, lun,                                   &
                      lchnk,      icol,                k,                &
-                     kactfirst,  ipass_calc_updraft                     )
+                     kactfirst        )
                end if
 
-            end if ! (convproc_method_activate <= 1)
 
 ! aqueous chemistry
 !    do glaciated levels as aqchem_conv will eventually do acid vapor uptake
@@ -2244,19 +1641,6 @@ k_loop_main_bb: &
          end if    ! "(mu_p_eudp(k) > mbsth)"
       end do k_loop_main_bb ! "k = kbot, ktop, -1"
 
-! when doing updraft calcs twice, only need to go this far on the first pass
-      if ( (ipass_calc_updraft == 1) .and. &
-           (npass_calc_updraft == 2) ) cycle ipass_calc_updraft_loop
-
-      if (idiag_in(icol) > 0) then
-         ! do wet removal diagnostics here 
-         do k = kbot, ktop, -1
-            if (mu_p_eudp(k) > mbsth) &
-               write(lun,'(a,i9,3i4,1p,6e10.3)') &
-                  'qakr - l,i,k,jt; cdt, cldfrac, icwmr, rprd, ...', lchnk, icol, k, jtsub, &
-                  cdt(k), cldfrac_i(k), icwmr(icol,k), rprd(icol,k), dp(i,k), mu_p_eudp(k)
-         end do
-      end if
 
 
 ! Compute downdraft mixing ratios from cloudtop to cloudbase
@@ -2381,26 +1765,6 @@ k_loop_main_cc: &
             sumaqchem(m) = sumaqchem(m) + fa_u_dp*dconudt_aqchem(m,k)
             sumwetdep(m) = sumwetdep(m) + fa_u_dp*dconudt_wetdep(m,k)
 
-            if ( idiag_in(icol)>0 .and. k==26 .and. &
-                 (m==16 .or. m==23 .or. m==16+pcnst .or. m==23+pcnst) ) then
-               if (m==16) &
-               write(lun,'(a,i9,4i4,1p,22x,   2x,11x,  2x,6e11.3)') &
-                  'qakww0-'//convtype(1:4), lchnk, icol, k, -1, jtsub, &
-                  dtsub*mu_i(k+1)/dp_i(k), dtsub*mu_i(k)/dp_i(k), dtsub*eudp(k)/dp_i(k), &
-                  dtsub*md_i(k+1)/dp_i(k), dtsub*md_i(k)/dp_i(k), dtsub*eddp(k)/dp_i(k) 
-
-               write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,6e11.3)') &
-                  'qakww1-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-                  const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k), &
-                  dtsub*fluxin/dp_i(k), -dtsub*fluxout/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_aqchem(m,k)/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_activa(m,k)/dp_i(k), &
-                  dtsub*fa_u_dp*dconudt_wetdep(m,k)/dp_i(k)
-               write(lun,'(a,i9,4i4,1p,22x,   2x,11x,  2x,6e11.3)') &
-                  'qakww1-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-                  dtsub*tmpveca(1:6)/dp_i(k)
-            end if
-
             end if   ! "(doconvproc_extd(m))"
          end do      ! "m = 2,ncnst_extd"
       end do k_loop_main_cc ! "k = ktop, kbot"
@@ -2411,42 +1775,15 @@ k_loop_main_cc: &
                                   dcondt_prevap_hist,                      & ! REASTER 08/05/2015
                                   rprd,   evapc,          dp_i,            &
                                   icol,   ktop,           pcnst_extd,      &
-                                  lun,    idiag_in(icol), lchnk,           &
+                                  lun,    lchnk,                           &
                                   doconvproc_extd,                         &
-                                  species_class, mam_prevap_resusp_optaa   ) ! REASTER 08/05/2015
-      if ( idiag_in(icol)>0 ) then
-         k = 26
-         do m = 16, 23, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww2-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-         do m = 16+pcnst, 23+pcnst, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww2-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-      end if
-
+                                  species_class ) ! REASTER 08/05/2015
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
 !    pairs to account any (or total) resuspension of convective-cloudborne aerosol
       call ma_resuspend_convproc( dcondt, dcondt_resusp,   &
                                   const, dp_i, ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
-      if ( idiag_in(icol)>0 ) then
-         k = 26
-         do m = 16, 23, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww3-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-         do m = 16+pcnst, 23+pcnst, 7
-            write(lun,'(a,i9,4i4,1p,2e11.3,2x,e11.3,2x,5e11.3)') &
-               'qakww3-'//convtype(1:4), lchnk, icol, k, m, jtsub, &
-               const(m,k), const(m,k)+dtsub*dcondt(m,k), dtsub*dcondt(m,k)
-         end do
-      end if
 
 
 ! calculate new column-tendency variables
@@ -2467,63 +1804,6 @@ k_loop_main_cc: &
       end do ! m
 
 
-! do checks for mass conservation
-! do not expect errors > 1.0e-14, but use a conservative 1.0e-10 here,
-! as an error of this size is still not a big concern
-      relerr_cut = 1.0e-10
-      if (nerr < nerrmax) then
-         merr = 0
-         if (courantmax > (1.0_r8 + 1.0e-6_r8)) then
-            write(lun,9161) '-', trim(convtype), courantmax
-            merr = merr + 1
-         end if
-         do m = 2, ncnst_extd
-            if (doconvproc_extd(m)) then
-               itmpa = 0
-               ! sumflux should be ~=0.0 because fluxout of one layer cancels
-               !    fluxin to adjacent layer
-               tmpa = sumflux(m)
-               tmpb = max( maxflux(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '1', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 1
-               end if
-               ! sumflux2 involve environment fluxes and entrainment/detrainment
-               !    to up/downdrafts, and it should be equal to sumchng,
-               !    and so (sumflux2 - sumsrce) should be ~=0.0
-               tmpa = sumflux2(m) - sumsrce(m)
-               tmpb = max( maxflux2(m), maxsrce(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '2', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 10
-               end if
-               ! sunchng = sumflux + sumsrce, so (sumchng - sumsrc) should be ~=0.0
-               tmpa = sumchng(m) - sumsrce(m)
-               tmpb = max( maxflux(m), maxsrce(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '3', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 100
-               end if
-               ! sumchng3 = sumchng + sumresusp + sumprevap, 
-               !    so tmpa (below) should be ~=0.0
-               tmpa = sumchng3(m) - (sumsrce(m) + sumresusp(m) + sumprevap(m))
-               tmpb = max( maxflux(m), maxsrce(m), maxresusp(m), maxprevap(m), small )
-               if (abs(tmpa) > relerr_cut*tmpb) then
-                  write(lun,9151) '4', m, cnst_name_extd(m), tmpb, tmpa, (tmpa/tmpb)
-                  itmpa = itmpa + 1000
-               end if
-
-               if (itmpa > 0) merr = merr + 1
-            end if
-         end do ! m
-         if (merr > 0) write(lun,9181) convtype, lchnk, icol, i, jt(i), mx(i)
-         nerr = nerr + merr
-         if (nerr >= nerrmax) write(lun,9171) nerr
-      end if ! (nerr < nerrmax) then
-
-9151 format( '*** ma_convproc_tend error, massbal', a, 1x, i5,1x,a, &
-             ' -- maxflux, sumflux, relerr =', 3(1pe14.6) )
-9161 format( '*** ma_convproc_tend error, courantmax', 2a, 3x, 1pe14.6 )
 9171 format( '*** ma_convproc_tend error, stopping messages after nerr =', i10 )
 
 9181 format( '*** ma_convproc_tend error -- convtype, lchnk, icol, il, jt, mx =  ', a,2x,5(1x,i10) )
@@ -2597,126 +1877,6 @@ k_loop_main_cc: &
       end do ! m
 
 
-! diagnostic output of profiles before
-      if (idiag_in(icol) > 0) then
-         write(lun, '(/3a,i9,2i4)' ) 'qakr-', trim(convtype), ' - lchnk,i,jtsub', lchnk, icol, jtsub
-         n = 1
-
-         do j = 1, 2
-            if (j == 1) then
-               write(lun, '(4a,i4)' ) &
-                  'qakr-', trim(convtype), ' - k, mu,md; then mode-1 ', &
-                  'numb & numbcw for q, const, conu, cond, delq(a/c/ac noresu)', jtsub
-            else
-               write(lun, '(/4a,i4)' ) &
-                  'qakr-', trim(convtype), ' - k, mu,md; then mode-1 ', &
-                  'mass & masscw for q, const, conu, cond, delq(a/c/ac noresu)', jtsub
-            end if
-
-            do k = 10, pver
-               tmpveca(:) = 0.0
-               do ll = 1, nspec_amode(n)
-                  if (j == 1) then
-                     la = numptr_amode(n)
-                     lc = numptr_amode(n) + pcnst
-                  else
-                     la = lmassptr_amode(ll,n)
-                     lc = lmassptr_amode(ll,n) + pcnst
-                  end if
-                  tmpveca(1)  = tmpveca(1) + q_i(k,la)
-                  tmpveca(2)  = tmpveca(2) + const(la,k)
-                  tmpveca(3)  = tmpveca(3) + const(lc,k)
-                  tmpveca(4)  = tmpveca(4) + conu( la,k)
-                  tmpveca(5)  = tmpveca(5) + conu( lc,k)
-                  tmpveca(6)  = tmpveca(6) + cond( la,k)
-                  tmpveca(7)  = tmpveca(7) + cond( lc,k)
-                  tmpveca(8)  = tmpveca(8) + (dcondt(la,k)-dcondt_resusp(la,k))*dtsub
-                  tmpveca(9)  = tmpveca(9) + (dcondt(lc,k)-dcondt_resusp(lc,k))*dtsub
-                  tmpveca(10) = tmpveca(8) + tmpveca(9)
-                  if (j == 1) exit
-               end do ! ll
-               if ((k > 15) .and. (mod(k,5) == 1)) write(lun,'(a)')
-               write(lun, '(a,i3,1p,2e10.2, e11.2, 3(2x,2e9.2), 2x,3e10.2 )' ) 'qakr', k, &
-                  mu_i(k), md_i(k), tmpveca(1:10)
-            end do ! k
-         end do ! j
-
-         if (pcnst < 0) then
-         write(lun, '(/a,i4)' ) &
-            'qakr - name; burden; qsrflx tot, activa,resusp,aqchem,wetdep,resid', jtsub
-         do m = 2, ncnst
-            if ( .not. doconvproc(m) ) cycle
-            tmpveca(1) = sum(    q_i(:,m)*dp_i(:) ) * hund_ovr_g
-            tmpveca(2) = sum( dqdt_i(:,m)*dp_i(:) ) * hund_ovr_g
-            tmpveca(3:6) = qsrflx_i(m,1:4)
-            tmpveca(7) = tmpveca(2) - sum( tmpveca(3:6) )
-            write(lun, '(2a,1p,2(2x,e11.3),2x,4e11.3,2x,e11.3)' ) &
-               'qakr  ', cnst_name_extd(m)(1:10), tmpveca(1:7)
-         end do ! m
-         end if ! (pcnst < 0) then
-
-         write(lun, '(/3a,i4)' ) 'qakr-', trim(convtype), &
-            ' - name; burden; sumchng3, sumactiva,resusp,aqchem,wetdep, resid,resid*dt/burden', jtsub
-!        write(lun, '(/2a)' ) &
-!           'qakr - name;  burden;  sumchng3;  ', &
-!           'sumactiva,resusp,aqchem,wetdep,prevap;  resid,resid*dtsub/burden'
-         tmpb = 0.0_r8
-         itmpb = 0
-         do m = 2, pcnst
-            if ( .not. doconvproc_extd(m) ) cycle
-
-            tmpmata(:,:) = 0.0
-            do j = 1, 3
-               l = m
-               if (j == 3) l = m + pcnst
-               if ( .not. doconvproc_extd(l) ) cycle
-
-               if (j == 1) then
-                  tmpmata(1,j) = sum(    q_i(:,l)*dp_i(:) ) * hund_ovr_g
-                  tmpmata(2,j) = sum( dqdt_i(:,l)*dp_i(:) ) * hund_ovr_g
-                  tmpmata(3:7,j) = qsrflx_i(l,1:5)
-               else
-                  tmpmata(1,j) = sum( const(l,1:pver)*dp_i(1:pver) ) * hund_ovr_g
-                  tmpmata(2,j) = sumchng3( l) * hund_ovr_g
-                  tmpmata(3,j) = sumactiva(l) * hund_ovr_g
-                  tmpmata(4,j) = sumresusp(l) * hund_ovr_g
-                  tmpmata(5,j) = sumaqchem(l) * hund_ovr_g
-                  tmpmata(6,j) = sumwetdep(l) * hund_ovr_g
-                  tmpmata(7,j) = sumprevap(l) * hund_ovr_g
-               end if
-            end do ! j
-
-            tmpmata(3:7,2) = tmpmata(3:7,2) - tmpmata(3:7,3)  ! because lc values were added onto la
-            do j = 1, 3
-               tmpmata(8,j) = tmpmata(2,j) - sum( tmpmata(3:7,j) )  ! residual
-               tmpa = max( tmpmata(1,min(j,2)), 1.0e-20_r8 )
-               tmpmata(9,j) = tmpmata(8,j) * dtsub / tmpa
-               if (abs(tmpmata(9,j)) > tmpb) then
-                  tmpb = abs(tmpmata(9,j))
-                  itmpb = m
-               end if
-            end do
-
-!           write(lun, '(/2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr1 ', cnst_name_extd(m)(1:10), tmpmata(1:6,1), tmpmata(8:9,1)
-            write(lun, '(/2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr1 ', cnst_name_extd(m)(1:10), tmpmata(1:9,1)
-!           write(lun, '( 2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr2 ', cnst_name_extd(m)(1:10), tmpmata(1:6,2), tmpmata(8:9,2)
-            write(lun, '( 2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr2 ', cnst_name_extd(m)(1:10), tmpmata(1:9,2)
-            if ( .not. doconvproc_extd(l) ) cycle
-!           write(lun, '( 2a,1p,2(2x,e11.3),2x,4e11.3,2x,2e11.3)' ) &
-!              'qakr3 ', cnst_name_cw(m)(1:10), tmpmata(1:6,3), tmpmata(8:9,3)
-            write(lun, '( 2a,1p,2(2x,e11.3),2x,5e11.3,2x,2e11.3)' ) &
-               'qakr3 ', cnst_name_cw(m)(1:10), tmpmata(1:9,3)
-         end do ! m
-         write(lun, '(/3a,2i4,1p,e11.2)' ) 'qakr-', trim(convtype), &
-            ' - max(resid*dt/burden)', jtsub, itmpb, tmpb
-
-      end if ! (idiag_in(icol) > 0) then
-
-
       if (jtsub < ntsub) then
          ! update the q_i for the next interation of the jtsub loop
          do m = 2, ncnst
@@ -2728,7 +1888,6 @@ k_loop_main_cc: &
          end do ! m
       end if
 
-      end do ipass_calc_updraft_loop
 
       end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
 
@@ -2746,9 +1905,9 @@ end subroutine ma_convproc_tend
               dcondt_prevap_hist,                              & ! REASTER 08/05/2015
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
-              lun,     idiag_prevap,  lchnk,                   &
+              lun,     lchnk,                                  &
               doconvproc_extd,                                 &
-              species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
+              species_class      ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2803,12 +1962,10 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_prevap ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
    integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in)    :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -2827,111 +1984,16 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
 
 
-   if ( mam_prevap_resusp_optaa == 30 ) then
       call ma_precpevap30_convproc(                         &
            dcondt,  dcondt_wetdep, dcondt_prevap,           &
            dcondt_prevap_hist,                              &
            rprd,    evapc,         dp_i,                    &
            icol,    ktop,          pcnst_extd,              &
-           lun,     idiag_prevap,  lchnk,                   &
+           lun,     lchnk,                                  &
            doconvproc_extd,                                 &
-           species_class, mam_prevap_resusp_optaa           )
+           species_class        )
       return
-   else if ( mam_prevap_resusp_optaa /=   0 .and. &
-             mam_prevap_resusp_optaa /=  10 .and. &
-             mam_prevap_resusp_optaa /=  11 .and. &
-             mam_prevap_resusp_optaa /=  20 .and. &
-             mam_prevap_resusp_optaa /=  21 ) then
-      write(msg,'(a,2(1x,i10))') &
-         'ma_precpevap_convproc - bad mam_prevap_resusp_optaa =', &
-         mam_prevap_resusp_optaa
-      call endrun( msg )
-   end if
 
-!
-! *** note use of non-standard units
-!
-! precip
-!    tmpdp = dp_i is mb
-!    rprd and evapc are kgwtr/kgair/s
-!    pr_flux = tmpdp*rprd is mb*kgwtr/kgair/s
-! this works ok because the only important thing is fdel_pr_flux_evap which is dimensionless
-!
-! precip-borne aerosol
-!    dcondt_wetdep is kgaero/kgair/s
-!    wd_flux = tmpdp*dcondt_wetdep is mb*kgaero/kgair/s
-!    dcondt_prevap = del_wd_flux_evap/tmpdp is kgaero/kgair/s
-! so this works ok too
-!
-   pr_flux = 0.0_r8
-   wd_flux(:) = 0.0_r8
-
-   if (idiag_prevap > 0) then
-      write(lun,'(a,i9,i4,5x,a)') 'qakx - lchnk,i', lchnk, icol, &
-         '// k; pr_flux old,new; delprod,devap; mode-1 numb wetdep,prevap; mass ...'
-   end if
-
-   do k = ktop, pver
-      tmpdp = dp_i(k)
-
-      pr_flux_old = pr_flux
-      del_pr_flux_prod = tmpdp*max(0.0_r8, rprd(icol,k))
-      pr_flux = pr_flux_old + del_pr_flux_prod
-
-      del_pr_flux_evap = min( pr_flux, tmpdp*max(0.0_r8, evapc(icol,k)) )
-      fdel_pr_flux_evap = del_pr_flux_evap / max(pr_flux, 1.0e-35_r8)
-
-      if ( mam_prevap_resusp_optaa <= 0 ) then
-         fdel_pr_flux_evap = 0.0_r8  ! REASTER 08/05/2015 - turn off resuspension from precip evap
-      end if
-
-      do m = 2, pcnst_extd
-         if ( doconvproc_extd(m) ) then
-
-            ! dcondt_wetdep(m,k) is negative (or zero), so use -dcondt_wetdep(m,k) here
-            wd_flux(m) = wd_flux(m) + tmpdp*max(0.0_r8, -dcondt_wetdep(m,k)) 
-            del_wd_flux_evap = wd_flux(m)*fdel_pr_flux_evap
-
-! REASTER 08/05/2015 BEGIN
-!           wd_flux(m) = max( 0.0_r8, wd_flux(m)-del_wd_flux_evap )
-
-!           dcondt_prevap(m,k) = del_wd_flux_evap/tmpdp
-!           dcondt(m,k) = dcondt(m,k) + dcondt_prevap(m,k)
-
-            ! do this for mam_prevap_resusp_optaa = 0,10,11,20,21
-            ! (also for trace gases when mam_prevap_resusp_opt = ???,
-            !  but currently modal_aero_convproc does not do trace gases)
-            dcondt_prevap_hist(m,k) = del_wd_flux_evap/tmpdp
-            dcondt_prevap(m,k) = del_wd_flux_evap/tmpdp
-            dcondt(m,k) = dcondt(m,k) + dcondt_prevap(m,k)
-
-            wd_flux(m) = max( 0.0_r8, wd_flux(m)-del_wd_flux_evap )
-
-         end if ! ( doconvproc_extd(m) ) then
-      end do ! m = 2, pcnst_extd
-! REASTER 08/05/2015 END
-
-      pr_flux = max( 0.0_r8, pr_flux-del_pr_flux_evap )
-
-      if (idiag_prevap > 0) then
-         n = 1
-         l = numptrcw_amode(n) + pcnst
-         tmpa = dcondt_wetdep(l,k)
-         tmpb = dcondt_prevap(l,k)
-         tmpc = 0.0_r8
-         tmpd = 0.0_r8
-         do ll = 1, nspec_amode(n)
-            l = lmassptrcw_amode(ll,n) + pcnst
-            tmpc = tmpc + dcondt_wetdep(l,k)
-            tmpd = tmpd + dcondt_prevap(l,k)
-         end do
-         write(lun,'(a,i4,1p,4(2x,2e10.2))') 'qakx', k, &
-            pr_flux_old, pr_flux, del_pr_flux_prod, -del_pr_flux_evap, &
-            -tmpa, tmpb, -tmpc, tmpd
-      end if
-   end do ! k
-
-   return
    end subroutine ma_precpevap_convproc
 
 
@@ -2942,9 +2004,9 @@ end subroutine ma_convproc_tend
               dcondt_prevap_hist,                              & ! REASTER 08/05/2015
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
-              lun,     idiag_prevap,  lchnk,                   &
+              lun,     lchnk,                                  &
               doconvproc_extd,                                 &
-              species_class, mam_prevap_resusp_optaa           ) ! REASTER 08/05/2015
+              species_class           ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -3005,12 +2067,10 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_prevap ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
    integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
-   integer,  intent(in)    :: mam_prevap_resusp_optaa ! REASTER 08/05/2015
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -3062,10 +2122,6 @@ end subroutine ma_convproc_tend
    pr_flux_base = 0.0_r8
    wd_flux(:) = 0.0_r8
 
-   if (idiag_prevap > 0) then
-      write(lun,'(a,i9,i4,5x,a)') 'qakx - lchnk,i', lchnk, icol, &
-         '// k; pr_flux old,new; delprod,devap; mode-1 numb wetdep,prevap; mass ...'
-   end if
 
    do k = ktop, pver
       tmpdp = dp_i(k)
@@ -3165,314 +2221,10 @@ end subroutine ma_convproc_tend
 
       end do ! m = 2, pcnst_extd
 
-      if (idiag_prevap > 0) then
-         n = 1
-         l = numptrcw_amode(n) + pcnst
-         tmpa = dcondt_wetdep(l,k)
-         tmpb = dcondt_prevap(l,k)
-         tmpc = 0.0_r8
-         tmpd = 0.0_r8
-         do ll = 1, nspec_amode(n)
-            l = lmassptrcw_amode(ll,n) + pcnst
-            tmpc = tmpc + dcondt_wetdep(l,k)
-            tmpd = tmpd + dcondt_prevap(l,k)
-         end do
-         write(lun,'(a,i4,1p,4(2x,2e10.2))') 'qakx', k, &
-            pr_flux_old, pr_flux, del_pr_flux_prod, -del_pr_flux_evap, &
-            -tmpa, tmpb, -tmpc, tmpd
-      end if
-
    end do ! k
 
    return
    end subroutine ma_precpevap30_convproc
-
-
-
-!=========================================================================================
-   subroutine ma_activate_convproc(             &
-              conu,       dconudt,   conent,    &
-              f_ent,      dt_u,      wup,       &
-              tair,       rhoair,    fracice,   &
-              pcnst_extd, lun,       idiag_act, &
-              lchnk,      i,         k,         &
-              ipass_calc_updraft                )
-!-----------------------------------------------------------------------
-!
-! Purpose:
-! Calculate activation of aerosol species in convective updraft
-! for a single column and level
-!
-! Method:
-! conu(l)    = Updraft TMR (tracer mixing ratio) at k/k-1 interface
-! conent(l)  = TMR of air that is entrained into the updraft from level k
-! f_ent      = Fraction of the "before-detrainment" updraft massflux at 
-!              k/k-1 interface" resulting from entrainment of level k air
-!              (where k is the current level in subr ma_convproc_tend)
-!
-! On entry to this routine, the conu(l) represents the updraft TMR
-! after entrainment, but before chemistry/physics and detrainment, 
-! and is equal to
-!    conu(l) = f_ent*conent(l) + (1.0-f_ent)*conu_below(l)
-! where 
-!    conu_below(l) = updraft TMR at the k+1/k interface, and
-!    f_ent   = (eudp/mu_p_eudp) is the fraction of the updraft massflux 
-!              from level k entrainment
-!
-! This routine applies aerosol activation to the entrained tracer,
-! then adjusts the conu so that on exit,
-!   conu(la) = conu_incoming(la) - f_ent*conent(la)*f_act(la)
-!   conu(lc) = conu_incoming(lc) + f_ent*conent(la)*f_act(la)
-! where 
-!   la, lc   = indices for an unactivated/activated aerosol component pair
-!   f_act    = fraction of conent(la) that is activated.  The f_act are
-!              calculated with the Razzak-Ghan activation parameterization.
-!              The f_act differ for each mode, and for number/surface/mass.
-!
-! Note:  At the lowest layer with cloud water, subr convproc calls this 
-! routine with conent==conu and f_ent==1.0, with the result that 
-! activation is applied to the entire updraft tracer flux
-!
-! *** The updraft velocity used for activation calculations is rather 
-!     uncertain and needs more work.  However, an updraft of 1-3 m/s 
-!     will activate essentially all of accumulation and coarse mode particles.
-!
-! Author: R. Easter
-!
-!-----------------------------------------------------------------------
-
-   use ppgrid, only: pver
-   use constituents, only: pcnst, cnst_name
-   use ndrop, only: activate_modal
-
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-      lspectype_amode, ntot_amode, &
-      nspec_amode, ntot_amode, numptr_amode, numptrcw_amode, &
-      sigmag_amode, specdens_amode, spechygro, &
-      voltonumblo_amode, voltonumbhi_amode
-
-   implicit none
-
-!-----------------------------------------------------------------------
-! arguments  (note:  TMR = tracer mixing ratio)
-   integer, intent(in)     :: pcnst_extd
-   ! conu = tracer mixing ratios in updraft at top of this (current) level
-   !        The conu are changed by activation
-   real(r8), intent(inout) :: conu(pcnst_extd)    
-   ! conent = TMRs in the entrained air at this level
-   real(r8), intent(in)    :: conent(pcnst_extd)
-   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation
-
-   real(r8), intent(in)    :: f_ent  ! fraction of updraft massflux that was
-                                     ! entrained across this layer == eudp/mu_p_eudp
-   real(r8), intent(in)    :: dt_u   ! lagrangian transport time (s) in the 
-                                     ! updraft at current level
-   real(r8), intent(in)    :: wup    ! mean updraft vertical velocity (m/s)
-                                     ! at current level updraft
-
-   real(r8), intent(in)    :: tair   ! Temperature in Kelvin
-   real(r8), intent(in)    :: rhoair ! air density (kg/m3)
-
-   real(r8), intent(in)    :: fracice ! Fraction of ice within the cloud
-                                     ! used as in-cloud wet removal rate
-   integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_act ! flag for diagnostic output
-   integer,  intent(in)    :: lchnk  ! chunk index
-   integer,  intent(in)    :: i      ! column index
-   integer,  intent(in)    :: k      ! level index
-   integer,  intent(in)    :: ipass_calc_updraft
-
-!-----------------------------------------------------------------------
-! local variables
-   integer  :: l, ll, la, lc, n
-
-   real(r8) :: delact                ! working variable
-   real(r8) :: dt_u_inv              ! 1.0/dt_u
-   real(r8) :: fluxm(ntot_amode)      ! to understand this, see subr activate_modal
-   real(r8) :: fluxn(ntot_amode)      ! to understand this, see subr activate_modal
-   real(r8) :: flux_fullact           ! to understand this, see subr activate_modal
-   real(r8) :: fm(ntot_amode)         ! mass fraction of aerosols activated
-   real(r8) :: fn(ntot_amode)         ! number fraction of aerosols activated
-   real(r8) :: hygro(ntot_amode)      ! current hygroscopicity for int+act
-   real(r8) :: naerosol(ntot_amode)   ! interstitial+activated number conc (#/m3)
-   real(r8) :: sigw                  ! standard deviation of updraft velocity (cm/s)
-   real(r8) :: tmpa, tmpb, tmpc      ! working variable
-   real(r8) :: tmp_fact              ! working variable
-   real(r8) :: vaerosol(ntot_amode)   ! int+act volume (m3/m3)
-   real(r8) :: wbar                  ! mean updraft velocity (cm/s)
-   real(r8) :: wdiab                 ! diabatic vertical velocity (cm/s)
-   real(r8) :: wminf, wmaxf          ! limits for integration over updraft spectrum (cm/s)
-
-
-!-----------------------------------------------------------------------
-
-
-! when ipass_calc_updraft == 2, apply the activation tendencies
-!    from pass 1, but multiplied by factor_reduce_actfrac
-! (can only have ipass_calc_updraft == 2 when method_reduce_actfrac = 2)
-   if (ipass_calc_updraft == 2) then
-
-   dt_u_inv = 1.0_r8/dt_u
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-         end if
-
-         delact = dconudt(lc)*dt_u * factor_reduce_actfrac
-         delact = min( delact, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
-   return
-
-   end if ! (ipass_calc_updraft == 2)
-
-
-! check f_ent > 0
-   if (f_ent <= 0.0) return
-
-
-   do n = 1, ntot_amode
-! compute a (or a+cw) volume and hygroscopicity
-      tmpa = 0.0_r8
-      tmpb = 0.0_r8
-      do ll = 1, nspec_amode(n)
-         tmpc = max( conent(lmassptr_amode(ll,n)), 0.0_r8 )
-         if ( use_cwaer_for_activate_maxsat ) &
-         tmpc = tmpc + max( conent(lmassptrcw_amode(ll,n)+pcnst), 0.0_r8 )
-         tmpc = tmpc / specdens_amode(lspectype_amode(ll,n))
-         tmpa = tmpa + tmpc
-         tmpb = tmpb + tmpc * spechygro(lspectype_amode(ll,n))
-      end do
-      vaerosol(n) = tmpa * rhoair
-      if (tmpa < 1.0e-35_r8) then
-         hygro(n) = 0.2_r8
-      else
-         hygro(n) = tmpb/tmpa
-      end if
-
-! load a (or a+cw) number and bound it
-      tmpa = max( conent(numptr_amode(n)), 0.0_r8 )
-      if ( use_cwaer_for_activate_maxsat ) &
-      tmpa = tmpa + max( conent(numptrcw_amode(n)+pcnst), 0.0_r8 )
-      naerosol(n) = tmpa * rhoair
-      naerosol(n) = max( naerosol(n),   &
-                         vaerosol(n)*voltonumbhi_amode(n) )
-      naerosol(n) = min( naerosol(n),   &
-                         vaerosol(n)*voltonumblo_amode(n) )
-
-! diagnostic output for testing/development
-!      if (lun > 0) then
-!         if (n == 1) then
-!            write(lun,9500)
-!            write(lun,9510) (cnst_name(l), conu(l), l=1,pcnst_extd)
-!            write(lun,9520) tair, rhoaircgs, airconcgs
-!         end if
-!         write(lun,9530) n, ntype(n), vaerosol
-!         write(lun,9540) naerosol(n), tmp*airconcgs, &
-!                         voltonumbhi_amode(n), voltonumblo_amode(n)
-!         write(lun,9550) (maerosol(l,n), l=1,ntype(n))
-!9500     format( / 'activate_conv output -- conu values' )
-!9510     format( 3( a, 1pe11.3, 4x ) )
-!9520     format( 'ta, rhoa, acon     ', 3(1pe11.3) )
-!9530     format( 'n, ntype, sg, vol  ', i6, i5, 2(1pe11.3) )
-!9540     format( 'num, num0, v2nhi&lo', 4(1pe11.3) )
-!9550     format( 'masses             ', 6(1pe11.3) )
-!      end if
-
-   end do
-
-
-! call Razzak-Ghan activation routine with single updraft
-   wbar = max( wup, 0.5_r8 )  ! force wbar >= 0.5 m/s for now
-   sigw = 0.0
-   wdiab = 0.0
-   wminf = wbar
-   wmaxf = wbar
-
-!  -ubroutine activate_modal(                            &
-!        wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
-!        na, pmode, nmode, volume, sigman, hygro,        &
-!        fn, fm, fluxn, fluxm, flux_fullact              )
-!     real(r8) wbar          ! grid cell mean vertical velocity (m/s)
-!     real(r8) sigw          ! subgrid standard deviation of vertical vel (m/s)
-!     real(r8) wdiab         ! diabatic vertical velocity (0 if adiabatic)
-!     real(r8) wminf         ! minimum updraft velocity for integration (m/s)
-!     real(r8) wmaxf         ! maximum updraft velocity for integration (m/s)
-!     real(r8) tair          ! air temperature (K)
-!     real(r8) rhoair        ! air density (kg/m3)
-!     real(r8) na(pmode)     ! aerosol number concentration (/m3)
-!     integer pmode          ! dimension of modes
-!     integer nmode          ! number of aerosol modes
-!     real(r8) volume(pmode) ! aerosol volume concentration (m3/m3)
-!     real(r8) sigman(pmode) ! geometric standard deviation of aerosol size distribution
-!     real(r8) hygro(pmode)  ! hygroscopicity of aerosol mode
-
-   call activate_modal(                                                    &
-         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
-         naerosol, ntot_amode, vaerosol, hygro,                            &
-         fn, fm, fluxn, fluxm, flux_fullact                                )
-   
-
-
-! diagnostic output for testing/development
-   if (idiag_act > 0) then
-      n = min( ntot_amode, 3 )
-      write(lun, '(a,i3,2f6.3, 1p,2(2x,3e10.2), 0p,3(2x,3f6.3) )' ) &
-         'qaku k,w,qn,qm,hy,fn,fm', k, wup, wbar, &
-         naerosol(1:n)/rhoair, vaerosol(1:n)*1.8e3/rhoair, &
-         hygro(1:n), fn(1:n), fm(1:n)
-         ! convert naer, vaer to number and (approx) mass TMRs
-   end if
-!   if (lun > 0) then
-!      write(lun,9560) (fn(n), n=1,ntot_amode)
-!      write(lun,9570) (fm(n), n=1,ntot_amode)
-!9560  format( 'fnact values       ', 6(1pe11.3) )
-!9570  format( 'fmact values       ', 6(1pe11.3) )
-!   end if
-
-      
-! apply the activation fractions to the updraft aerosol mixing ratios
-   dt_u_inv = 1.0_r8/dt_u
-
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-            tmp_fact = fn(n)
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-            tmp_fact = fm(n)
-         end if
-
-         if ( (method_reduce_actfrac == 1)      .and. &
-              (factor_reduce_actfrac >= 0.0_r8) .and. &
-              (factor_reduce_actfrac <  1.0_r8) )     &
-              tmp_fact = tmp_fact * factor_reduce_actfrac
-
-         delact = min( conent(la)*tmp_fact*f_ent, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
-
-   return
-   end subroutine ma_activate_convproc
-
 
 
 !=========================================================================================
@@ -3480,9 +2232,9 @@ end subroutine ma_convproc_tend
               conu,       dconudt,              &
               f_ent,      dt_u,      wup,       &
               tair,       rhoair,    fracice,   &
-              pcnst_extd, lun,       idiag_act, &
+              pcnst_extd, lun,                  &
               lchnk,      i,         k,         &
-              kactfirst,  ipass_calc_updraft    )
+              kactfirst    )
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -3554,12 +2306,10 @@ end subroutine ma_convproc_tend
    real(r8), intent(in)    :: fracice ! Fraction of ice within the cloud
                                      ! used as in-cloud wet removal rate
    integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: idiag_act ! flag for diagnostic output
    integer,  intent(in)    :: lchnk  ! chunk index
    integer,  intent(in)    :: i      ! column index
    integer,  intent(in)    :: k      ! level index
    integer,  intent(in)    :: kactfirst ! k at cloud base
-   integer,  intent(in)    :: ipass_calc_updraft
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -3586,35 +2336,6 @@ end subroutine ma_convproc_tend
 
 !-----------------------------------------------------------------------
 
-
-! when ipass_calc_updraft == 2, apply the activation tendencies
-!    from pass 1, but multiplied by factor_reduce_actfrac
-! (can only have ipass_calc_updraft == 2 when method_reduce_actfrac = 2)
-   if (ipass_calc_updraft == 2) then
-
-   dt_u_inv = 1.0_r8/dt_u
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-         end if
-
-         delact = dconudt(lc)*dt_u * factor_reduce_actfrac
-         delact = min( delact, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
-   return
-
-   end if ! (ipass_calc_updraft == 2)
 
 
 ! check f_ent > 0
@@ -3650,25 +2371,6 @@ end subroutine ma_convproc_tend
       naerosol(n) = min( naerosol(n),   &
                          vaerosol(n)*voltonumblo_amode(n) )
 
-! diagnostic output for testing/development
-!      if (lun > 0) then
-!         if (n == 1) then
-!            write(lun,9500)
-!            write(lun,9510) (cnst_name(l), conu(l), l=1,pcnst_extd)
-!            write(lun,9520) tair, rhoaircgs, airconcgs
-!         end if
-!         write(lun,9530) n, ntype(n), vaerosol
-!         write(lun,9540) naerosol(n), tmp*airconcgs, &
-!                         voltonumbhi_amode(n), voltonumblo_amode(n)
-!         write(lun,9550) (maerosol(l,n), l=1,ntype(n))
-!9500     format( / 'activate_conv output -- conu values' )
-!9510     format( 3( a, 1pe11.3, 4x ) )
-!9520     format( 'ta, rhoa, acon     ', 3(1pe11.3) )
-!9530     format( 'n, ntype, sg, vol  ', i6, i5, 2(1pe11.3) )
-!9540     format( 'num, num0, v2nhi&lo', 4(1pe11.3) )
-!9550     format( 'masses             ', 6(1pe11.3) )
-!      end if
-
    end do
 
 
@@ -3679,24 +2381,6 @@ end subroutine ma_convproc_tend
    wminf = wbar
    wmaxf = wbar
 
-!  -ubroutine activate_modal(                                &
-!        wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,      &
-!        na, pmode, nmode, volume, sigman, hygro,            &
-!        fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed )
-!     real(r8) wbar          ! grid cell mean vertical velocity (m/s)
-!     real(r8) sigw          ! subgrid standard deviation of vertical vel (m/s)
-!     real(r8) wdiab         ! diabatic vertical velocity (0 if adiabatic)
-!     real(r8) wminf         ! minimum updraft velocity for integration (m/s)
-!     real(r8) wmaxf         ! maximum updraft velocity for integration (m/s)
-!     real(r8) tair          ! air temperature (K)
-!     real(r8) rhoair        ! air density (kg/m3)
-!     real(r8) na(pmode)     ! aerosol number concentration (/m3)
-!     integer pmode          ! dimension of modes
-!     integer nmode          ! number of aerosol modes
-!     real(r8) volume(pmode) ! aerosol volume concentration (m3/m3)
-!     real(r8) sigman(pmode) ! geometric standard deviation of aerosol size distribution
-!     real(r8) hygro(pmode)  ! hygroscopicity of aerosol mode
-!     real(r8), optional :: smax_prescribed  ! prescribed max. supersaturation for secondary activation
    if (k == kactfirst) then
 ! at cloud base - do primary activation
       call activate_modal(                                                 &
@@ -3716,22 +2400,6 @@ end subroutine ma_convproc_tend
    end if
 
 
-! diagnostic output for testing/development
-   if (idiag_act > 0) then
-      n = min( ntot_amode, 3 )
-      write(lun, '(a,i3,2f6.3, 1p,2(2x,3e10.2), 0p,3(2x,3f6.3) )' ) &
-         'qaku k,w,qn,qm,hy,fn,fm', k, wup, wbar, &
-         naerosol(1:n)/rhoair, vaerosol(1:n)*1.8e3/rhoair, &
-         hygro(1:n), fn(1:n), fm(1:n)
-         ! convert naer, vaer to number and (approx) mass TMRs
-   end if
-!   if (lun > 0) then
-!      write(lun,9560) (fn(n), n=1,ntot_amode)
-!      write(lun,9570) (fm(n), n=1,ntot_amode)
-!9560  format( 'fnact values       ', 6(1pe11.3) )
-!9570  format( 'fmact values       ', 6(1pe11.3) )
-!   end if
-
       
 ! apply the activation fractions to the updraft aerosol mixing ratios
    dt_u_inv = 1.0_r8/dt_u
@@ -3748,10 +2416,6 @@ end subroutine ma_convproc_tend
             tmp_fact = fm(n)
          end if
 
-         if ( (method_reduce_actfrac == 1)      .and. &
-              (factor_reduce_actfrac >= 0.0_r8) .and. &
-              (factor_reduce_actfrac <  1.0_r8) )     &
-              tmp_fact = tmp_fact * factor_reduce_actfrac
 
          delact = min( conu(la)*tmp_fact, conu(la) )
          delact = max( delact, 0.0_r8 )
@@ -3852,18 +2516,6 @@ end subroutine ma_convproc_tend
             qdota = dcondt(la,k)
             qdotc = dcondt(lc,k)
             qdotac = qdota + qdotc
-
-! mirage2 approach
-!           qa = max( const(la,k), 0.0_r8 )
-!           qc = max( const(lc,k), 0.0_r8 )
-!           qac = qa + qc
-!           if (qac <= 0.0) then
-!              dcondt(la,k) = qdotac
-!              dcondt(lc,k) = 0.0
-!           else
-!              dcondt(la,k) = qdotac*(qa/qac)
-!              dcondt(lc,k) = qdotac*(qc/qac)
-!           end if
 
 ! cam5 approach
             dcondt(la,k) = qdotac

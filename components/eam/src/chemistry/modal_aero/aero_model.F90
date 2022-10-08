@@ -186,7 +186,7 @@ contains
     use cam_history,     only: addfld, horiz_only, add_default
     use phys_control,    only: phys_getopts
     use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
-    use modal_aero_data, only: cnst_name_cw, rain_evap_to_coarse_aero, mam_prevap_resusp_optaa
+    use modal_aero_data, only: cnst_name_cw
     use modal_aero_initialize_data, only: modal_aero_initialize
     use modal_aero_convproc, only: deepconv_wetdep_history
     use rad_constituents,           only: rad_cnst_get_info
@@ -255,41 +255,6 @@ contains
     endif ! ( iflagaa == 2 )
 
 
-    m = mam_prevap_resusp_optaa
-    if ( rain_evap_to_coarse_aero ) then
-       if ( mam_prevap_resusp_optaa /= 30 ) then
-          mam_prevap_resusp_optaa = 30
-          if ( masterproc ) write(iulog,'(2a,i4,a)') 'aero_model_init - ', &
-             'mam_prevap_resusp_optaa changed from ', m, ' to 30 because rain_evap_to_coarse_aero = .true.'
-       end if
-
-    else
-       if ( mam_prevap_resusp_optaa == 10 .and. resus_fix ) then
-          ! this case is mam_prevap_resusp_optaa = 20, so change the default value
-          mam_prevap_resusp_optaa = 20
-          if ( masterproc ) write(iulog,'(2a)') 'aero_model_init - ', &
-             'mam_prevap_resusp_optaa changed from 10 to 20 because resus_fix = .true.'
-       else if ( mam_prevap_resusp_optaa == 10 .and. convproc_do_aer ) then
-          ! when convproc_do_aer, the prevap_resusp tendencies are always written
-          !    to history, so change mam_prevap_resusp_optaa to 11
-          mam_prevap_resusp_optaa = 11
-          if ( masterproc ) write(iulog,'(2a)') 'aero_model_init - ', &
-             'mam_prevap_resusp_optaa changed from 10 to 11 because convproc_do_aer = .true.'
-       endif
-    endif
-
-! *** activate this to override mam_prevap_resusp_optaa value for testing ***
-!   mam_prevap_resusp_optaa = 20
-!   if ( masterproc ) write(iulog,'(2a)') 'aero_model_init - ', &
-!      'mam_prevap_resusp_optaa changed from ?? to 20 for special test run'
-
-    if ( masterproc ) then
-       write(iulog,'(2a,4l5,2i5)') 'aero_model_init - ', &
-          'convproc_do_aer & _gas, resus_fix, rain_evap_to_coarse, mam_prevap_resusp_optaa_v1/v2', &
-          convproc_do_aer, convproc_do_gas, resus_fix, &
-          rain_evap_to_coarse_aero, m, mam_prevap_resusp_optaa 
-    endif
-
     ! The unified convective transport/removal for aerosols does not 
     ! do gases yet, and convproc_do_gas is just a place holder.  For that reason, 
     !    (1) All of the "if ( convproc_do_aer .or. convproc_do_gas ) then" statements 
@@ -308,31 +273,8 @@ contains
        endif
     endif
 
-!  mam_prevap_resusp_optaa values
-!     0 = no resuspension
-!    10 = original mam method with resus_fix=.false.       (so4_a1 --> so4_a1, so4_c1 --> so4_c1) 
-!    20 = original mam method with resus_fix=.true.        (so4_a1 & so4_c1 --> so4_a1)
-!    30 = resuspend to coarse mode, full non-linear method (so4_a1 & so4_c1 --> so4_a3)
-!    11 = like 10 but output column resuspension tendencies (rcscavt & rsscavt) to history
-!    21 = like 20 but a with a few xxx = max( 0.0, xxx) added in werdepa_v2
-    m = 0
-    if ( mam_prevap_resusp_optaa ==  0 ) m = 1
-    if ( mam_prevap_resusp_optaa == 10 ) m = 1
-    if ( mam_prevap_resusp_optaa == 11 ) m = 1
-    if ( mam_prevap_resusp_optaa == 20 ) m = 1
-    if ( mam_prevap_resusp_optaa == 21 ) m = 1
-    if ( rain_evap_to_coarse_aero ) then
-       if ( mam_prevap_resusp_optaa == 30 ) m = 1
-    endif
-    if (m <= 0) then
-       write(errmes,'(2a,l5,i10)') 'aero_model_init - ', &
-          'illegal rain_evap_to_coarse_aero, bad mam_prevap_resusp_optaa = ', &
-          rain_evap_to_coarse_aero, mam_prevap_resusp_optaa
-       call endrun( errmes )
-    endif
-
-    history_aero_prevap_resusp = .false.
-    if ( mam_prevap_resusp_optaa /= 10 ) history_aero_prevap_resusp = .true.
+!   resuspend to coarse mode, full non-linear method (so4_a1 & so4_c1 --> so4_a3)
+    history_aero_prevap_resusp = .true.
     ! REASTER 08/04/2015 END
 
 
@@ -1278,7 +1220,7 @@ contains
        lmassptr_amode, lspectype_amode, &
        modeptr_coarse, &
        nspec_amode, ntot_amode, numptr_amode, &
-       mam_prevap_resusp_optaa, mmtoo_prevap_resusp, ntoo_prevap_resusp
+       mmtoo_prevap_resusp, ntoo_prevap_resusp
     use phys_control,    only: phys_getopts
 
     integer :: lspec, lspec2
@@ -1286,30 +1228,19 @@ contains
     integer :: n, ntoo, nch
     character(len=100) :: msg
 
-    if ( masterproc ) then
-       write(iulog,'(/a)') 'mam_prevap_resusp_init'
-       write(iulog,'(a,i10)') 'mam_prevap_resusp_optaa', mam_prevap_resusp_optaa
-    end if
 
 ! calculate pointers for resuspension
-! when mam_prevap_resusp_optaa = 30, mmtoo_prevap_resusp values are
+! mmtoo_prevap_resusp values are
 !    >0 for aerosol mass species with    coarse mode counterpart
 !    -1 for aerosol mass species WITHOUT coarse mode counterpart
 !    -2 for aerosol number species
 !     0 for other species
-! when mam_prevap_resusp_optaa = 0, 10, 11, 20, 21, mmtoo_prevap_resusp values are 0
 
     mmtoo_prevap_resusp(:) = 0
     ntoo_prevap_resusp(:) = 0
 
-    if ( mam_prevap_resusp_optaa == 30 ) then
 
-#if ( defined MODAL_AERO_3MODE ) || ( defined MODAL_AERO_4MODE ) || ( defined MODAL_AERO_4MODE_MOM )
        ntoo = modeptr_coarse
-#else
-       call endrun( 'modal_aero_wetscav_init: new resuspension not implemented for 7-mode or 9-mode MAM.')
-#endif
-
        do n = 1, ntot_amode   ! loop over aerosol modes that was wet-removed
 
           do lspec = 1, nspec_amode(n)   ! loop over chem constituents that was wet-removed
@@ -1348,7 +1279,6 @@ contains
           ntoo_prevap_resusp(mm)  = ntoo
        end do ! n
 
-    end if
 
     if ( masterproc ) then
        do mm = 1, pcnst
@@ -1434,7 +1364,7 @@ contains
     integer :: m, mtmp ! mode index
     integer :: mm, mmai, mmtoo ! tracer (q-array) index
     integer :: ncol ! number of atmospheric columns
-    integer :: mam_prevap_resusp_optaa10, mam_prevap_resusp_optcc
+    integer :: mam_prevap_resusp_optcc
 
     real(r8) :: iscavt(pcols, pver)
     real(r8) :: icscavt(pcols, pver)
@@ -1616,12 +1546,10 @@ contains
 
     scavcoefnv(:,:,0) = 0.0_r8 ! below-cloud scavcoef = 0.0 for cloud-borne species
 
-    if ( mam_prevap_resusp_optaa >= 20 ) then
        ! resuspension goes to a different phase or mode
-       rtscavt_sv(:,:,:) = 0.0_r8
-       rcscavt_cn_sv(:,:) = 0.0_r8
-       rsscavt_cn_sv(:,:) = 0.0_r8
-    endif
+    rtscavt_sv(:,:,:) = 0.0_r8
+    rcscavt_cn_sv(:,:) = 0.0_r8
+    rsscavt_cn_sv(:,:) = 0.0_r8
 
 mmode_loop_aa: &
 ! REASTER 08/11/2015 BEGIN
@@ -1787,7 +1715,6 @@ lspec_loop_aa: &
              if (mm <= 0) cycle
 
 
-             mam_prevap_resusp_optaa10 = mam_prevap_resusp_optaa/10
 
 ! mam_prevap_resusp_optcc values control the prevap_resusp calculations in wetdepa_v2:
 !     0 = no resuspension
@@ -1803,19 +1730,6 @@ lspec_loop_aa: &
 !
              mam_prevap_resusp_optcc = 0
 
-             if ( mam_prevap_resusp_optaa == 0 ) then
-                mam_prevap_resusp_optcc = 0
-             else if ( mam_prevap_resusp_optaa == 10 ) then
-                mam_prevap_resusp_optcc = 1
-             else if ( mam_prevap_resusp_optaa == 11) then
-                mam_prevap_resusp_optcc = 2
-
-             else if ( mam_prevap_resusp_optaa == 20 ) then
-                mam_prevap_resusp_optcc = 2
-             else if ( mam_prevap_resusp_optaa == 21 ) then
-                mam_prevap_resusp_optcc = 3
-
-             else if ( mam_prevap_resusp_optaa == 30 ) then
                 if ( jnummaswtr == jaeromass ) then
                    mam_prevap_resusp_optcc = 130
                 else if ( jnummaswtr == jaeronumb .and. &
@@ -1823,20 +1737,6 @@ lspec_loop_aa: &
                           m == modeptr_coarse ) then
                    mam_prevap_resusp_optcc = 230
                 endif
-
-             endif
-
-             if ( mam_prevap_resusp_optcc /=   0 .and. &
-                  mam_prevap_resusp_optcc /=   1 .and. &
-                  mam_prevap_resusp_optcc /=   2 .and. &
-                  mam_prevap_resusp_optcc /=   3 .and. &
-                  mam_prevap_resusp_optcc /= 130 .and. &
-                  mam_prevap_resusp_optcc /= 230 ) then
-                write(msg,'(a,2(1x,i10))') &
-                   'aero_model_wetdep - bad mam_prevap_resusp_optaa & cc =', &
-                   mam_prevap_resusp_optaa, mam_prevap_resusp_optcc
-                call endrun( msg )
-             endif
 
 
              ! set f_act_conv for interstitial (lphase=1) coarse mode species
@@ -1890,7 +1790,6 @@ lphase_jnmw_conditional: &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt )
 
 ! REASTER 08/12/2015 BEGIN
-                if ( mam_prevap_resusp_optaa10 == 3 ) then
                    ! resuspension goes to coarse mode
                    ! first deduct the current resuspension from the dqdt_tmp of the current species
                    dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
@@ -1903,15 +1802,8 @@ lphase_jnmw_conditional: &
                    !    from so4_a1/2/3 and so4c1/2/3
                    dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
 
-                endif
 ! REASTER 08/12/2015 END
 
-!               if (convproc_do_aer) then
-                if ( mam_prevap_resusp_optaa10 == 2 ) then
-                   ! add resuspension of cloudborne species to dqdt of interstitial species
-!                  dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,lspec)  ! RCE 2012/01/12
-                   dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)  ! REASTER 08/12/2015
-                endif
 
                 do_hygro_sum_del = .false.
 !               if ( lspec > 0 ) do_hygro_sum_del = .true. 
@@ -2141,7 +2033,6 @@ do_lphase2_conditional: &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
 
 ! REASTER 08/12/2015 BEGIN
-                if ( mam_prevap_resusp_optaa10 == 3 ) then
                    ! resuspension goes to coarse mode
                    ! first deduct the current resuspension from the dqdt_tmp of the current species
                    dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
@@ -2150,27 +2041,8 @@ do_lphase2_conditional: &
                    if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
 
-                endif
 ! REASTER 08/12/2015 END
 
-!                  if (convproc_do_aer) then
-                   if ( mam_prevap_resusp_optaa10 == 2 ) then
-                      ! the original wetdepa_v2 adds the resuspension of cloudborne aerosol species 
-                      !    to the dqdt of cloudborne species (as a source)
-                      ! when resus_fix=.true. and/or mam_prevap_resusp_optaa=20,21 ) then
-                      !    > save resuspension of cloudborne species to rtscavt_sv
-                      !    > deduct it from the tendency (dqdt_tmp) of the cloudborne   species
-                      !    > add    it to   the tendency (dqdt_tmp) of the interstitial species (which is done above)
-!                     rtscavt_sv(1:ncol,:,lspec) = rcscavt(1:ncol,:) + rsscavt(1:ncol,:)  ! RCE 2012/01/12
-                      if ( 0 < mmai .and. mmai <= pcnst ) then
-                         rtscavt_sv(1:ncol,:,mmai) = rcscavt(1:ncol,:) + rsscavt(1:ncol,:)  ! REASTER 08/11/2015
-                      else
-                         write(msg,'(a,3(1x,i5))') 'aero_model_wetdep - bad mmai - m, mm, mmai =', m, mm, mmai
-                         call endrun( msg )
-                      endif
-!                     dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - rtscavt_sv(1:ncol,:,lspec)  ! RCE 2012/01/12                     
-                      dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - rtscavt_sv(1:ncol,:,mmai)  ! REASTER 08/11/2015
-                   endif
 
                    
                    fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
@@ -2262,7 +2134,7 @@ do_lphase2_conditional: &
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                           &
             nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr, aerdepwetis,        &
             mu, md, du, eu, ed, dp, dsubcld, jt, maxg, ideep, lengath,  &
-            species_class, mam_prevap_resusp_optaa,                     &
+            species_class,                                              &
             history_aero_prevap_resusp                                  )
        call t_stopf('ma_convproc')       
     endif
