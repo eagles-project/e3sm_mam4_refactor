@@ -19,6 +19,9 @@ main () {
     #check if xmlquery is present
     if_file_not_present_then_exit xmlquery " Please cd into the case directory"
 
+    #source the enviroment to build E3SM
+    source .env_mach_specific.sh
+
     #get the build directory path
     bld_dir=`./xmlquery -value EXEROOT`
     case_dir=`pwd`
@@ -40,7 +43,7 @@ main () {
         newline && time_elapsed_min
         echo "Model Failed to compile with status:$status, exiting..."
         newline
-        exit -1
+        exit 1
     fi
     newline && time_elapsed_min
 
@@ -64,7 +67,7 @@ main () {
         echo "This test failed in more than one way,num_fails:$num_fails, exiting..."
         newline
         cat TestStatus
-        exit -1
+        exit 1
     fi
     #Replace Build phase fail with a PASS
     sed -i 's/FAIL/PASS/g' TestStatus
@@ -91,7 +94,7 @@ main () {
 if_file_not_present_then_exit () {
     if [ ! -f $1 ]; then
         echo "$1 is not found.$2"
-        exit -1
+        exit 1
     fi
 }
 
