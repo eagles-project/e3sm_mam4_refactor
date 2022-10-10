@@ -800,19 +800,6 @@ subroutine nucleate_ice_cam_calc( &
    call outfld('NIDEP', nidep, pcols, lchnk)
    call outfld('NIMEY', nimey, pcols, lchnk)
 
-   if (use_preexisting_ice) then
-      call outfld( 'fhom' , fhom, pcols, lchnk)
-      call outfld( 'WICE' , wice, pcols, lchnk)
-      call outfld( 'WEFF' , weff, pcols, lchnk)
-      call outfld('INnso4  ',INnso4 , pcols,lchnk)
-      call outfld('INnbc   ',INnbc  , pcols,lchnk)
-      call outfld('INndust ',INndust, pcols,lchnk)
-      call outfld('INhet   ',INhet  , pcols,lchnk)
-      call outfld('INhom   ',INhom  , pcols,lchnk)
-      call outfld('INFrehom',INFrehom,pcols,lchnk)
-      call outfld('INFreIN ',INFreIN, pcols,lchnk)
-   end if
-
 end subroutine nucleate_ice_cam_calc
 
 !================================================================================================
