@@ -53,12 +53,7 @@ real(r8) :: mincld
 real(r8) :: subgrid
 
 real(r8), parameter :: Shet   = 1.3_r8     ! het freezing threshold
-real(r8), parameter :: rhoice = 0.5e3_r8   ! kg/m3, Wpice is not sensitive to rhoice
-real(r8), parameter :: minweff= 0.001_r8   ! m/s
-real(r8), parameter :: gamma1=1.0_r8 
-real(r8), parameter :: gamma2=1.0_r8 
-real(r8), parameter :: gamma3=2.0_r8 
-real(r8), parameter :: gamma4=6.0_r8 
+real(r8), parameter :: rhoice = 0.5e3_r8   ! kg/m3, Wpice is not sensitive to rhoice 
 
 real(r8) :: ci
 
@@ -99,11 +94,9 @@ subroutine nucleati(  &
    wbar, tair, pmid, relhum, cldn,      &
    qc, qi, ni_in, rhoair,               &
    so4_num, dst_num, soot_num,          &
-   dst1_sfc_to_num, dst3_sfc_to_num,    &
    nuci, onihf, oniimm, onidep, onimey, &
-   wpice, weff, fhom,                   &
    dst1_num,dst2_num,dst3_num,dst4_num, &
-   organic_num, clim_modal_aero )
+   clim_modal_aero )
 
    !---------------------------------------------------------------
    ! Purpose:
@@ -134,9 +127,6 @@ subroutine nucleati(  &
    real(r8), intent(in) :: dst2_num     ! dust aerosol number (#/cm^3)
    real(r8), intent(in) :: dst3_num     ! dust aerosol number (#/cm^3)
    real(r8), intent(in) :: dst4_num     ! dust aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst1_sfc_to_num
-   real(r8), intent(in) :: dst3_sfc_to_num
-   real(r8), intent(in) :: organic_num  !organic aerosol number (primary carbon) (#/cm^3)
    logical,  intent(in) :: clim_modal_aero !whether MAM is used or not
 
    ! Output Arguments
@@ -145,9 +135,6 @@ subroutine nucleati(  &
    real(r8), intent(out) :: oniimm     ! nucleated number from immersion freezing
    real(r8), intent(out) :: onidep     ! nucleated number from deposition nucleation
    real(r8), intent(out) :: onimey     ! nucleated number from deposition nucleation  (meyers: mixed phase)
-   real(r8), intent(out) :: wpice      ! diagnosed Vertical velocity Reduction caused by preexisting ice (m/s), at Shom
-   real(r8), intent(out) :: weff       ! effective Vertical velocity for ice nucleation (m/s); weff=wbar-wpice
-   real(r8), intent(out) :: fhom       ! how much fraction of cloud can reach Shom
 
    ! Local workspace
    real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4
@@ -158,25 +145,11 @@ subroutine nucleati(  &
    real(r8) :: tc, A, B, regm            ! work variable
    real(r8) :: esl, esi, deles           ! work variable
 
-   !(09/29/2014)DeMott for mixed-phase cloud ice nucleation 
-   real(r8)  :: na500, na500_1                            ! aerosol number with D>500 nm (#/cm^3)
-   real(r8)  :: na500stp                                  ! aerosol number with D>500 nm (#/cm^3) at STP
-   real(r8)  :: nimeystp                                  ! nucleated number from ice nucleation (meyers) at STP
-   real(r8)  :: ad, bd   
+   
+   real(r8)  :: nimeystp                                  ! nucleated number from ice nucleation (meyers) at STP  
    real(r8)  :: wbar1, wbar2
 
-   ! Niemand et al. for mixed-phase cloud immersion ice nucleation (surface area based, dust)
-   real(r8)  :: an
-   real(r8)  :: ns_dust_imm    ! dust active site surface densities from AIDA experiments (m-2)
 
-   ! used in SUBROUTINE Vpreice
-   real(r8) :: Ni_preice        ! cloud ice number conc (1/m3)   
-   real(r8) :: lami,Ri_preice   ! mean cloud ice radius (m)
-   real(r8) :: Shom             ! initial ice saturation ratio; if <1, use hom threshold Si
-   real(r8) :: detaT,RHimean    ! temperature standard deviation, mean cloudy RHi
-   real(r8) :: wpicehet   ! diagnosed Vertical velocity Reduction caused by preexisting ice (m/s), at shet
-
-   real(r8) :: weffhet    ! effective Vertical velocity for ice nucleation (m/s)  weff=wbar-wpicehet 
    !-------------------------------------------------------------------------------
 
    ! temp variables that depend on use_preexisting_ice
@@ -195,14 +168,7 @@ subroutine nucleati(  &
 
    if(so4_num >= 1.0e-10_r8 .and. (soot_num+dst3_num) >= 1.0e-10_r8 .and. cldn > 0._r8) then
 
-#ifdef USE_XLIU_MOD
-!++ Mod from Xiaohong is the following two line conditional.
-!   It changes answers so needs climate validation.
-      if ((relhum*svp_water(tair)/svp_ice(tair)*subgrid).ge.1.2_r8) then
-         if ( ((tc.le.0.0_r8).and.(tc.ge.-37.0_r8).and.(qc.lt.1.e-12_r8)).or.(tc.le.-37.0_r8)) then
-#else
       if((tc.le.-35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid).ge.1.2_r8)) then ! use higher RHi threshold
-#endif
 
             A = -1.4938_r8 * log(soot_num+dst3_num) + 12.884_r8
             B = -10.41_r8  * log(soot_num+dst3_num) - 67.69_r8
@@ -263,28 +229,14 @@ subroutine nucleati(  &
 
          end if
       end if
-#ifdef USE_XLIU_MOD
-   end if
-#endif
+
 
    ! deposition/condensation nucleation in mixed clouds (-37<T<0C) (Meyers, 1992)
    if(tc.lt.0._r8 .and. tc.gt.-37._r8 .and. qc.gt.1.e-12_r8) then
-      if (use_dem_nucleate) then          ! use DeMott et al.         
-         !++iceMP
-         nimeystp = 1.e-3_r8 * 3.0_r8 * (na500stp**ad) * exp(bd)               ! cm^-3 
-         nimey=nimeystp*273.15_r8*pmid/(101325_r8*tair)
-      else if (use_nie_nucleate) then
-         ns_dust_imm = exp(an)          ! m^-2
-         nimey = dst1_num * (1._r8 - exp(-1.0_r8 * dst1_sfc_to_num * ns_dust_imm))&   ! cm^-3
-               + dst3_num * (1._r8 - exp(-1.0_r8 * dst3_sfc_to_num * ns_dust_imm))
-
-      else
-         !--iceMP
-         esl = svp_water(tair)     ! over water in mixed clouds
-         esi = svp_ice(tair)     ! over ice
-         deles = (esl - esi)
-         nimey=1.e-3_r8*exp(12.96_r8*deles/esi - 0.639_r8) 
-      endif 
+      esl = svp_water(tair)     ! over water in mixed clouds
+      esi = svp_ice(tair)     ! over ice
+      deles = (esl - esi)
+      nimey=1.e-3_r8*exp(12.96_r8*deles/esi - 0.639_r8)  
    else
       nimey=0._r8
    endif
@@ -293,8 +245,6 @@ subroutine nucleati(  &
 
    nuci=ni+nimey
    if(nuci.gt.9999._r8.or.nuci.lt.0._r8) then
-      write(iulog, *) 'Warning: incorrect ice nucleation number (nuci reset =0)'
-      write(iulog, *) ni, tair, relhum, wbar, nihf, niimm, nidep,deles,esi,dst_num,so4_num
       nuci=0._r8
    endif
 
