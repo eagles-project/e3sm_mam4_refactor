@@ -202,9 +202,6 @@ subroutine ndrop_init
                      history_verbose_out = history_verbose, &
                      history_aerosol_out = history_aerosol, &
                      prog_modal_aero_out=prog_modal_aero, & 
-!  BJG 10/7  removing option to not enforce g1 bux fix
-!  With this change, setting the following flag to .false. in the namelist will have no effect.
-!                     fix_g1_err_ndrop_out = fix_g1_err_ndrop, &
                      regen_fix_out=regen_fix                )
 
 
@@ -1626,32 +1623,36 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
    integer  :: m  ! mode index
    real(r8) :: sum, g1, g2
-   logical  :: lweak  !  BJG 10/7 whether forcing is sufficiently weak or not
+   logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
 
 
-   lweak = .true.
-   do m=1,nmode
-      if(zeta(m).le.1.e5_r8*eta(m).and.smc(m)*smc(m).le.1.e5_r8*eta(m))then
-         lweak = .false.
+   weak_forcing = .true.
+   do m=1, nmode
+      if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
+         !weak forcing. essentially none activated
+         smax=1.e-20_r8
+      else
+         !significant activation of this mode. calc activation of all modes.
+         weak_forcing = .false.
+         exit
       endif
    enddo
 
-   if(lweak) then         !            weak forcing. essentially none activated
-      smax=1.e-20_r8   
-   else
-      sum=0
-      do m=1,nmode
-         if(eta(m).gt.1.e-20_r8)then
-            g1 = (zeta(m)/eta(m)) * sqrt(zeta(m)/eta(m))
-            g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta(m))) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta(m)))
-            sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
-         else
-            sum=1.e20_r8
-         endif
-      enddo
-      smax=1._r8/sqrt(sum)
-   endif
+   !if the forcing is weak, return
+   if (weak_forcing) return
 
+   sum=0
+   do m=1,nmode
+      if(eta(m).gt.1.e-20_r8)then
+         g1 = (zeta(m)/eta(m)) * sqrt(zeta(m)/eta(m))
+         g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta(m))) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta(m)))
+         sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
+      else
+         sum=1.e20_r8
+      endif
+   enddo
+   smax=1._r8/sqrt(sum)
+ 
 end subroutine maxsat
 
 !===============================================================================
