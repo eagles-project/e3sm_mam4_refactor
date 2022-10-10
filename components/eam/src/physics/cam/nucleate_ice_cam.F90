@@ -221,16 +221,6 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
       if (mode_coarse_slt_idx < 0) mode_coarse_slt_idx = mode_coarse_idx
       if (mode_fine_dst_idx < 0 .and. (use_nie_nucleate .or. use_dem_nucleate)) mode_fine_dst_idx = mode_accum_idx
 
-      ! Check that required mode types were found
-      if (use_nie_nucleate .or. use_dem_nucleate) then
-         if (mode_accum_idx == -1 .or. mode_aitken_idx == -1 .or. &
-             mode_coarse_dst_idx == -1.or. mode_coarse_slt_idx == -1 .or. &
-             mode_fine_dst_idx == -1) then
-            write(iulog,*) routine//': ERROR required mode type not found - mode idx:', &
-               mode_accum_idx, mode_aitken_idx, mode_coarse_dst_idx, mode_coarse_slt_idx, mode_fine_dst_idx
-            call endrun(routine//': ERROR required mode type not found')
-         end if
-      end if
 
       ! species indices for specified types
       ! find indices for the dust and seasalt species in the coarse mode
@@ -332,9 +322,6 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
 
       ! get specific mode properties
       call rad_cnst_get_mode_props(0, mode_aitken_idx, sigmag=sigmag_aitken)
-      if (use_nie_nucleate .or. use_dem_nucleate) then
-         call rad_cnst_get_mode_props(0, mode_coarse_dst_idx, sigmag=sigmag_coarse)
-      endif
 
    endif
 
@@ -438,38 +425,28 @@ subroutine nucleate_ice_cam_calc( &
       enddo
    enddo
 
-   if (clim_modal_aero) then
-      ! mode number mixing ratios
-      call rad_cnst_get_mode_num(0, mode_accum_idx,  'a', state, pbuf, num_accum)
-      call rad_cnst_get_mode_num(0, mode_aitken_idx, 'a', state, pbuf, num_aitken)
-      call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state, pbuf, num_coarse)
+   ! mode number mixing ratios
+   call rad_cnst_get_mode_num(0, mode_accum_idx,  'a', state, pbuf, num_accum)
+   call rad_cnst_get_mode_num(0, mode_aitken_idx, 'a', state, pbuf, num_aitken)
+   call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state, pbuf, num_coarse)
 
-      ! mode specie mass m.r.
-      call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state, pbuf, coarse_dust)
-      call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state, pbuf, coarse_nacl)
-    
-      if (mode_coarse_idx > 0) then
-         call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_so4_idx, 'a', state, pbuf, coarse_so4)
-      endif
-
-      if (use_nie_nucleate .or. use_dem_nucleate) then
-         call rad_cnst_get_aer_mmr(0, mode_fine_dst_idx, fine_dust_idx, 'a', state, pbuf, fine_dust)
-      endif
-
-      call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_mom_idx, 'a', state, pbuf, coarse_mom) 
-      call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_bc_idx,  'a', state, pbuf, coarse_bc)
-      call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_pom_idx, 'a', state, pbuf, coarse_pom)
-      call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_soa_idx, 'a', state, pbuf, coarse_soa)
-   endif
+   ! mode specie mass m.r.
+   call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state, pbuf, coarse_dust)
+   call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state, pbuf, coarse_nacl)
+   call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_so4_idx, 'a', state, pbuf, coarse_so4)
+  
+   call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_mom_idx, 'a', state, pbuf, coarse_mom) 
+   call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_bc_idx,  'a', state, pbuf, coarse_bc)
+   call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_pom_idx, 'a', state, pbuf, coarse_pom)
+   call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_soa_idx, 'a', state, pbuf, coarse_soa)
+   
 
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
    icecldf(:ncol,:pver) = ast(:ncol,:pver)
-
-   if (clim_modal_aero) then
-      call pbuf_get_field(pbuf, dgnum_idx, dgnum)
-   endif
+   
+   call pbuf_get_field(pbuf, dgnum_idx, dgnum)
 
    ! naai and naai_hom are the outputs from this parameterization
    call pbuf_get_field(pbuf, naai_idx, naai)
@@ -514,45 +491,40 @@ subroutine nucleate_ice_cam_calc( &
             dst4_num = 0._r8
             dst_num  = 0._r8
 
-            if (clim_modal_aero) then
-               !For modal aerosols, assume for the upper troposphere:
-               ! soot = accumulation mode
-               ! sulfate = aiken mode
-               ! dust = coarse mode
-               ! since modal has internal mixtures.
-               soot_num = num_accum(i,k)*rho(i,k)*1.0e-6_r8
-               dmc  = coarse_dust(i,k)*rho(i,k)
-               ssmc = coarse_nacl(i,k)*rho(i,k)
+            
+            !For modal aerosols, assume for the upper troposphere:
+            ! soot = accumulation mode
+            ! sulfate = aiken mode
+            ! dust = coarse mode
+            ! since modal has internal mixtures.
+            soot_num = num_accum(i,k)*rho(i,k)*1.0e-6_r8
+            dmc  = coarse_dust(i,k)*rho(i,k)
+            ssmc = coarse_nacl(i,k)*rho(i,k)
+            so4mc  = coarse_so4(i,k)*rho(i,k)
 
-               if (mode_coarse_idx > 0) then
-                  so4mc  = coarse_so4(i,k)*rho(i,k)
-               endif
+            mommc  = coarse_mom(i,k)*rho(i,k)
+            bcmc   = coarse_bc(i,k)*rho(i,k)
+            pommc  = coarse_pom(i,k)*rho(i,k)
+            soamc  = coarse_soa(i,k)*rho(i,k)
 
-               mommc  = coarse_mom(i,k)*rho(i,k)
-               bcmc   = coarse_bc(i,k)*rho(i,k)
-               pommc  = coarse_pom(i,k)*rho(i,k)
-               soamc  = coarse_soa(i,k)*rho(i,k)
-
-               if (dmc > 0._r8) then
-                  wght = dmc/(ssmc + dmc + so4mc + bcmc + pommc + soamc + mommc)
-                  dst3_num = wght * num_coarse(i,k)*rho(i,k)*1.0e-6_r8
-               else 
-                  dst3_num = 0.0_r8
-               endif
-
-               dst_num = dst3_num
-
-               if (dgnum(i,k,mode_aitken_idx) > 0._r8) then
-                  ! only allow so4 with D>0.1 um in ice nucleation
-                  so4_num  = num_aitken(i,k)*rho(i,k)*1.0e-6_r8 &
-                             * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(i,k,mode_aitken_idx))/  &
-                             (2._r8**0.5_r8*log(sigmag_aitken))))
-               else 
-                  so4_num = 0.0_r8 
-               endif
-               so4_num = max(0.0_r8, so4_num)
-
+            if (dmc > 0._r8) then
+               wght = dmc/(ssmc + dmc + so4mc + bcmc + pommc + soamc + mommc)
+               dst3_num = wght * num_coarse(i,k)*rho(i,k)*1.0e-6_r8
+            else 
+               dst3_num = 0.0_r8
             endif
+
+            dst_num = dst3_num
+
+            if (dgnum(i,k,mode_aitken_idx) > 0._r8) then
+               ! only allow so4 with D>0.1 um in ice nucleation
+               so4_num  = num_aitken(i,k)*rho(i,k)*1.0e-6_r8 &
+                          * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(i,k,mode_aitken_idx))/  &
+                          (2._r8**0.5_r8*log(sigmag_aitken))))
+            else 
+               so4_num = 0.0_r8 
+            endif
+            so4_num = max(0.0_r8, so4_num)
 
             ! *** Turn off soot nucleation ***
             soot_num = 0.0_r8
