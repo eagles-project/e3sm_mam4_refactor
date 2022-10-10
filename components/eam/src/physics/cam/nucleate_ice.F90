@@ -52,7 +52,6 @@ real(r8) :: mincld
 ! Subgrid scale factor on relative humidity (dimensionless)
 real(r8) :: subgrid
 
-real(r8), parameter :: Shet   = 1.3_r8     ! het freezing threshold
 real(r8), parameter :: rhoice = 0.5e3_r8   ! kg/m3, Wpice is not sensitive to rhoice 
 
 real(r8) :: ci
@@ -232,16 +231,10 @@ subroutine nucleati(  &
 
 
    ! deposition/condensation nucleation in mixed clouds (-37<T<0C) (Meyers, 1992)
-   if(tc.lt.0._r8 .and. tc.gt.-37._r8 .and. qc.gt.1.e-12_r8) then
-      esl = svp_water(tair)     ! over water in mixed clouds
-      esi = svp_ice(tair)     ! over ice
-      deles = (esl - esi)
-      nimey=1.e-3_r8*exp(12.96_r8*deles/esi - 0.639_r8)  
-   else
-      nimey=0._r8
-   endif
+   ! this part is executed but is always replaced by 0, because CNT scheme takes over
+   ! the calculation. use_hetfrz_classnuc is always true.
 
-   if (use_hetfrz_classnuc) nimey = 0._r8
+   nimey = 0._r8
 
    nuci=ni+nimey
    if(nuci.gt.9999._r8.or.nuci.lt.0._r8) then

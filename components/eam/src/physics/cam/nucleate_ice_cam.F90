@@ -536,18 +536,6 @@ subroutine nucleate_ice_cam_calc( &
    real(r8) :: pommc
    real(r8) :: soamc
 
-   ! For pre-existing ice
-   real(r8) :: fhom(pcols,pver)    ! how much fraction of cloud can reach Shom
-   real(r8) :: wice(pcols,pver)    ! diagnosed Vertical velocity Reduction caused by preexisting ice (m/s), at Shom 
-   real(r8) :: weff(pcols,pver)    ! effective Vertical velocity for ice nucleation (m/s); weff=wsubi-wice 
-   real(r8) :: INnso4(pcols,pver)   ! #/m3, so4 aerosol number used for ice nucleation
-   real(r8) :: INnbc(pcols,pver)    ! #/m3, bc aerosol number used for ice nucleation
-   real(r8) :: INndust(pcols,pver)  ! #/m3, dust aerosol number used for ice nucleation
-   real(r8) :: INhet(pcols,pver)    ! #/m3, ice number from het freezing
-   real(r8) :: INhom(pcols,pver)    ! #/m3, ice number from hom freezing
-   real(r8) :: INFrehom(pcols,pver) !  hom freezing occurence frequency.  1 occur, 0 not occur.
-   real(r8) :: INFreIN(pcols,pver)  !  ice nucleation occerence frequency.   1 occur, 0 not occur.
-
    ! history output for ice nucleation
    real(r8) :: nihf(pcols,pver)  !output number conc of ice nuclei due to heterogenous freezing (1/m3)
    real(r8) :: niimm(pcols,pver) !output number conc of ice nuclei due to immersion freezing (hetero nuc) (1/m3)
@@ -659,19 +647,6 @@ subroutine nucleate_ice_cam_calc( &
    dst3_sfc    = 0.0_r8
    dst4_sfc    = 0.0_r8
 
-   if (use_preexisting_ice) then
-      fhom(:,:)     = 0.0_r8
-      wice(:,:)     = 0.0_r8
-      weff(:,:)     = 0.0_r8
-      INnso4(:,:)   = 0.0_r8
-      INnbc(:,:)    = 0.0_r8
-      INndust(:,:)  = 0.0_r8
-      INhet(:,:)    = 0.0_r8
-      INhom(:,:)    = 0.0_r8
-      INFrehom(:,:) = 0.0_r8
-      INFreIN(:,:)  = 0.0_r8
-   endif
-
    do k = top_lev, pver
 
       ! Get humidity and saturation vapor pressures
@@ -751,27 +726,13 @@ subroutine nucleate_ice_cam_calc( &
                   dst3_num = 0.0_r8
                end if
 
-               if (use_nie_nucleate .or. use_dem_nucleate) then
-                  dst1_num = fine_dust(i,k) * rho(i,k) * dst1_num_to_mass * 1.0e-6_r8
-
-                  alnsg = log(sigmag_coarse)
-                  dst3_sfc_to_num = pi*dgnum(i,k,mode_coarse_idx)**2.0_r8*exp(2.0_r8*alnsg**2.0_r8) ! m2/#, individual particle sfc 
-
-                  dst_num = dst1_num + dst3_num
-               else
-                  dst_num = dst3_num
-               end if
+               dst_num = dst3_num
 
                if (dgnum(i,k,mode_aitken_idx) > 0._r8) then
-                  if (.not. use_preexisting_ice) then
-                     ! only allow so4 with D>0.1 um in ice nucleation
-                     so4_num  = num_aitken(i,k)*rho(i,k)*1.0e-6_r8 &
-                        * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(i,k,mode_aitken_idx))/  &
-                        (2._r8**0.5_r8*log(sigmag_aitken))))
-                  else
-                     ! all so4 from aitken
-                     so4_num  = num_aitken(i,k)*rho(i,k)*1.0e-6_r8
-                  end if
+                  ! only allow so4 with D>0.1 um in ice nucleation
+                  so4_num  = num_aitken(i,k)*rho(i,k)*1.0e-6_r8 &
+                             * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(i,k,mode_aitken_idx))/  &
+                             (2._r8**0.5_r8*log(sigmag_aitken))))
                else 
                   so4_num = 0.0_r8 
                end if
@@ -821,32 +782,6 @@ subroutine nucleate_ice_cam_calc( &
             niimm(i,k)    = niimm(i,k)*rho(i,k)
             nidep(i,k)    = nidep(i,k)*rho(i,k)
             nimey(i,k)    = nimey(i,k)*rho(i,k)
-
-            if (use_preexisting_ice) then
-               INnso4(i,k) =so4_num*1e6_r8  ! (convert from #/cm3 -> #/m3)
-               INnbc(i,k)  =soot_num*1e6_r8
-               INndust(i,k)=dst_num*1e6_r8
-               INFreIN(i,k)=1.0_r8          ! 1,ice nucleation occur
-               INhet(i,k) = niimm(i,k) + nidep(i,k)   ! #/m3, nimey not in cirrus
-               INhom(i,k) = nihf(i,k)                 ! #/m3
-               if (INhom(i,k).gt.1e3_r8)   then ! > 1/L
-                  INFrehom(i,k)=1.0_r8       ! 1, hom freezing occur
-               endif
-
-               ! exclude  no ice nucleaton 
-               if ((INFrehom(i,k) < 0.5_r8) .and. (INhet(i,k) < 1.0_r8))   then   
-                  INnso4(i,k) =0.0_r8
-                  INnbc(i,k)  =0.0_r8
-                  INndust(i,k)=0.0_r8
-                  INFreIN(i,k)=0.0_r8
-                  INhet(i,k) = 0.0_r8
-                  INhom(i,k) = 0.0_r8
-                  INFrehom(i,k)=0.0_r8    
-                  wice(i,k) = 0.0_r8
-                  weff(i,k) = 0.0_r8 
-                  fhom(i,k) = 0.0_r8
-               endif
-            end if
 
          end if
       end do
