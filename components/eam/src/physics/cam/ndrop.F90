@@ -92,8 +92,6 @@ logical :: prog_modal_aero     ! true when modal aerosols are prognostic
 logical :: lq(pcnst) = .false. ! set flags true for constituents with non-zero tendencies
                                ! in the ptend object
 
-!BSINGH -  Bugfix flags (Must be removed once the bug fix is accepted for master merge)
-logical :: fix_g1_err_ndrop = .false. !BSINGH - default is false
 logical :: regen_fix 
 
 !===============================================================================
@@ -204,7 +202,6 @@ subroutine ndrop_init
                      history_verbose_out = history_verbose, &
                      history_aerosol_out = history_aerosol, &
                      prog_modal_aero_out=prog_modal_aero, & 
-                     fix_g1_err_ndrop_out = fix_g1_err_ndrop, &
                      regen_fix_out=regen_fix                )
 
 
@@ -1620,50 +1617,42 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    !      2. Multiple aerosol types. J. Geophys. Res., 105, 6837-6844.
 
    integer,  intent(in)  :: nmode ! number of modes
-   real(r8), intent(in)  :: smc(nmode) ! critical supersaturation for number mode radius
-   real(r8), intent(in)  :: zeta(nmode)
-   real(r8), intent(in)  :: eta(nmode)
-   real(r8), intent(out) :: smax ! maximum supersaturation
+   real(r8), intent(in)  :: smc(nmode) ! critical supersaturation for number mode radius [fraction]
+   real(r8), intent(in)  :: zeta(nmode) ! [dimensionless]
+   real(r8), intent(in)  :: eta(nmode) ! [dimensionless]
+   real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
    integer  :: m  ! mode index
-   real(r8) :: sum, g1, g2, g1sqrt, g2sqrt
+   real(r8) :: sum, g1, g2
+   logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
 
-   do m=1,nmode
+
+   weak_forcing = .true.
+   do m=1, nmode
       if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
-         !            weak forcing. essentially none activated
+         !weak forcing. essentially none activated
          smax=1.e-20_r8
       else
-         !            significant activation of this mode. calc activation all modes.
-         go to 1
+         !significant activation of this mode. calc activation of all modes.
+         weak_forcing = .false.
+         exit
       endif
    enddo
 
-   return
-
-1  continue
+   !if the forcing is weak, return
+   if (weak_forcing) return
 
    sum=0
    do m=1,nmode
       if(eta(m).gt.1.e-20_r8)then
-         g1=zeta(m)/eta(m)
-         g1sqrt=sqrt(g1)
-         !BSINGH - repeated "g1=g1sqrt*g1" is a bug. Following code fixes this bug.
-         !BSINGH - This flag is added to maintain b4b result with the default code.
-         if(.not. fix_g1_err_ndrop) then
-            g1=g1sqrt*g1
-         endif
-         !BSINGH -ENDS
-         g1=g1sqrt*g1
-         g2=smc(m)/sqrt(eta(m)+3._r8*zeta(m))
-         g2sqrt=sqrt(g2)
-         g2=g2sqrt*g2
+         g1 = (zeta(m)/eta(m)) * sqrt(zeta(m)/eta(m))
+         g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta(m))) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta(m)))
          sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
       else
          sum=1.e20_r8
       endif
    enddo
-
    smax=1._r8/sqrt(sum)
-
+ 
 end subroutine maxsat
 
 !===============================================================================
