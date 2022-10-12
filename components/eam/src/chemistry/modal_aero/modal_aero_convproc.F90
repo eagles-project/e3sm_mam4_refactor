@@ -1936,14 +1936,13 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
 ! arguments
 ! (note:  TMR = tracer mixing ratio)
-   integer,  intent(in)    :: pcnst_extd
-
+   integer,  intent(in)    :: pcnst_extd        ! aerosol dimension [unitless]
    real(r8), intent(inout) :: dcondt(pcnst_extd,pver)
-                              ! overall TMR tendency from convection
+                              ! overall TMR tendency from convection [kg/kg/s]
    real(r8), intent(in)    :: dcondt_wetdep(pcnst_extd,pver)
-                              ! portion of TMR tendency due to wet removal
+                              ! portion of TMR tendency due to wet removal [kg/kg/s]
    real(r8), intent(inout) :: dcondt_prevap(pcnst_extd,pver)
-                              ! portion of TMR tendency due to precip evaporation
+                              ! portion of TMR tendency due to precip evaporation [kg/kg/s]
                               ! (actually, due to the adjustments made here)
                               ! (on entry, this is 0.0)
    real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver) ! REASTER 08/05/2015
@@ -1960,9 +1959,9 @@ end subroutine ma_convproc_tend
                               ! this is done to allow better tracking of the
                               !    resuspension in the mass-budget post-processing scripts
 
-   real(r8), intent(in)    :: rprd(pcols,pver)  ! conv precip production  rate (gathered)
-   real(r8), intent(in)    :: evapc(pcols,pver)  ! conv precip evaporation rate (gathered)
-   real(r8), intent(in)    :: dp_i(pver) ! pressure thickness of level (in mb)
+   real(r8), intent(in)    :: rprd(pcols,pver)  ! conv precip production  rate (gathered) [kg/kg/s]
+   real(r8), intent(in)    :: evapc(pcols,pver)  ! conv precip evaporation rate (gathered) [kg/kg/s]
+   real(r8), intent(in)    :: dp_i(pver) ! pressure thickness of level [mb]
 
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
@@ -1974,22 +1973,16 @@ end subroutine ma_convproc_tend
 
 !-----------------------------------------------------------------------
 ! local variables
-   integer  :: k, l, ll, lspec, lspectype
-   integer  :: m, m2, mmtoo, n, numtoo
-   real(r8) :: d1p_prevap_resusp     ! dry-diameter of one resuspended aerosol particle (m) 
-   real(r8) :: del_pr_flux_prod      ! change to precip flux from production  [(kg/kg/s)*mb]
-   real(r8) :: del_pr_flux_evap      ! change to precip flux from evaporation [(kg/kg/s)*mb]
+   integer  :: k
+   integer  :: m, m2, mmtoo
    real(r8) :: del_wd_flux_evap      ! change to wet deposition flux from evaporation [(kg/kg/s)*mb]
-   real(r8) :: fdel_pr_flux_evap     ! fractional change to precip flux from evaporation
    real(r8) :: pr_flux               ! precip flux at base of current layer [(kg/kg/s)*mb]
    real(r8) :: pr_flux_old
    real(r8) :: pr_flux_tmp
    real(r8) :: pr_flux_base          ! precip flux at an effective cloud base for calculations in a particular layer
-   real(r8) :: specdens_prevap_resusp(pcnst)
    real(r8) :: tmpa, tmpb, tmpc, tmpd
-   real(r8) :: tmpdp                 ! delta-pressure (mb)
+   real(r8) :: tmpdp                 ! delta-pressure [mb]
    real(r8) :: u_old, u_tmp
-   real(r8) :: v1p_prevap_resusp     ! dry-volume of one resuspended aerosol particle (m^3)
    real(r8) :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
    real(r8) :: wd_flux_tmp(pcnst_extd)
    real(r8) :: x_old, x_tmp, x_ratio
@@ -2002,7 +1995,6 @@ end subroutine ma_convproc_tend
 !    tmpdp = dp_i is mb
 !    rprd and evapc are kgwtr/kgair/s
 !    pr_flux = tmpdp*rprd is mb*kgwtr/kgair/s
-! this works ok because the only important thing is fdel_pr_flux_evap which is dimensionless
 !
 ! precip-borne aerosol
 !    dcondt_wetdep is kgaero/kgair/s
@@ -2031,13 +2023,6 @@ end subroutine ma_convproc_tend
 !    "fresh" in each iteration of the "do k" loop
 ! no big deal except it clutters up the code
 
-!     pr_flux_old = pr_flux
-!     del_pr_flux_prod = tmpdp*max(0.0_r8, rprd(icol,k))
-!     pr_flux = pr_flux_old + del_pr_flux_prod
-
-!     del_pr_flux_evap = min( pr_flux, tmpdp*max(0.0_r8, evapc(icol,k)) )
-!     fdel_pr_flux_evap = del_pr_flux_evap / max(pr_flux, 1.0e-35_r8)
-
 ! step 1 - precip evaporation and aerosol resuspension
       tmpa = max( 0.0_r8, evapc(icol,k)*tmpdp )
       pr_flux_tmp = max( 0.0_r8, pr_flux - tmpa )
@@ -2045,8 +2030,10 @@ end subroutine ma_convproc_tend
 
       if (pr_flux_base < 1.0e-30_r8) then
          ! when pr_flux_base=0, set u=0 to force 100% resuspension
-         u_old = 1.0_r8 ; x_old = 1.0_r8
-         u_tmp = 0.0_r8 ; x_tmp = 0.0_r8
+         u_old = 1.0_r8 
+         x_old = 1.0_r8
+         u_tmp = 0.0_r8
+         x_tmp = 0.0_r8
          x_ratio = 0.0_r8
          pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer 
          pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
@@ -2069,8 +2056,8 @@ end subroutine ma_convproc_tend
             pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
          else
             x_ratio = x_tmp/x_old
-         end if
-      end if
+         endif
+      endif
 
 ! step 2 - precip production and aerosol scavenging
       tmpa = max( 0.0_r8, rprd(icol,k)*tmpdp )
@@ -2078,17 +2065,16 @@ end subroutine ma_convproc_tend
       pr_flux      = max( 0.0_r8, pr_flux_tmp  + tmpa )
       pr_flux      = min( pr_flux_base, pr_flux )
 
-
       do m = 2, pcnst_extd
          if ( .not. doconvproc_extd(m) ) cycle
 
-! step 1 again, but only the aerosol resuspension
-! wd_flux_tmp (updated) = (wd_flux coming into the layer) - (resuspension ! decrement)
+        ! step 1 again, but only the aerosol resuspension
+        ! wd_flux_tmp (updated) = (wd_flux coming into the layer) - (resuspension ! decrement)
          wd_flux_tmp(m) = max( 0.0_r8, wd_flux(m) * x_ratio )
          del_wd_flux_evap = max( 0.0_r8, wd_flux(m) - wd_flux_tmp(m) )
 
-! step 2 again, but only the aerosol scavenging
-! wd_flux (updated) = (wd_flux after resuspension) - (scavenging increment)
+        ! step 2 again, but only the aerosol scavenging
+        ! wd_flux (updated) = (wd_flux after resuspension) - (scavenging increment)
          tmpa = max( 0.0_r8, -dcondt_wetdep(m,k)*tmpdp )
          wd_flux(m) = max( 0.0_r8, wd_flux_tmp(m) + tmpa )
 
@@ -2109,7 +2095,7 @@ end subroutine ma_convproc_tend
                ! coarse-mode species
                dcondt_prevap(mmtoo,k) = dcondt_prevap(mmtoo,k) + tmpc
                dcondt(mmtoo,k) = dcondt(mmtoo,k) + tmpc
-            end if
+            endif
 
          else ! ( species_class(m2) /= spec_class_aerosol ) 
             ! do this for trace gases (although currently modal_aero_convproc
@@ -2117,11 +2103,11 @@ end subroutine ma_convproc_tend
             dcondt_prevap_hist(m,k) = dcondt_prevap_hist(m,k) + tmpc
             dcondt_prevap(m,k) = dcondt_prevap(m,k) + tmpc
             dcondt(m,k) = dcondt(m,k) + tmpc
-         end if
+         endif
 
-      end do ! m = 2, pcnst_extd
+      enddo ! m = 2, pcnst_extd
 
-   end do ! k
+   enddo ! k
 
    return
    end subroutine ma_precpevap_convproc
