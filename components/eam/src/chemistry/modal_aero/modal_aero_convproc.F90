@@ -1898,108 +1898,8 @@ k_loop_main_cc: &
 end subroutine ma_convproc_tend
 
 
-
 !=========================================================================================
-   subroutine ma_precpevap_convproc(                           &
-              dcondt,  dcondt_wetdep, dcondt_prevap,           &
-              dcondt_prevap_hist,                              & ! REASTER 08/05/2015
-              rprd,    evapc,         dp_i,                    &
-              icol,    ktop,          pcnst_extd,              &
-              lun,     lchnk,                                  &
-              doconvproc_extd,                                 &
-              species_class      ) ! REASTER 08/05/2015
-!-----------------------------------------------------------------------
-!
-! Purpose:
-! Calculate resuspension of wet-removed aerosol species resulting 
-!    precip evaporation
-!
-! Author: R. Easter
-!
-!-----------------------------------------------------------------------
-
-   use ppgrid, only: pcols, pver
-   use constituents, only: pcnst
-   use physconst, only: spec_class_aerosol ! REASTER 08/05/2015
-
-   use modal_aero_data, only:  &
-      lmassptrcw_amode, nspec_amode, numptrcw_amode, &
-      mmtoo_prevap_resusp ! REASTER 08/05/2015
-
-   implicit none
-
-!-----------------------------------------------------------------------
-! arguments
-! (note:  TMR = tracer mixing ratio)
-   integer,  intent(in)    :: pcnst_extd
-
-   real(r8), intent(inout) :: dcondt(pcnst_extd,pver)
-                              ! overall TMR tendency from convection
-   real(r8), intent(in)    :: dcondt_wetdep(pcnst_extd,pver)
-                              ! portion of TMR tendency due to wet removal
-   real(r8), intent(inout) :: dcondt_prevap(pcnst_extd,pver)
-                              ! portion of TMR tendency due to precip evaporation
-                              ! (actually, due to the adjustments made here)
-                              ! (on entry, this is 0.0)
-   real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver) ! REASTER 08/05/2015
-                              ! this determines what goes into the history 
-                              !    precip-evap SFSEC variables
-                              ! currently, the SFSEC resuspension are attributed
-                              !    to the species that got scavenged,
-                              !    WHICH IS NOT the species that actually
-                              !    receives the resuspension
-                              !    when modal_aero_wetdep_resusp_opt > 0
-                              ! so when scavenged so4_c1 is resuspended as so4_a1, 
-                              !    this resuspension column-tendency shows
-                              !    up in so4_c1SFSES
-                              ! this is done to allow better tracking of the
-                              !    resuspension in the mass-budget post-processing scripts
-
-   real(r8), intent(in)    :: rprd(pcols,pver)  ! conv precip production  rate (gathered)
-   real(r8), intent(in)    :: evapc(pcols,pver)  ! conv precip evaporation rate (gathered)
-   real(r8), intent(in)    :: dp_i(pver) ! pressure thickness of level (in mb)
-
-   integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
-   integer,  intent(in)    :: ktop  ! index of top cloud level for current column
-   integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: lchnk  ! chunk index
-
-   logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
-   integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
-
-!-----------------------------------------------------------------------
-! local variables
-   integer  :: k, l, ll, m, m2, mmtoo, n ! REASTER 08/05/2015
-   real(r8) :: del_pr_flux_prod      ! change to precip flux from production  [(kg/kg/s)*mb]
-   real(r8) :: del_pr_flux_evap      ! change to precip flux from evaporation [(kg/kg/s)*mb]
-   real(r8) :: del_wd_flux_evap      ! change to wet deposition flux from evaporation [(kg/kg/s)*mb]
-   real(r8) :: fdel_pr_flux_evap     ! fractional change to precip flux from evaporation
-   real(r8) :: pr_flux               ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: pr_flux_old
-   real(r8) :: tmpa, tmpb, tmpc, tmpd
-   real(r8) :: tmpdp                 ! delta-pressure (mb)
-   real(r8) :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
-   character(len=100) :: msg
-   
-!-----------------------------------------------------------------------
-
-
-      call ma_precpevap30_convproc(                         &
-           dcondt,  dcondt_wetdep, dcondt_prevap,           &
-           dcondt_prevap_hist,                              &
-           rprd,    evapc,         dp_i,                    &
-           icol,    ktop,          pcnst_extd,              &
-           lun,     lchnk,                                  &
-           doconvproc_extd,                                 &
-           species_class        )
-      return
-
-   end subroutine ma_precpevap_convproc
-
-
-
-!=========================================================================================
-   subroutine ma_precpevap30_convproc(                         &
+   subroutine ma_precpevap_convproc(                         &
               dcondt,  dcondt_wetdep, dcondt_prevap,           &
               dcondt_prevap_hist,                              & ! REASTER 08/05/2015
               rprd,    evapc,         dp_i,                    &
@@ -2224,7 +2124,7 @@ end subroutine ma_convproc_tend
    end do ! k
 
    return
-   end subroutine ma_precpevap30_convproc
+   end subroutine ma_precpevap_convproc
 
 
 !=========================================================================================
