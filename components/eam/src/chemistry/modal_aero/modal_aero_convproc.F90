@@ -2434,7 +2434,7 @@ end subroutine ma_convproc_tend
 !=========================================================================================
    subroutine ma_resuspend_convproc(                           &
               dcondt,  dcondt_resusp,                          &
-              ktop,  kbot_prevap,  pcnst_extd ) ! REASTER 08/05/2015
+              ktop,  kbot_prevap,  pcnst_extd )
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2480,31 +2480,30 @@ end subroutine ma_convproc_tend
 ! (note:  TMR = tracer mixing ratio)
    integer,  intent(in)    :: pcnst_extd ! cloudborne aerosol dimension [unitless]
    real(r8), intent(inout) :: dcondt(pcnst_extd,pver)
-                              ! overall TMR tendency from convection [kg/kg/s] 
+                              ! overall TMR tendency from convection [#/kg/s or kg/kg/s] 
    real(r8), intent(inout) :: dcondt_resusp(pcnst_extd,pver)
-                              ! portion of TMR tendency due to resuspension [kg/kg/s]
+                              ! portion of TMR tendency due to resuspension [#/kg/s or kg/kg/s]
                               ! (actually, due to the adjustments made here)
 
-   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels ! REASTER 08/05/2015
+   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels
 
 !-----------------------------------------------------------------------
 ! local variables
-   integer  :: k, ll, la, lc, n
-   real(r8) :: qdota, qdotc, qdotac  ! working variables (MR tendencies)
+   integer  :: ll, la, lc, nn      ! indices
 !-----------------------------------------------------------------------
 
 
-   do n = 1, ntot_amode
+   do nn = 1, ntot_amode
 
       ! TMR number
-      la = numptr_amode(n)
-      lc = numptrcw_amode(n) + pcnst
+      la = numptr_amode(nn)
+      lc = numptrcw_amode(nn) + pcnst
       call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
 
       ! TMR mass
-      do ll = 1, nspec_amode(n)
-         la = lmassptr_amode(ll,n)
-         lc = lmassptrcw_amode(ll,n) + pcnst
+      do ll = 1, nspec_amode(nn)
+         la = lmassptr_amode(ll,nn)
+         lc = lmassptrcw_amode(ll,nn) + pcnst
          call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
       enddo   ! "ll = -1, nspec_amode(n)"
    enddo      ! "n = 1, ntot_amode"
@@ -2524,23 +2523,22 @@ end subroutine ma_convproc_tend
 
    ! arguments (note:  TMR = tracer mixing ratio)
    integer,  intent(in)    :: pcnst_extd ! cloudborne aerosol dimension [unitless]
-   real(r8), intent(inout) :: dcondt(pcnst_extd,pver) ! overall TMR tendency from convection [kg/kg/s]
-   real(r8), intent(inout) :: dcondt_resusp(pcnst_extd,pver) ! portion of TMR tendency due to resuspension [kg/kg/s]
+   real(r8), intent(inout) :: dcondt(pcnst_extd,pver) ! overall TMR tendency from convection [#/kg/s or kg/kg/s]
+   real(r8), intent(inout) :: dcondt_resusp(pcnst_extd,pver) ! portion of TMR tendency due to resuspension [#/kg/s or kg/kg/s]
    integer, intent(in)     :: la, lc            ! indices
-   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels ! REASTER 08/05/2015
+   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels
 
    ! local variables
-   integer  :: k
-   real(r8) :: qdota, qdotc, qdotac  ! working variables (MR tendencies)
+   integer  :: kk   ! indices of vertical levels
 
    ! only apply adjustments to dcondt for pairs of unactivated (la) and activated (lc) aerosol species
    if ((la > 0) .and. (la <= pcnst_extd) .and. (lc > 0) .and. (lc <= pcnst_extd)) then
-       do k = ktop, kbot_prevap ! REASTER 08/05/2015
+       do kk = ktop, kbot_prevap
             ! cam5 approach
-            dcondt(la,k) = dcondt(la,k) + dcondt(lc,k)
-            dcondt(lc,k) = 0.0
-            dcondt_resusp(la,k) = dcondt(lc,k)
-            dcondt_resusp(lc,k) =  - dcondt(lc,k)
+            dcondt(la,kk) = dcondt(la,kk) + dcondt(lc,kk)
+            dcondt_resusp(la,kk) = dcondt(lc,kk)
+            dcondt_resusp(lc,kk) =  - dcondt(lc,kk)
+            dcondt(lc,kk) = 0.0
        enddo
    endif
 
