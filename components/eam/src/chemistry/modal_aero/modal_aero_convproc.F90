@@ -224,7 +224,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 
 
 ! Local variables
-   integer, parameter :: nsrflx = 6        ! last dimension of qsrflx ! REASTER 08/05/2015
+   integer, parameter :: nsrflx = 6        ! last dimension of qsrflx
    integer  :: i, ii 
    integer  :: k
    integer  :: l, ll, lchnk
@@ -349,8 +349,8 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
         ! these used for history file wetdep diagnostics
         sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
         sflxid(1:ncol,l) = sflxid(1:ncol,l) + qsrflx(1:ncol,l,4) 
-        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) ! REASTER 08/05/2015
-        sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,6) ! REASTER 08/05/2015
+        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) 
+        sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,6)
      end if
 
      if (species_class(l) == spec_class_aerosol) then
@@ -404,7 +404,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      if ((species_class(l) == spec_class_aerosol) .or. &
          (species_class(l) == spec_class_gas    )) then
         sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
-        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) ! REASTER 08/05/2015
+        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) 
      end if
 
      if (species_class(l) == spec_class_aerosol) then
@@ -626,7 +626,7 @@ subroutine ma_convproc_dp_intr(                &
                      dp_frac,    icwmrdp,    rprddp,     evapcdp,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class,                                  & ! REASTER 08/05/2015
+                     species_class,                                  &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 !                    ed,         dp,         dsubcld,    jt,         &   
@@ -916,7 +916,7 @@ subroutine ma_convproc_sh_intr(                 &
                      sh_frac,    icwmrsh,    rprdsh,     evapcsh,    &
                      fracice,                                        &
                      dqdt,       dotend,     nsrflx,     qsrflx,     &
-                     species_class,                                  & ! REASTER 08/05/2015
+                     species_class,                                  &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 
@@ -946,7 +946,7 @@ subroutine ma_convproc_tend(                                           &
                      cldfrac,    icwmr,      rprd,       evapc,      &
                      fracice,                                        &
                      dqdt,       doconvproc, nsrflx,     qsrflx,     &
-                     species_class,                                  & ! REASTER 08/05/2015
+                     species_class,                                  & 
                      xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
                      lun                                             )
 
@@ -1051,8 +1051,8 @@ subroutine ma_convproc_tend(                                           &
                               !  3 = aqueous chemistry (not implemented yet, so zero)
                               !  4 = wet removal
                               !  5 = actual precip-evap resuspension (what actually is applied to a species)
-                              !  6 = pseudo precip-evap resuspension (for history file) ! REASTER 08/05/2015
-   integer,  intent(in) :: species_class(:) ! REASTER 08/05/2015
+                              !  6 = pseudo precip-evap resuspension (for history file) 
+   integer,  intent(in) :: species_class(:) 
    real(r8), intent(out):: xx_mfup_max(pcols)
    real(r8), intent(out):: xx_wcldbase(pcols)
    real(r8), intent(out):: xx_kcldbase(pcols)
@@ -1073,7 +1073,7 @@ subroutine ma_convproc_tend(                                           &
    integer :: kactcntb        ! Counter for activation diagnostic output
    integer :: kactfirst       ! Lowest layer with activation (= cloudbase)
    integer :: kbot            ! Cloud-flux bottom layer for current i (=mx(i))
-   integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip ! REASTER 08/05/2015
+   integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip 
    integer :: ktop            ! Cloud-flux top    layer for current i (=jt(i))
                               ! Layers between kbot,ktop have mass fluxes
                               !    but not all have cloud water, because the
@@ -1103,7 +1103,7 @@ subroutine ma_convproc_tend(                                           &
 
    real(r8) dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column
    real(r8) dcondt_prevap(pcnst_extd,pver) ! portion of dcondt from precip evaporation
-   real(r8) dcondt_prevap_hist(pcnst_extd,pver) ! similar but used for history output ! REASTER 08/05/2015
+   real(r8) dcondt_prevap_hist(pcnst_extd,pver) ! similar but used for history output 
    real(r8) dcondt_resusp(pcnst_extd,pver) ! portion of dcondt from resuspension
 
    real(r8) dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition
@@ -1125,7 +1125,7 @@ subroutine ma_convproc_tend(                                           &
    real(r8) sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa
    real(r8) sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem
    real(r8) sumprevap(pcnst_extd)    ! sum (over layers) of dp*dcondt_prevap
-   real(r8) sumprevap_hist(pcnst_extd) ! sum (over layers) of dp*dcondt_prevap_hist ! REASTER 08/05/2015
+   real(r8) sumprevap_hist(pcnst_extd) ! sum (over layers) of dp*dcondt_prevap_hist 
    real(r8) sumresusp(pcnst_extd)    ! sum (over layers) of dp*dcondt_resusp
    real(r8) sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep
 
@@ -1304,7 +1304,6 @@ i_loop_main_aa: &
 ! Zero out values at "top of cloudtop", "base of cloudbase"
       ktop = jt(i)
       kbot = mx(i)
-! REASTER 08/05/2015 BEGIN
 ! usually the updraft ( & downdraft) start ( & end ) at kbot=pver, but sometimes kbot < pver
 ! transport, activation, resuspension, and wet removal only occur between kbot >= k >= ktop
 ! resuspension from evaporating precip can occur at k > kbot when kbot < pver
@@ -1315,7 +1314,6 @@ i_loop_main_aa: &
 !      kbot_prevap = kbot
 ! apply this minor fix when doing resuspend to coarse mode      
       kbot_prevap = pver
-! REASTER 08/05/2015 END
       mu_i(:) = 0.0
       md_i(:) = 0.0
       do k = ktop+1, kbot
@@ -1403,7 +1401,7 @@ jtsub_loop_main_aa: &
       dcondt_resusp(:,:) = 0.0
       dcondt_wetdep(:,:) = 0.0
       dcondt_prevap(:,:) = 0.0
-      dcondt_prevap_hist(:,:) = 0.0 ! REASTER 08/05/2015
+      dcondt_prevap_hist(:,:) = 0.0 
       dconudt_aqchem(:,:) = 0.0
       dconudt_wetdep(:,:) = 0.0
 ! initialize the activation tendency 
@@ -1674,7 +1672,7 @@ k_loop_main_bb: &
       sumwetdep(:) = 0.0
       sumresusp(:) = 0.0
       sumprevap(:) = 0.0
-      sumprevap_hist(:) = 0.0 ! REASTER 08/05/2015
+      sumprevap_hist(:) = 0.0 
 
       maxflux(:) = 0.0
       maxflux2(:) = 0.0
@@ -1772,25 +1770,25 @@ k_loop_main_cc: &
 
 ! calculate effects of precipitation evaporation
       call ma_precpevap_convproc( dcondt, dcondt_wetdep,  dcondt_prevap,   &
-                                  dcondt_prevap_hist,                      & ! REASTER 08/05/2015
+                                  dcondt_prevap_hist,                      & 
                                   rprd,   evapc,          dp_i,            &
                                   icol,   ktop,           pcnst_extd,      &
                                   lun,    lchnk,                           &
                                   doconvproc_extd,                         &
-                                  species_class ) ! REASTER 08/05/2015
+                                  species_class ) 
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
 !    pairs to account any (or total) resuspension of convective-cloudborne aerosol
       call ma_resuspend_convproc( dcondt, dcondt_resusp,   &
-                                  const, dp_i, ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
+                                  const, dp_i, ktop, kbot_prevap, pcnst_extd ) 
 
 
 ! calculate new column-tendency variables
       do m = 2, ncnst_extd
          if (doconvproc_extd(m)) then
             ! should go to k=pver for dcondt_prevap, and this should be safe for other sums
-            do k = ktop, kbot_prevap  ! REASTER 08/05/2015
+            do k = ktop, kbot_prevap 
                sumchng3(m)  = sumchng3(m)  + dcondt(m,k)*dp_i(k)
                sumresusp(m) = sumresusp(m) + dcondt_resusp(m,k)*dp_i(k)
                maxresusp(m) = max( maxresusp(m),   &
@@ -1798,7 +1796,7 @@ k_loop_main_cc: &
                sumprevap(m) = sumprevap(m) + dcondt_prevap(m,k)*dp_i(k)
                maxprevap(m) = max( maxprevap(m),   &
                                          abs(dcondt_prevap(m,k)*dp_i(k)) )
-               sumprevap_hist(m) = sumprevap_hist(m) + dcondt_prevap_hist(m,k)*dp_i(k) ! REASTER 08/05/2015
+               sumprevap_hist(m) = sumprevap_hist(m) + dcondt_prevap_hist(m,k)*dp_i(k)
             end do
          end if
       end do ! m
@@ -1841,7 +1839,7 @@ k_loop_main_cc: &
                sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
                sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
                sumprevap(la) = sumprevap(la) + sumprevap(lc)
-               sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc) ! REASTER 08/05/2015
+               sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
 !              if (n==1 .and. ll==1) then
 !	           write(lun,*) 'la, sumaqchem(la) =', la, sumaqchem(la)
 !              endif
@@ -1854,7 +1852,7 @@ k_loop_main_cc: &
 !
       do m = 2, ncnst
          if (doconvproc(m)) then
-            do k = ktop, kbot_prevap  ! should go to k=pver because of prevap ! REASTER 08/05/2015
+            do k = ktop, kbot_prevap  ! should go to k=pver because of prevap 
                dqdt_i(k,m) = dcondt(m,k)
                dqdt(icol,k,m) = dqdt(icol,k,m) + dqdt_i(k,m)*xinv_ntsub
             end do
@@ -1870,9 +1868,9 @@ k_loop_main_cc: &
             qsrflx_i(m,3) = sumaqchem(m)*hund_ovr_g
             qsrflx_i(m,4) = sumwetdep(m)*hund_ovr_g
             qsrflx_i(m,5) = sumprevap(m)*hund_ovr_g
-            qsrflx_i(m,6) = sumprevap_hist(m)*hund_ovr_g ! REASTER 08/05/2015
+            qsrflx_i(m,6) = sumprevap_hist(m)*hund_ovr_g 
 !           qsrflx_i(m,1:4) = 0.
-            qsrflx(icol,m,1:6) = qsrflx(icol,m,1:6) + qsrflx_i(m,1:6)*xinv_ntsub ! REASTER 08/05/2015
+            qsrflx(icol,m,1:6) = qsrflx(icol,m,1:6) + qsrflx_i(m,1:6)*xinv_ntsub 
          end if
       end do ! m
 
@@ -1881,7 +1879,7 @@ k_loop_main_cc: &
          ! update the q_i for the next interation of the jtsub loop
          do m = 2, ncnst
             if (doconvproc(m)) then
-               do k = ktop, kbot_prevap  ! should go to k=pver because of prevap ! REASTER 08/05/2015
+               do k = ktop, kbot_prevap  ! should go to k=pver because of prevap
                   q_i(k,m) = max( (q_i(k,m) + dqdt_i(k,m)*dtsub), 0.0_r8 )
                end do
             end if
@@ -1901,12 +1899,12 @@ end subroutine ma_convproc_tend
 !=========================================================================================
    subroutine ma_precpevap_convproc(                         &
               dcondt,  dcondt_wetdep, dcondt_prevap,           &
-              dcondt_prevap_hist,                              & ! REASTER 08/05/2015
+              dcondt_prevap_hist,                              & 
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
               lun,     lchnk,                                  &
               doconvproc_extd,                                 &
-              species_class           ) ! REASTER 08/05/2015
+              species_class           ) 
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -1922,12 +1920,12 @@ end subroutine ma_convproc_tend
 
    use ppgrid, only: pcols, pver
    use constituents, only: pcnst
-   use physconst, only: pi, spec_class_aerosol ! REASTER 08/05/2015
+   use physconst, only: pi, spec_class_aerosol 
 
    use modal_aero_data, only:  &
       lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
       nspec_amode, ntot_amode, numptr_amode, numptrcw_amode, &
-      mmtoo_prevap_resusp, ntoo_prevap_resusp, & ! REASTER 08/05/2015
+      mmtoo_prevap_resusp, ntoo_prevap_resusp, & 
       specdens_amode
    use wetdep, only:  faer_resusp_vs_fprec_evap_mpln
 
@@ -1945,7 +1943,7 @@ end subroutine ma_convproc_tend
                               ! portion of TMR tendency due to precip evaporation [kg/kg/s]
                               ! (actually, due to the adjustments made here)
                               ! (on entry, this is 0.0)
-   real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver) ! REASTER 08/05/2015
+   real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver) 
                               ! this determines what goes into the history 
                               !    precip-evap SFSEC variables
                               ! currently, the SFSEC resuspension are attributed
@@ -1969,7 +1967,7 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
-   integer,  intent(in)    :: species_class(:) ! REASTER 08/05/2015
+   integer,  intent(in)    :: species_class(:) 
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -2320,7 +2318,7 @@ end subroutine ma_convproc_tend
 !=========================================================================================
    subroutine ma_resuspend_convproc(                           &
               dcondt,  dcondt_resusp,                          &
-              const,   dp_i,          ktop,  kbot_prevap,  pcnst_extd ) ! REASTER 08/05/2015
+              const,   dp_i,          ktop,  kbot_prevap,  pcnst_extd ) 
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2372,7 +2370,7 @@ end subroutine ma_convproc_tend
    real(r8), intent(in)    :: const(pcnst_extd,pver)  ! TMRs before convection
 
    real(r8), intent(in)    :: dp_i(pver) ! pressure thickness of level (in mb)
-   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels ! REASTER 08/05/2015
+   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels 
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -2398,7 +2396,7 @@ end subroutine ma_convproc_tend
          if ( (la <= 0) .or. (la > pcnst_extd) ) cycle
          if ( (lc <= 0) .or. (lc > pcnst_extd) ) cycle
 
-         do k = ktop, kbot_prevap ! REASTER 08/05/2015
+         do k = ktop, kbot_prevap 
             qdota = dcondt(la,k)
             qdotc = dcondt(lc,k)
             qdotac = qdota + qdotc
