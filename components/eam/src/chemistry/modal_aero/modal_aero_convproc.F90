@@ -2023,8 +2023,9 @@ end subroutine ma_convproc_tend
 
 ! step 1 - precip evaporation and aerosol resuspension
       tmpa = max( 0.0_r8, evapc(icol,k)*tmpdp )
-      pr_flux_tmp = max( 0.0_r8, pr_flux - tmpa )
-      pr_flux_tmp = min( pr_flux_base, pr_flux_tmp )
+!      pr_flux_tmp = max( 0.0_r8, pr_flux - tmpa )
+!      pr_flux_tmp = min( pr_flux_base, pr_flux_tmp )
+      pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-tmpa)
 
       if (pr_flux_base < 1.0e-30_r8) then
          ! when pr_flux_base=0, set u=0 to force 100% resuspension
@@ -2037,15 +2038,19 @@ end subroutine ma_convproc_tend
          pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
       else
          u_old = pr_flux/pr_flux_base
-         u_old = max( 0.0_r8, min( 1.0_r8, u_old ) )
+!         u_old = max( 0.0_r8, min( 1.0_r8, u_old ) )
+         u_old = min_max_bound(0.0_r8, 1.0_r8, u_old)
          x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, 2)
-         x_old = max( 0.0_r8, min( 1.0_r8, x_old ) )
+!         x_old = max( 0.0_r8, min( 1.0_r8, x_old ) )
+         x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
 
          u_tmp = pr_flux_tmp/pr_flux_base
-         u_tmp = max( 0.0_r8, min( 1.0_r8, u_tmp ) )
+!         u_tmp = max( 0.0_r8, min( 1.0_r8, u_tmp ) )
+         u_tmp = min_max_bound(0.0_r8, 1.0_r8, u_tmp)
          u_tmp = min( u_tmp, u_old )
          x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_tmp, 2)
-         x_tmp = max( 0.0_r8, min( 1.0_r8, x_tmp ) )
+!         x_tmp = max( 0.0_r8, min( 1.0_r8, x_tmp ) )
+         x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
          x_tmp = min( x_tmp, x_old )
    
          if (x_tmp < 1.0e-30_r8) then  ! or check on x?  note that should have x_tmp >= x
@@ -2060,8 +2065,9 @@ end subroutine ma_convproc_tend
 ! step 2 - precip production and aerosol scavenging
       tmpa = max( 0.0_r8, rprd(icol,k)*tmpdp )
       pr_flux_base = max( 0.0_r8, pr_flux_base + tmpa )
-      pr_flux      = max( 0.0_r8, pr_flux_tmp  + tmpa )
-      pr_flux      = min( pr_flux_base, pr_flux )
+!      pr_flux      = max( 0.0_r8, pr_flux_tmp  + tmpa )
+!      pr_flux      = min( pr_flux_base, pr_flux )
+      pr_flux = min_max_bound(0.0_r8, pr_flux_base, pr_flux_tmp+tmpa)
 
       do m = 2, pcnst_extd
          if ( .not. doconvproc_extd(m) ) cycle
@@ -2110,6 +2116,18 @@ end subroutine ma_convproc_tend
    return
    end subroutine ma_precpevap_convproc
 
+! ================================================================
+   pure function min_max_bound(minlim, maxlim, input) result(bounded)
+
+        real(r8), intent(in) :: minlim, maxlim
+        real(r8), intent(in) :: input
+
+        !return value
+        real(r8) :: bounded
+
+        bounded = max(min(maxlim, input), minlim)
+
+   end function min_max_bound
 
 !=========================================================================================
    subroutine ma_activate_convproc_method2(     &
