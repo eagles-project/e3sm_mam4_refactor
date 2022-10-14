@@ -1783,7 +1783,7 @@ k_loop_main_cc: &
 ! make adjustments to dcondt for activated & unactivated aerosol species
 !    pairs to account any (or total) resuspension of convective-cloudborne aerosol
       call ma_resuspend_convproc( dcondt, dcondt_resusp,   &
-                                  dp_i, ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
+                                  ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
 
 
 ! calculate new column-tendency variables
@@ -2434,7 +2434,7 @@ end subroutine ma_convproc_tend
 !=========================================================================================
    subroutine ma_resuspend_convproc(                           &
               dcondt,  dcondt_resusp,                          &
-              dp_i,          ktop,  kbot_prevap,  pcnst_extd ) ! REASTER 08/05/2015
+              ktop,  kbot_prevap,  pcnst_extd ) ! REASTER 08/05/2015
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2485,7 +2485,6 @@ end subroutine ma_convproc_tend
                               ! portion of TMR tendency due to resuspension [kg/kg/s]
                               ! (actually, due to the adjustments made here)
 
-   real(r8), intent(in)    :: dp_i(pver) ! pressure thickness of level [mb]
    integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels ! REASTER 08/05/2015
 
 !-----------------------------------------------------------------------
@@ -2500,17 +2499,13 @@ end subroutine ma_convproc_tend
       ! TMR number
       la = numptr_amode(n)
       lc = numptrcw_amode(n) + pcnst
-      if ((la > 0) .and. (la <= pcnst_extd) .and. (lc > 0) .and. (lc <= pcnst_extd)) then
-         call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
-      endif
+      call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
 
       ! TMR mass
       do ll = 1, nspec_amode(n)
          la = lmassptr_amode(ll,n)
          lc = lmassptrcw_amode(ll,n) + pcnst
-          if ((la > 0) .and. (la <= pcnst_extd) .and. (lc > 0) .and. (lc <= pcnst_extd)) then
-            call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
-         endif
+         call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
       enddo   ! "ll = -1, nspec_amode(n)"
    enddo      ! "n = 1, ntot_amode"
 
@@ -2538,16 +2533,16 @@ end subroutine ma_convproc_tend
    integer  :: k
    real(r8) :: qdota, qdotc, qdotac  ! working variables (MR tendencies)
 
-   do k = ktop, kbot_prevap ! REASTER 08/05/2015
-            qdota = dcondt(la,k)
-            qdotc = dcondt(lc,k)
-            qdotac = qdota + qdotc
+   ! only apply adjustments to dcondt for pairs of unactivated (la) and activated (lc) aerosol species
+   if ((la > 0) .and. (la <= pcnst_extd) .and. (lc > 0) .and. (lc <= pcnst_extd)) then
+       do k = ktop, kbot_prevap ! REASTER 08/05/2015
             ! cam5 approach
-            dcondt(la,k) = qdotac
+            dcondt(la,k) = dcondt(la,k) + dcondt(lc,k)
             dcondt(lc,k) = 0.0
-            dcondt_resusp(la,k) = (dcondt(la,k) - qdota)
-            dcondt_resusp(lc,k) = (dcondt(lc,k) - qdotc)
-   enddo
+            dcondt_resusp(la,k) = dcondt(lc,k)
+            dcondt_resusp(lc,k) =  - dcondt(lc,k)
+       enddo
+   endif
 
    return
    end subroutine tmr_tendency
