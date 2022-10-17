@@ -1769,12 +1769,13 @@ k_loop_main_cc: &
 
 
 ! calculate effects of precipitation evaporation
-      call ma_precpevap_convproc( dcondt, dcondt_wetdep,  dcondt_prevap,   &
-                                  dcondt_prevap_hist,                      & 
-                                  rprd,   evapc,          dp_i,            &
-                                  icol,   ktop,           pcnst_extd,      &
-                                  doconvproc_extd,                         &
-                                  species_class ) 
+      call ma_precpevap_convproc(                                                & 
+                                dcondt,  dcondt_prevap,  dcondt_prevap_hist,     & ! inout
+                                dcondt_wetdep,                                   & ! in
+                                rprd,   evapc,           dp_i,                   & ! in
+                                icol,   ktop,            pcnst_extd,             & ! in
+                                doconvproc_extd,         species_class           & ! in
+                                ) 
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
@@ -1896,18 +1897,17 @@ end subroutine ma_convproc_tend
 
 
 !=========================================================================================
-   subroutine ma_precpevap_convproc(                         &
-              dcondt,  dcondt_wetdep, dcondt_prevap,           &
-              dcondt_prevap_hist,                              & 
-              rprd,    evapc,         dp_i,                    &
-              icol,    ktop,          pcnst_extd,              &
-              doconvproc_extd,                                 &
-              species_class           ) 
+   subroutine ma_precpevap_convproc(                           &
+              dcondt,  dcondt_prevap,  dcondt_prevap_hist,     & ! inout
+              dcondt_wetdep,                                   & ! in
+              rprd,    evapc,         dp_i,                    & ! in
+              icol,    ktop,          pcnst_extd,              & ! in
+              doconvproc_extd,        species_class            & ! in
+              ) 
 !-----------------------------------------------------------------------
 !
 ! Purpose:
 ! Calculate resuspension of wet-removed aerosol species resulting precip evaporation
-! for mam_prevap_resusp_optaa = 30
 !
 !     for aerosol mass   species, do non-linear resuspension to coarse mode
 !     for aerosol number species, all the resuspension is done in wetdepa_v2, so do nothing here
@@ -1960,10 +1960,10 @@ end subroutine ma_convproc_tend
 ! local variables
    integer  :: kk
    real(r8) :: pr_flux               ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: pr_flux_tmp
+   real(r8) :: pr_flux_tmp           ! precip flux at base of current layer, after adjustment of resuspension in step 1 [(kg/kg/s)*mb]
    real(r8) :: pr_flux_base          ! precip flux at an effective cloud base for calculations in a particular layer
    real(r8) :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: x_ratio
+   real(r8) :: x_ratio               ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, calculated in step 1 and used in step 2
 
 !-----------------------------------------------------------------------
 
@@ -1971,14 +1971,14 @@ end subroutine ma_convproc_tend
 ! *** note use of non-standard units
 !
 ! precip
-!    tmpdp = dp_i is mb
+!    dp_i is mb
 !    rprd and evapc are kgwtr/kgair/s
-!    pr_flux = tmpdp*rprd is mb*kgwtr/kgair/s
+!    pr_flux = dp_i(kk)*rprd is mb*kgwtr/kgair/s
 !
 ! precip-borne aerosol
 !    dcondt_wetdep is kgaero/kgair/s
 !    wd_flux = tmpdp*dcondt_wetdep is mb*kgaero/kgair/s
-!    dcondt_prevap = del_wd_flux_evap/tmpdp is kgaero/kgair/s
+!    dcondt_prevap = del_wd_flux_evap/dp_i is kgaero/kgair/s
 ! so this works ok too
 !
 
@@ -1989,10 +1989,11 @@ end subroutine ma_convproc_tend
 
    do kk = ktop, pver
 ! step 1 - precip evaporation and aerosol resuspension
-      call ma_precpevap(                                     &
+      call ma_precpevap(                                        &
                             icol,     kk,    dp_i,     evapc,   &  ! in
                             pr_flux,         pr_flux_base,      &  ! inout
-                            pr_flux_tmp,     x_ratio            )  ! out
+                            pr_flux_tmp,     x_ratio            &  ! out
+                        )
 
 ! step 2 - precip production and aerosol scavenging
       call  ma_precpprod(                                         &
@@ -2003,7 +2004,7 @@ end subroutine ma_convproc_tend
               dcondt,    dcondt_prevap,  dcondt_prevap_hist       & ! inout
               )
 
-   enddo ! k
+   enddo ! kk
 
    return
    end subroutine ma_precpevap_convproc
@@ -2019,54 +2020,53 @@ end subroutine ma_convproc_tend
    use ppgrid, only: pcols,pver
    use wetdep, only:  faer_resusp_vs_fprec_evap_mpln
 
-   integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
-   integer,  intent(in)    :: kk
-   real(r8), intent(in)    :: evapc(pcols,pver) ! conv precipitataion evaporation rate (at a certain level) [kg/kg/s]
-   real(r8), intent(in)    :: dp_i(pver)      ! pressure thickness of level [mb]
-
-   real(r8), intent(inout)    :: pr_flux   ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8), intent(inout)    :: pr_flux_base   ! precip flux at an effective cloud base for calculations in a particular layer
-   real(r8), intent(out)    :: pr_flux_tmp   ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8), intent(out)    :: x_ratio
+   integer,  intent(in)      :: icol  ! normal (ungathered) i index for current column
+   integer,  intent(in)      :: kk    ! vertical level
+   real(r8), intent(in)      :: evapc(pcols,pver) ! conv precipitataion evaporation rate [kg/kg/s]
+   real(r8), intent(in)      :: dp_i(pver)        ! pressure thickness of level [mb]
+   real(r8), intent(inout)   :: pr_flux           ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(inout)   :: pr_flux_base      ! precip flux at an effective cloud base for calculations in a particular layer
+   real(r8), intent(out)     :: pr_flux_tmp       ! precip flux at base of current layer, after adjustment in step 1 [(kg/kg/s)*mb]
+   real(r8), intent(out)     :: x_ratio           ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, used in step 2
 
    ! local variables
+   real(r8), parameter :: small_value = 1.0e-30_r8   ! a small value that variables smaller than it are considered as zero
    real(r8) :: ev_flux_local ! local precip flux from evaporation [(kg/kg/s)*mb]
-   real(r8) :: u_old, u_tmp
-   real(r8) :: x_old, x_tmp
+   real(r8) :: pr_ratio_old, pr_ratio_tmp  ! ratio of pr_flux and pr_flux_base, before and after adjustment in step 1
+   real(r8) :: frac_aer_resusp_old, frac_aer_resusp_tmp  ! fraction of precipitation-borne aerosol flux that is NOT resuspended, before and after adjustment in step 1
 
-      ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
-      pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
+   ! adjust pr_flux due to local evaporation
+   ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
+   pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
 
-      if (pr_flux_base < 1.0e-30_r8) then
-         ! when pr_flux_base=0, set u=0 to force 100% resuspension
-         u_old = 1.0_r8
-         x_old = 1.0_r8
-         u_tmp = 0.0_r8
-         x_tmp = 0.0_r8
+   if (pr_flux_base < small_value) then
+      ! when pr_flux_base=0, force 100% resuspension
+         pr_ratio_old = 1.0_r8
+         frac_aer_resusp_old = 1.0_r8
+         pr_ratio_tmp = 0.0_r8
+         frac_aer_resusp_tmp = 0.0_r8
          x_ratio = 0.0_r8
          pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
-         pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
-      else
-         u_old = pr_flux/pr_flux_base
-         u_old = min_max_bound(0.0_r8, 1.0_r8, u_old)
-         x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, 2)
-         x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
-
-         u_tmp = pr_flux_tmp/pr_flux_base
-         u_tmp = min_max_bound(0.0_r8, 1.0_r8, u_tmp)
-         u_tmp = min( u_tmp, u_old )
-         x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_tmp, 2)
-         x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
-         x_tmp = min( x_tmp, x_old )
-
-         if (x_tmp < 1.0e-30_r8) then  ! or check on x?  note that should have x_tmp >= x
+         pr_flux_tmp  = 0.0_r8    ! (the next layer will then have pr_ratio_old = 1)
+   else  ! calculate fraction of resuspension
+         pr_ratio_old = pr_flux/pr_flux_base
+         pr_ratio_old = min_max_bound(0.0_r8, 1.0_r8, pr_ratio_old)
+         frac_aer_resusp_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-pr_ratio_old, 2)  ! 2: log-normal distribution
+         frac_aer_resusp_old = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_old)
+         pr_ratio_tmp = pr_flux_tmp/pr_flux_base
+         pr_ratio_tmp = min_max_bound(0.0_r8, 1.0_r8, pr_ratio_tmp)
+         pr_ratio_tmp = min( pr_ratio_tmp, pr_ratio_old )
+         frac_aer_resusp_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-pr_ratio_tmp, 2)
+         frac_aer_resusp_tmp = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_tmp)
+         frac_aer_resusp_tmp = min( frac_aer_resusp_tmp, frac_aer_resusp_old )
+         if (frac_aer_resusp_tmp < small_value) then
             x_ratio = 0.0_r8
             pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
-            pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
+            pr_flux_tmp  = 0.0_r8    ! (the next layer will then have pr_ratio_old = 1)
          else
-            x_ratio = x_tmp/x_old
+            x_ratio = frac_aer_resusp_tmp/frac_aer_resusp_old
          endif
-      endif
+   endif
 
    return
    end subroutine ma_precpevap
@@ -2094,22 +2094,22 @@ end subroutine ma_convproc_tend
    real(r8), intent(in)    :: dcondt_wetdep(pcnst_extd,pver) ! portion of TMR tendency due to wet removal [kg/kg/s]
    real(r8), intent(in)    :: dp_i(pver)      ! pressure thickness of level [mb]
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
-   real(r8), intent(in)    :: x_ratio
+   real(r8), intent(in)    :: x_ratio    ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, calculated in step 1
    integer,  intent(in)    :: species_class(:)
 
    real(r8), intent(inout)    :: pr_flux   ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8), intent(inout)    :: pr_flux_tmp   ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(inout)    :: pr_flux_tmp   ! precip flux at base of current layer, after adjustment in step 1 [(kg/kg/s)*mb]
    real(r8), intent(inout)    :: pr_flux_base   ! precip flux at an effective cloud base for calculations in a particular layer
    real(r8), intent(inout)    :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
-   real(r8), intent(inout) :: dcondt(pcnst_extd,pver)  ! overall TMR tendency from convection at a certain layer [kg/kg/s]
-   real(r8), intent(inout) :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
-   real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver)   ! dcondt_prevap_hist at a certain layer [kg/kg/s]
+   real(r8), intent(inout)    :: dcondt(pcnst_extd,pver)  ! overall TMR tendency from convection at a certain layer [kg/kg/s]
+   real(r8), intent(inout)    :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
+   real(r8), intent(inout)    :: dcondt_prevap_hist(pcnst_extd,pver)   ! dcondt_prevap_hist at a certain layer [kg/kg/s]
 
    ! local variables
-   real(r8) :: pr_flux_local          ! local precip flux [(kg/kg/s)*mb]
+   real(r8) :: pr_flux_local            ! local precip flux [(kg/kg/s)*mb]
    real(r8) :: wd_flux_local            ! local wet deposition flux [(kg/kg/s)*mb]
    real(r8) :: wd_flux_tmp              ! updated wet deposition flux [(kg/kg/s)*mb]
-   real(r8) :: del_wd_flux_evap      ! change to wet deposition flux from evaporation [(kg/kg/s)*mb]
+   real(r8) :: del_wd_flux_evap         ! change to wet deposition flux from evaporation [(kg/kg/s)*mb]
    real(r8) :: dcondt_wdflux            ! dcondt due to wet deposition flux change [kg/kg/s]
    integer  :: icnst, icnst2, mmtoo
 
