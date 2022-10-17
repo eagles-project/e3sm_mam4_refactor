@@ -2024,39 +2024,10 @@ end subroutine ma_convproc_tend
 ! no big deal except it clutters up the code
 
 ! step 1 - precip evaporation and aerosol resuspension
-      ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
-      pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
-
-      if (pr_flux_base < 1.0e-30_r8) then
-         ! when pr_flux_base=0, set u=0 to force 100% resuspension
-         u_old = 1.0_r8 
-         x_old = 1.0_r8
-         u_tmp = 0.0_r8
-         x_tmp = 0.0_r8
-         x_ratio = 0.0_r8
-         pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer 
-         pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
-      else
-         u_old = pr_flux/pr_flux_base
-         u_old = min_max_bound(0.0_r8, 1.0_r8, u_old)
-         x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, 2)
-         x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
-
-         u_tmp = pr_flux_tmp/pr_flux_base
-         u_tmp = min_max_bound(0.0_r8, 1.0_r8, u_tmp)
-         u_tmp = min( u_tmp, u_old )
-         x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_tmp, 2)
-         x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
-         x_tmp = min( x_tmp, x_old )
-   
-         if (x_tmp < 1.0e-30_r8) then  ! or check on x?  note that should have x_tmp >= x
-            x_ratio = 0.0_r8
-            pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer 
-            pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
-         else
-            x_ratio = x_tmp/x_old
-         endif
-      endif
+      call ma_precpevap(                                     &
+                            icol,     kk,    dp_i,     evapc,   &
+                            pr_flux,         pr_flux_base,      &
+                            pr_flux_tmp,     x_ratio            )
 
 
 ! step 2 - precip production and aerosol scavenging
@@ -2074,12 +2045,67 @@ end subroutine ma_convproc_tend
    end subroutine ma_precpevap_convproc
 
 !=========================================================================================
-  ! subroutine ma_get_precpevap
+   subroutine ma_precpevap(                                     &
+                            icol,     kk,    dp_i,     evapc,   &
+                            pr_flux,         pr_flux_base,      &
+                            pr_flux_tmp,     x_ratio            )
 !------------------------------------------
 ! step 1 in ma_precpevap_convproc: aerosol resuspension from precipitation evaporation
 !------------------------------------------
+   use ppgrid, only: pcols,pver
+   use wetdep, only:  faer_resusp_vs_fprec_evap_mpln
 
- !  end subroutine ma_get_precpevap
+   integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
+   integer,  intent(in)    :: kk
+   real(r8), intent(in)    :: evapc(pcols,pver) ! conv precipitataion evaporation rate (at a certain level) [kg/kg/s]
+   real(r8), intent(in)    :: dp_i(pver)      ! pressure thickness of level [mb]
+   real(r8), intent(out)    :: x_ratio
+
+   real(r8), intent(inout)    :: pr_flux   ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(out)    :: pr_flux_tmp   ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(inout)    :: pr_flux_base   ! precip flux at an effective cloud base for calculations in a particular layer
+
+   ! local variables
+   real(r8) :: ev_flux_local
+   real(r8) :: u_old, u_tmp
+   real(r8) :: x_old, x_tmp
+
+      ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
+      pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
+
+      if (pr_flux_base < 1.0e-30_r8) then
+         ! when pr_flux_base=0, set u=0 to force 100% resuspension
+         u_old = 1.0_r8
+         x_old = 1.0_r8
+         u_tmp = 0.0_r8
+         x_tmp = 0.0_r8
+         x_ratio = 0.0_r8
+         pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
+         pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
+      else
+         u_old = pr_flux/pr_flux_base
+         u_old = min_max_bound(0.0_r8, 1.0_r8, u_old)
+         x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, 2)
+         x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
+
+         u_tmp = pr_flux_tmp/pr_flux_base
+         u_tmp = min_max_bound(0.0_r8, 1.0_r8, u_tmp)
+         u_tmp = min( u_tmp, u_old )
+         x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_tmp, 2)
+         x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
+         x_tmp = min( x_tmp, x_old )
+
+         if (x_tmp < 1.0e-30_r8) then  ! or check on x?  note that should have x_tmp >= x
+            x_ratio = 0.0_r8
+            pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
+            pr_flux_tmp  = 0.0_r8    ! (the next layer will then have u_old = 1)
+         else
+            x_ratio = x_tmp/x_old
+         endif
+      endif
+
+   return
+   end subroutine ma_precpevap
 
 !=========================================================================================
    subroutine ma_precpprod(                                       &
