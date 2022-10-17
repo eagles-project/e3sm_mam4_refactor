@@ -1773,7 +1773,6 @@ k_loop_main_cc: &
                                   dcondt_prevap_hist,                      & 
                                   rprd,   evapc,          dp_i,            &
                                   icol,   ktop,           pcnst_extd,      &
-                                  lun,    lchnk,                           &
                                   doconvproc_extd,                         &
                                   species_class ) 
 
@@ -1902,7 +1901,6 @@ end subroutine ma_convproc_tend
               dcondt_prevap_hist,                              & 
               rprd,    evapc,         dp_i,                    &
               icol,    ktop,          pcnst_extd,              &
-              lun,     lchnk,                                  &
               doconvproc_extd,                                 &
               species_class           ) 
 !-----------------------------------------------------------------------
@@ -1919,15 +1917,6 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
 
    use ppgrid, only: pcols, pver
-   use constituents, only: pcnst
-   use physconst, only: pi, spec_class_aerosol 
-
-   use modal_aero_data, only:  &
-      lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
-      nspec_amode, ntot_amode, numptr_amode, numptrcw_amode, &
-      mmtoo_prevap_resusp, ntoo_prevap_resusp, & 
-      specdens_amode
-   use wetdep, only:  faer_resusp_vs_fprec_evap_mpln
 
    implicit none
 
@@ -1963,8 +1952,6 @@ end subroutine ma_convproc_tend
 
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
-   integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: lchnk  ! chunk index
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
    integer,  intent(in)    :: species_class(:) 
@@ -1972,21 +1959,12 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
 ! local variables
    integer  :: kk
-   real(r8) :: del_wd_flux_evap      ! change to wet deposition flux from evaporation [(kg/kg/s)*mb]
    real(r8) :: pr_flux               ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: pr_flux_old
    real(r8) :: pr_flux_tmp
    real(r8) :: pr_flux_base          ! precip flux at an effective cloud base for calculations in a particular layer
-   real(r8) :: u_old, u_tmp
    real(r8) :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: wd_flux_tmp
-   real(r8) :: x_old, x_tmp, x_ratio
+   real(r8) :: x_ratio
 
-   real(r8) :: ev_flux_local          ! local precip flux from evaporation [(kg/kg/s)*mb]
-   real(r8) :: pr_flux_local          ! local precip flux [(kg/kg/s)*mb]
-   real(r8) :: wd_flux_local            ! local wet deposition flux [(kg/kg/s)*mb]
-   real(r8) :: dcondt_wdflux            ! dcondt due to wet deposition flux change [kg/kg/s]
-   integer  :: icnst, icnst2, mmtoo
 !-----------------------------------------------------------------------
 
 !
@@ -2003,40 +1981,26 @@ end subroutine ma_convproc_tend
 !    dcondt_prevap = del_wd_flux_evap/tmpdp is kgaero/kgair/s
 ! so this works ok too
 !
-! *** dilip switched from tmpdg to tmpdpg = tmpdp/gravit
-! that is incorrect, but probably does not matter
-!    for precip, the u_old and u_tmp are dimensionless
-!    for aerosol, wd_flux units do not matter
-!        only important thing is that tmpdp (or tmpdpg) is used
-!        consistently when going from dcondt to wd_flux then to dcondt
-! 
 
+   ! initiate variables that are integrated in vertical
    pr_flux = 0.0_r8
    pr_flux_base = 0.0_r8
    wd_flux(:) = 0.0_r8
 
-
    do kk = ktop, pver
-
-! note - setting pr_flux_tmp, wd_flux_tmp, u_old, u_tmp, x_old, x_tmp
-!    to zero at this point is not necessary since they are all calculated
-!    "fresh" in each iteration of the "do k" loop
-! no big deal except it clutters up the code
-
 ! step 1 - precip evaporation and aerosol resuspension
       call ma_precpevap(                                     &
-                            icol,     kk,    dp_i,     evapc,   &
-                            pr_flux,         pr_flux_base,      &
-                            pr_flux_tmp,     x_ratio            )
-
+                            icol,     kk,    dp_i,     evapc,   &  ! in
+                            pr_flux,         pr_flux_base,      &  ! inout
+                            pr_flux_tmp,     x_ratio            )  ! out
 
 ! step 2 - precip production and aerosol scavenging
       call  ma_precpprod(                                         &
-              rprd,   dp_i,   icol,    kk,      pcnst_extd,       &
-              doconvproc_extd,  x_ratio,        species_class,    &
-              pr_flux,        pr_flux_tmp,       pr_flux_base,    &
-              wd_flux,    dcondt_wetdep,                          &
-              dcondt,    dcondt_prevap,  dcondt_prevap_hist       &
+              rprd,   dp_i,   icol,    kk,      pcnst_extd,       & ! in
+              doconvproc_extd,  x_ratio,        species_class,    & ! in
+              pr_flux,        pr_flux_tmp,       pr_flux_base,    & ! inout
+              wd_flux,    dcondt_wetdep,                          & ! inout
+              dcondt,    dcondt_prevap,  dcondt_prevap_hist       & ! inout
               )
 
    enddo ! k
@@ -2046,9 +2010,9 @@ end subroutine ma_convproc_tend
 
 !=========================================================================================
    subroutine ma_precpevap(                                     &
-                            icol,     kk,    dp_i,     evapc,   &
-                            pr_flux,         pr_flux_base,      &
-                            pr_flux_tmp,     x_ratio            )
+                            icol,     kk,    dp_i,     evapc,   & ! in
+                            pr_flux,         pr_flux_base,      & ! inout
+                            pr_flux_tmp,     x_ratio            ) ! out
 !------------------------------------------
 ! step 1 in ma_precpevap_convproc: aerosol resuspension from precipitation evaporation
 !------------------------------------------
@@ -2059,14 +2023,14 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: kk
    real(r8), intent(in)    :: evapc(pcols,pver) ! conv precipitataion evaporation rate (at a certain level) [kg/kg/s]
    real(r8), intent(in)    :: dp_i(pver)      ! pressure thickness of level [mb]
-   real(r8), intent(out)    :: x_ratio
 
    real(r8), intent(inout)    :: pr_flux   ! precip flux at base of current layer [(kg/kg/s)*mb]
-   real(r8), intent(out)    :: pr_flux_tmp   ! precip flux at base of current layer [(kg/kg/s)*mb]
    real(r8), intent(inout)    :: pr_flux_base   ! precip flux at an effective cloud base for calculations in a particular layer
+   real(r8), intent(out)    :: pr_flux_tmp   ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(out)    :: x_ratio
 
    ! local variables
-   real(r8) :: ev_flux_local
+   real(r8) :: ev_flux_local ! local precip flux from evaporation [(kg/kg/s)*mb]
    real(r8) :: u_old, u_tmp
    real(r8) :: x_old, x_tmp
 
@@ -2109,11 +2073,11 @@ end subroutine ma_convproc_tend
 
 !=========================================================================================
    subroutine ma_precpprod(                                       &
-              rprd,   dp_i,   icol,    kk,      pcnst_extd,       &
-              doconvproc_extd,  x_ratio,        species_class,    &
-              pr_flux,        pr_flux_tmp,       pr_flux_base,    &
-              wd_flux,    dcondt_wetdep,                          &
-              dcondt,    dcondt_prevap,  dcondt_prevap_hist       &                                     
+              rprd,   dp_i,   icol,    kk,      pcnst_extd,       &  ! in
+              doconvproc_extd,  x_ratio,        species_class,    &  ! in
+              pr_flux,        pr_flux_tmp,       pr_flux_base,    &  ! inout
+              wd_flux,    dcondt_wetdep,                          &  ! inout
+              dcondt,    dcondt_prevap,  dcondt_prevap_hist       &  ! inout                            
               ) 
 !------------------------------------------
 ! step 2 in ma_precpevap_convproc: aerosol scavenging from precipitation production
