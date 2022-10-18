@@ -141,11 +141,7 @@ subroutine nucleati(  &
    real(r8) :: nidep                     ! nucleated number from deposition nucleation
    real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers)
    real(r8) :: n1, ni                    ! nucleated number
-   real(r8) :: tc, A, B, regm            ! work variable
-   real(r8) :: esl, esi, deles           ! work variable
-
-   
-   real(r8)  :: nimeystp                                  ! nucleated number from ice nucleation (meyers) at STP  
+   real(r8) :: tc, A, B, regm            ! work variable  
    real(r8)  :: wbar1, wbar2
 
 
@@ -162,22 +158,23 @@ subroutine nucleati(  &
    niimm = 0._r8
    nidep = 0._r8
    nihf  = 0._r8
-   deles = 0._r8
-   esi   = 0._r8
+
 
    if(so4_num >= 1.0e-10_r8 .and. (soot_num+dst3_num) >= 1.0e-10_r8 .and. cldn > 0._r8) then
 
-      if((tc.le.-35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid).ge.1.2_r8)) then ! use higher RHi threshold
+      if((tc <= -35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid) >= 1.2_r8)) then ! use higher RHi threshold
 
             A = -1.4938_r8 * log(soot_num+dst3_num) + 12.884_r8
             B = -10.41_r8  * log(soot_num+dst3_num) - 67.69_r8
 
             regm = A * log(wbar1) + B
 
-            ! heterogeneous nucleation only
-            if (tc .gt. regm) then
+            
 
-               if(tc.lt.-40._r8 .and. wbar1.gt.1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
+            ! heterogeneous nucleation only
+            if (tc > regm) then
+
+               if(tc < -40._r8 .and. wbar1 > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
                   call hf(tc,wbar1,relhum,so4_num,nihf)
                   niimm=0._r8
@@ -193,7 +190,7 @@ subroutine nucleati(  &
                endif
 
             ! homogeneous nucleation only
-            else if (tc.lt.regm-5._r8) then
+            else if (tc < regm-5._r8) then
 
                call hf(tc,wbar1,relhum,so4_num,nihf)
                niimm=0._r8
@@ -203,7 +200,7 @@ subroutine nucleati(  &
             ! transition between homogeneous and heterogeneous: interpolate in-between
             else
 
-               if (tc.lt.-40._r8 .and. wbar1.gt.1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
+               if (tc < -40._r8 .and. wbar1 > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
                   call hf(tc, wbar1, relhum, so4_num, nihf)
                   niimm = 0._r8
@@ -215,7 +212,7 @@ subroutine nucleati(  &
                   call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
                   call hetero(regm,wbar2,soot_num+dst3_num,niimm,nidep)
 
-                  if (nihf .le. (niimm+nidep)) then
+                  if (nihf <= (niimm+nidep)) then
                      n1 = nihf
                   else
                      n1=(niimm+nidep)*((niimm+nidep)/nihf)**((tc-regm)/5._r8)
@@ -237,7 +234,7 @@ subroutine nucleati(  &
    nimey = 0._r8
 
    nuci=ni+nimey
-   if(nuci.gt.9999._r8.or.nuci.lt.0._r8) then
+   if(nuci > 9999._r8 .or. nuci < 0._r8) then
       nuci=0._r8
    endif
 
@@ -251,35 +248,50 @@ end subroutine nucleati
 
 !===============================================================================
 
-subroutine hetero(T,ww,Ns,Nis,Nid)
+subroutine hetero(Temperature,w_vlc,Ns,Nis,Nid)
 
-    real(r8), intent(in)  :: T, ww, Ns
-    real(r8), intent(out) :: Nis, Nid
+!-------------------------------------------------------------------------------
+! Calculate number of ice crystals by heterogenous freezing (Nis) based on
+! Eq. 4.7 in Liu & Penner (2005), Meteorol. Z.
+!-------------------------------------------------------------------------------
 
-    real(r8) A11,A12,A21,A22,B11,B12,B21,B22
-    real(r8) B,C
+    real(r8), intent(in)  :: Temperature     ! temperature [C]
+    real(r8), intent(in)  :: w_vlc           ! vertical velocity [m/s]
+    real(r8), intent(in)  :: Ns              ! aerosol concentrations [#/cm^3]
+    real(r8), intent(out) :: Nis             ! ice number concentrations [#/cm^3]
+    real(r8), intent(out) :: Nid             ! ice number concentrations [#/cm^3]  
 
 !---------------------------------------------------------------------
 ! parameters
+!---------------------------------------------------------------------
 
-      A11 = 0.0263_r8
-      A12 = -0.0185_r8
-      A21 = 2.758_r8
-      A22 = 1.3221_r8
-      B11 = -0.008_r8
-      B12 = -0.0468_r8
-      B21 = -0.2667_r8
-      B22 = -1.4588_r8
+    real(r8), parameter :: A11 =  0.0263_r8
+    real(r8), parameter :: A12 = -0.0185_r8
+    real(r8), parameter :: A21 =  2.758_r8
+    real(r8), parameter :: A22 =  1.3221_r8
+    real(r8), parameter :: B11 = -0.008_r8
+    real(r8), parameter :: B12 = -0.0468_r8
+    real(r8), parameter :: B21 = -0.2667_r8
+    real(r8), parameter :: B22 = -1.4588_r8
 
-!     ice from immersion nucleation (cm^-3)
+!---------------------------------------------------------------------
+! local variables
+!---------------------------------------------------------------------
+   
+   real(r8) lnNs, lnw, B_coef, C_coef
 
-      B = (A11+B11*log(Ns)) * log(ww) + (A12+B12*log(Ns))
-      C =  A21+B21*log(Ns)
+   lnNs = log(Ns)
+   lnw  = log(w_vlc)
 
-      Nis = exp(A22) * Ns**B22 * exp(B*T) * ww**C
-      Nis = min(Nis,Ns)
+!  ice from immersion nucleation (cm^-3)
 
-      Nid = 0.0_r8    ! don't include deposition nucleation for cirrus clouds when T<-37C
+   B_coef = (A11 + B11*lnNs) * lnw + (A12 + B12*lnNs) 
+   C_coef = A21 + B21*lnNs
+
+   Nis = exp(A22) * Ns**B22 * exp(B_coef*Temperature) * w_vlc**C_coef
+   Nis = min(Nis,Ns)
+
+   Nid = 0.0_r8    ! don't include deposition nucleation for cirrus clouds when T<-37C
 
 end subroutine hetero
 
@@ -330,13 +342,13 @@ subroutine hf(Temperature, w_vlc, RH, Na, Ni)
 
       call calculate_RHw_hf(Temperature, lnw, RHw)
 
-      if((Temperature.le.-37.0_r8) .and. ((RH*subgrid).ge.RHw)) then
+      if((Temperature <= -37.0_r8) .and. ((RH*subgrid) >= RHw)) then
 
         regm = 6.07_r8*lnw-55.0_r8
 
-        if(Temperature.ge.regm) then    ! fast-growth regime
+        if(Temperature >= regm) then    ! fast-growth regime
 
-          if(Temperature.gt.-64.0_r8) then
+          if(Temperature > -64.0_r8) then
             A2_fast=A21_fast
             B2_fast=B21_fast
           else
