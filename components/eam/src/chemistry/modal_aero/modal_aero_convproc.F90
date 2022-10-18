@@ -1954,7 +1954,12 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: ktop  ! index of top cloud level for current column
 
    logical,  intent(in)    :: doconvproc_extd(pcnst_extd)  ! indicates which species to process
-   integer,  intent(in)    :: species_class(:) 
+   integer,  intent(in)    :: species_class(:)  ! specify what kind of species it is. defined at physconst.F90
+                                                ! undefined  = 0
+                                                ! cldphysics = 1
+                                                ! aerosol    = 2
+                                                ! gas        = 3
+                                                ! other      = 4
 
 !-----------------------------------------------------------------------
 ! local variables
@@ -1963,7 +1968,7 @@ end subroutine ma_convproc_tend
    real(r8) :: pr_flux_tmp           ! precip flux at base of current layer, after adjustment of resuspension in step 1 [(kg/kg/s)*mb]
    real(r8) :: pr_flux_base          ! precip flux at an effective cloud base for calculations in a particular layer
    real(r8) :: wd_flux(pcnst_extd)   ! tracer wet deposition flux at base of current layer [(kg/kg/s)*mb]
-   real(r8) :: x_ratio               ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, calculated in step 1 and used in step 2
+   real(r8) :: x_ratio               ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, calculated in step 1 and used in step 2 (see below)
 
 !-----------------------------------------------------------------------
 
@@ -1981,6 +1986,11 @@ end subroutine ma_convproc_tend
 !    dcondt_prevap = del_wd_flux_evap/dp_i is kgaero/kgair/s
 ! so this works ok too
 !
+! *** dilip switched from tmpdg (or dp_i) to tmpdpg = tmpdp/gravit
+! that is incorrect, but probably does not matter
+!    for aerosol, wd_flux units do not matter
+!        only important thing is that tmpdp (or tmpdpg) is used
+!        consistently when going from dcondt to wd_flux then to dcondt
 
    ! initiate variables that are integrated in vertical
    pr_flux = 0.0_r8
@@ -2039,33 +2049,33 @@ end subroutine ma_convproc_tend
    ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
    pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
 
+
+   x_ratio = 0.0_r8
    if (pr_flux_base < small_value) then
-      ! when pr_flux_base=0, force 100% resuspension
-         pr_ratio_old = 1.0_r8
-         frac_aer_resusp_old = 1.0_r8
-         pr_ratio_tmp = 0.0_r8
-         frac_aer_resusp_tmp = 0.0_r8
-         x_ratio = 0.0_r8
          pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
-         pr_flux_tmp  = 0.0_r8    ! (the next layer will then have pr_ratio_old = 1)
-   else  ! calculate fraction of resuspension
-         pr_ratio_old = pr_flux/pr_flux_base
-         pr_ratio_old = min_max_bound(0.0_r8, 1.0_r8, pr_ratio_old)
-         frac_aer_resusp_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-pr_ratio_old, 2)  ! 2: log-normal distribution
-         frac_aer_resusp_old = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_old)
-         pr_ratio_tmp = pr_flux_tmp/pr_flux_base
-         pr_ratio_tmp = min_max_bound(0.0_r8, 1.0_r8, pr_ratio_tmp)
-         pr_ratio_tmp = min( pr_ratio_tmp, pr_ratio_old )
-         frac_aer_resusp_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-pr_ratio_tmp, 2)
-         frac_aer_resusp_tmp = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_tmp)
-         frac_aer_resusp_tmp = min( frac_aer_resusp_tmp, frac_aer_resusp_old )
-         if (frac_aer_resusp_tmp < small_value) then
-            x_ratio = 0.0_r8
-            pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
-            pr_flux_tmp  = 0.0_r8    ! (the next layer will then have pr_ratio_old = 1)
-         else
-            x_ratio = frac_aer_resusp_tmp/frac_aer_resusp_old
-         endif
+         pr_flux_tmp  = 0.0_r8
+          return
+   endif
+
+   ! calculate fraction of resuspension
+   pr_ratio_old = pr_flux/pr_flux_base
+   pr_ratio_old = min_max_bound(0.0_r8, 1.0_r8, pr_ratio_old)
+   frac_aer_resusp_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-pr_ratio_old, 2)  ! 2: log-normal distribution
+   frac_aer_resusp_old = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_old)
+
+   pr_ratio_tmp = min_max_bound(0.0_r8, 1.0_r8, pr_flux_tmp/pr_flux_base)
+   pr_ratio_tmp = min( pr_ratio_tmp, pr_ratio_old )
+   frac_aer_resusp_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-pr_ratio_tmp, 2)
+   frac_aer_resusp_tmp = min_max_bound(0.0_r8, 1.0_r8, frac_aer_resusp_tmp)
+   frac_aer_resusp_tmp = min( frac_aer_resusp_tmp, frac_aer_resusp_old )
+
+   !compute x_ratio
+   if (frac_aer_resusp_tmp > small_value) then
+          x_ratio = frac_aer_resusp_tmp/frac_aer_resusp_old
+   else   ! this will start things fresh at the next layer
+          x_ratio = 0.0_r8
+          pr_flux_base = 0.0_r8
+          pr_flux_tmp  = 0.0_r8
    endif
 
    return
