@@ -2001,7 +2001,8 @@ end subroutine ma_convproc_tend
 ! step 1 - precip evaporation and aerosol resuspension
       call ma_precpevap(                                        &
                             icol,     kk,    dp_i,     evapc,   &  ! in
-                            pr_flux,         pr_flux_base,      &  ! inout
+                            pr_flux,                            &  ! in
+                            pr_flux_base,                       &  ! inout
                             pr_flux_tmp,     x_ratio            &  ! out
                         )
 
@@ -2022,7 +2023,8 @@ end subroutine ma_convproc_tend
 !=========================================================================================
    subroutine ma_precpevap(                                     &
                             icol,     kk,    dp_i,     evapc,   & ! in
-                            pr_flux,         pr_flux_base,      & ! inout
+                            pr_flux,                            & ! in
+                            pr_flux_base,                       & ! inout
                             pr_flux_tmp,     x_ratio            ) ! out
 !------------------------------------------
 ! step 1 in ma_precpevap_convproc: aerosol resuspension from precipitation evaporation
@@ -2034,7 +2036,7 @@ end subroutine ma_convproc_tend
    integer,  intent(in)      :: kk    ! vertical level
    real(r8), intent(in)      :: evapc(pcols,pver) ! conv precipitataion evaporation rate [kg/kg/s]
    real(r8), intent(in)      :: dp_i(pver)        ! pressure thickness of level [mb]
-   real(r8), intent(inout)   :: pr_flux           ! precip flux at base of current layer [(kg/kg/s)*mb]
+   real(r8), intent(in)      :: pr_flux           ! precip flux at base of current layer [(kg/kg/s)*mb]
    real(r8), intent(inout)   :: pr_flux_base      ! precip flux at an effective cloud base for calculations in a particular layer
    real(r8), intent(out)     :: pr_flux_tmp       ! precip flux at base of current layer, after adjustment in step 1 [(kg/kg/s)*mb]
    real(r8), intent(out)     :: x_ratio           ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, used in step 2
@@ -2048,7 +2050,6 @@ end subroutine ma_convproc_tend
    ! adjust pr_flux due to local evaporation
    ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dp_i(kk) )
    pr_flux_tmp = min_max_bound(0.0_r8, pr_flux_base, pr_flux-ev_flux_local)
-
 
    x_ratio = 0.0_r8
    if (pr_flux_base < small_value) then
