@@ -164,6 +164,10 @@ main() {
 
     echo 'Comparison run should be in queue...'
 
+    echo 'Link fast_compile_run.sh script in the comparison directory..'
+    cd $comparison_dir
+    /bin/ln -sf  `./xmlquery SRCROOT --value`/mam4_refactor_scripts/fast_compile_run.sh .
+
     newline && time_elapsed_min
 
     echo '-------------------------------------------------------------------'
