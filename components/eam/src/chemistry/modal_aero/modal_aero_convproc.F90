@@ -49,10 +49,8 @@ module modal_aero_convproc
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
 
-!  method1_activate_nlayers = number of layers (including cloud base) where activation is applied
-   integer, parameter  :: method1_activate_nlayers = 2
-!  method2_activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
-   real(r8), parameter :: method2_activate_smaxmax = 0.003_r8
+!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
+   real(r8), parameter :: activate_smaxmax = 0.003_r8
 
    real(r8), parameter :: factor_reduce_actfrac = 0.5_r8
 
@@ -132,10 +130,8 @@ subroutine ma_convproc_init
       use_cwaer_for_activate_maxsat
    write(*,'(a,l12)')     'ma_convproc_init - apply_convproc_tend_to_ptend  = ', &
       apply_convproc_tend_to_ptend
-   write(*,'(a,i12)')     'ma_convproc_init - method1_activate_nlayers      = ', &
-      method1_activate_nlayers
-   write(*,'(a,1pe12.4)') 'ma_convproc_init - method2_activate_smaxmax      = ', &
-      method2_activate_smaxmax
+   write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
+      activate_smaxmax
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
       factor_reduce_actfrac
 
@@ -1558,12 +1554,11 @@ k_loop_main_bb: &
                if ( do_act_this_lev ) then
                   kactcntb = kactcntb + 1
 
-                  call ma_activate_convproc_method2(                    &
+                  call ma_activate_convproc(                    &
                      conu(:,k),  dconudt_activa(:,k),                   &
                      f_ent,      dt_u(k),             wup(k),           &
                      t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                     pcnst_extd, lun,                                   &
-                     lchnk,      icol,                k,                &
+                     pcnst_extd, icol,                k,                &
                      kactfirst        )
                end if
 
@@ -2011,8 +2006,8 @@ end subroutine ma_convproc_tend
               rprd,   dp_i,   icol,    kk,      pcnst_extd,       & ! in
               doconvproc_extd,  x_ratio,        species_class,    & ! in
               pr_flux,        pr_flux_tmp,       pr_flux_base,    & ! inout
-              wd_flux,    dcondt_wetdep,                          & ! inout
-              dcondt,    dcondt_prevap,  dcondt_prevap_hist       & ! inout
+              wd_flux,        dcondt_wetdep,                      & ! inout
+              dcondt,         dcondt_prevap,  dcondt_prevap_hist  & ! inout
               )
 
    enddo ! kk
@@ -2055,7 +2050,7 @@ end subroutine ma_convproc_tend
    if (pr_flux_base < small_value) then
          pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
          pr_flux_tmp  = 0.0_r8
-          return
+         return
    endif
 
    ! calculate fraction of resuspension
@@ -2074,7 +2069,6 @@ end subroutine ma_convproc_tend
    if (frac_aer_resusp_tmp > small_value) then
           x_ratio = frac_aer_resusp_tmp/frac_aer_resusp_old
    else   ! this will start things fresh at the next layer
-          x_ratio = 0.0_r8
           pr_flux_base = 0.0_r8
           pr_flux_tmp  = 0.0_r8
    endif
@@ -2185,12 +2179,11 @@ end subroutine ma_convproc_tend
    end function min_max_bound
 
 !=========================================================================================
-   subroutine ma_activate_convproc_method2(     &
+   subroutine ma_activate_convproc(             &
               conu,       dconudt,              &
               f_ent,      dt_u,      wup,       &
               tair,       rhoair,    fracice,   &
-              pcnst_extd, lun,                  &
-              lchnk,      i,         k,         &
+              pcnst_extd, i,         k,         &
               kactfirst    )
 !-----------------------------------------------------------------------
 !
@@ -2262,8 +2255,6 @@ end subroutine ma_convproc_tend
 
    real(r8), intent(in)    :: fracice ! Fraction of ice within the cloud
                                      ! used as in-cloud wet removal rate
-   integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: lchnk  ! chunk index
    integer,  intent(in)    :: i      ! column index
    integer,  intent(in)    :: k      ! level index
    integer,  intent(in)    :: kactfirst ! k at cloud base
@@ -2305,30 +2296,30 @@ end subroutine ma_convproc_tend
       tmpb = 0.0_r8
       do ll = 1, nspec_amode(n)
          tmpc = max( conu(lmassptr_amode(ll,n)), 0.0_r8 )
-         if ( use_cwaer_for_activate_maxsat ) &
-         tmpc = tmpc + max( conu(lmassptrcw_amode(ll,n)+pcnst), 0.0_r8 )
+         if ( use_cwaer_for_activate_maxsat )  then
+                tmpc = tmpc + max( conu(lmassptrcw_amode(ll,n)+pcnst), 0.0_r8 )
+         endif
          tmpc = tmpc / specdens_amode(lspectype_amode(ll,n))
          tmpa = tmpa + tmpc
          tmpb = tmpb + tmpc * spechygro(lspectype_amode(ll,n))
-      end do
+      enddo
       vaerosol(n) = tmpa * rhoair
       if (tmpa < 1.0e-35_r8) then
          hygro(n) = 0.2_r8
       else
          hygro(n) = tmpb/tmpa
-      end if
+      endif
 
 ! load a (or a+cw) number and bound it
       tmpa = max( conu(numptr_amode(n)), 0.0_r8 )
-      if ( use_cwaer_for_activate_maxsat ) &
-      tmpa = tmpa + max( conu(numptrcw_amode(n)+pcnst), 0.0_r8 )
+      if ( use_cwaer_for_activate_maxsat ) then 
+              tmpa = tmpa + max( conu(numptrcw_amode(n)+pcnst), 0.0_r8 )
+      endif
       naerosol(n) = tmpa * rhoair
-      naerosol(n) = max( naerosol(n),   &
-                         vaerosol(n)*voltonumbhi_amode(n) )
-      naerosol(n) = min( naerosol(n),   &
-                         vaerosol(n)*voltonumblo_amode(n) )
+      naerosol(n) = max( naerosol(n), vaerosol(n)*voltonumbhi_amode(n) )
+      naerosol(n) = min( naerosol(n), vaerosol(n)*voltonumblo_amode(n) )
 
-   end do
+   enddo
 
 
 ! call Razzak-Ghan activation routine with single updraft
@@ -2349,12 +2340,12 @@ end subroutine ma_convproc_tend
    else
 ! above cloud base - do secondary activation with prescribed supersat 
 ! that is constant with height
-      smax_prescribed = method2_activate_smaxmax
+      smax_prescribed = activate_smaxmax
       call activate_modal(                                                 &
          wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
          naerosol, ntot_amode, vaerosol, hygro,                            &
          fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed               )
-   end if
+   endif
 
 
       
@@ -2371,7 +2362,7 @@ end subroutine ma_convproc_tend
             la = lmassptr_amode(ll,n)
             lc = lmassptrcw_amode(ll,n) + pcnst
             tmp_fact = fm(n)
-         end if
+         endif
 
 
          delact = min( conu(la)*tmp_fact, conu(la) )
@@ -2380,11 +2371,11 @@ end subroutine ma_convproc_tend
          conu(lc) = conu(lc) + delact
          dconudt(la) = -delact*dt_u_inv
          dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
+      enddo
+   enddo   ! "n = 1, ntot_amode"
 
    return
-   end subroutine ma_activate_convproc_method2
+   end subroutine ma_activate_convproc
 
 
 
