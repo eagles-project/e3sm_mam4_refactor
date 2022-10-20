@@ -1212,6 +1212,9 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 end subroutine explmix
 
 !===============================================================================
+!  BJG:  sigw is not needed in single updraft case and can be removed from argument list.
+!  BJG:  However, this needs to be done from the invocations of this function, not only
+!  BJG:  in ndrop.F90, but in chemistry/modal_aero/modal_aero_convproc.F90
 
 subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    na, nmode, volume, hygro, &
@@ -1230,25 +1233,25 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
    !      input
 
-   real(r8), intent(in) :: wbar          ! grid cell mean vertical velocity (m/s)
-   real(r8), intent(in) :: sigw          ! subgrid standard deviation of vertical vel (m/s)
-   real(r8), intent(in) :: wdiab         ! diabatic vertical velocity (0 if adiabatic)
-   real(r8), intent(in) :: wminf         ! minimum updraft velocity for integration (m/s)
-   real(r8), intent(in) :: wmaxf         ! maximum updraft velocity for integration (m/s)
-   real(r8), intent(in) :: tair          ! air temperature (K)
-   real(r8), intent(in) :: rhoair        ! air density (kg/m3)
-   real(r8), intent(in) :: na(:)      ! aerosol number concentration (/m3)
+   real(r8), intent(in) :: wbar          ! grid cell mean vertical velocity [m/s]
+   real(r8), intent(in) :: sigw          ! subgrid standard deviation of vertical vel [m/s]
+   real(r8), intent(in) :: wdiab         ! diabatic vertical velocity (0 if adiabatic) BJG 
+   real(r8), intent(in) :: wminf         ! minimum updraft velocity for integration [m/s]
+   real(r8), intent(in) :: wmaxf         ! maximum updraft velocity for integration [m/s]
+   real(r8), intent(in) :: tair          ! air temperature [K]
+   real(r8), intent(in) :: rhoair        ! air density [kg/m3]
+   real(r8), intent(in) :: na(:)      ! aerosol number concentration [#/m3]
    integer,  intent(in) :: nmode      ! number of aerosol modes
-   real(r8), intent(in) :: volume(:)  ! aerosol volume concentration (m3/m3)
-   real(r8), intent(in) :: hygro(:)   ! hygroscopicity of aerosol mode
+   real(r8), intent(in) :: volume(:)  ! aerosol volume concentration [m3/m3]
+   real(r8), intent(in) :: hygro(:)   ! hygroscopicity of aerosol mode [dimensionless]
 
    !      output
 
-   real(r8), intent(out) :: fn(:)      ! number fraction of aerosols activated
-   real(r8), intent(out) :: fm(:)      ! mass fraction of aerosols activated
-   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud (cm/s)
-   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud (cm/s)
-   real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation (cm/s)
+   real(r8), intent(out) :: fn(:)      ! number fraction of aerosols activated [fraction]
+   real(r8), intent(out) :: fm(:)      ! mass fraction of aerosols activated [fraction]
+   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud BJG (cm/s)
+   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud BJG (cm/s)
+   real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation BJG(cm/s)
    !    rce-comment
    !    used for consistency check -- this should match (ekd(k)*zs(k))
    !    also, fluxm/flux_fullact gives fraction of aerosol mass flux
@@ -1260,66 +1263,35 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    !      local
 
    integer, parameter:: nx=200
-!  BJG   integer iquasisect_option, isectional
-!  BJG    real(r8) integ,integf
-   real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure (Pa)
-! BJG   real(r8) xmin(nmode),xmax(nmode) ! ln(r) at section interfaces
-! BJG   real(r8) volmin(nmode),volmax(nmode) ! volume at interfaces
-! BJG   real(r8) tmass ! total aerosol mass concentration (g/cm3)
-! BJG   real(r8) sign(nmode)    ! geometric standard deviation of size distribution
-! BJG   real(r8) rm ! number mode radius of aerosol at max supersat (cm)
-   real(r8) pres ! pressure (Pa)
-! BJG   real(r8) path ! mean free path (m)
-! BJG   real(r8) diff ! diffusivity (m2/s)
-! BJG   real(r8) conduct ! thermal conductivity (Joule/m/sec/deg)
-   real(r8) diff0,conduct0
-   real(r8) es ! saturation vapor pressure
-   real(r8) qs ! water vapor saturation mixing ratio
-   real(r8) dqsdt ! change in qs with temperature
-! BJG   real(r8) dqsdp ! change in qs with pressure
-!  BJG:  maybe change name of 'g'?
-   real(r8) g ! thermodynamic function (m2/s)
+   real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure [Pa]
+   real(r8) pres ! pressure [Pa]
+! BJG   real(r8) diff0,conduct0
+   real(r8) diff0 ! BJG reference thermal diffusivity [m2/s]
+   real(r8) conduct0 ! BJG reference thermal conductivity [J / (m-sec-deg)]
+   real(r8) es ! saturation vapor pressure BJG
+   real(r8) qs ! water vapor saturation mixing ratio BJG
+   real(r8) dqsdt ! change in qs with temperature  BJG
    real(r8) zeta(nmode), eta(nmode)
    real(r8) lnsmax ! ln(smax)
    real(r8) alpha
    real(r8) gamma
    real(r8) beta
-   real(r8) sqrtg(nmode)
+! BJG  real(r8) g ! thermodynamic function [m2/s]
+   real(r8) gthermfac ! thermodynamic function [m2/s]
+! BJG   real(r8) sqrtg(nmode)! sqrt of thermodynamic function [m / s^0.5]
    real(r8) :: amcube(nmode) ! cube of dry mode radius (m)
-! BJG   real(r8) :: smcrit(nmode) ! critical supersatuation for activation
-   real(r8) :: lnsm(nmode) ! ln(smcrit)
    real(r8) smc(nmode) ! critical supersaturation for number mode radius
-! BJG   real(r8) sumflx_fullact
-! BJG   real(r8) sumflxn(nmode)
-! BJG   real(r8) sumflxm(nmode)
-! BJG   real(r8) sumfn(nmode)
-! BJG   real(r8) sumfm(nmode)
-! BJG   real(r8) fnold(nmode)   ! number fraction activated
-! BJG   real(r8) fmold(nmode)   ! mass fraction activated
-! BJG   real(r8) wold,gold
-! BJG   real(r8) alogam
-! BJG   real(r8) rlo,rhi,xint1,xint2,xint3,xint4
-! BJG   real(r8) wmin,wmax,w,dw,dwmax,dwmin,wnuc,dwnew,wb
+   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation)
+
    real(r8) w,wnuc
-! BJG   real(r8) dfmin,dfmax,fnew,fold,fnmin,fnbar,fsbar,fmbar
    real(r8) alw,sqrtalw
    real(r8) smax
-!  BJG:  maybe rename x below?
-   real(r8) x,arg
-! BJG  real(r8) xmincoeff,xcut,volcut,surfcut
-   real(r8) xmincoeff
-! BJG  real(r8) z,z1,z2,wf1,wf2,zf1,zf2,gf1,gf2,gf
+!  BJG   real(r8) x,arg
+   real(r8) arg_erf_n,arg_erf_m
+!  BJG assigned but not otherwise used apparently   real(r8) xmincoeff
    real(r8) etafactor1,etafactor2(nmode),etafactor2max
-! BJG   integer m,n
    integer m
-   !      numerical integration parameters
-! BJG   real(r8), parameter :: eps=0.3_r8,fmax=0.99_r8,sds=3._r8
 
-! BJG   real(r8), parameter :: namin=1.e6_r8   ! minimum aerosol number concentration (/m3)
-
-!   integer ndist(nx)  ! accumulates frequency distribution of integration bins required
-!   data ndist/nx*0/
-!   save ndist
 
    fn(:)=0._r8
    fm(:)=0._r8
@@ -1355,38 +1327,9 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    alpha=gravit*(latvap/(cpair*rh2o*tair*tair)-1._r8/(rair*tair))
    gamma=(1+latvap/cpair*dqsdt)/(rhoair*qs)
    etafactor2max=1.e10_r8/(alpha*wmaxf)**1.5_r8 ! this should make eta big if na is very small.
+   gthermfac=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
+           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
 
-   do m=1,nmode
-      if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
-         !            number mode radius (m)
-         !           write(iulog,*)'alogsig,volc,na=',alogsig(m),volc(m),na(m)
-         amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
-         !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
-         !           should depend on mean radius of mode to account for gas kinetic effects
-         !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
-         !           for approriate size to use for effective diffusivity.
-         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-            +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-         sqrtg(m)=sqrt(g)
-         beta=2._r8*pi*rhoh2o*g*gamma
-         etafactor2(m)=1._r8/(na(m)*beta*sqrtg(m))
-         if(hygro(m).gt.1.e-10_r8)then
-            smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
-         else
-            smc(m)=100._r8
-         endif
-         !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
-      else
-         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-            +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-         sqrtg(m)=sqrt(g)
-         smc(m)=1._r8
-         etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
-      endif
-      lnsm(m)=log(smc(m)) ! only if variable size dist
-      !	 write(iulog,'(a,i4,4g12.2)')'m,na,amcube,hygro,sm,lnsm=', &
-      !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
-   enddo
 
       !        single updraft
 ! BJG      wnuc=wbar+wdiab
@@ -1400,10 +1343,51 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          sqrtalw=sqrt(alw)
          etafactor1=alw*sqrtalw
 
-         do m=1,nmode
-            eta(m)=etafactor1*etafactor2(m)
-            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
-         enddo
+
+   do m=1,nmode
+      if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
+         !            number mode radius (m)
+         !           write(iulog,*)'alogsig,volc,na=',alogsig(m),volc(m),na(m)
+         amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
+         !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
+         !           should depend on mean radius of mode to account for gas kinetic effects
+         !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
+         !           for approriate size to use for effective diffusivity.
+! BJG - these do not depend on mode, no reason to have in loop, or be arrays, defined above  g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
+!           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
+!         sqrtg(m)=sqrt(g)
+!  BJG         beta=2._r8*pi*rhoh2o*g*gamma
+         beta=2._r8*pi*rhoh2o*gthermfac*gamma
+! BJG         etafactor2(m)=1._r8/(na(m)*beta*sqrtg(m))
+         etafactor2(m)=1._r8/(na(m)*beta*sqrt(gthermfac))
+         if(hygro(m).gt.1.e-10_r8)then
+            smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
+         else
+            smc(m)=100._r8
+         endif
+         !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
+      else
+! BJG         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
+! BJG           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
+! BJG         sqrtg(m)=sqrt(g)
+         smc(m)=1._r8
+         etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
+      endif
+      lnsm(m)=log(smc(m)) ! only if variable size dist
+      !	 write(iulog,'(a,i4,4g12.2)')'m,na,amcube,hygro,sm,lnsm=', &
+      !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
+
+
+      eta(m)=etafactor1*etafactor2(m)
+! BJG      zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
+      zeta(m)=twothird*sqrtalw*aten/sqrt(gthermfac)
+
+   enddo
+
+!  BJG move contents of this loop into above loop         do m=1,nmode
+!            eta(m)=etafactor1*etafactor2(m)
+!            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
+!         enddo
          ! use smax_prescribed if it is present; otherwise get smax from subr maxsat
          if ( present( smax_prescribed ) ) then
             smax = smax_prescribed
@@ -1412,19 +1396,23 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          endif
 
          lnsmax=log(smax)
-         xmincoeff=alogaten-twothird*(lnsmax-alog2)-alog3
+!  BJG not otherwise used?         xmincoeff=alogaten-twothird*(lnsmax-alog2)-alog3
 
 
          do m=1,nmode
             !                 modal
-            x=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
-            fn(m)=0.5_r8*(1._r8-erf(x))
-            arg=x-1.5_r8*sq2*alogsig(m)
-            fm(m)=0.5_r8*(1._r8-erf(arg))
-            if(wbar.gt.0._r8)then
+! BJG            x=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
+            arg_erf_n=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
+! BJG            fn(m)=0.5_r8*(1._r8-erf(x))
+            fn(m)=0.5_r8*(1._r8-erf(arg_erf_n))
+! BJG            arg=x-1.5_r8*sq2*alogsig(m)
+            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(m)
+! BJG            fm(m)=0.5_r8*(1._r8-erf(arg))
+            fm(m)=0.5_r8*(1._r8-erf(arg_erf_m))
+! BJG this is always true if this point is reached    if(wbar.gt.0._r8)then
                fluxn(m)=fn(m)*w
                fluxm(m)=fm(m)*w
-            endif
+!            endif
          enddo
          flux_fullact = w
 
