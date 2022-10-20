@@ -2274,7 +2274,7 @@ end subroutine ma_convproc_tend
    real(r8) :: sigw                  ! standard deviation of updraft velocity (cm/s)
    real(r8) :: smax_prescribed       ! prescribed supersaturation for secondary activation (0-1 fraction)
    real(r8) :: tmpa, tmpb, tmpc      ! working variable
-   real(r8) :: tmp_fact              ! working variable
+   real(r8) :: act_frac              ! activation fraction
    real(r8) :: vaerosol(ntot_amode)   ! int+act volume (m3/m3)
    real(r8) :: wbar                  ! mean updraft velocity (cm/s)
    real(r8) :: wdiab                 ! diabatic vertical velocity (cm/s)
@@ -2315,36 +2315,58 @@ end subroutine ma_convproc_tend
          fn, fm, fluxn, fluxm, flux_fullact,                           & ! out
          smax_prescribed                                               ) ! optional in
    endif
-
-
       
 ! apply the activation fractions to the updraft aerosol mixing ratios
    dt_u_inv = 1.0_r8/dt_u
 
    do imode = 1, ntot_amode
-      do ispec = 0, nspec_amode(imode)
-         if (ispec == 0) then
-            la = numptr_amode(imode)
-            lc = numptrcw_amode(imode) + pcnst
-            tmp_fact = fn(imode)
-         else
+        ! for aerosol number
+        la = numptr_amode(imode)
+        lc = numptrcw_amode(imode) + pcnst
+        act_frac = fn(imode)
+        call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
+        ! for aerosol mass
+        do ispec = 1, nspec_amode(imode)
             la = lmassptr_amode(ispec,imode)
             lc = lmassptrcw_amode(ispec,imode) + pcnst
-            tmp_fact = fm(imode)
-         endif
-
-
-         delact = min( conu(la)*tmp_fact, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      enddo  ! ispec
+            act_frac = fm(imode)
+            call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
+        enddo  ! ispec
    enddo   ! imode
 
    return
    end subroutine ma_activate_convproc
+
+!========================================================================================
+   subroutine update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                                        pcnst_extd,  la,    lc,        & ! in
+                                        act_frac,    dt_u_inv          ) ! in
+!-----------------------------------------------------------------------
+! update conu and dconudt from activation fraction
+!-----------------------------------------------------------------------
+! arguments:
+   integer, intent(in)     :: pcnst_extd
+   real(r8), intent(inout) :: conu(pcnst_extd)    ! TMR concentration [#/kg or kg/kg]
+   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
+   real(r8), intent(in)    :: act_frac            ! activation fraction [fraction]
+   real(r8), intent(in)    :: dt_u_inv            ! 1.0/dt_u  [1/s]
+   integer, intent(in)     :: la                  ! indices for interstitial aerosols
+   integer, intent(in)     :: lc                  ! indices for in-cloud water aerosols
+! local variable
+   real(r8)     :: delact   ! change of aerosols due to activation [#/kg or kg/kg]
+
+   delact = min_max_bound(0.0_r8, conu(la), conu(la)*act_frac)
+   ! update conu in interstitial and in-cloud condition
+   conu(la) = conu(la) - delact
+   conu(lc) = conu(lc) + delact
+   ! update dconu/dt
+   dconudt(la) = -delact*dt_u_inv
+   dconudt(lc) =  delact*dt_u_inv
+
+   return
+   end subroutine update_conu_from_act_frac
 
 !========================================================================================
    subroutine aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
