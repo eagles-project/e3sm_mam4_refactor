@@ -2285,37 +2285,9 @@ end subroutine ma_convproc_tend
 ! check f_ent > 0
    if (f_ent <= 0.0) return
 
-
-   do imode = 1, ntot_amode
-! compute a (or a+cw) volume and hygroscopicity
-      tmpa = 0.0_r8
-      tmpb = 0.0_r8
-      do ispec = 1, nspec_amode(imode)
-         tmpc = max( conu(lmassptr_amode(ispec,imode)), 0.0_r8 )
-         if ( use_cwaer_for_activate_maxsat )  then
-                tmpc = tmpc + max( conu(lmassptrcw_amode(ispec,imode)+pcnst), 0.0_r8 )
-         endif
-         tmpc = tmpc / specdens_amode(lspectype_amode(ispec,imode))
-         tmpa = tmpa + tmpc
-         tmpb = tmpb + tmpc * spechygro(lspectype_amode(ispec,imode))
-      enddo
-      vaerosol(imode) = tmpa * rhoair
-      if (tmpa < 1.0e-35_r8) then
-         hygro(imode) = 0.2_r8
-      else
-         hygro(imode) = tmpb/tmpa
-      endif
-
-! load a (or a+cw) number and bound it
-      tmpa = max( conu(numptr_amode(imode)), 0.0_r8 )
-      if ( use_cwaer_for_activate_maxsat ) then 
-              tmpa = tmpa + max( conu(numptrcw_amode(imode)+pcnst), 0.0_r8 )
-      endif
-      naerosol(imode) = tmpa * rhoair
-      naerosol(imode) = max( naerosol(imode), vaerosol(imode)*voltonumbhi_amode(imode) )
-      naerosol(imode) = min( naerosol(imode), vaerosol(imode)*voltonumblo_amode(imode) )
-
-   enddo  ! imode
+! calculate aerosol (or a+cw) volume, number and hygroscopicity
+   call aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                           vaerosol,   naerosol, hygro      ) ! out
 
 
 ! call Razzak-Ghan activation routine with single updraft
@@ -2374,7 +2346,68 @@ end subroutine ma_convproc_tend
    return
    end subroutine ma_activate_convproc
 
+!========================================================================================
+   subroutine aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                                 vaerosol,   naerosol, hygro      ) ! out
+!-----------------------------------------------------------------------
+! calculate aerosol volume, number and hygroscopicity 
+!-----------------------------------------------------------------------
+                                
+   use constituents, only: pcnst
+   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
+      lspectype_amode, nspec_amode, ntot_amode,  &
+      numptr_amode, numptrcw_amode, &
+      specdens_amode, spechygro, &
+      voltonumblo_amode, voltonumbhi_amode
 
+!-----------------------------------------------------------------------
+! arguments:
+   implicit none
+   integer, intent(in)     :: pcnst_extd             ! TMR index
+   ! conu = tracer mixing ratios in updraft at top of this (current) level. The conu are changed by activation
+   real(r8), intent(in)    :: conu(pcnst_extd)       ! TMR [#/kg or kg/kg]
+   real(r8), intent(in)    :: rhoair                 ! air density [kg/m3]
+   real(r8), intent(out)   :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
+   real(r8), intent(out)   :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
+   real(r8), intent(out)   :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
+
+! local variables
+   integer  :: imode, ispec          ! index
+   real(r8) :: tmp_vol_spec          ! aerosol volume for a single species [m3/kg]
+   real(r8) :: tmp_vol               ! aerosol volume [m3/kg]
+   real(r8) :: tmp_num               ! aerosol number [#/kg]
+   real(r8) :: tmp_hygro             ! aerosol hygroscopicity * volume [m3/kg]
+   real(r8) :: n_min, n_max          ! min and max bound of naerosol
+   real(r8), parameter :: small_value = 1.0e-35_r8    ! a small value that variables smaller than it are considered as zero
+!-----------------------------------------------------------------------
+
+   do imode = 1, ntot_amode
+
+      ! compute aerosol (or a+cw) volume and hygroscopicity
+      tmp_vol = 0.0_r8
+      tmp_hygro = 0.0_r8
+      do ispec = 1, nspec_amode(imode)
+         tmp_vol_spec = max( conu(lmassptr_amode(ispec,imode)), 0.0_r8 ) / specdens_amode(lspectype_amode(ispec,imode))    ! mass divided by density
+         tmp_vol = tmp_vol + tmp_vol_spec ! total aerosol volume
+         tmp_hygro = tmp_hygro + tmp_vol_spec * spechygro(lspectype_amode(ispec,imode))   ! volume*hygro suming up for all species
+      enddo
+      vaerosol(imode) = tmp_vol * rhoair   ! change volume from m3/kgair to m3/m3air
+      if (tmp_vol < small_value) then
+         hygro(imode) = 0.2_r8
+      else
+         hygro(imode) = tmp_hygro/tmp_vol
+      endif
+
+      ! computer a (or a+cw) number and bound it
+      tmp_num = max( conu(numptr_amode(imode)), 0.0_r8 )
+      n_min = vaerosol(imode)*voltonumbhi_amode(imode)
+      n_max = vaerosol(imode)*voltonumblo_amode(imode)
+      naerosol(imode) = min_max_bound(n_min, n_max, tmp_num*rhoair)
+
+   enddo  ! imode
+
+   return
+   end subroutine aer_vol_num_hygro
 
 !=========================================================================================
    subroutine ma_resuspend_convproc(                           &
