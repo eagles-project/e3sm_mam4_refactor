@@ -1260,23 +1260,24 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    !      local
 
    integer, parameter:: nx=200
-   integer iquasisect_option, isectional
-   real(r8) integ,integf
+!  BJG   integer iquasisect_option, isectional
+!  BJG    real(r8) integ,integf
    real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure (Pa)
-   real(r8) xmin(nmode),xmax(nmode) ! ln(r) at section interfaces
-   real(r8) volmin(nmode),volmax(nmode) ! volume at interfaces
-   real(r8) tmass ! total aerosol mass concentration (g/cm3)
-   real(r8) sign(nmode)    ! geometric standard deviation of size distribution
-   real(r8) rm ! number mode radius of aerosol at max supersat (cm)
+! BJG   real(r8) xmin(nmode),xmax(nmode) ! ln(r) at section interfaces
+! BJG   real(r8) volmin(nmode),volmax(nmode) ! volume at interfaces
+! BJG   real(r8) tmass ! total aerosol mass concentration (g/cm3)
+! BJG   real(r8) sign(nmode)    ! geometric standard deviation of size distribution
+! BJG   real(r8) rm ! number mode radius of aerosol at max supersat (cm)
    real(r8) pres ! pressure (Pa)
-   real(r8) path ! mean free path (m)
-   real(r8) diff ! diffusivity (m2/s)
-   real(r8) conduct ! thermal conductivity (Joule/m/sec/deg)
+! BJG   real(r8) path ! mean free path (m)
+! BJG   real(r8) diff ! diffusivity (m2/s)
+! BJG   real(r8) conduct ! thermal conductivity (Joule/m/sec/deg)
    real(r8) diff0,conduct0
    real(r8) es ! saturation vapor pressure
    real(r8) qs ! water vapor saturation mixing ratio
    real(r8) dqsdt ! change in qs with temperature
-   real(r8) dqsdp ! change in qs with pressure
+! BJG   real(r8) dqsdp ! change in qs with pressure
+!  BJG:  maybe change name of 'g'?
    real(r8) g ! thermodynamic function (m2/s)
    real(r8) zeta(nmode), eta(nmode)
    real(r8) lnsmax ! ln(smax)
@@ -1285,36 +1286,40 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    real(r8) beta
    real(r8) sqrtg(nmode)
    real(r8) :: amcube(nmode) ! cube of dry mode radius (m)
-   real(r8) :: smcrit(nmode) ! critical supersatuation for activation
+! BJG   real(r8) :: smcrit(nmode) ! critical supersatuation for activation
    real(r8) :: lnsm(nmode) ! ln(smcrit)
    real(r8) smc(nmode) ! critical supersaturation for number mode radius
-   real(r8) sumflx_fullact
-   real(r8) sumflxn(nmode)
-   real(r8) sumflxm(nmode)
-   real(r8) sumfn(nmode)
-   real(r8) sumfm(nmode)
-   real(r8) fnold(nmode)   ! number fraction activated
-   real(r8) fmold(nmode)   ! mass fraction activated
-   real(r8) wold,gold
-   real(r8) alogam
-   real(r8) rlo,rhi,xint1,xint2,xint3,xint4
-   real(r8) wmin,wmax,w,dw,dwmax,dwmin,wnuc,dwnew,wb
-   real(r8) dfmin,dfmax,fnew,fold,fnmin,fnbar,fsbar,fmbar
+! BJG   real(r8) sumflx_fullact
+! BJG   real(r8) sumflxn(nmode)
+! BJG   real(r8) sumflxm(nmode)
+! BJG   real(r8) sumfn(nmode)
+! BJG   real(r8) sumfm(nmode)
+! BJG   real(r8) fnold(nmode)   ! number fraction activated
+! BJG   real(r8) fmold(nmode)   ! mass fraction activated
+! BJG   real(r8) wold,gold
+! BJG   real(r8) alogam
+! BJG   real(r8) rlo,rhi,xint1,xint2,xint3,xint4
+! BJG   real(r8) wmin,wmax,w,dw,dwmax,dwmin,wnuc,dwnew,wb
+   real(r8) w,wnuc
+! BJG   real(r8) dfmin,dfmax,fnew,fold,fnmin,fnbar,fsbar,fmbar
    real(r8) alw,sqrtalw
    real(r8) smax
+!  BJG:  maybe rename x below?
    real(r8) x,arg
-   real(r8) xmincoeff,xcut,volcut,surfcut
-   real(r8) z,z1,z2,wf1,wf2,zf1,zf2,gf1,gf2,gf
+! BJG  real(r8) xmincoeff,xcut,volcut,surfcut
+   real(r8) xmincoeff
+! BJG  real(r8) z,z1,z2,wf1,wf2,zf1,zf2,gf1,gf2,gf
    real(r8) etafactor1,etafactor2(nmode),etafactor2max
-   integer m,n
+! BJG   integer m,n
+   integer m
    !      numerical integration parameters
-   real(r8), parameter :: eps=0.3_r8,fmax=0.99_r8,sds=3._r8
+! BJG   real(r8), parameter :: eps=0.3_r8,fmax=0.99_r8,sds=3._r8
 
-   real(r8), parameter :: namin=1.e6_r8   ! minimum aerosol number concentration (/m3)
+! BJG   real(r8), parameter :: namin=1.e6_r8   ! minimum aerosol number concentration (/m3)
 
-   integer ndist(nx)  ! accumulates frequency distribution of integration bins required
-   data ndist/nx*0/
-   save ndist
+!   integer ndist(nx)  ! accumulates frequency distribution of integration bins required
+!   data ndist/nx*0/
+!   save ndist
 
    fn(:)=0._r8
    fm(:)=0._r8
@@ -1322,9 +1327,20 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    fluxm(:)=0._r8
    flux_fullact=0._r8
 
+!  BJG:  nontrivial single updraft is apparently sigw.le.1.e-5_r8 but wbar.gt.0._r8
+!  BJG:  if wbar.le.0._r8 under these conditions, nothing is done other than set fn, fm, fluxn, fluxm, flux_fullact to zero.
+!  BJG:  also note presence of ndist as a save variable, though not used for single updraft version
+!  BJG:  Also nothing is done other than zeroing out above variables if optoinal smax_prescribed <= 0.0_r8, or nmode = 1 and na(1) < 1.e-20_r8
+
+!  BJG:  note this is also called from chemistry/modal_aero/modal_aero_convproc.F90
+!  BJG:  smax_prescribed not present in arguments here, but is present when called from modal_aero_convproc, so retain for now.
+!  BJG:  sigw argument is always zero when called, so is wdiab (though calls from here have it 0, calls from chemistry have it 0._r8
+
+
    if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
 
-   if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
+! BJG  if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
+   if(wbar.le.0._r8)return
 
    
    if ( present( smax_prescribed ) ) then 
@@ -1372,201 +1388,12 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
       !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
    enddo
 
-   if(sigw.gt.1.e-5_r8)then ! spectrum of updrafts
-
-      wmax=min(wmaxf,wbar+sds*sigw)
-      wmin=max(wminf,-wdiab)
-      wmin=max(wmin,wbar-sds*sigw)
-      w=wmin
-      dwmax=eps*sigw
-      dw=dwmax
-      dfmax=0.2_r8
-      dfmin=0.1_r8
-      if(wmax.le.w)then
-         do m=1,nmode
-            fluxn(m)=0._r8
-            fn(m)=0._r8
-            fluxm(m)=0._r8
-            fm(m)=0._r8
-         enddo
-         flux_fullact=0._r8
-         return
-      endif
-      do m=1,nmode
-         sumflxn(m)=0._r8
-         sumfn(m)=0._r8
-         fnold(m)=0._r8
-         sumflxm(m)=0._r8
-         sumfm(m)=0._r8
-         fmold(m)=0._r8
-      enddo
-      sumflx_fullact=0._r8
-
-      fold=0._r8
-      wold=0._r8
-      gold=0._r8
-
-      dwmin = min( dwmax, 0.01_r8 )
-
-      do n=1,200
-100      wnuc=w+wdiab
-         !           write(iulog,*)'wnuc=',wnuc
-         alw=alpha*wnuc
-         sqrtalw=sqrt(alw)
-         etafactor1=alw*sqrtalw
-
-         do m=1,nmode
-            eta(m)=etafactor1*etafactor2(m)
-            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
-         enddo
-
-         if ( present( smax_prescribed ) ) then
-            smax = smax_prescribed
-         else
-            call maxsat(zeta,eta,nmode,smc,smax)
-         endif
-         !	      write(iulog,*)'w,smax=',w,smax
-
-         lnsmax=log(smax)
-
-         x=twothird*(lnsm(nmode)-lnsmax)/(sq2*alogsig(nmode))
-         fnew=0.5_r8*(1._r8-erf(x))
-
-
-         dwnew = dw
-         if(fnew-fold.gt.dfmax.and.n.gt.1)then
-            !              reduce updraft increment for greater accuracy in integration
-            if (dw .gt. 1.01_r8*dwmin) then
-               dw=0.7_r8*dw
-               dw=max(dw,dwmin)
-               w=wold+dw
-               go to 100
-            else
-               dwnew = dwmin
-            endif
-         endif
-
-         if(fnew-fold.lt.dfmin)then
-            !              increase updraft increment to accelerate integration
-            dwnew=min(1.5_r8*dw,dwmax)
-         endif
-         fold=fnew
-
-         z=(w-wbar)/(sigw*sq2)
-         g=exp(-z*z)
-         fnmin=1._r8
-         xmincoeff=alogaten-twothird*(lnsmax-alog2)-alog3
-
-         do m=1,nmode
-            !              modal
-            x=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
-            fn(m)=0.5_r8*(1._r8-erf(x))
-            fnmin=min(fn(m),fnmin)
-            !               integration is second order accurate
-            !               assumes linear variation of f*g with w
-            fnbar=(fn(m)*g+fnold(m)*gold)
-            arg=x-1.5_r8*sq2*alogsig(m)
-            fm(m)=0.5_r8*(1._r8-erf(arg))
-            fmbar=(fm(m)*g+fmold(m)*gold)
-            wb=(w+wold)
-            if(w.gt.0._r8)then
-               sumflxn(m)=sumflxn(m)+sixth*(wb*fnbar           &
-                  +(fn(m)*g*w+fnold(m)*gold*wold))*dw
-               sumflxm(m)=sumflxm(m)+sixth*(wb*fmbar           &
-                  +(fm(m)*g*w+fmold(m)*gold*wold))*dw
-            endif
-            sumfn(m)=sumfn(m)+0.5_r8*fnbar*dw
-            !	       write(iulog,'(a,9g10.2)')'lnsmax,lnsm(m),x,fn(m),fnold(m),g,gold,fnbar,dw=',lnsmax,lnsm(m),x,fn(m),fnold(m),g,gold,fnbar,dw
-            fnold(m)=fn(m)
-            sumfm(m)=sumfm(m)+0.5_r8*fmbar*dw
-            fmold(m)=fm(m)
-         enddo
-         !           same form as sumflxm but replace the fm with 1.0
-         sumflx_fullact = sumflx_fullact &
-            + sixth*(wb*(g+gold) + (g*w+gold*wold))*dw
-         !            sumg=sumg+0.5_r8*(g+gold)*dw
-         gold=g
-         wold=w
-         dw=dwnew
-         if(n.gt.1.and.(w.gt.wmax.or.fnmin.gt.fmax))go to 20
-         w=w+dw
-      enddo
-      write(iulog,*)'do loop is too short in activate'
-      write(iulog,*)'wmin=',wmin,' w=',w,' wmax=',wmax,' dw=',dw
-      write(iulog,*)'wbar=',wbar,' sigw=',sigw,' wdiab=',wdiab
-      write(iulog,*)'wnuc=',wnuc
-      write(iulog,*)'na=',(na(m),m=1,nmode)
-      write(iulog,*)'fn=',(fn(m),m=1,nmode)
-      !   dump all subr parameters to allow testing with standalone code
-      !   (build a driver that will read input and call activate)
-      write(iulog,*)'wbar,sigw,wdiab,tair,rhoair,nmode='
-      write(iulog,*) wbar,sigw,wdiab,tair,rhoair,nmode
-      write(iulog,*)'na=',na
-      write(iulog,*)'volume=', (volume(m),m=1,nmode)
-      write(iulog,*)'hydro='
-      write(iulog,*) hygro
-
-      call endrun
-20    continue
-      ndist(n)=ndist(n)+1
-      if(w.lt.wmaxf)then
-
-         !            contribution from all updrafts stronger than wmax
-         !            assuming constant f (close to fmax)
-         wnuc=w+wdiab
-
-         z1=(w-wbar)/(sigw*sq2)
-         z2=(wmaxf-wbar)/(sigw*sq2)
-         g=exp(-z1*z1)
-         integ=sigw*0.5_r8*sq2*sqpi*(erf(z2)-erf(z1))
-         !            consider only upward flow into cloud base when estimating flux
-         wf1=max(w,zero)
-         zf1=(wf1-wbar)/(sigw*sq2)
-         gf1=exp(-zf1*zf1)
-         wf2=max(wmaxf,zero)
-         zf2=(wf2-wbar)/(sigw*sq2)
-         gf2=exp(-zf2*zf2)
-         gf=(gf1-gf2)
-         integf=wbar*sigw*0.5_r8*sq2*sqpi*(erf(zf2)-erf(zf1))+sigw*sigw*gf
-
-         do m=1,nmode
-            sumflxn(m)=sumflxn(m)+integf*fn(m)
-            sumfn(m)=sumfn(m)+fn(m)*integ
-            sumflxm(m)=sumflxm(m)+integf*fm(m)
-            sumfm(m)=sumfm(m)+fm(m)*integ
-         enddo
-         !           same form as sumflxm but replace the fm with 1.0
-         sumflx_fullact = sumflx_fullact + integf
-         !            sumg=sumg+integ
-      endif
-
-
-      do m=1,nmode
-         fn(m)=sumfn(m)/(sq2*sqpi*sigw)
-         !            fn(m)=sumfn(m)/(sumg)
-         if(fn(m).gt.1.01_r8)then
-            write(iulog,*)'fn=',fn(m),' > 1 in activate'
-            write(iulog,*)'w,m,na,amcube=',w,m,na(m),amcube(m)
-            write(iulog,*)'integ,sumfn,sigw=',integ,sumfn(m),sigw
-            call endrun('activate')
-         endif
-         fluxn(m)=sumflxn(m)/(sq2*sqpi*sigw)
-         fm(m)=sumfm(m)/(sq2*sqpi*sigw)
-         !            fm(m)=sumfm(m)/(sumg)
-         if(fm(m).gt.1.01_r8)then
-            write(iulog,*)'fm=',fm(m),' > 1 in activate'
-         endif
-         fluxm(m)=sumflxm(m)/(sq2*sqpi*sigw)
-      enddo
-      !        same form as fluxm
-      flux_fullact = sumflx_fullact/(sq2*sqpi*sigw)
-
-   else
-
       !        single updraft
-      wnuc=wbar+wdiab
+! BJG      wnuc=wbar+wdiab
+      wnuc = wbar
 
-      if(wnuc.gt.0._r8)then
+!  BJG  below is thus always true if this point is reached.
+!      if(wnuc.gt.0._r8)then
 
          w=wbar
          alw=alpha*wnuc
@@ -1600,9 +1427,10 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
             endif
          enddo
          flux_fullact = w
-      endif
 
-   endif
+! BJG      endif
+
+! BJG   endif
 
 end subroutine activate_modal
 
