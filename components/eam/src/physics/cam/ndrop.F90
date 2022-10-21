@@ -1249,47 +1249,46 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
    real(r8), intent(out) :: fn(:)      ! number fraction of aerosols activated [fraction]
    real(r8), intent(out) :: fm(:)      ! mass fraction of aerosols activated [fraction]
-   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud BJG (cm/s)
-   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud BJG (cm/s)
-   real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation BJG(cm/s)
+   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud  BJG [m/s]
+   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud BJG [m/s]
+   real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation [m/s]
    !    rce-comment
    !    used for consistency check -- this should match (ekd(k)*zs(k))
    !    also, fluxm/flux_fullact gives fraction of aerosol mass flux
    !       that is activated
   
    !      optional
-   real(r8), optional :: smax_prescribed  ! prescribed max. supersaturation for secondary activation 
+   real(r8), optional :: smax_prescribed  ! prescribed max. supersaturation for secondary activation [fraction]
 
    !      local
 
    integer, parameter:: nx=200
    real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure [Pa]
    real(r8) pres ! pressure [Pa]
-! BJG   real(r8) diff0,conduct0
-   real(r8) diff0 ! BJG reference thermal diffusivity [m2/s]
-   real(r8) conduct0 ! BJG reference thermal conductivity [J / (m-sec-deg)]
-   real(r8) es ! saturation vapor pressure BJG
-   real(r8) qs ! water vapor saturation mixing ratio BJG
-   real(r8) dqsdt ! change in qs with temperature  BJG
-   real(r8) zeta(nmode), eta(nmode)
-   real(r8) lnsmax ! ln(smax)
-   real(r8) alpha
-   real(r8) gamma
-   real(r8) beta
-! BJG  real(r8) g ! thermodynamic function [m2/s]
+   real(r8) diff0 ! vapor diffusivity [m2/s]
+   real(r8) conduct0 ! thermal conductivity [J / (m-s-K)]
+   real(r8) es ! saturation vapor pressure [Pa]
+   real(r8) qs ! BJG water vapor saturation specific humidity [kg/kg]
+   real(r8) dqsdt ! change in qs with temperature  [(kg/kg)/T]
+   real(r8) zeta(nmode), eta(nmode) ! [dimensionless]
+   real(r8) alpha ! [/m]
+   real(r8) gamma ![m3/kg]
+   real(r8) beta ! [m2/s]
    real(r8) gthermfac ! thermodynamic function [m2/s]
-! BJG   real(r8) sqrtg(nmode)! sqrt of thermodynamic function [m / s^0.5]
-   real(r8) :: amcube(nmode) ! cube of dry mode radius (m)
-   real(r8) smc(nmode) ! critical supersaturation for number mode radius
-   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation)
+   real(r8) :: amcube(nmode) ! BJG cube of dry mode radius [m3]
+   real(r8) smc(nmode) ! critical supersaturation for number mode radius [fraction]
+   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation) [dimensionless]
 
-   real(r8) w,wnuc
-   real(r8) alw,sqrtalw
-   real(r8) smax
-!  BJG   real(r8) x,arg
-   real(r8) arg_erf_n,arg_erf_m
-!  BJG assigned but not otherwise used apparently   real(r8) xmincoeff
-   real(r8) etafactor1,etafactor2(nmode),etafactor2max
+! BJG   real(r8) w,wnuc
+   real(r8) wnuc  ! BJG  nucleation w, but = wbar if wdiab == 0 [m/s]
+! BJG   real(r8) alw,sqrtalw
+   real(r8) alw ! [/s]
+   real(r8) smax ! maximum supersaturation [fraction]
+   real(r8) lnsmax ! ln(smax) [dimensionless]
+   real(r8) arg_erf_n,arg_erf_m  ! [dimensionless]
+! BJG   real(r8) etafactor1,etafactor2(nmode),etafactor2max 
+   real(r8) etafactor1  ! [/ s^(3/2)]
+   real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
    integer m
 
 
@@ -1338,10 +1337,11 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 !  BJG  below is thus always true if this point is reached.
 !      if(wnuc.gt.0._r8)then
 
-         w=wbar
+! BJG         w=wbar
          alw=alpha*wnuc
-         sqrtalw=sqrt(alw)
-         etafactor1=alw*sqrtalw
+! BJG         sqrtalw=sqrt(alw)
+! BJG         etafactor1=alw*sqrtalw
+         etafactor1=alw*sqrt(alw)
 
 
    do m=1,nmode
@@ -1353,12 +1353,11 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          !           should depend on mean radius of mode to account for gas kinetic effects
          !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
          !           for approriate size to use for effective diffusivity.
-! BJG - these do not depend on mode, no reason to have in loop, or be arrays, defined above  g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
+! BJG - these currently do not depend on mode, no reason to have in loop, or be arrays, so defined above
+!         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
 !           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
 !         sqrtg(m)=sqrt(g)
-!  BJG         beta=2._r8*pi*rhoh2o*g*gamma
          beta=2._r8*pi*rhoh2o*gthermfac*gamma
-! BJG         etafactor2(m)=1._r8/(na(m)*beta*sqrtg(m))
          etafactor2(m)=1._r8/(na(m)*beta*sqrt(gthermfac))
          if(hygro(m).gt.1.e-10_r8)then
             smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
@@ -1367,9 +1366,6 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          endif
          !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
       else
-! BJG         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-! BJG           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-! BJG         sqrtg(m)=sqrt(g)
          smc(m)=1._r8
          etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
       endif
@@ -1380,14 +1376,10 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
       eta(m)=etafactor1*etafactor2(m)
 ! BJG      zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
-      zeta(m)=twothird*sqrtalw*aten/sqrt(gthermfac)
+      zeta(m)=twothird*sqrt(alw)*aten/sqrt(gthermfac)
 
    enddo
 
-!  BJG move contents of this loop into above loop         do m=1,nmode
-!            eta(m)=etafactor1*etafactor2(m)
-!            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
-!         enddo
          ! use smax_prescribed if it is present; otherwise get smax from subr maxsat
          if ( present( smax_prescribed ) ) then
             smax = smax_prescribed
@@ -1396,25 +1388,22 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          endif
 
          lnsmax=log(smax)
-!  BJG not otherwise used?         xmincoeff=alogaten-twothird*(lnsmax-alog2)-alog3
-
 
          do m=1,nmode
             !                 modal
-! BJG            x=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
             arg_erf_n=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
-! BJG            fn(m)=0.5_r8*(1._r8-erf(x))
             fn(m)=0.5_r8*(1._r8-erf(arg_erf_n))
-! BJG            arg=x-1.5_r8*sq2*alogsig(m)
             arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(m)
-! BJG            fm(m)=0.5_r8*(1._r8-erf(arg))
             fm(m)=0.5_r8*(1._r8-erf(arg_erf_m))
 ! BJG this is always true if this point is reached    if(wbar.gt.0._r8)then
-               fluxn(m)=fn(m)*w
-               fluxm(m)=fm(m)*w
+! BJG               fluxn(m)=fn(m)*w
+               fluxn(m)=fn(m)*wbar
+! BJG               fluxm(m)=fm(m)*w
+               fluxm(m)=fm(m)*wbar
 !            endif
          enddo
-         flux_fullact = w
+! BJG      flux_fullact = w
+         flux_fullact = wbar
 
 ! BJG      endif
 
