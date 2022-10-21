@@ -1289,7 +1289,8 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 ! BJG   real(r8) etafactor1,etafactor2(nmode),etafactor2max 
    real(r8) etafactor1  ! [/ s^(3/2)]
    real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
-   integer m
+!! BJG   integer m
+   integer imode
 
 
    fn(:)=0._r8
@@ -1308,10 +1309,13 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 !  BJG:  sigw argument is always zero when called, so is wdiab (though calls from here have it 0, calls from chemistry have it 0._r8
 
 
-   if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
+! BJG   if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
+!! BJG  if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
+  if(nmode == 1 .and. na(1) < 1.e-20_r8)return
 
 ! BJG  if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
-   if(wbar.le.0._r8)return
+!! BJG   if(wbar.le.0._r8)return
+   if(wbar <= 0._r8)return
 
    
    if ( present( smax_prescribed ) ) then 
@@ -1344,11 +1348,14 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          etafactor1=alw*sqrt(alw)
 
 
-   do m=1,nmode
-      if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
+!! BJG   do m=1,nmode
+   do imode=1,nmode
+!! BJG      if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
+     if(volume(imode) > 1.e-39_r8 .and. na(imode) > 1.e-39_r8)then
          !            number mode radius (m)
          !           write(iulog,*)'alogsig,volc,na=',alogsig(m),volc(m),na(m)
-         amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
+!! BJG         amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
+         amcube(imode)=(3._r8*volume(imode)/(4._r8*pi*exp45logsig(imode)*na(imode)))  ! only if variable size dist
          !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
          !           should depend on mean radius of mode to account for gas kinetic effects
          !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
@@ -1358,25 +1365,33 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 !           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
 !         sqrtg(m)=sqrt(g)
          beta=2._r8*pi*rhoh2o*gthermfac*gamma
-         etafactor2(m)=1._r8/(na(m)*beta*sqrt(gthermfac))
-         if(hygro(m).gt.1.e-10_r8)then
-            smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
+!! BJG         etafactor2(m)=1._r8/(na(m)*beta*sqrt(gthermfac))
+         etafactor2(imode)=1._r8/(na(imode)*beta*sqrt(gthermfac))
+!! BJG         if(hygro(m).gt.1.e-10_r8)then
+         if(hygro(imode) > 1.e-10_r8)then
+!! BJG            smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
+            smc(imode)=2._r8*aten*sqrt(aten/(27._r8*hygro(imode)*amcube(imode))) ! only if variable size dist
          else
-            smc(m)=100._r8
+!! BJG            smc(m)=100._r8
+            smc(imode)=100._r8
          endif
          !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
       else
-         smc(m)=1._r8
-         etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
+!! BJG         smc(m)=1._r8
+         smc(imode)=1._r8
+!! BJG         etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
+         etafactor2(imode)=etafactor2max ! this should make eta big if na is very small.
       endif
-      lnsm(m)=log(smc(m)) ! only if variable size dist
+!! BJG      lnsm(m)=log(smc(m)) ! only if variable size dist
+      lnsm(imode)=log(smc(imode)) ! only if variable size dist
       !	 write(iulog,'(a,i4,4g12.2)')'m,na,amcube,hygro,sm,lnsm=', &
       !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
 
 
-      eta(m)=etafactor1*etafactor2(m)
+!! BJG      eta(m)=etafactor1*etafactor2(m)
+      eta(imode)=etafactor1*etafactor2(imode)
 ! BJG      zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
-      zeta(m)=twothird*sqrt(alw)*aten/sqrt(gthermfac)
+      zeta(imode)=twothird*sqrt(alw)*aten/sqrt(gthermfac)
 
    enddo
 
@@ -1389,17 +1404,22 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
          lnsmax=log(smax)
 
-         do m=1,nmode
+!! BJG         do m=1,nmode
+         do imode=1,nmode
             !                 modal
-            arg_erf_n=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
-            fn(m)=0.5_r8*(1._r8-erf(arg_erf_n))
-            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(m)
-            fm(m)=0.5_r8*(1._r8-erf(arg_erf_m))
+!! BJG            arg_erf_n=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
+            arg_erf_n=twothird*(lnsm(imode)-lnsmax)/(sq2*alogsig(imode))
+!! BJG            fn(m)=0.5_r8*(1._r8-erf(arg_erf_n))
+            fn(imode)=0.5_r8*(1._r8-erf(arg_erf_n))
+!! BJG            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(m)
+            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(imode)
+!! BJG            fm(m)=0.5_r8*(1._r8-erf(arg_erf_m))
+            fm(imode)=0.5_r8*(1._r8-erf(arg_erf_m))
 ! BJG this is always true if this point is reached    if(wbar.gt.0._r8)then
 ! BJG               fluxn(m)=fn(m)*w
-               fluxn(m)=fn(m)*wbar
+               fluxn(imode)=fn(imode)*wbar
 ! BJG               fluxm(m)=fm(m)*w
-               fluxm(m)=fm(m)*wbar
+               fluxm(imode)=fm(imode)*wbar
 !            endif
          enddo
 ! BJG      flux_fullact = w
