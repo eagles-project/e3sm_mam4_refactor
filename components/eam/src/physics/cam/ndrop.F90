@@ -1234,8 +1234,6 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    !      input
 
    real(r8), intent(in) :: wbar          ! grid cell mean vertical velocity [m/s]
-   real(r8), intent(in) :: sigw          ! subgrid standard deviation of vertical vel [m/s]
-   real(r8), intent(in) :: wdiab         ! diabatic vertical velocity (0 if adiabatic) BJG 
    real(r8), intent(in) :: wmaxf         ! maximum updraft velocity for integration [m/s]
    real(r8), intent(in) :: tair          ! air temperature [K]
    real(r8), intent(in) :: rhoair        ! air density [kg/m3]
