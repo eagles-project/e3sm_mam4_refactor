@@ -663,7 +663,8 @@ subroutine dropmixnuc( &
             end do
 
             call activate_modal( &
-               wbar, wmix, wdiab, wmin, wmax,                       &
+!               wbar, wmix, wdiab, wmin, wmax,                       &
+               wbar, wmax,                       &
                temp(i,k), cs(i,k), naermod, ntot_amode, &
                vaerosol, hygro, fn, fm, fluxn,                      &
                fluxm,flux_fullact(k))
@@ -754,7 +755,8 @@ subroutine dropmixnuc( &
                end do
 
                call activate_modal( &
-                  wbar, wmix, wdiab, wmin, wmax,                       &
+!                  wbar, wmix, wdiab, wmin, wmax,                       &
+                  wbar, wmax,                       &
                   temp(i,k), cs(i,k), naermod, ntot_amode, &
                   vaerosol, hygro, fn, fm, fluxn,                      &
                   fluxm, flux_fullact(k))
@@ -1212,11 +1214,9 @@ subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
 end subroutine explmix
 
 !===============================================================================
-!  BJG:  sigw is not needed in single updraft case and can be removed from argument list.
-!  BJG:  However, this needs to be done from the invocations of this function, not only
-!  BJG:  in ndrop.F90, but in chemistry/modal_aero/modal_aero_convproc.F90
 
-subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
+!subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
+subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    na, nmode, volume, hygro, &
    fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed ) 
 
@@ -1236,7 +1236,6 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    real(r8), intent(in) :: wbar          ! grid cell mean vertical velocity [m/s]
    real(r8), intent(in) :: sigw          ! subgrid standard deviation of vertical vel [m/s]
    real(r8), intent(in) :: wdiab         ! diabatic vertical velocity (0 if adiabatic) BJG 
-   real(r8), intent(in) :: wminf         ! minimum updraft velocity for integration [m/s]
    real(r8), intent(in) :: wmaxf         ! maximum updraft velocity for integration [m/s]
    real(r8), intent(in) :: tair          ! air temperature [K]
    real(r8), intent(in) :: rhoair        ! air density [kg/m3]
@@ -1249,8 +1248,8 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
    real(r8), intent(out) :: fn(:)      ! number fraction of aerosols activated [fraction]
    real(r8), intent(out) :: fm(:)      ! mass fraction of aerosols activated [fraction]
-   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud  BJG [m/s]
-   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud BJG [m/s]
+   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud [m/s]
+   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud [m/s]
    real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation [m/s]
    !    rce-comment
    !    used for consistency check -- this should match (ekd(k)*zs(k))
@@ -1268,28 +1267,24 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    real(r8) diff0 ! vapor diffusivity [m2/s]
    real(r8) conduct0 ! thermal conductivity [J / (m-s-K)]
    real(r8) es ! saturation vapor pressure [Pa]
-   real(r8) qs ! BJG water vapor saturation specific humidity [kg/kg]
+   real(r8) qs ! water vapor saturation specific humidity [kg/kg]
    real(r8) dqsdt ! change in qs with temperature  [(kg/kg)/T]
    real(r8) zeta(nmode), eta(nmode) ! [dimensionless]
    real(r8) alpha ! [/m]
    real(r8) gamma ![m3/kg]
    real(r8) beta ! [m2/s]
    real(r8) gthermfac ! thermodynamic function [m2/s]
-   real(r8) :: amcube(nmode) ! BJG cube of dry mode radius [m3]
+   real(r8) :: amcube(nmode) ! cube of dry mode radius [m3]
    real(r8) smc(nmode) ! critical supersaturation for number mode radius [fraction]
    real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation) [dimensionless]
 
-! BJG   real(r8) w,wnuc
-   real(r8) wnuc  ! BJG  nucleation w, but = wbar if wdiab == 0 [m/s]
-! BJG   real(r8) alw,sqrtalw
+   real(r8) wnuc  ! nucleation w, but = wbar if wdiab == 0 [m/s]
    real(r8) alw ! [/s]
    real(r8) smax ! maximum supersaturation [fraction]
    real(r8) lnsmax ! ln(smax) [dimensionless]
    real(r8) arg_erf_n,arg_erf_m  ! [dimensionless]
-! BJG   real(r8) etafactor1,etafactor2(nmode),etafactor2max 
    real(r8) etafactor1  ! [/ s^(3/2)]
    real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
-!! BJG   integer m
    integer imode
 
 
@@ -1299,22 +1294,11 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    fluxm(:)=0._r8
    flux_fullact=0._r8
 
-!  BJG:  nontrivial single updraft is apparently sigw.le.1.e-5_r8 but wbar.gt.0._r8
-!  BJG:  if wbar.le.0._r8 under these conditions, nothing is done other than set fn, fm, fluxn, fluxm, flux_fullact to zero.
-!  BJG:  also note presence of ndist as a save variable, though not used for single updraft version
-!  BJG:  Also nothing is done other than zeroing out above variables if optoinal smax_prescribed <= 0.0_r8, or nmode = 1 and na(1) < 1.e-20_r8
 
-!  BJG:  note this is also called from chemistry/modal_aero/modal_aero_convproc.F90
-!  BJG:  smax_prescribed not present in arguments here, but is present when called from modal_aero_convproc, so retain for now.
-!  BJG:  sigw argument is always zero when called, so is wdiab (though calls from here have it 0, calls from chemistry have it 0._r8
-
-
-! BJG   if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
-!! BJG  if(nmode.eq.1.and.na(1).lt.1.e-20_r8)return
   if(nmode == 1 .and. na(1) < 1.e-20_r8)return
 
-! BJG  if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
-!! BJG   if(wbar.le.0._r8)return
+! BJG sigw=0 (single updraft) whenever subroutine is called, so removed from argument list 
+! if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
    if(wbar <= 0._r8)return
 
    
@@ -1330,104 +1314,73 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    alpha=gravit*(latvap/(cpair*rh2o*tair*tair)-1._r8/(rair*tair))
    gamma=(1+latvap/cpair*dqsdt)/(rhoair*qs)
    etafactor2max=1.e10_r8/(alpha*wmaxf)**1.5_r8 ! this should make eta big if na is very small.
+! BJG g renamed to gthermfac, defined here since same for all modes in implementation
    gthermfac=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
            +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-
-
-      !        single updraft
-! BJG      wnuc=wbar+wdiab
-      wnuc = wbar
-
-!  BJG  below is thus always true if this point is reached.
+! BJG wdiab = 0 whenever subroutine is called, so removed from argument list
+!      wnuc=wbar+wdiab
+   wnuc = wbar
+!  BJG  below is always true if this point is reached.
 !      if(wnuc.gt.0._r8)then
+   alw=alpha*wnuc
+   etafactor1=alw*sqrt(alw)
 
-! BJG         w=wbar
-         alw=alpha*wnuc
-! BJG         sqrtalw=sqrt(alw)
-! BJG         etafactor1=alw*sqrtalw
-         etafactor1=alw*sqrt(alw)
+!  BJG  Here compute smc, zeta, eta for all modes for maxsat calculation
 
-
-!! BJG   do m=1,nmode
    do imode=1,nmode
-!! BJG      if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
      if(volume(imode) > 1.e-39_r8 .and. na(imode) > 1.e-39_r8)then
          !            number mode radius (m)
          !           write(iulog,*)'alogsig,volc,na=',alogsig(m),volc(m),na(m)
-!! BJG         amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
          amcube(imode)=(3._r8*volume(imode)/(4._r8*pi*exp45logsig(imode)*na(imode)))  ! only if variable size dist
          !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
          !           should depend on mean radius of mode to account for gas kinetic effects
          !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
          !           for approriate size to use for effective diffusivity.
-! BJG - these currently do not depend on mode, no reason to have in loop, or be arrays, so defined above
-!         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-!           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-!         sqrtg(m)=sqrt(g)
          beta=2._r8*pi*rhoh2o*gthermfac*gamma
-!! BJG         etafactor2(m)=1._r8/(na(m)*beta*sqrt(gthermfac))
          etafactor2(imode)=1._r8/(na(imode)*beta*sqrt(gthermfac))
-!! BJG         if(hygro(m).gt.1.e-10_r8)then
          if(hygro(imode) > 1.e-10_r8)then
-!! BJG            smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
             smc(imode)=2._r8*aten*sqrt(aten/(27._r8*hygro(imode)*amcube(imode))) ! only if variable size dist
          else
-!! BJG            smc(m)=100._r8
             smc(imode)=100._r8
          endif
          !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
       else
-!! BJG         smc(m)=1._r8
          smc(imode)=1._r8
-!! BJG         etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
          etafactor2(imode)=etafactor2max ! this should make eta big if na is very small.
       endif
-!! BJG      lnsm(m)=log(smc(m)) ! only if variable size dist
       lnsm(imode)=log(smc(imode)) ! only if variable size dist
       !	 write(iulog,'(a,i4,4g12.2)')'m,na,amcube,hygro,sm,lnsm=', &
       !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
-
-
-!! BJG      eta(m)=etafactor1*etafactor2(m)
       eta(imode)=etafactor1*etafactor2(imode)
-! BJG      zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
       zeta(imode)=twothird*sqrt(alw)*aten/sqrt(gthermfac)
-
    enddo
 
+!  BJG  Find maximum supersaturation 
+
          ! use smax_prescribed if it is present; otherwise get smax from subr maxsat
-         if ( present( smax_prescribed ) ) then
-            smax = smax_prescribed
-         else
-            call maxsat(zeta,eta,nmode,smc,smax)
-         endif
+   if ( present( smax_prescribed ) ) then
+      smax = smax_prescribed
+   else
+      call maxsat(zeta,eta,nmode,smc,smax)
+   endif
 
-         lnsmax=log(smax)
+   lnsmax=log(smax)
 
-!! BJG         do m=1,nmode
-         do imode=1,nmode
+
+!  BJG  Use maximum supersaturation to calculate aerosol activation output
+
+   do imode=1,nmode
             !                 modal
-!! BJG            arg_erf_n=twothird*(lnsm(m)-lnsmax)/(sq2*alogsig(m))
-            arg_erf_n=twothird*(lnsm(imode)-lnsmax)/(sq2*alogsig(imode))
-!! BJG            fn(m)=0.5_r8*(1._r8-erf(arg_erf_n))
-            fn(imode)=0.5_r8*(1._r8-erf(arg_erf_n))
-!! BJG            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(m)
-            arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(imode)
-!! BJG            fm(m)=0.5_r8*(1._r8-erf(arg_erf_m))
-            fm(imode)=0.5_r8*(1._r8-erf(arg_erf_m))
-! BJG this is always true if this point is reached    if(wbar.gt.0._r8)then
-! BJG               fluxn(m)=fn(m)*w
-               fluxn(imode)=fn(imode)*wbar
-! BJG               fluxm(m)=fm(m)*w
-               fluxm(imode)=fm(imode)*wbar
-!            endif
-         enddo
-! BJG      flux_fullact = w
-         flux_fullact = wbar
+      arg_erf_n=twothird*(lnsm(imode)-lnsmax)/(sq2*alogsig(imode))
+      fn(imode)=0.5_r8*(1._r8-erf(arg_erf_n))
+      arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(imode)
+      fm(imode)=0.5_r8*(1._r8-erf(arg_erf_m))
+      fluxn(imode)=fn(imode)*wbar
+      fluxm(imode)=fm(imode)*wbar
+   enddo
+   flux_fullact = wbar
 
 ! BJG      endif
-
-! BJG   endif
 
 end subroutine activate_modal
 
