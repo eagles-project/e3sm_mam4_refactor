@@ -49,10 +49,8 @@ module modal_aero_convproc
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
 
-!  method1_activate_nlayers = number of layers (including cloud base) where activation is applied
-   integer, parameter  :: method1_activate_nlayers = 2
-!  method2_activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
-   real(r8), parameter :: method2_activate_smaxmax = 0.003_r8
+!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
+   real(r8), parameter :: activate_smaxmax = 0.003_r8
 
    real(r8), parameter :: factor_reduce_actfrac = 0.5_r8
 
@@ -132,10 +130,8 @@ subroutine ma_convproc_init
       use_cwaer_for_activate_maxsat
    write(*,'(a,l12)')     'ma_convproc_init - apply_convproc_tend_to_ptend  = ', &
       apply_convproc_tend_to_ptend
-   write(*,'(a,i12)')     'ma_convproc_init - method1_activate_nlayers      = ', &
-      method1_activate_nlayers
-   write(*,'(a,1pe12.4)') 'ma_convproc_init - method2_activate_smaxmax      = ', &
-      method2_activate_smaxmax
+   write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
+      activate_smaxmax
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
       factor_reduce_actfrac
 
@@ -1558,13 +1554,11 @@ k_loop_main_bb: &
                if ( do_act_this_lev ) then
                   kactcntb = kactcntb + 1
 
-                  call ma_activate_convproc_method2(                    &
+                  call ma_activate_convproc(                    &
                      conu(:,k),  dconudt_activa(:,k),                   &
                      f_ent,      dt_u(k),             wup(k),           &
                      t(icol,k),  rhoair_i(k),         fracice(icol,k),  &
-                     pcnst_extd, lun,                                   &
-                     lchnk,      icol,                k,                &
-                     kactfirst        )
+                     pcnst_extd, k,                   kactfirst         )
                end if
 
 
@@ -2011,8 +2005,8 @@ end subroutine ma_convproc_tend
               rprd,   dp_i,   icol,    kk,      pcnst_extd,       & ! in
               doconvproc_extd,  x_ratio,        species_class,    & ! in
               pr_flux,        pr_flux_tmp,       pr_flux_base,    & ! inout
-              wd_flux,    dcondt_wetdep,                          & ! inout
-              dcondt,    dcondt_prevap,  dcondt_prevap_hist       & ! inout
+              wd_flux,        dcondt_wetdep,                      & ! inout
+              dcondt,         dcondt_prevap,  dcondt_prevap_hist  & ! inout
               )
 
    enddo ! kk
@@ -2055,7 +2049,7 @@ end subroutine ma_convproc_tend
    if (pr_flux_base < small_value) then
          pr_flux_base = 0.0_r8    ! this will start things fresh at the next layer
          pr_flux_tmp  = 0.0_r8
-          return
+         return
    endif
 
    ! calculate fraction of resuspension
@@ -2074,7 +2068,6 @@ end subroutine ma_convproc_tend
    if (frac_aer_resusp_tmp > small_value) then
           x_ratio = frac_aer_resusp_tmp/frac_aer_resusp_old
    else   ! this will start things fresh at the next layer
-          x_ratio = 0.0_r8
           pr_flux_base = 0.0_r8
           pr_flux_tmp  = 0.0_r8
    endif
@@ -2185,13 +2178,11 @@ end subroutine ma_convproc_tend
    end function min_max_bound
 
 !=========================================================================================
-   subroutine ma_activate_convproc_method2(     &
+   subroutine ma_activate_convproc(             &
               conu,       dconudt,              &
               f_ent,      dt_u,      wup,       &
               tair,       rhoair,    fracice,   &
-              pcnst_extd, lun,                  &
-              lchnk,      i,         k,         &
-              kactfirst    )
+              pcnst_extd, kk,        kactfirst  )
 !-----------------------------------------------------------------------
 !
 ! Purpose:
@@ -2230,163 +2221,195 @@ end subroutine ma_convproc_tend
 !
 !-----------------------------------------------------------------------
 
-   use ppgrid, only: pver
-   use constituents, only: pcnst, cnst_name
+   use constituents, only: pcnst
    use ndrop, only: activate_modal
 
    use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-      lspectype_amode, ntot_amode, &
-      nspec_amode, ntot_amode, numptr_amode, numptrcw_amode, &
-      sigmag_amode, specdens_amode, spechygro, &
-      voltonumblo_amode, voltonumbhi_amode
+       nspec_amode, ntot_amode, numptr_amode, numptrcw_amode
 
    implicit none
 
 !-----------------------------------------------------------------------
 ! arguments  (note:  TMR = tracer mixing ratio)
-   integer, intent(in)     :: pcnst_extd
-   ! conu = tracer mixing ratios in updraft at top of this (current) level
-   !        The conu are changed by activation
-   real(r8), intent(inout) :: conu(pcnst_extd)    
-   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation
-
-   real(r8), intent(in)    :: f_ent  ! fraction of updraft massflux that was
-                                     ! entrained across this layer == eudp/mu_p_eudp
-   real(r8), intent(in)    :: dt_u   ! lagrangian transport time (s) in the 
-                                     ! updraft at current level
-   real(r8), intent(in)    :: wup    ! mean updraft vertical velocity (m/s)
-                                     ! at current level updraft
-
-   real(r8), intent(in)    :: tair   ! Temperature in Kelvin
-   real(r8), intent(in)    :: rhoair ! air density (kg/m3)
-
-   real(r8), intent(in)    :: fracice ! Fraction of ice within the cloud
-                                     ! used as in-cloud wet removal rate
-   integer,  intent(in)    :: lun    ! logical unit for diagnostic output
-   integer,  intent(in)    :: lchnk  ! chunk index
-   integer,  intent(in)    :: i      ! column index
-   integer,  intent(in)    :: k      ! level index
+   integer, intent(in)     :: pcnst_extd        ! indices
+   ! conu = tracer mixing ratios in updraft at top of this (current) level. The conu are changed by activation
+   real(r8), intent(inout) :: conu(pcnst_extd)    ! [#/kg or kg/kg]
+   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
+   real(r8), intent(in)    :: f_ent     ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
+   real(r8), intent(in)    :: dt_u      ! lagrangian transport time in the updraft at current level [s]
+   real(r8), intent(in)    :: wup       ! mean updraft vertical velocity at current level updraft [m/s]
+   real(r8), intent(in)    :: tair      ! Temperature [K]
+   real(r8), intent(in)    :: rhoair    ! air density [kg/m3]
+   real(r8), intent(in)    :: fracice   ! Fraction of ice within the cloud used as in-cloud wet removal rate [fraction]
+   integer,  intent(in)    :: kk        ! level index
    integer,  intent(in)    :: kactfirst ! k at cloud base
 
 !-----------------------------------------------------------------------
 ! local variables
-   integer  :: l, ll, la, lc, n
+   integer  :: la, lc, imode, ispec   ! indices
 
-   real(r8) :: delact                ! working variable
-   real(r8) :: dt_u_inv              ! 1.0/dt_u
-   real(r8) :: fluxm(ntot_amode)      ! to understand this, see subr activate_modal
-   real(r8) :: fluxn(ntot_amode)      ! to understand this, see subr activate_modal
-   real(r8) :: flux_fullact           ! to understand this, see subr activate_modal
-   real(r8) :: fm(ntot_amode)         ! mass fraction of aerosols activated
-   real(r8) :: fn(ntot_amode)         ! number fraction of aerosols activated
-   real(r8) :: hygro(ntot_amode)      ! current hygroscopicity for int+act
-   real(r8) :: naerosol(ntot_amode)   ! interstitial+activated number conc (#/m3)
-   real(r8) :: sigw                  ! standard deviation of updraft velocity (cm/s)
-   real(r8) :: smax_prescribed       ! prescribed supersaturation for secondary activation (0-1 fraction)
-   real(r8) :: tmpa, tmpb, tmpc      ! working variable
-   real(r8) :: tmp_fact              ! working variable
-   real(r8) :: vaerosol(ntot_amode)   ! int+act volume (m3/m3)
-   real(r8) :: wbar                  ! mean updraft velocity (cm/s)
-   real(r8) :: wdiab                 ! diabatic vertical velocity (cm/s)
-   real(r8) :: wminf, wmaxf          ! limits for integration over updraft spectrum (cm/s)
-
+   real(r8) :: dt_u_inv               ! 1.0/dt_u [1/s]
+   real(r8) :: fluxm(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: fluxn(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: flux_fullact           ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: fm(ntot_amode)         ! mass fraction of aerosols activated [fraction]
+   real(r8) :: fn(ntot_amode)         ! number fraction of aerosols activated [fraction] 
+   real(r8) :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
+   real(r8) :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
+   real(r8) :: sigw                   ! standard deviation of updraft velocity [m/s]
+   real(r8) :: act_frac               ! activation fraction [fraction]
+   real(r8) :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
+   real(r8) :: wbar                   ! mean updraft velocity [m/s]
+   real(r8) :: wdiab                  ! diabatic vertical velocity [m/s]
+   real(r8) :: wminf, wmaxf           ! limits for integration over updraft spectrum [m/s]
 
 !-----------------------------------------------------------------------
 
-
-
 ! check f_ent > 0
-   if (f_ent <= 0.0) return
+   if (f_ent <= 0.0_r8) return
 
-
-   do n = 1, ntot_amode
-! compute a (or a+cw) volume and hygroscopicity
-      tmpa = 0.0_r8
-      tmpb = 0.0_r8
-      do ll = 1, nspec_amode(n)
-         tmpc = max( conu(lmassptr_amode(ll,n)), 0.0_r8 )
-         if ( use_cwaer_for_activate_maxsat ) &
-         tmpc = tmpc + max( conu(lmassptrcw_amode(ll,n)+pcnst), 0.0_r8 )
-         tmpc = tmpc / specdens_amode(lspectype_amode(ll,n))
-         tmpa = tmpa + tmpc
-         tmpb = tmpb + tmpc * spechygro(lspectype_amode(ll,n))
-      end do
-      vaerosol(n) = tmpa * rhoair
-      if (tmpa < 1.0e-35_r8) then
-         hygro(n) = 0.2_r8
-      else
-         hygro(n) = tmpb/tmpa
-      end if
-
-! load a (or a+cw) number and bound it
-      tmpa = max( conu(numptr_amode(n)), 0.0_r8 )
-      if ( use_cwaer_for_activate_maxsat ) &
-      tmpa = tmpa + max( conu(numptrcw_amode(n)+pcnst), 0.0_r8 )
-      naerosol(n) = tmpa * rhoair
-      naerosol(n) = max( naerosol(n),   &
-                         vaerosol(n)*voltonumbhi_amode(n) )
-      naerosol(n) = min( naerosol(n),   &
-                         vaerosol(n)*voltonumblo_amode(n) )
-
-   end do
+! calculate aerosol (or a+cw) volume, number and hygroscopicity
+   call aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                           vaerosol,   naerosol, hygro      ) ! out
 
 
 ! call Razzak-Ghan activation routine with single updraft
    wbar = max( wup, 0.5_r8 )  ! force wbar >= 0.5 m/s for now
-   sigw = 0.0
-   wdiab = 0.0
+   sigw = 0.0_r8
+   wdiab = 0.0_r8
    wminf = wbar
    wmaxf = wbar
 
-   if (k == kactfirst) then
+   if (kk == kactfirst) then
 ! at cloud base - do primary activation
-      call activate_modal(                                                 &
-         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
-         naerosol, ntot_amode, vaerosol, hygro,                            &
-         fn, fm, fluxn, fluxm, flux_fullact                                )
-
-
+      call activate_modal(                                             &
+         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                & ! in
+         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
+         fn, fm, fluxn, fluxm, flux_fullact                            ) ! out
    else
 ! above cloud base - do secondary activation with prescribed supersat 
 ! that is constant with height
-      smax_prescribed = method2_activate_smaxmax
-      call activate_modal(                                                 &
-         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
-         naerosol, ntot_amode, vaerosol, hygro,                            &
-         fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed               )
-   end if
-
-
+      call activate_modal(                                             &
+         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                & ! in
+         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
+         fn, fm, fluxn, fluxm, flux_fullact,                           & ! out
+         activate_smaxmax                                              ) ! optional in
+   endif
       
 ! apply the activation fractions to the updraft aerosol mixing ratios
    dt_u_inv = 1.0_r8/dt_u
 
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-            tmp_fact = fn(n)
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-            tmp_fact = fm(n)
-         end if
-
-
-         delact = min( conu(la)*tmp_fact, conu(la) )
-         delact = max( delact, 0.0_r8 )
-         conu(la) = conu(la) - delact
-         conu(lc) = conu(lc) + delact
-         dconudt(la) = -delact*dt_u_inv
-         dconudt(lc) =  delact*dt_u_inv
-      end do
-   end do   ! "n = 1, ntot_amode"
+   do imode = 1, ntot_amode
+        ! for aerosol number
+        la = numptr_amode(imode)
+        lc = numptrcw_amode(imode) + pcnst
+        act_frac = fn(imode)
+        call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
+        ! for aerosol mass
+        do ispec = 1, nspec_amode(imode)
+            la = lmassptr_amode(ispec,imode)
+            lc = lmassptrcw_amode(ispec,imode) + pcnst
+            act_frac = fm(imode)
+            call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
+        enddo  ! ispec
+   enddo   ! imode
 
    return
-   end subroutine ma_activate_convproc_method2
+   end subroutine ma_activate_convproc
 
+!========================================================================================
+   subroutine update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                                        pcnst_extd,  la,    lc,        & ! in
+                                        act_frac,    dt_u_inv          ) ! in
+!-----------------------------------------------------------------------
+! update conu and dconudt from activation fraction
+!-----------------------------------------------------------------------
+! arguments:
+   integer, intent(in)     :: pcnst_extd
+   real(r8), intent(inout) :: conu(pcnst_extd)    ! TMR concentration [#/kg or kg/kg]
+   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
+   real(r8), intent(in)    :: act_frac            ! activation fraction [fraction]
+   real(r8), intent(in)    :: dt_u_inv            ! 1.0/dt_u  [1/s]
+   integer, intent(in)     :: la                  ! indices for interstitial aerosols
+   integer, intent(in)     :: lc                  ! indices for in-cloud water aerosols
+! local variable
+   real(r8)     :: delact   ! change of aerosols due to activation [#/kg or kg/kg]
 
+   delact = min_max_bound(0.0_r8, conu(la), conu(la)*act_frac)
+   ! update conu in interstitial and in-cloud condition
+   conu(la) = conu(la) - delact
+   conu(lc) = conu(lc) + delact
+   ! update dconu/dt
+   dconudt(la) = -delact*dt_u_inv
+   dconudt(lc) =  delact*dt_u_inv
+
+   return
+   end subroutine update_conu_from_act_frac
+
+!========================================================================================
+   subroutine aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                                 vaerosol,   naerosol, hygro      ) ! out
+!-----------------------------------------------------------------------
+! calculate aerosol volume, number and hygroscopicity 
+!-----------------------------------------------------------------------
+                                
+   use constituents, only: pcnst
+   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
+      lspectype_amode, nspec_amode, ntot_amode,  &
+      numptr_amode, numptrcw_amode, &
+      specdens_amode, spechygro, &
+      voltonumblo_amode, voltonumbhi_amode
+
+!-----------------------------------------------------------------------
+! arguments:
+   implicit none
+   integer, intent(in)     :: pcnst_extd             ! TMR index
+   ! conu = tracer mixing ratios in updraft at top of this (current) level. The conu are changed by activation
+   real(r8), intent(in)    :: conu(pcnst_extd)       ! TMR [#/kg or kg/kg]
+   real(r8), intent(in)    :: rhoair                 ! air density [kg/m3]
+   real(r8), intent(out)   :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
+   real(r8), intent(out)   :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
+   real(r8), intent(out)   :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
+
+! local variables
+   integer  :: imode, ispec          ! index
+   real(r8) :: tmp_vol_spec          ! aerosol volume for a single species [m3/kg]
+   real(r8) :: tmp_vol               ! aerosol volume [m3/kg]
+   real(r8) :: tmp_num               ! aerosol number [#/kg]
+   real(r8) :: tmp_hygro             ! aerosol hygroscopicity * volume [m3/kg]
+   real(r8) :: n_min, n_max          ! min and max bound of naerosol
+   real(r8), parameter :: small_value = 1.0e-35_r8    ! a small value that variables smaller than it are considered as zero
+!-----------------------------------------------------------------------
+
+   do imode = 1, ntot_amode
+
+      ! compute aerosol (or a+cw) volume and hygroscopicity
+      tmp_vol = 0.0_r8
+      tmp_hygro = 0.0_r8
+      do ispec = 1, nspec_amode(imode)
+         tmp_vol_spec = max( conu(lmassptr_amode(ispec,imode)), 0.0_r8 ) / specdens_amode(lspectype_amode(ispec,imode))    ! mass divided by density
+         tmp_vol = tmp_vol + tmp_vol_spec ! total aerosol volume
+         tmp_hygro = tmp_hygro + tmp_vol_spec * spechygro(lspectype_amode(ispec,imode))   ! volume*hygro suming up for all species
+      enddo
+      vaerosol(imode) = tmp_vol * rhoair   ! change volume from m3/kgair to m3/m3air
+      if (tmp_vol < small_value) then
+         hygro(imode) = 0.2_r8
+      else
+         hygro(imode) = tmp_hygro/tmp_vol
+      endif
+
+      ! computer a (or a+cw) number and bound it
+      tmp_num = max( conu(numptr_amode(imode)), 0.0_r8 )
+      n_min = vaerosol(imode)*voltonumbhi_amode(imode)
+      n_max = vaerosol(imode)*voltonumblo_amode(imode)
+      naerosol(imode) = min_max_bound(n_min, n_max, tmp_num*rhoair)
+
+   enddo  ! imode
+
+   return
+   end subroutine aer_vol_num_hygro
 
 !=========================================================================================
    subroutine ma_resuspend_convproc(                           &
