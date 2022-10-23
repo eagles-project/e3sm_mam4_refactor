@@ -531,11 +531,9 @@ subroutine nucleate_ice_cam_calc( &
 
             call nucleati( &
                wsubi(i,k), t(i,k), pmid(i,k), relhum(i,k), icldm(i,k),   &
-               qc(i,k), qi(i,k), ni(i,k), rho(i,k),                      &
-               so4_num, dst_num, soot_num,                               &
+               rho(i,k), so4_num, dst_num, soot_num,                     &
                naai(i,k), nihf(i,k), niimm(i,k), nidep(i,k), nimey(i,k), &
-               dst1_num,dst2_num,dst3_num,dst4_num,                      &
-               clim_modal_aero)
+               dst3_num)
 
 
             naai_hom(i,k) = nihf(i,k)

@@ -91,11 +91,9 @@ end subroutine nucleati_init
 
 subroutine nucleati(  &
    wbar, tair, pmid, relhum, cldn,      &
-   qc, qi, ni_in, rhoair,               &
-   so4_num, dst_num, soot_num,          &
+   rhoair, so4_num, dst_num, soot_num,  &
    nuci, onihf, oniimm, onidep, onimey, &
-   dst1_num,dst2_num,dst3_num,dst4_num, &
-   clim_modal_aero )
+   dst3_num)
 
    !---------------------------------------------------------------
    ! Purpose:
@@ -115,18 +113,11 @@ subroutine nucleati(  &
    real(r8), intent(in) :: pmid        ! pressure at layer midpoints (pa)
    real(r8), intent(in) :: relhum      ! relative humidity with respective to liquid
    real(r8), intent(in) :: cldn        ! new value of cloud fraction    (fraction)
-   real(r8), intent(in) :: qc          ! liquid water mixing ratio (kg/kg)
-   real(r8), intent(in) :: qi          ! grid-mean preexisting cloud ice mass mixing ratio (kg/kg)
-   real(r8), intent(in) :: ni_in       ! grid-mean preexisting cloud ice number conc (#/kg) 
    real(r8), intent(in) :: rhoair      ! air density (kg/m3)
    real(r8), intent(in) :: so4_num     ! so4 aerosol number (#/cm^3)
    real(r8), intent(in) :: dst_num     ! total dust aerosol number (#/cm^3)
    real(r8), intent(in) :: soot_num    ! soot (hydrophilic) aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst1_num     ! dust aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst2_num     ! dust aerosol number (#/cm^3)
    real(r8), intent(in) :: dst3_num     ! dust aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst4_num     ! dust aerosol number (#/cm^3)
-   logical,  intent(in) :: clim_modal_aero !whether MAM is used or not
 
    ! Output Arguments
    real(r8), intent(out) :: nuci       ! ice number nucleated (#/kg)
@@ -141,9 +132,9 @@ subroutine nucleati(  &
    real(r8) :: nidep                     ! nucleated number from deposition nucleation
    real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers)
    real(r8) :: n1, ni                    ! nucleated number
-   real(r8) :: tc, A, B, regm            ! work variable  
-   real(r8)  :: wbar1, wbar2
-
+   real(r8) :: tc, regm                  ! work variable  
+   real(r8) :: aer_num
+   real(r8) :: wbar1, wbar2 
 
    !-------------------------------------------------------------------------------
 
@@ -153,6 +144,7 @@ subroutine nucleati(  &
 
    ni = 0._r8
    tc = tair - 273.15_r8
+   aer_num = soot_num + dst3_num
 
    ! initialize
    niimm = 0._r8
@@ -160,16 +152,11 @@ subroutine nucleati(  &
    nihf  = 0._r8
 
 
-   if(so4_num >= 1.0e-10_r8 .and. (soot_num+dst3_num) >= 1.0e-10_r8 .and. cldn > 0._r8) then
+   if(so4_num >= 1.0e-10_r8 .and. aer_num >= 1.0e-10_r8 .and. cldn > 0._r8) then
 
       if((tc <= -35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid) >= 1.2_r8)) then ! use higher RHi threshold
 
-            A = -1.4938_r8 * log(soot_num+dst3_num) + 12.884_r8
-            B = -10.41_r8  * log(soot_num+dst3_num) - 67.69_r8
-
-            regm = A * log(wbar1) + B
-
-            
+            call calculate_regm_nucleati(wbar1, aer_num, regm)
 
             ! heterogeneous nucleation only
             if (tc > regm) then
@@ -183,7 +170,7 @@ subroutine nucleati(  &
                   
                else
 
-                  call hetero(tc,wbar2,soot_num+dst3_num,niimm,nidep)
+                  call hetero(tc,wbar2,aer_num,niimm,nidep)
                   nihf=0._r8
                   n1=niimm+nidep
 
@@ -210,7 +197,7 @@ subroutine nucleati(  &
                else
 
                   call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
-                  call hetero(regm,wbar2,soot_num+dst3_num,niimm,nidep)
+                  call hetero(regm,wbar2,aer_num,niimm,nidep)
 
                   if (nihf <= (niimm+nidep)) then
                      n1 = nihf
@@ -237,7 +224,7 @@ subroutine nucleati(  &
    if(nuci > 9999._r8 .or. nuci < 0._r8) then
       nuci=0._r8
    endif
-
+   
    nuci   = nuci*1.e+6_r8/rhoair    ! change unit from #/cm3 to #/kg
    onimey = nimey*1.e+6_r8/rhoair
    onidep = nidep*1.e+6_r8/rhoair
@@ -372,6 +359,28 @@ end subroutine hf
 
 !===============================================================================
 
+subroutine calculate_regm_nucleati(w_vlc, Na, regm)
+
+!-------------------------------------------------------------------------------
+! Calculate temperature regime for ice nucleation based on
+! Eq. 4.5 in Liu & Penner (2005), Meteorol. Z.
+!-------------------------------------------------------------------------------
+
+   real(r8), intent(in)  :: w_vlc            ! vertical velocity [m/s]
+   real(r8), intent(in)  :: Na               ! aerosol number concentration [#/cm^3]
+   real(r8), intent(out) :: regm             ! threshold temperature [C] 
+
+   real(r8) A_coef, B_coef, lnNa
+
+   lnNa   = log(Na)
+
+   A_coef = -1.4938_r8 * lnNa + 12.884_r8
+   B_coef = -10.41_r8  * lnNa - 67.69_r8
+
+   regm = A_coef * log(w_vlc) + B_coef
+end subroutine calculate_regm_nucleati
+
+
 subroutine calculate_RHw_hf(Temperature, lnw, RHw)
 
 !-------------------------------------------------------------------------------
@@ -391,7 +400,7 @@ subroutine calculate_RHw_hf(Temperature, lnw, RHw)
    
    RHw = (A_coef*Temperature*Temperature + B_coef*Temperature + C_coef)*0.01_r8
 
-end subroutine
+end subroutine calculate_RHw_hf
 
 
 subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, Temperature, lnw, Na, Ni)
@@ -416,7 +425,7 @@ subroutine calculate_Ni_hf(A1, B1, C1, A2, B2, C2, Temperature, lnw, Na, Ni)
    Ni = k1*Na**(k2)
    Ni = min(Ni,Na)
 
-end subroutine
+end subroutine calculate_Ni_hf
 
 end module nucleate_ice
 
