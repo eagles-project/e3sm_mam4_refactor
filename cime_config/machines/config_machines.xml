@@ -2446,7 +2446,7 @@
       <env name="MKL_PATH">$ENV{MKLROOT}</env>
     </environment_variables>
     <environment_variables compiler="intel">
-      <env name="LD_LIBRARY_PATH">/share/apps/gcc/8.1.0/lib:/share/apps/gcc/8.1.0/lib64:$ENV{LD_LIBRARY_PATH}</env>
+      <env name="LD_LIBRARY_PATH"> /share/apps/intel/oneapi:/share/apps/gcc/8.1.0/lib:/share/apps/gcc/8.1.0/lib64:$ENV{LD_LIBRARY_PATH}</env>
     </environment_variables>
     <environment_variables mpilib="mvapich2">
       <env name="MV2_ENABLE_AFFINITY">0</env>
