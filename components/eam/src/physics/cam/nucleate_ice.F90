@@ -108,23 +108,23 @@ subroutine nucleati(  &
    !----------------------------------------------------------------
 
    ! Input Arguments
-   real(r8), intent(in) :: wbar        ! grid cell mean vertical velocity (m/s)
-   real(r8), intent(in) :: tair        ! temperature (K)
-   real(r8), intent(in) :: pmid        ! pressure at layer midpoints (pa)
-   real(r8), intent(in) :: relhum      ! relative humidity with respective to liquid
-   real(r8), intent(in) :: cldn        ! new value of cloud fraction    (fraction)
-   real(r8), intent(in) :: rhoair      ! air density (kg/m3)
-   real(r8), intent(in) :: so4_num     ! so4 aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst_num     ! total dust aerosol number (#/cm^3)
-   real(r8), intent(in) :: soot_num    ! soot (hydrophilic) aerosol number (#/cm^3)
-   real(r8), intent(in) :: dst3_num     ! dust aerosol number (#/cm^3)
+   real(r8), intent(in) :: wbar        ! grid cell mean vertical velocity [m/s]
+   real(r8), intent(in) :: tair        ! temperature [K]
+   real(r8), intent(in) :: pmid        ! pressure at layer midpoints [pa]
+   real(r8), intent(in) :: relhum      ! relative humidity with respective to liquid [unitless]
+   real(r8), intent(in) :: cldn        ! new value of cloud fraction    [fraction]
+   real(r8), intent(in) :: rhoair      ! air density [kg/m3]
+   real(r8), intent(in) :: so4_num     ! so4 aerosol number [#/cm^3]
+   real(r8), intent(in) :: dst_num     ! total dust aerosol number [#/cm^3]
+   real(r8), intent(in) :: soot_num    ! soot (hydrophilic) aerosol number [#/cm^3]
+   real(r8), intent(in) :: dst3_num     ! dust aerosol number [#/cm^3]
 
    ! Output Arguments
-   real(r8), intent(out) :: nuci       ! ice number nucleated (#/kg)
-   real(r8), intent(out) :: onihf      ! nucleated number from homogeneous freezing of so4
-   real(r8), intent(out) :: oniimm     ! nucleated number from immersion freezing
-   real(r8), intent(out) :: onidep     ! nucleated number from deposition nucleation
-   real(r8), intent(out) :: onimey     ! nucleated number from deposition nucleation  (meyers: mixed phase)
+   real(r8), intent(out) :: nuci       ! ice number nucleated [#/kg]
+   real(r8), intent(out) :: onihf      ! nucleated number from homogeneous freezing of so4 [#/kg]
+   real(r8), intent(out) :: oniimm     ! nucleated number from immersion freezing [#/kg]
+   real(r8), intent(out) :: onidep     ! nucleated number from deposition nucleation [#/kg]
+   real(r8), intent(out) :: onimey     ! nucleated number from deposition nucleation  (meyers: mixed phase) [#/kg]
 
    ! Local workspace
    real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4

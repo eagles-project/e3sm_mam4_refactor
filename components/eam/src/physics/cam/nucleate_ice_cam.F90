@@ -356,9 +356,6 @@ subroutine nucleate_ice_cam_calc( &
 
    real(r8), pointer :: t(:,:)          ! input temperature (K)
    real(r8), pointer :: qn(:,:)         ! input water vapor mixing ratio (kg/kg)
-   real(r8), pointer :: qc(:,:)         ! cloud water mixing ratio (kg/kg)
-   real(r8), pointer :: qi(:,:)         ! cloud ice mixing ratio (kg/kg)
-   real(r8), pointer :: ni(:,:)         ! cloud ice number conc (1/kg)
    real(r8), pointer :: pmid(:,:)       ! pressure at layer midpoints (pa)
 
    real(r8), pointer :: num_accum(:,:)  ! number m.r. of accumulation mode
@@ -414,9 +411,6 @@ subroutine nucleate_ice_cam_calc( &
    ncol  = state%ncol
    t     => state%t
    qn    => state%q(:,:,1)
-   qc    => state%q(:,:,cldliq_idx)
-   qi    => state%q(:,:,cldice_idx)
-   ni    => state%q(:,:,numice_idx)
    pmid  => state%pmid
 
    do k = top_lev, pver
