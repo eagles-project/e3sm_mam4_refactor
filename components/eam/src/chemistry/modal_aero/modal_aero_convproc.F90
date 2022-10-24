@@ -2282,18 +2282,15 @@ end subroutine ma_convproc_tend
 
    if (kk == kactfirst) then
 ! at cloud base - do primary activation
-! Remove sigw and wminf from arg list since not used for single updraft, and remove wdiab since always zero when subroutine is called.
       call activate_modal(                                             &
-!         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                & ! in
-         wbar, wmaxf, tair, rhoair,                & ! in
+         wbar, wmaxf, tair, rhoair,                                    & ! in
          naerosol, ntot_amode, vaerosol, hygro,                        & ! in
          fn, fm, fluxn, fluxm, flux_fullact                            ) ! out
    else
 ! above cloud base - do secondary activation with prescribed supersat 
 ! that is constant with height
       call activate_modal(                                             &
-!         wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                & ! in
-         wbar, wmaxf, tair, rhoair,                & ! in
+         wbar, wmaxf, tair, rhoair,                                    & ! in
          naerosol, ntot_amode, vaerosol, hygro,                        & ! in
          fn, fm, fluxn, fluxm, flux_fullact,                           & ! out
          activate_smaxmax                                              ) ! optional in

@@ -663,7 +663,6 @@ subroutine dropmixnuc( &
             end do
 
             call activate_modal( &
-!               wbar, wmix, wdiab, wmin, wmax,                       &
                wbar, wmax,                       &
                temp(i,k), cs(i,k), naermod, ntot_amode, &
                vaerosol, hygro, fn, fm, fluxn,                      &
@@ -755,7 +754,6 @@ subroutine dropmixnuc( &
                end do
 
                call activate_modal( &
-!                  wbar, wmix, wdiab, wmin, wmax,                       &
                   wbar, wmax,                       &
                   temp(i,k), cs(i,k), naermod, ntot_amode, &
                   vaerosol, hygro, fn, fm, fluxn,                      &
@@ -1215,7 +1213,6 @@ end subroutine explmix
 
 !===============================================================================
 
-!subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    na, nmode, volume, hygro, &
    fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed ) 
@@ -1267,20 +1264,20 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    real(r8) es ! saturation vapor pressure [Pa]
    real(r8) qs ! water vapor saturation specific humidity [kg/kg]
    real(r8) dqsdt ! change in qs with temperature  [(kg/kg)/T]
-   real(r8) zeta(nmode), eta(nmode) ! [dimensionless]
+   real(r8) zeta, eta(nmode) ! [unitless]
    real(r8) alpha ! [/m]
    real(r8) gamma ![m3/kg]
    real(r8) beta ! [m2/s]
    real(r8) gthermfac ! thermodynamic function [m2/s]
    real(r8) :: amcube(nmode) ! cube of dry mode radius [m3]
    real(r8) smc(nmode) ! critical supersaturation for number mode radius [fraction]
-   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation) [dimensionless]
+   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation) [unitless]
 
    real(r8) wnuc  ! nucleation w, but = wbar if wdiab == 0 [m/s]
    real(r8) alw ! [/s]
    real(r8) smax ! maximum supersaturation [fraction]
-   real(r8) lnsmax ! ln(smax) [dimensionless]
-   real(r8) arg_erf_n,arg_erf_m  ! [dimensionless]
+   real(r8) lnsmax ! ln(smax) [unitless]
+   real(r8) arg_erf_n,arg_erf_m  ! [unitless]
    real(r8) etafactor1  ! [/ s^(3/2)]
    real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
    integer imode
@@ -1293,10 +1290,8 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    flux_fullact=0._r8
 
 
-  if(nmode == 1 .and. na(1) < 1.e-20_r8)return
+   if(na(1) < 1.e-20_r8)return
 
-! BJG sigw=0 (single updraft) whenever subroutine is called, so removed from argument list 
-! if(sigw.le.1.e-5_r8.and.wbar.le.0._r8)return
    if(wbar <= 0._r8)return
 
    
@@ -1312,18 +1307,15 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    alpha=gravit*(latvap/(cpair*rh2o*tair*tair)-1._r8/(rair*tair))
    gamma=(1+latvap/cpair*dqsdt)/(rhoair*qs)
    etafactor2max=1.e10_r8/(alpha*wmaxf)**1.5_r8 ! this should make eta big if na is very small.
-! BJG g renamed to gthermfac, defined here since same for all modes in implementation
    gthermfac=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-! BJG wdiab = 0 whenever subroutine is called, so removed from argument list
-!      wnuc=wbar+wdiab
+           +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8)) !  gthermfac is same for all modes
+   beta=2._r8*pi*rhoh2o*gthermfac*gamma
    wnuc = wbar
-!  BJG  below is always true if this point is reached.
-!      if(wnuc.gt.0._r8)then
    alw=alpha*wnuc
    etafactor1=alw*sqrt(alw)
+   zeta=twothird*sqrt(alw)*aten/sqrt(gthermfac)
 
-!  BJG  Here compute smc, zeta, eta for all modes for maxsat calculation
+!  Here compute smc, eta for all modes for maxsat calculation
 
    do imode=1,nmode
      if(volume(imode) > 1.e-39_r8 .and. na(imode) > 1.e-39_r8)then
@@ -1334,26 +1326,22 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
          !           should depend on mean radius of mode to account for gas kinetic effects
          !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
          !           for approriate size to use for effective diffusivity.
-         beta=2._r8*pi*rhoh2o*gthermfac*gamma
+
          etafactor2(imode)=1._r8/(na(imode)*beta*sqrt(gthermfac))
          if(hygro(imode) > 1.e-10_r8)then
             smc(imode)=2._r8*aten*sqrt(aten/(27._r8*hygro(imode)*amcube(imode))) ! only if variable size dist
          else
             smc(imode)=100._r8
          endif
-         !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
       else
          smc(imode)=1._r8
          etafactor2(imode)=etafactor2max ! this should make eta big if na is very small.
       endif
       lnsm(imode)=log(smc(imode)) ! only if variable size dist
-      !	 write(iulog,'(a,i4,4g12.2)')'m,na,amcube,hygro,sm,lnsm=', &
-      !                   m,na(m),amcube(m),hygro(m),sm(m),lnsm(m)
       eta(imode)=etafactor1*etafactor2(imode)
-      zeta(imode)=twothird*sqrt(alw)*aten/sqrt(gthermfac)
    enddo
 
-!  BJG  Find maximum supersaturation 
+!  Find maximum supersaturation 
 
          ! use smax_prescribed if it is present; otherwise get smax from subr maxsat
    if ( present( smax_prescribed ) ) then
@@ -1365,7 +1353,7 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    lnsmax=log(smax)
 
 
-!  BJG  Use maximum supersaturation to calculate aerosol activation output
+!  Use maximum supersaturation to calculate aerosol activation output
 
    do imode=1,nmode
             !                 modal
@@ -1378,7 +1366,6 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
    enddo
    flux_fullact = wbar
 
-! BJG      endif
 
 end subroutine activate_modal
 
@@ -1394,7 +1381,7 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
 
    integer,  intent(in)  :: nmode ! number of modes
    real(r8), intent(in)  :: smc(nmode) ! critical supersaturation for number mode radius [fraction]
-   real(r8), intent(in)  :: zeta(nmode) ! [dimensionless]
+   real(r8), intent(in)  :: zeta ! [dimensionless]
    real(r8), intent(in)  :: eta(nmode) ! [dimensionless]
    real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
    integer  :: m  ! mode index
@@ -1404,7 +1391,7 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
 
    weak_forcing = .true.
    do m=1, nmode
-      if(zeta(m).gt.1.e5_r8*eta(m).or.smc(m)*smc(m).gt.1.e5_r8*eta(m))then
+      if(zeta > 1.e5_r8*eta(m).or.smc(m)*smc(m) > 1.e5_r8*eta(m))then
          !weak forcing. essentially none activated
          smax=1.e-20_r8
       else
@@ -1419,9 +1406,9 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
 
    sum=0
    do m=1,nmode
-      if(eta(m).gt.1.e-20_r8)then
-         g1 = (zeta(m)/eta(m)) * sqrt(zeta(m)/eta(m))
-         g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta(m))) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta(m)))
+      if(eta(m) > 1.e-20_r8)then
+         g1 = (zeta/eta(m)) * sqrt(zeta/eta(m))
+         g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta)) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta))
          sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
       else
          sum=1.e20_r8
