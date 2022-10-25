@@ -151,8 +151,8 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
                            aerdepwetis,                             &
                            mu, md, du, eu,                          &
                            ed, dp, dsubcld,                         &
-                           jt, maxg, ideep, lengath, species_class, &
-                           history_aero_prevap_resusp               )
+                           jt, maxg, ideep, lengath, species_class  &
+                           )
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -174,7 +174,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
    use time_manager,  only: get_nstep
    use physics_buffer, only: physics_buffer_desc, pbuf_get_index
    use constituents,  only: pcnst, cnst_name
-   use error_messages, only: alloc_err	
 
    use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
@@ -216,88 +215,45 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)
-   logical,  intent(in)    :: history_aero_prevap_resusp
 
 
 ! Local variables
    integer, parameter :: nsrflx = 6        ! last dimension of qsrflx
-   integer  :: i, ii 
-   integer  :: k
-   integer  :: l, ll, lchnk
-   integer  :: n, ncol, nstep
+   integer  :: ll      ! index
+   integer  :: ncol
 
    real(r8) :: dlfdp(pcols,pver)
    real(r8) :: dpdry(pcols,pver)
    real(r8) :: dqdt(pcols,pver,pcnst)
-   real(r8) :: dt
    real(r8) :: qa(pcols,pver,pcnst), qb(pcols,pver,pcnst)
    real(r8) :: qsrflx(pcols,pcnst,nsrflx)
-   real(r8) :: sflxic(pcols,pcnst)
-   real(r8) :: sflxid(pcols,pcnst)
-   real(r8) :: sflxec(pcols,pcnst)
-   real(r8) :: sflxed(pcols,pcnst)
-   real(r8) :: tmpa, tmpb, tmpg
 
    logical  :: dotend(pcnst)
-
-! physics buffer fields 
-   integer itim, ifld
-   real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
 !
 ! Initialize
 !
 
-   lchnk = state%lchnk
    ncol  = state%ncol
-   nstep = get_nstep()
-   dt = ztodt
 
    hund_ovr_g = 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
 
-   sflxic(:,:) = 0.0_r8
-   sflxid(:,:) = 0.0_r8
-   sflxec(:,:) = 0.0_r8
-   sflxed(:,:) = 0.0_r8
-   do l = 1, pcnst
-      if ( (species_class(l) == spec_class_aerosol) .and. ptend%lq(l) ) then
-         sflxec(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,1) 
-         sflxed(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,2) 
-      end if
-   end do
-
-!
-! Associate pointers with physics buffer fields
-!
-!  ifld = pbuf_get_fld_idx('FRACIS')
-!  fracis  => pbuf(ifld)%fld_ptr(1,1:pcols,1:pver,state%lchnk,1:pcnst)
-
-
 !
 ! prepare for deep conv processing
 !
-  do l = 1, pcnst
-     if ( ptend%lq(l) ) then
+  do ll = 1, pcnst
+     if ( ptend%lq(ll) ) then
         ! calc new q (after calcaersize and mz_aero_wet_intr)
-        qa(1:ncol,:,l) = state%q(1:ncol,:,l) + dt*ptend%q(1:ncol,:,l)
-        qb(1:ncol,:,l) = max( 0.0_r8, qa(1:ncol,:,l) ) 
-
-!    skip this -- if code generates negative q, 
-!    then you need to see the messages and fix it
-!       if ( apply_convproc_tend_to_ptend ) then
-!          ! adjust ptend%q when qa < 0.0
-!          ptend%q(1:ncol,:,l) = ptend%q(1:ncol,:,l) &
-!             + ( qb(1:ncol,:,l) - qa(1:ncol,:,l) )/dt
-!       end if
-
+        qa(1:ncol,:,ll) = state%q(1:ncol,:,ll) + ztodt*ptend%q(1:ncol,:,ll)
+        qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
      else
         ! use old q
-        qb(1:ncol,:,l) = state%q(1:ncol,:,l)
-     end if
-  end do
+        qb(1:ncol,:,ll) = state%q(1:ncol,:,ll)
+     endif
+  enddo
   dqdt(:,:,:) = 0.0_r8
   qsrflx(:,:,:) = 0.0_r8
   dotend(:) = .false.
@@ -311,7 +267,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
   dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
 
   call ma_convproc_dp_intr(                    &
-     state, pbuf, dt,                          &
+     state, pbuf, ztodt,                          &
      dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
      mu, md, du, eu,                           &
      ed, dp, dsubcld,                          &
@@ -321,47 +277,32 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 
 
 ! apply deep conv processing tendency and prepare for shallow conv processing
-  do l = 1, pcnst
-     if ( .not. dotend(l) ) cycle
+  do ll = 1, pcnst
+     if ( .not. dotend(ll) ) cycle
 
      ! calc new q (after ma_convproc_dp_intr)
-     qa(1:ncol,:,l) = qb(1:ncol,:,l) + dt*dqdt(1:ncol,:,l)
-     qb(1:ncol,:,l) = max( 0.0_r8, qa(1:ncol,:,l) ) 
-
-! skip this -- if code generates negative q, 
-! then you need to see the messages and fix it
-!    ! adjust dqdt when qa < 0.0
-!    dqdt(1:ncol,:,l) = dqdt(1:ncol,:,l) &
-!       + ( qb(1:ncol,:,l) - qa(1:ncol,:,l) )/dt
+     qa(1:ncol,:,ll) = qb(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
+     qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
 
      if ( apply_convproc_tend_to_ptend ) then
         ! add dqdt onto ptend%q and set ptend%lq
-        ptend%q(1:ncol,:,l) = ptend%q(1:ncol,:,l) + dqdt(1:ncol,:,l)
-        ptend%lq(l) = .true.
-     end if
+        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
+        ptend%lq(ll) = .true.
+     endif
 
-     if ((species_class(l) == spec_class_aerosol) .or. &
-         (species_class(l) == spec_class_gas    )) then
-        ! these used for history file wetdep diagnostics
-        sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
-        sflxid(1:ncol,l) = sflxid(1:ncol,l) + qsrflx(1:ncol,l,4) 
-        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) 
-        sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,6)
-     end if
-
-     if (species_class(l) == spec_class_aerosol) then
+     if (species_class(ll) == spec_class_aerosol) then
         ! this used for surface coupling
-        aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
-           + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5) 
-     end if
+        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
+           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5) 
+     endif
 
-  end do ! l
+  enddo ! l
 
   dqdt(:,:,:) = 0.0_r8
   qsrflx(:,:,:) = 0.0_r8
   dotend(:) = .false.
 
-  end if ! (convproc_do_aer  .or. convproc_do_gas ) then
+  endif ! (convproc_do_aer  .or. convproc_do_gas ) then
 
 
 !
@@ -370,7 +311,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
   if (convproc_do_aer .or. convproc_do_gas ) then
 
   call ma_convproc_sh_intr(                    &
-     state, pbuf, dt,                          &
+     state, pbuf, ztodt,                       &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
      cmfmcsh, sh_e_ed_ratio,                   &
      qb, dqdt, dotend, nsrflx, qsrflx,         &
@@ -378,68 +319,27 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 
 
 ! apply shallow conv processing tendency
-  do l = 1, pcnst
-     if ( .not. dotend(l) ) cycle
+  do ll = 1, pcnst
+     if ( .not. dotend(ll) ) cycle
 
      ! calc new q (after ma_convproc_sh_intr)
-     qa(1:ncol,:,l) = qb(1:ncol,:,l) + dt*dqdt(1:ncol,:,l)
-     qb(1:ncol,:,l) = max( 0.0_r8, qa(1:ncol,:,l) ) 
-
-! skip this -- if code generates negative q, 
-! then you need to see the messages and fix it
-!    ! adjust dqdt when qa < 0.0
-!    dqdt(1:ncol,:,l) = dqdt(1:ncol,:,l) &
-!       + ( qb(1:ncol,:,l) - qa(1:ncol,:,l) )/dt
+     qa(1:ncol,:,ll) = qb(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
+     qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
 
      if ( apply_convproc_tend_to_ptend ) then
         ! add dqdt onto ptend%q and set ptend%lq
-        ptend%q(1:ncol,:,l) = ptend%q(1:ncol,:,l) + dqdt(1:ncol,:,l)
-        ptend%lq(l) = .true.
-     end if
+        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
+        ptend%lq(ll) = .true.
+     endif
 
-     if ((species_class(l) == spec_class_aerosol) .or. &
-         (species_class(l) == spec_class_gas    )) then
-        sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
-        sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6) 
-     end if
+     if (species_class(ll) == spec_class_aerosol) then
+        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
+           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5) 
+     endif
 
-     if (species_class(l) == spec_class_aerosol) then
-        aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
-           + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5) 
-     end if
+  enddo ! l
 
-  end do ! l
-
-  end if ! (convproc_do_aer  .or. convproc_do_gas) then
-
-
-! output wet deposition fields to history
-!    I = in-cloud removal;     E = precip-evap resuspension
-!    C = convective (total);   D = deep convective
-! note that the precip-evap resuspension includes that resulting from
-!    below-cloud removal, calculated in mz_aero_wet_intr
-  if (convproc_do_aer .and. apply_convproc_tend_to_ptend ) then
-     do n = 1, ntot_amode
-     do ll = 0, nspec_amode(n)
-        if (ll == 0) then
-           l = numptr_amode(n)
-        else
-           l = lmassptr_amode(ll,n)
-        end if
-
-        call outfld( trim(cnst_name(l))//'SFWET', aerdepwetis(:,l), pcols, lchnk )
-        call outfld( trim(cnst_name(l))//'SFSIC', sflxic(:,l), pcols, lchnk )
-        if ( history_aero_prevap_resusp ) &
-        call outfld( trim(cnst_name(l))//'SFSEC', sflxec(:,l), pcols, lchnk )
-
-        if ( deepconv_wetdep_history ) then
-           call outfld( trim(cnst_name(l))//'SFSID', sflxid(:,l), pcols, lchnk )
-           if ( history_aero_prevap_resusp ) &
-           call outfld( trim(cnst_name(l))//'SFSED', sflxed(:,l), pcols, lchnk )
-        end if
-     end do ! ll
-     end do ! n
-  end if
+  endif ! (convproc_do_aer  .or. convproc_do_gas) then
 
 
 end subroutine ma_convproc_intr
