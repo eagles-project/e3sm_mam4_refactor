@@ -244,107 +244,111 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !
 ! prepare for deep conv processing
 !
-  do ll = 1, pcnst
-     if ( ptend%lq(ll) ) then
-        ! calc new q (after calcaersize and mz_aero_wet_intr)
-        qa(1:ncol,:,ll) = state%q(1:ncol,:,ll) + ztodt*ptend%q(1:ncol,:,ll)
-        qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
-     else
-        ! use old q
-        qb(1:ncol,:,ll) = state%q(1:ncol,:,ll)
-     endif
-  enddo
   dqdt(:,:,:) = 0.0_r8
   qsrflx(:,:,:) = 0.0_r8
   dotend(:) = .false.
+  qb(1:ncol,:,:) = state%q(1:ncol,:,:)
+  call update_qnew_ptend(                                         &
+                          ptend%lq,.false.,         .false.,      &  ! in
+                           ncol,   species_class,   ptend%q,      &  ! in
+                           qsrflx, ztodt,                         &  ! in
+                           ptend,  qb,          aerdepwetis       )  ! inout
 
 
 !
 ! do deep conv processing
 !
   if (convproc_do_aer .or. convproc_do_gas) then
-
-  dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
-
-  call ma_convproc_dp_intr(                    &
-     state, pbuf, ztodt,                          &
-     dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
-     mu, md, du, eu,                           &
-     ed, dp, dsubcld,                          &
-     jt, maxg, ideep, lengath,                 &
-     qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class )
-
-
-! apply deep conv processing tendency and prepare for shallow conv processing
-  do ll = 1, pcnst
-     if ( .not. dotend(ll) ) cycle
-
-     ! calc new q (after ma_convproc_dp_intr)
-     qa(1:ncol,:,ll) = qb(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
-     qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
-
-     if ( apply_convproc_tend_to_ptend ) then
-        ! add dqdt onto ptend%q and set ptend%lq
-        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
-        ptend%lq(ll) = .true.
-     endif
-
-     if (species_class(ll) == spec_class_aerosol) then
-        ! this used for surface coupling
-        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
-           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5) 
-     endif
-
-  enddo ! l
-
-  dqdt(:,:,:) = 0.0_r8
-  qsrflx(:,:,:) = 0.0_r8
-  dotend(:) = .false.
-
+     dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
+     call ma_convproc_dp_intr(                    &
+        state, pbuf, ztodt,                       &
+        dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
+        mu, md, du, eu,                           &
+        ed, dp, dsubcld,                          &
+        jt, maxg, ideep, lengath,                 &
+        qb, dqdt, dotend, nsrflx, qsrflx,         &
+        species_class )
+     ! apply deep conv processing tendency and prepare for shallow conv processing
+     call update_qnew_ptend(                          &
+            dotend, .true.,          .true.,       &  ! in
+            ncol,   species_class,   dqdt,         &  ! in
+            qsrflx, ztodt,                         &  ! in
+            ptend,  qb,          aerdepwetis       )  ! inout
+     dqdt(:,:,:) = 0.0_r8
+     qsrflx(:,:,:) = 0.0_r8
+     dotend(:) = .false.
   endif ! (convproc_do_aer  .or. convproc_do_gas ) then
-
 
 !
 ! do shallow conv processing
 !
   if (convproc_do_aer .or. convproc_do_gas ) then
-
-  call ma_convproc_sh_intr(                    &
-     state, pbuf, ztodt,                       &
-     sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
-     cmfmcsh, sh_e_ed_ratio,                   &
-     qb, dqdt, dotend, nsrflx, qsrflx,         &
-     species_class )
-
-
-! apply shallow conv processing tendency
-  do ll = 1, pcnst
-     if ( .not. dotend(ll) ) cycle
-
-     ! calc new q (after ma_convproc_sh_intr)
-     qa(1:ncol,:,ll) = qb(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
-     qb(1:ncol,:,ll) = max( 0.0_r8, qa(1:ncol,:,ll) ) 
-
-     if ( apply_convproc_tend_to_ptend ) then
-        ! add dqdt onto ptend%q and set ptend%lq
-        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
-        ptend%lq(ll) = .true.
-     endif
-
-     if (species_class(ll) == spec_class_aerosol) then
-        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
-           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5) 
-     endif
-
-  enddo ! l
-
+     call ma_convproc_sh_intr(                    &
+        state, pbuf, ztodt,                       &
+        sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
+        cmfmcsh, sh_e_ed_ratio,                   &
+        qb, dqdt, dotend, nsrflx, qsrflx,         &
+        species_class )
+     ! apply shallow conv processing tendency
+     call update_qnew_ptend(                            &
+              dotend, .true.,          .true.,       &  ! in
+              ncol,   species_class,   dqdt,         &  ! in
+              qsrflx, ztodt,                         &  ! in
+              ptend,  qb,          aerdepwetis       )  ! inout
   endif ! (convproc_do_aer  .or. convproc_do_gas) then
 
 
 end subroutine ma_convproc_intr
 
+!=========================================================================================
+subroutine update_qnew_ptend(                                         &
+                           dotend, is_update_ptend, is_update_wetdep, &  ! in
+                           ncol,   species_class,   dqdt,             &  ! in
+                           qsrflx, ztodt,                             &  ! in
+                           ptend,  qnew,            aerdepwetis       )  ! inout
 
+use physics_types, only: physics_state, physics_ptend
+use constituents,  only: pcnst
+
+   ! Arguments
+   type(physics_ptend), intent(inout) :: ptend          ! indivdual parameterization tendencies
+   logical,  intent(in)    :: dotend(pcnst)             ! if do tendency
+   logical,  intent(in)    :: is_update_ptend           ! if add dqdt onto ptend%q
+   logical,  intent(in)    :: is_update_wetdep          ! if calculate aerdepwetis
+   integer,  intent(in)    :: ncol                      ! index
+   integer,  intent(in)    :: species_class(:)          ! species index
+   real(r8), intent(inout) :: qnew(pcols,pver,pcnst)    ! Tracer array including moisture [kg/kg]
+   real(r8), intent(in)    :: dqdt(pcols,pver,pcnst)    ! time tendency of tracer [kg/kg/s]
+   real(r8), intent(in)    :: qsrflx(:,:,:)             ! process-specific column tracer tendencies. see ma_convproc_tend for detail info [kg/m2/s]
+   real(r8), intent(in)    :: ztodt                     ! 2 delta t (model time increment) [s]
+   real(r8), intent(inout) :: aerdepwetis(pcols,pcnst)  ! aerosol wet deposition (interstitial) [kg/m2/s]
+
+   ! Local variables
+   integer  :: ll                         ! index
+   real(r8) :: qtmp(pcols,pver,pcnst)     ! temporary q [kg/kg]
+
+
+   do ll = 1, pcnst
+     if ( .not. dotend(ll) ) cycle
+
+     ! calc new q (after ma_convproc_sh_intr)
+     qtmp(1:ncol,:,ll) = qnew(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
+     qnew(1:ncol,:,ll) = max( 0.0_r8, qtmp(1:ncol,:,ll) )
+
+     ! add dqdt onto ptend%q and set ptend%lq
+     if ( is_update_ptend ) then
+        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
+        ptend%lq(ll) = .true.
+     endif
+
+     ! this is used in surface coupling
+     if (is_update_wetdep .and. species_class(ll) == spec_class_aerosol) then
+        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
+           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5)
+     endif
+
+   enddo ! ll
+end subroutine update_qnew_ptend
 
 !=========================================================================================
 subroutine ma_convproc_dp_intr(                &
