@@ -1629,7 +1629,7 @@ do_rename_if_block30: &
       qnum_delsub_coag = 0.0_r8
 
       call mam_pcarbon_aging_1subarea(                              &
-         dgn_a,             do_cond,          n_mode,               &
+         dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
          qaer_delsub_coag_in,                                       &
@@ -2095,7 +2095,7 @@ do_newnuc_if_block50: &
       if ( n_agepair > 0 ) then
 
       call mam_pcarbon_aging_1subarea(                              &
-         dgn_a,             do_cond,          n_mode,               &
+         dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
          qaer_delsub_coag_in,                                       &
@@ -4121,7 +4121,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
       subroutine mam_pcarbon_aging_1subarea(                        &
-         dgn_a,             do_cond,          n_mode,               &
+         dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
          qaer_del_coag_in,                                          &
@@ -4133,7 +4133,6 @@ mainloop1_ipair:  do n = 1, ntot_amode
 
 ! arguments
       integer,  intent(in) :: n_mode                ! current number of modes (including temporary)
-      logical,  intent(in) :: do_cond               ! true if condensation (gas-aerosol exch) is on
       real(r8), intent(in), dimension( 1:max_mode ) :: dgn_a                 ! dgnum_dry of mode
       real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_cur
       real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_del_cond
@@ -4160,7 +4159,7 @@ agepair_loop1: &
       nfrm = modefrm_agepair(ipair)
       ntoo = modetoo_agepair(ipair)
 
-      call mam_pcarbon_aging_frac(nfrm, ipair, do_cond, &
+      call mam_pcarbon_aging_frac(nfrm, ipair, &
             dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
             xferfrac_pcage, frac_cond, frac_coag)
 
@@ -4190,8 +4189,8 @@ agepair_loop1: &
             qaer_cur(iaer,nfrm)      = 0.0_r8
             qaer_del_cond(iaer,nfrm) = 0.0_r8
             qaer_del_coag(iaer,nfrm) = 0.0_r8
-         end if
-      end do
+         endif
+      enddo
       ! number - transfer the aged fraction to accum mode
       ! include this transfer change in the cond and/or coag change (for mass budget)
       tmpa = qnum_cur(nfrm)*xferfrac_pcage
@@ -4202,12 +4201,12 @@ agepair_loop1: &
       qnum_del_coag(nfrm) = qnum_del_coag(nfrm) - tmpa*frac_coag
       qnum_del_coag(ntoo) = qnum_del_coag(ntoo) + tmpa*frac_coag
 
-      end do agepair_loop1
+      enddo agepair_loop1
 
       return
       end subroutine mam_pcarbon_aging_1subarea
 
-      subroutine mam_pcarbon_aging_frac(nfrm, ipair, do_cond, &
+      subroutine mam_pcarbon_aging_frac(nfrm, ipair, &
           dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
           xferfrac_pcage, frac_cond, frac_coag)      
 
@@ -4217,7 +4216,6 @@ agepair_loop1: &
 
       integer,  intent(in)  :: nfrm  
       integer,  intent(in)  :: ipair
-      logical,  intent(in)  :: do_cond               ! true if condensation (gas-aerosol exch) is on
       real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a                 ! dgnum_dry of mode
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond
@@ -4234,57 +4232,27 @@ agepair_loop1: &
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
 
-      vol_shell = qaer_cur(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4)
-      tmp3 = qaer_del_cond(iaer_so4,nfrm)  *fac_m2v_aer(iaer_so4)
-      tmp4 = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4)
-
-      do iaer = 1, naer
-!     species that contribute to aging are 
-!        so4 (but it is already done)
-!        soa, nh4 and no3
-!        ncl and cl (when aging_include_seasalt == .true.)
-         if ( (iaer <= nsoa    ) .or. &
-              (iaer == iaer_nh4) .or. &
-              (iaer == iaer_no3) .or. &
-              (iaer == iaer_cl ) ) then
-            continue
-         else if (iaer == iaer_ncl) then
-            if (aging_include_seasalt .eqv. .false.) cycle
-         else
-            cycle
-         end if
-
-         if ( (iaer == iaer_cl                    ) .and. &
-              (aging_include_seasalt .eqv. .false.) ) then
-            ! special case - only include the cl from condensation
-            tmp1 = max( qaer_del_cond(iaer,nfrm), 0.0_r8 )
-            tmp2 = max( qaer_del_coag_in(iaer,ipair), 0.0_r8 ) + tmp1
-            if (tmp2 >= 1.0e-35_r8) then
-               vol_shell = vol_shell + qaer_cur(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)*(tmp1/tmp2)
-               tmp3 = tmp3 + qaer_del_cond(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            end if
-         else
-            vol_shell = vol_shell + qaer_cur(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            tmp3 = tmp3 + qaer_del_cond(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            tmp4 = tmp4 + qaer_del_coag_in(iaer,ipair)*fac_m2v_eqvhyg_aer(iaer)
-         end if
-      end do
+! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
+! is set to 1 for default MAM4
+      vol_shell = qaer_cur(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4) + &
+                  qaer_cur(iaer_soa,nfrm)*fac_m2v_eqvhyg_aer(iaer_soa)
+      tmp3 = qaer_del_cond(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4) + &
+             qaer_del_cond(iaer_soa,nfrm)*fac_m2v_eqvhyg_aer(iaer_soa)
+      tmp4 = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
+             qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
       
-      if ( do_cond ) then
-         tmp3 = max( tmp3, 1.0e-35_r8 )
-         frac_cond = tmp3/(tmp3 + max( tmp4, 0.0_r8 ))
-      else
-         frac_cond = 0.0_r8
-      end if
+      
+      tmp3 = max( tmp3, 1.0e-35_r8 )
+      frac_cond = tmp3/(tmp3 + max( tmp4, 0.0_r8 ))
       frac_coag = 1.0_r8 - frac_cond
 
-      vol_core = 0.0
+      vol_core = 0.0_r8
       do iaer = 1, naer
          ! for core volume, only include the mapped species 
          !    which are primary and low hygroscopicity
          if (lmap_aer(iaer,nfrm) > 0) &
          vol_core = vol_core + qaer_cur(iaer,nfrm)*fac_m2v_aer(iaer)
-      end do
+      enddo
 !   ratio1 = vol_shell/vol_core = 
 !      actual hygroscopic-shell-volume/carbon-core-volume after gas uptake
 !   ratio2 = 6.0_r8*dr_so4_monolayers_pcage/(dgncur_a*fac_volsfc)
@@ -4305,7 +4273,7 @@ agepair_loop1: &
          xferfrac_pcage = xferfrac_max
       else
          xferfrac_pcage = min( tmp1/tmp2, xferfrac_max )
-      end if
+      endif
 
       return
       end subroutine mam_pcarbon_aging_frac 
