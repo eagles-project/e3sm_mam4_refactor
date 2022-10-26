@@ -74,7 +74,6 @@ subroutine ma_convproc_init
 !----------------------------------------
 
   use cam_history,    only: outfld, addfld, horiz_only, add_default
-  use physics_buffer, only: pbuf_add_field
   use phys_control,   only: phys_getopts
   use ppgrid,         only: pcols, pver
   use spmd_utils,     only: masterproc
@@ -143,7 +142,7 @@ end subroutine ma_convproc_init
 
 
 !=========================================================================================
-subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
+subroutine ma_convproc_intr( state, ptend, ztodt,             &
                            dp_frac, icwmrdp, rprddp, evapcdp,       &
                            sh_frac, icwmrsh, rprdsh, evapcsh,       &
                            dlf, dlfsh, cmfmcsh, sh_e_ed_ratio,      &
@@ -172,7 +171,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 
    use physics_types, only: physics_state, physics_ptend, physics_ptend_init
 !   use time_manager,  only: get_nstep
-   use physics_buffer, only: physics_buffer_desc, pbuf_get_index
    use constituents,  only: pcnst, cnst_name
 
 !   use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
@@ -180,7 +178,6 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
    type(physics_ptend), intent(inout) :: ptend          ! indivdual parameterization tendencies
-   type(physics_buffer_desc), pointer :: pbuf(:)
    real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
 
    real(r8), intent(in)    :: dp_frac(pcols,pver) ! Deep conv cloud frac (0-1)
@@ -260,7 +257,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      dotend(:) = .false.
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
-        state, pbuf, ztodt,                       &
+        state, ztodt,                       &
         dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
         mu, md, du, eu,                           &
         ed, dp, dsubcld,                          &
@@ -281,7 +278,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
      qsrflx(:,:,:) = 0.0_r8
      dotend(:) = .false.
      call ma_convproc_sh_intr(                    &
-        state, pbuf, ztodt,                       &
+        state, ztodt,                       &
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
         cmfmcsh, sh_e_ed_ratio,                   &
         qb, dqdt, dotend, nsrflx, qsrflx,         &
@@ -349,7 +346,7 @@ end subroutine update_qnew_ptend
 
 !=========================================================================================
 subroutine ma_convproc_dp_intr(                &
-     state, pbuf, dt,                          &
+     state,  dt,                          &
      dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
      mu, md, du, eu,                           &
      ed, dp, dsubcld,                          &
@@ -375,7 +372,6 @@ subroutine ma_convproc_dp_intr(                &
 
    use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
    use time_manager,   only: get_nstep
-   use physics_buffer, only: pbuf_get_index, physics_buffer_desc, pbuf_get_field
    use constituents,   only: pcnst, cnst_get_ind, cnst_name
    use error_messages, only: alloc_err	
 
@@ -385,7 +381,6 @@ subroutine ma_convproc_dp_intr(                &
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
-   type(physics_buffer_desc), pointer :: pbuf(:)
 
    real(r8), intent(in) :: dt                         ! delta t (model time increment)
 
@@ -434,9 +429,6 @@ subroutine ma_convproc_dp_intr(                &
    real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
    real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
 
-! physics buffer fields 
-   integer itim, ifld
-   real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
 !
 ! Initialize
@@ -444,15 +436,6 @@ subroutine ma_convproc_dp_intr(                &
    lun = iulog
 
 ! call physics_ptend_init(ptend)
-
-!
-! Associate pointers with physics buffer fields
-!
-   ifld = pbuf_get_index('FRACIS') 
-   call pbuf_get_field(pbuf, ifld, fracis)
-
-   fracice(:,:) = 0.0_r8
-
 
 !
 ! Transport all constituents except cloud water and ice
@@ -540,7 +523,7 @@ end subroutine ma_convproc_dp_intr
 
 !=========================================================================================
 subroutine ma_convproc_sh_intr(                 &
-     state, pbuf, dt,                           &
+     state, dt,                           &
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  &
      cmfmcsh, sh_e_ed_ratio,                    &
      q, dqdt, dotend, nsrflx, qsrflx,           &
@@ -564,7 +547,6 @@ subroutine ma_convproc_sh_intr(                 &
 
    use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
    use time_manager,   only: get_nstep
-   use physics_buffer, only: pbuf_get_index, physics_buffer_desc, pbuf_get_field
    use constituents,   only: pcnst, cnst_get_ind, cnst_name
    use error_messages, only: alloc_err	
 
@@ -574,7 +556,6 @@ subroutine ma_convproc_sh_intr(                 &
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
-   type(physics_buffer_desc), pointer :: pbuf(:)
 
    real(r8), intent(in) :: dt                         ! delta t (model time increment)
 
@@ -626,9 +607,6 @@ subroutine ma_convproc_sh_intr(                 &
    integer   :: ideep(pcols)      ! Gathering array
    integer   :: lengath           ! Gathered min lon indices over which to operate
 
-! physics buffer fields 
-   integer itim, ifld
-   real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
 !
 ! Initialize
@@ -636,14 +614,6 @@ subroutine ma_convproc_sh_intr(                 &
    lun = iulog
 
 ! call physics_ptend_init(ptend)
-
-!
-! Associate pointers with physics buffer fields
-!
-   ifld = pbuf_get_index('FRACIS')
-   call pbuf_get_field(pbuf, ifld, fracis)
-   
-   fracice(:,:) = 0.0_r8
 
 
 !

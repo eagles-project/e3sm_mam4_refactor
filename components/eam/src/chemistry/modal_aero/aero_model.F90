@@ -2128,7 +2128,7 @@ do_lphase2_conditional: &
        call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
        call t_startf('ma_convproc')
-       call ma_convproc_intr( state, ptend, pbuf, dt,                   &
+       call ma_convproc_intr( state, ptend, dt,                         &
             dp_frac, icwmrdp, rprddp, evapcdp,                          &
             sh_frac, icwmrsh, rprdsh, evapcsh,                          &
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                           &
