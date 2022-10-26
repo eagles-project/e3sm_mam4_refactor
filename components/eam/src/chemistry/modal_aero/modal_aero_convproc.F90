@@ -171,11 +171,11 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !-----------------------------------------------------------------------
 
    use physics_types, only: physics_state, physics_ptend, physics_ptend_init
-   use time_manager,  only: get_nstep
+!   use time_manager,  only: get_nstep
    use physics_buffer, only: physics_buffer_desc, pbuf_get_index
    use constituents,  only: pcnst, cnst_name
 
-   use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
+!   use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
@@ -233,9 +233,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !
 ! Initialize
 !
-
    ncol  = state%ncol
-
    hund_ovr_g = 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
@@ -244,21 +242,22 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
 !
 ! prepare for deep conv processing
 !
-  dqdt(:,:,:) = 0.0_r8
   qsrflx(:,:,:) = 0.0_r8
-  dotend(:) = .false.
   qb(1:ncol,:,:) = state%q(1:ncol,:,:)
   call update_qnew_ptend(                                         &
-                          ptend%lq,.false.,         .false.,      &  ! in
-                           ncol,   species_class,   ptend%q,      &  ! in
-                           qsrflx, ztodt,                         &  ! in
-                           ptend,  qb,          aerdepwetis       )  ! inout
+                        ptend%lq,  .false.,         .false.,      &  ! in
+                         ncol,     species_class,   ptend%q,      &  ! in
+                         qsrflx,   ztodt,                         &  ! in
+                         ptend,    qb,          aerdepwetis       )  ! inout
 
 
-!
-! do deep conv processing
-!
   if (convproc_do_aer .or. convproc_do_gas) then
+     !
+     ! do deep conv processing
+     !
+     dqdt(:,:,:) = 0.0_r8
+     qsrflx(:,:,:) = 0.0_r8
+     dotend(:) = .false.
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
         state, pbuf, ztodt,                       &
@@ -269,20 +268,18 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
         qb, dqdt, dotend, nsrflx, qsrflx,         &
         species_class )
      ! apply deep conv processing tendency and prepare for shallow conv processing
-     call update_qnew_ptend(                          &
+     call update_qnew_ptend(                       &
             dotend, .true.,          .true.,       &  ! in
             ncol,   species_class,   dqdt,         &  ! in
             qsrflx, ztodt,                         &  ! in
             ptend,  qb,          aerdepwetis       )  ! inout
+
+     !
+     ! do shallow conv processing
+     !
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
      dotend(:) = .false.
-  endif ! (convproc_do_aer  .or. convproc_do_gas ) then
-
-!
-! do shallow conv processing
-!
-  if (convproc_do_aer .or. convproc_do_gas ) then
      call ma_convproc_sh_intr(                    &
         state, pbuf, ztodt,                       &
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
@@ -290,7 +287,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
         qb, dqdt, dotend, nsrflx, qsrflx,         &
         species_class )
      ! apply shallow conv processing tendency
-     call update_qnew_ptend(                            &
+     call update_qnew_ptend(                         &
               dotend, .true.,          .true.,       &  ! in
               ncol,   species_class,   dqdt,         &  ! in
               qsrflx, ztodt,                         &  ! in
