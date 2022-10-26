@@ -4197,7 +4197,7 @@ agepair_loop1: &
 
 ! arguments
       integer,  intent(in)  :: nfrm      ! pcarbon mode index [unitless]
-      integer,  intent(in)  :: ipair     ! mode index [unitless]
+      integer,  intent(in)  :: ipair     ! aging pair index [unitless]
       real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a    ! dry geometric mean diameter of number distribution [m]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur            ! aerosol mass mixing ratio [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond       ! change of aerosol mass mixing ratio due to condensation [mol/mol]
@@ -4211,7 +4211,8 @@ agepair_loop1: &
       integer :: iaer
 
       real(r8) :: fac_volsfc
-      real(r8) :: tmp1, tmp2, tmp3, tmp4
+      real(r8) :: xferfrac_tmp1, xferfrac_tmp2 
+      real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
 
@@ -4219,14 +4220,14 @@ agepair_loop1: &
 ! is set to 1 for default MAM4
       vol_shell = qaer_cur(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4) + &
                   qaer_cur(iaer_soa,nfrm)*fac_m2v_eqvhyg_aer(iaer_soa)
-      tmp3 = qaer_del_cond(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4) + &
-             qaer_del_cond(iaer_soa,nfrm)*fac_m2v_eqvhyg_aer(iaer_soa)
-      tmp4 = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
-             qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
+      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4) + &
+                          qaer_del_cond(iaer_soa,nfrm)*fac_m2v_eqvhyg_aer(iaer_soa)
+      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
+                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
       
       
-      tmp3 = max( tmp3, 1.0e-35_r8 )
-      frac_cond = tmp3/(tmp3 + max( tmp4, 0.0_r8 ))
+      qaer_del_cond_tmp = max( qaer_del_cond_tmp, 1.0e-35_r8 )
+      frac_cond = qaer_del_cond_tmp/(qaer_del_cond_tmp + max( qaer_del_coag_tmp, 0.0_r8 ))
       frac_coag = 1.0_r8 - frac_cond
 
       vol_core = 0.0_r8
@@ -4250,12 +4251,12 @@ agepair_loop1: &
       fac_volsfc = exp( 2.5*(alnsg_aer(nfrm)**2) )
       xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
 
-      tmp1 = vol_shell*dgn_a(nfrm)*fac_volsfc
-      tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
-      if (tmp1 >= tmp2) then
+      xferfrac_tmp1 = vol_shell*dgn_a(nfrm)*fac_volsfc
+      xferfrac_tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
+      if (xferfrac_tmp1 >= xferfrac_tmp2) then
          xferfrac_pcage = xferfrac_max
       else
-         xferfrac_pcage = min( tmp1/tmp2, xferfrac_max )
+         xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
       endif
 
       return
