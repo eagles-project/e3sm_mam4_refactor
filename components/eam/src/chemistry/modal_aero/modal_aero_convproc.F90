@@ -222,7 +222,8 @@ subroutine ma_convproc_intr( state, ptend, ztodt,             &
    real(r8) :: dlfdp(pcols,pver)
    real(r8) :: dpdry(pcols,pver)
    real(r8) :: dqdt(pcols,pver,pcnst)
-   real(r8) :: qa(pcols,pver,pcnst), qb(pcols,pver,pcnst)
+   real(r8) :: qnew(pcols,pver,pcnst)           ! tracer mixing ratio from state%q [kg/kg]
+                                                ! qnew is updated through the processes in this subroutine but does not update into state
    real(r8) :: qsrflx(pcols,pcnst,nsrflx)
 
    logical  :: dotend(pcnst)
@@ -230,8 +231,11 @@ subroutine ma_convproc_intr( state, ptend, ztodt,             &
 !
 ! Initialize
 !
-   ncol  = state%ncol
-   hund_ovr_g = 100.0_r8/gravit
+  ncol  = state%ncol
+  qnew(1:ncol,:,:) = state%q(1:ncol,:,:)
+  dotend(:) = ptend%lq(:)
+  dqdt(:,:,:) = ptend%q(:,:,:)
+  hund_ovr_g = 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
@@ -240,12 +244,11 @@ subroutine ma_convproc_intr( state, ptend, ztodt,             &
 ! prepare for deep conv processing
 !
   qsrflx(:,:,:) = 0.0_r8
-  qb(1:ncol,:,:) = state%q(1:ncol,:,:)
   call update_qnew_ptend(                                         &
-                        ptend%lq,  .false.,         .false.,      &  ! in
-                         ncol,     species_class,   ptend%q,      &  ! in
+                         dotend,   .false.,         .false.,      &  ! in
+                         ncol,     species_class,   dqdt,         &  ! in
                          qsrflx,   ztodt,                         &  ! in
-                         ptend,    qb,          aerdepwetis       )  ! inout
+                         ptend,    qnew,          aerdepwetis     )  ! inout
 
 
   if (convproc_do_aer .or. convproc_do_gas) then
@@ -262,14 +265,14 @@ subroutine ma_convproc_intr( state, ptend, ztodt,             &
         mu, md, du, eu,                           &
         ed, dp, dsubcld,                          &
         jt, maxg, ideep, lengath,                 &
-        qb, dqdt, dotend, nsrflx, qsrflx,         &
+        qnew, dqdt, dotend, nsrflx, qsrflx,         &
         species_class )
      ! apply deep conv processing tendency and prepare for shallow conv processing
      call update_qnew_ptend(                       &
             dotend, .true.,          .true.,       &  ! in
             ncol,   species_class,   dqdt,         &  ! in
             qsrflx, ztodt,                         &  ! in
-            ptend,  qb,          aerdepwetis       )  ! inout
+            ptend,  qnew,          aerdepwetis       )  ! inout
 
      !
      ! do shallow conv processing
@@ -281,14 +284,14 @@ subroutine ma_convproc_intr( state, ptend, ztodt,             &
         state, ztodt,                       &
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
         cmfmcsh, sh_e_ed_ratio,                   &
-        qb, dqdt, dotend, nsrflx, qsrflx,         &
+        qnew, dqdt, dotend, nsrflx, qsrflx,         &
         species_class )
      ! apply shallow conv processing tendency
      call update_qnew_ptend(                         &
               dotend, .true.,          .true.,       &  ! in
               ncol,   species_class,   dqdt,         &  ! in
               qsrflx, ztodt,                         &  ! in
-              ptend,  qb,          aerdepwetis       )  ! inout
+              ptend,  qnew,          aerdepwetis       )  ! inout
   endif ! (convproc_do_aer  .or. convproc_do_gas) then
 
 
