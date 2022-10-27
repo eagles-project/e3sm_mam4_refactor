@@ -2128,14 +2128,13 @@ do_lphase2_conditional: &
        call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
        call t_startf('ma_convproc')
-       call ma_convproc_intr( state, ptend, pbuf, dt,                   &
-            dp_frac, icwmrdp, rprddp, evapcdp,                          &
-            sh_frac, icwmrsh, rprdsh, evapcsh,                          &
-            dlf, dlf2, cmfmc2, sh_e_ed_ratio,                           &
-            nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr, aerdepwetis,        &
-            mu, md, du, eu, ed, dp, dsubcld, jt, maxg, ideep, lengath,  &
-            species_class,                                              &
-            history_aero_prevap_resusp                                  )
+       call ma_convproc_intr( state, dt,                      & ! in
+            dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
+            sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
+            dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
+            mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
+            ideep, lengath,  species_class,                   & ! in
+            ptend, aerdepwetis                                ) ! inout
        call t_stopf('ma_convproc')       
     endif
 
