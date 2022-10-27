@@ -44,7 +44,7 @@ module modal_aero_convproc
    logical, parameter :: use_cwaer_for_activate_maxsat = .false.
    logical, parameter :: apply_convproc_tend_to_ptend = .true.
 
-   real(r8) :: hund_ovr_g ! = 100.0_r8/gravit
+   real(r8) :: hund_ovr_g  != 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
@@ -230,7 +230,8 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
   dotend(:) = ptend%lq(:)
   dqdt(:,:,:) = ptend%q(:,:,:)
   hund_ovr_g = 100.0_r8/gravit
-!  used with zm_conv mass fluxes and delta-p
+!  used with zm_conv mass fluxes and delta-p. This is also used in other
+!  subroutines in this file since it is declared at the beginning.
 !     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
 !     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
 
@@ -297,7 +298,9 @@ subroutine update_qnew_ptend(                                         &
                            ncol,   species_class,   dqdt,             &  ! in
                            qsrflx, ztodt,                             &  ! in
                            ptend,  qnew,            aerdepwetis       )  ! inout
-
+! ---------------------------------------------------------------------------------------
+! update qnew, ptend (%q and %lq) and wet deposition variable aerdepwetis
+! ---------------------------------------------------------------------------------------  
 use physics_types, only: physics_ptend
 use constituents,  only: pcnst
 
