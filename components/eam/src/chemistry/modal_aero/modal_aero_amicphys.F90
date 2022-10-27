@@ -1629,10 +1629,10 @@ do_rename_if_block30: &
       qnum_delsub_coag = 0.0_r8
 
       call mam_pcarbon_aging_1subarea(                              &
-         dgn_a,             n_mode,                                 &
-         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
-         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
-         qaer_delsub_coag_in)
+         dgn_a,             n_mode,                                 &  ! input
+         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &  ! in-outs
+         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &  ! in-outs
+         qaer_delsub_coag_in)                                          ! in-outs
 
       end if
 
@@ -2094,10 +2094,10 @@ do_newnuc_if_block50: &
       if ( n_agepair > 0 ) then
 
       call mam_pcarbon_aging_1subarea(                              &
-         dgn_a,             n_mode,                                 &
-         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
-         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
-         qaer_delsub_coag_in)
+         dgn_a,             n_mode,                                 & ! input
+         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     & ! in-outs
+         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     & ! in-outs
+         qaer_delsub_coag_in)                                         ! in-outs
 
       end if
 
@@ -4119,10 +4119,10 @@ mainloop1_ipair:  do n = 1, ntot_amode
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
       subroutine mam_pcarbon_aging_1subarea(                        &    
-         dgn_a,             n_mode,                                 &    ! input
-         qnum_cur,          qnum_del_cond,    qnum_del_coag,        &    ! in-outs
-         qaer_cur,          qaer_del_cond,    qaer_del_coag,        &    ! in-outs
-         qaer_del_coag_in)                                               ! in-outs
+         dgn_a,             n_mode,                                 &
+         qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
+         qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
+         qaer_del_coag_in)
 
 ! uses
 
@@ -4156,32 +4156,32 @@ agepair_loop1: &
       nsrc  = modefrm_agepair(ipair)
       ndest = modetoo_agepair(ipair)
 
-      call mam_pcarbon_aging_frac(nsrc, ipair, &
-            dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
-            xferfrac_pcage, frac_cond, frac_coag)
+      call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
+            qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
+            xferfrac_pcage, frac_cond, frac_coag)         ! output
 
       do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
             ! species is pom or bc
             ! transfer the aged fraction to accum mode
             ! include this transfer change in the cond and/or coag change (for mass budget)
-            call transfer_aged_pcarbon_to_accum(nsrc, ndest, &
-                                                xferfrac_pcage, frac_cond, frac_coag, &
-                                                qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:))
+            call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                                                  ! input
+                                                xferfrac_pcage, frac_cond, frac_coag, &                         ! input
+                                                qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
          else
             ! species is soa, so4, or nh4 produced by condensation or coagulation
             ! transfer all of it to accum mode
             ! also transfer the condensation and coagulation changes
             !    to accum mode (for mass budget)
-            call transfer_cond_coag_mass_to_accum(nsrc, ndest, &
-                                                  qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:))
+            call transfer_cond_coag_mass_to_accum(nsrc, ndest, &                                                  ! input
+                                                  qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
          endif
       enddo
       ! number - transfer the aged fraction to accum mode
       ! include this transfer change in the cond and/or coag change (for mass budget)
-      call transfer_aged_pcarbon_to_accum(nsrc, ndest, &
-                                          xferfrac_pcage, frac_cond, frac_coag, &
-                                          qnum_cur, qnum_del_cond, qnum_del_coag)
+      call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                           ! input
+                                          xferfrac_pcage, frac_cond, frac_coag, &  ! input
+                                          qnum_cur, qnum_del_cond, qnum_del_coag)  ! in-outs
 
       enddo agepair_loop1
 
@@ -4189,9 +4189,9 @@ agepair_loop1: &
       end subroutine mam_pcarbon_aging_1subarea
 
 
-      subroutine mam_pcarbon_aging_frac(nsrc, ipair, &         ! input
-          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
-          xferfrac_pcage, frac_cond, frac_coag)                ! output
+      subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
+          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, & 
+          xferfrac_pcage, frac_cond, frac_coag)
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
 ! change due to condenstion and coagulation
@@ -4266,9 +4266,9 @@ agepair_loop1: &
       end subroutine mam_pcarbon_aging_frac 
 
       
-      subroutine transfer_aged_pcarbon_to_accum(nsrc, ndest, &              ! input
-                                 xferfrac_pcage, frac_cond, frac_coag, &    ! input
-                                 q_cur, q_del_cond, q_del_coag)             ! in-outs
+      subroutine transfer_aged_pcarbon_to_accum(nsrc, ndest, &
+                                 xferfrac_pcage, frac_cond, frac_coag, &
+                                 q_cur, q_del_cond, q_del_coag)
 
 ! transfer mass/number of aged pom and bc from pcarbon to accum mode
 ! adjust the change of aerosol mass/number due to condenations/coagulation 
@@ -4304,8 +4304,8 @@ agepair_loop1: &
       end subroutine transfer_aged_pcarbon_to_accum
 
 
-      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &          ! input
-                                 qaer_cur, qaer_del_cond, qaer_del_coag)  ! in-outs
+      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &  
+                                 qaer_cur, qaer_del_cond, qaer_del_coag)
 
 ! transfer mass of aerosols contributing to aging (i.e., so4, soa) 
 ! from pcarbon to accum mode
