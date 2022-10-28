@@ -2241,7 +2241,7 @@ do_lphase2_conditional: &
 
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
-    use modal_aero_coag,       only : modal_aero_coag_sub
+   !use modal_aero_coag,       only : modal_aero_coag_sub
     use modal_aero_gasaerexch, only : modal_aero_gasaerexch_sub
     use modal_aero_newnuc,     only : modal_aero_newnuc_sub
     use mo_setsox,             only : setsox, has_sox
@@ -2395,57 +2395,60 @@ do_lphase2_conditional: &
    !------------------------------------------------------
 
     if (mam_amicphys_optaa <= 0) then
-    ! do gas-aerosol exchange, nucleation, and coagulation using old routines
 
-       ! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
-       if (ndx_h2so4 > 0) then
-          del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4)
-       else
-          del_h2so4_aeruptk(:,:) = 0.0_r8
-       endif
+       call endrun("mam_amicphys_optaa <= 0 is nolonger supported")
 
-       call t_startf('modal_gas-aer_exchng')
+  ! ! do gas-aerosol exchange, nucleation, and coagulation using old routines
 
-       call modal_aero_gasaerexch_sub(                         &
-            lchnk,    ncol,     nstep,            &
-            loffset,            delt,             &
-            tfld,     pmid,     pdel,             &
-            vmr,                vmrcw,            &
-            dvmrdt,             dvmrcwdt,     &
-            dgnum,              dgnumwet     )
+  !    ! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
+  !    if (ndx_h2so4 > 0) then
+  !       del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4)
+  !    else
+  !       del_h2so4_aeruptk(:,:) = 0.0_r8
+  !    endif
 
-       if (ndx_h2so4 > 0) then
-          del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
-       endif
+  !    call t_startf('modal_gas-aer_exchng')
 
-       call t_stopf('modal_gas-aer_exchng')
+  !    call modal_aero_gasaerexch_sub(                         &
+  !         lchnk,    ncol,     nstep,            &
+  !         loffset,            delt,             &
+  !         tfld,     pmid,     pdel,             &
+  !         vmr,                vmrcw,            &
+  !         dvmrdt,             dvmrcwdt,     &
+  !         dgnum,              dgnumwet     )
 
-       ! do aerosol nucleation (new particle formation)
-       call t_startf('modal_nucl')
+  !    if (ndx_h2so4 > 0) then
+  !       del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
+  !    endif
 
-       call modal_aero_newnuc_sub(                             &
-            lchnk,    ncol,     nstep,            &
-            loffset,            delt,             &
-            tfld,     pmid,     pdel,             &
-            zm,       pblh,                       &
-            qh2o,     cldfr,                      &
-            vmr,                                  &
-            del_h2so4_gasprod,  del_h2so4_aeruptk )
+  !    call t_stopf('modal_gas-aer_exchng')
 
-       call t_stopf('modal_nucl')
+  !    ! do aerosol nucleation (new particle formation)
+  !    call t_startf('modal_nucl')
 
-       ! do aerosol coagulation
-       call t_startf('modal_coag')
+  !    call modal_aero_newnuc_sub(                             &
+  !         lchnk,    ncol,     nstep,            &
+  !         loffset,            delt,             &
+  !         tfld,     pmid,     pdel,             &
+  !         zm,       pblh,                       &
+  !         qh2o,     cldfr,                      &
+  !         vmr,                                  &
+  !         del_h2so4_gasprod,  del_h2so4_aeruptk )
 
-       call modal_aero_coag_sub(                               &
-            lchnk,    ncol,     nstep,            &
-            loffset,            delt,             &
-            tfld,     pmid,     pdel,             &
-            vmr,                                  &
-            dgnum,              dgnumwet,         &
-            wetdens                          )
+  !    call t_stopf('modal_nucl')
 
-       call t_stopf('modal_coag')
+  !    ! do aerosol coagulation
+  !    call t_startf('modal_coag')
+
+  !    call modal_aero_coag_sub(                               &
+  !         lchnk,    ncol,     nstep,            &
+  !         loffset,            delt,             &
+  !         tfld,     pmid,     pdel,             &
+  !         vmr,                                  &
+  !         dgnum,              dgnumwet,         &
+  !         wetdens                          )
+
+  !    call t_stopf('modal_coag')
 
     else ! (mam_amicphys_optaa > 0) 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
