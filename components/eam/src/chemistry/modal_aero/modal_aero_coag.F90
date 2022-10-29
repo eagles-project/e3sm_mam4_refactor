@@ -15,26 +15,15 @@ module modal_aero_coag
 
   use modal_aero_amicphys_control
 
-  use spmd_utils, only   :  masterproc
-
   implicit none
   private
 
-! public :: set_coagulation_pairs
+  public :: set_coagulation_pairs
   public :: mam_coag_1subarea
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-  integer, parameter,public :: n_coagpair = 3
-  integer, parameter        :: max_coagpair = n_coagpair 
-
-  integer, public :: modefrm_coagpair(max_coagpair)
-  integer, public :: modetoo_coagpair(max_coagpair)
-  integer, public :: modeend_coagpair(max_coagpair)
-#endif
 
 contains
 
-subroutine set_coagulation_pairs( big_neg_int, big_pos_int )
+subroutine set_coagulation_pairs( big_neg_int )
 !----------------------------------------------------------------------
 ! Purpose: Set up coagulation pairs during model initialization.
 !
@@ -45,13 +34,13 @@ subroutine set_coagulation_pairs( big_neg_int, big_pos_int )
 !----------------------------------------------------------------------
 
    integer, intent(in) :: big_neg_int
-   integer, intent(in) :: big_pos_int
    integer :: ip
 
    modefrm_coagpair(:) = big_neg_int
    modetoo_coagpair(:) = big_neg_int
    modeend_coagpair(:) = big_neg_int
 
+   n_coagpair = 3
    ip=1; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
    ip=2; modefrm_coagpair(ip)=npca; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
    ip=3; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=npca; modeend_coagpair(ip)=nacc
@@ -62,7 +51,6 @@ subroutine mam_coag_1subarea(                                   &
      deltat,                                                    &
      temp,              pmid,             aircon,               &
      dgn_a,             dgn_awet,         wetdens,              &
-     n_mode,                                                    &
      qnum_cur,                                                  &
      qaer_cur,          qaer_del_coag_out                       )
 !-----------------------------------------------------------------------------------
@@ -77,7 +65,6 @@ subroutine mam_coag_1subarea(                                   &
 
       ! Arguments
 
-      integer,  intent(in) :: n_mode                ! current number of modes (including temporary)
       real(wp), intent(in) :: deltat                ! model timestep (s)
       real(wp), intent(in) :: temp                  ! temperature at model levels (K)
       real(wp), intent(in) :: pmid                  ! pressure at layer center (Pa)
@@ -87,11 +74,11 @@ subroutine mam_coag_1subarea(                                   &
       real(wp), intent(in) :: wetdens(max_mode)  ! interstitial aerosol wet density (kg/m3)
                                                  ! dry & wet geo. mean dia. (m) of number distrib.
 
-      real(wp), intent(inout), dimension( 1:max_mode )               :: qnum_cur  ! current number mixing ratios (#/kmol-air)
-      real(wp), intent(inout), dimension( 1:max_aer, 1:max_mode )    :: qaer_cur  ! current mass mixing ratios (kmol-aer/kmol-air)
+      real(wp), intent(inout), dimension(1:max_mode)           :: qnum_cur  ! current number mixing ratios (#/kmol-air)
+      real(wp), intent(inout), dimension(1:max_aer,1:max_mode) :: qaer_cur  ! current mass mixing ratios (kmol/kmol-air)
 
       ! Mass mixing ratio changes (kmol-aer/kmol-air) to be passed to the aging parameterization
-      real(wp), intent(out),   dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_out  
+      real(wp), intent(out),   dimension(1:max_aer,1:max_agepair) :: qaer_del_coag_out  
 
       ! Local variables
 
@@ -103,11 +90,11 @@ subroutine mam_coag_1subarea(                                   &
       real(wp) :: ybetaij0(max_coagpair), ybetaij3(max_coagpair), &
                   ybetaii0(max_coagpair), ybetajj0(max_coagpair)
 
-      real(wp), dimension( 1:max_mode ) :: qnum_bgn  ! number mixing ratios before coagulation
-      real(wp), dimension( 1:max_mode ) :: qnum_tavg ! average number mixing ratios during time step, calculated as
+      real(wp), dimension(1:max_mode) :: qnum_bgn  ! number mixing ratios before coagulation
+      real(wp), dimension(1:max_mode) :: qnum_tavg ! average number mixing ratios during time step, calculated as
                                                      ! as the arithmetic mean of the begin- and end-values
 
-      real(wp), dimension( 1:max_aer, 1:max_mode ) :: qaer_bgn ! mass mixing ratios before coagulation
+      real(wp), dimension(1:max_aer,1:max_mode) :: qaer_bgn ! mass mixing ratios before coagulation
 
       !----------------------------------------------------
       ! Preparation
@@ -127,12 +114,6 @@ subroutine mam_coag_1subarea(                                   &
       ! (based on E. Whitby's approximation approach)
       ! Here subr. arguments are all in mks unit.
       !--------------------------------------------------------------
-     ! write(iulog,'(/a)') 'inside coag: ip, modefrm, modetoo, modeend'
-     ! do ip = 1,n_coagpair
-     !    write(iulog,*) ip, modefrm_coagpair(ip), modetoo_coagpair(ip), modeend_coagpair(ip)
-     ! end do
-     ! stop
-
       do ip = 1, n_coagpair
 
          modefrm = modefrm_coagpair(ip)

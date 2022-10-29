@@ -129,12 +129,16 @@
   integer, parameter :: max_mode = ntot_amode_extd + max_mode_fresh
   public max_mode !BSINGH - used in module_mosaic_cam_init.F90
 
-  integer, parameter :: max_coagpair = 100
 
 #if ( defined MODAL_AERO_9MODE )
   integer, parameter :: max_agepair = 3
+  integer, parameter :: max_coagpair = 100
+#elif ( defined MODAL_AERO_4MODE_MOM )
+  integer, parameter :: max_agepair = 1
+  integer, parameter :: max_coagpair = 3 
 #else
   integer, parameter :: max_agepair = 1
+  integer, parameter :: max_coagpair = 100 
 #endif
 
   integer, parameter :: maxsubarea = 2
