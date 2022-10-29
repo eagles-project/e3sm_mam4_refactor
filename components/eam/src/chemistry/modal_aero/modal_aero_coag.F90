@@ -1,175 +1,514 @@
-! modal_aero_coag.F90
-
-
-!----------------------------------------------------------------------
-!BOP
+!--------------------------------------------------------------------------------------
+! Purpose:
 !
-! !MODULE: modal_aero_coag --- modal aerosol coagulation
+! Modal aerosol coagulation parameterization.
 !
-! !INTERFACE:
-   module modal_aero_coag
+! Revision history:
+!   Richard C. Easter, 07.04.13:  Adapted from MIRAGE2 code. Some of the 
+!                                 code came from the CMAQ model v4.6.
+!   Hui Wan 2022: Refactored code: memoved non-4-mode codes; restructured subroutines.
+!--------------------------------------------------------------------------------------
+module modal_aero_coag
 
-! !USES:
-   use shr_kind_mod,    only:  r8 => shr_kind_r8
-   use cam_logfile,     only:  iulog
+  use shr_kind_mod,    only:  wp => shr_kind_r8
+  use cam_logfile,     only:  iulog
 
-   use modal_aero_amicphys_control
+  use modal_aero_amicphys_control
+
+  use spmd_utils, only   :  masterproc
 
   implicit none
   private
 
-! !PUBLIC MEMBER FUNCTIONS:
+! public :: set_coagulation_pairs
   public :: mam_coag_1subarea
 
+#if ( defined( CAMBOX_ACTIVATE_THIS ) )
+  integer, parameter,public :: n_coagpair = 3
+  integer, parameter        :: max_coagpair = n_coagpair 
 
-!EOP
-!----------------------------------------------------------------------
-!BOC
+  integer, public :: modefrm_coagpair(max_coagpair)
+  integer, public :: modetoo_coagpair(max_coagpair)
+  integer, public :: modeend_coagpair(max_coagpair)
+#endif
 
+contains
 
-!EOC
+subroutine set_coagulation_pairs( big_neg_int, big_pos_int )
 !----------------------------------------------------------------------
-  contains
-!----------------------------------------------------------------------
-!BOP
-
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-      subroutine getcoags_wrapper_f(              &
-          airtemp, airprs,                        &
-          dgatk, dgacc,                           &
-          sgatk, sgacc,                           &
-          xxlsgat, xxlsgac,                       &
-          pdensat, pdensac,                       &
-          betaij0, betaij2i, betaij2j, betaij3,   &
-          betaii0, betaii2, betajj0, betajj2      )
-        use physconst, only: p0 => pstd, &
-                             tmelt, &
-                             boltz
+! Purpose: Set up coagulation pairs during model initialization.
 !
-! interface to subr. getcoags
-!
-! interface code adapted from subr. aeroproc of cmaq v4.6,
-!     with some of the parameter values from module aero_info_ae4
-!
+! The coagulation pairs are
+! mam version   modes involved in coagulation          # of coag pairs
+! -----------   -----------------------------          ---------------
+! 4 mode        accum, aitken, pcarbon/pca             3
+!----------------------------------------------------------------------
+
+   integer, intent(in) :: big_neg_int
+   integer, intent(in) :: big_pos_int
+   integer :: ip
+
+   modefrm_coagpair(:) = big_neg_int
+   modetoo_coagpair(:) = big_neg_int
+   modeend_coagpair(:) = big_neg_int
+
+   ip=1; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
+   ip=2; modefrm_coagpair(ip)=npca; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
+   ip=3; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=npca; modeend_coagpair(ip)=nacc
+
+end subroutine set_coagulation_pairs
+
+subroutine mam_coag_1subarea(                                   &
+     deltat,                                                    &
+     temp,              pmid,             aircon,               &
+     dgn_a,             dgn_awet,         wetdens,              &
+     n_mode,                                                    &
+     qnum_cur,                                                  &
+     qaer_cur,          qaer_del_coag_out                       )
+!-----------------------------------------------------------------------------------
+! Purpose: 
+! Considers the coagulation between aitken, pcarbon, and accum modes and
+! updates aerosol mass and number mixing ratios.
+! 
+! This subroutine is called by MAM4's microphysics driver for clear-air conditions.
+!-----------------------------------------------------------------------------------
+
       implicit none
 
-! *** arguments
+      ! Arguments
 
-      real(r8), intent(in) :: airtemp  ! air temperature [ k ]
-      real(r8), intent(in) :: airprs   ! air pressure in [ pa ]
+      integer,  intent(in) :: n_mode                ! current number of modes (including temporary)
+      real(wp), intent(in) :: deltat                ! model timestep (s)
+      real(wp), intent(in) :: temp                  ! temperature at model levels (K)
+      real(wp), intent(in) :: pmid                  ! pressure at layer center (Pa)
+      real(wp), intent(in) :: aircon                ! air molar concentration (kmol/m3)
+      real(wp), intent(in) :: dgn_a(max_mode)
+      real(wp), intent(in) :: dgn_awet(max_mode) ! dry & wet geo. mean dia. (m) of number distrib.
+      real(wp), intent(in) :: wetdens(max_mode)  ! interstitial aerosol wet density (kg/m3)
+                                                 ! dry & wet geo. mean dia. (m) of number distrib.
 
-      real(r8), intent(in) :: dgatk    ! aitken mode geometric mean diameter [m]
-      real(r8), intent(in) :: dgacc    ! accumulation mode geometric mean diam [m]
+      real(wp), intent(inout), dimension( 1:max_mode )               :: qnum_cur  ! current number mixing ratios (#/kmol-air)
+      real(wp), intent(inout), dimension( 1:max_aer, 1:max_mode )    :: qaer_cur  ! current mass mixing ratios (kmol-aer/kmol-air)
 
-      real(r8), intent(in) :: sgatk    ! aitken mode geometric standard deviation
-      real(r8), intent(in) :: sgacc    ! accumulation mode geometric standard deviation
+      ! Mass mixing ratio changes (kmol-aer/kmol-air) to be passed to the aging parameterization
+      real(wp), intent(out),   dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_out  
 
-      real(r8), intent(in) :: xxlsgat  ! natural log of geometric standard
-      real(r8), intent(in) :: xxlsgac  !  deviations
+      ! Local variables
 
-      real(r8), intent(in) :: pdensat  ! aitken mode particle density [ kg / m**3 ]
-      real(r8), intent(in) :: pdensac  ! accumulation mode density [ kg / m**3 ]
+      integer :: ip                 ! coagulation pair index
+      integer :: modefrm, modetoo   ! mode indices corresponding to the origin and desination of mass transfer
 
-      real(r8), intent(out) :: betaij0, betaij2i, betaij2j, betaij3,   &
-                               betaii0, betaii2,  betajj0,  betajj2
+      ! Coagulation rate coefficients corresponding the 0th and 3rd moments of the size distribution.
+
+      real(wp) :: ybetaij0(max_coagpair), ybetaij3(max_coagpair), &
+                  ybetaii0(max_coagpair), ybetajj0(max_coagpair)
+
+      real(wp), dimension( 1:max_mode ) :: qnum_bgn  ! number mixing ratios before coagulation
+      real(wp), dimension( 1:max_mode ) :: qnum_tavg ! average number mixing ratios during time step, calculated as
+                                                     ! as the arithmetic mean of the begin- and end-values
+
+      real(wp), dimension( 1:max_aer, 1:max_mode ) :: qaer_bgn ! mass mixing ratios before coagulation
+
+      !----------------------------------------------------
+      ! Preparation
+      !----------------------------------------------------
+      ! Clip negative values
+
+      qnum_cur = max( 0.0_wp, qnum_cur )
+      qaer_cur = max( 0.0_wp, qaer_cur )
+
+      ! Set initial values before coag
+
+      qnum_bgn = qnum_cur
+      qaer_bgn = qaer_cur
+
+      !--------------------------------------------------------------
+      ! Compute coagulation rates using the CMAQ models "fast" method
+      ! (based on E. Whitby's approximation approach)
+      ! Here subr. arguments are all in mks unit.
+      !--------------------------------------------------------------
+     ! write(iulog,'(/a)') 'inside coag: ip, modefrm, modetoo, modeend'
+     ! do ip = 1,n_coagpair
+     !    write(iulog,*) ip, modefrm_coagpair(ip), modetoo_coagpair(ip), modeend_coagpair(ip)
+     ! end do
+     ! stop
+
+      do ip = 1, n_coagpair
+
+         modefrm = modefrm_coagpair(ip)
+         modetoo = modetoo_coagpair(ip)
+
+         call getcoags_wrapper_f(                      &
+            temp,                pmid,                 &! in
+            dgn_awet(modefrm),   dgn_awet(modetoo),    &! in
+            sigmag_aer(modefrm), sigmag_aer(modetoo),  &! in
+            alnsg_aer(modefrm),  alnsg_aer(modetoo),   &! in
+            wetdens(modefrm),    wetdens(modetoo),     &! in
+            ybetaij0(ip),        ybetaij3(ip),         &! out
+            ybetaii0(ip),        ybetajj0(ip)          )! out
+
+      end do
+
+      ! Convert coag coefficients from (m3/s) to (kmol-air/s)
+
+      ybetaij0(1:n_coagpair) = ybetaij0(1:n_coagpair)*aircon
+      ybetaij3(1:n_coagpair) = ybetaij3(1:n_coagpair)*aircon
+      ybetaii0(1:n_coagpair) = ybetaii0(1:n_coagpair)*aircon
+      ybetajj0(1:n_coagpair) = ybetajj0(1:n_coagpair)*aircon
+
+      !---------------------------------------------------------------------------------------
+      ! Advance solutions in time assuming the coag coefficients are fixed within one timestep
+      !---------------------------------------------------------------------------------------
+      ! First update number mixing ratios 
+
+      call mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, &! in
+                                qnum_cur, qnum_tavg                             )! inout, out 
+
+      ! Then calculate mass transfers between modes and update mass mixing ratios
+
+      call mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, &! in
+                                qaer_cur, qaer_del_coag_out            )! inout, out
+
+end subroutine mam_coag_1subarea
+
+subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
+!----------------------------------------------------------------------------------------------------
+! Purpose: update aerosol number mixing ratios by taking into account self-coagulation (i.e., 
+!          intra-modal coagulation) and inter-modal coagulation.
+!
+! Numerical treatment:
+!  - Note that the updates for different modes are calculated in a sequential manner using a specific 
+!    ordering because
+!    - accum   number loss depends on accum number
+!    - pcarbon number loss depends on pcarbon and accum number
+!
+!  - The average number mixing ratio over current time step
+!    of other modes are used to calculate the number loss of a mode.
+!----------------------------------------------------------------------------------------------------
+
+      real(wp), intent(in) :: ybetaij0(max_coagpair) ! coag rate coefficient
+      real(wp), intent(in) :: ybetaii0(max_coagpair) ! coag rate coefficient
+      real(wp), intent(in) :: ybetajj0(max_coagpair) ! coag rate coefficient
+      real(wp), intent(in) :: deltat
+
+      real(wp), intent(in)    :: qnum_bgn(1:max_mode)  ! beginning values of number mixing ratios
+      real(wp), intent(inout) :: qnum_end(1:max_mode)  ! end values of number mixing ratios
+      real(wp), intent(out)   :: qnum_tavg(1:max_mode) ! time average defined as 0.5*(bgn+end)
+
+      ! local variables
+      real(wp) :: tmpa, rateij
+      real(wp) ::       rateii
+
+      !--------------------------------------------
+      ! accum mode number loss due to self-coag
+      !--------------------------------------------
+      call qnum_update_selfcoag( ybetajj0(1), deltat, qnum_bgn(nacc), qnum_end(nacc) )
+
+      qnum_tavg(nacc) = (qnum_bgn(nacc) + qnum_end(nacc))*0.5_wp
+
+      !----------------------------------------------------------------------------
+      ! pcarbon mode number loss - approximate analytical solution 
+      ! using average number conc. for accum mode
+      !----------------------------------------------------------------------------
+      rateij = max( 0.0_wp, deltat*ybetaij0(2)*qnum_tavg(nacc) )
+      rateii = max( 0.0_wp, deltat*ybetaii0(2) )
+
+      call qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn(npca), qnum_end(npca) )
+
+      qnum_tavg(npca) = (qnum_bgn(npca) + qnum_end(npca))*0.5_wp
+
+      !-----------------------------------------------------------------------------------------
+      ! aitken mode number loss - approximate analytical solution
+      ! using average number conc. for accum, pcarbon, and marine-org accum modes
+      !-----------------------------------------------------------------------------------------
+      tmpa = ybetaij0(1)*qnum_tavg(nacc)
+      tmpa = tmpa + ybetaij0(3)*qnum_tavg(npca)
+      rateij = max( 0.0_wp, deltat*tmpa )
+      rateii = max( 0.0_wp, deltat*ybetaii0(1) )
+
+      call qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn(nait), qnum_end(nait) )
+
+      qnum_tavg(nait) = (qnum_bgn(nait) + qnum_end(nait))*0.5_wp
 
 
-! *** local parameters
-      real(r8) :: t0  ! standard surface temperature (15 deg C) [ k ]
-      real(r8), parameter :: two3 = 2.0_r8/3.0_r8
-
-! *** local variables
-      real(r8) amu            ! atmospheric dynamic viscosity [ kg/m s ]
-      real(r8) sqrt_temp      ! square root of ambient temperature
-      real(r8) lamda          ! mean free path [ m ]
-
-! *** intramodal coagulation rates [ m**3/s ] ( 0th & 2nd moments )
-      real(r8)    batat( 2 )  ! aitken mode
-      real(r8)    bacac( 2 )  ! accumulation mode
-! *** intermodal coagulation rates [ m**3/s ] ( 0th & 2nd moments )
-      real(r8)    batac( 2 )  ! aitken to accumulation
-      real(r8)    bacat( 2 )  ! accumulation from aitken
-! *** intermodal coagulation rate [ m**3/s ] ( 3rd moment )
-      real(r8)    c3ij        ! aitken to accumulation
-! *** 3rd moment intermodal transfer rate by coagulation
-      real(r8)    c30atac     ! aitken to accumulation
-
-! *** near continnuum regime (independent of mode)
-      real(r8)    knc         ! knc = two3 * boltz *  airtemp / amu
-! *** free molecular regime (depends upon modal density)
-      real(r8)    kfmat       ! kfmat = sqrt(3.0*boltz*airtemp/pdensat)
-      real(r8)    kfmac       ! kfmac = sqrt(3.0*boltz*airtemp/pdensac)
-      real(r8)    kfmatac     ! kfmatac = sqrt( 6.0 * boltz * airtemp /
-                              !                ( pdensat + pdensac ) )
-
-      real(r8)    dumacc2, dumatk2, dumatk3
-
-      t0 = tmelt + 15._r8
-
-      sqrt_temp = sqrt( airtemp)
-
-! *** calculate mean free path [ m ]:
-!     6.6328e-8 is the sea level value given in table i.2.8
-!     on page 10 of u.s. standard atmosphere 1962
-      lamda = 6.6328e-8_r8 * p0 * airtemp  / ( t0 * airprs )
-
-! *** calculate dynamic viscosity [ kg m**-1 s**-1 ]:
-!     u.s. standard atmosphere 1962 page 14 expression
-!     for dynamic viscosity is:
-!     dynamic viscosity =  beta * t * sqrt(t) / ( t + s)
-!     where beta = 1.458e-6 [ kg sec^-1 k**-0.5 ], s = 110.4 [ k ].
-      amu = 1.458e-6_r8 * airtemp * sqrt_temp / ( airtemp + 110.4_r8 )
-
-! *** coagulation
-!     calculate coagulation coefficients using a method dictated by
-!     the value of fastcoag_flag.  if true, the computationally-
-!     efficient getcoags routine is used.  if false, the more intensive
-!     gauss-hermite numerical quadrature method is used.  see section
-!     2.1 of bhave et al. (2004) for further discussion.
-
-! *** calculate term used in equation a6 of binkowski & shankar (1995)
-      knc      = two3 * boltz *  airtemp / amu
-! *** calculate terms used in equation a5 of binkowski & shankar (1995)
-      kfmat    = sqrt( 3.0_r8 * boltz * airtemp / pdensat )
-      kfmac    = sqrt( 3.0_r8 * boltz * airtemp / pdensac )
-      kfmatac  = sqrt( 6.0_r8 * boltz * airtemp / ( pdensat + pdensac ) )
-
-! *** transfer of number to accumulation mode from aitken mode is zero
-      bacat(1) = 0.0_r8
-
-! *** calculate intermodal and intramodal coagulation coefficients
-!     for zeroth and second moments, and intermodal coagulation
-!     coefficient for third moment
-        call getcoags( lamda, kfmatac, kfmat, kfmac, knc,   &
-                       dgatk,   dgacc,   sgatk,   sgacc,     &
-                       xxlsgat,  xxlsgac,     &
-                       batat(2), batat(1), bacac(2), bacac(1),   &
-                       batac(2), bacat(2), batac(1), c3ij )
-
-! convert from the "cmaq" coag rate parameters 
-! to the "mirage2" parameters
-        dumacc2 = ( (dgacc**2) * exp( 2.0_r8*xxlsgac*xxlsgac ) )
-        dumatk2 = ( (dgatk**2) * exp( 2.0_r8*xxlsgat*xxlsgat ) )
-        dumatk3 = ( (dgatk**3) * exp( 4.5_r8*xxlsgat*xxlsgat ) )
-
-        betaii0  = max( 0.0_r8, batat(1) )
-        betajj0  = max( 0.0_r8, bacac(1) )
-        betaij0  = max( 0.0_r8, batac(1) )
-        betaij3  = max( 0.0_r8, c3ij / dumatk3 )
-
-        betajj2  = max( 0.0_r8, bacac(2) / dumacc2 )
-        betaii2  = max( 0.0_r8, batat(2) / dumatk2 )
-        betaij2i = max( 0.0_r8, batac(2) / dumatk2 )
-        betaij2j = max( 0.0_r8, bacat(2) / dumatk2 )
+end subroutine mam_coag_num_update
 
 
-      return
-      end subroutine getcoags_wrapper_f
+subroutine qnum_update_selfcoag( ybetajj0, deltat, qnum_bgn, qnum_end )
+!-----------------------------------------------------------------------------------------
+! Purpose: update the number mixing ratio of a single mode by considering self-coagulation
+!-----------------------------------------------------------------------------------------
+
+    real(wp),intent(in)  :: qnum_bgn   ! qnum (number mixing ratio) start value
+    real(wp),intent(in)  :: ybetajj0   ! self-coagulation coefficient
+    real(wp),intent(in)  :: deltat     ! timestep length
+    real(wp),intent(out) :: qnum_end   ! qnum (number mixing ratio) end value
+
+    ! Analytical solution
+    qnum_end = qnum_bgn / ( 1.0_wp + ybetajj0*deltat*qnum_bgn )
+
+end subroutine qnum_update_selfcoag
+
+subroutine qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_end )
+!-----------------------------------------------------------------------------------------
+! Purpose: update the number mixing ratio of a single mode considering self-coagulation 
+!          and inter-modal coagulation
+!-----------------------------------------------------------------------------------------
+
+    real(wp),intent(in)  :: rateij, rateii  ! inter-modal and self-coagulation rates
+    real(wp),intent(in)  :: qnum_bgn        ! qnum (number mixing ratio) start value
+    real(wp),intent(out) :: qnum_end        ! qnum (number mixing ratio) end value
+
+    real(wp) :: tmpc
+
+    if (rateij < 1.0e-5_wp) then
+       qnum_end = qnum_bgn / ( 1.0_wp + (rateij + rateii*qnum_bgn)*(1.0_wp + 0.5_wp*rateij) )
+    else
+       tmpc = exp(-rateij)
+       qnum_end = qnum_bgn*tmpc / ( 1.0_wp + (rateii*qnum_bgn/rateij)*(1.0_wp-tmpc) )
+    end if
+
+end subroutine qnum_update_self_and_intermodal_coag
 
 
+subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
+!=====================================================================================================
+! Purpose: update aerosol mass mixing ratios by taking into account coagulation-induced inter-modal
+!          mass transfer.
+! 
+! Assumed possible mass transfer pathways: 
+! - coag pair 1: aitken + accumulation -> accumulation
+! - coag pair 2: pca    + accumulation -> accumulation
+! - coag pair 3: aitken + pca          -> pca
+!
+! Sorted by mass source:
+!  - From aitken mode:
+!      - coag pair 1: aitken + accumulation -> accumulation
+!      - coag pair 3: aitken + pca          -> pca
+!  - From pca mode:
+!      - coag pair 2: pca    + accumulation -> accumulation
+!--------------------------------------------------------------------------------
+! Numerical treatment:
+!
+! The transfer amounts are calculated using as an exponential decay of
+! the initial mass mixing ratios,
+! where the decay rate is calculated using the average (over one timestep)
+! number mixing ratios for each mode
+!
+! The mass transfer calculations are first-order accurate in time,
+! because the mass transferred out of a mode does not
+! include any mass transferred in during the time step.
+! With this approach, the ordering is not important, but the mass transfer
+! calculations are done in the reverse order of the number loss calculations
+!=====================================================================================================
 
-! //////////////////////////////////////////////////////////////////
+      ! Arguments
+
+      real(wp), intent(in), dimension( 1:max_coagpair ) :: ybetaij3(max_coagpair)
+      real(wp), intent(in) :: deltat
+
+      real(wp), intent(in)    :: qnum_tavg(1:max_mode)
+      real(wp), intent(in)    :: qaer_bgn(1:max_aer, 1:max_mode) 
+      real(wp), intent(inout) :: qaer_end(1:max_aer, 1:max_mode)
+      real(wp), intent(out)   :: qaer_del_coag_out(1:max_aer, 1:max_agepair)
+
+      ! Local variables
+
+      real(wp) :: rate1, rate2  ! coag rates = coag coeff * qnum
+      real(wp) :: ratesum       ! coag rate summed over all modes
+      real(wp) :: prtn1, prtn2  ! portions of mass going into different desitination modes 
+      real(wp) :: tmpc
+      real(wp) :: tmp_dq, tmp_xf
+
+      integer :: iaer   ! aerosol species index
+
+      real(wp), parameter :: epsilonx2 = epsilon( 1.0_wp )*2.0_wp
+
+      !--------------------------------------------------------------------
+      ! Initialize the array that will be passed onto aging
+      !--------------------------------------------------------------------
+      qaer_del_coag_out = 0._wp
+
+      !--------------------------------------------------------------------
+      ! Mass transfer out of aitken mode. Two coag pairs are involved:
+      ! - coag pair 1: aitken + accumulation -> accumulation
+      ! - coag pair 3: aitken + pca          -> pca
+      !--------------------------------------------------------------------
+      ! Calculate the rate of mass transfer into different destination modes and the sum over all modes
+
+      rate1 = max( 0.0_wp, ybetaij3(1)*qnum_tavg(nacc) )
+      rate2 = max( 0.0_wp, ybetaij3(3)*qnum_tavg(npca) )
+      ratesum = rate1 + rate2
+
+      tmpc = deltat*ratesum ! calculate coag-induced changes only when this number is not ~= zero
+      if (tmpc > epsilonx2) then
+
+         ! Portions of mass going into different modes
+         prtn2 = rate2/ratesum
+         prtn1 = 1.0_wp - prtn2
+
+         tmp_xf = 1.0_wp - exp(-tmpc)    ! total fraction lost from aitken mode
+         do iaer = 1, naer
+
+            tmp_dq = tmp_xf*qaer_bgn(iaer,nait)  ! total amount lost from aitken mode
+
+            qaer_end(iaer,nait) = qaer_end(iaer,nait) - tmp_dq          ! subtract from aitken mode
+            qaer_end(iaer,nacc) = qaer_end(iaer,nacc) + tmp_dq*prtn1    ! add a portion to accumulation mode
+            qaer_end(iaer,npca) = qaer_end(iaer,npca) + tmp_dq*prtn2    ! add a portion to pca mode
+
+            ! prtn2 (pair 3) corresponds to mass transfer to pca mode, which will lead to aging.
+            ! Add this amount to the total mass gained by pca mode, to be used in the aging parameterization.
+
+              qaer_del_coag_out(iaer,i_agepair_pca) &
+            = qaer_del_coag_out(iaer,i_agepair_pca) + tmp_dq*prtn2
+         end do
+
+      end if
+
+      !--------------------------------------------------------------------
+      ! Mass transfer out of pcarbon mode. Only one coag pair is involved:
+      ! - coag pair 2: pca + accumulation -> accumulation
+      !--------------------------------------------------------------------
+      ratesum = max( 0.0_wp, ybetaij3(2)*qnum_tavg(nacc) )  ! there is only 1 destination
+
+      tmpc = deltat*ratesum ! calculate coag-induced changes only when this number is not ~= zero
+      if (tmpc > epsilonx2) then
+
+         tmp_xf = 1.0_wp - exp(-tmpc) ! total fraction lost from pca mode
+         do iaer = 1, naer
+            tmp_dq = tmp_xf*qaer_bgn(iaer,npca)                   ! total amount lost from pca mode
+            qaer_end(iaer,npca) = qaer_end(iaer,npca) - tmp_dq    ! subtract from pca mode
+            qaer_end(iaer,nacc) = qaer_end(iaer,nacc) + tmp_dq    ! add to accumulaiton mode
+         end do
+      end if
+
+end subroutine mam_coag_aer_update
+
+subroutine getcoags_wrapper_f(&
+             airtemp, airprs,   dgatk,   dgacc,    sgatk, sgacc, &
+             xxlsgat, xxlsgac,  pdensat, pdensac,                &
+             betaij0, betaij3,  betaii0, betajj0                 )
+!-------------------------------------------------------------------------------
+! Purpose: interface to subr. getcoags adapted from subr. aeroproc of CMAQ v4.6,
+! with some of the parameter values from module aero_info_ae4
+!-------------------------------------------------------------------------------
+
+    use physconst, only: p0 => pstd, tmelt, boltz
+
+    implicit none
+
+    ! Arguments 
+
+    real(wp), intent(in) :: airtemp  ! air temperature [ k ]
+    real(wp), intent(in) :: airprs   ! air pressure in [ pa ]
+
+    real(wp), intent(in) :: dgatk    ! aitken mode geometric mean diameter [m]
+    real(wp), intent(in) :: dgacc    ! accumulation mode geometric mean diam [m]
+
+    real(wp), intent(in) :: sgatk    ! aitken mode geometric standard deviation
+    real(wp), intent(in) :: sgacc    ! accumulation mode geometric standard deviation
+
+    real(wp), intent(in) :: xxlsgat  ! natural log of geometric standard
+    real(wp), intent(in) :: xxlsgac  !  deviations
+
+    real(wp), intent(in) :: pdensat  ! aitken mode particle density [ kg / m**3 ]
+    real(wp), intent(in) :: pdensac  ! accumulation mode density [ kg / m**3 ]
+
+    real(wp), intent(out) :: betaij0, betaii0, betajj0, betaij3
+
+    ! Local variables and parameters 
+
+    real(wp) :: t0  ! standard surface temperature (15 deg C) [ k ]
+    real(wp), parameter :: two3 = 2.0_wp/3.0_wp
+
+    real(wp) amu            ! atmospheric dynamic viscosity [ kg/m s ]
+    real(wp) sqrt_temp      ! square root of ambient temperature
+    real(wp) lamda          ! mean free path [ m ]
+
+
+    ! Near-continnuum regime (independent of mode)
+
+    real(wp) knc         ! knc = two3 * boltz *  airtemp / amu
+
+    ! Free-molecular regime (depends upon modal density)
+
+    real(wp) kfmat       ! kfmat = sqrt(3.0*boltz*airtemp/pdensat)
+    real(wp) kfmac       ! kfmac = sqrt(3.0*boltz*airtemp/pdensac)
+    real(wp) kfmatac     ! kfmatac = sqrt( 6.0 * boltz * airtemp /( pdensat + pdensac ) )
+
+    ! Output from getcoags
+
+    real(wp)  qn11  ! aitken mode intramodal coagulation rate [ m**3/s ] for 0th moment 
+    real(wp)  qn22  ! accum. mode intramodal coagulation rate [ m**3/s ] for 0th moment 
+
+    real(wp)  qn12  ! aitken to accumulation intermodal coagulation rate [ m**3/s ] for 0th moment
+    real(wp)  qv12  ! aitken to accumulation intermodal coagulation rate [ m**3/s ] for 3rd moment
+
+    ! For unit conversion
+    real(wp)  dumatk3
+
+    !-----------------------------------------------
+    ! Prepare input to subr. getcoags 
+    !-----------------------------------------------
+    t0 = tmelt + 15._wp
+    sqrt_temp = sqrt( airtemp)
+
+    ! Calculate mean free path [ m ]:
+    ! 6.6328e-8 is the sea level value given in table i.2.8
+    ! on page 10 of u.s. standard atmosphere 1962
+
+    lamda = 6.6328e-8_wp * p0 * airtemp  / ( t0 * airprs )
+
+    ! Calculate dynamic viscosity [ kg m**-1 s**-1 ]:
+    ! u.s. standard atmosphere 1962 page 14 expression
+    ! for dynamic viscosity is:
+    ! dynamic viscosity =  beta * t * sqrt(t) / ( t + s)
+    ! where beta = 1.458e-6 [ kg sec^-1 k**-0.5 ], s = 110.4 [ k ].
+
+    amu = 1.458e-6_wp * airtemp * sqrt_temp / ( airtemp + 110.4_wp )
+
+    ! Term used in equation a6 of binkowski & shankar (1995)
+
+    knc = two3 * boltz *  airtemp / amu
+
+    ! Terms used in equation a5 of binkowski & shankar (1995)
+
+    kfmat    = sqrt( 3.0_wp * boltz * airtemp / pdensat )
+    kfmac    = sqrt( 3.0_wp * boltz * airtemp / pdensac )
+    kfmatac  = sqrt( 6.0_wp * boltz * airtemp / ( pdensat + pdensac ) )
+
+    !--------------------------------------------------------------------
+    ! Call subr. getcoags from CMAQ to 
+    ! calculate intermodal and intramodal coagulation coefficients
+    ! for zeroth and intermodal coagulation coefficient for third moment
+    !--------------------------------------------------------------------
+    call getcoags( lamda, kfmatac, kfmat, kfmac, knc,            &! in
+                   dgatk, dgacc, sgatk, sgacc, xxlsgat, xxlsgac, &! in
+                   qn11, qn22, qn12, qv12                        )! out
+
+    !--------------------------------------------------------------------
+    ! Adjustments to the output from subr. getcoags
+    !--------------------------------------------------------------------
+    ! Clip negative values
+
+    betaii0  = max( 0.0_wp, qn11 )
+    betajj0  = max( 0.0_wp, qn22 )
+    betaij0  = max( 0.0_wp, qn12 )
+
+    ! For the mass transfer, convert from the "cmaq" coag rate parameters 
+    ! to the "mirage2" parameters
+
+    dumatk3 = ( (dgatk**3) * exp( 4.5_wp*xxlsgat*xxlsgat ) )
+    betaij3  = max( 0.0_wp, qv12 / dumatk3 )
+
+end subroutine getcoags_wrapper_f
+
+
+subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
+                     dgatk, dgacc, sgatk, sgacc, xxlsgat,xxlsgac, &
+                     qn11, qn22, qn12, qv12 )
+
+!//////////////////////////////////////////////////////////////////
 !  subroutine getcoags calculates the coagulation rates using a new
 !     approximate algorithm for the 2nd moment.  the 0th and 3rd moments
 !     are done by analytic expressions from whitby et al. (1991).  the
@@ -177,25 +516,17 @@
 !     (1991), but are derived from the gauss-hermite numerical
 !     quadratures used by binkowski and roselle (2003).
 !
-!     called from aerostep as:
-!     call getcoags( lamda, kfmatac, kfmat, kfmac, knc,
-!                    dgat,dgac, sgatk, sgacc, xxlsgat,xxlsgac,
-!                    batat(2), batat(1), bacac(2), bacac(1),
-!                    batac(2), bacat(2), batac(1), c3ij )
-!     where all input and outputs are real*8
-!
-!  revision history:
+!  Revision history:
 !   fsb 08/25/03 coded by dr. francis s. binkowksi
-!
 !   fsb 08/25/04 added in-line documentation
+!   rce 04/15/2007
+!    - code taken from cmaq v4.6 code; converted to f90;
+!    - added "intent" to subr arguments;
+!    - renamed "r4" & "dp" variables to "rx4" & "rx8";
+!    - changed "real*N" declarations to "real(rN)" (N = 4 or 8)
+!   Hui Wan, 2022 : removed unused calculations
 !
-!   rce 04/15/2007 
-!       code taken from cmaq v4.6 code; converted to f90;
-!	added "intent" to subr arguments;
-!       renamed "r4" & "r8" variables to "rx4" & "rx8";
-!       changed "real*N" declarations to "real(rN)" (N = 4 or 8)
-!
-!  references:
+!  References:
 !   1. whitby, e. r., p. h. mcmurry, u. shankar, and f. s. binkowski,
 !   modal aerosol dynamics modeling, rep. 600/3-91/020, atmospheric
 !   research and exposure assessment laboratory,
@@ -208,2130 +539,844 @@
 !   december 20, 1995.
 !
 !   3. binkowski, f.s. and s.j. roselle, models-3 community
-!      multiscale air quality (cmaq) model aerosol component 1:
-!      model description.  j. geophys. res., vol 108, no d6, 4183
-!      doi:10.1029/2001jd001409, 2003.
-
-
-      subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,   &
-                           dgatk, dgacc, sgatk, sgacc, xxlsgat,xxlsgac,   &
-                           qs11, qn11, qs22, qn22,   &
-                           qs12, qs21, qn12, qv12 )
-
-      implicit none
-
-      real(r8), intent(in) ::  lamda     ! mean free path [ m ]
-
-! *** coefficients for free molecular regime
-      real(r8), intent(in) ::  kfmat     ! aitken mode
-      real(r8), intent(in) ::  kfmac     ! accumulation mode
-      real(r8), intent(in) ::  kfmatac   ! aitken to accumulation mode
-
-      real(r8), intent(in) ::  knc   ! coefficient for near continnuum regime
-
-! *** modal geometric mean diameters: [ m ]
-      real(r8), intent(in) :: dgatk          ! aitken mode
-      real(r8), intent(in) :: dgacc          ! accumulation mode
-
-! *** modal geometric standard deviation
-      real(r8), intent(in) :: sgatk          ! atken mode
-      real(r8), intent(in) :: sgacc          ! accumulation mode
-
-! *** natural log of modal geometric standard deviation
-      real(r8), intent(in) :: xxlsgat         ! aitken mode
-      real(r8), intent(in) :: xxlsgac         ! accumulation mode
-
-! *** coagulation coefficients
-      real(r8), intent(out) :: qs11, qn11, qs22, qn22,   &
-                               qs12, qs21, qn12, qv12
-
-      integer ibeta, n1, n2a, n2n ! indices for correction factors
-
-      real(r8)  i1fm_at
-      real(r8)  i1nc_at
-      real(r8)  i1_at
-
-      real(r8)  i1fm_ac
-      real(r8)  i1nc_ac
-      real(r8)  i1_ac
-
-      real(r8)  i1fm
-      real(r8)  i1nc
-      real(r8)  i1
-
-      real(r8) constii
-
-      real(r8)    kngat, kngac
-      real(r8)    one, two, half
-       parameter( one = 1.0_r8, two = 2.0_r8, half = 0.5_r8 )
-      real(r8)    a
-!       parameter( a = 2.492_r8)
-      parameter( a = 1.246_r8)
-      real(r8)      two3rds
-       parameter( two3rds = 2._r8 / 3._r8)
-
-      real(r8)   sqrttwo  !  sqrt(two)
-      real(r8)   dlgsqt2  !  1/ln( sqrt( 2 ) )
-
-
-      real(r8)    esat01         ! aitken mode exp( log^2( sigmag )/8 )
-      real(r8)    esac01         ! accumulation mode exp( log^2( sigmag )/8 )
-
-      real(r8)    esat04
-      real(r8)    esac04
-
-      real(r8)    esat05
-      real(r8)    esac05
-
-      real(r8)    esat08
-      real(r8)    esac08
-
-      real(r8)    esat09
-      real(r8)    esac09
-
-      real(r8)    esat16
-      real(r8)    esac16
-
-      real(r8)    esat20
-      real(r8)    esac20
-
-      real(r8)    esat24
-      real(r8)    esac24
-
-      real(r8)    esat25
-      real(r8)    esac25
-
-      real(r8)    esat36
-      real(r8)    esac36
-
-      real(r8)    esat49
-
-      real(r8)    esat64
-      real(r8)    esac64
-
-      real(r8)    esat100
-
-      real(r8) dgat2, dgac2, dgat3, dgac3
-      real(r8) sqdgat, sqdgac
-      real(r8) sqdgat5, sqdgac5
-      real(r8) sqdgat7
-      real(r8) r, r2, r3, rx4, r5, r6, rx8
-      real(r8) ri1, ri2, ri3, ri4
-      real(r8) rat
-      real(r8) coagfm0, coagnc0
-      real(r8) coagfm3, coagnc3
-      real(r8) coagfm_at, coagfm_ac
-      real(r8) coagnc_at, coagnc_ac
-      real(r8) coagatat0
-      real(r8) coagacac0
-      real(r8) coagatat2
-      real(r8) coagacac2
-      real(r8) coagatac0, coagatac3
-      real(r8) coagatac2
-      real(r8) coagacat2
-      real(r8) xm2at, xm3at, xm2ac, xm3ac
-
-! *** correction factors for coagulation rates
-      real(r8), save :: bm0( 10 )          ! m0 intramodal fm - rpm values
-      real(r8), save :: bm0ij( 10, 10, 10 ) ! m0 intermodal fm
-      real(r8), save :: bm3i( 10, 10, 10 ) ! m3 intermodal fm- rpm values
-      real(r8), save :: bm2ii(10) ! m2 intramodal fm
-      real(r8), save :: bm2iitt(10) ! m2 intramodal total
-      real(r8), save :: bm2ij(10,10,10) ! m2 intermodal fm i to j
-      real(r8), save :: bm2ji(10,10,10) ! m2 total intermodal  j from i
-
-! *** populate the arrays for the correction factors.
-
-! rpm 0th moment correction factors for unimodal fm coagulation  rates
-      data      bm0  /   &
-            0.707106785165097_r8, 0.726148960080488_r8, 0.766430744110958_r8,   &
-            0.814106389441342_r8, 0.861679526483207_r8, 0.903600509090092_r8,   &
-            0.936578814219156_r8, 0.960098926735545_r8, 0.975646823342881_r8,   &
-            0.985397173215326_r8   /
-
-
-! fsb new fm correction factors for m0 intermodal coagulation
-
-      data (bm0ij (  1,  1,ibeta), ibeta = 1,10) /   &
-        0.628539_r8,  0.639610_r8,  0.664514_r8,  0.696278_r8,  0.731558_r8,   &
-        0.768211_r8,  0.804480_r8,  0.838830_r8,  0.870024_r8,  0.897248_r8/
-      data (bm0ij (  1,  2,ibeta), ibeta = 1,10) /   &
-        0.639178_r8,  0.649966_r8,  0.674432_r8,  0.705794_r8,  0.740642_r8,   &
-        0.776751_r8,  0.812323_r8,  0.845827_r8,  0.876076_r8,  0.902324_r8/
-      data (bm0ij (  1,  3,ibeta), ibeta = 1,10) /   &
-        0.663109_r8,  0.673464_r8,  0.697147_r8,  0.727637_r8,  0.761425_r8,   &
-        0.796155_r8,  0.829978_r8,  0.861419_r8,  0.889424_r8,  0.913417_r8/
-      data (bm0ij (  1,  4,ibeta), ibeta = 1,10) /   &
-        0.693693_r8,  0.703654_r8,  0.726478_r8,  0.755786_r8,  0.787980_r8,   &
-        0.820626_r8,  0.851898_r8,  0.880459_r8,  0.905465_r8,  0.926552_r8/
-      data (bm0ij (  1,  5,ibeta), ibeta = 1,10) /   &
-        0.727803_r8,  0.737349_r8,  0.759140_r8,  0.786870_r8,  0.816901_r8,   &
-        0.846813_r8,  0.874906_r8,  0.900060_r8,  0.921679_r8,  0.939614_r8/
-      data (bm0ij (  1,  6,ibeta), ibeta = 1,10) /   &
-        0.763461_r8,  0.772483_r8,  0.792930_r8,  0.818599_r8,  0.845905_r8,   &
-        0.872550_r8,  0.897051_r8,  0.918552_r8,  0.936701_r8,  0.951528_r8/
-      data (bm0ij (  1,  7,ibeta), ibeta = 1,10) /   &
-        0.799021_r8,  0.807365_r8,  0.826094_r8,  0.849230_r8,  0.873358_r8,   &
-        0.896406_r8,  0.917161_r8,  0.935031_r8,  0.949868_r8,  0.961828_r8/
-      data (bm0ij (  1,  8,ibeta), ibeta = 1,10) /   &
-        0.833004_r8,  0.840514_r8,  0.857192_r8,  0.877446_r8,  0.898147_r8,   &
-        0.917518_r8,  0.934627_r8,  0.949106_r8,  0.960958_r8,  0.970403_r8/
-      data (bm0ij (  1,  9,ibeta), ibeta = 1,10) /   &
-        0.864172_r8,  0.870734_r8,  0.885153_r8,  0.902373_r8,  0.919640_r8,   &
-        0.935494_r8,  0.949257_r8,  0.960733_r8,  0.970016_r8,  0.977346_r8/
-      data (bm0ij (  1, 10,ibeta), ibeta = 1,10) /   &
-        0.891658_r8,  0.897227_r8,  0.909343_r8,  0.923588_r8,  0.937629_r8,   &
-        0.950307_r8,  0.961151_r8,  0.970082_r8,  0.977236_r8,  0.982844_r8/
-      data (bm0ij (  2,  1,ibeta), ibeta = 1,10) /   &
-        0.658724_r8,  0.670587_r8,  0.697539_r8,  0.731890_r8,  0.769467_r8,   &
-        0.807391_r8,  0.843410_r8,  0.875847_r8,  0.903700_r8,  0.926645_r8/
-      data (bm0ij (  2,  2,ibeta), ibeta = 1,10) /   &
-        0.667070_r8,  0.678820_r8,  0.705538_r8,  0.739591_r8,  0.776758_r8,   &
-        0.814118_r8,  0.849415_r8,  0.881020_r8,  0.908006_r8,  0.930121_r8/
-      data (bm0ij (  2,  3,ibeta), ibeta = 1,10) /   &
-        0.686356_r8,  0.697839_r8,  0.723997_r8,  0.757285_r8,  0.793389_r8,   &
-        0.829313_r8,  0.862835_r8,  0.892459_r8,  0.917432_r8,  0.937663_r8/
-      data (bm0ij (  2,  4,ibeta), ibeta = 1,10) /   &
-        0.711425_r8,  0.722572_r8,  0.747941_r8,  0.780055_r8,  0.814518_r8,   &
-        0.848315_r8,  0.879335_r8,  0.906290_r8,  0.928658_r8,  0.946526_r8/
-      data (bm0ij (  2,  5,ibeta), ibeta = 1,10) /   &
-        0.739575_r8,  0.750307_r8,  0.774633_r8,  0.805138_r8,  0.837408_r8,   &
-        0.868504_r8,  0.896517_r8,  0.920421_r8,  0.939932_r8,  0.955299_r8/
-      data (bm0ij (  2,  6,ibeta), ibeta = 1,10) /   &
-        0.769143_r8,  0.779346_r8,  0.802314_r8,  0.830752_r8,  0.860333_r8,   &
-        0.888300_r8,  0.913014_r8,  0.933727_r8,  0.950370_r8,  0.963306_r8/
-      data (bm0ij (  2,  7,ibeta), ibeta = 1,10) /   &
-        0.798900_r8,  0.808431_r8,  0.829700_r8,  0.855653_r8,  0.882163_r8,   &
-        0.906749_r8,  0.928075_r8,  0.945654_r8,  0.959579_r8,  0.970280_r8/
-      data (bm0ij (  2,  8,ibeta), ibeta = 1,10) /   &
-        0.827826_r8,  0.836542_r8,  0.855808_r8,  0.878954_r8,  0.902174_r8,   &
-        0.923316_r8,  0.941345_r8,  0.955989_r8,  0.967450_r8,  0.976174_r8/
-      data (bm0ij (  2,  9,ibeta), ibeta = 1,10) /   &
-        0.855068_r8,  0.862856_r8,  0.879900_r8,  0.900068_r8,  0.919956_r8,   &
-        0.937764_r8,  0.952725_r8,  0.964726_r8,  0.974027_r8,  0.981053_r8/
-      data (bm0ij (  2, 10,ibeta), ibeta = 1,10) /   &
-        0.879961_r8,  0.886755_r8,  0.901484_r8,  0.918665_r8,  0.935346_r8,   &
-        0.950065_r8,  0.962277_r8,  0.971974_r8,  0.979432_r8,  0.985033_r8/
-      data (bm0ij (  3,  1,ibeta), ibeta = 1,10) /   &
-        0.724166_r8,  0.735474_r8,  0.761359_r8,  0.794045_r8,  0.828702_r8,   &
-        0.862061_r8,  0.891995_r8,  0.917385_r8,  0.937959_r8,  0.954036_r8/
-      data (bm0ij (  3,  2,ibeta), ibeta = 1,10) /   &
-        0.730416_r8,  0.741780_r8,  0.767647_r8,  0.800116_r8,  0.834344_r8,   &
-        0.867093_r8,  0.896302_r8,  0.920934_r8,  0.940790_r8,  0.956237_r8/
-      data (bm0ij (  3,  3,ibeta), ibeta = 1,10) /   &
-        0.745327_r8,  0.756664_r8,  0.782255_r8,  0.814026_r8,  0.847107_r8,   &
-        0.878339_r8,  0.905820_r8,  0.928699_r8,  0.946931_r8,  0.960977_r8/
-      data (bm0ij (  3,  4,ibeta), ibeta = 1,10) /   &
-        0.765195_r8,  0.776312_r8,  0.801216_r8,  0.831758_r8,  0.863079_r8,   &
-        0.892159_r8,  0.917319_r8,  0.937939_r8,  0.954145_r8,  0.966486_r8/
-      data (bm0ij (  3,  5,ibeta), ibeta = 1,10) /   &
-        0.787632_r8,  0.798347_r8,  0.822165_r8,  0.850985_r8,  0.880049_r8,   &
-        0.906544_r8,  0.929062_r8,  0.947218_r8,  0.961288_r8,  0.971878_r8/
-      data (bm0ij (  3,  6,ibeta), ibeta = 1,10) /   &
-        0.811024_r8,  0.821179_r8,  0.843557_r8,  0.870247_r8,  0.896694_r8,   &
-        0.920365_r8,  0.940131_r8,  0.955821_r8,  0.967820_r8,  0.976753_r8/
-      data (bm0ij (  3,  7,ibeta), ibeta = 1,10) /   &
-        0.834254_r8,  0.843709_r8,  0.864356_r8,  0.888619_r8,  0.912245_r8,   &
-        0.933019_r8,  0.950084_r8,  0.963438_r8,  0.973530_r8,  0.980973_r8/
-      data (bm0ij (  3,  8,ibeta), ibeta = 1,10) /   &
-        0.856531_r8,  0.865176_r8,  0.883881_r8,  0.905544_r8,  0.926290_r8,   &
-        0.944236_r8,  0.958762_r8,  0.969988_r8,  0.978386_r8,  0.984530_r8/
-      data (bm0ij (  3,  9,ibeta), ibeta = 1,10) /   &
-        0.877307_r8,  0.885070_r8,  0.901716_r8,  0.920729_r8,  0.938663_r8,   &
-        0.953951_r8,  0.966169_r8,  0.975512_r8,  0.982442_r8,  0.987477_r8/
-      data (bm0ij (  3, 10,ibeta), ibeta = 1,10) /   &
-        0.896234_r8,  0.903082_r8,  0.917645_r8,  0.934069_r8,  0.949354_r8,   &
-        0.962222_r8,  0.972396_r8,  0.980107_r8,  0.985788_r8,  0.989894_r8/
-      data (bm0ij (  4,  1,ibeta), ibeta = 1,10) /   &
-        0.799294_r8,  0.809144_r8,  0.831293_r8,  0.858395_r8,  0.885897_r8,   &
-        0.911031_r8,  0.932406_r8,  0.949642_r8,  0.963001_r8,  0.973062_r8/
-      data (bm0ij (  4,  2,ibeta), ibeta = 1,10) /   &
-        0.804239_r8,  0.814102_r8,  0.836169_r8,  0.862984_r8,  0.890003_r8,   &
-        0.914535_r8,  0.935274_r8,  0.951910_r8,  0.964748_r8,  0.974381_r8/
-      data (bm0ij (  4,  3,ibeta), ibeta = 1,10) /   &
-        0.815910_r8,  0.825708_r8,  0.847403_r8,  0.873389_r8,  0.899185_r8,   &
-        0.922275_r8,  0.941543_r8,  0.956826_r8,  0.968507_r8,  0.977204_r8/
-      data (bm0ij (  4,  4,ibeta), ibeta = 1,10) /   &
-        0.831348_r8,  0.840892_r8,  0.861793_r8,  0.886428_r8,  0.910463_r8,   &
-        0.931614_r8,  0.948993_r8,  0.962593_r8,  0.972872_r8,  0.980456_r8/
-      data (bm0ij (  4,  5,ibeta), ibeta = 1,10) /   &
-        0.848597_r8,  0.857693_r8,  0.877402_r8,  0.900265_r8,  0.922180_r8,   &
-        0.941134_r8,  0.956464_r8,  0.968298_r8,  0.977143_r8,  0.983611_r8/
-      data (bm0ij (  4,  6,ibeta), ibeta = 1,10) /   &
-        0.866271_r8,  0.874764_r8,  0.892984_r8,  0.913796_r8,  0.933407_r8,   &
-        0.950088_r8,  0.963380_r8,  0.973512_r8,  0.981006_r8,  0.986440_r8/
-      data (bm0ij (  4,  7,ibeta), ibeta = 1,10) /   &
-        0.883430_r8,  0.891216_r8,  0.907762_r8,  0.926388_r8,  0.943660_r8,   &
-        0.958127_r8,  0.969499_r8,  0.978070_r8,  0.984351_r8,  0.988872_r8/
-      data (bm0ij (  4,  8,ibeta), ibeta = 1,10) /   &
-        0.899483_r8,  0.906505_r8,  0.921294_r8,  0.937719_r8,  0.952729_r8,   &
-        0.965131_r8,  0.974762_r8,  0.981950_r8,  0.987175_r8,  0.990912_r8/
-      data (bm0ij (  4,  9,ibeta), ibeta = 1,10) /   &
-        0.914096_r8,  0.920337_r8,  0.933373_r8,  0.947677_r8,  0.960579_r8,   &
-        0.971111_r8,  0.979206_r8,  0.985196_r8,  0.989520_r8,  0.992597_r8/
-      data (bm0ij (  4, 10,ibeta), ibeta = 1,10) /   &
-        0.927122_r8,  0.932597_r8,  0.943952_r8,  0.956277_r8,  0.967268_r8,   &
-        0.976147_r8,  0.982912_r8,  0.987882_r8,  0.991450_r8,  0.993976_r8/
-      data (bm0ij (  5,  1,ibeta), ibeta = 1,10) /   &
-        0.865049_r8,  0.872851_r8,  0.889900_r8,  0.909907_r8,  0.929290_r8,   &
-        0.946205_r8,  0.959991_r8,  0.970706_r8,  0.978764_r8,  0.984692_r8/
-      data (bm0ij (  5,  2,ibeta), ibeta = 1,10) /   &
-        0.868989_r8,  0.876713_r8,  0.893538_r8,  0.913173_r8,  0.932080_r8,   &
-        0.948484_r8,  0.961785_r8,  0.972080_r8,  0.979796_r8,  0.985457_r8/
-      data (bm0ij (  5,  3,ibeta), ibeta = 1,10) /   &
-        0.878010_r8,  0.885524_r8,  0.901756_r8,  0.920464_r8,  0.938235_r8,   &
-        0.953461_r8,  0.965672_r8,  0.975037_r8,  0.982005_r8,  0.987085_r8/
-      data (bm0ij (  5,  4,ibeta), ibeta = 1,10) /   &
-        0.889534_r8,  0.896698_r8,  0.912012_r8,  0.929395_r8,  0.945647_r8,   &
-        0.959366_r8,  0.970227_r8,  0.978469_r8,  0.984547_r8,  0.988950_r8/
-      data (bm0ij (  5,  5,ibeta), ibeta = 1,10) /   &
-        0.902033_r8,  0.908713_r8,  0.922848_r8,  0.938648_r8,  0.953186_r8,   &
-        0.965278_r8,  0.974729_r8,  0.981824_r8,  0.987013_r8,  0.990746_r8/
-      data (bm0ij (  5,  6,ibeta), ibeta = 1,10) /   &
-        0.914496_r8,  0.920599_r8,  0.933389_r8,  0.947485_r8,  0.960262_r8,   &
-        0.970743_r8,  0.978839_r8,  0.984858_r8,  0.989225_r8,  0.992348_r8/
-      data (bm0ij (  5,  7,ibeta), ibeta = 1,10) /   &
-        0.926281_r8,  0.931761_r8,  0.943142_r8,  0.955526_r8,  0.966600_r8,   &
-        0.975573_r8,  0.982431_r8,  0.987485_r8,  0.991128_r8,  0.993718_r8/
-      data (bm0ij (  5,  8,ibeta), ibeta = 1,10) /   &
-        0.937029_r8,  0.941877_r8,  0.951868_r8,  0.962615_r8,  0.972112_r8,   &
-        0.979723_r8,  0.985488_r8,  0.989705_r8,  0.992725_r8,  0.994863_r8/
-      data (bm0ij (  5,  9,ibeta), ibeta = 1,10) /   &
-        0.946580_r8,  0.950819_r8,  0.959494_r8,  0.968732_r8,  0.976811_r8,   &
-        0.983226_r8,  0.988047_r8,  0.991550_r8,  0.994047_r8,  0.995806_r8/
-      data (bm0ij (  5, 10,ibeta), ibeta = 1,10) /   &
-        0.954909_r8,  0.958581_r8,  0.966049_r8,  0.973933_r8,  0.980766_r8,   &
-        0.986149_r8,  0.990166_r8,  0.993070_r8,  0.995130_r8,  0.996577_r8/
-      data (bm0ij (  6,  1,ibeta), ibeta = 1,10) /   &
-        0.914182_r8,  0.919824_r8,  0.931832_r8,  0.945387_r8,  0.957999_r8,   &
-        0.968606_r8,  0.976982_r8,  0.983331_r8,  0.988013_r8,  0.991407_r8/
-      data (bm0ij (  6,  2,ibeta), ibeta = 1,10) /   &
-        0.917139_r8,  0.922665_r8,  0.934395_r8,  0.947580_r8,  0.959792_r8,   &
-        0.970017_r8,  0.978062_r8,  0.984138_r8,  0.988609_r8,  0.991843_r8/
-      data (bm0ij (  6,  3,ibeta), ibeta = 1,10) /   &
-        0.923742_r8,  0.928990_r8,  0.940064_r8,  0.952396_r8,  0.963699_r8,   &
-        0.973070_r8,  0.980381_r8,  0.985866_r8,  0.989878_r8,  0.992768_r8/
-      data (bm0ij (  6,  4,ibeta), ibeta = 1,10) /   &
-        0.931870_r8,  0.936743_r8,  0.946941_r8,  0.958162_r8,  0.968318_r8,   &
-        0.976640_r8,  0.983069_r8,  0.987853_r8,  0.991330_r8,  0.993822_r8/
-      data (bm0ij (  6,  5,ibeta), ibeta = 1,10) /   &
-        0.940376_r8,  0.944807_r8,  0.954004_r8,  0.963999_r8,  0.972928_r8,   &
-        0.980162_r8,  0.985695_r8,  0.989779_r8,  0.992729_r8,  0.994833_r8/
-      data (bm0ij (  6,  6,ibeta), ibeta = 1,10) /   &
-        0.948597_r8,  0.952555_r8,  0.960703_r8,  0.969454_r8,  0.977181_r8,   &
-        0.983373_r8,  0.988067_r8,  0.991507_r8,  0.993977_r8,  0.995730_r8/
-      data (bm0ij (  6,  7,ibeta), ibeta = 1,10) /   &
-        0.956167_r8,  0.959648_r8,  0.966763_r8,  0.974326_r8,  0.980933_r8,   &
-        0.986177_r8,  0.990121_r8,  0.992993_r8,  0.995045_r8,  0.996495_r8/
-      data (bm0ij (  6,  8,ibeta), ibeta = 1,10) /   &
-        0.962913_r8,  0.965937_r8,  0.972080_r8,  0.978552_r8,  0.984153_r8,   &
-        0.988563_r8,  0.991857_r8,  0.994242_r8,  0.995938_r8,  0.997133_r8/
-      data (bm0ij (  6,  9,ibeta), ibeta = 1,10) /   &
-        0.968787_r8,  0.971391_r8,  0.976651_r8,  0.982148_r8,  0.986869_r8,   &
-        0.990560_r8,  0.993301_r8,  0.995275_r8,  0.996675_r8,  0.997657_r8/
-      data (bm0ij (  6, 10,ibeta), ibeta = 1,10) /   &
-        0.973822_r8,  0.976047_r8,  0.980523_r8,  0.985170_r8,  0.989134_r8,   &
-        0.992215_r8,  0.994491_r8,  0.996124_r8,  0.997277_r8,  0.998085_r8/
-      data (bm0ij (  7,  1,ibeta), ibeta = 1,10) /   &
-        0.947410_r8,  0.951207_r8,  0.959119_r8,  0.967781_r8,  0.975592_r8,   &
-        0.981981_r8,  0.986915_r8,  0.990590_r8,  0.993266_r8,  0.995187_r8/
-      data (bm0ij (  7,  2,ibeta), ibeta = 1,10) /   &
-        0.949477_r8,  0.953161_r8,  0.960824_r8,  0.969187_r8,  0.976702_r8,   &
-        0.982831_r8,  0.987550_r8,  0.991057_r8,  0.993606_r8,  0.995434_r8/
-      data (bm0ij (  7,  3,ibeta), ibeta = 1,10) /   &
-        0.954008_r8,  0.957438_r8,  0.964537_r8,  0.972232_r8,  0.979095_r8,   &
-        0.984653_r8,  0.988907_r8,  0.992053_r8,  0.994330_r8,  0.995958_r8/
-      data (bm0ij (  7,  4,ibeta), ibeta = 1,10) /   &
-        0.959431_r8,  0.962539_r8,  0.968935_r8,  0.975808_r8,  0.981882_r8,   &
-        0.986759_r8,  0.990466_r8,  0.993190_r8,  0.995153_r8,  0.996552_r8/
-      data (bm0ij (  7,  5,ibeta), ibeta = 1,10) /   &
-        0.964932_r8,  0.967693_r8,  0.973342_r8,  0.979355_r8,  0.984620_r8,   &
-        0.988812_r8,  0.991974_r8,  0.994285_r8,  0.995943_r8,  0.997119_r8/
-      data (bm0ij (  7,  6,ibeta), ibeta = 1,10) /   &
-        0.970101_r8,  0.972517_r8,  0.977428_r8,  0.982612_r8,  0.987110_r8,   &
-        0.990663_r8,  0.993326_r8,  0.995261_r8,  0.996644_r8,  0.997621_r8/
-      data (bm0ij (  7,  7,ibeta), ibeta = 1,10) /   &
-        0.974746_r8,  0.976834_r8,  0.981055_r8,  0.985475_r8,  0.989280_r8,   &
-        0.992265_r8,  0.994488_r8,  0.996097_r8,  0.997241_r8,  0.998048_r8/
-      data (bm0ij (  7,  8,ibeta), ibeta = 1,10) /   &
-        0.978804_r8,  0.980591_r8,  0.984187_r8,  0.987927_r8,  0.991124_r8,   &
-        0.993617_r8,  0.995464_r8,  0.996795_r8,  0.997739_r8,  0.998403_r8/
-      data (bm0ij (  7,  9,ibeta), ibeta = 1,10) /   &
-        0.982280_r8,  0.983799_r8,  0.986844_r8,  0.989991_r8,  0.992667_r8,   &
-        0.994742_r8,  0.996273_r8,  0.997372_r8,  0.998149_r8,  0.998695_r8/
-      data (bm0ij (  7, 10,ibeta), ibeta = 1,10) /   &
-        0.985218_r8,  0.986503_r8,  0.989071_r8,  0.991711_r8,  0.993945_r8,   &
-        0.995669_r8,  0.996937_r8,  0.997844_r8,  0.998484_r8,  0.998932_r8/
-      data (bm0ij (  8,  1,ibeta), ibeta = 1,10) /   &
-        0.968507_r8,  0.970935_r8,  0.975916_r8,  0.981248_r8,  0.985947_r8,   &
-        0.989716_r8,  0.992580_r8,  0.994689_r8,  0.996210_r8,  0.997297_r8/
-      data (bm0ij (  8,  2,ibeta), ibeta = 1,10) /   &
-        0.969870_r8,  0.972210_r8,  0.977002_r8,  0.982119_r8,  0.986619_r8,   &
-        0.990219_r8,  0.992951_r8,  0.994958_r8,  0.996405_r8,  0.997437_r8/
-      data (bm0ij (  8,  3,ibeta), ibeta = 1,10) /   &
-        0.972820_r8,  0.974963_r8,  0.979339_r8,  0.983988_r8,  0.988054_r8,   &
-        0.991292_r8,  0.993738_r8,  0.995529_r8,  0.996817_r8,  0.997734_r8/
-      data (bm0ij (  8,  4,ibeta), ibeta = 1,10) /   &
-        0.976280_r8,  0.978186_r8,  0.982060_r8,  0.986151_r8,  0.989706_r8,   &
-        0.992520_r8,  0.994636_r8,  0.996179_r8,  0.997284_r8,  0.998069_r8/
-      data (bm0ij (  8,  5,ibeta), ibeta = 1,10) /   &
-        0.979711_r8,  0.981372_r8,  0.984735_r8,  0.988263_r8,  0.991309_r8,   &
-        0.993706_r8,  0.995499_r8,  0.996801_r8,  0.997730_r8,  0.998389_r8/
-      data (bm0ij (  8,  6,ibeta), ibeta = 1,10) /   &
-        0.982863_r8,  0.984292_r8,  0.987172_r8,  0.990174_r8,  0.992750_r8,   &
-        0.994766_r8,  0.996266_r8,  0.997352_r8,  0.998125_r8,  0.998670_r8/
-      data (bm0ij (  8,  7,ibeta), ibeta = 1,10) /   &
-        0.985642_r8,  0.986858_r8,  0.989301_r8,  0.991834_r8,  0.993994_r8,   &
-        0.995676_r8,  0.996923_r8,  0.997822_r8,  0.998460_r8,  0.998910_r8/
-      data (bm0ij (  8,  8,ibeta), ibeta = 1,10) /   &
-        0.988029_r8,  0.989058_r8,  0.991116_r8,  0.993240_r8,  0.995043_r8,   &
-        0.996440_r8,  0.997472_r8,  0.998214_r8,  0.998739_r8,  0.999108_r8/
-      data (bm0ij (  8,  9,ibeta), ibeta = 1,10) /   &
-        0.990046_r8,  0.990912_r8,  0.992640_r8,  0.994415_r8,  0.995914_r8,   &
-        0.997073_r8,  0.997925_r8,  0.998536_r8,  0.998968_r8,  0.999271_r8/
-      data (bm0ij (  8, 10,ibeta), ibeta = 1,10) /   &
-        0.991732_r8,  0.992459_r8,  0.993906_r8,  0.995386_r8,  0.996633_r8,   &
-        0.997592_r8,  0.998296_r8,  0.998799_r8,  0.999154_r8,  0.999403_r8/
-      data (bm0ij (  9,  1,ibeta), ibeta = 1,10) /   &
-        0.981392_r8,  0.982893_r8,  0.985938_r8,  0.989146_r8,  0.991928_r8,   &
-        0.994129_r8,  0.995783_r8,  0.996991_r8,  0.997857_r8,  0.998473_r8/
-      data (bm0ij (  9,  2,ibeta), ibeta = 1,10) /   &
-        0.982254_r8,  0.983693_r8,  0.986608_r8,  0.989673_r8,  0.992328_r8,   &
-        0.994424_r8,  0.995998_r8,  0.997146_r8,  0.997969_r8,  0.998553_r8/
-      data (bm0ij (  9,  3,ibeta), ibeta = 1,10) /   &
-        0.984104_r8,  0.985407_r8,  0.988040_r8,  0.990798_r8,  0.993178_r8,   &
-        0.995052_r8,  0.996454_r8,  0.997474_r8,  0.998204_r8,  0.998722_r8/
-      data (bm0ij (  9,  4,ibeta), ibeta = 1,10) /   &
-        0.986243_r8,  0.987386_r8,  0.989687_r8,  0.992087_r8,  0.994149_r8,   &
-        0.995765_r8,  0.996971_r8,  0.997846_r8,  0.998470_r8,  0.998913_r8/
-      data (bm0ij (  9,  5,ibeta), ibeta = 1,10) /   &
-        0.988332_r8,  0.989313_r8,  0.991284_r8,  0.993332_r8,  0.995082_r8,   &
-        0.996449_r8,  0.997465_r8,  0.998200_r8,  0.998723_r8,  0.999093_r8/
-      data (bm0ij (  9,  6,ibeta), ibeta = 1,10) /   &
-        0.990220_r8,  0.991053_r8,  0.992721_r8,  0.994445_r8,  0.995914_r8,   &
-        0.997056_r8,  0.997902_r8,  0.998513_r8,  0.998947_r8,  0.999253_r8/
-      data (bm0ij (  9,  7,ibeta), ibeta = 1,10) /   &
-        0.991859_r8,  0.992561_r8,  0.993961_r8,  0.995403_r8,  0.996626_r8,   &
-        0.997574_r8,  0.998274_r8,  0.998778_r8,  0.999136_r8,  0.999387_r8/
-      data (bm0ij (  9,  8,ibeta), ibeta = 1,10) /   &
-        0.993250_r8,  0.993837_r8,  0.995007_r8,  0.996208_r8,  0.997223_r8,   &
-        0.998007_r8,  0.998584_r8,  0.998999_r8,  0.999293_r8,  0.999499_r8/
-      data (bm0ij (  9,  9,ibeta), ibeta = 1,10) /   &
-        0.994413_r8,  0.994903_r8,  0.995878_r8,  0.996876_r8,  0.997716_r8,   &
-        0.998363_r8,  0.998839_r8,  0.999180_r8,  0.999421_r8,  0.999591_r8/
-      data (bm0ij (  9, 10,ibeta), ibeta = 1,10) /   &
-        0.995376_r8,  0.995785_r8,  0.996597_r8,  0.997425_r8,  0.998121_r8,   &
-        0.998655_r8,  0.999048_r8,  0.999328_r8,  0.999526_r8,  0.999665_r8/
-      data (bm0ij ( 10,  1,ibeta), ibeta = 1,10) /   &
-        0.989082_r8,  0.989991_r8,  0.991819_r8,  0.993723_r8,  0.995357_r8,   &
-        0.996637_r8,  0.997592_r8,  0.998286_r8,  0.998781_r8,  0.999132_r8/
-      data (bm0ij ( 10,  2,ibeta), ibeta = 1,10) /   &
-        0.989613_r8,  0.990480_r8,  0.992224_r8,  0.994039_r8,  0.995594_r8,   &
-        0.996810_r8,  0.997717_r8,  0.998375_r8,  0.998845_r8,  0.999178_r8/
-      data (bm0ij ( 10,  3,ibeta), ibeta = 1,10) /   &
-        0.990744_r8,  0.991523_r8,  0.993086_r8,  0.994708_r8,  0.996094_r8,   &
-        0.997176_r8,  0.997981_r8,  0.998564_r8,  0.998980_r8,  0.999274_r8/
-      data (bm0ij ( 10,  4,ibeta), ibeta = 1,10) /   &
-        0.992041_r8,  0.992716_r8,  0.994070_r8,  0.995470_r8,  0.996662_r8,   &
-        0.997591_r8,  0.998280_r8,  0.998778_r8,  0.999133_r8,  0.999383_r8/
-      data (bm0ij ( 10,  5,ibeta), ibeta = 1,10) /   &
-        0.993292_r8,  0.993867_r8,  0.995015_r8,  0.996199_r8,  0.997205_r8,   &
-        0.997985_r8,  0.998564_r8,  0.998981_r8,  0.999277_r8,  0.999487_r8/
-      data (bm0ij ( 10,  6,ibeta), ibeta = 1,10) /   &
-        0.994411_r8,  0.994894_r8,  0.995857_r8,  0.996847_r8,  0.997685_r8,   &
-        0.998334_r8,  0.998814_r8,  0.999159_r8,  0.999404_r8,  0.999577_r8/
-      data (bm0ij ( 10,  7,ibeta), ibeta = 1,10) /   &
-        0.995373_r8,  0.995776_r8,  0.996577_r8,  0.997400_r8,  0.998094_r8,   &
-        0.998630_r8,  0.999026_r8,  0.999310_r8,  0.999512_r8,  0.999654_r8/
-      data (bm0ij ( 10,  8,ibeta), ibeta = 1,10) /   &
-        0.996181_r8,  0.996516_r8,  0.997181_r8,  0.997861_r8,  0.998435_r8,   &
-        0.998877_r8,  0.999202_r8,  0.999435_r8,  0.999601_r8,  0.999717_r8/
-      data (bm0ij ( 10,  9,ibeta), ibeta = 1,10) /   &
-        0.996851_r8,  0.997128_r8,  0.997680_r8,  0.998242_r8,  0.998715_r8,   &
-        0.999079_r8,  0.999346_r8,  0.999538_r8,  0.999673_r8,  0.999769_r8/
-      data (bm0ij ( 10, 10,ibeta), ibeta = 1,10) /   &
-        0.997402_r8,  0.997632_r8,  0.998089_r8,  0.998554_r8,  0.998945_r8,   &
-        0.999244_r8,  0.999464_r8,  0.999622_r8,  0.999733_r8,  0.999811_r8/
-
-
-! rpm....   3rd moment nuclei mode corr. fac. for bimodal fm coag rate
-
-       data (bm3i( 1, 1,ibeta ), ibeta=1,10)/   &
-       0.70708_r8,0.71681_r8,0.73821_r8,0.76477_r8,0.79350_r8,0.82265_r8,0.85090_r8,0.87717_r8,   &
-       0.90069_r8,0.92097_r8/
-       data (bm3i( 1, 2,ibeta ), ibeta=1,10)/   &
-       0.72172_r8,0.73022_r8,0.74927_r8,0.77324_r8,0.79936_r8,0.82601_r8,0.85199_r8,0.87637_r8,   &
-       0.89843_r8,0.91774_r8/
-       data (bm3i( 1, 3,ibeta ), ibeta=1,10)/   &
-       0.78291_r8,0.78896_r8,0.80286_r8,0.82070_r8,0.84022_r8,0.85997_r8,0.87901_r8,0.89669_r8,   &
-       0.91258_r8,0.92647_r8/
-       data (bm3i( 1, 4,ibeta ), ibeta=1,10)/   &
-       0.87760_r8,0.88147_r8,0.89025_r8,0.90127_r8,0.91291_r8,0.92420_r8,0.93452_r8,0.94355_r8,   &
-       0.95113_r8,0.95726_r8/
-       data (bm3i( 1, 5,ibeta ), ibeta=1,10)/   &
-       0.94988_r8,0.95184_r8,0.95612_r8,0.96122_r8,0.96628_r8,0.97085_r8,0.97467_r8,0.97763_r8,   &
-       0.97971_r8,0.98089_r8/
-       data (bm3i( 1, 6,ibeta ), ibeta=1,10)/   &
-       0.98318_r8,0.98393_r8,0.98551_r8,0.98728_r8,0.98889_r8,0.99014_r8,0.99095_r8,0.99124_r8,   &
-       0.99100_r8,0.99020_r8/
-       data (bm3i( 1, 7,ibeta ), ibeta=1,10)/   &
-       0.99480_r8,0.99504_r8,0.99551_r8,0.99598_r8,0.99629_r8,0.99635_r8,0.99611_r8,0.99550_r8,   &
-       0.99450_r8,0.99306_r8/
-       data (bm3i( 1, 8,ibeta ), ibeta=1,10)/   &
-       0.99842_r8,0.99848_r8,0.99858_r8,0.99861_r8,0.99850_r8,0.99819_r8,0.99762_r8,0.99674_r8,   &
-       0.99550_r8,0.99388_r8/
-       data (bm3i( 1, 9,ibeta ), ibeta=1,10)/   &
-       0.99951_r8,0.99951_r8,0.99949_r8,0.99939_r8,0.99915_r8,0.99872_r8,0.99805_r8,0.99709_r8,   &
-       0.99579_r8,0.99411_r8/
-       data (bm3i( 1,10,ibeta ), ibeta=1,10)/   &
-       0.99984_r8,0.99982_r8,0.99976_r8,0.99962_r8,0.99934_r8,0.99888_r8,0.99818_r8,0.99719_r8,   &
-       0.99587_r8,0.99417_r8/
-       data (bm3i( 2, 1,ibeta ), ibeta=1,10)/   &
-       0.72957_r8,0.73993_r8,0.76303_r8,0.79178_r8,0.82245_r8,0.85270_r8,0.88085_r8,0.90578_r8,   &
-       0.92691_r8,0.94415_r8/
-       data (bm3i( 2, 2,ibeta ), ibeta=1,10)/   &
-       0.72319_r8,0.73320_r8,0.75547_r8,0.78323_r8,0.81307_r8,0.84287_r8,0.87107_r8,0.89651_r8,   &
-       0.91852_r8,0.93683_r8/
-       data (bm3i( 2, 3,ibeta ), ibeta=1,10)/   &
-       0.74413_r8,0.75205_r8,0.76998_r8,0.79269_r8,0.81746_r8,0.84258_r8,0.86685_r8,0.88938_r8,   &
-       0.90953_r8,0.92695_r8/
-       data (bm3i( 2, 4,ibeta ), ibeta=1,10)/   &
-       0.82588_r8,0.83113_r8,0.84309_r8,0.85825_r8,0.87456_r8,0.89072_r8,0.90594_r8,0.91972_r8,   &
-       0.93178_r8,0.94203_r8/
-       data (bm3i( 2, 5,ibeta ), ibeta=1,10)/   &
-       0.91886_r8,0.92179_r8,0.92831_r8,0.93624_r8,0.94434_r8,0.95192_r8,0.95856_r8,0.96409_r8,   &
-       0.96845_r8,0.97164_r8/
-       data (bm3i( 2, 6,ibeta ), ibeta=1,10)/   &
-       0.97129_r8,0.97252_r8,0.97515_r8,0.97818_r8,0.98108_r8,0.98354_r8,0.98542_r8,0.98665_r8,   &
-       0.98721_r8,0.98709_r8/
-       data (bm3i( 2, 7,ibeta ), ibeta=1,10)/   &
-       0.99104_r8,0.99145_r8,0.99230_r8,0.99320_r8,0.99394_r8,0.99439_r8,0.99448_r8,0.99416_r8,   &
-       0.99340_r8,0.99217_r8/
-       data (bm3i( 2, 8,ibeta ), ibeta=1,10)/   &
-       0.99730_r8,0.99741_r8,0.99763_r8,0.99779_r8,0.99782_r8,0.99762_r8,0.99715_r8,0.99636_r8,   &
-       0.99519_r8,0.99363_r8/
-       data (bm3i( 2, 9,ibeta ), ibeta=1,10)/   &
-       0.99917_r8,0.99919_r8,0.99921_r8,0.99915_r8,0.99895_r8,0.99856_r8,0.99792_r8,0.99698_r8,   &
-       0.99570_r8,0.99404_r8/
-       data (bm3i( 2,10,ibeta ), ibeta=1,10)/   &
-       0.99973_r8,0.99973_r8,0.99968_r8,0.99955_r8,0.99928_r8,0.99883_r8,0.99814_r8,0.99716_r8,   &
-       0.99584_r8,0.99415_r8/
-       data (bm3i( 3, 1,ibeta ), ibeta=1,10)/   &
-       0.78358_r8,0.79304_r8,0.81445_r8,0.84105_r8,0.86873_r8,0.89491_r8,0.91805_r8,0.93743_r8,   &
-       0.95300_r8,0.96510_r8/
-       data (bm3i( 3, 2,ibeta ), ibeta=1,10)/   &
-       0.76412_r8,0.77404_r8,0.79635_r8,0.82404_r8,0.85312_r8,0.88101_r8,0.90610_r8,0.92751_r8,   &
-       0.94500_r8,0.95879_r8/
-       data (bm3i( 3, 3,ibeta ), ibeta=1,10)/   &
-       0.74239_r8,0.75182_r8,0.77301_r8,0.79956_r8,0.82809_r8,0.85639_r8,0.88291_r8,0.90658_r8,   &
-       0.92683_r8,0.94350_r8/
-       data (bm3i( 3, 4,ibeta ), ibeta=1,10)/   &
-       0.78072_r8,0.78758_r8,0.80317_r8,0.82293_r8,0.84437_r8,0.86589_r8,0.88643_r8,0.90526_r8,   &
-       0.92194_r8,0.93625_r8/
-       data (bm3i( 3, 5,ibeta ), ibeta=1,10)/   &
-       0.87627_r8,0.88044_r8,0.88981_r8,0.90142_r8,0.91357_r8,0.92524_r8,0.93585_r8,0.94510_r8,   &
-       0.95285_r8,0.95911_r8/
-       data (bm3i( 3, 6,ibeta ), ibeta=1,10)/   &
-       0.95176_r8,0.95371_r8,0.95796_r8,0.96297_r8,0.96792_r8,0.97233_r8,0.97599_r8,0.97880_r8,   &
-       0.98072_r8,0.98178_r8/
-       data (bm3i( 3, 7,ibeta ), ibeta=1,10)/   &
-       0.98453_r8,0.98523_r8,0.98670_r8,0.98833_r8,0.98980_r8,0.99092_r8,0.99160_r8,0.99179_r8,   &
-       0.99145_r8,0.99058_r8/
-       data (bm3i( 3, 8,ibeta ), ibeta=1,10)/   &
-       0.99534_r8,0.99555_r8,0.99597_r8,0.99637_r8,0.99662_r8,0.99663_r8,0.99633_r8,0.99569_r8,   &
-       0.99465_r8,0.99318_r8/
-       data (bm3i( 3, 9,ibeta ), ibeta=1,10)/   &
-       0.99859_r8,0.99864_r8,0.99872_r8,0.99873_r8,0.99860_r8,0.99827_r8,0.99768_r8,0.99679_r8,   &
-       0.99555_r8,0.99391_r8/
-       data (bm3i( 3,10,ibeta ), ibeta=1,10)/   &
-       0.99956_r8,0.99956_r8,0.99953_r8,0.99942_r8,0.99918_r8,0.99875_r8,0.99807_r8,0.99711_r8,   &
-       0.99580_r8,0.99412_r8/
-       data (bm3i( 4, 1,ibeta ), ibeta=1,10)/   &
-       0.84432_r8,0.85223_r8,0.86990_r8,0.89131_r8,0.91280_r8,0.93223_r8,0.94861_r8,0.96172_r8,   &
-       0.97185_r8,0.97945_r8/
-       data (bm3i( 4, 2,ibeta ), ibeta=1,10)/   &
-       0.82299_r8,0.83164_r8,0.85101_r8,0.87463_r8,0.89857_r8,0.92050_r8,0.93923_r8,0.95443_r8,   &
-       0.96629_r8,0.97529_r8/
-       data (bm3i( 4, 3,ibeta ), ibeta=1,10)/   &
-       0.77870_r8,0.78840_r8,0.81011_r8,0.83690_r8,0.86477_r8,0.89124_r8,0.91476_r8,0.93460_r8,   &
-       0.95063_r8,0.96316_r8/
-       data (bm3i( 4, 4,ibeta ), ibeta=1,10)/   &
-       0.76386_r8,0.77233_r8,0.79147_r8,0.81557_r8,0.84149_r8,0.86719_r8,0.89126_r8,0.91275_r8,   &
-       0.93116_r8,0.94637_r8/
-       data (bm3i( 4, 5,ibeta ), ibeta=1,10)/   &
-       0.82927_r8,0.83488_r8,0.84756_r8,0.86346_r8,0.88040_r8,0.89704_r8,0.91257_r8,0.92649_r8,   &
-       0.93857_r8,0.94874_r8/
-       data (bm3i( 4, 6,ibeta ), ibeta=1,10)/   &
-       0.92184_r8,0.92481_r8,0.93136_r8,0.93925_r8,0.94724_r8,0.95462_r8,0.96104_r8,0.96634_r8,   &
-       0.97048_r8,0.97348_r8/
-       data (bm3i( 4, 7,ibeta ), ibeta=1,10)/   &
-       0.97341_r8,0.97457_r8,0.97706_r8,0.97991_r8,0.98260_r8,0.98485_r8,0.98654_r8,0.98760_r8,   &
-       0.98801_r8,0.98777_r8/
-       data (bm3i( 4, 8,ibeta ), ibeta=1,10)/   &
-       0.99192_r8,0.99229_r8,0.99305_r8,0.99385_r8,0.99449_r8,0.99486_r8,0.99487_r8,0.99449_r8,   &
-       0.99367_r8,0.99239_r8/
-       data (bm3i( 4, 9,ibeta ), ibeta=1,10)/   &
-       0.99758_r8,0.99768_r8,0.99787_r8,0.99800_r8,0.99799_r8,0.99777_r8,0.99727_r8,0.99645_r8,   &
-       0.99527_r8,0.99369_r8/
-       data (bm3i( 4,10,ibeta ), ibeta=1,10)/   &
-       0.99926_r8,0.99928_r8,0.99928_r8,0.99921_r8,0.99900_r8,0.99860_r8,0.99795_r8,0.99701_r8,   &
-       0.99572_r8,0.99405_r8/
-       data (bm3i( 5, 1,ibeta ), ibeta=1,10)/   &
-       0.89577_r8,0.90190_r8,0.91522_r8,0.93076_r8,0.94575_r8,0.95876_r8,0.96932_r8,0.97751_r8,   &
-       0.98367_r8,0.98820_r8/
-       data (bm3i( 5, 2,ibeta ), ibeta=1,10)/   &
-       0.87860_r8,0.88547_r8,0.90052_r8,0.91828_r8,0.93557_r8,0.95075_r8,0.96319_r8,0.97292_r8,   &
-       0.98028_r8,0.98572_r8/
-       data (bm3i( 5, 3,ibeta ), ibeta=1,10)/   &
-       0.83381_r8,0.84240_r8,0.86141_r8,0.88425_r8,0.90707_r8,0.92770_r8,0.94510_r8,0.95906_r8,   &
-       0.96986_r8,0.97798_r8/
-       data (bm3i( 5, 4,ibeta ), ibeta=1,10)/   &
-       0.78530_r8,0.79463_r8,0.81550_r8,0.84127_r8,0.86813_r8,0.89367_r8,0.91642_r8,0.93566_r8,   &
-       0.95125_r8,0.96347_r8/
-       data (bm3i( 5, 5,ibeta ), ibeta=1,10)/   &
-       0.79614_r8,0.80332_r8,0.81957_r8,0.84001_r8,0.86190_r8,0.88351_r8,0.90368_r8,0.92169_r8,   &
-       0.93718_r8,0.95006_r8/
-       data (bm3i( 5, 6,ibeta ), ibeta=1,10)/   &
-       0.88192_r8,0.88617_r8,0.89565_r8,0.90728_r8,0.91931_r8,0.93076_r8,0.94107_r8,0.94997_r8,   &
-       0.95739_r8,0.96333_r8/
-       data (bm3i( 5, 7,ibeta ), ibeta=1,10)/   &
-       0.95509_r8,0.95698_r8,0.96105_r8,0.96583_r8,0.97048_r8,0.97460_r8,0.97796_r8,0.98050_r8,   &
-       0.98218_r8,0.98304_r8/
-       data (bm3i( 5, 8,ibeta ), ibeta=1,10)/   &
-       0.98596_r8,0.98660_r8,0.98794_r8,0.98943_r8,0.99074_r8,0.99172_r8,0.99227_r8,0.99235_r8,   &
-       0.99192_r8,0.99096_r8/
-       data (bm3i( 5, 9,ibeta ), ibeta=1,10)/   &
-       0.99581_r8,0.99600_r8,0.99637_r8,0.99672_r8,0.99691_r8,0.99687_r8,0.99653_r8,0.99585_r8,   &
-       0.99478_r8,0.99329_r8/
-       data (bm3i( 5,10,ibeta ), ibeta=1,10)/   &
-       0.99873_r8,0.99878_r8,0.99884_r8,0.99883_r8,0.99869_r8,0.99834_r8,0.99774_r8,0.99684_r8,   &
-       0.99558_r8,0.99394_r8/
-       data (bm3i( 6, 1,ibeta ), ibeta=1,10)/   &
-       0.93335_r8,0.93777_r8,0.94711_r8,0.95764_r8,0.96741_r8,0.97562_r8,0.98210_r8,0.98701_r8,   &
-       0.99064_r8,0.99327_r8/
-       data (bm3i( 6, 2,ibeta ), ibeta=1,10)/   &
-       0.92142_r8,0.92646_r8,0.93723_r8,0.94947_r8,0.96096_r8,0.97069_r8,0.97842_r8,0.98431_r8,   &
-       0.98868_r8,0.99186_r8/
-       data (bm3i( 6, 3,ibeta ), ibeta=1,10)/   &
-       0.88678_r8,0.89351_r8,0.90810_r8,0.92508_r8,0.94138_r8,0.95549_r8,0.96693_r8,0.97578_r8,   &
-       0.98243_r8,0.98731_r8/
-       data (bm3i( 6, 4,ibeta ), ibeta=1,10)/   &
-       0.83249_r8,0.84124_r8,0.86051_r8,0.88357_r8,0.90655_r8,0.92728_r8,0.94477_r8,0.95880_r8,   &
-       0.96964_r8,0.97779_r8/
-       data (bm3i( 6, 5,ibeta ), ibeta=1,10)/   &
-       0.79593_r8,0.80444_r8,0.82355_r8,0.84725_r8,0.87211_r8,0.89593_r8,0.91735_r8,0.93566_r8,   &
-       0.95066_r8,0.96255_r8/
-       data (bm3i( 6, 6,ibeta ), ibeta=1,10)/   &
-       0.84124_r8,0.84695_r8,0.85980_r8,0.87575_r8,0.89256_r8,0.90885_r8,0.92383_r8,0.93704_r8,   &
-       0.94830_r8,0.95761_r8/
-       data (bm3i( 6, 7,ibeta ), ibeta=1,10)/   &
-       0.92721_r8,0.93011_r8,0.93647_r8,0.94406_r8,0.95166_r8,0.95862_r8,0.96460_r8,0.96949_r8,   &
-       0.97326_r8,0.97595_r8/
-       data (bm3i( 6, 8,ibeta ), ibeta=1,10)/   &
-       0.97573_r8,0.97681_r8,0.97913_r8,0.98175_r8,0.98421_r8,0.98624_r8,0.98772_r8,0.98860_r8,   &
-       0.98885_r8,0.98847_r8/
-       data (bm3i( 6, 9,ibeta ), ibeta=1,10)/   &
-       0.99271_r8,0.99304_r8,0.99373_r8,0.99444_r8,0.99499_r8,0.99528_r8,0.99522_r8,0.99477_r8,   &
-       0.99390_r8,0.99258_r8/
-       data (bm3i( 6,10,ibeta ), ibeta=1,10)/   &
-       0.99782_r8,0.99791_r8,0.99807_r8,0.99817_r8,0.99813_r8,0.99788_r8,0.99737_r8,0.99653_r8,   &
-       0.99533_r8,0.99374_r8/
-       data (bm3i( 7, 1,ibeta ), ibeta=1,10)/   &
-       0.95858_r8,0.96158_r8,0.96780_r8,0.97460_r8,0.98073_r8,0.98575_r8,0.98963_r8,0.99252_r8,   &
-       0.99463_r8,0.99615_r8/
-       data (bm3i( 7, 2,ibeta ), ibeta=1,10)/   &
-       0.95091_r8,0.95438_r8,0.96163_r8,0.96962_r8,0.97688_r8,0.98286_r8,0.98751_r8,0.99099_r8,   &
-       0.99353_r8,0.99536_r8/
-       data (bm3i( 7, 3,ibeta ), ibeta=1,10)/   &
-       0.92751_r8,0.93233_r8,0.94255_r8,0.95406_r8,0.96473_r8,0.97366_r8,0.98070_r8,0.98602_r8,   &
-       0.98994_r8,0.99278_r8/
-       data (bm3i( 7, 4,ibeta ), ibeta=1,10)/   &
-       0.88371_r8,0.89075_r8,0.90595_r8,0.92351_r8,0.94028_r8,0.95474_r8,0.96642_r8,0.97544_r8,   &
-       0.98220_r8,0.98715_r8/
-       data (bm3i( 7, 5,ibeta ), ibeta=1,10)/   &
-       0.82880_r8,0.83750_r8,0.85671_r8,0.87980_r8,0.90297_r8,0.92404_r8,0.94195_r8,0.95644_r8,   &
-       0.96772_r8,0.97625_r8/
-       data (bm3i( 7, 6,ibeta ), ibeta=1,10)/   &
-       0.81933_r8,0.82655_r8,0.84279_r8,0.86295_r8,0.88412_r8,0.90449_r8,0.92295_r8,0.93890_r8,   &
-       0.95215_r8,0.96281_r8/
-       data (bm3i( 7, 7,ibeta ), ibeta=1,10)/   &
-       0.89099_r8,0.89519_r8,0.90448_r8,0.91577_r8,0.92732_r8,0.93820_r8,0.94789_r8,0.95616_r8,   &
-       0.96297_r8,0.96838_r8/
-       data (bm3i( 7, 8,ibeta ), ibeta=1,10)/   &
-       0.95886_r8,0.96064_r8,0.96448_r8,0.96894_r8,0.97324_r8,0.97701_r8,0.98004_r8,0.98228_r8,   &
-       0.98371_r8,0.98435_r8/
-       data (bm3i( 7, 9,ibeta ), ibeta=1,10)/   &
-       0.98727_r8,0.98786_r8,0.98908_r8,0.99043_r8,0.99160_r8,0.99245_r8,0.99288_r8,0.99285_r8,   &
-       0.99234_r8,0.99131_r8/
-       data (bm3i( 7,10,ibeta ), ibeta=1,10)/   &
-       0.99621_r8,0.99638_r8,0.99671_r8,0.99700_r8,0.99715_r8,0.99707_r8,0.99670_r8,0.99599_r8,   &
-       0.99489_r8,0.99338_r8/
-       data (bm3i( 8, 1,ibeta ), ibeta=1,10)/   &
-       0.97470_r8,0.97666_r8,0.98064_r8,0.98491_r8,0.98867_r8,0.99169_r8,0.99399_r8,0.99569_r8,   &
-       0.99691_r8,0.99779_r8/
-       data (bm3i( 8, 2,ibeta ), ibeta=1,10)/   &
-       0.96996_r8,0.97225_r8,0.97693_r8,0.98196_r8,0.98643_r8,0.99003_r8,0.99279_r8,0.99482_r8,   &
-       0.99630_r8,0.99735_r8/
-       data (bm3i( 8, 3,ibeta ), ibeta=1,10)/   &
-       0.95523_r8,0.95848_r8,0.96522_r8,0.97260_r8,0.97925_r8,0.98468_r8,0.98888_r8,0.99200_r8,   &
-       0.99427_r8,0.99590_r8/
-       data (bm3i( 8, 4,ibeta ), ibeta=1,10)/   &
-       0.92524_r8,0.93030_r8,0.94098_r8,0.95294_r8,0.96397_r8,0.97317_r8,0.98038_r8,0.98582_r8,   &
-       0.98981_r8,0.99270_r8/
-       data (bm3i( 8, 5,ibeta ), ibeta=1,10)/   &
-       0.87576_r8,0.88323_r8,0.89935_r8,0.91799_r8,0.93583_r8,0.95126_r8,0.96377_r8,0.97345_r8,   &
-       0.98072_r8,0.98606_r8/
-       data (bm3i( 8, 6,ibeta ), ibeta=1,10)/   &
-       0.83078_r8,0.83894_r8,0.85705_r8,0.87899_r8,0.90126_r8,0.92179_r8,0.93950_r8,0.95404_r8,   &
-       0.96551_r8,0.97430_r8/
-       data (bm3i( 8, 7,ibeta ), ibeta=1,10)/   &
-       0.85727_r8,0.86294_r8,0.87558_r8,0.89111_r8,0.90723_r8,0.92260_r8,0.93645_r8,0.94841_r8,   &
-       0.95838_r8,0.96643_r8/
-       data (bm3i( 8, 8,ibeta ), ibeta=1,10)/   &
-       0.93337_r8,0.93615_r8,0.94220_r8,0.94937_r8,0.95647_r8,0.96292_r8,0.96840_r8,0.97283_r8,   &
-       0.97619_r8,0.97854_r8/
-       data (bm3i( 8, 9,ibeta ), ibeta=1,10)/   &
-       0.97790_r8,0.97891_r8,0.98105_r8,0.98346_r8,0.98569_r8,0.98751_r8,0.98879_r8,0.98950_r8,   &
-       0.98961_r8,0.98912_r8/
-       data (bm3i( 8,10,ibeta ), ibeta=1,10)/   &
-       0.99337_r8,0.99367_r8,0.99430_r8,0.99493_r8,0.99541_r8,0.99562_r8,0.99551_r8,0.99501_r8,   &
-       0.99410_r8,0.99274_r8/
-       data (bm3i( 9, 1,ibeta ), ibeta=1,10)/   &
-       0.98470_r8,0.98594_r8,0.98844_r8,0.99106_r8,0.99334_r8,0.99514_r8,0.99650_r8,0.99749_r8,   &
-       0.99821_r8,0.99872_r8/
-       data (bm3i( 9, 2,ibeta ), ibeta=1,10)/   &
-       0.98184_r8,0.98330_r8,0.98624_r8,0.98934_r8,0.99205_r8,0.99420_r8,0.99582_r8,0.99701_r8,   &
-       0.99787_r8,0.99848_r8/
-       data (bm3i( 9, 3,ibeta ), ibeta=1,10)/   &
-       0.97288_r8,0.97498_r8,0.97927_r8,0.98385_r8,0.98789_r8,0.99113_r8,0.99360_r8,0.99541_r8,   &
-       0.99673_r8,0.99766_r8/
-       data (bm3i( 9, 4,ibeta ), ibeta=1,10)/   &
-       0.95403_r8,0.95741_r8,0.96440_r8,0.97202_r8,0.97887_r8,0.98444_r8,0.98872_r8,0.99190_r8,   &
-       0.99421_r8,0.99586_r8/
-       data (bm3i( 9, 5,ibeta ), ibeta=1,10)/   &
-       0.91845_r8,0.92399_r8,0.93567_r8,0.94873_r8,0.96076_r8,0.97079_r8,0.97865_r8,0.98457_r8,   &
-       0.98892_r8,0.99206_r8/
-       data (bm3i( 9, 6,ibeta ), ibeta=1,10)/   &
-       0.86762_r8,0.87533_r8,0.89202_r8,0.91148_r8,0.93027_r8,0.94669_r8,0.96013_r8,0.97062_r8,   &
-       0.97855_r8,0.98441_r8/
-       data (bm3i( 9, 7,ibeta ), ibeta=1,10)/   &
-       0.84550_r8,0.85253_r8,0.86816_r8,0.88721_r8,0.90671_r8,0.92490_r8,0.94083_r8,0.95413_r8,   &
-       0.96481_r8,0.97314_r8/
-       data (bm3i( 9, 8,ibeta ), ibeta=1,10)/   &
-       0.90138_r8,0.90544_r8,0.91437_r8,0.92513_r8,0.93602_r8,0.94615_r8,0.95506_r8,0.96258_r8,   &
-       0.96868_r8,0.97347_r8/
-       data (bm3i( 9, 9,ibeta ), ibeta=1,10)/   &
-       0.96248_r8,0.96415_r8,0.96773_r8,0.97187_r8,0.97583_r8,0.97925_r8,0.98198_r8,0.98394_r8,   &
-       0.98514_r8,0.98559_r8/
-       data (bm3i( 9,10,ibeta ), ibeta=1,10)/   &
-       0.98837_r8,0.98892_r8,0.99005_r8,0.99127_r8,0.99232_r8,0.99306_r8,0.99339_r8,0.99328_r8,   &
-       0.99269_r8,0.99161_r8/
-       data (bm3i(10, 1,ibeta ), ibeta=1,10)/   &
-       0.99080_r8,0.99158_r8,0.99311_r8,0.99471_r8,0.99607_r8,0.99715_r8,0.99795_r8,0.99853_r8,   &
-       0.99895_r8,0.99925_r8/
-       data (bm3i(10, 2,ibeta ), ibeta=1,10)/   &
-       0.98910_r8,0.99001_r8,0.99182_r8,0.99371_r8,0.99533_r8,0.99661_r8,0.99757_r8,0.99826_r8,   &
-       0.99876_r8,0.99912_r8/
-       data (bm3i(10, 3,ibeta ), ibeta=1,10)/   &
-       0.98374_r8,0.98506_r8,0.98772_r8,0.99051_r8,0.99294_r8,0.99486_r8,0.99630_r8,0.99736_r8,   &
-       0.99812_r8,0.99866_r8/
-       data (bm3i(10, 4,ibeta ), ibeta=1,10)/   &
-       0.97238_r8,0.97453_r8,0.97892_r8,0.98361_r8,0.98773_r8,0.99104_r8,0.99354_r8,0.99538_r8,   &
-       0.99671_r8,0.99765_r8/
-       data (bm3i(10, 5,ibeta ), ibeta=1,10)/   &
-       0.94961_r8,0.95333_r8,0.96103_r8,0.96941_r8,0.97693_r8,0.98303_r8,0.98772_r8,0.99119_r8,   &
-       0.99371_r8,0.99551_r8/
-       data (bm3i(10, 6,ibeta ), ibeta=1,10)/   &
-       0.90943_r8,0.91550_r8,0.92834_r8,0.94275_r8,0.95608_r8,0.96723_r8,0.97600_r8,0.98263_r8,   &
-       0.98751_r8,0.99103_r8/
-       data (bm3i(10, 7,ibeta ), ibeta=1,10)/   &
-       0.86454_r8,0.87200_r8,0.88829_r8,0.90749_r8,0.92630_r8,0.94300_r8,0.95687_r8,0.96785_r8,   &
-       0.97626_r8,0.98254_r8/
-       data (bm3i(10, 8,ibeta ), ibeta=1,10)/   &
-       0.87498_r8,0.88048_r8,0.89264_r8,0.90737_r8,0.92240_r8,0.93642_r8,0.94877_r8,0.95917_r8,   &
-       0.96762_r8,0.97429_r8/
-       data (bm3i(10, 9,ibeta ), ibeta=1,10)/   &
-       0.93946_r8,0.94209_r8,0.94781_r8,0.95452_r8,0.96111_r8,0.96704_r8,0.97203_r8,0.97602_r8,   &
-       0.97900_r8,0.98106_r8/
-       data (bm3i(10,10,ibeta ), ibeta=1,10)/   &
-       0.97977_r8,0.98071_r8,0.98270_r8,0.98492_r8,0.98695_r8,0.98858_r8,0.98970_r8,0.99027_r8,   &
-       0.99026_r8,0.98968_r8/
-
-! fsb fm correction for intramodal m2 coagulation
-       data bm2ii /   &
-        0.707107_r8,  0.720583_r8,  0.745310_r8,  0.748056_r8,  0.696935_r8,   &
-        0.604164_r8,  0.504622_r8,  0.416559_r8,  0.343394_r8,  0.283641_r8/
-
-! *** total correction for intramodal m2 coagulation
-
-      data bm2iitt /   &
-        1.000000_r8,  0.907452_r8,  0.680931_r8,  0.409815_r8,  0.196425_r8,   &
-        0.078814_r8,  0.028473_r8,  0.009800_r8,  0.003322_r8,  0.001129_r8/
-
-
-! fsb fm correction for m2 i to j coagulation
-
-      data (bm2ij (  1,  1,ibeta), ibeta = 1,10) /   &
-        0.707107_r8,  0.716828_r8,  0.738240_r8,  0.764827_r8,  0.793610_r8,   &
-        0.822843_r8,  0.851217_r8,  0.877670_r8,  0.901404_r8,  0.921944_r8/
-      data (bm2ij (  1,  2,ibeta), ibeta = 1,10) /   &
-        0.719180_r8,  0.727975_r8,  0.747638_r8,  0.772334_r8,  0.799234_r8,   &
-        0.826666_r8,  0.853406_r8,  0.878482_r8,  0.901162_r8,  0.920987_r8/
-      data (bm2ij (  1,  3,ibeta), ibeta = 1,10) /   &
-        0.760947_r8,  0.767874_r8,  0.783692_r8,  0.803890_r8,  0.826015_r8,   &
-        0.848562_r8,  0.870498_r8,  0.891088_r8,  0.909823_r8,  0.926400_r8/
-      data (bm2ij (  1,  4,ibeta), ibeta = 1,10) /   &
-        0.830926_r8,  0.836034_r8,  0.847708_r8,  0.862528_r8,  0.878521_r8,   &
-        0.894467_r8,  0.909615_r8,  0.923520_r8,  0.935959_r8,  0.946858_r8/
-      data (bm2ij (  1,  5,ibeta), ibeta = 1,10) /   &
-        0.903643_r8,  0.907035_r8,  0.914641_r8,  0.924017_r8,  0.933795_r8,   &
-        0.943194_r8,  0.951806_r8,  0.959449_r8,  0.966087_r8,  0.971761_r8/
-      data (bm2ij (  1,  6,ibeta), ibeta = 1,10) /   &
-        0.954216_r8,  0.956094_r8,  0.960211_r8,  0.965123_r8,  0.970068_r8,   &
-        0.974666_r8,  0.978750_r8,  0.982277_r8,  0.985268_r8,  0.987775_r8/
-      data (bm2ij (  1,  7,ibeta), ibeta = 1,10) /   &
-        0.980546_r8,  0.981433_r8,  0.983343_r8,  0.985568_r8,  0.987751_r8,   &
-        0.989735_r8,  0.991461_r8,  0.992926_r8,  0.994150_r8,  0.995164_r8/
-      data (bm2ij (  1,  8,ibeta), ibeta = 1,10) /   &
-        0.992142_r8,  0.992524_r8,  0.993338_r8,  0.994272_r8,  0.995174_r8,   &
-        0.995981_r8,  0.996675_r8,  0.997257_r8,  0.997740_r8,  0.998137_r8/
-      data (bm2ij (  1,  9,ibeta), ibeta = 1,10) /   &
-        0.996868_r8,  0.997026_r8,  0.997361_r8,  0.997742_r8,  0.998106_r8,   &
-        0.998430_r8,  0.998705_r8,  0.998935_r8,  0.999125_r8,  0.999280_r8/
-      data (bm2ij (  1, 10,ibeta), ibeta = 1,10) /   &
-        0.998737_r8,  0.998802_r8,  0.998939_r8,  0.999094_r8,  0.999241_r8,   &
-        0.999371_r8,  0.999481_r8,  0.999573_r8,  0.999648_r8,  0.999709_r8/
-      data (bm2ij (  2,  1,ibeta), ibeta = 1,10) /   &
-        0.729600_r8,  0.739948_r8,  0.763059_r8,  0.791817_r8,  0.822510_r8,   &
-        0.852795_r8,  0.881000_r8,  0.905999_r8,  0.927206_r8,  0.944532_r8/
-      data (bm2ij (  2,  2,ibeta), ibeta = 1,10) /   &
-        0.727025_r8,  0.737116_r8,  0.759615_r8,  0.787657_r8,  0.817740_r8,   &
-        0.847656_r8,  0.875801_r8,  0.901038_r8,  0.922715_r8,  0.940643_r8/
-      data (bm2ij (  2,  3,ibeta), ibeta = 1,10) /   &
-        0.738035_r8,  0.746779_r8,  0.766484_r8,  0.791340_r8,  0.818324_r8,   &
-        0.845546_r8,  0.871629_r8,  0.895554_r8,  0.916649_r8,  0.934597_r8/
-      data (bm2ij (  2,  4,ibeta), ibeta = 1,10) /   &
-        0.784185_r8,  0.790883_r8,  0.806132_r8,  0.825501_r8,  0.846545_r8,   &
-        0.867745_r8,  0.888085_r8,  0.906881_r8,  0.923705_r8,  0.938349_r8/
-      data (bm2ij (  2,  5,ibeta), ibeta = 1,10) /   &
-        0.857879_r8,  0.862591_r8,  0.873238_r8,  0.886539_r8,  0.900645_r8,   &
-        0.914463_r8,  0.927360_r8,  0.939004_r8,  0.949261_r8,  0.958125_r8/
-      data (bm2ij (  2,  6,ibeta), ibeta = 1,10) /   &
-        0.925441_r8,  0.928304_r8,  0.934645_r8,  0.942324_r8,  0.950181_r8,   &
-        0.957600_r8,  0.964285_r8,  0.970133_r8,  0.975147_r8,  0.979388_r8/
-      data (bm2ij (  2,  7,ibeta), ibeta = 1,10) /   &
-        0.966728_r8,  0.968176_r8,  0.971323_r8,  0.975027_r8,  0.978705_r8,   &
-        0.982080_r8,  0.985044_r8,  0.987578_r8,  0.989710_r8,  0.991485_r8/
-      data (bm2ij (  2,  8,ibeta), ibeta = 1,10) /   &
-        0.986335_r8,  0.986980_r8,  0.988362_r8,  0.989958_r8,  0.991511_r8,   &
-        0.992912_r8,  0.994122_r8,  0.995143_r8,  0.995992_r8,  0.996693_r8/
-      data (bm2ij (  2,  9,ibeta), ibeta = 1,10) /   &
-        0.994547_r8,  0.994817_r8,  0.995391_r8,  0.996046_r8,  0.996677_r8,   &
-        0.997238_r8,  0.997719_r8,  0.998122_r8,  0.998454_r8,  0.998727_r8/
-      data (bm2ij (  2, 10,ibeta), ibeta = 1,10) /   &
-        0.997817_r8,  0.997928_r8,  0.998163_r8,  0.998429_r8,  0.998683_r8,   &
-        0.998908_r8,  0.999099_r8,  0.999258_r8,  0.999389_r8,  0.999497_r8/
-      data (bm2ij (  3,  1,ibeta), ibeta = 1,10) /   &
-        0.783612_r8,  0.793055_r8,  0.814468_r8,  0.841073_r8,  0.868769_r8,   &
-        0.894963_r8,  0.918118_r8,  0.937527_r8,  0.953121_r8,  0.965244_r8/
-      data (bm2ij (  3,  2,ibeta), ibeta = 1,10) /   &
-        0.772083_r8,  0.781870_r8,  0.803911_r8,  0.831238_r8,  0.859802_r8,   &
-        0.887036_r8,  0.911349_r8,  0.931941_r8,  0.948649_r8,  0.961751_r8/
-      data (bm2ij (  3,  3,ibeta), ibeta = 1,10) /   &
-        0.755766_r8,  0.765509_r8,  0.787380_r8,  0.814630_r8,  0.843526_r8,   &
-        0.871670_r8,  0.897443_r8,  0.919870_r8,  0.938557_r8,  0.953576_r8/
-      data (bm2ij (  3,  4,ibeta), ibeta = 1,10) /   &
-        0.763816_r8,  0.772145_r8,  0.790997_r8,  0.814784_r8,  0.840434_r8,   &
-        0.865978_r8,  0.890034_r8,  0.911671_r8,  0.930366_r8,  0.945963_r8/
-      data (bm2ij (  3,  5,ibeta), ibeta = 1,10) /   &
-        0.813597_r8,  0.819809_r8,  0.833889_r8,  0.851618_r8,  0.870640_r8,   &
-        0.889514_r8,  0.907326_r8,  0.923510_r8,  0.937768_r8,  0.950003_r8/
-      data (bm2ij (  3,  6,ibeta), ibeta = 1,10) /   &
-        0.886317_r8,  0.890437_r8,  0.899643_r8,  0.910955_r8,  0.922730_r8,   &
-        0.934048_r8,  0.944422_r8,  0.953632_r8,  0.961624_r8,  0.968444_r8/
-      data (bm2ij (  3,  7,ibeta), ibeta = 1,10) /   &
-        0.944565_r8,  0.946855_r8,  0.951872_r8,  0.957854_r8,  0.963873_r8,   &
-        0.969468_r8,  0.974438_r8,  0.978731_r8,  0.982372_r8,  0.985424_r8/
-      data (bm2ij (  3,  8,ibeta), ibeta = 1,10) /   &
-        0.976358_r8,  0.977435_r8,  0.979759_r8,  0.982467_r8,  0.985125_r8,   &
-        0.987540_r8,  0.989642_r8,  0.991425_r8,  0.992916_r8,  0.994150_r8/
-      data (bm2ij (  3,  9,ibeta), ibeta = 1,10) /   &
-        0.990471_r8,  0.990932_r8,  0.991917_r8,  0.993048_r8,  0.994142_r8,   &
-        0.995121_r8,  0.995964_r8,  0.996671_r8,  0.997258_r8,  0.997740_r8/
-      data (bm2ij (  3, 10,ibeta), ibeta = 1,10) /   &
-        0.996199_r8,  0.996389_r8,  0.996794_r8,  0.997254_r8,  0.997694_r8,   &
-        0.998086_r8,  0.998420_r8,  0.998699_r8,  0.998929_r8,  0.999117_r8/
-      data (bm2ij (  4,  1,ibeta), ibeta = 1,10) /   &
-        0.844355_r8,  0.852251_r8,  0.869914_r8,  0.891330_r8,  0.912823_r8,   &
-        0.932259_r8,  0.948642_r8,  0.961767_r8,  0.971897_r8,  0.979510_r8/
-      data (bm2ij (  4,  2,ibeta), ibeta = 1,10) /   &
-        0.831550_r8,  0.839954_r8,  0.858754_r8,  0.881583_r8,  0.904592_r8,   &
-        0.925533_r8,  0.943309_r8,  0.957647_r8,  0.968779_r8,  0.977185_r8/
-      data (bm2ij (  4,  3,ibeta), ibeta = 1,10) /   &
-        0.803981_r8,  0.813288_r8,  0.834060_r8,  0.859400_r8,  0.885285_r8,   &
-        0.909286_r8,  0.930084_r8,  0.947193_r8,  0.960714_r8,  0.971078_r8/
-      data (bm2ij (  4,  4,ibeta), ibeta = 1,10) /   &
-        0.781787_r8,  0.791080_r8,  0.811931_r8,  0.837749_r8,  0.864768_r8,   &
-        0.890603_r8,  0.913761_r8,  0.933477_r8,  0.949567_r8,  0.962261_r8/
-      data (bm2ij (  4,  5,ibeta), ibeta = 1,10) /   &
-        0.791591_r8,  0.799355_r8,  0.816916_r8,  0.838961_r8,  0.862492_r8,   &
-        0.885595_r8,  0.907003_r8,  0.925942_r8,  0.942052_r8,  0.955310_r8/
-      data (bm2ij (  4,  6,ibeta), ibeta = 1,10) /   &
-        0.844933_r8,  0.850499_r8,  0.863022_r8,  0.878593_r8,  0.895038_r8,   &
-        0.911072_r8,  0.925939_r8,  0.939227_r8,  0.950765_r8,  0.960550_r8/
-      data (bm2ij (  4,  7,ibeta), ibeta = 1,10) /   &
-        0.912591_r8,  0.916022_r8,  0.923607_r8,  0.932777_r8,  0.942151_r8,   &
-        0.951001_r8,  0.958976_r8,  0.965950_r8,  0.971924_r8,  0.976965_r8/
-      data (bm2ij (  4,  8,ibeta), ibeta = 1,10) /   &
-        0.959859_r8,  0.961617_r8,  0.965433_r8,  0.969924_r8,  0.974382_r8,   &
-        0.978472_r8,  0.982063_r8,  0.985134_r8,  0.987716_r8,  0.989865_r8/
-      data (bm2ij (  4,  9,ibeta), ibeta = 1,10) /   &
-        0.983377_r8,  0.984162_r8,  0.985844_r8,  0.987788_r8,  0.989681_r8,   &
-        0.991386_r8,  0.992860_r8,  0.994104_r8,  0.995139_r8,  0.995991_r8/
-      data (bm2ij (  4, 10,ibeta), ibeta = 1,10) /   &
-        0.993343_r8,  0.993672_r8,  0.994370_r8,  0.995169_r8,  0.995937_r8,   &
-        0.996622_r8,  0.997209_r8,  0.997700_r8,  0.998106_r8,  0.998439_r8/
-      data (bm2ij (  5,  1,ibeta), ibeta = 1,10) /   &
-        0.895806_r8,  0.901918_r8,  0.915233_r8,  0.930783_r8,  0.945768_r8,   &
-        0.958781_r8,  0.969347_r8,  0.977540_r8,  0.983697_r8,  0.988225_r8/
-      data (bm2ij (  5,  2,ibeta), ibeta = 1,10) /   &
-        0.885634_r8,  0.892221_r8,  0.906629_r8,  0.923540_r8,  0.939918_r8,   &
-        0.954213_r8,  0.965873_r8,  0.974951_r8,  0.981794_r8,  0.986840_r8/
-      data (bm2ij (  5,  3,ibeta), ibeta = 1,10) /   &
-        0.860120_r8,  0.867858_r8,  0.884865_r8,  0.904996_r8,  0.924724_r8,   &
-        0.942177_r8,  0.956602_r8,  0.967966_r8,  0.976616_r8,  0.983043_r8/
-      data (bm2ij (  5,  4,ibeta), ibeta = 1,10) /   &
-        0.827462_r8,  0.836317_r8,  0.855885_r8,  0.879377_r8,  0.902897_r8,   &
-        0.924232_r8,  0.942318_r8,  0.956900_r8,  0.968222_r8,  0.976774_r8/
-      data (bm2ij (  5,  5,ibeta), ibeta = 1,10) /   &
-        0.805527_r8,  0.814279_r8,  0.833853_r8,  0.857892_r8,  0.882726_r8,   &
-        0.906095_r8,  0.926690_r8,  0.943938_r8,  0.957808_r8,  0.968615_r8/
-      data (bm2ij (  5,  6,ibeta), ibeta = 1,10) /   &
-        0.820143_r8,  0.827223_r8,  0.843166_r8,  0.863002_r8,  0.883905_r8,   &
-        0.904128_r8,  0.922585_r8,  0.938687_r8,  0.952222_r8,  0.963255_r8/
-      data (bm2ij (  5,  7,ibeta), ibeta = 1,10) /   &
-        0.875399_r8,  0.880208_r8,  0.890929_r8,  0.904065_r8,  0.917699_r8,   &
-        0.930756_r8,  0.942656_r8,  0.953131_r8,  0.962113_r8,  0.969657_r8/
-      data (bm2ij (  5,  8,ibeta), ibeta = 1,10) /   &
-        0.934782_r8,  0.937520_r8,  0.943515_r8,  0.950656_r8,  0.957840_r8,   &
-        0.964516_r8,  0.970446_r8,  0.975566_r8,  0.979905_r8,  0.983534_r8/
-      data (bm2ij (  5,  9,ibeta), ibeta = 1,10) /   &
-        0.971369_r8,  0.972679_r8,  0.975505_r8,  0.978797_r8,  0.982029_r8,   &
-        0.984964_r8,  0.987518_r8,  0.989685_r8,  0.991496_r8,  0.992994_r8/
-      data (bm2ij (  5, 10,ibeta), ibeta = 1,10) /   &
-        0.988329_r8,  0.988893_r8,  0.990099_r8,  0.991485_r8,  0.992825_r8,   &
-        0.994025_r8,  0.995058_r8,  0.995925_r8,  0.996643_r8,  0.997234_r8/
-      data (bm2ij (  6,  1,ibeta), ibeta = 1,10) /   &
-        0.933384_r8,  0.937784_r8,  0.947130_r8,  0.957655_r8,  0.967430_r8,   &
-        0.975639_r8,  0.982119_r8,  0.987031_r8,  0.990657_r8,  0.993288_r8/
-      data (bm2ij (  6,  2,ibeta), ibeta = 1,10) /   &
-        0.926445_r8,  0.931227_r8,  0.941426_r8,  0.952975_r8,  0.963754_r8,   &
-        0.972845_r8,  0.980044_r8,  0.985514_r8,  0.989558_r8,  0.992498_r8/
-      data (bm2ij (  6,  3,ibeta), ibeta = 1,10) /   &
-        0.907835_r8,  0.913621_r8,  0.926064_r8,  0.940308_r8,  0.953745_r8,   &
-        0.965189_r8,  0.974327_r8,  0.981316_r8,  0.986510_r8,  0.990297_r8/
-      data (bm2ij (  6,  4,ibeta), ibeta = 1,10) /   &
-        0.879088_r8,  0.886306_r8,  0.901945_r8,  0.920079_r8,  0.937460_r8,   &
-        0.952509_r8,  0.964711_r8,  0.974166_r8,  0.981265_r8,  0.986484_r8/
-      data (bm2ij (  6,  5,ibeta), ibeta = 1,10) /   &
-        0.846500_r8,  0.854862_r8,  0.873189_r8,  0.894891_r8,  0.916264_r8,   &
-        0.935315_r8,  0.951197_r8,  0.963812_r8,  0.973484_r8,  0.980715_r8/
-      data (bm2ij (  6,  6,ibeta), ibeta = 1,10) /   &
-        0.828137_r8,  0.836250_r8,  0.854310_r8,  0.876287_r8,  0.898710_r8,   &
-        0.919518_r8,  0.937603_r8,  0.952560_r8,  0.964461_r8,  0.973656_r8/
-      data (bm2ij (  6,  7,ibeta), ibeta = 1,10) /   &
-        0.848595_r8,  0.854886_r8,  0.868957_r8,  0.886262_r8,  0.904241_r8,   &
-        0.921376_r8,  0.936799_r8,  0.950096_r8,  0.961172_r8,  0.970145_r8/
-      data (bm2ij (  6,  8,ibeta), ibeta = 1,10) /   &
-        0.902919_r8,  0.906922_r8,  0.915760_r8,  0.926427_r8,  0.937312_r8,   &
-        0.947561_r8,  0.956758_r8,  0.964747_r8,  0.971525_r8,  0.977175_r8/
-      data (bm2ij (  6,  9,ibeta), ibeta = 1,10) /   &
-        0.952320_r8,  0.954434_r8,  0.959021_r8,  0.964418_r8,  0.969774_r8,   &
-        0.974688_r8,  0.979003_r8,  0.982690_r8,  0.985789_r8,  0.988364_r8/
-      data (bm2ij (  6, 10,ibeta), ibeta = 1,10) /   &
-        0.979689_r8,  0.980650_r8,  0.982712_r8,  0.985093_r8,  0.987413_r8,   &
-        0.989502_r8,  0.991308_r8,  0.992831_r8,  0.994098_r8,  0.995142_r8/
-      data (bm2ij (  7,  1,ibeta), ibeta = 1,10) /   &
-        0.958611_r8,  0.961598_r8,  0.967817_r8,  0.974620_r8,  0.980752_r8,   &
-        0.985771_r8,  0.989650_r8,  0.992543_r8,  0.994653_r8,  0.996171_r8/
-      data (bm2ij (  7,  2,ibeta), ibeta = 1,10) /   &
-        0.954225_r8,  0.957488_r8,  0.964305_r8,  0.971795_r8,  0.978576_r8,   &
-        0.984144_r8,  0.988458_r8,  0.991681_r8,  0.994034_r8,  0.995728_r8/
-      data (bm2ij (  7,  3,ibeta), ibeta = 1,10) /   &
-        0.942147_r8,  0.946158_r8,  0.954599_r8,  0.963967_r8,  0.972529_r8,   &
-        0.979612_r8,  0.985131_r8,  0.989271_r8,  0.992301_r8,  0.994487_r8/
-      data (bm2ij (  7,  4,ibeta), ibeta = 1,10) /   &
-        0.921821_r8,  0.927048_r8,  0.938140_r8,  0.950598_r8,  0.962118_r8,   &
-        0.971752_r8,  0.979326_r8,  0.985046_r8,  0.989254_r8,  0.992299_r8/
-      data (bm2ij (  7,  5,ibeta), ibeta = 1,10) /   &
-        0.893419_r8,  0.900158_r8,  0.914598_r8,  0.931070_r8,  0.946584_r8,   &
-        0.959795_r8,  0.970350_r8,  0.978427_r8,  0.984432_r8,  0.988811_r8/
-      data (bm2ij (  7,  6,ibeta), ibeta = 1,10) /   &
-        0.863302_r8,  0.871111_r8,  0.888103_r8,  0.907990_r8,  0.927305_r8,   &
-        0.944279_r8,  0.958245_r8,  0.969211_r8,  0.977540_r8,  0.983720_r8/
-      data (bm2ij (  7,  7,ibeta), ibeta = 1,10) /   &
-        0.850182_r8,  0.857560_r8,  0.873890_r8,  0.893568_r8,  0.913408_r8,   &
-        0.931591_r8,  0.947216_r8,  0.960014_r8,  0.970121_r8,  0.977886_r8/
-      data (bm2ij (  7,  8,ibeta), ibeta = 1,10) /   &
-        0.875837_r8,  0.881265_r8,  0.893310_r8,  0.907936_r8,  0.922910_r8,   &
-        0.936977_r8,  0.949480_r8,  0.960154_r8,  0.968985_r8,  0.976111_r8/
-      data (bm2ij (  7,  9,ibeta), ibeta = 1,10) /   &
-        0.926228_r8,  0.929445_r8,  0.936486_r8,  0.944868_r8,  0.953293_r8,   &
-        0.961108_r8,  0.968028_r8,  0.973973_r8,  0.978974_r8,  0.983118_r8/
-      data (bm2ij (  7, 10,ibeta), ibeta = 1,10) /   &
-        0.965533_r8,  0.967125_r8,  0.970558_r8,  0.974557_r8,  0.978484_r8,   &
-        0.982050_r8,  0.985153_r8,  0.987785_r8,  0.989982_r8,  0.991798_r8/
-      data (bm2ij (  8,  1,ibeta), ibeta = 1,10) /   &
-        0.974731_r8,  0.976674_r8,  0.980660_r8,  0.984926_r8,  0.988689_r8,   &
-        0.991710_r8,  0.994009_r8,  0.995703_r8,  0.996929_r8,  0.997805_r8/
-      data (bm2ij (  8,  2,ibeta), ibeta = 1,10) /   &
-        0.972062_r8,  0.974192_r8,  0.978571_r8,  0.983273_r8,  0.987432_r8,   &
-        0.990780_r8,  0.993333_r8,  0.995218_r8,  0.996581_r8,  0.997557_r8/
-      data (bm2ij (  8,  3,ibeta), ibeta = 1,10) /   &
-        0.964662_r8,  0.967300_r8,  0.972755_r8,  0.978659_r8,  0.983921_r8,   &
-        0.988181_r8,  0.991444_r8,  0.993859_r8,  0.995610_r8,  0.996863_r8/
-      data (bm2ij (  8,  4,ibeta), ibeta = 1,10) /   &
-        0.951782_r8,  0.955284_r8,  0.962581_r8,  0.970559_r8,  0.977737_r8,   &
-        0.983593_r8,  0.988103_r8,  0.991454_r8,  0.993889_r8,  0.995635_r8/
-      data (bm2ij (  8,  5,ibeta), ibeta = 1,10) /   &
-        0.931947_r8,  0.936723_r8,  0.946751_r8,  0.957843_r8,  0.967942_r8,   &
-        0.976267_r8,  0.982734_r8,  0.987571_r8,  0.991102_r8,  0.993642_r8/
-      data (bm2ij (  8,  6,ibeta), ibeta = 1,10) /   &
-        0.905410_r8,  0.911665_r8,  0.924950_r8,  0.939908_r8,  0.953798_r8,   &
-        0.965469_r8,  0.974684_r8,  0.981669_r8,  0.986821_r8,  0.990556_r8/
-      data (bm2ij (  8,  7,ibeta), ibeta = 1,10) /   &
-        0.878941_r8,  0.886132_r8,  0.901679_r8,  0.919688_r8,  0.936970_r8,   &
-        0.951980_r8,  0.964199_r8,  0.973709_r8,  0.980881_r8,  0.986174_r8/
-      data (bm2ij (  8,  8,ibeta), ibeta = 1,10) /   &
-        0.871653_r8,  0.878218_r8,  0.892652_r8,  0.909871_r8,  0.927034_r8,   &
-        0.942592_r8,  0.955836_r8,  0.966604_r8,  0.975065_r8,  0.981545_r8/
-      data (bm2ij (  8,  9,ibeta), ibeta = 1,10) /   &
-        0.900693_r8,  0.905239_r8,  0.915242_r8,  0.927232_r8,  0.939335_r8,   &
-        0.950555_r8,  0.960420_r8,  0.968774_r8,  0.975651_r8,  0.981188_r8/
-      data (bm2ij (  8, 10,ibeta), ibeta = 1,10) /   &
-        0.944922_r8,  0.947435_r8,  0.952894_r8,  0.959317_r8,  0.965689_r8,   &
-        0.971529_r8,  0.976645_r8,  0.981001_r8,  0.984641_r8,  0.987642_r8/
-      data (bm2ij (  9,  1,ibeta), ibeta = 1,10) /   &
-        0.984736_r8,  0.985963_r8,  0.988453_r8,  0.991078_r8,  0.993357_r8,   &
-        0.995161_r8,  0.996519_r8,  0.997512_r8,  0.998226_r8,  0.998734_r8/
-      data (bm2ij (  9,  2,ibeta), ibeta = 1,10) /   &
-        0.983141_r8,  0.984488_r8,  0.987227_r8,  0.990119_r8,  0.992636_r8,   &
-        0.994632_r8,  0.996137_r8,  0.997238_r8,  0.998030_r8,  0.998595_r8/
-      data (bm2ij (  9,  3,ibeta), ibeta = 1,10) /   &
-        0.978726_r8,  0.980401_r8,  0.983819_r8,  0.987450_r8,  0.990626_r8,   &
-        0.993157_r8,  0.995071_r8,  0.996475_r8,  0.997486_r8,  0.998206_r8/
-      data (bm2ij (  9,  4,ibeta), ibeta = 1,10) /   &
-        0.970986_r8,  0.973224_r8,  0.977818_r8,  0.982737_r8,  0.987072_r8,   &
-        0.990546_r8,  0.993184_r8,  0.995124_r8,  0.996523_r8,  0.997521_r8/
-      data (bm2ij (  9,  5,ibeta), ibeta = 1,10) /   &
-        0.958579_r8,  0.961700_r8,  0.968149_r8,  0.975116_r8,  0.981307_r8,   &
-        0.986301_r8,  0.990112_r8,  0.992923_r8,  0.994954_r8,  0.996404_r8/
-      data (bm2ij (  9,  6,ibeta), ibeta = 1,10) /   &
-        0.940111_r8,  0.944479_r8,  0.953572_r8,  0.963506_r8,  0.972436_r8,   &
-        0.979714_r8,  0.985313_r8,  0.989468_r8,  0.992483_r8,  0.994641_r8/
-      data (bm2ij (  9,  7,ibeta), ibeta = 1,10) /   &
-        0.916127_r8,  0.921878_r8,  0.934003_r8,  0.947506_r8,  0.959899_r8,   &
-        0.970199_r8,  0.978255_r8,  0.984314_r8,  0.988755_r8,  0.991960_r8/
-      data (bm2ij (  9,  8,ibeta), ibeta = 1,10) /   &
-        0.893848_r8,  0.900364_r8,  0.914368_r8,  0.930438_r8,  0.945700_r8,   &
-        0.958824_r8,  0.969416_r8,  0.977603_r8,  0.983746_r8,  0.988262_r8/
-      data (bm2ij (  9,  9,ibeta), ibeta = 1,10) /   &
-        0.892161_r8,  0.897863_r8,  0.910315_r8,  0.925021_r8,  0.939523_r8,   &
-        0.952544_r8,  0.963544_r8,  0.972442_r8,  0.979411_r8,  0.984742_r8/
-      data (bm2ij (  9, 10,ibeta), ibeta = 1,10) /   &
-        0.922260_r8,  0.925966_r8,  0.934047_r8,  0.943616_r8,  0.953152_r8,   &
-        0.961893_r8,  0.969506_r8,  0.975912_r8,  0.981167_r8,  0.985394_r8/
-      data (bm2ij ( 10,  1,ibeta), ibeta = 1,10) /   &
-        0.990838_r8,  0.991598_r8,  0.993128_r8,  0.994723_r8,  0.996092_r8,   &
-        0.997167_r8,  0.997969_r8,  0.998552_r8,  0.998969_r8,  0.999265_r8/
-      data (bm2ij ( 10,  2,ibeta), ibeta = 1,10) /   &
-        0.989892_r8,  0.990727_r8,  0.992411_r8,  0.994167_r8,  0.995678_r8,   &
-        0.996864_r8,  0.997751_r8,  0.998396_r8,  0.998858_r8,  0.999186_r8/
-      data (bm2ij ( 10,  3,ibeta), ibeta = 1,10) /   &
-        0.987287_r8,  0.988327_r8,  0.990428_r8,  0.992629_r8,  0.994529_r8,   &
-        0.996026_r8,  0.997148_r8,  0.997965_r8,  0.998551_r8,  0.998967_r8/
-      data (bm2ij ( 10,  4,ibeta), ibeta = 1,10) /   &
-        0.982740_r8,  0.984130_r8,  0.986952_r8,  0.989926_r8,  0.992508_r8,   &
-        0.994551_r8,  0.996087_r8,  0.997208_r8,  0.998012_r8,  0.998584_r8/
-      data (bm2ij ( 10,  5,ibeta), ibeta = 1,10) /   &
-        0.975380_r8,  0.977330_r8,  0.981307_r8,  0.985529_r8,  0.989216_r8,   &
-        0.992147_r8,  0.994358_r8,  0.995975_r8,  0.997136_r8,  0.997961_r8/
-      data (bm2ij ( 10,  6,ibeta), ibeta = 1,10) /   &
-        0.963911_r8,  0.966714_r8,  0.972465_r8,  0.978614_r8,  0.984022_r8,   &
-        0.988346_r8,  0.991620_r8,  0.994020_r8,  0.995747_r8,  0.996974_r8/
-      data (bm2ij ( 10,  7,ibeta), ibeta = 1,10) /   &
-        0.947187_r8,  0.951161_r8,  0.959375_r8,  0.968258_r8,  0.976160_r8,   &
-        0.982540_r8,  0.987409_r8,  0.991000_r8,  0.993592_r8,  0.995441_r8/
-      data (bm2ij ( 10,  8,ibeta), ibeta = 1,10) /   &
-        0.926045_r8,  0.931270_r8,  0.942218_r8,  0.954297_r8,  0.965273_r8,   &
-        0.974311_r8,  0.981326_r8,  0.986569_r8,  0.990394_r8,  0.993143_r8/
-      data (bm2ij ( 10,  9,ibeta), ibeta = 1,10) /   &
-        0.908092_r8,  0.913891_r8,  0.926288_r8,  0.940393_r8,  0.953667_r8,   &
-        0.964987_r8,  0.974061_r8,  0.981038_r8,  0.986253_r8,  0.990078_r8/
-      data (bm2ij ( 10, 10,ibeta), ibeta = 1,10) /   &
-        0.911143_r8,  0.915972_r8,  0.926455_r8,  0.938721_r8,  0.950701_r8,   &
-        0.961370_r8,  0.970329_r8,  0.977549_r8,  0.983197_r8,  0.987518_r8/
-
-
-! fsb total correction factor for m2 coagulation j from i
-
-      data  (bm2ji( 1, 1,ibeta), ibeta = 1,10) /   &
-        0.753466_r8,  0.756888_r8,  0.761008_r8,  0.759432_r8,  0.748675_r8,   &
-        0.726951_r8,  0.693964_r8,  0.650915_r8,  0.600227_r8,  0.545000_r8/
-      data  (bm2ji( 1, 2,ibeta), ibeta = 1,10) /   &
-        0.824078_r8,  0.828698_r8,  0.835988_r8,  0.838943_r8,  0.833454_r8,   &
-        0.817148_r8,  0.789149_r8,  0.750088_r8,  0.701887_r8,  0.647308_r8/
-      data  (bm2ji( 1, 3,ibeta), ibeta = 1,10) /   &
-        1.007389_r8,  1.014362_r8,  1.028151_r8,  1.041011_r8,  1.047939_r8,   &
-        1.045707_r8,  1.032524_r8,  1.007903_r8,  0.972463_r8,  0.927667_r8/
-      data  (bm2ji( 1, 4,ibeta), ibeta = 1,10) /   &
-        1.246157_r8,  1.255135_r8,  1.274249_r8,  1.295351_r8,  1.313362_r8,   &
-        1.325187_r8,  1.329136_r8,  1.324491_r8,  1.311164_r8,  1.289459_r8/
-      data  (bm2ji( 1, 5,ibeta), ibeta = 1,10) /   &
-        1.450823_r8,  1.459551_r8,  1.478182_r8,  1.499143_r8,  1.518224_r8,   &
-        1.533312_r8,  1.543577_r8,  1.548882_r8,  1.549395_r8,  1.545364_r8/
-      data  (bm2ji( 1, 6,ibeta), ibeta = 1,10) /   &
-        1.575248_r8,  1.581832_r8,  1.595643_r8,  1.610866_r8,  1.624601_r8,   &
-        1.635690_r8,  1.643913_r8,  1.649470_r8,  1.652688_r8,  1.653878_r8/
-      data  (bm2ji( 1, 7,ibeta), ibeta = 1,10) /   &
-        1.638426_r8,  1.642626_r8,  1.651293_r8,  1.660641_r8,  1.668926_r8,   &
-        1.675571_r8,  1.680572_r8,  1.684147_r8,  1.686561_r8,  1.688047_r8/
-      data  (bm2ji( 1, 8,ibeta), ibeta = 1,10) /   &
-        1.669996_r8,  1.672392_r8,  1.677283_r8,  1.682480_r8,  1.687028_r8,   &
-        1.690651_r8,  1.693384_r8,  1.695372_r8,  1.696776_r8,  1.697734_r8/
-      data  (bm2ji( 1, 9,ibeta), ibeta = 1,10) /   &
-        1.686148_r8,  1.687419_r8,  1.689993_r8,  1.692704_r8,  1.695057_r8,   &
-        1.696922_r8,  1.698329_r8,  1.699359_r8,  1.700099_r8,  1.700621_r8/
-      data  (bm2ji( 1,10,ibeta), ibeta = 1,10) /   &
-        1.694364_r8,  1.695010_r8,  1.696313_r8,  1.697676_r8,  1.698853_r8,   &
-        1.699782_r8,  1.700482_r8,  1.700996_r8,  1.701366_r8,  1.701631_r8/
-      data  (bm2ji( 2, 1,ibeta), ibeta = 1,10) /   &
-        0.783166_r8,  0.779369_r8,  0.768044_r8,  0.747572_r8,  0.716709_r8,   &
-        0.675422_r8,  0.624981_r8,  0.567811_r8,  0.507057_r8,  0.445975_r8/
-      data  (bm2ji( 2, 2,ibeta), ibeta = 1,10) /   &
-        0.848390_r8,  0.847100_r8,  0.840874_r8,  0.826065_r8,  0.800296_r8,   &
-        0.762625_r8,  0.713655_r8,  0.655545_r8,  0.591603_r8,  0.525571_r8/
-      data  (bm2ji( 2, 3,ibeta), ibeta = 1,10) /   &
-        1.039894_r8,  1.043786_r8,  1.049445_r8,  1.049664_r8,  1.039407_r8,   &
-        1.015322_r8,  0.975983_r8,  0.922180_r8,  0.856713_r8,  0.783634_r8/
-      data  (bm2ji( 2, 4,ibeta), ibeta = 1,10) /   &
-        1.345995_r8,  1.356064_r8,  1.376947_r8,  1.398304_r8,  1.412685_r8,   &
-        1.414611_r8,  1.400652_r8,  1.369595_r8,  1.322261_r8,  1.260993_r8/
-      data  (bm2ji( 2, 5,ibeta), ibeta = 1,10) /   &
-        1.675575_r8,  1.689859_r8,  1.720957_r8,  1.756659_r8,  1.788976_r8,   &
-        1.812679_r8,  1.824773_r8,  1.824024_r8,  1.810412_r8,  1.784630_r8/
-      data  (bm2ji( 2, 6,ibeta), ibeta = 1,10) /   &
-        1.919835_r8,  1.933483_r8,  1.962973_r8,  1.996810_r8,  2.028377_r8,   &
-        2.054172_r8,  2.072763_r8,  2.083963_r8,  2.088190_r8,  2.086052_r8/
-      data  (bm2ji( 2, 7,ibeta), ibeta = 1,10) /   &
-        2.064139_r8,  2.074105_r8,  2.095233_r8,  2.118909_r8,  2.140688_r8,   &
-        2.158661_r8,  2.172373_r8,  2.182087_r8,  2.188330_r8,  2.191650_r8/
-      data  (bm2ji( 2, 8,ibeta), ibeta = 1,10) /   &
-        2.144871_r8,  2.150990_r8,  2.163748_r8,  2.177731_r8,  2.190364_r8,   &
-        2.200712_r8,  2.208687_r8,  2.214563_r8,  2.218716_r8,  2.221502_r8/
-      data  (bm2ji( 2, 9,ibeta), ibeta = 1,10) /   &
-        2.189223_r8,  2.192595_r8,  2.199540_r8,  2.207033_r8,  2.213706_r8,   &
-        2.219125_r8,  2.223297_r8,  2.226403_r8,  2.228660_r8,  2.230265_r8/
-      data  (bm2ji( 2,10,ibeta), ibeta = 1,10) /   &
-        2.212595_r8,  2.214342_r8,  2.217912_r8,  2.221723_r8,  2.225082_r8,   &
-        2.227791_r8,  2.229869_r8,  2.231417_r8,  2.232551_r8,  2.233372_r8/
-      data  (bm2ji( 3, 1,ibeta), ibeta = 1,10) /   &
-        0.837870_r8,  0.824476_r8,  0.793119_r8,  0.750739_r8,  0.700950_r8,   &
-        0.646691_r8,  0.590508_r8,  0.534354_r8,  0.479532_r8,  0.426856_r8/
-      data  (bm2ji( 3, 2,ibeta), ibeta = 1,10) /   &
-        0.896771_r8,  0.885847_r8,  0.859327_r8,  0.821694_r8,  0.775312_r8,   &
-        0.722402_r8,  0.665196_r8,  0.605731_r8,  0.545742_r8,  0.486687_r8/
-      data  (bm2ji( 3, 3,ibeta), ibeta = 1,10) /   &
-        1.076089_r8,  1.071727_r8,  1.058845_r8,  1.036171_r8,  1.002539_r8,   &
-        0.957521_r8,  0.901640_r8,  0.836481_r8,  0.764597_r8,  0.689151_r8/
-      data  (bm2ji( 3, 4,ibeta), ibeta = 1,10) /   &
-        1.409571_r8,  1.415168_r8,  1.425346_r8,  1.432021_r8,  1.428632_r8,   &
-        1.409696_r8,  1.371485_r8,  1.312958_r8,  1.236092_r8,  1.145293_r8/
-      data  (bm2ji( 3, 5,ibeta), ibeta = 1,10) /   &
-        1.862757_r8,  1.880031_r8,  1.918394_r8,  1.963456_r8,  2.004070_r8,   &
-        2.030730_r8,  2.036144_r8,  2.016159_r8,  1.970059_r8,  1.900079_r8/
-      data  (bm2ji( 3, 6,ibeta), ibeta = 1,10) /   &
-        2.289741_r8,  2.313465_r8,  2.366789_r8,  2.431612_r8,  2.495597_r8,   &
-        2.549838_r8,  2.588523_r8,  2.608665_r8,  2.609488_r8,  2.591662_r8/
-      data  (bm2ji( 3, 7,ibeta), ibeta = 1,10) /   &
-        2.597157_r8,  2.618731_r8,  2.666255_r8,  2.722597_r8,  2.777531_r8,   &
-        2.825187_r8,  2.862794_r8,  2.889648_r8,  2.906199_r8,  2.913380_r8/
-      data  (bm2ji( 3, 8,ibeta), ibeta = 1,10) /   &
-        2.797975_r8,  2.813116_r8,  2.845666_r8,  2.882976_r8,  2.918289_r8,   &
-        2.948461_r8,  2.972524_r8,  2.990687_r8,  3.003664_r8,  3.012284_r8/
-      data  (bm2ji( 3, 9,ibeta), ibeta = 1,10) /   &
-        2.920832_r8,  2.929843_r8,  2.948848_r8,  2.970057_r8,  2.989632_r8,   &
-        3.006057_r8,  3.019067_r8,  3.028979_r8,  3.036307_r8,  3.041574_r8/
-      data  (bm2ji( 3,10,ibeta), ibeta = 1,10) /   &
-        2.989627_r8,  2.994491_r8,  3.004620_r8,  3.015720_r8,  3.025789_r8,   &
-        3.034121_r8,  3.040664_r8,  3.045641_r8,  3.049347_r8,  3.052066_r8/
-      data  (bm2ji( 4, 1,ibeta), ibeta = 1,10) /   &
-        0.893179_r8,  0.870897_r8,  0.820996_r8,  0.759486_r8,  0.695488_r8,   &
-        0.634582_r8,  0.579818_r8,  0.532143_r8,  0.490927_r8,  0.454618_r8/
-      data  (bm2ji( 4, 2,ibeta), ibeta = 1,10) /   &
-        0.948355_r8,  0.927427_r8,  0.880215_r8,  0.821146_r8,  0.758524_r8,   &
-        0.697680_r8,  0.641689_r8,  0.591605_r8,  0.546919_r8,  0.506208_r8/
-      data  (bm2ji( 4, 3,ibeta), ibeta = 1,10) /   &
-        1.109562_r8,  1.093648_r8,  1.056438_r8,  1.007310_r8,  0.951960_r8,   &
-        0.894453_r8,  0.837364_r8,  0.781742_r8,  0.727415_r8,  0.673614_r8/
-      data  (bm2ji( 4, 4,ibeta), ibeta = 1,10) /   &
-        1.423321_r8,  1.417557_r8,  1.402442_r8,  1.379079_r8,  1.347687_r8,   &
-        1.308075_r8,  1.259703_r8,  1.201983_r8,  1.134778_r8,  1.058878_r8/
-      data  (bm2ji( 4, 5,ibeta), ibeta = 1,10) /   &
-        1.933434_r8,  1.944347_r8,  1.968765_r8,  1.997653_r8,  2.023054_r8,   &
-        2.036554_r8,  2.029949_r8,  1.996982_r8,  1.934982_r8,  1.845473_r8/
-      data  (bm2ji( 4, 6,ibeta), ibeta = 1,10) /   &
-        2.547772_r8,  2.577105_r8,  2.645918_r8,  2.735407_r8,  2.830691_r8,   &
-        2.917268_r8,  2.981724_r8,  3.013684_r8,  3.007302_r8,  2.961560_r8/
-      data  (bm2ji( 4, 7,ibeta), ibeta = 1,10) /   &
-        3.101817_r8,  3.139271_r8,  3.225851_r8,  3.336402_r8,  3.453409_r8,   &
-        3.563116_r8,  3.655406_r8,  3.724014_r8,  3.766113_r8,  3.781394_r8/
-      data  (bm2ji( 4, 8,ibeta), ibeta = 1,10) /   &
-        3.540920_r8,  3.573780_r8,  3.647439_r8,  3.737365_r8,  3.828468_r8,   &
-        3.911436_r8,  3.981317_r8,  4.036345_r8,  4.076749_r8,  4.103751_r8/
-      data  (bm2ji( 4, 9,ibeta), ibeta = 1,10) /   &
-        3.856771_r8,  3.879363_r8,  3.928579_r8,  3.986207_r8,  4.042173_r8,   &
-        4.091411_r8,  4.132041_r8,  4.164052_r8,  4.188343_r8,  4.206118_r8/
-      data  (bm2ji( 4,10,ibeta), ibeta = 1,10) /   &
-        4.053923_r8,  4.067191_r8,  4.095509_r8,  4.127698_r8,  4.158037_r8,   &
-        4.184055_r8,  4.205135_r8,  4.221592_r8,  4.234115_r8,  4.243463_r8/
-      data  (bm2ji( 5, 1,ibeta), ibeta = 1,10) /   &
-        0.935846_r8,  0.906814_r8,  0.843358_r8,  0.768710_r8,  0.695885_r8,   &
-        0.631742_r8,  0.579166_r8,  0.538471_r8,  0.508410_r8,  0.486863_r8/
-      data  (bm2ji( 5, 2,ibeta), ibeta = 1,10) /   &
-        0.988308_r8,  0.959524_r8,  0.896482_r8,  0.821986_r8,  0.748887_r8,   &
-        0.684168_r8,  0.630908_r8,  0.589516_r8,  0.558676_r8,  0.536056_r8/
-      data  (bm2ji( 5, 3,ibeta), ibeta = 1,10) /   &
-        1.133795_r8,  1.107139_r8,  1.048168_r8,  0.977258_r8,  0.906341_r8,   &
-        0.842477_r8,  0.789093_r8,  0.746731_r8,  0.713822_r8,  0.687495_r8/
-      data  (bm2ji( 5, 4,ibeta), ibeta = 1,10) /   &
-        1.405692_r8,  1.385781_r8,  1.340706_r8,  1.284776_r8,  1.227085_r8,   &
-        1.173532_r8,  1.127008_r8,  1.087509_r8,  1.052712_r8,  1.018960_r8/
-      data  (bm2ji( 5, 5,ibeta), ibeta = 1,10) /   &
-        1.884992_r8,  1.879859_r8,  1.868463_r8,  1.854995_r8,  1.841946_r8,   &
-        1.829867_r8,  1.816972_r8,  1.799319_r8,  1.771754_r8,  1.729406_r8/
-      data  (bm2ji( 5, 6,ibeta), ibeta = 1,10) /   &
-        2.592275_r8,  2.612268_r8,  2.661698_r8,  2.731803_r8,  2.815139_r8,   &
-        2.901659_r8,  2.978389_r8,  3.031259_r8,  3.048045_r8,  3.021122_r8/
-      data  (bm2ji( 5, 7,ibeta), ibeta = 1,10) /   &
-        3.390321_r8,  3.435519_r8,  3.545615_r8,  3.698419_r8,  3.876958_r8,   &
-        4.062790_r8,  4.236125_r8,  4.378488_r8,  4.475619_r8,  4.519170_r8/
-      data  (bm2ji( 5, 8,ibeta), ibeta = 1,10) /   &
-        4.161376_r8,  4.216558_r8,  4.346896_r8,  4.519451_r8,  4.711107_r8,   &
-        4.902416_r8,  5.077701_r8,  5.226048_r8,  5.341423_r8,  5.421764_r8/
-      data  (bm2ji( 5, 9,ibeta), ibeta = 1,10) /   &
-        4.843961_r8,  4.892035_r8,  5.001492_r8,  5.138515_r8,  5.281684_r8,   &
-        5.416805_r8,  5.535493_r8,  5.634050_r8,  5.712063_r8,  5.770996_r8/
-      data  (bm2ji( 5,10,ibeta), ibeta = 1,10) /   &
-        5.352093_r8,  5.385119_r8,  5.458056_r8,  5.545311_r8,  5.632162_r8,   &
-        5.710566_r8,  5.777005_r8,  5.830863_r8,  5.873123_r8,  5.905442_r8/
-      data  (bm2ji( 6, 1,ibeta), ibeta = 1,10) /   &
-        0.964038_r8,  0.930794_r8,  0.859433_r8,  0.777776_r8,  0.700566_r8,   &
-        0.634671_r8,  0.582396_r8,  0.543656_r8,  0.517284_r8,  0.501694_r8/
-      data  (bm2ji( 6, 2,ibeta), ibeta = 1,10) /   &
-        1.013416_r8,  0.979685_r8,  0.907197_r8,  0.824135_r8,  0.745552_r8,   &
-        0.678616_r8,  0.625870_r8,  0.587348_r8,  0.561864_r8,  0.547674_r8/
-      data  (bm2ji( 6, 3,ibeta), ibeta = 1,10) /   &
-        1.145452_r8,  1.111457_r8,  1.038152_r8,  0.953750_r8,  0.873724_r8,   &
-        0.805955_r8,  0.753621_r8,  0.717052_r8,  0.694920_r8,  0.684910_r8/
-      data  (bm2ji( 6, 4,ibeta), ibeta = 1,10) /   &
-        1.376547_r8,  1.345004_r8,  1.276415_r8,  1.196704_r8,  1.121091_r8,   &
-        1.058249_r8,  1.012197_r8,  0.983522_r8,  0.970323_r8,  0.968933_r8/
-      data  (bm2ji( 6, 5,ibeta), ibeta = 1,10) /   &
-        1.778801_r8,  1.755897_r8,  1.706074_r8,  1.649008_r8,  1.597602_r8,   &
-        1.560087_r8,  1.540365_r8,  1.538205_r8,  1.549738_r8,  1.568333_r8/
-      data  (bm2ji( 6, 6,ibeta), ibeta = 1,10) /   &
-        2.447603_r8,  2.445172_r8,  2.443762_r8,  2.451842_r8,  2.475877_r8,   &
-        2.519039_r8,  2.580118_r8,  2.653004_r8,  2.727234_r8,  2.789738_r8/
-      data  (bm2ji( 6, 7,ibeta), ibeta = 1,10) /   &
-        3.368490_r8,  3.399821_r8,  3.481357_r8,  3.606716_r8,  3.772101_r8,   &
-        3.969416_r8,  4.184167_r8,  4.396163_r8,  4.582502_r8,  4.721838_r8/
-      data  (bm2ji( 6, 8,ibeta), ibeta = 1,10) /   &
-        4.426458_r8,  4.489861_r8,  4.648250_r8,  4.877510_r8,  5.160698_r8,   &
-        5.477495_r8,  5.803123_r8,  6.111250_r8,  6.378153_r8,  6.586050_r8/
-      data  (bm2ji( 6, 9,ibeta), ibeta = 1,10) /   &
-        5.568061_r8,  5.644988_r8,  5.829837_r8,  6.081532_r8,  6.371214_r8,   &
-        6.672902_r8,  6.963737_r8,  7.226172_r8,  7.449199_r8,  7.627886_r8/
-      data  (bm2ji( 6,10,ibeta), ibeta = 1,10) /   &
-        6.639152_r8,  6.707020_r8,  6.863974_r8,  7.065285_r8,  7.281744_r8,   &
-        7.492437_r8,  7.683587_r8,  7.847917_r8,  7.983296_r8,  8.090977_r8/
-      data  (bm2ji( 7, 1,ibeta), ibeta = 1,10) /   &
-        0.980853_r8,  0.945724_r8,  0.871244_r8,  0.787311_r8,  0.708818_r8,   &
-        0.641987_r8,  0.588462_r8,  0.547823_r8,  0.518976_r8,  0.500801_r8/
-      data  (bm2ji( 7, 2,ibeta), ibeta = 1,10) /   &
-        1.026738_r8,  0.990726_r8,  0.914306_r8,  0.828140_r8,  0.747637_r8,   &
-        0.679351_r8,  0.625127_r8,  0.584662_r8,  0.556910_r8,  0.540749_r8/
-      data  (bm2ji( 7, 3,ibeta), ibeta = 1,10) /   &
-        1.146496_r8,  1.108808_r8,  1.028695_r8,  0.938291_r8,  0.854101_r8,   &
-        0.783521_r8,  0.728985_r8,  0.690539_r8,  0.667272_r8,  0.657977_r8/
-      data  (bm2ji( 7, 4,ibeta), ibeta = 1,10) /   &
-        1.344846_r8,  1.306434_r8,  1.224543_r8,  1.132031_r8,  1.046571_r8,   &
-        0.976882_r8,  0.926488_r8,  0.896067_r8,  0.884808_r8,  0.891027_r8/
-      data  (bm2ji( 7, 5,ibeta), ibeta = 1,10) /   &
-        1.670227_r8,  1.634583_r8,  1.558421_r8,  1.472939_r8,  1.396496_r8,   &
-        1.339523_r8,  1.307151_r8,  1.300882_r8,  1.319622_r8,  1.360166_r8/
-      data  (bm2ji( 7, 6,ibeta), ibeta = 1,10) /   &
-        2.224548_r8,  2.199698_r8,  2.148284_r8,  2.095736_r8,  2.059319_r8,   &
-        2.050496_r8,  2.075654_r8,  2.136382_r8,  2.229641_r8,  2.347958_r8/
-      data  (bm2ji( 7, 7,ibeta), ibeta = 1,10) /   &
-        3.104483_r8,  3.105947_r8,  3.118398_r8,  3.155809_r8,  3.230427_r8,   &
-        3.350585_r8,  3.519071_r8,  3.731744_r8,  3.976847_r8,  4.235616_r8/
-      data  (bm2ji( 7, 8,ibeta), ibeta = 1,10) /   &
-        4.288426_r8,  4.331456_r8,  4.447024_r8,  4.633023_r8,  4.891991_r8,   &
-        5.221458_r8,  5.610060_r8,  6.036467_r8,  6.471113_r8,  6.880462_r8/
-      data  (bm2ji( 7, 9,ibeta), ibeta = 1,10) /   &
-        5.753934_r8,  5.837061_r8,  6.048530_r8,  6.363800_r8,  6.768061_r8,   &
-        7.241280_r8,  7.755346_r8,  8.276666_r8,  8.771411_r8,  9.210826_r8/
-      data  (bm2ji( 7,10,ibeta), ibeta = 1,10) /   &
-        7.466219_r8,  7.568810_r8,  7.819032_r8,  8.168340_r8,  8.582973_r8,   &
-        9.030174_r8,  9.478159_r8,  9.899834_r8, 10.275940_r8, 10.595910_r8/
-      data  (bm2ji( 8, 1,ibeta), ibeta = 1,10) /   &
-        0.990036_r8,  0.954782_r8,  0.880531_r8,  0.797334_r8,  0.719410_r8,   &
-        0.652220_r8,  0.596923_r8,  0.552910_r8,  0.519101_r8,  0.494529_r8/
-      data  (bm2ji( 8, 2,ibeta), ibeta = 1,10) /   &
-        1.032428_r8,  0.996125_r8,  0.919613_r8,  0.833853_r8,  0.753611_r8,   &
-        0.684644_r8,  0.628260_r8,  0.583924_r8,  0.550611_r8,  0.527407_r8/
-      data  (bm2ji( 8, 3,ibeta), ibeta = 1,10) /   &
-        1.141145_r8,  1.102521_r8,  1.021017_r8,  0.929667_r8,  0.844515_r8,   &
-        0.772075_r8,  0.714086_r8,  0.670280_r8,  0.639824_r8,  0.621970_r8/
-      data  (bm2ji( 8, 4,ibeta), ibeta = 1,10) /   &
-        1.314164_r8,  1.273087_r8,  1.186318_r8,  1.089208_r8,  0.999476_r8,   &
-        0.924856_r8,  0.867948_r8,  0.829085_r8,  0.807854_r8,  0.803759_r8/
-      data  (bm2ji( 8, 5,ibeta), ibeta = 1,10) /   &
-        1.580611_r8,  1.538518_r8,  1.449529_r8,  1.350459_r8,  1.260910_r8,   &
-        1.190526_r8,  1.143502_r8,  1.121328_r8,  1.124274_r8,  1.151974_r8/
-      data  (bm2ji( 8, 6,ibeta), ibeta = 1,10) /   &
-        2.016773_r8,  1.977721_r8,  1.895727_r8,  1.806974_r8,  1.732891_r8,   &
-        1.685937_r8,  1.673026_r8,  1.697656_r8,  1.761039_r8,  1.862391_r8/
-      data  (bm2ji( 8, 7,ibeta), ibeta = 1,10) /   &
-        2.750093_r8,  2.723940_r8,  2.672854_r8,  2.628264_r8,  2.612250_r8,   &
-        2.640406_r8,  2.723211_r8,  2.866599_r8,  3.071893_r8,  3.335217_r8/
-      data  (bm2ji( 8, 8,ibeta), ibeta = 1,10) /   &
-        3.881905_r8,  3.887143_r8,  3.913667_r8,  3.981912_r8,  4.111099_r8,   &
-        4.316575_r8,  4.608146_r8,  4.988157_r8,  5.449592_r8,  5.974848_r8/
-      data  (bm2ji( 8, 9,ibeta), ibeta = 1,10) /   &
-        5.438870_r8,  5.492742_r8,  5.640910_r8,  5.886999_r8,  6.241641_r8,   &
-        6.710609_r8,  7.289480_r8,  7.960725_r8,  8.693495_r8,  9.446644_r8/
-      data  (bm2ji( 8,10,ibeta), ibeta = 1,10) /   &
-        7.521152_r8,  7.624621_r8,  7.892039_r8,  8.300444_r8,  8.839787_r8,   &
-        9.493227_r8, 10.231770_r8, 11.015642_r8, 11.799990_r8, 12.542260_r8/
-      data  (bm2ji( 9, 1,ibeta), ibeta = 1,10) /   &
-        0.994285_r8,  0.960012_r8,  0.887939_r8,  0.807040_r8,  0.730578_r8,   &
-        0.663410_r8,  0.606466_r8,  0.559137_r8,  0.520426_r8,  0.489429_r8/
-      data  (bm2ji( 9, 2,ibeta), ibeta = 1,10) /   &
-        1.033505_r8,  0.998153_r8,  0.923772_r8,  0.840261_r8,  0.761383_r8,   &
-        0.692242_r8,  0.633873_r8,  0.585709_r8,  0.546777_r8,  0.516215_r8/
-      data  (bm2ji( 9, 3,ibeta), ibeta = 1,10) /   &
-        1.132774_r8,  1.094907_r8,  1.015161_r8,  0.925627_r8,  0.841293_r8,   &
-        0.767888_r8,  0.706741_r8,  0.657439_r8,  0.619135_r8,  0.591119_r8/
-      data  (bm2ji( 9, 4,ibeta), ibeta = 1,10) /   &
-        1.286308_r8,  1.245273_r8,  1.158809_r8,  1.061889_r8,  0.971208_r8,   &
-        0.893476_r8,  0.830599_r8,  0.782561_r8,  0.748870_r8,  0.729198_r8/
-      data  (bm2ji( 9, 5,ibeta), ibeta = 1,10) /   &
-        1.511105_r8,  1.467141_r8,  1.374520_r8,  1.271162_r8,  1.175871_r8,   &
-        1.096887_r8,  1.037243_r8,  0.997820_r8,  0.978924_r8,  0.980962_r8/
-      data  (bm2ji( 9, 6,ibeta), ibeta = 1,10) /   &
-        1.857468_r8,  1.812177_r8,  1.717002_r8,  1.612197_r8,  1.519171_r8,   &
-        1.448660_r8,  1.405871_r8,  1.393541_r8,  1.413549_r8,  1.467532_r8/
-      data  (bm2ji( 9, 7,ibeta), ibeta = 1,10) /   &
-        2.430619_r8,  2.388452_r8,  2.301326_r8,  2.210241_r8,  2.139724_r8,   &
-        2.104571_r8,  2.114085_r8,  2.174696_r8,  2.291294_r8,  2.467500_r8/
-      data  (bm2ji( 9, 8,ibeta), ibeta = 1,10) /   &
-        3.385332_r8,  3.357690_r8,  3.306611_r8,  3.269804_r8,  3.274462_r8,   &
-        3.340862_r8,  3.484609_r8,  3.717740_r8,  4.048748_r8,  4.481588_r8/
-      data  (bm2ji( 9, 9,ibeta), ibeta = 1,10) /   &
-        4.850497_r8,  4.858280_r8,  4.896008_r8,  4.991467_r8,  5.171511_r8,   &
-        5.459421_r8,  5.873700_r8,  6.426128_r8,  7.119061_r8,  7.942603_r8/
-      data  (bm2ji( 9,10,ibeta), ibeta = 1,10) /   &
-        6.957098_r8,  7.020164_r8,  7.197272_r8,  7.499331_r8,  7.946554_r8,   &
-        8.555048_r8,  9.330503_r8, 10.263610_r8, 11.327454_r8, 12.478332_r8/
-      data  (bm2ji(10, 1,ibeta), ibeta = 1,10) /   &
-        0.994567_r8,  0.961842_r8,  0.892854_r8,  0.814874_r8,  0.740198_r8,   &
-        0.673303_r8,  0.615105_r8,  0.565139_r8,  0.522558_r8,  0.486556_r8/
-      data  (bm2ji(10, 2,ibeta), ibeta = 1,10) /   &
-        1.031058_r8,  0.997292_r8,  0.926082_r8,  0.845571_r8,  0.768501_r8,   &
-        0.699549_r8,  0.639710_r8,  0.588538_r8,  0.545197_r8,  0.508894_r8/
-      data  (bm2ji(10, 3,ibeta), ibeta = 1,10) /   &
-        1.122535_r8,  1.086287_r8,  1.009790_r8,  0.923292_r8,  0.840626_r8,   &
-        0.766982_r8,  0.703562_r8,  0.650004_r8,  0.605525_r8,  0.569411_r8/
-      data  (bm2ji(10, 4,ibeta), ibeta = 1,10) /   &
-        1.261142_r8,  1.221555_r8,  1.137979_r8,  1.043576_r8,  0.953745_r8,   &
-        0.874456_r8,  0.807292_r8,  0.752109_r8,  0.708326_r8,  0.675477_r8/
-      data  (bm2ji(10, 5,ibeta), ibeta = 1,10) /   &
-        1.456711_r8,  1.413432_r8,  1.322096_r8,  1.219264_r8,  1.122319_r8,   &
-        1.038381_r8,  0.969743_r8,  0.916811_r8,  0.879544_r8,  0.858099_r8/
-      data  (bm2ji(10, 6,ibeta), ibeta = 1,10) /   &
-        1.741792_r8,  1.695157_r8,  1.596897_r8,  1.487124_r8,  1.385734_r8,   &
-        1.301670_r8,  1.238638_r8,  1.198284_r8,  1.181809_r8,  1.190689_r8/
-      data  (bm2ji(10, 7,ibeta), ibeta = 1,10) /   &
-        2.190197_r8,  2.141721_r8,  2.040226_r8,  1.929245_r8,  1.832051_r8,   &
-        1.760702_r8,  1.721723_r8,  1.719436_r8,  1.757705_r8,  1.840677_r8/
-      data  (bm2ji(10, 8,ibeta), ibeta = 1,10) /   &
-        2.940764_r8,  2.895085_r8,  2.801873_r8,  2.707112_r8,  2.638603_r8,   &
-        2.613764_r8,  2.644686_r8,  2.741255_r8,  2.912790_r8,  3.168519_r8/
-      data  (bm2ji(10, 9,ibeta), ibeta = 1,10) /   &
-        4.186191_r8,  4.155844_r8,  4.101953_r8,  4.069102_r8,  4.089886_r8,   &
-        4.189530_r8,  4.389145_r8,  4.707528_r8,  5.161567_r8,  5.765283_r8/
-      data  (bm2ji(10,10,ibeta), ibeta = 1,10) /   &
-        6.119526_r8,  6.127611_r8,  6.171174_r8,  6.286528_r8,  6.508738_r8,   &
-        6.869521_r8,  7.396912_r8,  8.113749_r8,  9.034683_r8, 10.162190_r8/
-
-! *** end of data statements.
-
-
-! *** start calculations:
-
-      constii = abs( half * ( two ) ** two3rds - one )
-      sqrttwo = sqrt(two)
-      dlgsqt2 = one / log( sqrttwo )
-
-         esat01   = exp( 0.125_r8 * xxlsgat * xxlsgat )
-         esac01   = exp( 0.125_r8 * xxlsgac * xxlsgac )
-
-         esat04  = esat01 ** 4
-         esac04  = esac01 ** 4
-
-         esat05  = esat04 * esat01
-         esac05  = esac04 * esac01
-
-         esat08  = esat04 * esat04
-         esac08  = esac04 * esac04
-
-         esat09  = esat08 * esat01
-         esac09  = esac08 * esac01
-
-         esat16  = esat08 * esat08
-         esac16  = esac08 * esac08
-
-         esat20  = esat16 * esat04
-         esac20  = esac16 * esac04
-
-         esat24  = esat20 * esat04
-         esac24  = esac20 * esac04
-
-         esat25  = esat20 * esat05
-         esac25  = esac20 * esac05
-
-         esat36  = esat20 * esat16
-         esac36  = esac20 * esac16
-
-         esat49  = esat24 * esat25
-
-         esat64  = esat20 * esat20 * esat24
-         esac64  = esac20 * esac20 * esac24
-
-         esat100 = esat64 * esat36
-
-         dgat2   = dgatk * dgatk
-         dgat3   = dgatk * dgatk * dgatk
-         dgac2   = dgacc * dgacc
-         dgac3   = dgacc * dgacc * dgacc
-
-         sqdgat  = sqrt( dgatk )
-         sqdgac  = sqrt( dgacc )
-         sqdgat5 = dgat2 * sqdgat
-         sqdgac5 = dgac2 * sqdgac
-         sqdgat7 = dgat3 * sqdgat
-
-         xm2at = dgat2 * esat16
-         xm3at = dgat3 * esat36
-
-         xm2ac = dgac2 * esac16
-         xm3ac = dgac3 * esac36
-
-! *** for the free molecular regime:  page h.3 of whitby et al. (1991)
-
-         r       = sqdgac / sqdgat
-         r2      = r * r
-         r3      = r2 * r
-         rx4     = r2 * r2
-         r5      = r3 * r2
-         r6      = r3 * r3
-         rx8      = rx4 * rx4
-         ri1     = one / r
-         ri2     = one / r2
-         ri3     = one / r3
-         ri4     = ri2 * ri2
-         kngat   = two * lamda / dgatk
-         kngac   = two * lamda / dgacc
-
-
-! *** calculate ratio of geometric mean diameters
-         rat = dgacc / dgatk
-! *** trap subscripts for bm0 and bm0i, between 1 and 10
-!     see page h.5 of whitby et al. (1991)
-
-      n2n = max( 1, min( 10,   &
-            nint( 4.0_r8 * ( sgatk - 0.75_r8 ) ) ) )
-
-      n2a = max( 1, min( 10,   &
-            nint( 4.0_r8 * ( sgacc - 0.75_r8 ) ) ) )
-
-      n1  = max( 1, min( 10,   &
-             1 + nint( dlgsqt2 * log( rat ) ) ) )
-
-! *** intermodal coagulation
-
-
-! *** set up for zeroeth moment
-
-! *** near-continuum form:  equation h.10a of whitby et al. (1991)
-
-         coagnc0 = knc * (   &
-          two + a * ( kngat * ( esat04 + r2 * esat16 * esac04 )   &
-                    + kngac * ( esac04 + ri2 * esac16 * esat04 ) )   &
-                    + ( r2 + ri2 ) * esat04 * esac04  )
-
-
-! *** free-molecular form:  equation h.7a of whitby et al. (1991)
-
-         coagfm0 = kfmatac * sqdgat * bm0ij(n1,n2n,n2a) * (   &
-                   esat01 + r * esac01 + two * r2 * esat01 * esac04   &
-                 + rx4 * esat09 * esac16 + ri3 * esat16 * esac09   &
-                 + two * ri1 * esat04 + esac01  )
-
-
-! *** loss to accumulation mode
-
-! *** harmonic mean
-
-      coagatac0 = coagnc0 * coagfm0 / ( coagnc0 + coagfm0 )
-
-      qn12 = coagatac0
-
-
-! *** set up for second moment
-!      the second moment equations are new and begin with equations a1
-!     through a4 of binkowski and shankar (1995). after some algebraic
-!     rearrangement and application of the extended mean value theorem
-!     of integral calculus, equations are obtained that can be solved
-!     analytically with correction factors as has been done by
-!     whitby et al. (1991)
-
-! *** the term ( dp1 + dp2 ) ** (2/3) in equations a3 and a4 of
-!     binkowski and shankar (1995) is approximated by
-!     (dgat ** 3 + dgac **3 ) ** 2/3
-
-! *** near-continuum form
-
-      i1nc = knc * dgat2 * (   &
-             two * esat16   &
-           + r2 * esat04 * esac04   &
-           + ri2 * esat36 * esac04   &
-           + a * kngat * (   &
-                 esat04   &
-           +     ri2 * esat16 * esac04   &
-           +     ri4 * esat36 * esac16   &
-           +     r2 * esac04 )  )
-
-
-
-
-! *** free-molecular form
-
-       i1fm =  kfmatac * sqdgat5 * bm2ij(n1,n2n,n2a) * (   &
-               esat25   &
-            +  two * r2 * esat09 * esac04   &
-            +  rx4 * esat01 * esac16   &
-            +  ri3 * esat64 * esac09   &
-            +  two * ri1 * esat36 * esac01   &
-            +  r * esat16 * esac01  )
-
-
-
-! *** loss to accumulation mode
-
-! *** harmonic mean
-
-      i1 = ( i1fm * i1nc ) / ( i1fm + i1nc )
-
-      coagatac2 = i1
-
-      qs12 = coagatac2
-
-
-! *** gain by accumulation mode
-
-      coagacat2 = ( ( one + r6 ) ** two3rds - rx4 ) * i1
-
-      qs21 = coagacat2 * bm2ji(n1,n2n,n2a)
-
-! *** set up for third moment
-
-! *** near-continuum form: equation h.10b of whitby et al. (1991)
-
-      coagnc3 = knc * dgat3 * (   &
-                two * esat36   &
-              + a * kngat * ( esat16 + r2 * esat04 * esac04 )   &
-              + a * kngac * ( esat36 * esac04 + ri2 * esat64 * esac16 )   &
-              + r2 * esat16 * esac04 + ri2 * esat64 * esac04 )
-
-
-! *** free_molecular form: equation h.7b of whitby et al. (1991)
-
-      coagfm3 = kfmatac * sqdgat7 * bm3i( n1, n2n, n2a ) * (   &
-               esat49   &
-              +  r * esat36  * esac01   &
-              + two * r2 * esat25  * esac04   &
-              + rx4 * esat09  * esac16   &
-              + ri3 * esat100 * esac09   &
-              + two * ri1 * esat64  * esac01 )
-
-! *** gain by accumulation mode = loss from aitken mode
-
-! *** harmonic mean
-
-      coagatac3 = coagnc3 * coagfm3 / ( coagnc3 + coagfm3 )
-
-      qv12 = coagatac3
-
-! *** intramodal coagulation
-
-! *** zeroeth moment
-
-! *** aitken mode
-
-! *** near-continuum form: equation h.12a of whitby et al. (1991)
-
-      coagnc_at = knc * (one + esat08 + a * kngat * (esat20 + esat04))
-
-! *** free-molecular form: equation h.11a of whitby et al. (1991)
-
-      coagfm_at = kfmat * sqdgat * bm0(n2n) *   &
-                 ( esat01 + esat25 + two * esat05 )
-
-
-! *** harmonic mean
-
-      coagatat0 = coagfm_at * coagnc_at / ( coagfm_at + coagnc_at )
-
-      qn11 = coagatat0
-
-
-! *** accumulation mode
-
-! *** near-continuum form: equation h.12a of whitby et al. (1991)
-
-      coagnc_ac = knc * (one + esac08 + a * kngac * (esac20 + esac04))
-
-! *** free-molecular form: equation h.11a of whitby et al. (1991)
-
-      coagfm_ac = kfmac * sqdgac * bm0(n2a) *   &
-                   ( esac01 + esac25 + two * esac05 )
-
-! *** harmonic mean
-
-      coagacac0 = coagfm_ac * coagnc_ac / ( coagfm_ac + coagnc_ac )
-
-      qn22 = coagacac0
-
-
-! *** set up for second moment
-!      the second moment equations are new and begin with 3.11a on page
-!     45 of whitby et al. (1991). after some algebraic rearrangement and
-!     application of the extended mean value theorem of integral calculus
-!     equations are obtained that can be solved analytically with
-!     correction factors as has been done by whitby et al. (1991)
-
-! *** aitken mode
-
-! *** near-continuum
-
-      i1nc_at = knc * dgat2 * (   &
-             two * esat16   &
-           + esat04 * esat04   &
-           + esat36 * esat04   &
-           + a * kngat * (   &
-                two * esat04   &
-           +     esat16 * esat04   &
-           +     esat36 * esat16 )  )
-
-! *** free- molecular form
-
-       i1fm_at =  kfmat * sqdgat5 * bm2ii(n2n) * (   &
-               esat25   &
-            +  two * esat09 * esat04   &
-            +  esat01 * esat16   &
-            +  esat64 * esat09   &
-            +  two * esat36 * esat01   &
-            +  esat16 * esat01  )
-
-      i1_at = ( i1nc_at * i1fm_at ) / ( i1nc_at + i1fm_at  )
-
-      coagatat2 = constii * i1_at
-
-      qs11 = coagatat2 * bm2iitt(n2n)
-
-! *** accumulation mode
-
-! *** near-continuum
-
-      i1nc_ac = knc * dgac2 * (   &
-             two * esac16   &
-           + esac04 * esac04   &
-           + esac36 * esac04   &
-           + a * kngac * (   &
-                two * esac04   &
-           +     esac16 * esac04   &
-           +     esac36 * esac16 )  )
-
-! *** free- molecular form
-
-       i1fm_ac =  kfmac * sqdgac5 * bm2ii(n2a) * (   &
-               esac25   &
-            +  two * esac09 * esac04   &
-            +  esac01 * esac16   &
-            +  esac64 * esac09   &
-            +  two * esac36 * esac01   &
-            +  esac16 * esac01  )
-
-      i1_ac = ( i1nc_ac * i1fm_ac ) / ( i1nc_ac + i1fm_ac  )
-
-      coagacac2 = constii * i1_ac
-
-      qs22 = coagacac2 * bm2iitt(n2a)
-
-
-      return
-
-      end  subroutine getcoags
-
-!----------------------------------------------------------------------
-
-!----------------------------------------------------------------------
-      subroutine mam_coag_1subarea(                                 &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         deltat,                                                    &
-         temp,              pmid,             aircon,               &
-         dgn_a,             dgn_awet,         wetdens,              &
-         n_mode,                                                    &
-         qnum_cur,                                                  &
-         qaer_cur,          qaer_del_coag_in,                       &
-         qwtr_cur                                                   )
-
-! coag between aitken, pcarbon, and accum modes
-! inter-modal coag of ultrafine mode
-
-! uses
-      implicit none
-
-! arguments
-      integer,  intent(in) :: nstep                 ! model time-step number
-      integer,  intent(in) :: lchnk                 ! chunk identifier
-      integer,  intent(in) :: i, k                  ! column and level indices
-      integer,  intent(in) :: jsub                  ! sub-area index
-      integer,  intent(in) :: latndx, lonndx        ! lat and lon indices
-      integer,  intent(in) :: lund                  ! logical unit for diagnostic output
-      integer,  intent(in) :: n_mode                ! current number of modes (including temporary)
-
-      real(r8), intent(in) :: deltat                ! model timestep (s)
-      real(r8), intent(in) :: temp                  ! temperature at model levels (K)
-      real(r8), intent(in) :: pmid                  ! pressure at layer center (Pa)
-      real(r8), intent(in) :: aircon                ! air molar concentration (kmol/m3)
-      real(r8), intent(in) :: dgn_a(max_mode)
-      real(r8), intent(in) :: dgn_awet(max_mode)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
-      real(r8), intent(in) :: wetdens(max_mode)
-                                    ! interstitial aerosol wet density (kg/m3)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
-
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qnum_cur
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer_cur
-      real(r8), intent(out), dimension( 1:max_aer, 1:max_agepair ) :: &
-         qaer_del_coag_in
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qwtr_cur
-
-! local variables
-      integer :: iaer, ip
-      integer :: modefrm, modetoo
-      integer :: n
-
-      real(r8), parameter :: epsilonx1 = epsilon( 1.0_r8 )
-      real(r8), parameter :: epsilonx2 = epsilonx1*2.0_r8
-
-      real(r8) :: tmp1, tmp2, tmp3, tmp4
-      real(r8) :: tmpa, tmpb, tmpc, tmpn
-      real(r8) :: tmp_dq, tmp_xf
-      real(r8) :: xbetaij2i, xbetaij2j, xbetaii2, xbetajj2
-      real(r8) :: ybetaij0(max_coagpair), ybetaij3(max_coagpair), &
-                  ybetaii0(max_coagpair), ybetajj0(max_coagpair)
-
-      real(r8), dimension( 1:max_mode ) :: &
-         qnum_tmpa, qnum_tmpb, qnum_tmpc
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer_tmpa, qaer_tmpb, qaer_tmpc
-
-! DESCRIPTION: 
-
-      qnum_tmpa = max( 0.0_r8, qnum_cur )
-      qaer_tmpa = max( 0.0_r8, qaer_cur )
-      qnum_tmpb = qnum_tmpa
-      qaer_tmpb = qaer_tmpa
-      qaer_del_coag_in = 0.0_r8
-
-!
-! compute coagulation rates using cmaq "fast" method
-!    (based on E. Whitby's approximation approach)
-! here subr. arguments are all in mks unit
-!
-      lun15n = 149 + i
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag15n ) write(lun15n,'(//a,3i5,1p,e11.3)') 'coag - nstep,i,k', nstep, i, k, aircon
-#endif
-
-      do ip = 1, n_coagpair
-         modefrm = modefrm_coagpair(ip)
-         modetoo = modetoo_coagpair(ip)
-
-!        call getcoags_wrapper_f(              &
-!           airtemp, airprs,                        &
-!           dgatk, dgacc,                           &
-!           sgatk, sgacc,                           &
-!           xxlsgat, xxlsgac,                       &
-!           pdensat, pdensac,                       &
-!           betaij0, betaij2i, betaij2j, betaij3,   &
-!           betaii0, betaii2, betajj0, betajj2      )
-         call getcoags_wrapper_f(                                       &
-            temp,                        pmid,                          &
-            dgn_awet(modefrm),           dgn_awet(modetoo),             &
-            sigmag_aer(modefrm),         sigmag_aer(modetoo),           &
-            alnsg_aer(modefrm),          alnsg_aer(modetoo),            &
-            wetdens(modefrm),            wetdens(modetoo),              &
-            ybetaij0(ip), xbetaij2i,     xbetaij2j,     ybetaij3(ip),   &
-            ybetaii0(ip), xbetaii2,      ybetajj0(ip),  xbetajj2        )
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-!   short diagnostics for coag coefficients
-         if ( ldiag15n ) write(lun15n,'(a,i5,1p,10e11.3)') 'ip, ybeta       ', ip, &
-            ybetaij0(ip), ybetaij3(ip), ybetaii0(ip), ybetajj0(ip)
-
-!   long diagnostics for coag coefficients
-!        if ( ldiag15n ) then
-!        if ( ip == 1 ) then
-!        write(lun15n,'(a,1p,2e12.4)') 'temp, pmid', temp, pmid
-!        write(lun15n,'(a/a/a/a/a)') &
-!           'modefrm, modetoo, ip,                                  ', &
-!           'ybetaij0(ip), ybetaij3(ip), ybetaii0(ip), ybetajj0(ip), [m3/s]', &
-!           'dgn_awet(modefrm)*1.0e6,     dgn_awet(modetoo)*1.0e6,  ', &
-!           'sigmag_aer(modefrm),         sigmag_aer(modetoo),      ', &
-!           'wetdens(modefrm)*1.0e-3,     wetdens(modetoo)*1.0e-3   ' 
-!        end if
-!        write(lun15n,'(a,2i3,i5,1p,4e11.3, 0p,2x,2f7.4,2(2x,2f6.3))') &
-!           'ip, ybeta ', modefrm, modetoo, ip, &
-!           ybetaij0(ip), ybetaij3(ip), ybetaii0(ip), ybetajj0(ip), &
-!           dgn_awet(modefrm)*1.0e6,     dgn_awet(modetoo)*1.0e6,   &
-!           sigmag_aer(modefrm),         sigmag_aer(modetoo),       &
-!           wetdens(modefrm)*1.0e-3,     wetdens(modetoo)*1.0e-3
-!        end if
-#endif
-
-         ! convert coag coefficients from (m3/s) to (kmol-air/s)
-         ybetaij0(ip) = ybetaij0(ip)*aircon
-         ybetaij3(ip) = ybetaij3(ip)*aircon
-         ybetaii0(ip) = ybetaii0(ip)*aircon
-         ybetajj0(ip) = ybetajj0(ip)*aircon
-      end do ! ip
-
-
-! first calculate changes to number
-! use the following order because
-!    accum   number loss depends on accum number
-!    pcarbon number loss depends on pcarbon and accum number
-!    maccum  number loss depends on maccum, pcarbon, and accum number
-!    aitken  number loss depends on aitken, maccum, pcarbon, and accum number
-!    maitken number loss depends on maitken, aitken, maccum, pcarbon, and accum number
-! the average number concencentrations (over current time step)
-!    of other modes can thus be used to calculate the number loss of a mode
-
-! accum mode number loss - analytical solution
-      tmpa = max( 0.0_r8, deltat*ybetajj0(1) )
-      qnum_tmpb(nacc) = qnum_tmpa(nacc) / &
-         ( 1.0_r8 + ybetajj0(1)*deltat*qnum_tmpa(nacc) ) 
-      qnum_tmpc(nacc) = (qnum_tmpa(nacc) + qnum_tmpb(nacc))*0.5_r8
-
-! pcarbon mode number loss - approximate analytical solution
-!    using average number conc. for accum mode
-      if (npca > 0) then
-         tmpa = max( 0.0_r8, deltat*ybetaij0(2)*qnum_tmpc(nacc) )
-         tmpb = max( 0.0_r8, deltat*ybetaii0(2) )
-         tmpn = qnum_tmpa(npca)
-         if (tmpa < 1.0e-5_r8) then
-            qnum_tmpb(npca) = tmpn / &
-               ( 1.0_r8 + (tmpa+tmpb*tmpn)*(1.0_r8 + 0.5_r8*tmpa) )
-         else
-            tmpc = exp(-tmpa)
-            qnum_tmpb(npca) = tmpn*tmpc / &
-               ( 1.0_r8 + (tmpb*tmpn/tmpa)*(1.0_r8-tmpc) )
-         end if
-         qnum_tmpc(npca) = (qnum_tmpa(npca) + qnum_tmpb(npca))*0.5_r8
-      end if
-
-! marine-organics accum mode number loss - approximate analytical solution
-!    using average number conc. for accum and pcarbon modes
-      if (nmacc > 0) then
-         tmpa = ybetaij0( 9)*qnum_tmpc(nacc) & 
-              + ybetaij0(10)*qnum_tmpc(npca)
-         tmpa = max( 0.0_r8, deltat*tmpa )
-         tmpb = max( 0.0_r8, deltat*ybetaii0(9) )
-         tmpn = qnum_tmpa(nmacc)
-         if (tmpa < 1.0e-5_r8) then
-            qnum_tmpb(nmacc) = tmpn / &
-               ( 1.0_r8 + (tmpa+tmpb*tmpn)*(1.0_r8 + 0.5_r8*tmpa) )
-         else
-            tmpc = exp(-tmpa)
-            qnum_tmpb(nmacc) = tmpn*tmpc / &
-               ( 1.0_r8 + (tmpb*tmpn/tmpa)*(1.0_r8-tmpc) )
-         end if
-         qnum_tmpc(nmacc) = (qnum_tmpa(nmacc) + qnum_tmpb(nmacc))*0.5_r8
-      end if
-
-! aitken mode number loss - approximate analytical solution
-!    using average number conc. for accum, pcarbon, and marine-org accum modes
-      tmpa = ybetaij0(1)*qnum_tmpc(nacc)
-      if (npca  > 0) tmpa = tmpa + ybetaij0(3)*qnum_tmpc(npca)
-      if (nmacc > 0) tmpa = tmpa + ybetaij0(4)*qnum_tmpc(nmacc)
-      tmpa = max( 0.0_r8, deltat*tmpa )
-      tmpb = max( 0.0_r8, deltat*ybetaii0(1) )
-      tmpn = qnum_tmpa(nait)
-      if (tmpa < 1.0e-5_r8) then
-         qnum_tmpb(nait) = tmpn / &
-            ( 1.0_r8 + (tmpa+tmpb*tmpn)*(1.0_r8 + 0.5_r8*tmpa) )
-      else
-         tmpc = exp(-tmpa)
-         qnum_tmpb(nait) = tmpn*tmpc / &
-            ( 1.0_r8 + (tmpb*tmpn/tmpa)*(1.0_r8-tmpc) )
-      end if
-      qnum_tmpc(nait) = (qnum_tmpa(nait) + qnum_tmpb(nait))*0.5_r8
-
-! marine-organics aitken mode number loss - approximate analytical solution
-!    using average number conc. for accum, pcarbon, aitken, and marine-org accum modes
-      if (nmait > 0) then
-         tmpa = ybetaij0(5)*qnum_tmpc(nacc) + ybetaij0(7)*qnum_tmpc(nait) &
-              + ybetaij0(6)*qnum_tmpc(npca) + ybetaij0(8)*qnum_tmpc(nmacc)
-         tmpa = max( 0.0_r8, deltat*tmpa )
-         tmpb = max( 0.0_r8, deltat*ybetaii0(5) )
-         tmpn = qnum_tmpa(nmait)
-         if (tmpa < 1.0e-5_r8) then
-            qnum_tmpb(nmait) = tmpn / &
-               ( 1.0_r8 + (tmpa+tmpb*tmpn)*(1.0_r8 + 0.5_r8*tmpa) )
-         else
-            tmpc = exp(-tmpa)
-            qnum_tmpb(nmait) = tmpn*tmpc / &
-               ( 1.0_r8 + (tmpb*tmpn/tmpa)*(1.0_r8-tmpc) )
-         end if
-         qnum_tmpc(nmait) = (qnum_tmpa(nmait) + qnum_tmpb(nmait))*0.5_r8
-      end if
-
-
-! now calculate mass transfers between modes
-! the transfer amounts are calculated using as an exponential decay of
-!     the initial mass concentrations, 
-!     where the decay rate is calculated using the average (over time step) 
-!     number concentrations for each mode
-! the mass transfer calculations are first-order accurate in time, 
-!     because the mass transferred out of a mode does not
-!     include any mass transferred in during the time step
-! with this approach, the ordering is not important, but the mass transfer
-!     calculations are done in the reverse order of the number loss calculations
-
-! mass transfer out of marine-organics aitken mode
-!    uses average number conc. for accum, aitken, pcarbon, and marine-org accum modes
-      if (nmait > 0) then
-         tmp1 = max( 0.0_r8, ybetaij3(5)*qnum_tmpc(nacc) )
-         tmp2 = max( 0.0_r8, ybetaij3(6)*qnum_tmpc(npca) )
-         tmp3 = max( 0.0_r8, ybetaij3(7)*qnum_tmpc(nait) )
-         tmp4 = max( 0.0_r8, ybetaij3(8)*qnum_tmpc(nmacc) )
-         tmpa = tmp1 + tmp2 + tmp3 + tmp4
-         tmpc = deltat*tmpa
-         if (tmpc > epsilonx2) then
-            ! calc coag change only when it is not ~= zero
-            tmp_xf = 1.0_r8 - exp(-tmpc)
-            tmp2 = tmp2/tmpa
-            tmp3 = tmp3/tmpa
-            tmp4 = tmp4/tmpa
-            tmp1 = 1.0_r8 - (tmp2 + tmp3 + tmp4)
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,nmait)
-               qaer_tmpb(iaer,nmait) = qaer_tmpb(iaer,nmait) - tmp_dq
-               qaer_tmpb(iaer,nacc ) = qaer_tmpb(iaer,nacc ) + tmp_dq*tmp1
-               qaer_tmpb(iaer,npca ) = qaer_tmpb(iaer,npca ) + tmp_dq*tmp2
-               qaer_tmpb(iaer,nait ) = qaer_tmpb(iaer,nait ) + tmp_dq*tmp3
-               qaer_tmpb(iaer,nmacc) = qaer_tmpb(iaer,nmacc) + tmp_dq*tmp4
-               qaer_del_coag_in(iaer,i_agepair_pca ) &
-                                    = qaer_del_coag_in(iaer,i_agepair_pca ) + tmp_dq*tmp2
-               qaer_del_coag_in(iaer,i_agepair_macc) &
-                                    = qaer_del_coag_in(iaer,i_agepair_macc) + tmp_dq*tmp4
-            end do
-         end if
-      end if
-
-! (ip == 2)  modefrm = npca  ; modetoo = nacc
-! (ip == 1)  modefrm = nait  ; modetoo = nacc
-! (ip == 3)  modefrm = nait  ; modetoo = npca
-! (ip == 4)  modefrm = nait  ; modetoo = nmacc
-! (ip == 5)  modefrm = nmait ; modetoo = nacc
-! (ip == 6)  modefrm = nmait ; modetoo = npca
-! (ip == 7)  modefrm = nmait ; modetoo = nait
-! (ip == 8)  modefrm = nmait ; modetoo = nmacc
-! (ip == 9)  modefrm = nmacc ; modetoo = nacc
-! (ip ==10)  modefrm = nmacc ; modetoo = npca
-
-! mass transfer out of aitken mode
-!    uses average number conc. for accum, pcarbon, and marine-org accum modes
-      tmp1 = max( 0.0_r8, ybetaij3(1)*qnum_tmpc(nacc) )
-      if (nmacc > 0) then
-         tmp2 = max( 0.0_r8, ybetaij3(3)*qnum_tmpc(npca) )
-         tmp3 = max( 0.0_r8, ybetaij3(4)*qnum_tmpc(nmacc) )
-      else if (npca > 0) then
-         tmp2 = max( 0.0_r8, ybetaij3(3)*qnum_tmpc(npca) )
-         tmp3 = 0.0_r8
-      else
-         tmp2 = 0.0_r8
-         tmp3 = 0.0_r8
-      end if
-      tmpa = tmp1 + tmp2 + tmp3
-      tmpc = deltat*tmpa
-      if (tmpc > epsilonx2) then
-         ! calc coag change only when it is not ~= zero
-         tmp_xf = 1.0_r8 - exp(-tmpc)
-         if (nmacc > 0) then
-            tmp2 = tmp2/tmpa
-            tmp3 = tmp3/tmpa
-            tmp1 = 1.0_r8 - (tmp2 + tmp3)
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,nait)
-               qaer_tmpb(iaer,nait)  = qaer_tmpb(iaer,nait)  - tmp_dq
-               qaer_tmpb(iaer,nacc)  = qaer_tmpb(iaer,nacc)  + tmp_dq*tmp1
-               qaer_tmpb(iaer,npca)  = qaer_tmpb(iaer,npca)  + tmp_dq*tmp2
-               qaer_tmpb(iaer,nmacc) = qaer_tmpb(iaer,nmacc) + tmp_dq*tmp3
-               qaer_del_coag_in(iaer,i_agepair_pca) &
-                                    = qaer_del_coag_in(iaer,i_agepair_pca) + tmp_dq*tmp2
-               qaer_del_coag_in(iaer,i_agepair_macc) &
-                                    = qaer_del_coag_in(iaer,i_agepair_macc) + tmp_dq*tmp3
-            end do
-         else if (npca > 0) then
-            tmp2 = tmp2/tmpa
-            tmp1 = 1.0_r8 - tmp2
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,nait)
-               qaer_tmpb(iaer,nait) = qaer_tmpb(iaer,nait) - tmp_dq
-               qaer_tmpb(iaer,nacc) = qaer_tmpb(iaer,nacc) + tmp_dq*tmp1
-               qaer_tmpb(iaer,npca) = qaer_tmpb(iaer,npca) + tmp_dq*tmp2
-               qaer_del_coag_in(iaer,i_agepair_pca) &
-                                    = qaer_del_coag_in(iaer,i_agepair_pca) + tmp_dq*tmp2
-            end do
-         else
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,nait)
-               qaer_tmpb(iaer,nait) = qaer_tmpb(iaer,nait) - tmp_dq
-               qaer_tmpb(iaer,nacc) = qaer_tmpb(iaer,nacc) + tmp_dq
-            end do
-         end if
-      end if
-
-!! old version for 3 and 7 mode only
-!! mass transfer out of aitken mode mass
-!!    uses average number conc. for accum and pcarbon modes
-!      tmpa = max( 0.0_r8, ybetaij3(1)*qnum_tmpc(nacc) )
-!      if (npca > 0) then
-!         tmpb = max( 0.0_r8, ybetaij3(3)*qnum_tmpc(npca) )
-!         tmpc = tmpa + tmpb
-!      else
-!         tmpc = tmpa
-!      end if
-!      tmpc = deltat*tmpc
-!      if (tmpc > epsilonx2) then
-!         ! calc coag change only when it is not ~= zero
-!         tmp_xf = 1.0_r8 - exp(-tmpc)
-!         if (npca > 0) then
-!            tmp2 = tmpb/(tmpa + tmpb + epsilonx1)
-!            tmp1 = 1.0_r8 - tmp2
-!            do iaer = 1, naer
-!               tmp_dq = tmp_xf*qaer_tmpa(iaer,nait)
-!               qaer_tmpb(iaer,nait) = qaer_tmpb(iaer,nait) - tmp_dq
-!               qaer_tmpb(iaer,nacc) = qaer_tmpb(iaer,nacc) + tmp_dq*tmp1
-!               qaer_tmpb(iaer,npca) = qaer_tmpb(iaer,npca) + tmp_dq*tmp2
-!               qaer_del_coag_in(iaer,i_agepair_pca) &
-!                                    = qaer_del_coag_in(iaer,i_agepair_pca) + tmp_dq*tmp2
-!            end do
-!         else
-!            do iaer = 1, naer
-!               tmp_dq = tmp_xf*qaer_tmpa(iaer,nait)
-!               qaer_tmpb(iaer,nait) = qaer_tmpb(iaer,nait) - tmp_dq
-!               qaer_tmpb(iaer,nacc) = qaer_tmpb(iaer,nacc) + tmp_dq
-!            end do
-!         end if
-!      end if
-
-! mass transfer out of marine-organics accum mode
-!    uses average number conc. for accum and pcarbon modes
-      if (nmacc > 0) then
-         tmp1 = max( 0.0_r8, ybetaij3( 9)*qnum_tmpc(nacc) )
-         tmp2 = max( 0.0_r8, ybetaij3(10)*qnum_tmpc(npca) )
-         tmpa = tmp1 + tmp2
-         tmpc = deltat*tmpa
-         if (tmpc > epsilonx2) then
-            ! calc coag change only when it is not ~= zero
-            tmp_xf = 1.0_r8 - exp(-tmpc)
-            tmp2 = tmp2/tmpa
-            tmp1 = 1.0_r8 - tmp2
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,nmacc)
-               qaer_tmpb(iaer,nmacc) = qaer_tmpb(iaer,nmacc) - tmp_dq
-               qaer_tmpb(iaer,nacc ) = qaer_tmpb(iaer,nacc ) + tmp_dq*tmp1
-               qaer_tmpb(iaer,npca ) = qaer_tmpb(iaer,npca ) + tmp_dq*tmp2
-               qaer_del_coag_in(iaer,i_agepair_pca ) &
-                                    = qaer_del_coag_in(iaer,i_agepair_pca ) + tmp_dq*tmp2
-            end do
-         end if
-      end if
-
-! mass transfer out of pcarbon mode 
-!    uses average number conc. for accum mode
-      if (npca > 0) then
-         tmpc = max( 0.0_r8, ybetaij3(2)*qnum_tmpc(nacc) )
-         tmpc = deltat*tmpc
-         if (tmpc > epsilonx2) then
-            tmp_xf = 1.0_r8 - exp(-tmpc)
-            do iaer = 1, naer
-               tmp_dq = tmp_xf*qaer_tmpa(iaer,npca)
-               qaer_tmpb(iaer,npca) = qaer_tmpb(iaer,npca) - tmp_dq
-               qaer_tmpb(iaer,nacc) = qaer_tmpb(iaer,nacc) + tmp_dq
-            end do
-         end if
-      end if
-
-! mass transfer out of accum mode - there is no transfer out of this mode
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag15n ) then
-! diagnostics
-      do n = 1, 3
-         write(lun15n,'(a,i5,1p,10e11.3)') 'n, qnum_tmpa/b/c', n, &
-         qnum_tmpa(n), qnum_tmpc(n), qnum_tmpb(n), &
-         qnum_tmpb(n)-qnum_tmpa(n), &
-         1.0_r8-qnum_tmpb(n)/max(1.0e-5_r8,qnum_tmpa(n))
-      end do
-      do n = 1, 3
-         write(lun15n,'(a,i5,1p,10e11.3)') 'n, dgnd/w, densw', n, &
-         dgn_a(n), dgn_awet(n), wetdens(n)
-      end do
-      end if
-#endif
-
-      qnum_cur = qnum_tmpb
-      qaer_cur = qaer_tmpb
-
-      return
-      end subroutine mam_coag_1subarea
-
-!----------------------------------------------------------------------
-
-   end module modal_aero_coag
-
-
+!   multiscale air quality (cmaq) model aerosol component 1:
+!   model description.  j. geophys. res., vol 108, no d6, 4183
+!   doi:10.1029/2001jd001409, 2003.
+!//////////////////////////////////////////////////////////////////
+
+    implicit none
+
+    real(wp), intent(in) ::  lamda     ! mean free path [ m ]
+
+    ! Coefficients for free molecular regime
+
+    real(wp), intent(in) ::  kfmat     ! aitken mode
+    real(wp), intent(in) ::  kfmac     ! accumulation mode
+    real(wp), intent(in) ::  kfmatac   ! aitken to accumulation mode
+
+    real(wp), intent(in) ::  knc   ! coefficient for near continnuum regime
+
+    ! Modal geometric mean diameters: [ m ]
+
+    real(wp), intent(in) :: dgatk          ! aitken mode
+    real(wp), intent(in) :: dgacc          ! accumulation mode
+
+    ! Modal geometric standard deviation
+
+    real(wp), intent(in) :: sgatk          ! atken mode
+    real(wp), intent(in) :: sgacc          ! accumulation mode
+
+    ! Natural log of modal geometric standard deviation
+
+    real(wp), intent(in) :: xxlsgat         ! aitken mode
+    real(wp), intent(in) :: xxlsgac         ! accumulation mode
+
+    ! Coagulation coefficients
+    real(wp), intent(out) :: qn11, qn22, qn12, qv12 
+
+    integer ibeta, n1, n2a, n2n ! indices for correction factors
+
+    real(wp) :: kngat, kngac
+    real(wp),parameter :: one = 1.0_wp, two = 2.0_wp, half = 0.5_wp
+    real(wp),parameter :: a = 1.246_wp
+    real(wp),parameter :: two3rds = 2._wp / 3._wp
+
+    real(wp) sqrttwo  !  sqrt(two)
+    real(wp) dlgsqt2  !  1/ln( sqrt( 2 ) )
+
+    real(wp) esat01         ! aitken mode exp( log^2( sigmag )/8 )
+    real(wp) esac01         ! accumulation mode exp( log^2( sigmag )/8 )
+
+    real(wp) esat04,esat05,esat08,esat09,esat16,esat20,esat24,esat25,esat36,esat49,esat64,esat100
+    real(wp) esac04,esac05,esac08,esac09,esac16,esac20,esac24,esac25,esac36,       esac64
+
+    real(wp) dgat2, dgac2, dgat3, dgac3
+    real(wp) sqdgat, sqdgac
+    real(wp) sqdgat5, sqdgac5
+    real(wp) sqdgat7
+    real(wp) r, r2, r3, rx4
+    real(wp) ri1, ri2, ri3
+    real(wp) rat
+    real(wp) coagfm0, coagnc0
+    real(wp) coagfm3, coagnc3
+    real(wp) coagfm_at, coagfm_ac
+    real(wp) coagnc_at, coagnc_ac
+
+    ! Correction factors for coagulation rates
+    real(wp), save :: bm0( 10 )           ! m0 intramodal fm - rpm values
+    real(wp), save :: bm0ij( 10, 10, 10 ) ! m0 intermodal fm
+    real(wp), save :: bm3i( 10, 10, 10 )  ! m3 intermodal fm- rpm values
+
+    ! Populate the arrays for the correction factors *************************************
+
+    ! rpm 0th moment correction factors for unimodal fm coagulation  rates
+    data      bm0  /   &
+      0.707106785165097_wp, 0.726148960080488_wp, 0.766430744110958_wp,   &
+      0.814106389441342_wp, 0.861679526483207_wp, 0.903600509090092_wp,   &
+      0.936578814219156_wp, 0.960098926735545_wp, 0.975646823342881_wp,   &
+      0.985397173215326_wp   /
+
+    ! fsb new fm correction factors for m0 intermodal coagulation
+
+    data (bm0ij (  1,  1,ibeta), ibeta = 1,10) /   &
+      0.628539_wp,  0.639610_wp,  0.664514_wp,  0.696278_wp,  0.731558_wp,   &
+      0.768211_wp,  0.804480_wp,  0.838830_wp,  0.870024_wp,  0.897248_wp/
+    data (bm0ij (  1,  2,ibeta), ibeta = 1,10) /   &
+      0.639178_wp,  0.649966_wp,  0.674432_wp,  0.705794_wp,  0.740642_wp,   &
+      0.776751_wp,  0.812323_wp,  0.845827_wp,  0.876076_wp,  0.902324_wp/
+    data (bm0ij (  1,  3,ibeta), ibeta = 1,10) /   &
+      0.663109_wp,  0.673464_wp,  0.697147_wp,  0.727637_wp,  0.761425_wp,   &
+      0.796155_wp,  0.829978_wp,  0.861419_wp,  0.889424_wp,  0.913417_wp/
+    data (bm0ij (  1,  4,ibeta), ibeta = 1,10) /   &
+      0.693693_wp,  0.703654_wp,  0.726478_wp,  0.755786_wp,  0.787980_wp,   &
+      0.820626_wp,  0.851898_wp,  0.880459_wp,  0.905465_wp,  0.926552_wp/
+    data (bm0ij (  1,  5,ibeta), ibeta = 1,10) /   &
+      0.727803_wp,  0.737349_wp,  0.759140_wp,  0.786870_wp,  0.816901_wp,   &
+      0.846813_wp,  0.874906_wp,  0.900060_wp,  0.921679_wp,  0.939614_wp/
+    data (bm0ij (  1,  6,ibeta), ibeta = 1,10) /   &
+      0.763461_wp,  0.772483_wp,  0.792930_wp,  0.818599_wp,  0.845905_wp,   &
+      0.872550_wp,  0.897051_wp,  0.918552_wp,  0.936701_wp,  0.951528_wp/
+    data (bm0ij (  1,  7,ibeta), ibeta = 1,10) /   &
+      0.799021_wp,  0.807365_wp,  0.826094_wp,  0.849230_wp,  0.873358_wp,   &
+      0.896406_wp,  0.917161_wp,  0.935031_wp,  0.949868_wp,  0.961828_wp/
+    data (bm0ij (  1,  8,ibeta), ibeta = 1,10) /   &
+      0.833004_wp,  0.840514_wp,  0.857192_wp,  0.877446_wp,  0.898147_wp,   &
+      0.917518_wp,  0.934627_wp,  0.949106_wp,  0.960958_wp,  0.970403_wp/
+    data (bm0ij (  1,  9,ibeta), ibeta = 1,10) /   &
+      0.864172_wp,  0.870734_wp,  0.885153_wp,  0.902373_wp,  0.919640_wp,   &
+      0.935494_wp,  0.949257_wp,  0.960733_wp,  0.970016_wp,  0.977346_wp/
+    data (bm0ij (  1, 10,ibeta), ibeta = 1,10) /   &
+      0.891658_wp,  0.897227_wp,  0.909343_wp,  0.923588_wp,  0.937629_wp,   &
+      0.950307_wp,  0.961151_wp,  0.970082_wp,  0.977236_wp,  0.982844_wp/
+    data (bm0ij (  2,  1,ibeta), ibeta = 1,10) /   &
+      0.658724_wp,  0.670587_wp,  0.697539_wp,  0.731890_wp,  0.769467_wp,   &
+      0.807391_wp,  0.843410_wp,  0.875847_wp,  0.903700_wp,  0.926645_wp/
+    data (bm0ij (  2,  2,ibeta), ibeta = 1,10) /   &
+      0.667070_wp,  0.678820_wp,  0.705538_wp,  0.739591_wp,  0.776758_wp,   &
+      0.814118_wp,  0.849415_wp,  0.881020_wp,  0.908006_wp,  0.930121_wp/
+    data (bm0ij (  2,  3,ibeta), ibeta = 1,10) /   &
+      0.686356_wp,  0.697839_wp,  0.723997_wp,  0.757285_wp,  0.793389_wp,   &
+      0.829313_wp,  0.862835_wp,  0.892459_wp,  0.917432_wp,  0.937663_wp/
+    data (bm0ij (  2,  4,ibeta), ibeta = 1,10) /   &
+      0.711425_wp,  0.722572_wp,  0.747941_wp,  0.780055_wp,  0.814518_wp,   &
+      0.848315_wp,  0.879335_wp,  0.906290_wp,  0.928658_wp,  0.946526_wp/
+    data (bm0ij (  2,  5,ibeta), ibeta = 1,10) /   &
+      0.739575_wp,  0.750307_wp,  0.774633_wp,  0.805138_wp,  0.837408_wp,   &
+      0.868504_wp,  0.896517_wp,  0.920421_wp,  0.939932_wp,  0.955299_wp/
+    data (bm0ij (  2,  6,ibeta), ibeta = 1,10) /   &
+      0.769143_wp,  0.779346_wp,  0.802314_wp,  0.830752_wp,  0.860333_wp,   &
+      0.888300_wp,  0.913014_wp,  0.933727_wp,  0.950370_wp,  0.963306_wp/
+    data (bm0ij (  2,  7,ibeta), ibeta = 1,10) /   &
+      0.798900_wp,  0.808431_wp,  0.829700_wp,  0.855653_wp,  0.882163_wp,   &
+      0.906749_wp,  0.928075_wp,  0.945654_wp,  0.959579_wp,  0.970280_wp/
+    data (bm0ij (  2,  8,ibeta), ibeta = 1,10) /   &
+      0.827826_wp,  0.836542_wp,  0.855808_wp,  0.878954_wp,  0.902174_wp,   &
+      0.923316_wp,  0.941345_wp,  0.955989_wp,  0.967450_wp,  0.976174_wp/
+    data (bm0ij (  2,  9,ibeta), ibeta = 1,10) /   &
+      0.855068_wp,  0.862856_wp,  0.879900_wp,  0.900068_wp,  0.919956_wp,   &
+      0.937764_wp,  0.952725_wp,  0.964726_wp,  0.974027_wp,  0.981053_wp/
+    data (bm0ij (  2, 10,ibeta), ibeta = 1,10) /   &
+      0.879961_wp,  0.886755_wp,  0.901484_wp,  0.918665_wp,  0.935346_wp,   &
+      0.950065_wp,  0.962277_wp,  0.971974_wp,  0.979432_wp,  0.985033_wp/
+    data (bm0ij (  3,  1,ibeta), ibeta = 1,10) /   &
+      0.724166_wp,  0.735474_wp,  0.761359_wp,  0.794045_wp,  0.828702_wp,   &
+      0.862061_wp,  0.891995_wp,  0.917385_wp,  0.937959_wp,  0.954036_wp/
+    data (bm0ij (  3,  2,ibeta), ibeta = 1,10) /   &
+      0.730416_wp,  0.741780_wp,  0.767647_wp,  0.800116_wp,  0.834344_wp,   &
+      0.867093_wp,  0.896302_wp,  0.920934_wp,  0.940790_wp,  0.956237_wp/
+    data (bm0ij (  3,  3,ibeta), ibeta = 1,10) /   &
+      0.745327_wp,  0.756664_wp,  0.782255_wp,  0.814026_wp,  0.847107_wp,   &
+      0.878339_wp,  0.905820_wp,  0.928699_wp,  0.946931_wp,  0.960977_wp/
+    data (bm0ij (  3,  4,ibeta), ibeta = 1,10) /   &
+      0.765195_wp,  0.776312_wp,  0.801216_wp,  0.831758_wp,  0.863079_wp,   &
+      0.892159_wp,  0.917319_wp,  0.937939_wp,  0.954145_wp,  0.966486_wp/
+    data (bm0ij (  3,  5,ibeta), ibeta = 1,10) /   &
+      0.787632_wp,  0.798347_wp,  0.822165_wp,  0.850985_wp,  0.880049_wp,   &
+      0.906544_wp,  0.929062_wp,  0.947218_wp,  0.961288_wp,  0.971878_wp/
+    data (bm0ij (  3,  6,ibeta), ibeta = 1,10) /   &
+      0.811024_wp,  0.821179_wp,  0.843557_wp,  0.870247_wp,  0.896694_wp,   &
+      0.920365_wp,  0.940131_wp,  0.955821_wp,  0.967820_wp,  0.976753_wp/
+    data (bm0ij (  3,  7,ibeta), ibeta = 1,10) /   &
+      0.834254_wp,  0.843709_wp,  0.864356_wp,  0.888619_wp,  0.912245_wp,   &
+      0.933019_wp,  0.950084_wp,  0.963438_wp,  0.973530_wp,  0.980973_wp/
+    data (bm0ij (  3,  8,ibeta), ibeta = 1,10) /   &
+      0.856531_wp,  0.865176_wp,  0.883881_wp,  0.905544_wp,  0.926290_wp,   &
+      0.944236_wp,  0.958762_wp,  0.969988_wp,  0.978386_wp,  0.984530_wp/
+    data (bm0ij (  3,  9,ibeta), ibeta = 1,10) /   &
+      0.877307_wp,  0.885070_wp,  0.901716_wp,  0.920729_wp,  0.938663_wp,   &
+      0.953951_wp,  0.966169_wp,  0.975512_wp,  0.982442_wp,  0.987477_wp/
+    data (bm0ij (  3, 10,ibeta), ibeta = 1,10) /   &
+      0.896234_wp,  0.903082_wp,  0.917645_wp,  0.934069_wp,  0.949354_wp,   &
+      0.962222_wp,  0.972396_wp,  0.980107_wp,  0.985788_wp,  0.989894_wp/
+    data (bm0ij (  4,  1,ibeta), ibeta = 1,10) /   &
+      0.799294_wp,  0.809144_wp,  0.831293_wp,  0.858395_wp,  0.885897_wp,   &
+      0.911031_wp,  0.932406_wp,  0.949642_wp,  0.963001_wp,  0.973062_wp/
+    data (bm0ij (  4,  2,ibeta), ibeta = 1,10) /   &
+      0.804239_wp,  0.814102_wp,  0.836169_wp,  0.862984_wp,  0.890003_wp,   &
+      0.914535_wp,  0.935274_wp,  0.951910_wp,  0.964748_wp,  0.974381_wp/
+    data (bm0ij (  4,  3,ibeta), ibeta = 1,10) /   &
+      0.815910_wp,  0.825708_wp,  0.847403_wp,  0.873389_wp,  0.899185_wp,   &
+      0.922275_wp,  0.941543_wp,  0.956826_wp,  0.968507_wp,  0.977204_wp/
+    data (bm0ij (  4,  4,ibeta), ibeta = 1,10) /   &
+      0.831348_wp,  0.840892_wp,  0.861793_wp,  0.886428_wp,  0.910463_wp,   &
+      0.931614_wp,  0.948993_wp,  0.962593_wp,  0.972872_wp,  0.980456_wp/
+    data (bm0ij (  4,  5,ibeta), ibeta = 1,10) /   &
+      0.848597_wp,  0.857693_wp,  0.877402_wp,  0.900265_wp,  0.922180_wp,   &
+      0.941134_wp,  0.956464_wp,  0.968298_wp,  0.977143_wp,  0.983611_wp/
+    data (bm0ij (  4,  6,ibeta), ibeta = 1,10) /   &
+      0.866271_wp,  0.874764_wp,  0.892984_wp,  0.913796_wp,  0.933407_wp,   &
+      0.950088_wp,  0.963380_wp,  0.973512_wp,  0.981006_wp,  0.986440_wp/
+    data (bm0ij (  4,  7,ibeta), ibeta = 1,10) /   &
+      0.883430_wp,  0.891216_wp,  0.907762_wp,  0.926388_wp,  0.943660_wp,   &
+      0.958127_wp,  0.969499_wp,  0.978070_wp,  0.984351_wp,  0.988872_wp/
+    data (bm0ij (  4,  8,ibeta), ibeta = 1,10) /   &
+      0.899483_wp,  0.906505_wp,  0.921294_wp,  0.937719_wp,  0.952729_wp,   &
+      0.965131_wp,  0.974762_wp,  0.981950_wp,  0.987175_wp,  0.990912_wp/
+    data (bm0ij (  4,  9,ibeta), ibeta = 1,10) /   &
+      0.914096_wp,  0.920337_wp,  0.933373_wp,  0.947677_wp,  0.960579_wp,   &
+      0.971111_wp,  0.979206_wp,  0.985196_wp,  0.989520_wp,  0.992597_wp/
+    data (bm0ij (  4, 10,ibeta), ibeta = 1,10) /   &
+      0.927122_wp,  0.932597_wp,  0.943952_wp,  0.956277_wp,  0.967268_wp,   &
+      0.976147_wp,  0.982912_wp,  0.987882_wp,  0.991450_wp,  0.993976_wp/
+    data (bm0ij (  5,  1,ibeta), ibeta = 1,10) /   &
+      0.865049_wp,  0.872851_wp,  0.889900_wp,  0.909907_wp,  0.929290_wp,   &
+      0.946205_wp,  0.959991_wp,  0.970706_wp,  0.978764_wp,  0.984692_wp/
+    data (bm0ij (  5,  2,ibeta), ibeta = 1,10) /   &
+      0.868989_wp,  0.876713_wp,  0.893538_wp,  0.913173_wp,  0.932080_wp,   &
+      0.948484_wp,  0.961785_wp,  0.972080_wp,  0.979796_wp,  0.985457_wp/
+    data (bm0ij (  5,  3,ibeta), ibeta = 1,10) /   &
+      0.878010_wp,  0.885524_wp,  0.901756_wp,  0.920464_wp,  0.938235_wp,   &
+      0.953461_wp,  0.965672_wp,  0.975037_wp,  0.982005_wp,  0.987085_wp/
+    data (bm0ij (  5,  4,ibeta), ibeta = 1,10) /   &
+      0.889534_wp,  0.896698_wp,  0.912012_wp,  0.929395_wp,  0.945647_wp,   &
+      0.959366_wp,  0.970227_wp,  0.978469_wp,  0.984547_wp,  0.988950_wp/
+    data (bm0ij (  5,  5,ibeta), ibeta = 1,10) /   &
+      0.902033_wp,  0.908713_wp,  0.922848_wp,  0.938648_wp,  0.953186_wp,   &
+      0.965278_wp,  0.974729_wp,  0.981824_wp,  0.987013_wp,  0.990746_wp/
+    data (bm0ij (  5,  6,ibeta), ibeta = 1,10) /   &
+      0.914496_wp,  0.920599_wp,  0.933389_wp,  0.947485_wp,  0.960262_wp,   &
+      0.970743_wp,  0.978839_wp,  0.984858_wp,  0.989225_wp,  0.992348_wp/
+    data (bm0ij (  5,  7,ibeta), ibeta = 1,10) /   &
+      0.926281_wp,  0.931761_wp,  0.943142_wp,  0.955526_wp,  0.966600_wp,   &
+      0.975573_wp,  0.982431_wp,  0.987485_wp,  0.991128_wp,  0.993718_wp/
+    data (bm0ij (  5,  8,ibeta), ibeta = 1,10) /   &
+      0.937029_wp,  0.941877_wp,  0.951868_wp,  0.962615_wp,  0.972112_wp,   &
+      0.979723_wp,  0.985488_wp,  0.989705_wp,  0.992725_wp,  0.994863_wp/
+    data (bm0ij (  5,  9,ibeta), ibeta = 1,10) /   &
+      0.946580_wp,  0.950819_wp,  0.959494_wp,  0.968732_wp,  0.976811_wp,   &
+      0.983226_wp,  0.988047_wp,  0.991550_wp,  0.994047_wp,  0.995806_wp/
+    data (bm0ij (  5, 10,ibeta), ibeta = 1,10) /   &
+      0.954909_wp,  0.958581_wp,  0.966049_wp,  0.973933_wp,  0.980766_wp,   &
+      0.986149_wp,  0.990166_wp,  0.993070_wp,  0.995130_wp,  0.996577_wp/
+    data (bm0ij (  6,  1,ibeta), ibeta = 1,10) /   &
+      0.914182_wp,  0.919824_wp,  0.931832_wp,  0.945387_wp,  0.957999_wp,   &
+      0.968606_wp,  0.976982_wp,  0.983331_wp,  0.988013_wp,  0.991407_wp/
+    data (bm0ij (  6,  2,ibeta), ibeta = 1,10) /   &
+      0.917139_wp,  0.922665_wp,  0.934395_wp,  0.947580_wp,  0.959792_wp,   &
+      0.970017_wp,  0.978062_wp,  0.984138_wp,  0.988609_wp,  0.991843_wp/
+    data (bm0ij (  6,  3,ibeta), ibeta = 1,10) /   &
+      0.923742_wp,  0.928990_wp,  0.940064_wp,  0.952396_wp,  0.963699_wp,   &
+      0.973070_wp,  0.980381_wp,  0.985866_wp,  0.989878_wp,  0.992768_wp/
+    data (bm0ij (  6,  4,ibeta), ibeta = 1,10) /   &
+      0.931870_wp,  0.936743_wp,  0.946941_wp,  0.958162_wp,  0.968318_wp,   &
+      0.976640_wp,  0.983069_wp,  0.987853_wp,  0.991330_wp,  0.993822_wp/
+    data (bm0ij (  6,  5,ibeta), ibeta = 1,10) /   &
+      0.940376_wp,  0.944807_wp,  0.954004_wp,  0.963999_wp,  0.972928_wp,   &
+      0.980162_wp,  0.985695_wp,  0.989779_wp,  0.992729_wp,  0.994833_wp/
+    data (bm0ij (  6,  6,ibeta), ibeta = 1,10) /   &
+      0.948597_wp,  0.952555_wp,  0.960703_wp,  0.969454_wp,  0.977181_wp,   &
+      0.983373_wp,  0.988067_wp,  0.991507_wp,  0.993977_wp,  0.995730_wp/
+    data (bm0ij (  6,  7,ibeta), ibeta = 1,10) /   &
+      0.956167_wp,  0.959648_wp,  0.966763_wp,  0.974326_wp,  0.980933_wp,   &
+      0.986177_wp,  0.990121_wp,  0.992993_wp,  0.995045_wp,  0.996495_wp/
+    data (bm0ij (  6,  8,ibeta), ibeta = 1,10) /   &
+      0.962913_wp,  0.965937_wp,  0.972080_wp,  0.978552_wp,  0.984153_wp,   &
+      0.988563_wp,  0.991857_wp,  0.994242_wp,  0.995938_wp,  0.997133_wp/
+    data (bm0ij (  6,  9,ibeta), ibeta = 1,10) /   &
+      0.968787_wp,  0.971391_wp,  0.976651_wp,  0.982148_wp,  0.986869_wp,   &
+      0.990560_wp,  0.993301_wp,  0.995275_wp,  0.996675_wp,  0.997657_wp/
+    data (bm0ij (  6, 10,ibeta), ibeta = 1,10) /   &
+      0.973822_wp,  0.976047_wp,  0.980523_wp,  0.985170_wp,  0.989134_wp,   &
+      0.992215_wp,  0.994491_wp,  0.996124_wp,  0.997277_wp,  0.998085_wp/
+    data (bm0ij (  7,  1,ibeta), ibeta = 1,10) /   &
+      0.947410_wp,  0.951207_wp,  0.959119_wp,  0.967781_wp,  0.975592_wp,   &
+      0.981981_wp,  0.986915_wp,  0.990590_wp,  0.993266_wp,  0.995187_wp/
+    data (bm0ij (  7,  2,ibeta), ibeta = 1,10) /   &
+      0.949477_wp,  0.953161_wp,  0.960824_wp,  0.969187_wp,  0.976702_wp,   &
+      0.982831_wp,  0.987550_wp,  0.991057_wp,  0.993606_wp,  0.995434_wp/
+    data (bm0ij (  7,  3,ibeta), ibeta = 1,10) /   &
+      0.954008_wp,  0.957438_wp,  0.964537_wp,  0.972232_wp,  0.979095_wp,   &
+      0.984653_wp,  0.988907_wp,  0.992053_wp,  0.994330_wp,  0.995958_wp/
+    data (bm0ij (  7,  4,ibeta), ibeta = 1,10) /   &
+      0.959431_wp,  0.962539_wp,  0.968935_wp,  0.975808_wp,  0.981882_wp,   &
+      0.986759_wp,  0.990466_wp,  0.993190_wp,  0.995153_wp,  0.996552_wp/
+    data (bm0ij (  7,  5,ibeta), ibeta = 1,10) /   &
+      0.964932_wp,  0.967693_wp,  0.973342_wp,  0.979355_wp,  0.984620_wp,   &
+      0.988812_wp,  0.991974_wp,  0.994285_wp,  0.995943_wp,  0.997119_wp/
+    data (bm0ij (  7,  6,ibeta), ibeta = 1,10) /   &
+      0.970101_wp,  0.972517_wp,  0.977428_wp,  0.982612_wp,  0.987110_wp,   &
+      0.990663_wp,  0.993326_wp,  0.995261_wp,  0.996644_wp,  0.997621_wp/
+    data (bm0ij (  7,  7,ibeta), ibeta = 1,10) /   &
+      0.974746_wp,  0.976834_wp,  0.981055_wp,  0.985475_wp,  0.989280_wp,   &
+      0.992265_wp,  0.994488_wp,  0.996097_wp,  0.997241_wp,  0.998048_wp/
+    data (bm0ij (  7,  8,ibeta), ibeta = 1,10) /   &
+      0.978804_wp,  0.980591_wp,  0.984187_wp,  0.987927_wp,  0.991124_wp,   &
+      0.993617_wp,  0.995464_wp,  0.996795_wp,  0.997739_wp,  0.998403_wp/
+    data (bm0ij (  7,  9,ibeta), ibeta = 1,10) /   &
+      0.982280_wp,  0.983799_wp,  0.986844_wp,  0.989991_wp,  0.992667_wp,   &
+      0.994742_wp,  0.996273_wp,  0.997372_wp,  0.998149_wp,  0.998695_wp/
+    data (bm0ij (  7, 10,ibeta), ibeta = 1,10) /   &
+      0.985218_wp,  0.986503_wp,  0.989071_wp,  0.991711_wp,  0.993945_wp,   &
+      0.995669_wp,  0.996937_wp,  0.997844_wp,  0.998484_wp,  0.998932_wp/
+    data (bm0ij (  8,  1,ibeta), ibeta = 1,10) /   &
+      0.968507_wp,  0.970935_wp,  0.975916_wp,  0.981248_wp,  0.985947_wp,   &
+      0.989716_wp,  0.992580_wp,  0.994689_wp,  0.996210_wp,  0.997297_wp/
+    data (bm0ij (  8,  2,ibeta), ibeta = 1,10) /   &
+      0.969870_wp,  0.972210_wp,  0.977002_wp,  0.982119_wp,  0.986619_wp,   &
+      0.990219_wp,  0.992951_wp,  0.994958_wp,  0.996405_wp,  0.997437_wp/
+    data (bm0ij (  8,  3,ibeta), ibeta = 1,10) /   &
+      0.972820_wp,  0.974963_wp,  0.979339_wp,  0.983988_wp,  0.988054_wp,   &
+      0.991292_wp,  0.993738_wp,  0.995529_wp,  0.996817_wp,  0.997734_wp/
+    data (bm0ij (  8,  4,ibeta), ibeta = 1,10) /   &
+      0.976280_wp,  0.978186_wp,  0.982060_wp,  0.986151_wp,  0.989706_wp,   &
+      0.992520_wp,  0.994636_wp,  0.996179_wp,  0.997284_wp,  0.998069_wp/
+    data (bm0ij (  8,  5,ibeta), ibeta = 1,10) /   &
+      0.979711_wp,  0.981372_wp,  0.984735_wp,  0.988263_wp,  0.991309_wp,   &
+      0.993706_wp,  0.995499_wp,  0.996801_wp,  0.997730_wp,  0.998389_wp/
+    data (bm0ij (  8,  6,ibeta), ibeta = 1,10) /   &
+      0.982863_wp,  0.984292_wp,  0.987172_wp,  0.990174_wp,  0.992750_wp,   &
+      0.994766_wp,  0.996266_wp,  0.997352_wp,  0.998125_wp,  0.998670_wp/
+    data (bm0ij (  8,  7,ibeta), ibeta = 1,10) /   &
+      0.985642_wp,  0.986858_wp,  0.989301_wp,  0.991834_wp,  0.993994_wp,   &
+      0.995676_wp,  0.996923_wp,  0.997822_wp,  0.998460_wp,  0.998910_wp/
+    data (bm0ij (  8,  8,ibeta), ibeta = 1,10) /   &
+      0.988029_wp,  0.989058_wp,  0.991116_wp,  0.993240_wp,  0.995043_wp,   &
+      0.996440_wp,  0.997472_wp,  0.998214_wp,  0.998739_wp,  0.999108_wp/
+    data (bm0ij (  8,  9,ibeta), ibeta = 1,10) /   &
+      0.990046_wp,  0.990912_wp,  0.992640_wp,  0.994415_wp,  0.995914_wp,   &
+      0.997073_wp,  0.997925_wp,  0.998536_wp,  0.998968_wp,  0.999271_wp/
+    data (bm0ij (  8, 10,ibeta), ibeta = 1,10) /   &
+      0.991732_wp,  0.992459_wp,  0.993906_wp,  0.995386_wp,  0.996633_wp,   &
+      0.997592_wp,  0.998296_wp,  0.998799_wp,  0.999154_wp,  0.999403_wp/
+    data (bm0ij (  9,  1,ibeta), ibeta = 1,10) /   &
+      0.981392_wp,  0.982893_wp,  0.985938_wp,  0.989146_wp,  0.991928_wp,   &
+      0.994129_wp,  0.995783_wp,  0.996991_wp,  0.997857_wp,  0.998473_wp/
+    data (bm0ij (  9,  2,ibeta), ibeta = 1,10) /   &
+      0.982254_wp,  0.983693_wp,  0.986608_wp,  0.989673_wp,  0.992328_wp,   &
+      0.994424_wp,  0.995998_wp,  0.997146_wp,  0.997969_wp,  0.998553_wp/
+    data (bm0ij (  9,  3,ibeta), ibeta = 1,10) /   &
+      0.984104_wp,  0.985407_wp,  0.988040_wp,  0.990798_wp,  0.993178_wp,   &
+      0.995052_wp,  0.996454_wp,  0.997474_wp,  0.998204_wp,  0.998722_wp/
+    data (bm0ij (  9,  4,ibeta), ibeta = 1,10) /   &
+      0.986243_wp,  0.987386_wp,  0.989687_wp,  0.992087_wp,  0.994149_wp,   &
+      0.995765_wp,  0.996971_wp,  0.997846_wp,  0.998470_wp,  0.998913_wp/
+    data (bm0ij (  9,  5,ibeta), ibeta = 1,10) /   &
+      0.988332_wp,  0.989313_wp,  0.991284_wp,  0.993332_wp,  0.995082_wp,   &
+      0.996449_wp,  0.997465_wp,  0.998200_wp,  0.998723_wp,  0.999093_wp/
+    data (bm0ij (  9,  6,ibeta), ibeta = 1,10) /   &
+      0.990220_wp,  0.991053_wp,  0.992721_wp,  0.994445_wp,  0.995914_wp,   &
+      0.997056_wp,  0.997902_wp,  0.998513_wp,  0.998947_wp,  0.999253_wp/
+    data (bm0ij (  9,  7,ibeta), ibeta = 1,10) /   &
+      0.991859_wp,  0.992561_wp,  0.993961_wp,  0.995403_wp,  0.996626_wp,   &
+      0.997574_wp,  0.998274_wp,  0.998778_wp,  0.999136_wp,  0.999387_wp/
+    data (bm0ij (  9,  8,ibeta), ibeta = 1,10) /   &
+      0.993250_wp,  0.993837_wp,  0.995007_wp,  0.996208_wp,  0.997223_wp,   &
+      0.998007_wp,  0.998584_wp,  0.998999_wp,  0.999293_wp,  0.999499_wp/
+    data (bm0ij (  9,  9,ibeta), ibeta = 1,10) /   &
+      0.994413_wp,  0.994903_wp,  0.995878_wp,  0.996876_wp,  0.997716_wp,   &
+      0.998363_wp,  0.998839_wp,  0.999180_wp,  0.999421_wp,  0.999591_wp/
+    data (bm0ij (  9, 10,ibeta), ibeta = 1,10) /   &
+      0.995376_wp,  0.995785_wp,  0.996597_wp,  0.997425_wp,  0.998121_wp,   &
+      0.998655_wp,  0.999048_wp,  0.999328_wp,  0.999526_wp,  0.999665_wp/
+    data (bm0ij ( 10,  1,ibeta), ibeta = 1,10) /   &
+      0.989082_wp,  0.989991_wp,  0.991819_wp,  0.993723_wp,  0.995357_wp,   &
+      0.996637_wp,  0.997592_wp,  0.998286_wp,  0.998781_wp,  0.999132_wp/
+    data (bm0ij ( 10,  2,ibeta), ibeta = 1,10) /   &
+      0.989613_wp,  0.990480_wp,  0.992224_wp,  0.994039_wp,  0.995594_wp,   &
+      0.996810_wp,  0.997717_wp,  0.998375_wp,  0.998845_wp,  0.999178_wp/
+    data (bm0ij ( 10,  3,ibeta), ibeta = 1,10) /   &
+      0.990744_wp,  0.991523_wp,  0.993086_wp,  0.994708_wp,  0.996094_wp,   &
+      0.997176_wp,  0.997981_wp,  0.998564_wp,  0.998980_wp,  0.999274_wp/
+    data (bm0ij ( 10,  4,ibeta), ibeta = 1,10) /   &
+      0.992041_wp,  0.992716_wp,  0.994070_wp,  0.995470_wp,  0.996662_wp,   &
+      0.997591_wp,  0.998280_wp,  0.998778_wp,  0.999133_wp,  0.999383_wp/
+    data (bm0ij ( 10,  5,ibeta), ibeta = 1,10) /   &
+      0.993292_wp,  0.993867_wp,  0.995015_wp,  0.996199_wp,  0.997205_wp,   &
+      0.997985_wp,  0.998564_wp,  0.998981_wp,  0.999277_wp,  0.999487_wp/
+    data (bm0ij ( 10,  6,ibeta), ibeta = 1,10) /   &
+      0.994411_wp,  0.994894_wp,  0.995857_wp,  0.996847_wp,  0.997685_wp,   &
+      0.998334_wp,  0.998814_wp,  0.999159_wp,  0.999404_wp,  0.999577_wp/
+    data (bm0ij ( 10,  7,ibeta), ibeta = 1,10) /   &
+      0.995373_wp,  0.995776_wp,  0.996577_wp,  0.997400_wp,  0.998094_wp,   &
+      0.998630_wp,  0.999026_wp,  0.999310_wp,  0.999512_wp,  0.999654_wp/
+    data (bm0ij ( 10,  8,ibeta), ibeta = 1,10) /   &
+      0.996181_wp,  0.996516_wp,  0.997181_wp,  0.997861_wp,  0.998435_wp,   &
+      0.998877_wp,  0.999202_wp,  0.999435_wp,  0.999601_wp,  0.999717_wp/
+    data (bm0ij ( 10,  9,ibeta), ibeta = 1,10) /   &
+      0.996851_wp,  0.997128_wp,  0.997680_wp,  0.998242_wp,  0.998715_wp,   &
+      0.999079_wp,  0.999346_wp,  0.999538_wp,  0.999673_wp,  0.999769_wp/
+    data (bm0ij ( 10, 10,ibeta), ibeta = 1,10) /   &
+      0.997402_wp,  0.997632_wp,  0.998089_wp,  0.998554_wp,  0.998945_wp,   &
+      0.999244_wp,  0.999464_wp,  0.999622_wp,  0.999733_wp,  0.999811_wp/
+
+
+    ! rpm....   3rd moment nuclei mode corr. fac. for bimodal fm coag rate
+
+    data (bm3i( 1, 1,ibeta ), ibeta=1,10)/   &
+      0.70708_wp,0.71681_wp,0.73821_wp,0.76477_wp,0.79350_wp,0.82265_wp,0.85090_wp,0.87717_wp,   &
+      0.90069_wp,0.92097_wp/
+    data (bm3i( 1, 2,ibeta ), ibeta=1,10)/   &
+      0.72172_wp,0.73022_wp,0.74927_wp,0.77324_wp,0.79936_wp,0.82601_wp,0.85199_wp,0.87637_wp,   &
+      0.89843_wp,0.91774_wp/
+    data (bm3i( 1, 3,ibeta ), ibeta=1,10)/   &
+      0.78291_wp,0.78896_wp,0.80286_wp,0.82070_wp,0.84022_wp,0.85997_wp,0.87901_wp,0.89669_wp,   &
+      0.91258_wp,0.92647_wp/
+    data (bm3i( 1, 4,ibeta ), ibeta=1,10)/   &
+      0.87760_wp,0.88147_wp,0.89025_wp,0.90127_wp,0.91291_wp,0.92420_wp,0.93452_wp,0.94355_wp,   &
+      0.95113_wp,0.95726_wp/
+    data (bm3i( 1, 5,ibeta ), ibeta=1,10)/   &
+      0.94988_wp,0.95184_wp,0.95612_wp,0.96122_wp,0.96628_wp,0.97085_wp,0.97467_wp,0.97763_wp,   &
+      0.97971_wp,0.98089_wp/
+    data (bm3i( 1, 6,ibeta ), ibeta=1,10)/   &
+      0.98318_wp,0.98393_wp,0.98551_wp,0.98728_wp,0.98889_wp,0.99014_wp,0.99095_wp,0.99124_wp,   &
+      0.99100_wp,0.99020_wp/
+    data (bm3i( 1, 7,ibeta ), ibeta=1,10)/   &
+      0.99480_wp,0.99504_wp,0.99551_wp,0.99598_wp,0.99629_wp,0.99635_wp,0.99611_wp,0.99550_wp,   &
+      0.99450_wp,0.99306_wp/
+    data (bm3i( 1, 8,ibeta ), ibeta=1,10)/   &
+      0.99842_wp,0.99848_wp,0.99858_wp,0.99861_wp,0.99850_wp,0.99819_wp,0.99762_wp,0.99674_wp,   &
+      0.99550_wp,0.99388_wp/
+    data (bm3i( 1, 9,ibeta ), ibeta=1,10)/   &
+      0.99951_wp,0.99951_wp,0.99949_wp,0.99939_wp,0.99915_wp,0.99872_wp,0.99805_wp,0.99709_wp,   &
+      0.99579_wp,0.99411_wp/
+    data (bm3i( 1,10,ibeta ), ibeta=1,10)/   &
+      0.99984_wp,0.99982_wp,0.99976_wp,0.99962_wp,0.99934_wp,0.99888_wp,0.99818_wp,0.99719_wp,   &
+      0.99587_wp,0.99417_wp/
+    data (bm3i( 2, 1,ibeta ), ibeta=1,10)/   &
+      0.72957_wp,0.73993_wp,0.76303_wp,0.79178_wp,0.82245_wp,0.85270_wp,0.88085_wp,0.90578_wp,   &
+      0.92691_wp,0.94415_wp/
+    data (bm3i( 2, 2,ibeta ), ibeta=1,10)/   &
+      0.72319_wp,0.73320_wp,0.75547_wp,0.78323_wp,0.81307_wp,0.84287_wp,0.87107_wp,0.89651_wp,   &
+      0.91852_wp,0.93683_wp/
+    data (bm3i( 2, 3,ibeta ), ibeta=1,10)/   &
+      0.74413_wp,0.75205_wp,0.76998_wp,0.79269_wp,0.81746_wp,0.84258_wp,0.86685_wp,0.88938_wp,   &
+      0.90953_wp,0.92695_wp/
+    data (bm3i( 2, 4,ibeta ), ibeta=1,10)/   &
+      0.82588_wp,0.83113_wp,0.84309_wp,0.85825_wp,0.87456_wp,0.89072_wp,0.90594_wp,0.91972_wp,   &
+      0.93178_wp,0.94203_wp/
+    data (bm3i( 2, 5,ibeta ), ibeta=1,10)/   &
+      0.91886_wp,0.92179_wp,0.92831_wp,0.93624_wp,0.94434_wp,0.95192_wp,0.95856_wp,0.96409_wp,   &
+      0.96845_wp,0.97164_wp/
+    data (bm3i( 2, 6,ibeta ), ibeta=1,10)/   &
+      0.97129_wp,0.97252_wp,0.97515_wp,0.97818_wp,0.98108_wp,0.98354_wp,0.98542_wp,0.98665_wp,   &
+      0.98721_wp,0.98709_wp/
+    data (bm3i( 2, 7,ibeta ), ibeta=1,10)/   &
+      0.99104_wp,0.99145_wp,0.99230_wp,0.99320_wp,0.99394_wp,0.99439_wp,0.99448_wp,0.99416_wp,   &
+      0.99340_wp,0.99217_wp/
+    data (bm3i( 2, 8,ibeta ), ibeta=1,10)/   &
+      0.99730_wp,0.99741_wp,0.99763_wp,0.99779_wp,0.99782_wp,0.99762_wp,0.99715_wp,0.99636_wp,   &
+      0.99519_wp,0.99363_wp/
+    data (bm3i( 2, 9,ibeta ), ibeta=1,10)/   &
+      0.99917_wp,0.99919_wp,0.99921_wp,0.99915_wp,0.99895_wp,0.99856_wp,0.99792_wp,0.99698_wp,   &
+      0.99570_wp,0.99404_wp/
+    data (bm3i( 2,10,ibeta ), ibeta=1,10)/   &
+      0.99973_wp,0.99973_wp,0.99968_wp,0.99955_wp,0.99928_wp,0.99883_wp,0.99814_wp,0.99716_wp,   &
+      0.99584_wp,0.99415_wp/
+    data (bm3i( 3, 1,ibeta ), ibeta=1,10)/   &
+      0.78358_wp,0.79304_wp,0.81445_wp,0.84105_wp,0.86873_wp,0.89491_wp,0.91805_wp,0.93743_wp,   &
+      0.95300_wp,0.96510_wp/
+    data (bm3i( 3, 2,ibeta ), ibeta=1,10)/   &
+      0.76412_wp,0.77404_wp,0.79635_wp,0.82404_wp,0.85312_wp,0.88101_wp,0.90610_wp,0.92751_wp,   &
+      0.94500_wp,0.95879_wp/
+    data (bm3i( 3, 3,ibeta ), ibeta=1,10)/   &
+      0.74239_wp,0.75182_wp,0.77301_wp,0.79956_wp,0.82809_wp,0.85639_wp,0.88291_wp,0.90658_wp,   &
+      0.92683_wp,0.94350_wp/
+    data (bm3i( 3, 4,ibeta ), ibeta=1,10)/   &
+      0.78072_wp,0.78758_wp,0.80317_wp,0.82293_wp,0.84437_wp,0.86589_wp,0.88643_wp,0.90526_wp,   &
+      0.92194_wp,0.93625_wp/
+    data (bm3i( 3, 5,ibeta ), ibeta=1,10)/   &
+      0.87627_wp,0.88044_wp,0.88981_wp,0.90142_wp,0.91357_wp,0.92524_wp,0.93585_wp,0.94510_wp,   &
+      0.95285_wp,0.95911_wp/
+    data (bm3i( 3, 6,ibeta ), ibeta=1,10)/   &
+      0.95176_wp,0.95371_wp,0.95796_wp,0.96297_wp,0.96792_wp,0.97233_wp,0.97599_wp,0.97880_wp,   &
+      0.98072_wp,0.98178_wp/
+    data (bm3i( 3, 7,ibeta ), ibeta=1,10)/   &
+      0.98453_wp,0.98523_wp,0.98670_wp,0.98833_wp,0.98980_wp,0.99092_wp,0.99160_wp,0.99179_wp,   &
+      0.99145_wp,0.99058_wp/
+    data (bm3i( 3, 8,ibeta ), ibeta=1,10)/   &
+      0.99534_wp,0.99555_wp,0.99597_wp,0.99637_wp,0.99662_wp,0.99663_wp,0.99633_wp,0.99569_wp,   &
+      0.99465_wp,0.99318_wp/
+    data (bm3i( 3, 9,ibeta ), ibeta=1,10)/   &
+      0.99859_wp,0.99864_wp,0.99872_wp,0.99873_wp,0.99860_wp,0.99827_wp,0.99768_wp,0.99679_wp,   &
+      0.99555_wp,0.99391_wp/
+    data (bm3i( 3,10,ibeta ), ibeta=1,10)/   &
+      0.99956_wp,0.99956_wp,0.99953_wp,0.99942_wp,0.99918_wp,0.99875_wp,0.99807_wp,0.99711_wp,   &
+      0.99580_wp,0.99412_wp/
+    data (bm3i( 4, 1,ibeta ), ibeta=1,10)/   &
+      0.84432_wp,0.85223_wp,0.86990_wp,0.89131_wp,0.91280_wp,0.93223_wp,0.94861_wp,0.96172_wp,   &
+      0.97185_wp,0.97945_wp/
+    data (bm3i( 4, 2,ibeta ), ibeta=1,10)/   &
+      0.82299_wp,0.83164_wp,0.85101_wp,0.87463_wp,0.89857_wp,0.92050_wp,0.93923_wp,0.95443_wp,   &
+      0.96629_wp,0.97529_wp/
+    data (bm3i( 4, 3,ibeta ), ibeta=1,10)/   &
+      0.77870_wp,0.78840_wp,0.81011_wp,0.83690_wp,0.86477_wp,0.89124_wp,0.91476_wp,0.93460_wp,   &
+      0.95063_wp,0.96316_wp/
+    data (bm3i( 4, 4,ibeta ), ibeta=1,10)/   &
+      0.76386_wp,0.77233_wp,0.79147_wp,0.81557_wp,0.84149_wp,0.86719_wp,0.89126_wp,0.91275_wp,   &
+      0.93116_wp,0.94637_wp/
+    data (bm3i( 4, 5,ibeta ), ibeta=1,10)/   &
+      0.82927_wp,0.83488_wp,0.84756_wp,0.86346_wp,0.88040_wp,0.89704_wp,0.91257_wp,0.92649_wp,   &
+      0.93857_wp,0.94874_wp/
+    data (bm3i( 4, 6,ibeta ), ibeta=1,10)/   &
+      0.92184_wp,0.92481_wp,0.93136_wp,0.93925_wp,0.94724_wp,0.95462_wp,0.96104_wp,0.96634_wp,   &
+      0.97048_wp,0.97348_wp/
+    data (bm3i( 4, 7,ibeta ), ibeta=1,10)/   &
+      0.97341_wp,0.97457_wp,0.97706_wp,0.97991_wp,0.98260_wp,0.98485_wp,0.98654_wp,0.98760_wp,   &
+      0.98801_wp,0.98777_wp/
+    data (bm3i( 4, 8,ibeta ), ibeta=1,10)/   &
+      0.99192_wp,0.99229_wp,0.99305_wp,0.99385_wp,0.99449_wp,0.99486_wp,0.99487_wp,0.99449_wp,   &
+      0.99367_wp,0.99239_wp/
+    data (bm3i( 4, 9,ibeta ), ibeta=1,10)/   &
+      0.99758_wp,0.99768_wp,0.99787_wp,0.99800_wp,0.99799_wp,0.99777_wp,0.99727_wp,0.99645_wp,   &
+      0.99527_wp,0.99369_wp/
+    data (bm3i( 4,10,ibeta ), ibeta=1,10)/   &
+      0.99926_wp,0.99928_wp,0.99928_wp,0.99921_wp,0.99900_wp,0.99860_wp,0.99795_wp,0.99701_wp,   &
+      0.99572_wp,0.99405_wp/
+    data (bm3i( 5, 1,ibeta ), ibeta=1,10)/   &
+      0.89577_wp,0.90190_wp,0.91522_wp,0.93076_wp,0.94575_wp,0.95876_wp,0.96932_wp,0.97751_wp,   &
+      0.98367_wp,0.98820_wp/
+    data (bm3i( 5, 2,ibeta ), ibeta=1,10)/   &
+      0.87860_wp,0.88547_wp,0.90052_wp,0.91828_wp,0.93557_wp,0.95075_wp,0.96319_wp,0.97292_wp,   &
+      0.98028_wp,0.98572_wp/
+    data (bm3i( 5, 3,ibeta ), ibeta=1,10)/   &
+      0.83381_wp,0.84240_wp,0.86141_wp,0.88425_wp,0.90707_wp,0.92770_wp,0.94510_wp,0.95906_wp,   &
+      0.96986_wp,0.97798_wp/
+    data (bm3i( 5, 4,ibeta ), ibeta=1,10)/   &
+      0.78530_wp,0.79463_wp,0.81550_wp,0.84127_wp,0.86813_wp,0.89367_wp,0.91642_wp,0.93566_wp,   &
+      0.95125_wp,0.96347_wp/
+    data (bm3i( 5, 5,ibeta ), ibeta=1,10)/   &
+      0.79614_wp,0.80332_wp,0.81957_wp,0.84001_wp,0.86190_wp,0.88351_wp,0.90368_wp,0.92169_wp,   &
+      0.93718_wp,0.95006_wp/
+    data (bm3i( 5, 6,ibeta ), ibeta=1,10)/   &
+      0.88192_wp,0.88617_wp,0.89565_wp,0.90728_wp,0.91931_wp,0.93076_wp,0.94107_wp,0.94997_wp,   &
+      0.95739_wp,0.96333_wp/
+    data (bm3i( 5, 7,ibeta ), ibeta=1,10)/   &
+      0.95509_wp,0.95698_wp,0.96105_wp,0.96583_wp,0.97048_wp,0.97460_wp,0.97796_wp,0.98050_wp,   &
+      0.98218_wp,0.98304_wp/
+    data (bm3i( 5, 8,ibeta ), ibeta=1,10)/   &
+      0.98596_wp,0.98660_wp,0.98794_wp,0.98943_wp,0.99074_wp,0.99172_wp,0.99227_wp,0.99235_wp,   &
+      0.99192_wp,0.99096_wp/
+    data (bm3i( 5, 9,ibeta ), ibeta=1,10)/   &
+      0.99581_wp,0.99600_wp,0.99637_wp,0.99672_wp,0.99691_wp,0.99687_wp,0.99653_wp,0.99585_wp,   &
+      0.99478_wp,0.99329_wp/
+    data (bm3i( 5,10,ibeta ), ibeta=1,10)/   &
+      0.99873_wp,0.99878_wp,0.99884_wp,0.99883_wp,0.99869_wp,0.99834_wp,0.99774_wp,0.99684_wp,   &
+      0.99558_wp,0.99394_wp/
+    data (bm3i( 6, 1,ibeta ), ibeta=1,10)/   &
+      0.93335_wp,0.93777_wp,0.94711_wp,0.95764_wp,0.96741_wp,0.97562_wp,0.98210_wp,0.98701_wp,   &
+      0.99064_wp,0.99327_wp/
+    data (bm3i( 6, 2,ibeta ), ibeta=1,10)/   &
+      0.92142_wp,0.92646_wp,0.93723_wp,0.94947_wp,0.96096_wp,0.97069_wp,0.97842_wp,0.98431_wp,   &
+      0.98868_wp,0.99186_wp/
+    data (bm3i( 6, 3,ibeta ), ibeta=1,10)/   &
+      0.88678_wp,0.89351_wp,0.90810_wp,0.92508_wp,0.94138_wp,0.95549_wp,0.96693_wp,0.97578_wp,   &
+      0.98243_wp,0.98731_wp/
+    data (bm3i( 6, 4,ibeta ), ibeta=1,10)/   &
+      0.83249_wp,0.84124_wp,0.86051_wp,0.88357_wp,0.90655_wp,0.92728_wp,0.94477_wp,0.95880_wp,   &
+      0.96964_wp,0.97779_wp/
+    data (bm3i( 6, 5,ibeta ), ibeta=1,10)/   &
+      0.79593_wp,0.80444_wp,0.82355_wp,0.84725_wp,0.87211_wp,0.89593_wp,0.91735_wp,0.93566_wp,   &
+      0.95066_wp,0.96255_wp/
+    data (bm3i( 6, 6,ibeta ), ibeta=1,10)/   &
+      0.84124_wp,0.84695_wp,0.85980_wp,0.87575_wp,0.89256_wp,0.90885_wp,0.92383_wp,0.93704_wp,   &
+      0.94830_wp,0.95761_wp/
+    data (bm3i( 6, 7,ibeta ), ibeta=1,10)/   &
+      0.92721_wp,0.93011_wp,0.93647_wp,0.94406_wp,0.95166_wp,0.95862_wp,0.96460_wp,0.96949_wp,   &
+      0.97326_wp,0.97595_wp/
+    data (bm3i( 6, 8,ibeta ), ibeta=1,10)/   &
+      0.97573_wp,0.97681_wp,0.97913_wp,0.98175_wp,0.98421_wp,0.98624_wp,0.98772_wp,0.98860_wp,   &
+      0.98885_wp,0.98847_wp/
+    data (bm3i( 6, 9,ibeta ), ibeta=1,10)/   &
+      0.99271_wp,0.99304_wp,0.99373_wp,0.99444_wp,0.99499_wp,0.99528_wp,0.99522_wp,0.99477_wp,   &
+      0.99390_wp,0.99258_wp/
+    data (bm3i( 6,10,ibeta ), ibeta=1,10)/   &
+      0.99782_wp,0.99791_wp,0.99807_wp,0.99817_wp,0.99813_wp,0.99788_wp,0.99737_wp,0.99653_wp,   &
+      0.99533_wp,0.99374_wp/
+    data (bm3i( 7, 1,ibeta ), ibeta=1,10)/   &
+      0.95858_wp,0.96158_wp,0.96780_wp,0.97460_wp,0.98073_wp,0.98575_wp,0.98963_wp,0.99252_wp,   &
+      0.99463_wp,0.99615_wp/
+    data (bm3i( 7, 2,ibeta ), ibeta=1,10)/   &
+      0.95091_wp,0.95438_wp,0.96163_wp,0.96962_wp,0.97688_wp,0.98286_wp,0.98751_wp,0.99099_wp,   &
+      0.99353_wp,0.99536_wp/
+    data (bm3i( 7, 3,ibeta ), ibeta=1,10)/   &
+      0.92751_wp,0.93233_wp,0.94255_wp,0.95406_wp,0.96473_wp,0.97366_wp,0.98070_wp,0.98602_wp,   &
+      0.98994_wp,0.99278_wp/
+    data (bm3i( 7, 4,ibeta ), ibeta=1,10)/   &
+      0.88371_wp,0.89075_wp,0.90595_wp,0.92351_wp,0.94028_wp,0.95474_wp,0.96642_wp,0.97544_wp,   &
+      0.98220_wp,0.98715_wp/
+    data (bm3i( 7, 5,ibeta ), ibeta=1,10)/   &
+      0.82880_wp,0.83750_wp,0.85671_wp,0.87980_wp,0.90297_wp,0.92404_wp,0.94195_wp,0.95644_wp,   &
+      0.96772_wp,0.97625_wp/
+    data (bm3i( 7, 6,ibeta ), ibeta=1,10)/   &
+      0.81933_wp,0.82655_wp,0.84279_wp,0.86295_wp,0.88412_wp,0.90449_wp,0.92295_wp,0.93890_wp,   &
+      0.95215_wp,0.96281_wp/
+    data (bm3i( 7, 7,ibeta ), ibeta=1,10)/   &
+      0.89099_wp,0.89519_wp,0.90448_wp,0.91577_wp,0.92732_wp,0.93820_wp,0.94789_wp,0.95616_wp,   &
+      0.96297_wp,0.96838_wp/
+    data (bm3i( 7, 8,ibeta ), ibeta=1,10)/   &
+      0.95886_wp,0.96064_wp,0.96448_wp,0.96894_wp,0.97324_wp,0.97701_wp,0.98004_wp,0.98228_wp,   &
+      0.98371_wp,0.98435_wp/
+    data (bm3i( 7, 9,ibeta ), ibeta=1,10)/   &
+      0.98727_wp,0.98786_wp,0.98908_wp,0.99043_wp,0.99160_wp,0.99245_wp,0.99288_wp,0.99285_wp,   &
+      0.99234_wp,0.99131_wp/
+    data (bm3i( 7,10,ibeta ), ibeta=1,10)/   &
+      0.99621_wp,0.99638_wp,0.99671_wp,0.99700_wp,0.99715_wp,0.99707_wp,0.99670_wp,0.99599_wp,   &
+      0.99489_wp,0.99338_wp/
+    data (bm3i( 8, 1,ibeta ), ibeta=1,10)/   &
+      0.97470_wp,0.97666_wp,0.98064_wp,0.98491_wp,0.98867_wp,0.99169_wp,0.99399_wp,0.99569_wp,   &
+      0.99691_wp,0.99779_wp/
+    data (bm3i( 8, 2,ibeta ), ibeta=1,10)/   &
+      0.96996_wp,0.97225_wp,0.97693_wp,0.98196_wp,0.98643_wp,0.99003_wp,0.99279_wp,0.99482_wp,   &
+      0.99630_wp,0.99735_wp/
+    data (bm3i( 8, 3,ibeta ), ibeta=1,10)/   &
+      0.95523_wp,0.95848_wp,0.96522_wp,0.97260_wp,0.97925_wp,0.98468_wp,0.98888_wp,0.99200_wp,   &
+      0.99427_wp,0.99590_wp/
+    data (bm3i( 8, 4,ibeta ), ibeta=1,10)/   &
+      0.92524_wp,0.93030_wp,0.94098_wp,0.95294_wp,0.96397_wp,0.97317_wp,0.98038_wp,0.98582_wp,   &
+      0.98981_wp,0.99270_wp/
+    data (bm3i( 8, 5,ibeta ), ibeta=1,10)/   &
+      0.87576_wp,0.88323_wp,0.89935_wp,0.91799_wp,0.93583_wp,0.95126_wp,0.96377_wp,0.97345_wp,   &
+      0.98072_wp,0.98606_wp/
+    data (bm3i( 8, 6,ibeta ), ibeta=1,10)/   &
+      0.83078_wp,0.83894_wp,0.85705_wp,0.87899_wp,0.90126_wp,0.92179_wp,0.93950_wp,0.95404_wp,   &
+      0.96551_wp,0.97430_wp/
+    data (bm3i( 8, 7,ibeta ), ibeta=1,10)/   &
+      0.85727_wp,0.86294_wp,0.87558_wp,0.89111_wp,0.90723_wp,0.92260_wp,0.93645_wp,0.94841_wp,   &
+      0.95838_wp,0.96643_wp/
+    data (bm3i( 8, 8,ibeta ), ibeta=1,10)/   &
+      0.93337_wp,0.93615_wp,0.94220_wp,0.94937_wp,0.95647_wp,0.96292_wp,0.96840_wp,0.97283_wp,   &
+      0.97619_wp,0.97854_wp/
+    data (bm3i( 8, 9,ibeta ), ibeta=1,10)/   &
+      0.97790_wp,0.97891_wp,0.98105_wp,0.98346_wp,0.98569_wp,0.98751_wp,0.98879_wp,0.98950_wp,   &
+      0.98961_wp,0.98912_wp/
+    data (bm3i( 8,10,ibeta ), ibeta=1,10)/   &
+      0.99337_wp,0.99367_wp,0.99430_wp,0.99493_wp,0.99541_wp,0.99562_wp,0.99551_wp,0.99501_wp,   &
+      0.99410_wp,0.99274_wp/
+    data (bm3i( 9, 1,ibeta ), ibeta=1,10)/   &
+      0.98470_wp,0.98594_wp,0.98844_wp,0.99106_wp,0.99334_wp,0.99514_wp,0.99650_wp,0.99749_wp,   &
+      0.99821_wp,0.99872_wp/
+    data (bm3i( 9, 2,ibeta ), ibeta=1,10)/   &
+      0.98184_wp,0.98330_wp,0.98624_wp,0.98934_wp,0.99205_wp,0.99420_wp,0.99582_wp,0.99701_wp,   &
+      0.99787_wp,0.99848_wp/
+    data (bm3i( 9, 3,ibeta ), ibeta=1,10)/   &
+      0.97288_wp,0.97498_wp,0.97927_wp,0.98385_wp,0.98789_wp,0.99113_wp,0.99360_wp,0.99541_wp,   &
+      0.99673_wp,0.99766_wp/
+    data (bm3i( 9, 4,ibeta ), ibeta=1,10)/   &
+      0.95403_wp,0.95741_wp,0.96440_wp,0.97202_wp,0.97887_wp,0.98444_wp,0.98872_wp,0.99190_wp,   &
+      0.99421_wp,0.99586_wp/
+    data (bm3i( 9, 5,ibeta ), ibeta=1,10)/   &
+      0.91845_wp,0.92399_wp,0.93567_wp,0.94873_wp,0.96076_wp,0.97079_wp,0.97865_wp,0.98457_wp,   &
+      0.98892_wp,0.99206_wp/
+    data (bm3i( 9, 6,ibeta ), ibeta=1,10)/   &
+      0.86762_wp,0.87533_wp,0.89202_wp,0.91148_wp,0.93027_wp,0.94669_wp,0.96013_wp,0.97062_wp,   &
+      0.97855_wp,0.98441_wp/
+    data (bm3i( 9, 7,ibeta ), ibeta=1,10)/   &
+      0.84550_wp,0.85253_wp,0.86816_wp,0.88721_wp,0.90671_wp,0.92490_wp,0.94083_wp,0.95413_wp,   &
+      0.96481_wp,0.97314_wp/
+    data (bm3i( 9, 8,ibeta ), ibeta=1,10)/   &
+      0.90138_wp,0.90544_wp,0.91437_wp,0.92513_wp,0.93602_wp,0.94615_wp,0.95506_wp,0.96258_wp,   &
+      0.96868_wp,0.97347_wp/
+    data (bm3i( 9, 9,ibeta ), ibeta=1,10)/   &
+      0.96248_wp,0.96415_wp,0.96773_wp,0.97187_wp,0.97583_wp,0.97925_wp,0.98198_wp,0.98394_wp,   &
+      0.98514_wp,0.98559_wp/
+    data (bm3i( 9,10,ibeta ), ibeta=1,10)/   &
+      0.98837_wp,0.98892_wp,0.99005_wp,0.99127_wp,0.99232_wp,0.99306_wp,0.99339_wp,0.99328_wp,   &
+      0.99269_wp,0.99161_wp/
+    data (bm3i(10, 1,ibeta ), ibeta=1,10)/   &
+      0.99080_wp,0.99158_wp,0.99311_wp,0.99471_wp,0.99607_wp,0.99715_wp,0.99795_wp,0.99853_wp,   &
+      0.99895_wp,0.99925_wp/
+    data (bm3i(10, 2,ibeta ), ibeta=1,10)/   &
+      0.98910_wp,0.99001_wp,0.99182_wp,0.99371_wp,0.99533_wp,0.99661_wp,0.99757_wp,0.99826_wp,   &
+      0.99876_wp,0.99912_wp/
+    data (bm3i(10, 3,ibeta ), ibeta=1,10)/   &
+      0.98374_wp,0.98506_wp,0.98772_wp,0.99051_wp,0.99294_wp,0.99486_wp,0.99630_wp,0.99736_wp,   &
+      0.99812_wp,0.99866_wp/
+    data (bm3i(10, 4,ibeta ), ibeta=1,10)/   &
+      0.97238_wp,0.97453_wp,0.97892_wp,0.98361_wp,0.98773_wp,0.99104_wp,0.99354_wp,0.99538_wp,   &
+      0.99671_wp,0.99765_wp/
+    data (bm3i(10, 5,ibeta ), ibeta=1,10)/   &
+      0.94961_wp,0.95333_wp,0.96103_wp,0.96941_wp,0.97693_wp,0.98303_wp,0.98772_wp,0.99119_wp,   &
+      0.99371_wp,0.99551_wp/
+    data (bm3i(10, 6,ibeta ), ibeta=1,10)/   &
+      0.90943_wp,0.91550_wp,0.92834_wp,0.94275_wp,0.95608_wp,0.96723_wp,0.97600_wp,0.98263_wp,   &
+      0.98751_wp,0.99103_wp/
+    data (bm3i(10, 7,ibeta ), ibeta=1,10)/   &
+      0.86454_wp,0.87200_wp,0.88829_wp,0.90749_wp,0.92630_wp,0.94300_wp,0.95687_wp,0.96785_wp,   &
+      0.97626_wp,0.98254_wp/
+    data (bm3i(10, 8,ibeta ), ibeta=1,10)/   &
+      0.87498_wp,0.88048_wp,0.89264_wp,0.90737_wp,0.92240_wp,0.93642_wp,0.94877_wp,0.95917_wp,   &
+      0.96762_wp,0.97429_wp/
+    data (bm3i(10, 9,ibeta ), ibeta=1,10)/   &
+      0.93946_wp,0.94209_wp,0.94781_wp,0.95452_wp,0.96111_wp,0.96704_wp,0.97203_wp,0.97602_wp,   &
+      0.97900_wp,0.98106_wp/
+    data (bm3i(10,10,ibeta ), ibeta=1,10)/   &
+      0.97977_wp,0.98071_wp,0.98270_wp,0.98492_wp,0.98695_wp,0.98858_wp,0.98970_wp,0.99027_wp,   &
+      0.99026_wp,0.98968_wp/
+
+    ! *** end of data statements *************************************
+
+    !----------------------------------------------------------
+    ! Start calculations
+    !----------------------------------------------------------
+    ! Constants and parameters
+
+    sqrttwo = sqrt(two)
+    dlgsqt2 = one / log( sqrttwo )
+
+    esat01   = exp( 0.125_wp * xxlsgat * xxlsgat )
+    esac01   = exp( 0.125_wp * xxlsgac * xxlsgac )
+
+    esat04  = esat01 ** 4
+    esac04  = esac01 ** 4
+
+    esat05  = esat04 * esat01
+    esac05  = esac04 * esac01
+
+    esat08  = esat04 * esat04
+    esac08  = esac04 * esac04
+
+    esat09  = esat08 * esat01
+    esac09  = esac08 * esac01
+
+    esat16  = esat08 * esat08
+    esac16  = esac08 * esac08
+
+    esat20  = esat16 * esat04
+    esac20  = esac16 * esac04
+
+    esat24  = esat20 * esat04
+    esac24  = esac20 * esac04
+
+    esat25  = esat20 * esat05
+    esac25  = esac20 * esac05
+
+    esat36  = esat20 * esat16
+    esac36  = esac20 * esac16
+
+    esat49  = esat24 * esat25
+
+    esat64  = esat20 * esat20 * esat24
+    esac64  = esac20 * esac20 * esac24
+
+    esat100 = esat64 * esat36
+
+    dgat2   = dgatk * dgatk
+    dgat3   = dgatk * dgatk * dgatk
+    dgac2   = dgacc * dgacc
+    dgac3   = dgacc * dgacc * dgacc
+
+    sqdgat  = sqrt( dgatk )
+    sqdgac  = sqrt( dgacc )
+    sqdgat5 = dgat2 * sqdgat
+    sqdgac5 = dgac2 * sqdgac
+    sqdgat7 = dgat3 * sqdgat
+
+    !------------------------------------------------------------------
+    ! For the free molecular regime:  page h.3 of whitby et al. (1991)
+    !------------------------------------------------------------------
+    r       = sqdgac / sqdgat
+    r2      = r * r
+    r3      = r2 * r
+    rx4     = r2 * r2
+    ri1     = one / r
+    ri2     = one / r2
+    ri3     = one / r3
+    kngat   = two * lamda / dgatk
+    kngac   = two * lamda / dgacc
+
+    ! Calculate ratio of geometric mean diameters
+
+    rat = dgacc / dgatk
+
+    ! Trap subscripts for bm0 and bm0i, between 1 and 10.
+    ! See page h.5 of whitby et al. (1991)
+
+    n2n = max( 1, min( 10,   nint( 4.0_wp * ( sgatk - 0.75_wp ) ) ) )
+    n2a = max( 1, min( 10,   nint( 4.0_wp * ( sgacc - 0.75_wp ) ) ) )
+    n1  = max( 1, min( 10,   1 + nint( dlgsqt2 * log( rat ) ) ) )
+
+    !----------------------------------------------------
+    ! Intermodal coagulation, set up for zeroeth moment
+    !----------------------------------------------------
+    ! Near-continuum form:  equation h.10a of whitby et al. (1991)
+
+    coagnc0 = knc * (   &
+      two + a * ( kngat * ( esat04 + r2 * esat16 * esac04 )   &
+      + kngac * ( esac04 + ri2 * esac16 * esat04 ) )   &
+      + ( r2 + ri2 ) * esat04 * esac04  )
+
+    ! Free-molecular form:  equation h.7a of whitby et al. (1991)
+
+    coagfm0 = kfmatac * sqdgat * bm0ij(n1,n2n,n2a) * (   &
+      esat01 + r * esac01 + two * r2 * esat01 * esac04   &
+      + rx4 * esat09 * esac16 + ri3 * esat16 * esac09   &
+      + two * ri1 * esat04 + esac01  )
+
+    ! Loss to accumulation mode, harmonic mean
+
+    qn12 = coagnc0 * coagfm0 / ( coagnc0 + coagfm0 )
+
+    !-----------------------------------------------------------------
+    ! Intermodal coagulation, zeroeth moment, set up for third moment
+    !-----------------------------------------------------------------
+    ! Near-continuum form: equation h.10b of whitby et al. (1991)
+
+    coagnc3 = knc * dgat3 * (   &
+      two * esat36   &
+      + a * kngat * ( esat16 + r2 * esat04 * esac04 )   &
+      + a * kngac * ( esat36 * esac04 + ri2 * esat64 * esac16 )   &
+      + r2 * esat16 * esac04 + ri2 * esat64 * esac04 )
+
+    ! Free-molecular form: equation h.7b of whitby et al. (1991)
+
+    coagfm3 = kfmatac * sqdgat7 * bm3i( n1, n2n, n2a ) * (   &
+      esat49   &
+      +  r * esat36  * esac01   &
+      + two * r2 * esat25  * esac04   &
+      + rx4 * esat09  * esac16   &
+      + ri3 * esat100 * esac09   &
+      + two * ri1 * esat64  * esac01 )
+
+    ! Gain by accumulation mode = loss from aitken mode. Harmonic mean
+
+    qv12 = coagnc3 * coagfm3 / ( coagnc3 + coagfm3 )
+
+    !-----------------------------------------------------
+    ! Intramodal coagulation
+    !-----------------------------------------------------
+    ! aitken mode
+    !--------------
+    ! Near-continuum form: equation h.12a of whitby et al. (1991)
+    coagnc_at = knc * (one + esat08 + a * kngat * (esat20 + esat04))
+
+    ! Free-molecular form: equation h.11a of whitby et al. (1991)
+    coagfm_at = kfmat * sqdgat * bm0(n2n) *  ( esat01 + esat25 + two * esat05 )
+
+    ! Harmonic mean
+    qn11 = coagfm_at * coagnc_at / ( coagfm_at + coagnc_at )
+
+    !-------------------
+    ! accumulation mode
+    !-------------------
+    ! Near-continuum form: equation h.12a of whitby et al. (1991)
+    coagnc_ac = knc * (one + esac08 + a * kngac * (esac20 + esac04))
+
+    ! Free-molecular form: equation h.11a of whitby et al. (1991)
+    coagfm_ac = kfmac * sqdgac * bm0(n2a) * ( esac01 + esac25 + two * esac05 )
+
+    ! Harmonic mean
+    qn22 = coagfm_ac * coagnc_ac / ( coagfm_ac + coagnc_ac )
+
+end  subroutine getcoags
+
+end module modal_aero_coag

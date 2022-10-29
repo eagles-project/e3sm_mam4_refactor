@@ -2074,16 +2074,12 @@ do_newnuc_if_block50: &
       qaer_sv1 = qaer_cur
 
       call mam_coag_1subarea(                                       &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
          dtsubstep,                                                 &
          temp,              pmid,             aircon,               &
          dgn_a,             dgn_awet,         wetdens,              &
          n_mode,                                                    &
          qnum_cur,                                                  &
-         qaer_cur,          qaer_delsub_coag_in,                    &
-         qwtr_cur                                                   )
+         qaer_cur,          qaer_delsub_coag_in                     )
 
       qnum_delsub_coag = qnum_cur - qnum_sv1
       qaer_delsub_coag = qaer_cur - qaer_sv1
@@ -5044,6 +5040,12 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
             write(iulog,'(4i5,2x,a)') &
                lmz+loffset, lmz, lmapcc_all(lmz), j, solsym(lmz)
          end do
+
+         write(iulog,'(/a)') 'coag: ipair, modefrm, modetoo, modeend'
+         do ipair = 1,n_coagpair
+            write(iulog,*) ipair, modefrm_coagpair(ipair), modetoo_coagpair(ipair), modeend_coagpair(ipair)
+         end do
+         write(iulog,'(a/)') 'coag: ----'
 
       end if ! ( masterproc )
 
