@@ -412,47 +412,30 @@ subroutine ma_convproc_dp_intr(                &
 !  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
 
 ! Local variables
-   integer :: i, ii
-   integer :: k, kaa, kbb, kk
-   integer :: l, ll, lchnk, lun
-   integer :: n, ncol, nstep
+   integer :: ii
+   integer :: lchnk, lun
+   integer :: ncol, nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
-   real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
-   real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
-   real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
-   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
-
+   real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets. this variable may be removed
+   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols) !these variables may be removed
 
 !
 ! Initialize
 !
    lun = iulog
 
-!
-! Transport all constituents except cloud water and ice
-!
-
    lchnk = state%lchnk
    ncol  = state%ncol
    nstep = get_nstep()
 
-!
-!     Convective transport of all trace species except cloud liquid 
-!     and cloud ice done here because we need to do the scavenging first
-!     to determine the interstitial fraction.
-!
-
 ! initialize dpdry (units=mb), which is used for tracers of dry mixing ratio type
    dpdry = 0._r8
-   do i = 1, lengath
-      dpdry(i,:) = state%pdeldry(ideep(i),:)/100._r8
+   do ii = 1, lengath
+      dpdry(ii,:) = state%pdeldry(ideep(ii),:)/100._r8
    end do
 
-! qaa hold tracer mixing ratios
-   qaa = q
-
+! turn on/off calculations for aerosols and trace gases
    call assign_dotend( species_class, dotend)
 
 !
@@ -474,7 +457,7 @@ subroutine ma_convproc_dp_intr(                &
    call ma_convproc_tend(                                            &
                      'deep',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
-                     state%t,    state%pmid, state%pdel, qaa,        &   
+                     state%t,    state%pmid, state%pdel, q,          &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -555,9 +538,7 @@ subroutine ma_convproc_sh_intr(                 &
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets
-   real(r8) :: qaa(pcols,pver,pcnst), qbb(pcols,pver,pcnst)
-   real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpg
-   real(r8) :: tmpveca(300), tmpvecb(300), tmpvecc(300)
+   real(r8) :: tmpa, tmpb
    real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
 
 ! variables that mimic the zm-deep counterparts
@@ -581,22 +562,9 @@ subroutine ma_convproc_sh_intr(                 &
 !
    lun = iulog
 
-! call physics_ptend_init(ptend)
-
-
-!
-! Transport all constituents except cloud water and ice
-!
-
    lchnk = state%lchnk
    ncol  = state%ncol
    nstep = get_nstep()
-
-!
-!     Convective transport of all trace species except cloud liquid 
-!     and cloud ice done here because we need to do the scavenging first
-!     to determine the interstitial fraction.
-!
 
 !
 ! create mass flux, entrainment, detrainment, and delta-p arrays 
@@ -702,10 +670,6 @@ subroutine ma_convproc_sh_intr(                 &
    end do ! i
 
 
-! qaa hold tracer mixing ratios
-   qaa = q
-
-
 ! turn on/off calculations for aerosols and trace gases
    call assign_dotend( species_class, dotend)
 
@@ -728,7 +692,7 @@ subroutine ma_convproc_sh_intr(                 &
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
                      lchnk,      pcnst,      nstep,      dt,         &
-                     state%t,    state%pmid, state%pdel, qaa,        &   
+                     state%t,    state%pmid, state%pdel, q,          &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
