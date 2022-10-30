@@ -252,7 +252,6 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      !
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
-     dotend(:) = .false.
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
         state, ztodt,                             &
@@ -274,7 +273,6 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      !
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
-     dotend(:) = .false.
      call ma_convproc_sh_intr(                    &
         state, ztodt,                             &
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
@@ -346,13 +344,13 @@ end subroutine update_qnew_ptend
 
 !=========================================================================================
 subroutine ma_convproc_dp_intr(                &
-     state,  dt,                               &
-     dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
-     mu, md, du, eu,                           &
-     ed, dp,                                   &
-     jt, maxg, ideep, lengath,                 &
-     q, dqdt, dotend, nsrflx, qsrflx,          &
-     species_class )
+     state,  dt,                               & ! in
+     dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
+     mu, md, du, eu,                           & ! in
+     ed, dp,                                   & ! in
+     jt, maxg, ideep, lengath,   q,            & ! in
+     dqdt, dotend, nsrflx, qsrflx,             & ! inout (except nsrflx and dotend)
+     species_class                             ) ! in
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -386,7 +384,7 @@ subroutine ma_convproc_dp_intr(                &
 
    real(r8), intent(in)    :: q(pcols,pver,pcnst)
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)
-   logical,  intent(inout) :: dotend(pcnst)
+   logical,  intent(out)   :: dotend(pcnst)
    integer,  intent(in)    :: nsrflx
    real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
 
@@ -415,8 +413,6 @@ subroutine ma_convproc_dp_intr(                &
 
 ! Local variables
    integer :: i, ii
-   integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
-   integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: k, kaa, kbb, kk
    integer :: l, ll, lchnk, lun
    integer :: n, ncol, nstep
@@ -434,8 +430,6 @@ subroutine ma_convproc_dp_intr(                &
 !
    lun = iulog
 
-! call physics_ptend_init(ptend)
-
 !
 ! Transport all constituents except cloud water and ice
 !
@@ -449,8 +443,6 @@ subroutine ma_convproc_dp_intr(                &
 !     and cloud ice done here because we need to do the scavenging first
 !     to determine the interstitial fraction.
 !
-!  call cnst_get_ind('CLDLIQ', ixcldliq)
-!  call cnst_get_ind('CLDICE', ixcldice)
 
 ! initialize dpdry (units=mb), which is used for tracers of dry mixing ratio type
    dpdry = 0._r8
@@ -461,23 +453,7 @@ subroutine ma_convproc_dp_intr(                &
 ! qaa hold tracer mixing ratios
    qaa = q
 
-! turn on/off calculations for aerosols and trace gases
-   do l = 1, pcnst
-      dotend(l) = .false.
-      if (species_class(l) == spec_class_aerosol) then
-         if (convproc_do_aer) dotend(l) = .true.
-      else if (species_class(l) == spec_class_gas) then
-         if (convproc_do_gas) dotend(l) = .true.
-      end if
-   end do
-
-
-
-! change profiles of first 4 gases
-   call cnst_get_ind('H2O2',   ixh2o2)
-   call cnst_get_ind('so4_a1', ixso4_a1)
-   call cnst_get_ind('bc_a1',  ixbc_a1)
-
+   call assign_dotend( species_class, dotend)
 
 !
 ! do ma_convproc_tend call
@@ -504,16 +480,12 @@ subroutine ma_convproc_dp_intr(                &
                      maxg,       ideep,      1,          lengath,    &       
                      dp_frac,    icwmrdp,    rprddp,     evapcdp,    &
                      fracice,                                        &
-                     dqdt,       dotend,     nsrflx,     qsrflx,     &
+                     dqdt,                                           & ! out
+                     dotend,     nsrflx,                             &
+                     qsrflx,                                         & ! out
                      species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
                      lun                                             )
-
-
-   call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, lchnk )
-   call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, lchnk )
-   call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, lchnk )
-
 
 end subroutine ma_convproc_dp_intr
 
@@ -521,11 +493,11 @@ end subroutine ma_convproc_dp_intr
 
 !=========================================================================================
 subroutine ma_convproc_sh_intr(                 &
-     state, dt,                                 &
-     sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  &
-     cmfmcsh, sh_e_ed_ratio,                    &
-     q, dqdt, dotend, nsrflx, qsrflx,           &
-     species_class  )
+     state, dt,                                 & ! in
+     sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  & ! in
+     cmfmcsh, sh_e_ed_ratio,    q,              & ! in
+     dqdt, dotend, nsrflx, qsrflx,              & ! inout (except nsrflx and dotend)
+     species_class                              ) ! in
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -559,7 +531,7 @@ subroutine ma_convproc_sh_intr(                 &
 
    real(r8), intent(in)    :: q(pcols,pver,pcnst)
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)
-   logical,  intent(inout) :: dotend(pcnst)
+   logical,  intent(out)   :: dotend(pcnst)
    integer,  intent(in)    :: nsrflx
    real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
 
@@ -576,8 +548,6 @@ subroutine ma_convproc_sh_intr(                 &
 
 ! Local variables
    integer :: i, ii
-   integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
-   integer :: ixh2o2, ixbc_a1, ixso4_a1
    integer :: k, kaa, kbb, kcc, kk
    integer :: l, ll, lchnk, lun
    integer :: maxg_minval
@@ -627,8 +597,6 @@ subroutine ma_convproc_sh_intr(                 &
 !     and cloud ice done here because we need to do the scavenging first
 !     to determine the interstitial fraction.
 !
-!  call cnst_get_ind('CLDLIQ', ixcldliq)
-!  call cnst_get_ind('CLDICE', ixcldice)
 
 !
 ! create mass flux, entrainment, detrainment, and delta-p arrays 
@@ -739,21 +707,7 @@ subroutine ma_convproc_sh_intr(                 &
 
 
 ! turn on/off calculations for aerosols and trace gases
-   do l = 1, pcnst
-      dotend(l) = .false.
-      if (species_class(l) == spec_class_aerosol) then
-         if (convproc_do_aer) dotend(l) = .true.
-      else if (species_class(l) == spec_class_gas) then
-         if (convproc_do_gas) dotend(l) = .true.
-      end if
-   end do
-
-
-
-! change profiles of first 4 gases
-   call cnst_get_ind('H2O2',   ixh2o2)
-   call cnst_get_ind('so4_a1', ixso4_a1)
-   call cnst_get_ind('bc_a1',  ixbc_a1)
+   call assign_dotend( species_class, dotend)
 
 !
 ! do ma_convproc_tend call
@@ -780,40 +734,62 @@ subroutine ma_convproc_sh_intr(                 &
                      maxg,       ideep,      1,          lengath,    &       
                      sh_frac,    icwmrsh,    rprdsh,     evapcsh,    &
                      fracice,                                        &
-                     dqdt,       dotend,     nsrflx,     qsrflx,     &
+                     dqdt,                                           & ! out
+                     dotend,     nsrflx,                             &
+                     qsrflx,                                         & ! out
                      species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
                      lun                                             )
-
-
-
-!  if (maxg_minval <= pver) write(lun,'(i3.3,i9,a)') &
-!     maxg_minval, lchnk, '  sqak999888 lchnk, maxg_minval'
-
-
-   call outfld( 'SH_MFUP_MAX', xx_mfup_max, pcols, lchnk )
-   call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, lchnk )
-   call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, lchnk )
 
 
 end subroutine ma_convproc_sh_intr
 
+!=========================================================================================
+subroutine assign_dotend( species_class,  & ! in
+                          dotend          ) ! out
+!---------------------------------------------------------------------
+! assign do-tendency flag from species_class, convproc_do_aer and
+! convproc_do_gas.
+! convproc_do_aer and convproc_do_gas are assigned in the beginning of the
+! module
+!---------------------------------------------------------------------
 
+use constituents,   only: pcnst
+
+integer,  intent(in)    :: species_class(:)
+logical,  intent(out)   :: dotend(pcnst)
+
+integer  :: ll
+
+! turn on/off calculations for aerosols and trace gases
+   do ll = 1, pcnst
+      if (species_class(ll) == spec_class_aerosol .and. convproc_do_aer) then
+         dotend(ll) = .true.
+      elseif (species_class(ll) == spec_class_gas .and. convproc_do_gas) then
+         dotend(ll) = .true.
+      else
+         dotend(ll) = .false.
+      endif
+   enddo
+
+end subroutine assign_dotend
 
 !=========================================================================================
 subroutine ma_convproc_tend(                                           &
-                     convtype,                                       &
-                     lchnk,      ncnst,      nstep,      dt,         &
-                     t,          pmid,       pdel,       q,          &   
-                     mu,         md,         du,         eu,         &   
-                     ed,         dp,         dpdry,      jt,         &   
-                     mx,         ideep,      il1g,       il2g,       &       
-                     cldfrac,    icwmr,      rprd,       evapc,      &
-                     fracice,                                        &
-                     dqdt,       doconvproc, nsrflx,     qsrflx,     &
-                     species_class,                                  & 
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          &
-                     lun                                             )
+                     convtype,                                       & ! in
+                     lchnk,      ncnst,      nstep,      dt,         & ! in
+                     t,          pmid,       pdel,       q,          & ! in
+                     mu,         md,         du,         eu,         & ! in
+                     ed,         dp,         dpdry,      jt,         & ! in
+                     mx,         ideep,      il1g,       il2g,       & ! in  
+                     cldfrac,    icwmr,      rprd,       evapc,      & ! in
+                     fracice,                                        & ! in
+                     dqdt,                                           & ! out
+                     doconvproc, nsrflx,                             & ! in
+                     qsrflx,                                         & ! out
+                     species_class,                                  & ! in
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
+                     lun                                             ) ! in
 
 !----------------------------------------------------------------------- 
 ! 
