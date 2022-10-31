@@ -376,7 +376,7 @@ contains
        use physconst,             only: rhoh2o, mwh2o
        use modal_aero_amicphys,   only: modal_aero_amicphys_init
        use modal_aero_calcsize,   only: modal_aero_calcsize_init
-       use modal_aero_coag,       only: modal_aero_coag_init
+      !use modal_aero_coag,       only: modal_aero_coag_init
        use modal_aero_deposition, only: modal_aero_deposition_init
        use modal_aero_gasaerexch, only: modal_aero_gasaerexch_init
        use modal_aero_newnuc,     only: modal_aero_newnuc_init
@@ -604,19 +604,9 @@ loop:    do i = icldphy+1, pcnst
        !
        !   call other initialization routines
        !
-       if ( mam_amicphys_optaa > 0 ) then
-          call modal_aero_calcsize_init( pbuf2d, species_class )
-          call modal_aero_newnuc_init( mam_amicphys_optaa )
-          call modal_aero_amicphys_init( imozart, species_class,n_so4_monolayers_pcage_in )
-       else
-          call modal_aero_rename_init
-          !   calcsize call must follow rename call
-          call modal_aero_calcsize_init( pbuf2d, species_class )
-          call modal_aero_gasaerexch_init
-          !   coag call must follow gasaerexch call
-          call modal_aero_coag_init
-          call modal_aero_newnuc_init( mam_amicphys_optaa )
-       endif
+       call modal_aero_calcsize_init( pbuf2d, species_class )
+       call modal_aero_newnuc_init( mam_amicphys_optaa )
+       call modal_aero_amicphys_init( imozart, species_class,n_so4_monolayers_pcage_in )
 
        ! call modal_aero_deposition_init only if the user has not specified 
        ! prescribed aerosol deposition fluxes
