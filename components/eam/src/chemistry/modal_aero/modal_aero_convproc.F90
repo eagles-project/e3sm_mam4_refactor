@@ -254,13 +254,14 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      qsrflx(:,:,:) = 0.0_r8
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
-        state, ztodt,                             &
-        dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, &
-        mu, md, du, eu,                           &
-        ed, dp,                                   &
-        jt, maxg, ideep, lengath,                 &
-        qnew, dqdt, dotend, nsrflx, qsrflx,       &
-        species_class )
+        state, ztodt,                             & ! in
+        dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
+        mu, md, du, eu, ed, dp,                   & ! in
+        jt, maxg, ideep, lengath, qnew,           & ! in
+        nsrflx,  species_class,                   & ! in
+        dqdt, qsrflx,                             & ! inout
+        dotend                                    ) ! out
+
      ! apply deep conv processing tendency and prepare for shallow conv processing
      call update_qnew_ptend(                       &
             dotend, .true.,          .true.,       &  ! in
@@ -274,11 +275,13 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
      call ma_convproc_sh_intr(                    &
-        state, ztodt,                             &
-        sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, &
-        cmfmcsh, sh_e_ed_ratio,                   &
-        qnew, dqdt, dotend, nsrflx, qsrflx,       &
-        species_class )
+        state, ztodt,                             & ! in
+        sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, & ! in
+        cmfmcsh, sh_e_ed_ratio,   qnew,           & ! in
+        nsrflx,  species_class,                   & ! in
+        dqdt,    qsrflx,                          & ! inout
+        dotend                                    ) ! out
+
      ! apply shallow conv processing tendency
      call update_qnew_ptend(                         &
               dotend, .true.,          .true.,       &  ! in
@@ -346,11 +349,11 @@ end subroutine update_qnew_ptend
 subroutine ma_convproc_dp_intr(                &
      state,  dt,                               & ! in
      dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
-     mu, md, du, eu,                           & ! in
-     ed, dp,                                   & ! in
-     jt, maxg, ideep, lengath,   q,            & ! in
-     dqdt, dotend, nsrflx, qsrflx,             & ! inout (except nsrflx and dotend)
-     species_class                             ) ! in
+     mu, md, du, eu, ed, dp,                   & ! in
+     jt, maxg, ideep, lengath,   qnew,         & ! in
+     nsrflx,  species_class,                   & ! in
+     dqdt, qsrflx,                             & ! inout
+     dotend                                    ) ! out
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -368,65 +371,56 @@ subroutine ma_convproc_dp_intr(                &
 ! 
 !-----------------------------------------------------------------------
 
-   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
+   use physics_types,  only: physics_state
    use time_manager,   only: get_nstep
-   use constituents,   only: pcnst, cnst_get_ind, cnst_name
-   use error_messages, only: alloc_err	
+   use constituents,   only: pcnst
 
-   use physconst,      only: gravit, rair
 
-   use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
 
-   real(r8), intent(in) :: dt                         ! delta t (model time increment)
+   real(r8), intent(in)    :: dt                         ! delta t (model time increment) [s]
 
-   real(r8), intent(in)    :: q(pcols,pver,pcnst)
-   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)
-   logical,  intent(out)   :: dotend(pcnst)
-   integer,  intent(in)    :: nsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
+   real(r8), intent(in)    :: qnew(pcols,pver,pcnst)     ! tracer mixing ratio including water vapor [kg/kg]
+   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)     ! time tendency of q [kg/kg/s]
+   logical,  intent(out)   :: dotend(pcnst)              ! if do tendency
+   integer,  intent(in)    :: nsrflx                     ! last dimension of qsrflx
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx) ! process-specific column tracer tendencies (see ma_convproc_intr for more information)
 
-   real(r8), intent(in)    :: dp_frac(pcols,pver) ! Deep conv cloud frac (0-1)
-   real(r8), intent(in)    :: icwmrdp(pcols,pver) ! Deep conv cloud condensate (kg/kg - in cloud)
-   real(r8), intent(in)    :: rprddp(pcols,pver)  ! Deep conv precip production (kg/kg/s - grid avg)
-   real(r8), intent(in)    :: evapcdp(pcols,pver) ! Deep conv precip evaporation (kg/kg/s - grid avg)
-   real(r8), intent(in)    :: dlfdp(pcols,pver)   ! Deep conv cldwtr detrainment (kg/kg/s - grid avg)
+   real(r8), intent(in)    :: dp_frac(pcols,pver) ! Deep conv cloud fraction [0-1]
+   real(r8), intent(in)    :: icwmrdp(pcols,pver) ! Deep conv cloud condensate (in cloud) [kg/kg]
+   real(r8), intent(in)    :: rprddp(pcols,pver)  ! Deep conv precip production (grid avg) [kg/kg/s]
+   real(r8), intent(in)    :: evapcdp(pcols,pver) ! Deep conv precip evaporation (grid avg) [kg/kg/s]
+   real(r8), intent(in)    :: dlfdp(pcols,pver)   ! Deep conv cldwtr detrainment (grid avg) [kg/kg/s]
 
                                                ! mu, md, ..., ideep, lengath are all deep conv variables
-   real(r8), intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive)
-   real(r8), intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative)
-   real(r8), intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft
-   real(r8), intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft
-   real(r8), intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft
+   real(r8), intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
+   real(r8), intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative) [mb/s]
+   real(r8), intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
+   real(r8), intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
+   real(r8), intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft [1/s]
                            ! eu, ed, du are "d(massflux)/dp" and are all positive
-   real(r8), intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces
+   real(r8), intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces [mb]
 
    integer,  intent(in)    :: jt(pcols)         ! Index of cloud top for each column
    integer,  intent(in)    :: maxg(pcols)       ! Index of cloud top for each column
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
-   integer,  intent(in)    :: species_class(:)
-
-!  real(r8), intent(in)    :: concld(pcols,pver) ! Convective cloud cover
+   integer,  intent(in)    :: species_class(:)  ! species index
 
 ! Local variables
    integer :: ii
-   integer :: lchnk, lun
-   integer :: ncol, nstep
+   integer :: nstep
 
-   real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry (mb)
+   real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets. this variable may be removed
    real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols) !these variables may be removed
 
 !
 ! Initialize
 !
-   lun = iulog
 
-   lchnk = state%lchnk
-   ncol  = state%ncol
    nstep = get_nstep()
 
 ! initialize dpdry (units=mb), which is used for tracers of dry mixing ratio type
@@ -456,8 +450,8 @@ subroutine ma_convproc_dp_intr(                &
 
    call ma_convproc_tend(                                            &
                      'deep',                                         &
-                     lchnk,      pcnst,      nstep,      dt,         &
-                     state%t,    state%pmid, state%pdel, q,          &   
+                     state%lchnk,      pcnst,      nstep,      dt,   &
+                     state%t,    state%pmid, state%pdel, qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -467,8 +461,7 @@ subroutine ma_convproc_dp_intr(                &
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
                      species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
-                     lun                                             )
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
 end subroutine ma_convproc_dp_intr
 
@@ -478,9 +471,10 @@ end subroutine ma_convproc_dp_intr
 subroutine ma_convproc_sh_intr(                 &
      state, dt,                                 & ! in
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  & ! in
-     cmfmcsh, sh_e_ed_ratio,    q,              & ! in
-     dqdt, dotend, nsrflx, qsrflx,              & ! inout (except nsrflx and dotend)
-     species_class                              ) ! in
+     cmfmcsh, sh_e_ed_ratio,    qnew,           & ! in
+     nsrflx,  species_class,                    & ! in
+     dqdt,    qsrflx,                           & ! inout
+     dotend                                     ) ! out
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -504,38 +498,25 @@ subroutine ma_convproc_sh_intr(                 &
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
-   real(r8), intent(in)    :: dt                      ! delta t (model time increment)
-   real(r8), intent(in)    :: q(pcols,pver,pcnst)     ! tracer mixing ratio (TMR) including water vapor [kg/kg]
+   real(r8), intent(in)    :: dt                      ! delta t (model time increment) [s]
+   real(r8), intent(in)    :: qnew(pcols,pver,pcnst)  ! tracer mixing ratio (TMR) including water vapor [kg/kg]
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)  ! time tendency of TMR [kg/kg/s]
    logical,  intent(out)   :: dotend(pcnst)           ! flag if do tendency
    integer,  intent(in)    :: nsrflx                  ! last dimension of qsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
-                              ! process-specific column tracer tendencies
-                              !  1 = activation   of interstial to
-                              !  conv-cloudborne
-                              !  2 = resuspension of conv-cloudborne to
-                              !  interstital
-                              !  3 = aqueous chemistry (not implemented yet, so
-                              !  zero)
-                              !  4 = wet removal
-                              !  5 = actual precip-evap resuspension (what
-                              !  actually is applied to a species)
-                              !  6 = pseudo precip-evap resuspension (for
-                              !  history file)
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)  ! process-specific column tracer tendencies  (see ma_convproc_intr for more information)
 
-   real(r8), intent(in)    :: sh_frac(pcols,pver) ! Shallow conv cloud frac [0-1]
-   real(r8), intent(in)    :: icwmrsh(pcols,pver) ! Shallow conv cloud condensate (in cloud) [kg/kg]
-   real(r8), intent(in)    :: rprdsh(pcols,pver)  ! Shallow conv precip production (grid avg) [kg/kg/s]
-   real(r8), intent(in)    :: evapcsh(pcols,pver) ! Shallow conv precip evaporation (grid avg) [kg/kg/s]
-   real(r8), intent(in)    :: dlfsh(pcols,pver)   ! Shallow conv cldwtr detrainment (grid avg) [kg/kg/s]
-   real(r8), intent(in)    :: cmfmcsh(pcols,pverp) ! Shallow conv mass flux [kg/m2/s]
-   real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
-   integer,  intent(in)    :: species_class(:)
+   real(r8), intent(in)    :: sh_frac(pcols,pver)       ! Shallow conv cloud frac [0-1]
+   real(r8), intent(in)    :: icwmrsh(pcols,pver)       ! Shallow conv cloud condensate (in cloud) [kg/kg]
+   real(r8), intent(in)    :: rprdsh(pcols,pver)        ! Shallow conv precip production (grid avg) [kg/kg/s]
+   real(r8), intent(in)    :: evapcsh(pcols,pver)       ! Shallow conv precip evaporation (grid avg) [kg/kg/s]
+   real(r8), intent(in)    :: dlfsh(pcols,pver)         ! Shallow conv cldwtr detrainment (grid avg) [kg/kg/s]
+   real(r8), intent(in)    :: cmfmcsh(pcols,pverp)      ! Shallow conv mass flux [kg/m2/s]
+   real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver) ! shallow conv [ent/(ent+det)] ratio
+   integer,  intent(in)    :: species_class(:)          ! species index
 
 ! Local variables
    integer :: icol, ncol
    integer :: nstep
-   integer :: lchnk, lun        ! may not used
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets, may not used
@@ -559,12 +540,9 @@ subroutine ma_convproc_sh_intr(                 &
 !
 ! Initialize
 !
-   lun = iulog
 
-   lchnk = state%lchnk
    ncol  = state%ncol
    nstep = get_nstep()
-   lengath = ncol
 
    ! md and ed are assumed zero in shallow convection in ma_convproc_tend
    md(:,:) = 0.0_r8
@@ -582,7 +560,7 @@ subroutine ma_convproc_sh_intr(                 &
 ! mimic variables counterparts as in zm-deep
    call mimic_deep_counterparts( ncol,                   & ! in
                         dpdry,  cmfmcsh,  sh_e_ed_ratio, & ! in
-                        jt, maxg, mu, eu, du             ) ! out
+                        jt, maxg, mu, eu, du, lengath    ) ! out
 
 
 ! turn on/off calculations for aerosols and trace gases
@@ -606,8 +584,8 @@ subroutine ma_convproc_sh_intr(                 &
 
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
-                     lchnk,      pcnst,      nstep,      dt,         &
-                     state%t,    state%pmid, state%pdel, q,          &   
+                     state%lchnk,      pcnst,      nstep,      dt,   &
+                     state%t,    state%pmid, state%pdel, qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -617,8 +595,7 @@ subroutine ma_convproc_sh_intr(                 &
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
                      species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
-                     lun                                             )
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
 
 end subroutine ma_convproc_sh_intr
@@ -627,10 +604,8 @@ end subroutine ma_convproc_sh_intr
 subroutine assign_dotend( species_class,  & ! in
                           dotend          ) ! out
 !---------------------------------------------------------------------
-! assign do-tendency flag from species_class, convproc_do_aer and
-! convproc_do_gas.
-! convproc_do_aer and convproc_do_gas are assigned in the beginning of the
-! module
+! assign do-tendency flag from species_class, convproc_do_aer and convproc_do_gas.
+! convproc_do_aer and convproc_do_gas are assigned in the beginning of the  module
 !---------------------------------------------------------------------
 
 use constituents,   only: pcnst
@@ -656,7 +631,7 @@ end subroutine assign_dotend
 !=========================================================================================
 subroutine mimic_deep_counterparts( ncol,                & ! in
                         dpdry,  cmfmcsh,  sh_e_ed_ratio, & ! in
-                        jt, maxg, mu, eu, du             ) ! out
+                        jt, maxg, mu, eu, du, lengath    ) ! out
 !-----------------------------------------------------------------------------
 ! create mass flux, entrainment, detrainment, and delta-p arrays
 ! with the same units as the zm-deep
@@ -669,6 +644,7 @@ subroutine mimic_deep_counterparts( ncol,                & ! in
 
    integer,  intent(out)   :: jt(pcols)        ! Index of cloud top for each column
    integer,  intent(out)   :: maxg(pcols)      ! Index of cloud bot for each column
+   integer,  intent(out)   :: lengath          ! min lon indices over which to operate
    real(r8), intent(out)   :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
    real(r8), intent(out)   :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
    real(r8), intent(out)   :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
@@ -678,9 +654,10 @@ subroutine mimic_deep_counterparts( ncol,                & ! in
    integer      :: tot_conv_layer       ! total layers of convection in this column
    integer      :: maxg_init            ! initial maxg at icol
 
-   do icol = 1, ncol
-!        ideep(icol) = icol
 
+   lengath = ncol   ! mimic lengath in zm-deep
+
+   do icol = 1, ncol
         ! load updraft mass flux from cmfmcsh
         call load_updraft_massflux(             &
                 icol,   cmfmcsh,                & ! in
@@ -696,11 +673,8 @@ subroutine mimic_deep_counterparts( ncol,                & ! in
 
 ! calc ent / detrainment, using the [ent/(ent+det)] ratio from uw scheme
 !    which is equal to [fer_out/(fer_out+fdr_out)]  (see uwshcu.F90)
-!
-! note that the ratio is set to -1.0 (invalid) when both fer and fdr are very
-! small
-!    and the ratio values are often strange (??) at topmost layer
-!
+! note that the ratio is set to -1.0 (invalid) when both fer and fdr are very small
+!    and the ratio values are often strange (??) at topmost layer\
         call calculate_ent_det(                 &
                 icol,   maxg,  maxg_init,  jt,  & ! in
                 dpdry,  mu,    sh_e_ed_ratio,   & ! in
@@ -874,8 +848,7 @@ subroutine ma_convproc_tend(                                           &
                      doconvproc, nsrflx,                             & ! in
                      qsrflx,                                         & ! out
                      species_class,                                  & ! in
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase,          & ! out
-                     lun                                             ) ! in
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
 !----------------------------------------------------------------------- 
 ! 
@@ -982,7 +955,6 @@ subroutine ma_convproc_tend(                                           &
    real(r8), intent(out):: xx_mfup_max(pcols)
    real(r8), intent(out):: xx_wcldbase(pcols)
    real(r8), intent(out):: xx_kcldbase(pcols)
-   integer,  intent(in) :: lun               ! unit number for diagnostic output
 
 
 !--------------------------Local Variables------------------------------
@@ -990,6 +962,7 @@ subroutine ma_convproc_tend(                                           &
 ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer, parameter :: pcnst_extd = pcnst*2
 
+   integer :: lun             ! unit number for diagnostic output
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
@@ -1111,6 +1084,8 @@ subroutine ma_convproc_tend(                                           &
 
 !-----------------------------------------------------------------------
 !
+
+   lun = iulog
 
 !  if (nstep > 1) call endrun()
 
