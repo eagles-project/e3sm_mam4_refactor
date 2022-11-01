@@ -356,9 +356,6 @@ subroutine nucleate_ice_cam_calc( &
 
    real(r8), pointer :: t(:,:)          ! input temperature (K)
    real(r8), pointer :: qn(:,:)         ! input water vapor mixing ratio (kg/kg)
-   real(r8), pointer :: qc(:,:)         ! cloud water mixing ratio (kg/kg)
-   real(r8), pointer :: qi(:,:)         ! cloud ice mixing ratio (kg/kg)
-   real(r8), pointer :: ni(:,:)         ! cloud ice number conc (1/kg)
    real(r8), pointer :: pmid(:,:)       ! pressure at layer midpoints (pa)
 
    real(r8), pointer :: num_accum(:,:)  ! number m.r. of accumulation mode
@@ -414,9 +411,6 @@ subroutine nucleate_ice_cam_calc( &
    ncol  = state%ncol
    t     => state%t
    qn    => state%q(:,:,1)
-   qc    => state%q(:,:,cldliq_idx)
-   qi    => state%q(:,:,cldice_idx)
-   ni    => state%q(:,:,numice_idx)
    pmid  => state%pmid
 
    do k = top_lev, pver
@@ -531,11 +525,9 @@ subroutine nucleate_ice_cam_calc( &
 
             call nucleati( &
                wsubi(i,k), t(i,k), pmid(i,k), relhum(i,k), icldm(i,k),   &
-               qc(i,k), qi(i,k), ni(i,k), rho(i,k),                      &
-               so4_num, dst_num, soot_num,                               &
+               rho(i,k), so4_num, dst_num, soot_num,                     &
                naai(i,k), nihf(i,k), niimm(i,k), nidep(i,k), nimey(i,k), &
-               dst1_num,dst2_num,dst3_num,dst4_num,                      &
-               clim_modal_aero)
+               dst3_num)
 
 
             naai_hom(i,k) = nihf(i,k)
