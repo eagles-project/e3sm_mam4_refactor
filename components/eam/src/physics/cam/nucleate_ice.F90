@@ -133,8 +133,8 @@ subroutine nucleati(  &
    real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers)
    real(r8) :: n1, ni                    ! nucleated number
    real(r8) :: tc, regm                  ! work variable  
-   real(r8) :: aer_num
-   real(r8) :: wbar1, wbar2 
+   real(r8) :: soot_dst3_num
+   real(r8) :: wbar1, wbar2
 
    !-------------------------------------------------------------------------------
 
@@ -144,7 +144,7 @@ subroutine nucleati(  &
 
    ni = 0._r8
    tc = tair - 273.15_r8
-   aer_num = soot_num + dst3_num
+   soot_dst3_num = soot_num + dst3_num
 
    ! initialize
    niimm = 0._r8
@@ -152,11 +152,11 @@ subroutine nucleati(  &
    nihf  = 0._r8
 
 
-   if(so4_num >= 1.0e-10_r8 .and. aer_num >= 1.0e-10_r8 .and. cldn > 0._r8) then
+   if(so4_num >= 1.0e-10_r8 .and. soot_dst3_num >= 1.0e-10_r8 .and. cldn > 0._r8) then
 
       if((tc <= -35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid) >= 1.2_r8)) then ! use higher RHi threshold
 
-            call calculate_regm_nucleati(wbar1, aer_num, regm)
+            call calculate_regm_nucleati(wbar1, soot_dst3_num, regm)
 
             ! heterogeneous nucleation only
             if (tc > regm) then
@@ -170,7 +170,7 @@ subroutine nucleati(  &
                   
                else
 
-                  call hetero(tc,wbar2,aer_num,niimm,nidep)
+                  call hetero(tc,wbar2,soot_dst3_num,niimm,nidep)
                   nihf=0._r8
                   n1=niimm+nidep
 
@@ -197,7 +197,7 @@ subroutine nucleati(  &
                else
 
                   call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
-                  call hetero(regm,wbar2,aer_num,niimm,nidep)
+                  call hetero(regm,wbar2,soot_dst3_num,niimm,nidep)
 
                   if (nihf <= (niimm+nidep)) then
                      n1 = nihf
