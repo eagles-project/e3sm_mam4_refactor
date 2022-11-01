@@ -372,7 +372,6 @@ subroutine ma_convproc_dp_intr(                &
 !-----------------------------------------------------------------------
 
    use physics_types,  only: physics_state
-   use time_manager,   only: get_nstep
    use constituents,   only: pcnst
 
 
@@ -411,7 +410,6 @@ subroutine ma_convproc_dp_intr(                &
 
 ! Local variables
    integer :: ii
-   integer :: nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets. this variable may be removed
@@ -421,7 +419,6 @@ subroutine ma_convproc_dp_intr(                &
 ! Initialize
 !
 
-   nstep = get_nstep()
 
 ! initialize dpdry (units=mb), which is used for tracers of dry mixing ratio type
    dpdry = 0._r8
@@ -450,7 +447,7 @@ subroutine ma_convproc_dp_intr(                &
 
    call ma_convproc_tend(                                            &
                      'deep',                                         &
-                     state%lchnk,      pcnst,      nstep,      dt,   &
+                     state%lchnk,      pcnst,            dt,         &
                      state%t,    state%pmid, state%pdel, qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
@@ -493,7 +490,6 @@ subroutine ma_convproc_sh_intr(                 &
 !-----------------------------------------------------------------------
 
    use physics_types,  only: physics_state
-   use time_manager,   only: get_nstep
    use constituents,   only: pcnst
  
 ! Arguments
@@ -516,7 +512,6 @@ subroutine ma_convproc_sh_intr(                 &
 
 ! Local variables
    integer :: icol, ncol
-   integer :: nstep
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
    real(r8) :: fracice(pcols,pver)   ! Ice fraction of cloud droplets, may not used
@@ -542,7 +537,6 @@ subroutine ma_convproc_sh_intr(                 &
 !
 
    ncol  = state%ncol
-   nstep = get_nstep()
 
    ! md and ed are assumed zero in shallow convection in ma_convproc_tend
    md(:,:) = 0.0_r8
@@ -584,7 +578,7 @@ subroutine ma_convproc_sh_intr(                 &
 
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
-                     state%lchnk,      pcnst,      nstep,      dt,   &
+                     state%lchnk,      pcnst,            dt,         &
                      state%t,    state%pmid, state%pdel, qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
@@ -737,7 +731,7 @@ subroutine extend_belowcloud_downward(             &
    real(r8), intent(inout) :: mu(pcols,pver)    ! Updraft mass flux (positive) [mb/s]
    integer,  intent(out)   :: maxg_init         ! initial maxg at icol
 
-   integer              :: kk, kaa, kbb         ! vertical index
+   integer              :: kk, k_cldbot, k_4_below_cldbot         ! vertical index
    real(r8)             :: dp_sum               ! sum of dpdry for weighting purpose
    integer              :: maxg_minval
 
@@ -745,19 +739,19 @@ subroutine extend_belowcloud_downward(             &
    maxg_minval = pver*2  ! this variable seems not used
    maxg_minval = min( maxg_minval, maxg(icol) )
 
-   kaa = maxg(icol)          ! cloud bot level
-   kbb = min( kaa+4, pver )  ! 4 levels below cloud bottom
-   if (kbb > kaa) then  ! make sure cloud bot is not the bottom model level
-      dp_sum = sum( dpdry(icol,kaa:kbb) )
-      do kk = kaa+1, kbb
-         ! extend mass flux below cloud to kbb
-         mu(icol,kk) = mu(icol,kaa)*sum( dpdry(icol,kk:kbb) )/dp_sum
+   k_cldbot = maxg(icol)          ! cloud bot level
+   k_4_below_cldbot = min( k_cldbot+4, pver )  ! 4 levels below cloud bottom
+   if (k_4_below_cldbot > k_cldbot) then  ! make sure cloud bot is not the bottom model level
+      dp_sum = sum( dpdry(icol,k_cldbot:k_4_below_cldbot) )
+      do kk = k_cldbot+1, k_4_below_cldbot
+         ! extend mass flux below cloud to k_4_below_cldbot
+         mu(icol,kk) = mu(icol,k_cldbot)*sum( dpdry(icol,kk:k_4_below_cldbot) )/dp_sum
       enddo ! kk
-      maxg(icol) = kbb
+      maxg(icol) = k_4_below_cldbot
    endif
 
    ! assign initial maxg value at icol for calculate_ent_det use
-   maxg_init = kaa
+   maxg_init = k_cldbot
 
 end subroutine extend_belowcloud_downward
 
@@ -837,7 +831,7 @@ end subroutine calculate_ent_det
 !=========================================================================================
 subroutine ma_convproc_tend(                                           &
                      convtype,                                       & ! in
-                     lchnk,      ncnst,      nstep,      dt,         & ! in
+                     lchnk,      ncnst,      dt,                     & ! in
                      t,          pmid,       pdel,       q,          & ! in
                      mu,         md,         du,         eu,         & ! in
                      ed,         dp,         dpdry,      jt,         & ! in
@@ -908,7 +902,6 @@ subroutine ma_convproc_tend(                                           &
                                              ! convection ("deep", "shcu")
    integer,  intent(in) :: lchnk             ! chunk identifier
    integer,  intent(in) :: ncnst             ! number of tracers to transport
-   integer,  intent(in) :: nstep             ! Time step index
    real(r8), intent(in) :: dt                ! Model timestep
    real(r8), intent(in) :: t(pcols,pver)     ! Temperature
    real(r8), intent(in) :: pmid(pcols,pver)  ! Pressure at model levels
@@ -1087,7 +1080,6 @@ subroutine ma_convproc_tend(                                           &
 
    lun = iulog
 
-!  if (nstep > 1) call endrun()
 
    if (convtype == 'deep') then
       iconvtype = 1
