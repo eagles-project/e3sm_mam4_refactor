@@ -4895,12 +4895,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       n_agepair = ipair
 
 ! coagulation pairs
-#if ( defined MODAL_AERO_4MODE_MOM )
       call set_coagulation_pairs( big_neg_int )
-#else
-      call endrun("only MODAL_AERO_4MODE_MOM is supported")
-#endif
-
 
 ! diagnostics
       if ( masterproc ) then
