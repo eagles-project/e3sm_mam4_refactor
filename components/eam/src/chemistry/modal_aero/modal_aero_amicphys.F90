@@ -1629,15 +1629,10 @@ do_rename_if_block30: &
       qnum_delsub_coag = 0.0_r8
 
       call mam_pcarbon_aging_1subarea(                              &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         dtsubstep,         dgn_a,            do_cond,              &
-         n_mode,                                                    &
-         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
-         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
-         qaer_delsub_coag_in,                                       &
-         qwtr_cur                                                   )
+         dgn_a,             n_mode,                                 &  ! input
+         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &  ! in-outs
+         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &  ! in-outs
+         qaer_delsub_coag_in)                                          ! in-outs
 
       end if
 
@@ -2099,15 +2094,10 @@ do_newnuc_if_block50: &
       if ( n_agepair > 0 ) then
 
       call mam_pcarbon_aging_1subarea(                              &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         dtsubstep,         dgn_a,            do_cond,              &
-         n_mode,                                                    &
-         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &
-         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &
-         qaer_delsub_coag_in,                                       &
-         qwtr_cur                                                   )
+         dgn_a,             n_mode,                                 & ! input
+         qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     & ! in-outs
+         qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     & ! in-outs
+         qaer_delsub_coag_in)                                         ! in-outs
 
       end if
 
@@ -4128,114 +4118,128 @@ mainloop1_ipair:  do n = 1, ntot_amode
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_pcarbon_aging_1subarea(                        &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         deltat,            dgn_a,            do_cond,              &
-         n_mode,                                                    &
+      subroutine mam_pcarbon_aging_1subarea(                        &    
+         dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
-         qaer_del_coag_in,                                          &
-         qwtr_cur                                                   )
+         qaer_del_coag_in)
 
 ! uses
 
       implicit none
 
 ! arguments
-      integer,  intent(in) :: nstep                 ! model time-step number
-      integer,  intent(in) :: lchnk                 ! chunk identifier
-      integer,  intent(in) :: i, k                  ! column and level indices
-      integer,  intent(in) :: jsub                  ! sub-area index
-      integer,  intent(in) :: latndx, lonndx        ! lat and lon indices
-      integer,  intent(in) :: lund                  ! logical unit for diagnostic output
-      integer,  intent(in) :: n_mode                ! current number of modes (including temporary)
-
-      logical,  intent(in) :: do_cond               ! true if condensation (gas-aerosol exch) is on
-
-      real(r8), intent(in) :: deltat                ! model timestep (s)
-      real(r8), intent(in), dimension( 1:max_mode ) :: &
-                              dgn_a                 ! dgnum_dry of mode
-
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qnum_cur, qnum_del_cond, qnum_del_coag
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer_cur, qaer_del_cond, qaer_del_coag
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: &
-         qaer_del_coag_in
+      integer,  intent(in) :: n_mode                                      ! current number of modes (including temporary) [unitless]
+      real(r8), intent(in), dimension( 1:max_mode ) :: dgn_a              ! dry geometric mean diameter of number distribution [m]
+      real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_cur        ! aerosol number mixing ratio [#/kmol]
+      real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_del_cond   ! change of aerosol number mixing ratio due to condensation [#/kmol]
+      real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_del_coag   ! change of aerosol number mixing ratio due to coagulation [#/kmol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur       ! aerosol mass mixing ratio [mol/mol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond  ! change of aerosol mass mixing ratio due to condensation [mol/mol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_coag  ! change of aerosol mass mixing ratio due to coagulation [mol/mol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+                                                                                         ! from subrountine mam_coag_1subarea [mol/mol]
 ! *** need to add qaer_del_coag_nmoacc_in
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qwtr_cur
+
 
 ! local variables
-      integer :: iaer, ipair, itmpa
-      integer :: nfrm, ntoo
+      integer :: iaer, ipair
+      integer :: nsrc, ndest
 
-      real(r8) :: fac_volsfc
-      real(r8) :: tmpa, tmp1, tmp2, tmp3, tmp4
-      real(r8) :: vol_core, vol_shell
-      real(r8) :: xferfrac_max, xferfrac_pcage
+      real(r8) :: xferfrac_pcage, frac_cond, frac_coag
 
 
 ! 
 agepair_loop1: &
-      do ipair = 1, n_agepair
+      do ipair = 1, n_agepair         ! only execute for ipair = 1, ipair>=2 is for MAM9
 
-      nfrm = modefrm_agepair(ipair)
-      ntoo = modetoo_agepair(ipair)
+      nsrc  = modefrm_agepair(ipair)
+      ndest = modetoo_agepair(ipair)
 
-      vol_shell = qaer_cur(iaer_so4,nfrm)*fac_m2v_aer(iaer_so4)
-      tmp3 = qaer_del_cond(iaer_so4,nfrm)  *fac_m2v_aer(iaer_so4)
-      tmp4 = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4)
+      call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
+            qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
+            xferfrac_pcage, frac_cond, frac_coag)         ! output
 
       do iaer = 1, naer
-!     species that contribute to aging are 
-!        so4 (but it is already done)
-!        soa, nh4 and no3
-!        ncl and cl (when aging_include_seasalt == .true.)
-         if ( (iaer <= nsoa    ) .or. &
-              (iaer == iaer_nh4) .or. &
-              (iaer == iaer_no3) .or. &
-              (iaer == iaer_cl ) ) then
-            continue
-         else if (iaer == iaer_ncl) then
-            if (aging_include_seasalt .eqv. .false.) cycle
+         if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
+            ! species is pom or bc
+            ! transfer the aged fraction to accum mode
+            ! include this transfer change in the cond and/or coag change (for mass budget)
+            call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                                                  ! input
+                                                xferfrac_pcage, frac_cond, frac_coag, &                         ! input
+                                                qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
          else
-            cycle
-         end if
+            ! species is soa, so4, or nh4 produced by condensation or coagulation
+            ! transfer all of it to accum mode
+            ! also transfer the condensation and coagulation changes
+            !    to accum mode (for mass budget)
+            call transfer_cond_coag_mass_to_accum(nsrc, ndest, &                                                  ! input
+                                                  qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
+         endif
+      enddo
+      ! number - transfer the aged fraction to accum mode
+      ! include this transfer change in the cond and/or coag change (for mass budget)
+      call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                           ! input
+                                          xferfrac_pcage, frac_cond, frac_coag, &  ! input
+                                          qnum_cur, qnum_del_cond, qnum_del_coag)  ! in-outs
 
-         if ( (iaer == iaer_cl                    ) .and. &
-              (aging_include_seasalt .eqv. .false.) ) then
-            ! special case - only include the cl from condensation
-            tmp1 = max( qaer_del_cond(iaer,nfrm), 0.0_r8 )
-            tmp2 = max( qaer_del_coag_in(iaer,ipair), 0.0_r8 ) + tmp1
-            if (tmp2 >= 1.0e-35_r8) then
-               vol_shell = vol_shell + qaer_cur(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)*(tmp1/tmp2)
-               tmp3 = tmp3 + qaer_del_cond(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            end if
-         else
-            vol_shell = vol_shell + qaer_cur(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            tmp3 = tmp3 + qaer_del_cond(iaer,nfrm)*fac_m2v_eqvhyg_aer(iaer)
-            tmp4 = tmp4 + qaer_del_coag_in(iaer,ipair)*fac_m2v_eqvhyg_aer(iaer)
-         end if
-      end do
+      enddo agepair_loop1
 
-      if ( do_cond ) then
-         tmp3 = max( tmp3, 1.0e-35_r8 )
-         tmp3 = tmp3/(tmp3 + max( tmp4, 0.0_r8 ))
-      else
-         tmp3 = 0.0_r8
-      end if
-      tmp4 = 1.0_r8 - tmp3
+      return
+      end subroutine mam_pcarbon_aging_1subarea
 
-      vol_core = 0.0
+
+      subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
+          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, & 
+          xferfrac_pcage, frac_cond, frac_coag)
+
+! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
+! change due to condenstion and coagulation
+
+      implicit none
+
+! arguments
+      integer,  intent(in)  :: nsrc      ! pcarbon mode index [unitless]
+      integer,  intent(in)  :: ipair     ! aging pair index [unitless]
+      real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a    ! dry geometric mean diameter of number distribution [m]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur            ! aerosol mass mixing ratio [mol/mol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond       ! change of aerosol mass mixing ratio due to condensation [mol/mol]
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+                                                                                         ! from subrountine mam_coag_1subarea [mol/mol]
+      real(r8), intent(out) :: xferfrac_pcage    ! fraction of aged pom/bc transferred to accum [unitless]
+      real(r8), intent(out) :: frac_cond         ! fraction of aerosol change due to condensation [unitless]
+      real(r8), intent(out) :: frac_coag         ! fraction of aerosol change due to coagulation [unitless]
+
+! local variables
+      integer :: iaer
+
+      real(r8) :: fac_volsfc
+      real(r8) :: xferfrac_tmp1, xferfrac_tmp2 
+      real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
+      real(r8) :: vol_core, vol_shell
+      real(r8) :: xferfrac_max
+
+! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
+! is set to 1 for default MAM4
+      vol_shell = qaer_cur(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+                  qaer_cur(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
+      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+                          qaer_del_cond(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
+      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
+                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
+      
+      
+      qaer_del_cond_tmp = max( qaer_del_cond_tmp, 1.0e-35_r8 )
+      frac_cond = qaer_del_cond_tmp/(qaer_del_cond_tmp + max( qaer_del_coag_tmp, 0.0_r8 ))
+      frac_coag = 1.0_r8 - frac_cond
+
+      vol_core = 0.0_r8
       do iaer = 1, naer
          ! for core volume, only include the mapped species 
          !    which are primary and low hygroscopicity
-         if (lmap_aer(iaer,nfrm) > 0) &
-         vol_core = vol_core + qaer_cur(iaer,nfrm)*fac_m2v_aer(iaer)
-      end do
+         if (lmap_aer(iaer,nsrc) > 0) &
+         vol_core = vol_core + qaer_cur(iaer,nsrc)*fac_m2v_aer(iaer)
+      enddo
 !   ratio1 = vol_shell/vol_core = 
 !      actual hygroscopic-shell-volume/carbon-core-volume after gas uptake
 !   ratio2 = 6.0_r8*dr_so4_monolayers_pcage/(dgncur_a*fac_volsfc)
@@ -4247,60 +4251,89 @@ agepair_loop1: &
 !   Define xferfrac_pcage = min( 1.0, ratio1/ratio2)
 !   But ratio1/ratio2 == tmp1/tmp2, and coding below avoids possible overflow 
 !
-      fac_volsfc = exp( 2.5*(alnsg_aer(nfrm)**2) )
+      fac_volsfc = exp( 2.5*(alnsg_aer(nsrc)**2) )
       xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
 
-      tmp1 = vol_shell*dgn_a(nfrm)*fac_volsfc
-      tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
-      if (tmp1 >= tmp2) then
+      xferfrac_tmp1 = vol_shell*dgn_a(nsrc)*fac_volsfc
+      xferfrac_tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
+      if (xferfrac_tmp1 >= xferfrac_tmp2) then
          xferfrac_pcage = xferfrac_max
       else
-         xferfrac_pcage = min( tmp1/tmp2, xferfrac_max )
-      end if
-
-      do iaer = 1, naer
-         if (lmap_aer(iaer,nfrm) > 0) then
-            ! species is pom or bc
-            ! transfer the aged fraction to accum mode
-            ! include this transfer change in the cond and/or coag change (for mass budget)
-            tmpa = qaer_cur(iaer,nfrm)*xferfrac_pcage
-            qaer_cur(iaer,nfrm)      = qaer_cur(iaer,nfrm) - tmpa
-            qaer_cur(iaer,ntoo)      = qaer_cur(iaer,ntoo) + tmpa
-            qaer_del_cond(iaer,nfrm) = qaer_del_cond(iaer,nfrm) - tmpa*tmp3
-            qaer_del_cond(iaer,ntoo) = qaer_del_cond(iaer,ntoo) + tmpa*tmp3
-            qaer_del_coag(iaer,nfrm) = qaer_del_coag(iaer,nfrm) - tmpa*tmp4
-            qaer_del_coag(iaer,ntoo) = qaer_del_coag(iaer,ntoo) + tmpa*tmp4
-         else
-            ! species is soa, so4, or nh4 produced by condensation or coagulation
-            ! transfer all of it to accum mode
-            ! also transfer the condensation and coagulation changes
-            !    to accum mode (for mass budget)
-            qaer_cur(iaer,ntoo)      = qaer_cur(iaer,ntoo) &
-                                     + qaer_cur(iaer,nfrm)
-            qaer_del_cond(iaer,ntoo) = qaer_del_cond(iaer,ntoo) &
-                                     + qaer_del_cond(iaer,nfrm)
-            qaer_del_coag(iaer,ntoo) = qaer_del_coag(iaer,ntoo) &
-                                     + qaer_del_coag(iaer,nfrm)
-            qaer_cur(iaer,nfrm)      = 0.0_r8
-            qaer_del_cond(iaer,nfrm) = 0.0_r8
-            qaer_del_coag(iaer,nfrm) = 0.0_r8
-         end if
-      end do
-      ! number - transfer the aged fraction to accum mode
-      ! include this transfer change in the cond and/or coag change (for mass budget)
-      tmpa = qnum_cur(nfrm)*xferfrac_pcage
-      qnum_cur(nfrm)      = qnum_cur(nfrm) - tmpa
-      qnum_cur(ntoo)      = qnum_cur(ntoo) + tmpa
-      qnum_del_cond(nfrm) = qnum_del_cond(nfrm) - tmpa*tmp3
-      qnum_del_cond(ntoo) = qnum_del_cond(ntoo) + tmpa*tmp3
-      qnum_del_coag(nfrm) = qnum_del_coag(nfrm) - tmpa*tmp4
-      qnum_del_coag(ntoo) = qnum_del_coag(ntoo) + tmpa*tmp4
-
-      end do agepair_loop1
+         xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
+      endif
 
       return
-      end subroutine mam_pcarbon_aging_1subarea
+      end subroutine mam_pcarbon_aging_frac 
 
+      
+      subroutine transfer_aged_pcarbon_to_accum(nsrc, ndest, &
+                                 xferfrac_pcage, frac_cond, frac_coag, &
+                                 q_cur, q_del_cond, q_del_coag)
+
+! transfer mass/number of aged pom and bc from pcarbon to accum mode
+! adjust the change of aerosol mass/number due to condenations/coagulation 
+! in pcarbon anc accum mode
+
+      implicit none
+      
+! arguments      
+      integer,  intent(in) :: nsrc            ! pcarbon mode index [unitless]
+      integer,  intent(in) :: ndest           ! accum mode index [unitless]
+      real(r8), intent(in) :: xferfrac_pcage  ! fraction of aged pom/bc transferred to accum [unitless]
+      real(r8), intent(in) :: frac_cond       ! fraction of aerosol mass change due to condensation [unitless]
+      real(r8), intent(in) :: frac_coag       ! fraction of aerosol mass change due to coagulation [unitless]
+      real(r8), intent(inout), dimension(1:max_mode) :: q_cur         ! aerosol mass or number mixing ratio [mol/mol]/[#/kmol]
+      real(r8), intent(inout), dimension(1:max_mode) :: q_del_cond    ! change of aerosol mass or number mixing ratio due to condensation [mol/mol]/[#/kmol]
+      real(r8), intent(inout), dimension(1:max_mode) :: q_del_coag    ! change of aerosol mass or number mixing ratio due to coagulation [mol/mol]/[#/kmol]
+
+! local variables
+      real(r8) q_tmp
+
+      q_tmp = q_cur(nsrc)*xferfrac_pcage
+      
+      q_cur(nsrc)       = q_cur(nsrc)  - q_tmp
+      q_cur(ndest)      = q_cur(ndest) + q_tmp
+
+      q_del_cond(nsrc)  = q_del_cond(nsrc)  - q_tmp*frac_cond
+      q_del_cond(ndest) = q_del_cond(ndest) + q_tmp*frac_cond
+
+      q_del_coag(nsrc)  = q_del_coag(nsrc)  - q_tmp*frac_coag
+      q_del_coag(ndest) = q_del_coag(ndest) + q_tmp*frac_coag
+
+      return
+      end subroutine transfer_aged_pcarbon_to_accum
+
+
+      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &  
+                                 qaer_cur, qaer_del_cond, qaer_del_coag)
+
+! transfer mass of aerosols contributing to aging (i.e., so4, soa) 
+! from pcarbon to accum mode
+! adjust the change of aerosol mass/number due to condenations/coagulation
+! in pcarbon and accum mode
+
+      implicit none
+      
+! arguments
+      integer,  intent(in) :: nsrc          ! pcarbon mode index [unitless]
+      integer,  intent(in) :: ndest         ! accum mode index [unitless]
+      real(r8), intent(inout), dimension(1:max_mode) :: qaer_cur          ! aerosol mass mixing ratio [mol/mol]
+      real(r8), intent(inout), dimension(1:max_mode) :: qaer_del_cond     ! change of aerosol mass mixing ratio due to condensation [mol/mol]
+      real(r8), intent(inout), dimension(1:max_mode) :: qaer_del_coag     ! change of aerosol mass mixing ratio due to coagulation [mol/mol]
+
+      qaer_cur(ndest)      = qaer_cur(ndest) &
+                           + qaer_cur(nsrc)
+      qaer_del_cond(ndest) = qaer_del_cond(ndest) &
+                           + qaer_del_cond(nsrc)
+      qaer_del_coag(ndest) = qaer_del_coag(ndest) &
+                           + qaer_del_coag(nsrc)
+
+      qaer_cur(nsrc)       = 0.0_r8
+      qaer_del_cond(nsrc)  = 0.0_r8
+      qaer_del_coag(nsrc)  = 0.0_r8
+
+      return
+      end subroutine transfer_cond_coag_mass_to_accum
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
