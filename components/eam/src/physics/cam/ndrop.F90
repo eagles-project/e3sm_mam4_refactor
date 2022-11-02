@@ -1521,7 +1521,7 @@ end subroutine ccncalc
 !===============================================================================
 
 subroutine loadaer( &
-   state, pbuf, istart, istop, k, &
+   state, pbuf, istart, istop, kk, &
    m, cs, phase, naerosol, &
    vaerosol, hygro)
 
@@ -1534,93 +1534,131 @@ subroutine loadaer( &
    integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
    integer,  intent(in) :: istop       ! stop column index
    integer,  intent(in) :: m           ! mode index
-   integer,  intent(in) :: k           ! level index
-   real(r8), intent(in) :: cs(:,:)     ! air density (kg/m3)
+   integer,  intent(in) :: kk          ! level index
+   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
    integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
 
    ! output arguments
-   real(r8), intent(out) :: naerosol(:)  ! number conc (1/m3)
-   real(r8), intent(out) :: vaerosol(:)  ! volume conc (m3/m3)
-   real(r8), intent(out) :: hygro(:)     ! bulk hygroscopicity of mode
+   real(r8), intent(out) :: naerosol(:)  ! number conc [1/m3]
+   real(r8), intent(out) :: vaerosol(:)  ! volume conc [m3/m3]
+   real(r8), intent(out) :: hygro(:)     ! bulk hygroscopicity of mode [dimensionless]
 
    ! internal
-   integer  :: lchnk               ! chunk identifier
+!! BJG   integer  :: lchnk               ! chunk identifier
 
-   real(r8), pointer :: raer(:,:) ! interstitial aerosol mass, number mixing ratios
+   real(r8), pointer :: raer(:,:) ! interstitial aerosol mass, number mixing ratios [kg/kg]
    real(r8), pointer :: qqcw(:,:) ! cloud-borne aerosol mass, number mixing ratios
-   real(r8) :: specdens, spechygro
+   real(r8) :: specdens, spechygro   ! [kg/m3]
 
-   real(r8) :: vol(pcols) ! aerosol volume mixing ratio
-   integer  :: i, l
+!! BJG   real(r8) :: vol(pcols) ! aerosol volume mixing ratio [m3/kg]
+   real(r8) :: vol ! aerosol volume mixing ratio [m3/kg]
+!! BJG   integer  :: i, l
+   integer  :: icol, lspec
+   logical  :: first_pass, last_pass
    !-------------------------------------------------------------------------------
 
-   lchnk = state%lchnk
+!! BJG   lchnk = state%lchnk
 
-   do i = istart, istop
-      vaerosol(i) = 0._r8
-      hygro(i)    = 0._r8
-   end do
+!!! BJG   do i = istart, istop
+!!! BJG      vaerosol(i) = 0._r8
+!!! BJG      hygro(i)    = 0._r8
+!!! BJG   end do
 
-   do l = 1, nspec_amode(m)
+   do lspec = 1, nspec_amode(m)
+      first_pass = .false.
+      last_pass = .false.
 
-      call rad_cnst_get_aer_mmr(0, m, l, 'a', state, pbuf, raer)
-      call rad_cnst_get_aer_mmr(0, m, l, 'c', state, pbuf, qqcw)
-      call rad_cnst_get_aer_props(0, m, l, density_aer=specdens, hygro_aer=spechygro)
+      if( lspec == 1 ) then
+          first_pass = .true.
+      elseif( lspec == nspec_amode(m) ) then
+          last_pass = .true.
+      end if
+
+
+      !  pull from index in state q array at top of subroutine
+      ! pconst number of elements (1-40) 1D
+      call rad_cnst_get_aer_mmr(0, m, lspec, 'a', state, pbuf, raer)
+      call rad_cnst_get_aer_props(0, m, lspec, density_aer=specdens, hygro_aer=spechygro)
+
+      if( phase == 3) then
+      call rad_cnst_get_aer_mmr(0, m, lspec, 'c', state, pbuf, qqcw)
+      endif
+
+      do icol = istart, istop
+       
+      if( first_pass ) then
+        vaerosol(icol) = 0._r8
+        hygro(icol)    = 0._r8
+      endif
 
       if (phase == 3) then
-         do i = istart, istop
-            vol(i) = max(raer(i,k) + qqcw(i,k), 0._r8)/specdens
-         end do
-      else if (phase == 2) then
-         do i = istart, istop
-            vol(i) = max(qqcw(i,k), 0._r8)/specdens
-         end do
+
+            vol = max(raer(icol,kk) + qqcw(icol,kk), 0._r8)/specdens
+! BJG         end do
+!! BJG      else if (phase == 2) then
+!! BJG         do i = istart, istop
+!! BJG            vol(i) = max(qqcw(i,k), 0._r8)/specdens
+!! BJG         end do
       else if (phase == 1) then
-         do i = istart, istop
-            vol(i) = max(raer(i,k), 0._r8)/specdens
-         end do
-      else
-         write(iulog,*)'phase=',phase,' in loadaer'
-         call endrun('phase error in loadaer')
+!! BJG         do i = istart, istop
+            vol = max(raer(icol,kk), 0._r8)/specdens
+!! BJG         end do
+!! BJG      else
+!! BJG         write(iulog,*)'phase=',phase,' in loadaer'
+!! BJG         call endrun('phase error in loadaer')
       end if
 
-      do i = istart, istop
-         vaerosol(i) = vaerosol(i) + vol(i)
-         hygro(i)    = hygro(i) + vol(i)*spechygro
-      end do
+!! BJG      do i = istart, istop
+         vaerosol(icol) = vaerosol(icol) + vol
+         hygro(icol)    = hygro(icol) + vol*spechygro
+
+
+      if( last_pass ) then
+
+      if (vaerosol(icol) > 1.0e-30_r8) then   ! +++xl add 8/2/2007
+         hygro(icol)    = hygro(icol)/(vaerosol(icol))
+         vaerosol(icol) = vaerosol(icol)*cs(icol,kk)
+      else
+         hygro(icol)    = 0.0_r8
+         vaerosol(icol) = 0.0_r8
+      end if
+
+      end if
+   
+
+   end do  
 
    end do
 
-   do i = istart, istop
-      if (vaerosol(i) > 1.0e-30_r8) then   ! +++xl add 8/2/2007
-         hygro(i)    = hygro(i)/(vaerosol(i))
-         vaerosol(i) = vaerosol(i)*cs(i,k)
-      else
-         hygro(i)    = 0.0_r8
-         vaerosol(i) = 0.0_r8
-      end if
-   end do
+!! BJG   do icol = istart, istop
+
+!! BJG   end do
 
    ! aerosol number
    call rad_cnst_get_mode_num(0, m, 'a', state, pbuf, raer)
-   call rad_cnst_get_mode_num(0, m, 'c', state, pbuf, qqcw)
+
    if (phase == 3) then
-      do i = istart, istop
-         naerosol(i) = (raer(i,k) + qqcw(i,k))*cs(i,k)
-      end do
-   else if (phase == 2) then
-      do i = istart, istop
-         naerosol(i) = qqcw(i,k)*cs(i,k)
-      end do
+   call rad_cnst_get_mode_num(0, m, 'c', state, pbuf, qqcw)
+   endif
+
+   do icol = istart, istop
+   if (phase == 3) then
+
+         naerosol(icol) = (raer(icol,kk) + qqcw(icol,kk))*cs(icol,kk)
+!! BJG      end do
+!! BJG   else if (phase == 2) then
+!! BJG      do i = istart, istop
+!! BJG         naerosol(i) = qqcw(i,k)*cs(i,k)
+!! BJG      end do
    else
-      do i = istart, istop
-         naerosol(i) = raer(i,k)*cs(i,k)
-      end do
+!! BJG      do i = istart, istop
+         naerosol(icol) = raer(icol,kk)*cs(icol,kk)
+!! BJG      end do
    end if
    ! adjust number so that dgnumlo < dgnum < dgnumhi
-   do i = istart, istop
-      naerosol(i) = max(naerosol(i), vaerosol(i)*voltonumbhi_amode(m))
-      naerosol(i) = min(naerosol(i), vaerosol(i)*voltonumblo_amode(m))
+!! BJG   do i = istart, istop
+      naerosol(icol) = max(naerosol(icol), vaerosol(icol)*voltonumbhi_amode(m))
+      naerosol(icol) = min(naerosol(icol), vaerosol(icol)*voltonumblo_amode(m))
    end do
 
 end subroutine loadaer
