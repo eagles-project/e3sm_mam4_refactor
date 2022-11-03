@@ -32,6 +32,17 @@ use cam_history,      only: addfld, horiz_only, add_default, fieldname_len, outf
 use cam_abortutils,       only: endrun
 use cam_logfile,      only: iulog
 
+!  BJG:  add these for direct access to num,mmr in state q array.
+    use modal_aero_data,   only: numptr_amode
+    use modal_aero_data,   only: numptrcw_amode
+    use modal_aero_data,   only: lmassptr_amode
+    use modal_aero_data,   only: lmassptrcw_amode
+    use modal_aero_data,   only: lspectype_amode
+    use modal_aero_data,   only: specdens_amode
+    use modal_aero_data,   only: spechygro
+!  BJG ends
+
+
 implicit none
 private
 save
@@ -651,12 +662,15 @@ subroutine dropmixnuc( &
 
             ! load aerosol properties, assuming external mixtures
 
+
             phase = 1 ! interstitial
             do m = 1, ntot_amode
                call loadaer( &
                   state, pbuf, i, i, k, &
                   m, cs, phase, na, va, &
-                  hy)
+                  hy, numptr_amode, numptrcw_amode, &
+                  lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
+                  specdens_amode, spechygro )
                naermod(m)  = na(i)
                vaerosol(m) = va(i)
                hygro(m)    = hy(i)
@@ -747,7 +761,9 @@ subroutine dropmixnuc( &
                   call loadaer( &
                      state, pbuf, i, i, kp1,  &
                      m, cs, phase, na, va,   &
-                     hy)
+                     hy, numptr_amode, numptrcw_amode, &
+                     lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
+                     specdens_amode, spechygro )
                   naermod(m)  = na(i)
                   vaerosol(m) = va(i)
                   hygro(m)    = hy(i)
@@ -1494,7 +1510,9 @@ subroutine ccncalc(state, pbuf, cs, ccn)
          call loadaer( &
             state, pbuf, 1, ncol, k, &
             m, cs, phase, naerosol, vaerosol, &
-            hygro)
+            hygro, numptr_amode, numptrcw_amode, &
+            lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
+            specdens_amode, spechygro )
 
          where(naerosol(:ncol)>1.e-3_r8)
             amcube(:ncol)=amcubecoef(m)*vaerosol(:ncol)/naerosol(:ncol)
@@ -1523,7 +1541,9 @@ end subroutine ccncalc
 subroutine loadaer( &
    state, pbuf, istart, istop, kk, &
    m, cs, phase, naerosol, &
-   vaerosol, hygro)
+   vaerosol, hygro, numptr_amode, numptrcw_amode, &
+   lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
+   specdens_amode, spechygro )
 
    ! return aerosol number, volume concentrations, and bulk hygroscopicity
 
@@ -1537,6 +1557,14 @@ subroutine loadaer( &
    integer,  intent(in) :: kk          ! level index
    real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
    integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
+   integer,  intent(in) :: numptr_amode(:)
+   integer,  intent(in) :: numptrcw_amode(:)
+   integer,  intent(in) :: lmassptr_amode(:,:)
+   integer,  intent(in) :: lmassptrcw_amode(:,:)
+   integer,  intent(in) :: lspectype_amode(:,:)
+   real(r8), intent(in) :: specdens_amode(:)    ! [kg/m3] 
+   real(r8), intent(in) :: spechygro(:)   
+
 
    ! output arguments
    real(r8), intent(out) :: naerosol(:)  ! number conc [1/m3]
@@ -1546,14 +1574,16 @@ subroutine loadaer( &
    ! internal
 !! BJG   integer  :: lchnk               ! chunk identifier
 
-   real(r8), pointer :: raer(:,:) ! interstitial aerosol mass, number mixing ratios [kg/kg]
-   real(r8), pointer :: qqcw(:,:) ! cloud-borne aerosol mass, number mixing ratios
-   real(r8) :: specdens, spechygro   ! [kg/m3]
+!   real(r8), pointer :: raer(:,:) ! interstitial aerosol mass, number mixing ratios [kg/kg]
+!   real(r8), pointer :: qqcw(:,:) ! cloud-borne aerosol mass, number mixing ratios
+   real(r8) :: raer(pcols) ! interstitial aerosol mass, number mixing ratios [kg/kg]
+   real(r8) :: qqcw(pcols) ! cloud-borne aerosol mass, number mixing ratios
+   real(r8) :: specdens_val, spechygro_val   ! [kg/m3]
 
 !! BJG   real(r8) :: vol(pcols) ! aerosol volume mixing ratio [m3/kg]
    real(r8) :: vol ! aerosol volume mixing ratio [m3/kg]
 !! BJG   integer  :: i, l
-   integer  :: icol, lspec
+   integer  :: icol, lspec, mm, mm2
    logical  :: first_pass, last_pass
    !-------------------------------------------------------------------------------
 
@@ -1577,12 +1607,27 @@ subroutine loadaer( &
 
       !  pull from index in state q array at top of subroutine
       ! pconst number of elements (1-40) 1D
-      call rad_cnst_get_aer_mmr(0, m, lspec, 'a', state, pbuf, raer)
-      call rad_cnst_get_aer_props(0, m, lspec, density_aer=specdens, hygro_aer=spechygro)
+!       call rad_cnst_get_aer_mmr(0, m, lspec, 'a', state, pbuf, raer)
+!      call rad_cnst_get_aer_props(0, m, lspec, density_aer=specdens, hygro_aer=spechygro)
+
+
+      mm = lmassptr_amode(lspec,m)
+      raer = state%q(:,kk,mm)
+
+      
 
       if( phase == 3) then
-      call rad_cnst_get_aer_mmr(0, m, lspec, 'c', state, pbuf, qqcw)
+!      call rad_cnst_get_aer_mmr(0, m, lspec, 'c', state, pbuf, qqcw)
+
+      mm2 = lmassptrcw_amode(lspec,m)
+      qqcw = state%q(:,kk,mm2)
+
       endif
+
+
+      specdens_val = specdens_amode(lspectype_amode(lspec,m))
+      spechygro_val = spechygro(lspectype_amode(lspec,m))     
+
 
       do icol = istart, istop
        
@@ -1593,7 +1638,8 @@ subroutine loadaer( &
 
       if (phase == 3) then
 
-            vol = max(raer(icol,kk) + qqcw(icol,kk), 0._r8)/specdens
+!!            vol = max(raer(icol,kk) + qqcw(icol,kk), 0._r8)/specdens
+            vol = max(raer(icol) + qqcw(icol), 0._r8)/specdens_val
 ! BJG         end do
 !! BJG      else if (phase == 2) then
 !! BJG         do i = istart, istop
@@ -1601,7 +1647,8 @@ subroutine loadaer( &
 !! BJG         end do
       else if (phase == 1) then
 !! BJG         do i = istart, istop
-            vol = max(raer(icol,kk), 0._r8)/specdens
+!!            vol = max(raer(icol,kk), 0._r8)/specdens
+            vol = max(raer(icol), 0._r8)/specdens_val
 !! BJG         end do
 !! BJG      else
 !! BJG         write(iulog,*)'phase=',phase,' in loadaer'
@@ -1610,7 +1657,8 @@ subroutine loadaer( &
 
 !! BJG      do i = istart, istop
          vaerosol(icol) = vaerosol(icol) + vol
-         hygro(icol)    = hygro(icol) + vol*spechygro
+         hygro(icol)    = hygro(icol) + vol*spechygro_val
+
 
 
       if( last_pass ) then
@@ -1635,16 +1683,23 @@ subroutine loadaer( &
 !! BJG   end do
 
    ! aerosol number
-   call rad_cnst_get_mode_num(0, m, 'a', state, pbuf, raer)
+!   call rad_cnst_get_mode_num(0, m, 'a', state, pbuf, raer)
+
+   mm = numptr_amode(m)
+   raer = state%q(:,kk,mm) 
 
    if (phase == 3) then
-   call rad_cnst_get_mode_num(0, m, 'c', state, pbuf, qqcw)
+!   call rad_cnst_get_mode_num(0, m, 'c', state, pbuf, qqcw)
+
+   mm2 = numptrcw_amode(m)
+   qqcw = state%q(:,kk,mm2) 
+
    endif
 
    do icol = istart, istop
    if (phase == 3) then
 
-         naerosol(icol) = (raer(icol,kk) + qqcw(icol,kk))*cs(icol,kk)
+         naerosol(icol) = (raer(icol) + qqcw(icol))*cs(icol,kk)
 !! BJG      end do
 !! BJG   else if (phase == 2) then
 !! BJG      do i = istart, istop
@@ -1652,7 +1707,7 @@ subroutine loadaer( &
 !! BJG      end do
    else
 !! BJG      do i = istart, istop
-         naerosol(icol) = raer(icol,kk)*cs(icol,kk)
+         naerosol(icol) = raer(icol)*cs(icol,kk)
 !! BJG      end do
    end if
    ! adjust number so that dgnumlo < dgnum < dgnumhi
