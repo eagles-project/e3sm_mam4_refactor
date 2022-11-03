@@ -32,15 +32,6 @@ use cam_history,      only: addfld, horiz_only, add_default, fieldname_len, outf
 use cam_abortutils,       only: endrun
 use cam_logfile,      only: iulog
 
-!  BJG:  add these for direct access to num,mmr in state q array.
-    use modal_aero_data,   only: numptr_amode
-    use modal_aero_data,   only: numptrcw_amode
-    use modal_aero_data,   only: lmassptr_amode
-    use modal_aero_data,   only: lmassptrcw_amode
-    use modal_aero_data,   only: lspectype_amode
-    use modal_aero_data,   only: specdens_amode
-    use modal_aero_data,   only: spechygro
-!  BJG ends
 
 
 implicit none
@@ -668,9 +659,7 @@ subroutine dropmixnuc( &
                call loadaer( &
                   state, pbuf, i, i, k, &
                   m, cs, phase, na, va, &
-                  hy, numptr_amode, numptrcw_amode, &
-                  lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
-                  specdens_amode, spechygro )
+                  hy )
                naermod(m)  = na(i)
                vaerosol(m) = va(i)
                hygro(m)    = hy(i)
@@ -761,9 +750,7 @@ subroutine dropmixnuc( &
                   call loadaer( &
                      state, pbuf, i, i, kp1,  &
                      m, cs, phase, na, va,   &
-                     hy, numptr_amode, numptrcw_amode, &
-                     lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
-                     specdens_amode, spechygro )
+                     hy )
                   naermod(m)  = na(i)
                   vaerosol(m) = va(i)
                   hygro(m)    = hy(i)
@@ -1510,9 +1497,7 @@ subroutine ccncalc(state, pbuf, cs, ccn)
          call loadaer( &
             state, pbuf, 1, ncol, k, &
             m, cs, phase, naerosol, vaerosol, &
-            hygro, numptr_amode, numptrcw_amode, &
-            lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
-            specdens_amode, spechygro )
+            hygro )
 
          where(naerosol(:ncol)>1.e-3_r8)
             amcube(:ncol)=amcubecoef(m)*vaerosol(:ncol)/naerosol(:ncol)
@@ -1541,11 +1526,22 @@ end subroutine ccncalc
 subroutine loadaer( &
    state, pbuf, istart, istop, kk, &
    m, cs, phase, naerosol, &
-   vaerosol, hygro, numptr_amode, numptrcw_amode, &
-   lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
-   specdens_amode, spechygro )
+   vaerosol, hygro )
 
    ! return aerosol number, volume concentrations, and bulk hygroscopicity
+
+
+!  BJG:  add these for direct access to num,mmr in state q array.
+    use modal_aero_data,   only: numptr_amode
+    use modal_aero_data,   only: numptrcw_amode
+    use modal_aero_data,   only: lmassptr_amode
+    use modal_aero_data,   only: lmassptrcw_amode
+    use modal_aero_data,   only: lspectype_amode
+    use modal_aero_data,   only: specdens_amode
+    use modal_aero_data,   only: spechygro
+!  BJG ends
+
+
 
    ! input arguments
    type(physics_state), target, intent(in) :: state
@@ -1557,13 +1553,13 @@ subroutine loadaer( &
    integer,  intent(in) :: kk          ! level index
    real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
    integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
-   integer,  intent(in) :: numptr_amode(:)
-   integer,  intent(in) :: numptrcw_amode(:)
-   integer,  intent(in) :: lmassptr_amode(:,:)
-   integer,  intent(in) :: lmassptrcw_amode(:,:)
-   integer,  intent(in) :: lspectype_amode(:,:)
-   real(r8), intent(in) :: specdens_amode(:)    ! [kg/m3] 
-   real(r8), intent(in) :: spechygro(:)   
+!   integer,  intent(in) :: numptr_amode(:)
+!   integer,  intent(in) :: numptrcw_amode(:)
+!   integer,  intent(in) :: lmassptr_amode(:,:)
+!   integer,  intent(in) :: lmassptrcw_amode(:,:)
+!   integer,  intent(in) :: lspectype_amode(:,:)
+!   real(r8), intent(in) :: specdens_amode(:)    ! [kg/m3] 
+!   real(r8), intent(in) :: spechygro(:)   
 
 
    ! output arguments
@@ -1593,6 +1589,8 @@ subroutine loadaer( &
 !!! BJG      vaerosol(i) = 0._r8
 !!! BJG      hygro(i)    = 0._r8
 !!! BJG   end do
+
+
 
    do lspec = 1, nspec_amode(m)
       first_pass = .false.
