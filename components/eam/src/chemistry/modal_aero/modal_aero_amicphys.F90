@@ -103,7 +103,7 @@ implicit none
                                                    ! *** MUST BE  #/kmol-air for number
                                                    ! *** MUST BE mol/mol-air for mass
                                                    ! *** NOTE ncol dimension
-   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx) 
+   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx)
                                                    ! like q but for cloud-borner tracers
                                                    ! these values are updated
    real(r8), intent(in)    :: q_pregaschem(ncol,pver,pcnstxx)    ! q TMRs    before gas-phase chemistry
@@ -111,7 +111,7 @@ implicit none
    real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,pcnstxx) ! qqcw TMRs before cloud chemistry
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
    real(r8), intent(inout) :: q_tendbb(ncol,pver,pcnstxx,nqtendbb)    ! TMR tendencies for box-model diagnostic output
-   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb) 
+   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb)
 #endif
 
    real(r8), intent(in)    :: t(pcols,pver)        ! temperature at model levels (K)
@@ -130,10 +130,10 @@ implicit none
                               qaerwat(pcols,pver,ntot_amode)
                                  ! aerosol water mixing ratio (kg/kg, NOT mol/mol)
 
-! !DESCRIPTION: 
+! !DESCRIPTION:
 ! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
 !    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to both 
+!    growth from smaller to larger modes (renaming) due to both
 !       condensation and cloud chemistry
 !    new particle nucleation
 !    coagulation
@@ -182,7 +182,7 @@ implicit none
 !----------------------------------------------------------------------
    logical   :: history_aerocom    ! Output the aerocom history
 !-----------------------------------------------------------------------
- 
+
 
       real(8), parameter :: fcld_locutoff = 1.0e-5_r8
 ! cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
@@ -237,7 +237,7 @@ implicit none
 
 ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
 !    for different processes, which are output to history
-! the processes are condensation/evaporation (and associated aging), 
+! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) :: &
          q_coltendaa
@@ -257,7 +257,7 @@ implicit none
 
       adjust_factor_pbl_ratenucl = newnuc_adjust_factor_pbl
 
-#if ( defined CAM_VERSION_IS_ACME ) 
+#if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
 #else
       call phys_getopts( history_aerocom_out        = history_aerocom )
@@ -617,7 +617,7 @@ main_i_loop: &
             lc = lmap_numcw(n)
             tmpch6a = name_num(n)
             tmpch6c = name_numcw(n)
-         else 
+         else
             if (l2 == 2) then
                iaer = iaer_so4
             else
@@ -833,8 +833,8 @@ main_i_loop: &
 
       ncluster_3dtend_nnuc(i,k) = misc_vars_aa%ncluster_tend_nnuc_1grid
 #if ( defined ( MOSAIC_SPECIES ) )
-      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid 
-      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid 
+      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid
+      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid
       xnerr_astem_negative(pcols,pver,1:5,1:4) = misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4)
 #endif
 
@@ -974,14 +974,14 @@ main_i_loop: &
 !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
       real(r8), intent(in   ), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3 
+         qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
       real(r8), intent(inout), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
          qsub4, qqcwsub4
       real(r8), intent(inout), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: &
          qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
 ! qsub_tendaa and qqcwsub_tendaa are TMR tendencies
 !    for different processes, which are used to produce history output
-! the processes are condensation/evaporation (and associated aging), 
+! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) :: &
          qsub_tendaa
@@ -1053,7 +1053,7 @@ main_jsub_loop: &
          do_coag_sub   = do_coag
       end if
       do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
-      
+
 
 ! map incoming sub-area mix-ratios to gas/aer/num arrays
 
@@ -1174,8 +1174,8 @@ main_jsub_loop: &
          misc_vars_aa%ncluster_tend_nnuc_1grid = misc_vars_aa%ncluster_tend_nnuc_1grid &
                                                + misc_vars_aa_sub(jsub)%ncluster_tend_nnuc_1grid*afracsub(jsub)
 #if ( defined ( MOSAIC_SPECIES ) )
-         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid 
-         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid 
+         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid
+         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid
          misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = misc_vars_aa_sub(jsub)%xnerr_astem_negative_1grid(1:5,1:4)
 #endif
       end if
@@ -1454,7 +1454,7 @@ main_jsub_loop: &
 !    if qgas increases from pre-gaschem to post-cldchem,
 !       start from the pre-gaschem mix-ratio and add in the production
 !       during the integration
-!    if it decreases, 
+!    if it decreases,
 !       start from post-cldchem mix-ratio
 ! *** currently just do this for h2so4 and nh3
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
@@ -1707,7 +1707,7 @@ do_rename_if_block30: &
 ! qgas3, qaer3, qnum3 are the current incoming TMRs
 ! qgas4, qaer4, qnum4 are the updated outgoing TMRs
 !
-! this routine calculates changes involving 
+! this routine calculates changes involving
 !    gas-aerosol exchange (condensation/evaporation)
 !    growth from smaller to larger modes (renaming) due to condensation
 !    new particle nucleation
@@ -1757,7 +1757,7 @@ do_rename_if_block30: &
 !
 ! qXXX_delaa are TMR changes (not tendencies)
 !    for different processes, which are used to produce history output
-! for a clear sub-area, the processes are condensation/evaporation (and associated aging), 
+! for a clear sub-area, the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), intent(in   ), dimension( 1:max_gas ) :: &
          qgas1, qgas3
@@ -1813,7 +1813,7 @@ do_rename_if_block30: &
          qgas_del_cond, qgas_del_nnuc, qgas_netprod_otrproc
                 ! qgas_netprod_otrproc = gas net production rate from other processes
                 !    such as gas-phase chemistry and emissions (mol/mol/s)
-                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                 !    together, which is more accurate numerically
                 ! NOTE - must be >= zero, as numerical method can fail when it is negative
                 ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -1871,7 +1871,7 @@ do_rename_if_block30: &
 !    if qgas increases from pre-gaschem to post-cldchem,
 !       start from the pre-gaschem mix-ratio and add in the production
 !       during the integration
-!    if it decreases, 
+!    if it decreases,
 !       start from post-cldchem mix-ratio
 ! *** currently just do this for h2so4 and nh3
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
@@ -1963,7 +1963,7 @@ do_cond_if_block10: &
 #if ( defined( MOSAIC_SPECIES ) )
       end if
 #endif
-         
+
       if (newnuc_h2so4_conc_optaa == 11) then
          qgas_avg(igas_h2so4) = 0.5_r8*(qgas_sv1(igas_h2so4) + qgas_cur(igas_h2so4))
       else if (newnuc_h2so4_conc_optaa == 12) then
@@ -2158,14 +2158,14 @@ do_newnuc_if_block50: &
         !===========
         !1. Clean Mosaic code and get rid of the arguments which stays constant
         !   for the entire simulation
-        !3. Please handle the Mosaic counters, either use pbuf or make them internal to 
+        !3. Please handle the Mosaic counters, either use pbuf or make them internal to
         !   Mosaic
-        !4. Use get_nstep() for it_mosaic or pull out the it_mosaic .eq. 1 computation 
+        !4. Use get_nstep() for it_mosaic or pull out the it_mosaic .eq. 1 computation
         !   to the init routines
-        !5. SOA from CAM is stored in LIM2 of Mosaic. Rest of the 7 SOA species in 
+        !5. SOA from CAM is stored in LIM2 of Mosaic. Rest of the 7 SOA species in
         !   Mosaic are populated with zeros
-        !6. Some variables in Mosaic had to be initialized to zero. Please revisit and 
-        !  fix whatever is necessary 
+        !6. Some variables in Mosaic had to be initialized to zero. Please revisit and
+        !  fix whatever is necessary
         !7. jhyst_leg is constant for now and is equal to jhyst_up
         !
         !Author: Balwinder Singh (PNNL)
@@ -2187,13 +2187,13 @@ do_newnuc_if_block50: &
 #endif
 
         implicit none
-        
+
         !Args: intent(in)
         integer,  intent(in) :: lchnk                 ! chunk identifier
         integer,  intent(in) :: nstep                 ! model time-step number
         integer,  intent(in) :: i_in, k_in            ! column and level indices
         integer,  intent(in) :: jsub_in               ! subarea index
-      
+
         real(r8), intent(in) :: temp             !Temperature at model levels (K)
         real(r8), intent(in) :: relhum           !Relative humidity (0-1)
         real(r8), intent(in) :: pmid             !Pressure at layer center (Pa)
@@ -2212,7 +2212,7 @@ do_newnuc_if_block50: &
         real(r8), intent(inout) :: qgas_netprod_otrproc(max_gas)
                   ! qgas_netprod_otrproc = gas net production rate from other processes
                   !    such as gas-phase chemistry and emissions (mol/mol/s)
-                  ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                  ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                   !    together, which is more accurate numerically
                   ! NOTE - must be >= zero, as numerical method can fail when it is negative
                   ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -2223,10 +2223,10 @@ do_newnuc_if_block50: &
         integer  :: ierr
 !       integer  :: it_mosaic     !Time step counter for Mosaic
 !       integer  :: jASTEM_fail   !Counter to indicate if the ASTEM convergence failed in Mosaic
-        real(r8) :: dtchem        !Timestep in seconds 
+        real(r8) :: dtchem        !Timestep in seconds
         real(r8) :: T_K           !Temperature in K
 
-        
+
         integer :: mcall_load_mosaic_parameters !Flag to decide whether to call 'load_mosaic_parameters' or not(*BALLI not used anymore)
         integer :: mcall_print_aer_in           !Flag to decide whether to call 'print_aer' or not
 
@@ -2242,11 +2242,11 @@ do_newnuc_if_block50: &
         real(r8) :: cair_mol_m3       !Air molar density (mol/m3)
 
         real(r8), dimension(nbin_a_max) :: water_a    !Current aerosol water mix ratios (kg/m3)
-        real(r8), dimension(nbin_a_max) :: sigmag_a   !Geometric standard deviation for aerosol mode 
-        real(r8), dimension(nbin_a_max) :: Dp_dry_a   !Dry geo. mean dia. (cm) of number distrib. 
+        real(r8), dimension(nbin_a_max) :: sigmag_a   !Geometric standard deviation for aerosol mode
+        real(r8), dimension(nbin_a_max) :: Dp_dry_a   !Dry geo. mean dia. (cm) of number distrib.
 
         real(r8), dimension(nbin_a_max) :: num_a            !Current aerosol number mix ratios (#/cm3)
-        real(r8), dimension(nbin_a_max) :: dp_wet_a         !Diameter of aerosol in (cm) 
+        real(r8), dimension(nbin_a_max) :: dp_wet_a         !Diameter of aerosol in (cm)
         real(r8), dimension(nbin_a_max) :: mass_dry_a_bgn   !g/cc(air) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: mass_dry_a       !g/cc(air) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: dens_dry_a_bgn   !g/cc      **BALLI*** comment missing
@@ -2254,7 +2254,7 @@ do_newnuc_if_block50: &
         real(r8), dimension(nbin_a_max) :: water_a_hyst     !kg(water)/m^3(air) hysteresis (at 60% RH) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: aH2O_a           !Relative humidity in fraction(variaes between 0 and 1)
         real(r8), dimension(nbin_a_max) :: gam_ratio
-        
+
         real(r8), dimension(ngas_volatile) :: gas            !Current gas mix ratios (nano mol/m3)
         real(r8), dimension(ngas_volatile) :: gas_avg          ! average gas conc. over dtchem time step (nmol/m3)
         real(r8), dimension(ngas_volatile) :: gas_netprod_otrproc
@@ -2276,7 +2276,7 @@ do_newnuc_if_block50: &
         integer  :: unitn
 
         !BALLI -  Following should be in the modules as parameter
-        real(r8), parameter ::  oneatminv = 1.0_r8/1.01325e5_r8  
+        real(r8), parameter ::  oneatminv = 1.0_r8/1.01325e5_r8
         !BALLI -  Following should be in the modules as parameter -  ENDS
 
         !BSINGH - For converting CAM units to Mosaic units
@@ -2292,16 +2292,16 @@ do_newnuc_if_block50: &
         integer, dimension(nbin_a_max) :: jaerosolstate_in
         integer, dimension(nbin_a_max) :: jhyst_leg_in
 
-        real(r8), dimension(nbin_a_max) :: num_a_in 
+        real(r8), dimension(nbin_a_max) :: num_a_in
         real(r8), dimension(nbin_a_max) :: dp_wet_a_in
-        real(r8), dimension(nbin_a_max) :: water_a_in   
+        real(r8), dimension(nbin_a_max) :: water_a_in
         real(r8), dimension(nbin_a_max) :: sigmag_a_in
-        real(r8), dimension(nbin_a_max) :: Dp_dry_a_in  
+        real(r8), dimension(nbin_a_max) :: Dp_dry_a_in
 
         real(r8), dimension(ngas_volatile) :: gas_in, gas_netprod_otrproc_in, gas_avg_in
 
         real(r8), dimension(naer_mosaic,3,nbin_a_max) :: aer_in
-        
+
         real(r8), dimension(naer_mosaic) :: kappa_nonelectro
 
         type (mosaic_vars_aa_type) :: mosaic_vars_aa
@@ -2325,17 +2325,17 @@ do_newnuc_if_block50: &
         !Populate MOSAIC variables
         !------------------------------------------------------------!
         !------------------------------------------------------------!
-        
+
         !Counters:
         !BSINGH - This counter is internal to Mosaic model.
         !         It indicates if ASTEM convergence failed in Mosaic
 !       jASTEM_fail = 0
         mosaic_vars_aa%jastem_fail = 0
-        
+
         !BSINGH - This is time step number in Mosaic
 !       it_mosaic   = nstep
         mosaic_vars_aa%it_mosaic = nstep
-        
+
         !Inputs for Mosaic model (Should be intent-ins for Mosaic model)
         aH2O         = relhum               !Relative humidity [fraction between 0 and 1]
         T_K          = temp                 !Temperature in K
@@ -2343,14 +2343,14 @@ do_newnuc_if_block50: &
         RH_pc        = aH2O   * 100.0_r8    !Relative humidity [%age between 0 and 100]
         cair_mol_m3  = aircon * 1000.0_r8   !Air molar density (mol/m3){units conversion: aircon[kmol/m3] * 1.0e3[mol/kmol]}
         dtchem       = dtsubstep            !timestep (s)
-        
+
         jhyst_leg(1:nbin_a_max)      = jhyst_up
 
         !Flags to control Mosaic model
         mcall_load_mosaic_parameters = 1    !**BALLI.. This flag is not used anymore
         mcall_print_aer_in           = 0    !**BALLI...insert a dummy call to print_aer
-        
-        
+
+
         !Populate aersols
         nbin_a = n_mode   ! current number of modes
 
@@ -2359,20 +2359,20 @@ do_newnuc_if_block50: &
         !Populate aerosol numbers and water species
         num_a(:)   = 0.0_r8 !Initialized to zero
         water_a(:) = 0.0_r8 !initialized to zero
-        
+
         !BSINGH - units of qnum_cur in CAM are #/kmol of air. In Mosaic, units are #/cm3
         !Units conversion: qnum_cur[#/kmol] * 1.0e-3[kmol/mol] * cair_mol_m3[mol/m3] * 1.0e-6[m3/cm3]
 
         num_cam_to_mos_units = 1.0e-3_r8 * cair_mol_m3 * 1.0e-6_r8
-        
-        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3 
+
+        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3
         !Units conversion: qwtr_cur[mol/mol] * mwh2o[g/mol] * cair_mol_m3[mol/m3] * 1.0e-3[kg/g]
-        
+
         wtr_cam_to_mos_units = mwh2o * cair_mol_m3 * 1.0e-3_r8
-        
-        
+
+
         nano_mult_cair  =  cair_mol_m3 * 1.0e9_r8
-        
+
         do imode = 1, n_mode
            !Notes:
            !1. NCL(sea salt) of CAM is mapped in NA and CL of MOSAIC
@@ -2381,51 +2381,51 @@ do_newnuc_if_block50: &
            !4. Species ARO1, ARO2, ALK1, OLE1, API1, API2, LIM1 are SOA species in MOSAIC
            !   which are not used in CAM-MOSAIC framework as of now
            !5. CAM units are (mol/mol of air) which are converted to Mosaic units (nano mol/m3).
-           
-           !Units conversion:qaer_cur[mol/mol] * cair_mol_m3[mol/m3] * 1.0e9[nmol/mol] 
-           aer(inh4_a,  jtotal, imode)  = qaer_cur(iaer_nh4, imode) * nano_mult_cair 
+
+           !Units conversion:qaer_cur[mol/mol] * cair_mol_m3[mol/m3] * 1.0e9[nmol/mol]
+           aer(inh4_a,  jtotal, imode)  = qaer_cur(iaer_nh4, imode) * nano_mult_cair
            aer(ilim2_a, jtotal, imode)  = qaer_cur(iaer_soa, imode) * nano_mult_cair
-           aer(iso4_a,  jtotal, imode)  = qaer_cur(iaer_so4, imode) * nano_mult_cair 
-           aer(ina_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair 
+           aer(iso4_a,  jtotal, imode)  = qaer_cur(iaer_so4, imode) * nano_mult_cair
+           aer(ina_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair
            if (iaer_cl  > 0) then
-              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_cl,  imode) * nano_mult_cair 
+              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_cl,  imode) * nano_mult_cair
            else
-              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair 
+              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair
            end if
            if (iaer_no3 > 0) &
-                aer(ino3_a,  jtotal, imode)  = qaer_cur(iaer_no3, imode) * nano_mult_cair 
+                aer(ino3_a,  jtotal, imode)  = qaer_cur(iaer_no3, imode) * nano_mult_cair
            if (iaer_ca  > 0) &
-                aer(ica_a,   jtotal, imode)  = qaer_cur(iaer_ca,  imode) * nano_mult_cair 
+                aer(ica_a,   jtotal, imode)  = qaer_cur(iaer_ca,  imode) * nano_mult_cair
            if (iaer_co3 > 0) &
-                aer(ico3_a,  jtotal, imode)  = qaer_cur(iaer_co3, imode) * nano_mult_cair 
-           
+                aer(ico3_a,  jtotal, imode)  = qaer_cur(iaer_co3, imode) * nano_mult_cair
+
            !Units of BC, OC and DST in CAM are (mol/mol of air) and nano-g/m3 in MOSAIC
-           !Units conversion:qaer_cur[mol/mol] * mw_aer[g/mol] * cair_mol_m3[mol/m3] * 1.0e9[nano-g/g] 
-           aer(ibc_a,  jtotal, imode)  = qaer_cur(iaer_bc,  imode) * mw_aer(iaer_bc)  * nano_mult_cair 
+           !Units conversion:qaer_cur[mol/mol] * mw_aer[g/mol] * cair_mol_m3[mol/m3] * 1.0e9[nano-g/g]
+           aer(ibc_a,  jtotal, imode)  = qaer_cur(iaer_bc,  imode) * mw_aer(iaer_bc)  * nano_mult_cair
            aer(ioin_a, jtotal, imode)  = qaer_cur(iaer_dst, imode) * mw_aer(iaer_dst) * nano_mult_cair !BSINGH - "Other inorganic(oin)" in Mosaic is DST in CAM
            aer(ioc_a,  jtotal, imode)  = qaer_cur(iaer_pom, imode) * mw_aer(iaer_pom) * nano_mult_cair
-           
+
            !Populate aerosol number and water species
            num_a(imode)   = qnum_cur(imode) * num_cam_to_mos_units
            water_a(imode) = qwtr_cur(imode) * wtr_cam_to_mos_units
         end do
-        
+
         !Populate gases
         gas(:) = 0.0_r8  !Initialized to zero
-        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3). 
+        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3).
         !SOAG is stored in LIM2 gas species as of now
         !CAM units are (mol/mol of air) which are converted to Mosaic units (nano mol/m3).
         gas_avg(:) = 0.0_r8
-        
-        !Units conversion:qgas_cur[mol/mol] * cair_mol_m3[mol/m3] * 10.0e9[nmol/mol] 
+
+        !Units conversion:qgas_cur[mol/mol] * cair_mol_m3[mol/m3] * 10.0e9[nmol/mol]
         gas(ilim2_g)  = qgas_cur(igas_soa)   * nano_mult_cair
-        gas(ih2so4_g) = qgas_cur(igas_h2so4) * nano_mult_cair 
-        gas(inh3_g)   = qgas_cur(igas_nh3)   * nano_mult_cair 
+        gas(ih2so4_g) = qgas_cur(igas_h2so4) * nano_mult_cair
+        gas(inh3_g)   = qgas_cur(igas_nh3)   * nano_mult_cair
         if (igas_hno3 > 0) &
-             gas(ihno3_g)   = qgas_cur(igas_hno3)   * nano_mult_cair 
+             gas(ihno3_g)   = qgas_cur(igas_hno3)   * nano_mult_cair
         if (igas_hcl > 0) &
-             gas(ihcl_g)   = qgas_cur(igas_hcl)   * nano_mult_cair 
-        
+             gas(ihcl_g)   = qgas_cur(igas_hcl)   * nano_mult_cair
+
         !Populate gas_netprod_otrproc
         gas_netprod_otrproc(:) = 0.0_r8
         gas_netprod_otrproc(ih2so4_g) = qgas_netprod_otrproc(igas_h2so4) * nano_mult_cair
@@ -2434,21 +2434,21 @@ do_newnuc_if_block50: &
         !    for nh3 that for h2so4
         ! so for now, just add in the production here
         gas(inh3_g)   = gas(inh3_g) + max( qgas_netprod_otrproc(igas_nh3)*dtchem, 0.0_r8 ) * nano_mult_cair
-        
-        
+
+
         !BSINGH - Initialize the following variables as 'nan' and then assign values to a subset of their dimesions
         Dp_dry_a(:)            = nan
         sigmag_a(:)            = nan
         dp_wet_a(:)            = nan
-        
-        sigmag_a(1:n_mode) = sigmag_aer(1:n_mode)       !Geometric standard deviation for aerosol mode 
+
+        sigmag_a(1:n_mode) = sigmag_aer(1:n_mode)       !Geometric standard deviation for aerosol mode
         !Dry geo. mean dia.(cm) of number distrib [convert from m to cm]!**BALLI: check if it meant to be in,inout or out only and units also
         Dp_dry_a(1:n_mode) = dgn_a(1:n_mode)    * 100.0_r8 * fcvt_dgnum_dvolmean(1:n_mode)
         !Wet geo. mean dia.(cm) of number distrib [convert from m to cm]!**BALLI: check if it meant to be in,inout or out only and untis also
         dp_wet_a(1:n_mode) = dgn_awet(1:n_mode) * 100.0_r8 * fcvt_dgnum_dvolmean(1:n_mode)
-        
-        
-        !BSINGH - These are output variables from Mosaic. 
+
+
+        !BSINGH - These are output variables from Mosaic.
         !Declared as nan to make sure that they are not inadvertently 'used' before assignment.
 !       iter_mesa(:)         = bigint
         mosaic_vars_aa%iter_mesa(1:nbin_a_max) = 0
@@ -2462,8 +2462,8 @@ do_newnuc_if_block50: &
         water_a_hyst(:)      = nan
         aH2O_a(:)            = nan
         gam_ratio(:)         = nan
-        
-        
+
+
         !------------------------------------------------------------!
         !------------------------------------------------------------!
         !END [Populate MOSAIC variables]
@@ -2473,42 +2473,42 @@ do_newnuc_if_block50: &
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
         !BSINGH - This section is required ONLY for the MAM box model
-        !         to see if it can reproduce errors encountered by the 
+        !         to see if it can reproduce errors encountered by the
         !         CAM model during runtime(e.g. convergence errors).
-        !         This block repopulate all the information which is 
-        !         going into the mosaic box (intent-ins and intent-inouts). 
+        !         This block repopulate all the information which is
+        !         going into the mosaic box (intent-ins and intent-inouts).
         !         It is a binary read to preserve the accuracy.
-  
+
         if(debug_mosaic) then
            !Read a binary file which has all the inputs to the mosaic box
            !and stop the model
-           
+
            unitn = 101
            infile = 'mosaic_error_7.bin'
            open( unitn, file=trim(infile), status='old', form='unformatted', CONVERT = 'BIG_ENDIAN' )
-           
+
            read(unitn)aH2O
            read(unitn)T_K
            read(unitn)P_atm
            read(unitn)RH_pc
            read(unitn)dtchem
-           
+
            do ibin = 1, ntot_amode !nbin_a_max
               read(unitn)num_a(ibin),water_a(ibin),Dp_dry_a(ibin),        &
                    sigmag_a(ibin),dp_wet_a(ibin),jhyst_leg(ibin),          &
                    jaerosolstate(ibin)
            end do
-           
-           
+
+
            do igas = 1, ngas_volatile
               read(unitn) gas(igas), gas_avg(igas), gas_netprod_otrproc(igas)
            enddo
-           
+
            do ibin = 1, ntot_amode !nbin_a_max
               do istate = 1, 3
                  do iaer = 1 , naer
                     read(unitn)iaer_in,istate_in,ibin_in, aer_tmp
-                    aer(iaer_in,istate_in,ibin_in) = aer_tmp                    
+                    aer(iaer_in,istate_in,ibin_in) = aer_tmp
                  end do
               end do
            end do
@@ -2516,8 +2516,8 @@ do_newnuc_if_block50: &
         endif
         !BSINGH -----xxx ENDS reading file for debugging mosaic xxxx----
 #endif
-        
-        
+
+
         !Store the variables which are intent(inout) to Mosaic box model
         !for debuging purposes
         aer_in(:,:,:)             = aer(:,:,:)
@@ -2531,13 +2531,13 @@ do_newnuc_if_block50: &
         jaerosolstate_in(:)       = jaerosolstate(:)
         gas_netprod_otrproc_in(:) = gas_netprod_otrproc(:)
         gas_avg_in(:)             = gas_avg(:)
-        
+
 
         !BSINGH - zero_water_flag becomes .true. if water is zero in liquid phase
-!       zero_water_flag = .false. 
+!       zero_water_flag = .false.
         mosaic_vars_aa%zero_water_flag = .false.
         !BSINGH - flag_itr_kel becomes true when kelvin iteration in mdofule_mosaic_ext.F90 are greater then 100
-!       flag_itr_kel    = .false.        
+!       flag_itr_kel    = .false.
         mosaic_vars_aa%flag_itr_kel = .false.
 
 
@@ -2569,7 +2569,7 @@ do_newnuc_if_block50: &
 
 
         ! set kappa values for non-electrolyte species
-        ! reason for doing this here is that if cam eventually has multiple varieties of dust and/or pom, 
+        ! reason for doing this here is that if cam eventually has multiple varieties of dust and/or pom,
         !    then the dust hygroscopicity may vary spatially and temporally,
         !    and the kappa values cannot be constants
         kappa_nonelectro(:) = 0.0_r8
@@ -2582,9 +2582,9 @@ do_newnuc_if_block50: &
         !Call MOSAIC parameterization
         !BSINGH - jASTEM_fail is in arg list to know if the mosiac model converged or not
         !BSINGH - Following variables are not required by CAM but they still exist in the
-        !         calling arguments as intent-outs as Mosaic model needs them to be in the 
+        !         calling arguments as intent-outs as Mosaic model needs them to be in the
         !         arg list:
-        !         gam_ratio, iter_mesa, aH2O_a,jaerosolstate, mass_dry_a_bgn, mass_dry_a, 
+        !         gam_ratio, iter_mesa, aH2O_a,jaerosolstate, mass_dry_a_bgn, mass_dry_a,
         !         dens_dry_a_bgn, dens_dry_a, water_a_hyst, jaerosolstate_bgn
 
 ! *** ff03h version ***
@@ -2632,30 +2632,30 @@ do_newnuc_if_block50: &
         if (mosaic_vars_aa%flag_itr_kel) then
            misc_vars_aa_sub%max_kelvin_iter_1grid = misc_vars_aa_sub%max_kelvin_iter_1grid + 1.0_r8
         endif
-        
+
         if (mosaic_vars_aa%jASTEM_fail > 0 .or. mosaic_vars_aa%zero_water_flag .or. mosaic_vars_aa%f_mos_fail > 0 ) then !solver in ASTEM didn't converge
-           
-           !Let the run proceed and track the points(i,k) where the run fails convergence 
+
+           !Let the run proceed and track the points(i,k) where the run fails convergence
            if(convergence_pt_trk .and. mosaic_vars_aa%jASTEM_fail > 0 ) then
               misc_vars_aa_sub%cnvrg_fail_1grid = misc_vars_aa_sub%cnvrg_fail_1grid + 1.0_r8
            else
               !Printout a binary file which has all the inputs to the mosaic box
               !and stop the model
-              
+
               !Generate a unit number and form file name based on process number
 #ifdef SPMD
               unitn  = getunit()
               write(tmp_str,*)iam
-              write(nlfile,*)'mosaic_error_',trim(adjustl(tmp_str)),'.bin'               
+              write(nlfile,*)'mosaic_error_',trim(adjustl(tmp_str)),'.bin'
 #else
               unitn = 101
               nlfile = 'mosiac_error.txt'
 #endif
               !Open a binary file, remember it is written out as BIG ENDIAN
               open( unitn, file=trim(nlfile), status='unknown', form = 'unformatted' )
-              
+
               write(unitn)aH2O    !Write relative humidity
-              write(unitn)T_K     !Write relative temp 
+              write(unitn)T_K     !Write relative temp
               write(unitn)P_atm   !Write relative pressure
               write(unitn)RH_pc
               write(unitn)dtchem
@@ -2665,12 +2665,12 @@ do_newnuc_if_block50: &
                       sigmag_a_in(ibin),dp_wet_a_in(ibin),jhyst_leg_in(ibin),          &
                       jaerosolstate_in(ibin)
               end do
-              
+
               !Write gas array
               do igas = 1, ngas_volatile
                  write(unitn) gas_in(igas), gas_avg_in(igas), gas_netprod_otrproc_in(igas)
               enddo
-              
+
               !Write aerosols
               do ibin = 1, ntot_amode !nbin_a_max
                  do istate = 1, 3
@@ -2679,7 +2679,7 @@ do_newnuc_if_block50: &
                     end do
                  end do
               end do
-              !Close the file 
+              !Close the file
               close(unitn)
 #ifdef SPMD
               !free unit number
@@ -2692,7 +2692,7 @@ do_newnuc_if_block50: &
               call endrun (tmp_str)
            endif
         endif
-        
+
 
         ! copy other diagnostic outputs (that are written to history) from mosaic_vars_aa to misc_vars_aa_sub
         misc_vars_aa_sub%xnerr_astem_negative_1grid(:,:) = mosaic_vars_aa%xnerr_astem_negative(:,:)
@@ -2709,18 +2709,18 @@ do_newnuc_if_block50: &
         !------------------------------------------------------------!
         !Process MOSAIC output and store it in CAM data structures
         !------------------------------------------------------------!
-        !------------------------------------------------------------! 
+        !------------------------------------------------------------!
         !BSINGH - units of qnum_cur in CAM are #/kmol of air. In Mosaic, units are #/cm3
         num_mos_to_cam_units = 1.0_r8/num_cam_to_mos_units !Take inverse of cam_to_mos units
         num_cam_to_mos_units = nan                         !To avoid inadvertent use
 
-        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3 
+        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3
         wtr_mos_to_cam_units = 1.0_r8/wtr_cam_to_mos_units !Take inverse of cam_to_mos units
         wtr_cam_to_mos_units = nan                         !To avoid inadvertent use
 
         nano_mult_cair_inv  =  1.0_r8/nano_mult_cair       !Take inverse of cam to mosaic units
         nano_mult_cair      = nan                          !To avoid inadvertent use
-        
+
         do imode = 1, n_mode
            !Notes:
            !1. NCL(sea salt) of CAM is mapped in NA and CL of MOSAIC
@@ -2753,12 +2753,12 @@ do_newnuc_if_block50: &
            qwtr_cur(imode) = water_a(imode) * wtr_mos_to_cam_units
         end do
 
-        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3). 
+        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3).
         !SOAG is stored in LIM2 gas species as of now
 
         qgas_cur(igas_soa)   = gas(ilim2_g)  * nano_mult_cair_inv
-        qgas_cur(igas_h2so4) = gas(ih2so4_g) * nano_mult_cair_inv 
-        qgas_cur(igas_nh3)   = gas(inh3_g)   * nano_mult_cair_inv 
+        qgas_cur(igas_h2so4) = gas(ih2so4_g) * nano_mult_cair_inv
+        qgas_cur(igas_nh3)   = gas(inh3_g)   * nano_mult_cair_inv
 
         qgas_avg(igas_soa)   = gas_avg(ilim2_g)  * nano_mult_cair_inv
         qgas_avg(igas_h2so4) = gas_avg(ih2so4_g) * nano_mult_cair_inv
@@ -2773,7 +2773,7 @@ do_newnuc_if_block50: &
            qgas_avg(igas_hcl) = gas_avg(ihcl_g) * nano_mult_cair_inv
         end if
 
-        !update mode  diameters 
+        !update mode  diameters
         !Dry geo. mean dia.(m) of number distrib [convert from cm to m]
         dgn_a(1:n_mode)          = Dp_dry_a(1:n_mode) * 0.01_r8 / fcvt_dgnum_dvolmean(1:n_mode)
         !Wet geo. mean dia.(m) of number distrib [convert from cm to m]
@@ -2834,7 +2834,7 @@ do_newnuc_if_block50: &
          qgas_netprod_otrproc
                 ! qgas_netprod_otrproc = gas net production rate from other processes
                 !    such as gas-phase chemistry and emissions (mol/mol/s)
-                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                 !    together, which is more accurate numerically
                 ! NOTE - must be >= zero, as numerical method can fail when it is negative
                 ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -2904,7 +2904,7 @@ do_newnuc_if_block50: &
 
          iaer = igas
          do n = 1, ntot_amode
-            if ( lmap_aer(iaer,n) > 0 .or. & 
+            if ( lmap_aer(iaer,n) > 0 .or. &
                  mode_aging_optaa(n) > 0 ) then
                ! uptkrate is for number = 1 #/m3, so mult. by number conc. (#/m3)
                uptkaer(igas,n) = uptkrate(n) * (qnum_cur(n) * aircon)
@@ -3229,7 +3229,7 @@ time_loop: &
 !
 ! *** questions ***
 ! > why not use qgas and qaer instead of g_soa and a_soa
-! > why not calc the following on every substep because 
+! > why not calc the following on every substep because
 !      nuc and coag may change things:
 !      skip)soamode, uptkaer_soag_tmp, tot_soa, a_opoa
 ! > include gasprod for soa ??
@@ -3801,7 +3801,7 @@ time_loop: &
       function total_inter_cldbrn(iscldy, imode, interstitial, cldbrn) result (total)
 
         !compute total (dry volume or number) of interstitial and cloud borne species
-      
+
         logical,  intent(in) :: iscldy       !TRUE, if a cell has cloud
         integer,  intent(in) :: imode
         real(r8), intent(in) :: interstitial(:)     !interstital part [unit depends on the input]
@@ -4067,7 +4067,7 @@ time_loop: &
       real(r8), intent(inout), dimension( 1:max_mode ) :: &
          qwtr_cur
 
-! DESCRIPTION: 
+! DESCRIPTION:
 !   computes changes due to aerosol nucleation (new particle formation)
 !       treats both nucleation and subsequent growth of new particles
 !          to aitken mode size
@@ -4101,7 +4101,7 @@ time_loop: &
       real(r8) :: dpnuc
       real(r8) :: dplom_mode(1), dphim_mode(1)
       real(r8) :: mass1p
-      real(r8) :: mass1p_aithi, mass1p_aitlo 
+      real(r8) :: mass1p_aithi, mass1p_aitlo
       real(r8) :: qh2so4_cur, qh2so4_avg, qh2so4_del
       real(r8) :: qnh3_cur, qnh3_del, qnh4a_del
       real(r8) :: qnuma_del
@@ -4284,7 +4284,7 @@ time_loop: &
       end if
 
 !   mass nuc rate (kg/kmol-air/s) from mass nuc amts
-      dmdt_ait = max( 0.0_r8, (tmpb/deltat) ) 
+      dmdt_ait = max( 0.0_r8, (tmpb/deltat) )
 
       dndt_aitsv1 = dndt_ait
       dmdt_aitsv1 = dmdt_ait
@@ -4395,10 +4395,10 @@ time_loop: &
         write(lund,97020) 'qnh4a_del, qnh3_del          ',   &
                           qnh4a_del, qnh3_del
         write(lund,97020) 'dqdt(h2so4), (nh3)           ',   &
-              dqdt(i,k,l_h2so4), dqdt(i,k,l_nh3) 
+              dqdt(i,k,l_h2so4), dqdt(i,k,l_nh3)
         write(lund,97020) 'dqdt(so4a), (nh4a), (numa)   ',   &
               dqdt(i,k,lso4ait), dqdt(i,k,lnh4ait), dqdt(i,k,lnumait)
- 
+
        dpnuc = 0.0
        if (dndt_aitsv1 > 1.0e-5) dpnuc = (6.0*dmdt_aitsv1/   &
                    (pi*dens_so4a_host*dndt_aitsv1))**0.3333333
@@ -4408,7 +4408,7 @@ time_loop: &
        write(lund,97020) 'mass1p, mass1p_aitlo, _aithi ',   &
                     mass1p, mass1p_aitlo, mass1p_aithi
        end if
- 
+
 97010  format( / 'NEWNUC nstep,lat,lon,k,tk,cair', i8, 3i4, f8.2, 1pe12.4 )
 97020  format( a, 1p, 6e12.4 )
 97030  format( a, 1p, 2e12.4, 0p, 5f10.6 )
@@ -4430,7 +4430,7 @@ time_loop: &
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_pcarbon_aging_1subarea(                        &    
+      subroutine mam_pcarbon_aging_1subarea(                        &
          dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
@@ -4449,7 +4449,7 @@ time_loop: &
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur       ! aerosol mass mixing ratio [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond  ! change of aerosol mass mixing ratio due to condensation [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_coag  ! change of aerosol mass mixing ratio due to coagulation [mol/mol]
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation
                                                                                          ! from subrountine mam_coag_1subarea [mol/mol]
 ! *** need to add qaer_del_coag_nmoacc_in
 
@@ -4502,7 +4502,7 @@ agepair_loop1: &
 
 
       subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
-          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, & 
+          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
           xferfrac_pcage, frac_cond, frac_coag)
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
@@ -4516,7 +4516,7 @@ agepair_loop1: &
       real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a    ! dry geometric mean diameter of number distribution [m]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur            ! aerosol mass mixing ratio [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond       ! change of aerosol mass mixing ratio due to condensation [mol/mol]
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation
                                                                                          ! from subrountine mam_coag_1subarea [mol/mol]
       real(r8), intent(out) :: xferfrac_pcage    ! fraction of aged pom/bc transferred to accum [unitless]
       real(r8), intent(out) :: frac_cond         ! fraction of aerosol change due to condensation [unitless]
@@ -4526,19 +4526,19 @@ agepair_loop1: &
       integer :: iaer
 
       real(r8) :: fac_volsfc
-      real(r8) :: xferfrac_tmp1, xferfrac_tmp2 
+      real(r8) :: xferfrac_tmp1, xferfrac_tmp2
       real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
 
 ! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
 ! is set to 1 for default MAM4
-      vol_shell = qaer_cur(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+      vol_shell = qaer_cur(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
                   qaer_cur(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
-      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
                           qaer_del_cond(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
-      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
-                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
+      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*mass_2_vol(iaer_so4) + &
+                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa)
 
 
       qaer_del_cond_tmp = max( qaer_del_cond_tmp, 1.0e-35_r8 )
@@ -4547,21 +4547,21 @@ agepair_loop1: &
 
       vol_core = 0.0_r8
       do iaer = 1, naer
-         ! for core volume, only include the mapped species 
+         ! for core volume, only include the mapped species
          !    which are primary and low hygroscopicity
          if (lmap_aer(iaer,nsrc) > 0) &
-         vol_core = vol_core + qaer_cur(iaer,nsrc)*fac_m2v_aer(iaer)
+         vol_core = vol_core + qaer_cur(iaer,nsrc)*mass_2_vol(iaer)
       end do
-!   ratio1 = vol_shell/vol_core = 
+!   ratio1 = vol_shell/vol_core =
 !      actual hygroscopic-shell-volume/carbon-core-volume after gas uptake
 !   ratio2 = 6.0_r8*dr_so4_monolayers_pcage/(dgncur_a*fac_volsfc)
-!      = (shell-volume corresponding to n_so4_monolayers_pcage)/core-volume 
+!      = (shell-volume corresponding to n_so4_monolayers_pcage)/core-volume
 !      The 6.0/(dgncur_a*fac_volsfc) = (mode-surface-area/mode-volume)
 !   Note that vol_shell includes both so4+nh4 AND soa as "equivalent so4",
 !      The soa_equivso4_factor accounts for the lower hygroscopicity of soa.
 !
 !   Define xferfrac_pcage = min( 1.0, ratio1/ratio2)
-!   But ratio1/ratio2 == tmp1/tmp2, and coding below avoids possible overflow 
+!   But ratio1/ratio2 == tmp1/tmp2, and coding below avoids possible overflow
 !
       fac_volsfc = exp( 2.5*(alnsg_aer(nsrc)**2) )
       xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
@@ -4575,20 +4575,20 @@ agepair_loop1: &
       end if
 
       return
-      end subroutine mam_pcarbon_aging_frac 
+      end subroutine mam_pcarbon_aging_frac
 
-      
+
       subroutine transfer_aged_pcarbon_to_accum(nsrc, ndest, &
                                  xferfrac_pcage, frac_cond, frac_coag, &
                                  q_cur, q_del_cond, q_del_coag)
 
 ! transfer mass/number of aged pom and bc from pcarbon to accum mode
-! adjust the change of aerosol mass/number due to condenations/coagulation 
+! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon anc accum mode
 
       implicit none
-      
-! arguments      
+
+! arguments
       integer,  intent(in) :: nsrc            ! pcarbon mode index [unitless]
       integer,  intent(in) :: ndest           ! accum mode index [unitless]
       real(r8), intent(in) :: xferfrac_pcage  ! fraction of aged pom/bc transferred to accum [unitless]
@@ -4602,7 +4602,7 @@ agepair_loop1: &
       real(r8) q_tmp
 
       q_tmp = q_cur(nsrc)*xferfrac_pcage
-      
+
       q_cur(nsrc)       = q_cur(nsrc)  - q_tmp
       q_cur(ndest)      = q_cur(ndest) + q_tmp
 
@@ -4616,16 +4616,16 @@ agepair_loop1: &
       end subroutine transfer_aged_pcarbon_to_accum
 
 
-      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &  
+      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &
                                  qaer_cur, qaer_del_cond, qaer_del_coag)
 
-! transfer mass of aerosols contributing to aging (i.e., so4, soa) 
+! transfer mass of aerosols contributing to aging (i.e., so4, soa)
 ! from pcarbon to accum mode
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon and accum mode
 
       implicit none
-      
+
 ! arguments
       integer,  intent(in) :: nsrc          ! pcarbon mode index [unitless]
       integer,  intent(in) :: ndest         ! accum mode index [unitless]
@@ -4711,12 +4711,12 @@ agepair_loop1: &
                                ! mode-median wet diameter of number distribution (m)
       real(r8), intent(in)  :: lnsg(n_mode)
                                ! ln( sigmag )  (--)
-      real(r8), intent(out) :: uptkrate(n_mode)  
+      real(r8), intent(out) :: uptkrate(n_mode)
                                ! gas-to-aerosol mass transfer rates (1/s)
                                ! for number concentration = 1 #/m3
 
 
-! local 
+! local
       integer, parameter :: nghq = 2
       integer :: i, iq, k, l1, l2, la, n
 
@@ -4765,7 +4765,7 @@ agepair_loop1: &
          end if
 
          const  = tworootpi * exp( beta*lndpgn + 0.5_r8*(beta*lnsg(n))**2 )
-         
+
 !   sum over gauss-hermite quadrature points
          sumghq = 0.0
          do iq = 1, nghq
@@ -4782,7 +4782,7 @@ agepair_loop1: &
 
             sumghq = sumghq + wghq(iq)*dp*fuchs_sutugin/(dp**beta)
          end do
-         uptkrate(n) = const * gasdiffus * sumghq    
+         uptkrate(n) = const * gasdiffus * sumghq
 
       end do   ! "do n = 1, ntot_soamode"
 
@@ -4853,7 +4853,7 @@ implicit none
    character(128)                 :: msg, fmtaa
    character(2)                   :: tmpch2
    !-----------------------------------------------------------------------
- 
+
 !namelist variables
 n_so4_monolayers_pcage  = n_so4_monolayers_pcage_in
 dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
@@ -4865,7 +4865,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       ldiag98  = .true.  ; lun98  = 98
       ldiag13n = .true.  ; lun13n = 130
       ldiag15n = .true.  ; lun15n = 150
-      ldiagd1  = .true. 
+      ldiagd1  = .true.
 #else
       ldiag82  = .false. ; lun82  = iulog
       ldiag97  = .false. ; lun97  = iulog
@@ -4892,14 +4892,14 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       name_numcw  = "???"
 
       igas_h2so4 = 0 ; igas_nh3 = 0
-      iaer_bc  = 0 ; iaer_dst = 0 
-      iaer_ncl = 0 ; iaer_nh4 = 0 
-      iaer_pom = 0 ; iaer_soa = 0 
+      iaer_bc  = 0 ; iaer_dst = 0
+      iaer_ncl = 0 ; iaer_nh4 = 0
+      iaer_pom = 0 ; iaer_soa = 0
       iaer_so4 = 0
-      iaer_no3 = 0 ; iaer_cl  = 0 
-      iaer_ca  = 0 ; iaer_co3 = 0 
-      iaer_mpoly = 0 ; iaer_mprot = 0 
-      iaer_mlip  = 0 ; iaer_mhum = 0 
+      iaer_no3 = 0 ; iaer_cl  = 0
+      iaer_ca  = 0 ; iaer_co3 = 0
+      iaer_mpoly = 0 ; iaer_mprot = 0
+      iaer_mlip  = 0 ; iaer_mhum = 0
       iaer_mproc = 0 ; iaer_mom = 0
 
       if (nsoa == 1) then
@@ -5047,7 +5047,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
             msg = 'modal_aero_amicphys_init ERROR - lmap_gas for ' // name_gas(igas)
             call endrun( msg )
          end if
-         lmz = l - loffset 
+         lmz = l - loffset
          lmz2 = get_spc_ndx( name_gas(igas) )
          if (lmz /= lmz2 .or. lmz <= 0) then
             msg = 'modal_aero_amicphys_init ERROR - lmz /= lmz2 for ' // name_gas(igas)
@@ -5099,7 +5099,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
          do l1 = 1, nspec_amode(n)
             if (lac == 1) then
                l = lmassptr_amode(l1,n)
-               lmz = l - loffset 
+               lmz = l - loffset
                tmpnamea = cnst_name(l)
                tmpch2 = '_a'
             else
@@ -5260,7 +5260,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 !          aitken  + [ accum, pcarbon, maccum ]
 !          maitken + [ accum, pcarbon, maccum ]
 !    4 possible coagulation pairs involve similar sized modes
-!       the resulting particle is placed in the mode that is aged 
+!       the resulting particle is placed in the mode that is aged
 !       or contains the largest number of species
 !          pcarbon + accum   --> accum   (aged)
 !          maitken + aitken  --> aitken  (aged)
@@ -5399,7 +5399,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       return
       end subroutine modal_aero_amicphys_init
 
- 
+
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
       subroutine mam_set_lptr2_and_specxxx2
@@ -5505,11 +5505,11 @@ implicit none
    logical                        :: history_verbose      ! produce verbose history output
    logical                        :: history_aerocom    ! Output the aerocom history
    !-----------------------------------------------------------------------
- 
+
 
       call phys_getopts( history_aerosol_out = history_aerosol, &
                          history_verbose_out = history_verbose   )
-#if ( defined CAM_VERSION_IS_ACME ) 
+#if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
 #else
       call phys_getopts( history_aerocom_out        = history_aerocom )
@@ -5757,9 +5757,7 @@ implicit none
       return
       end subroutine m_a_amicphys_init_history
 
- 
+
 !----------------------------------------------------------------------
 
 end module modal_aero_amicphys
-
-

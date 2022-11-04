@@ -1,7 +1,7 @@
 !----------------------------------------------------------------------
 !BOP
 !
-! !MODULE: modal_aero_amicphys_control 
+! !MODULE: modal_aero_amicphys_control
 !
    module modal_aero_amicphys_control
 
@@ -13,7 +13,7 @@
 ! use ref_pres,        only:  top_lev => clim_modal_aero_top_lev  ! this is for gg02a
   use ref_pres,        only:  top_lev => trop_cloud_top_lev       ! this is for ee02c
 
-! !DESCRIPTION: This module contains the constants, parameters, and control variables 
+! !DESCRIPTION: This module contains the constants, parameters, and control variables
 !  separated from modal_aero_amicphys.
 !
 ! !REVISION HISTORY:
@@ -101,7 +101,7 @@
   integer, parameter :: max_aer = nsoa + npoa + nbc + 4
 #elif ( ( defined MODAL_AERO_7MODE ) && ( defined MOSAIC_SPECIES ) )
   integer, parameter :: max_gas = nsoa + 4
-  ! the +8 in max_aer are dst, ncl(=na), so4, no3, cl, nh4, ca, co3 
+  ! the +8 in max_aer are dst, ncl(=na), so4, no3, cl, nh4, ca, co3
   integer, parameter :: max_aer = nsoa + npoa + nbc + 8
 #elif ( defined MODAL_AERO_7MODE )
   integer, parameter :: max_gas = nsoa + 2
@@ -182,15 +182,20 @@
   logical :: ldiag82, ldiag97, ldiag98, ldiag13n, ldiag15n
   logical :: ldiagd1
 
+  !NOTE:dryvol_smallest is a very small molar mixing ratio [m3-spc/kmol-air] (where m3-spc
+  !is meter cubed volume of a species "spc") used for avoiding overflow.  it corresponds to dp = 1 nm
+  !and number = 1e-5 #/mg-air ~= 1e-5 #/cm3-air
+  real(r8), parameter :: smallest_dryvol_value = 1.0e-25
+
   real(r8) :: accom_coef_gas(max_gas)
   real(r8) :: alnsg_aer(max_mode)
   real(r8) :: dgnum_aer(max_mode), dgnumhi_aer(max_mode), dgnumlo_aer(max_mode)
   real(r8) :: dens_aer(max_aer)
   real(r8) :: dens_so4a_host
-  real(r8) :: fac_m2v_aer(max_aer)        ! converts (mol-aero/mol-air) to (m3-aero/mol-air)
+  real(r8) :: mass_2_vol(max_aer)        ! converts (mol-aero/mol-air) to (m3-aero/mol-air)
   real(r8) :: fac_eqvso4hyg_aer(max_aer)  ! converts a species volume to a volume of so4
                                           !    (or nh4hso4) having same hygroscopicity
-  real(r8) :: fac_m2v_eqvhyg_aer(max_aer) ! = fac_m2v_aer * fac_eqvso4hyg_aer
+  real(r8) :: fac_m2v_eqvhyg_aer(max_aer) ! = mass_2_vol * fac_eqvso4hyg_aer
 
   real(r8) :: fcvt_gas(max_gas), fcvt_aer(max_aer), fcvt_num, fcvt_wtr
   real(r8) :: fcvt_dgnum_dvolmean(max_mode)
