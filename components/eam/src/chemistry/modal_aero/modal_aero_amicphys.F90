@@ -12,6 +12,7 @@
 
 ! !USES:
   use cam_abortutils,  only:  endrun
+  use shr_log_mod ,    only: errMsg => shr_log_errMsg
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
 
@@ -20,7 +21,7 @@
   implicit none
   private
 
-  ! !PUBLIC MEMBER FUNCTIONS:
+! !PUBLIC MEMBER FUNCTIONS:
   public modal_aero_amicphys_intr, modal_aero_amicphys_init
 
 ! !DESCRIPTION: This module implements ...
@@ -102,7 +103,7 @@ implicit none
                                                    ! *** MUST BE  #/kmol-air for number
                                                    ! *** MUST BE mol/mol-air for mass
                                                    ! *** NOTE ncol dimension
-   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx) 
+   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx)
                                                    ! like q but for cloud-borner tracers
                                                    ! these values are updated
    real(r8), intent(in)    :: q_pregaschem(ncol,pver,pcnstxx)    ! q TMRs    before gas-phase chemistry
@@ -110,7 +111,7 @@ implicit none
    real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,pcnstxx) ! qqcw TMRs before cloud chemistry
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
    real(r8), intent(inout) :: q_tendbb(ncol,pver,pcnstxx,nqtendbb)    ! TMR tendencies for box-model diagnostic output
-   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb) 
+   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb)
 #endif
 
    real(r8), intent(in)    :: t(pcols,pver)        ! temperature at model levels (K)
@@ -129,10 +130,10 @@ implicit none
                               qaerwat(pcols,pver,ntot_amode)
                                  ! aerosol water mixing ratio (kg/kg, NOT mol/mol)
 
-! !DESCRIPTION: 
+! !DESCRIPTION:
 ! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
 !    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to both 
+!    growth from smaller to larger modes (renaming) due to both
 !       condensation and cloud chemistry
 !    new particle nucleation
 !    coagulation
@@ -181,7 +182,7 @@ implicit none
 !----------------------------------------------------------------------
    logical   :: history_aerocom    ! Output the aerocom history
 !-----------------------------------------------------------------------
- 
+
 
       real(8), parameter :: fcld_locutoff = 1.0e-5_r8
 ! cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
@@ -236,7 +237,7 @@ implicit none
 
 ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
 !    for different processes, which are output to history
-! the processes are condensation/evaporation (and associated aging), 
+! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) :: &
          q_coltendaa
@@ -256,7 +257,7 @@ implicit none
 
       adjust_factor_pbl_ratenucl = newnuc_adjust_factor_pbl
 
-#if ( defined CAM_VERSION_IS_ACME ) 
+#if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
 #else
       call phys_getopts( history_aerocom_out        = history_aerocom )
@@ -616,7 +617,7 @@ main_i_loop: &
             lc = lmap_numcw(n)
             tmpch6a = name_num(n)
             tmpch6c = name_numcw(n)
-         else 
+         else
             if (l2 == 2) then
                iaer = iaer_so4
             else
@@ -832,8 +833,8 @@ main_i_loop: &
 
       ncluster_3dtend_nnuc(i,k) = misc_vars_aa%ncluster_tend_nnuc_1grid
 #if ( defined ( MOSAIC_SPECIES ) )
-      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid 
-      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid 
+      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid
+      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid
       xnerr_astem_negative(pcols,pver,1:5,1:4) = misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4)
 #endif
 
@@ -973,14 +974,14 @@ main_i_loop: &
 !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
       real(r8), intent(in   ), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3 
+         qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
       real(r8), intent(inout), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
          qsub4, qqcwsub4
       real(r8), intent(inout), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: &
          qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
 ! qsub_tendaa and qqcwsub_tendaa are TMR tendencies
 !    for different processes, which are used to produce history output
-! the processes are condensation/evaporation (and associated aging), 
+! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) :: &
          qsub_tendaa
@@ -1052,7 +1053,7 @@ main_jsub_loop: &
          do_coag_sub   = do_coag
       end if
       do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
-      
+
 
 ! map incoming sub-area mix-ratios to gas/aer/num arrays
 
@@ -1173,8 +1174,8 @@ main_jsub_loop: &
          misc_vars_aa%ncluster_tend_nnuc_1grid = misc_vars_aa%ncluster_tend_nnuc_1grid &
                                                + misc_vars_aa_sub(jsub)%ncluster_tend_nnuc_1grid*afracsub(jsub)
 #if ( defined ( MOSAIC_SPECIES ) )
-         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid 
-         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid 
+         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid
+         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid
          misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = misc_vars_aa_sub(jsub)%xnerr_astem_negative_1grid(1:5,1:4)
 #endif
       end if
@@ -1362,9 +1363,9 @@ main_jsub_loop: &
       integer :: jtsubstep
       integer :: ll
       integer :: modefrm, modetoo
-! if mtoo_renamexf(n) >  0, then mode n gets renamed into mode mtoo_renamexf(n)
-! if mtoo_renamexf(n) <= 0, then mode n does not have renaming
-      integer :: mtoo_renamexf(max_mode)
+! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
+! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
+      integer :: dest_mode_of_mode(max_mode)
       integer :: n, ntsubstep
       integer :: n_mode
       integer :: ntot_soamode
@@ -1453,7 +1454,7 @@ main_jsub_loop: &
 !    if qgas increases from pre-gaschem to post-cldchem,
 !       start from the pre-gaschem mix-ratio and add in the production
 !       during the integration
-!    if it decreases, 
+!    if it decreases,
 !       start from post-cldchem mix-ratio
 ! *** currently just do this for h2so4 and nh3
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
@@ -1582,8 +1583,8 @@ do_cond_if_block10: &
 do_rename_if_block30: &
       if ( do_rename ) then
 
-      mtoo_renamexf(:) = 0
-      mtoo_renamexf(nait) = nacc
+      dest_mode_of_mode(:) = 0
+      dest_mode_of_mode(nait) = nacc
 
 ! qaer_delsub_grow4rnam   = change in qaer from cloud chemistry and gas condensation
 ! qaercw_delsub_grow4rnam = change in qaercw from cloud chemistry
@@ -1596,15 +1597,11 @@ do_rename_if_block30: &
       qaercw_sv1 = qaercw_cur
 
       call mam_rename_1subarea(                                      &
-         nstep,             lchnk,                                   &
-         i,                 k,                jsub,                  &
-         latndx,            lonndx,           lund,                  &
          iscldy_subarea,                                             &
-         mtoo_renamexf,                                              &
+         dest_mode_of_mode,                                              &
          n_mode,                                                     &
          qnum_cur,                                                   &
          qaer_cur,          qaer_delsub_grow4rnam,                   &
-         qwtr_cur,                                                   &
          qnumcw_cur,                                                 &
          qaercw_cur,        qaercw_delsub_grow4rnam                  )
 
@@ -1710,7 +1707,7 @@ do_rename_if_block30: &
 ! qgas3, qaer3, qnum3 are the current incoming TMRs
 ! qgas4, qaer4, qnum4 are the updated outgoing TMRs
 !
-! this routine calculates changes involving 
+! this routine calculates changes involving
 !    gas-aerosol exchange (condensation/evaporation)
 !    growth from smaller to larger modes (renaming) due to condensation
 !    new particle nucleation
@@ -1760,7 +1757,7 @@ do_rename_if_block30: &
 !
 ! qXXX_delaa are TMR changes (not tendencies)
 !    for different processes, which are used to produce history output
-! for a clear sub-area, the processes are condensation/evaporation (and associated aging), 
+! for a clear sub-area, the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), intent(in   ), dimension( 1:max_gas ) :: &
          qgas1, qgas3
@@ -1798,9 +1795,9 @@ do_rename_if_block30: &
       integer :: jtsubstep
       integer :: ll
       integer :: modefrm, modetoo
-! if mtoo_renamexf(n) >  0, then mode n gets renamed into mode mtoo_renamexf(n)
-! if mtoo_renamexf(n) <= 0, then mode n does not have renaming
-      integer :: mtoo_renamexf(max_mode)
+! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
+! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
+      integer :: dest_mode_of_mode(max_mode)
       integer :: n, ntsubstep
       integer :: n_mode
       integer :: ntot_soamode
@@ -1816,7 +1813,7 @@ do_rename_if_block30: &
          qgas_del_cond, qgas_del_nnuc, qgas_netprod_otrproc
                 ! qgas_netprod_otrproc = gas net production rate from other processes
                 !    such as gas-phase chemistry and emissions (mol/mol/s)
-                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                 !    together, which is more accurate numerically
                 ! NOTE - must be >= zero, as numerical method can fail when it is negative
                 ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -1874,7 +1871,7 @@ do_rename_if_block30: &
 !    if qgas increases from pre-gaschem to post-cldchem,
 !       start from the pre-gaschem mix-ratio and add in the production
 !       during the integration
-!    if it decreases, 
+!    if it decreases,
 !       start from post-cldchem mix-ratio
 ! *** currently just do this for h2so4 and nh3
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
@@ -1966,7 +1963,7 @@ do_cond_if_block10: &
 #if ( defined( MOSAIC_SPECIES ) )
       end if
 #endif
-         
+
       if (newnuc_h2so4_conc_optaa == 11) then
          qgas_avg(igas_h2so4) = 0.5_r8*(qgas_sv1(igas_h2so4) + qgas_cur(igas_h2so4))
       else if (newnuc_h2so4_conc_optaa == 12) then
@@ -2000,22 +1997,18 @@ do_cond_if_block10: &
 do_rename_if_block30: &
       if ( do_rename ) then
 
-      mtoo_renamexf(:) = 0
-      mtoo_renamexf(nait) = nacc
+      dest_mode_of_mode(:) = 0
+      dest_mode_of_mode(nait) = nacc
 
       qnum_sv1 = qnum_cur
       qaer_sv1 = qaer_cur
 
       call mam_rename_1subarea(                                    &
-         nstep,             lchnk,                                 &
-         i,                 k,                jsub,                &
-         latndx,            lonndx,           lund,                &
          iscldy_subarea,                                           &
-         mtoo_renamexf,                                            &
+         dest_mode_of_mode,                                            &
          n_mode,                                                   &
          qnum_cur,                                                 &
-         qaer_cur,          qaer_delsub_grow4rnam,                 &
-         qwtr_cur                                                  )
+         qaer_cur,          qaer_delsub_grow4rnam                  )
 
       qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
       qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
@@ -2165,14 +2158,14 @@ do_newnuc_if_block50: &
         !===========
         !1. Clean Mosaic code and get rid of the arguments which stays constant
         !   for the entire simulation
-        !3. Please handle the Mosaic counters, either use pbuf or make them internal to 
+        !3. Please handle the Mosaic counters, either use pbuf or make them internal to
         !   Mosaic
-        !4. Use get_nstep() for it_mosaic or pull out the it_mosaic .eq. 1 computation 
+        !4. Use get_nstep() for it_mosaic or pull out the it_mosaic .eq. 1 computation
         !   to the init routines
-        !5. SOA from CAM is stored in LIM2 of Mosaic. Rest of the 7 SOA species in 
+        !5. SOA from CAM is stored in LIM2 of Mosaic. Rest of the 7 SOA species in
         !   Mosaic are populated with zeros
-        !6. Some variables in Mosaic had to be initialized to zero. Please revisit and 
-        !  fix whatever is necessary 
+        !6. Some variables in Mosaic had to be initialized to zero. Please revisit and
+        !  fix whatever is necessary
         !7. jhyst_leg is constant for now and is equal to jhyst_up
         !
         !Author: Balwinder Singh (PNNL)
@@ -2194,13 +2187,13 @@ do_newnuc_if_block50: &
 #endif
 
         implicit none
-        
+
         !Args: intent(in)
         integer,  intent(in) :: lchnk                 ! chunk identifier
         integer,  intent(in) :: nstep                 ! model time-step number
         integer,  intent(in) :: i_in, k_in            ! column and level indices
         integer,  intent(in) :: jsub_in               ! subarea index
-      
+
         real(r8), intent(in) :: temp             !Temperature at model levels (K)
         real(r8), intent(in) :: relhum           !Relative humidity (0-1)
         real(r8), intent(in) :: pmid             !Pressure at layer center (Pa)
@@ -2219,7 +2212,7 @@ do_newnuc_if_block50: &
         real(r8), intent(inout) :: qgas_netprod_otrproc(max_gas)
                   ! qgas_netprod_otrproc = gas net production rate from other processes
                   !    such as gas-phase chemistry and emissions (mol/mol/s)
-                  ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                  ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                   !    together, which is more accurate numerically
                   ! NOTE - must be >= zero, as numerical method can fail when it is negative
                   ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -2230,10 +2223,10 @@ do_newnuc_if_block50: &
         integer  :: ierr
 !       integer  :: it_mosaic     !Time step counter for Mosaic
 !       integer  :: jASTEM_fail   !Counter to indicate if the ASTEM convergence failed in Mosaic
-        real(r8) :: dtchem        !Timestep in seconds 
+        real(r8) :: dtchem        !Timestep in seconds
         real(r8) :: T_K           !Temperature in K
 
-        
+
         integer :: mcall_load_mosaic_parameters !Flag to decide whether to call 'load_mosaic_parameters' or not(*BALLI not used anymore)
         integer :: mcall_print_aer_in           !Flag to decide whether to call 'print_aer' or not
 
@@ -2249,11 +2242,11 @@ do_newnuc_if_block50: &
         real(r8) :: cair_mol_m3       !Air molar density (mol/m3)
 
         real(r8), dimension(nbin_a_max) :: water_a    !Current aerosol water mix ratios (kg/m3)
-        real(r8), dimension(nbin_a_max) :: sigmag_a   !Geometric standard deviation for aerosol mode 
-        real(r8), dimension(nbin_a_max) :: Dp_dry_a   !Dry geo. mean dia. (cm) of number distrib. 
+        real(r8), dimension(nbin_a_max) :: sigmag_a   !Geometric standard deviation for aerosol mode
+        real(r8), dimension(nbin_a_max) :: Dp_dry_a   !Dry geo. mean dia. (cm) of number distrib.
 
         real(r8), dimension(nbin_a_max) :: num_a            !Current aerosol number mix ratios (#/cm3)
-        real(r8), dimension(nbin_a_max) :: dp_wet_a         !Diameter of aerosol in (cm) 
+        real(r8), dimension(nbin_a_max) :: dp_wet_a         !Diameter of aerosol in (cm)
         real(r8), dimension(nbin_a_max) :: mass_dry_a_bgn   !g/cc(air) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: mass_dry_a       !g/cc(air) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: dens_dry_a_bgn   !g/cc      **BALLI*** comment missing
@@ -2261,7 +2254,7 @@ do_newnuc_if_block50: &
         real(r8), dimension(nbin_a_max) :: water_a_hyst     !kg(water)/m^3(air) hysteresis (at 60% RH) **BALLI*** comment missing
         real(r8), dimension(nbin_a_max) :: aH2O_a           !Relative humidity in fraction(variaes between 0 and 1)
         real(r8), dimension(nbin_a_max) :: gam_ratio
-        
+
         real(r8), dimension(ngas_volatile) :: gas            !Current gas mix ratios (nano mol/m3)
         real(r8), dimension(ngas_volatile) :: gas_avg          ! average gas conc. over dtchem time step (nmol/m3)
         real(r8), dimension(ngas_volatile) :: gas_netprod_otrproc
@@ -2283,7 +2276,7 @@ do_newnuc_if_block50: &
         integer  :: unitn
 
         !BALLI -  Following should be in the modules as parameter
-        real(r8), parameter ::  oneatminv = 1.0_r8/1.01325e5_r8  
+        real(r8), parameter ::  oneatminv = 1.0_r8/1.01325e5_r8
         !BALLI -  Following should be in the modules as parameter -  ENDS
 
         !BSINGH - For converting CAM units to Mosaic units
@@ -2299,16 +2292,16 @@ do_newnuc_if_block50: &
         integer, dimension(nbin_a_max) :: jaerosolstate_in
         integer, dimension(nbin_a_max) :: jhyst_leg_in
 
-        real(r8), dimension(nbin_a_max) :: num_a_in 
+        real(r8), dimension(nbin_a_max) :: num_a_in
         real(r8), dimension(nbin_a_max) :: dp_wet_a_in
-        real(r8), dimension(nbin_a_max) :: water_a_in   
+        real(r8), dimension(nbin_a_max) :: water_a_in
         real(r8), dimension(nbin_a_max) :: sigmag_a_in
-        real(r8), dimension(nbin_a_max) :: Dp_dry_a_in  
+        real(r8), dimension(nbin_a_max) :: Dp_dry_a_in
 
         real(r8), dimension(ngas_volatile) :: gas_in, gas_netprod_otrproc_in, gas_avg_in
 
         real(r8), dimension(naer_mosaic,3,nbin_a_max) :: aer_in
-        
+
         real(r8), dimension(naer_mosaic) :: kappa_nonelectro
 
         type (mosaic_vars_aa_type) :: mosaic_vars_aa
@@ -2332,17 +2325,17 @@ do_newnuc_if_block50: &
         !Populate MOSAIC variables
         !------------------------------------------------------------!
         !------------------------------------------------------------!
-        
+
         !Counters:
         !BSINGH - This counter is internal to Mosaic model.
         !         It indicates if ASTEM convergence failed in Mosaic
 !       jASTEM_fail = 0
         mosaic_vars_aa%jastem_fail = 0
-        
+
         !BSINGH - This is time step number in Mosaic
 !       it_mosaic   = nstep
         mosaic_vars_aa%it_mosaic = nstep
-        
+
         !Inputs for Mosaic model (Should be intent-ins for Mosaic model)
         aH2O         = relhum               !Relative humidity [fraction between 0 and 1]
         T_K          = temp                 !Temperature in K
@@ -2350,14 +2343,14 @@ do_newnuc_if_block50: &
         RH_pc        = aH2O   * 100.0_r8    !Relative humidity [%age between 0 and 100]
         cair_mol_m3  = aircon * 1000.0_r8   !Air molar density (mol/m3){units conversion: aircon[kmol/m3] * 1.0e3[mol/kmol]}
         dtchem       = dtsubstep            !timestep (s)
-        
+
         jhyst_leg(1:nbin_a_max)      = jhyst_up
 
         !Flags to control Mosaic model
         mcall_load_mosaic_parameters = 1    !**BALLI.. This flag is not used anymore
         mcall_print_aer_in           = 0    !**BALLI...insert a dummy call to print_aer
-        
-        
+
+
         !Populate aersols
         nbin_a = n_mode   ! current number of modes
 
@@ -2366,20 +2359,20 @@ do_newnuc_if_block50: &
         !Populate aerosol numbers and water species
         num_a(:)   = 0.0_r8 !Initialized to zero
         water_a(:) = 0.0_r8 !initialized to zero
-        
+
         !BSINGH - units of qnum_cur in CAM are #/kmol of air. In Mosaic, units are #/cm3
         !Units conversion: qnum_cur[#/kmol] * 1.0e-3[kmol/mol] * cair_mol_m3[mol/m3] * 1.0e-6[m3/cm3]
 
         num_cam_to_mos_units = 1.0e-3_r8 * cair_mol_m3 * 1.0e-6_r8
-        
-        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3 
+
+        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3
         !Units conversion: qwtr_cur[mol/mol] * mwh2o[g/mol] * cair_mol_m3[mol/m3] * 1.0e-3[kg/g]
-        
+
         wtr_cam_to_mos_units = mwh2o * cair_mol_m3 * 1.0e-3_r8
-        
-        
+
+
         nano_mult_cair  =  cair_mol_m3 * 1.0e9_r8
-        
+
         do imode = 1, n_mode
            !Notes:
            !1. NCL(sea salt) of CAM is mapped in NA and CL of MOSAIC
@@ -2388,51 +2381,51 @@ do_newnuc_if_block50: &
            !4. Species ARO1, ARO2, ALK1, OLE1, API1, API2, LIM1 are SOA species in MOSAIC
            !   which are not used in CAM-MOSAIC framework as of now
            !5. CAM units are (mol/mol of air) which are converted to Mosaic units (nano mol/m3).
-           
-           !Units conversion:qaer_cur[mol/mol] * cair_mol_m3[mol/m3] * 1.0e9[nmol/mol] 
-           aer(inh4_a,  jtotal, imode)  = qaer_cur(iaer_nh4, imode) * nano_mult_cair 
+
+           !Units conversion:qaer_cur[mol/mol] * cair_mol_m3[mol/m3] * 1.0e9[nmol/mol]
+           aer(inh4_a,  jtotal, imode)  = qaer_cur(iaer_nh4, imode) * nano_mult_cair
            aer(ilim2_a, jtotal, imode)  = qaer_cur(iaer_soa, imode) * nano_mult_cair
-           aer(iso4_a,  jtotal, imode)  = qaer_cur(iaer_so4, imode) * nano_mult_cair 
-           aer(ina_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair 
+           aer(iso4_a,  jtotal, imode)  = qaer_cur(iaer_so4, imode) * nano_mult_cair
+           aer(ina_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair
            if (iaer_cl  > 0) then
-              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_cl,  imode) * nano_mult_cair 
+              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_cl,  imode) * nano_mult_cair
            else
-              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair 
+              aer(icl_a,   jtotal, imode)  = qaer_cur(iaer_ncl, imode) * nano_mult_cair
            end if
            if (iaer_no3 > 0) &
-                aer(ino3_a,  jtotal, imode)  = qaer_cur(iaer_no3, imode) * nano_mult_cair 
+                aer(ino3_a,  jtotal, imode)  = qaer_cur(iaer_no3, imode) * nano_mult_cair
            if (iaer_ca  > 0) &
-                aer(ica_a,   jtotal, imode)  = qaer_cur(iaer_ca,  imode) * nano_mult_cair 
+                aer(ica_a,   jtotal, imode)  = qaer_cur(iaer_ca,  imode) * nano_mult_cair
            if (iaer_co3 > 0) &
-                aer(ico3_a,  jtotal, imode)  = qaer_cur(iaer_co3, imode) * nano_mult_cair 
-           
+                aer(ico3_a,  jtotal, imode)  = qaer_cur(iaer_co3, imode) * nano_mult_cair
+
            !Units of BC, OC and DST in CAM are (mol/mol of air) and nano-g/m3 in MOSAIC
-           !Units conversion:qaer_cur[mol/mol] * mw_aer[g/mol] * cair_mol_m3[mol/m3] * 1.0e9[nano-g/g] 
-           aer(ibc_a,  jtotal, imode)  = qaer_cur(iaer_bc,  imode) * mw_aer(iaer_bc)  * nano_mult_cair 
+           !Units conversion:qaer_cur[mol/mol] * mw_aer[g/mol] * cair_mol_m3[mol/m3] * 1.0e9[nano-g/g]
+           aer(ibc_a,  jtotal, imode)  = qaer_cur(iaer_bc,  imode) * mw_aer(iaer_bc)  * nano_mult_cair
            aer(ioin_a, jtotal, imode)  = qaer_cur(iaer_dst, imode) * mw_aer(iaer_dst) * nano_mult_cair !BSINGH - "Other inorganic(oin)" in Mosaic is DST in CAM
            aer(ioc_a,  jtotal, imode)  = qaer_cur(iaer_pom, imode) * mw_aer(iaer_pom) * nano_mult_cair
-           
+
            !Populate aerosol number and water species
            num_a(imode)   = qnum_cur(imode) * num_cam_to_mos_units
            water_a(imode) = qwtr_cur(imode) * wtr_cam_to_mos_units
         end do
-        
+
         !Populate gases
         gas(:) = 0.0_r8  !Initialized to zero
-        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3). 
+        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3).
         !SOAG is stored in LIM2 gas species as of now
         !CAM units are (mol/mol of air) which are converted to Mosaic units (nano mol/m3).
         gas_avg(:) = 0.0_r8
-        
-        !Units conversion:qgas_cur[mol/mol] * cair_mol_m3[mol/m3] * 10.0e9[nmol/mol] 
+
+        !Units conversion:qgas_cur[mol/mol] * cair_mol_m3[mol/m3] * 10.0e9[nmol/mol]
         gas(ilim2_g)  = qgas_cur(igas_soa)   * nano_mult_cair
-        gas(ih2so4_g) = qgas_cur(igas_h2so4) * nano_mult_cair 
-        gas(inh3_g)   = qgas_cur(igas_nh3)   * nano_mult_cair 
+        gas(ih2so4_g) = qgas_cur(igas_h2so4) * nano_mult_cair
+        gas(inh3_g)   = qgas_cur(igas_nh3)   * nano_mult_cair
         if (igas_hno3 > 0) &
-             gas(ihno3_g)   = qgas_cur(igas_hno3)   * nano_mult_cair 
+             gas(ihno3_g)   = qgas_cur(igas_hno3)   * nano_mult_cair
         if (igas_hcl > 0) &
-             gas(ihcl_g)   = qgas_cur(igas_hcl)   * nano_mult_cair 
-        
+             gas(ihcl_g)   = qgas_cur(igas_hcl)   * nano_mult_cair
+
         !Populate gas_netprod_otrproc
         gas_netprod_otrproc(:) = 0.0_r8
         gas_netprod_otrproc(ih2so4_g) = qgas_netprod_otrproc(igas_h2so4) * nano_mult_cair
@@ -2441,21 +2434,21 @@ do_newnuc_if_block50: &
         !    for nh3 that for h2so4
         ! so for now, just add in the production here
         gas(inh3_g)   = gas(inh3_g) + max( qgas_netprod_otrproc(igas_nh3)*dtchem, 0.0_r8 ) * nano_mult_cair
-        
-        
+
+
         !BSINGH - Initialize the following variables as 'nan' and then assign values to a subset of their dimesions
         Dp_dry_a(:)            = nan
         sigmag_a(:)            = nan
         dp_wet_a(:)            = nan
-        
-        sigmag_a(1:n_mode) = sigmag_aer(1:n_mode)       !Geometric standard deviation for aerosol mode 
+
+        sigmag_a(1:n_mode) = sigmag_aer(1:n_mode)       !Geometric standard deviation for aerosol mode
         !Dry geo. mean dia.(cm) of number distrib [convert from m to cm]!**BALLI: check if it meant to be in,inout or out only and units also
         Dp_dry_a(1:n_mode) = dgn_a(1:n_mode)    * 100.0_r8 * fcvt_dgnum_dvolmean(1:n_mode)
         !Wet geo. mean dia.(cm) of number distrib [convert from m to cm]!**BALLI: check if it meant to be in,inout or out only and untis also
         dp_wet_a(1:n_mode) = dgn_awet(1:n_mode) * 100.0_r8 * fcvt_dgnum_dvolmean(1:n_mode)
-        
-        
-        !BSINGH - These are output variables from Mosaic. 
+
+
+        !BSINGH - These are output variables from Mosaic.
         !Declared as nan to make sure that they are not inadvertently 'used' before assignment.
 !       iter_mesa(:)         = bigint
         mosaic_vars_aa%iter_mesa(1:nbin_a_max) = 0
@@ -2469,8 +2462,8 @@ do_newnuc_if_block50: &
         water_a_hyst(:)      = nan
         aH2O_a(:)            = nan
         gam_ratio(:)         = nan
-        
-        
+
+
         !------------------------------------------------------------!
         !------------------------------------------------------------!
         !END [Populate MOSAIC variables]
@@ -2480,42 +2473,42 @@ do_newnuc_if_block50: &
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
         !BSINGH - This section is required ONLY for the MAM box model
-        !         to see if it can reproduce errors encountered by the 
+        !         to see if it can reproduce errors encountered by the
         !         CAM model during runtime(e.g. convergence errors).
-        !         This block repopulate all the information which is 
-        !         going into the mosaic box (intent-ins and intent-inouts). 
+        !         This block repopulate all the information which is
+        !         going into the mosaic box (intent-ins and intent-inouts).
         !         It is a binary read to preserve the accuracy.
-  
+
         if(debug_mosaic) then
            !Read a binary file which has all the inputs to the mosaic box
            !and stop the model
-           
+
            unitn = 101
            infile = 'mosaic_error_7.bin'
            open( unitn, file=trim(infile), status='old', form='unformatted', CONVERT = 'BIG_ENDIAN' )
-           
+
            read(unitn)aH2O
            read(unitn)T_K
            read(unitn)P_atm
            read(unitn)RH_pc
            read(unitn)dtchem
-           
+
            do ibin = 1, ntot_amode !nbin_a_max
               read(unitn)num_a(ibin),water_a(ibin),Dp_dry_a(ibin),        &
                    sigmag_a(ibin),dp_wet_a(ibin),jhyst_leg(ibin),          &
                    jaerosolstate(ibin)
            end do
-           
-           
+
+
            do igas = 1, ngas_volatile
               read(unitn) gas(igas), gas_avg(igas), gas_netprod_otrproc(igas)
            enddo
-           
+
            do ibin = 1, ntot_amode !nbin_a_max
               do istate = 1, 3
                  do iaer = 1 , naer
                     read(unitn)iaer_in,istate_in,ibin_in, aer_tmp
-                    aer(iaer_in,istate_in,ibin_in) = aer_tmp                    
+                    aer(iaer_in,istate_in,ibin_in) = aer_tmp
                  end do
               end do
            end do
@@ -2523,8 +2516,8 @@ do_newnuc_if_block50: &
         endif
         !BSINGH -----xxx ENDS reading file for debugging mosaic xxxx----
 #endif
-        
-        
+
+
         !Store the variables which are intent(inout) to Mosaic box model
         !for debuging purposes
         aer_in(:,:,:)             = aer(:,:,:)
@@ -2538,13 +2531,13 @@ do_newnuc_if_block50: &
         jaerosolstate_in(:)       = jaerosolstate(:)
         gas_netprod_otrproc_in(:) = gas_netprod_otrproc(:)
         gas_avg_in(:)             = gas_avg(:)
-        
+
 
         !BSINGH - zero_water_flag becomes .true. if water is zero in liquid phase
-!       zero_water_flag = .false. 
+!       zero_water_flag = .false.
         mosaic_vars_aa%zero_water_flag = .false.
         !BSINGH - flag_itr_kel becomes true when kelvin iteration in mdofule_mosaic_ext.F90 are greater then 100
-!       flag_itr_kel    = .false.        
+!       flag_itr_kel    = .false.
         mosaic_vars_aa%flag_itr_kel = .false.
 
 
@@ -2576,7 +2569,7 @@ do_newnuc_if_block50: &
 
 
         ! set kappa values for non-electrolyte species
-        ! reason for doing this here is that if cam eventually has multiple varieties of dust and/or pom, 
+        ! reason for doing this here is that if cam eventually has multiple varieties of dust and/or pom,
         !    then the dust hygroscopicity may vary spatially and temporally,
         !    and the kappa values cannot be constants
         kappa_nonelectro(:) = 0.0_r8
@@ -2589,9 +2582,9 @@ do_newnuc_if_block50: &
         !Call MOSAIC parameterization
         !BSINGH - jASTEM_fail is in arg list to know if the mosiac model converged or not
         !BSINGH - Following variables are not required by CAM but they still exist in the
-        !         calling arguments as intent-outs as Mosaic model needs them to be in the 
+        !         calling arguments as intent-outs as Mosaic model needs them to be in the
         !         arg list:
-        !         gam_ratio, iter_mesa, aH2O_a,jaerosolstate, mass_dry_a_bgn, mass_dry_a, 
+        !         gam_ratio, iter_mesa, aH2O_a,jaerosolstate, mass_dry_a_bgn, mass_dry_a,
         !         dens_dry_a_bgn, dens_dry_a, water_a_hyst, jaerosolstate_bgn
 
 ! *** ff03h version ***
@@ -2639,30 +2632,30 @@ do_newnuc_if_block50: &
         if (mosaic_vars_aa%flag_itr_kel) then
            misc_vars_aa_sub%max_kelvin_iter_1grid = misc_vars_aa_sub%max_kelvin_iter_1grid + 1.0_r8
         endif
-        
+
         if (mosaic_vars_aa%jASTEM_fail > 0 .or. mosaic_vars_aa%zero_water_flag .or. mosaic_vars_aa%f_mos_fail > 0 ) then !solver in ASTEM didn't converge
-           
-           !Let the run proceed and track the points(i,k) where the run fails convergence 
+
+           !Let the run proceed and track the points(i,k) where the run fails convergence
            if(convergence_pt_trk .and. mosaic_vars_aa%jASTEM_fail > 0 ) then
               misc_vars_aa_sub%cnvrg_fail_1grid = misc_vars_aa_sub%cnvrg_fail_1grid + 1.0_r8
            else
               !Printout a binary file which has all the inputs to the mosaic box
               !and stop the model
-              
+
               !Generate a unit number and form file name based on process number
 #ifdef SPMD
               unitn  = getunit()
               write(tmp_str,*)iam
-              write(nlfile,*)'mosaic_error_',trim(adjustl(tmp_str)),'.bin'               
+              write(nlfile,*)'mosaic_error_',trim(adjustl(tmp_str)),'.bin'
 #else
               unitn = 101
               nlfile = 'mosiac_error.txt'
 #endif
               !Open a binary file, remember it is written out as BIG ENDIAN
               open( unitn, file=trim(nlfile), status='unknown', form = 'unformatted' )
-              
+
               write(unitn)aH2O    !Write relative humidity
-              write(unitn)T_K     !Write relative temp 
+              write(unitn)T_K     !Write relative temp
               write(unitn)P_atm   !Write relative pressure
               write(unitn)RH_pc
               write(unitn)dtchem
@@ -2672,12 +2665,12 @@ do_newnuc_if_block50: &
                       sigmag_a_in(ibin),dp_wet_a_in(ibin),jhyst_leg_in(ibin),          &
                       jaerosolstate_in(ibin)
               end do
-              
+
               !Write gas array
               do igas = 1, ngas_volatile
                  write(unitn) gas_in(igas), gas_avg_in(igas), gas_netprod_otrproc_in(igas)
               enddo
-              
+
               !Write aerosols
               do ibin = 1, ntot_amode !nbin_a_max
                  do istate = 1, 3
@@ -2686,7 +2679,7 @@ do_newnuc_if_block50: &
                     end do
                  end do
               end do
-              !Close the file 
+              !Close the file
               close(unitn)
 #ifdef SPMD
               !free unit number
@@ -2699,7 +2692,7 @@ do_newnuc_if_block50: &
               call endrun (tmp_str)
            endif
         endif
-        
+
 
         ! copy other diagnostic outputs (that are written to history) from mosaic_vars_aa to misc_vars_aa_sub
         misc_vars_aa_sub%xnerr_astem_negative_1grid(:,:) = mosaic_vars_aa%xnerr_astem_negative(:,:)
@@ -2716,18 +2709,18 @@ do_newnuc_if_block50: &
         !------------------------------------------------------------!
         !Process MOSAIC output and store it in CAM data structures
         !------------------------------------------------------------!
-        !------------------------------------------------------------! 
+        !------------------------------------------------------------!
         !BSINGH - units of qnum_cur in CAM are #/kmol of air. In Mosaic, units are #/cm3
         num_mos_to_cam_units = 1.0_r8/num_cam_to_mos_units !Take inverse of cam_to_mos units
         num_cam_to_mos_units = nan                         !To avoid inadvertent use
 
-        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3 
+        !BSINGH - units for water in CAM are mol/mol. In Mosaic, units are kg/m3
         wtr_mos_to_cam_units = 1.0_r8/wtr_cam_to_mos_units !Take inverse of cam_to_mos units
         wtr_cam_to_mos_units = nan                         !To avoid inadvertent use
 
         nano_mult_cair_inv  =  1.0_r8/nano_mult_cair       !Take inverse of cam to mosaic units
         nano_mult_cair      = nan                          !To avoid inadvertent use
-        
+
         do imode = 1, n_mode
            !Notes:
            !1. NCL(sea salt) of CAM is mapped in NA and CL of MOSAIC
@@ -2760,12 +2753,12 @@ do_newnuc_if_block50: &
            qwtr_cur(imode) = water_a(imode) * wtr_mos_to_cam_units
         end do
 
-        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3). 
+        !BSINGH - only 3 gases are avialble in CAM (SOAG, H2SO4, NH3).
         !SOAG is stored in LIM2 gas species as of now
 
         qgas_cur(igas_soa)   = gas(ilim2_g)  * nano_mult_cair_inv
-        qgas_cur(igas_h2so4) = gas(ih2so4_g) * nano_mult_cair_inv 
-        qgas_cur(igas_nh3)   = gas(inh3_g)   * nano_mult_cair_inv 
+        qgas_cur(igas_h2so4) = gas(ih2so4_g) * nano_mult_cair_inv
+        qgas_cur(igas_nh3)   = gas(inh3_g)   * nano_mult_cair_inv
 
         qgas_avg(igas_soa)   = gas_avg(ilim2_g)  * nano_mult_cair_inv
         qgas_avg(igas_h2so4) = gas_avg(ih2so4_g) * nano_mult_cair_inv
@@ -2780,7 +2773,7 @@ do_newnuc_if_block50: &
            qgas_avg(igas_hcl) = gas_avg(ihcl_g) * nano_mult_cair_inv
         end if
 
-        !update mode  diameters 
+        !update mode  diameters
         !Dry geo. mean dia.(m) of number distrib [convert from cm to m]
         dgn_a(1:n_mode)          = Dp_dry_a(1:n_mode) * 0.01_r8 / fcvt_dgnum_dvolmean(1:n_mode)
         !Wet geo. mean dia.(m) of number distrib [convert from cm to m]
@@ -2841,7 +2834,7 @@ do_newnuc_if_block50: &
          qgas_netprod_otrproc
                 ! qgas_netprod_otrproc = gas net production rate from other processes
                 !    such as gas-phase chemistry and emissions (mol/mol/s)
-                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss 
+                ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
                 !    together, which is more accurate numerically
                 ! NOTE - must be >= zero, as numerical method can fail when it is negative
                 ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
@@ -2911,7 +2904,7 @@ do_newnuc_if_block50: &
 
          iaer = igas
          do n = 1, ntot_amode
-            if ( lmap_aer(iaer,n) > 0 .or. & 
+            if ( lmap_aer(iaer,n) > 0 .or. &
                  mode_aging_optaa(n) > 0 ) then
                ! uptkrate is for number = 1 #/m3, so mult. by number conc. (#/m3)
                uptkaer(igas,n) = uptkrate(n) * (qnum_cur(n) * aircon)
@@ -3236,7 +3229,7 @@ time_loop: &
 !
 ! *** questions ***
 ! > why not use qgas and qaer instead of g_soa and a_soa
-! > why not calc the following on every substep because 
+! > why not calc the following on every substep because
 !      nuc and coag may change things:
 !      skip)soamode, uptkaer_soag_tmp, tot_soa, a_opoa
 ! > include gasprod for soa ??
@@ -3371,331 +3364,650 @@ time_loop: &
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-      subroutine mam_rename_1subarea(                               &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         iscldy_subarea,                                            &
-         mtoo_renamexf,                                             &
-         n_mode,                                                    &
-         qnum_cur,                                                  &
-         qaer_cur,          qaer_del_grow4rnam,                     &
-         qwtr_cur,                                                  &
-         qnumcw_cur,                                                &
+      subroutine mam_rename_1subarea(iscldy, dest_mode_of_mode, nmode, &
+           qnum_cur, qaer_cur, qaer_del_grow4rnam, qnumcw_cur,         &
          qaercw_cur,        qaercw_del_grow4rnam                    )
 
-#if ( defined CAM_VERSION_IS_ACME ) 
-      use shr_spfn_mod, only: erfc => shr_spfn_erfc  ! acme version of cam
-#else
-      use error_function,  only: erfc                ! mozart-mosaic version of cam
-#endif
+        implicit none
+        !-------------------------------------------------------------------------------------
+        ! DESCRIPTION:
+        !-------------------------------------------------------------------------------------
+        ! Computes TMR (tracer mixing ratio) tendencies for "mode renaming" (i.e. transferring
+        ! particles from one mode to another or "renaming" mode of the particles) during a
+        ! continuous growth process.
+        !
+        ! Currently this transfers number and mass (and surface) from the aitken to accumulation
+        ! mode after gas condensation or stratiform-cloud aqueous chemistry
+        ! (convective cloud aqueous chemistry not yet implemented)
+        !-------------------------------------------------------------------------------------
 
-      logical,  intent(in)    :: iscldy_subarea        ! true if sub-area is cloudy
-      integer,  intent(in)    :: nstep                 ! model time-step number
-      integer,  intent(in)    :: lchnk                 ! chunk identifier
-      integer,  intent(in)    :: i, k                  ! column and level indices
-      integer,  intent(in)    :: jsub                  ! sub-area index
-      integer,  intent(in)    :: latndx, lonndx        ! lat and lon indices
-      integer,  intent(in)    :: lund                  ! logical unit for diagnostic output
-      integer,  intent(in)    :: mtoo_renamexf(max_mode)
-      integer,  intent(in)    :: n_mode                ! current number of modes (including temporary)
+        !input
+        logical,  intent(in) :: iscldy                      !true if sub-area is cloudy
+        integer,  intent(in) :: dest_mode_of_mode(max_mode) !destination mode of a mode
+        integer,  intent(in) :: nmode                       !number of modes
+        real(r8), intent(in) :: qaer_del_grow4rnam(1:max_aer, 1:max_mode)            !growth in aerosol molar mixing ratio [kmol/kmol-air]
+        real(r8), intent(in), optional :: qaercw_del_grow4rnam(1:max_aer, 1:max_mode)!growth in aerosol molar mixing ratio (cld borne) [kmol/kmol-air]
 
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qnum_cur
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer_cur
-      real(r8), intent(in   ), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer_del_grow4rnam
-      real(r8), intent(inout), dimension( 1:max_mode ) :: &
-         qwtr_cur
+        !output
+        real(r8), intent(inout) :: qnum_cur(1:max_mode)           !aerosol number mixing ratio [#/kmol-air]
+        real(r8), intent(inout) :: qaer_cur(1:max_aer, 1:max_mode)!aerosol molar mixing ratio   [kmol/kmol-air]
+        real(r8), intent(inout), optional :: qnumcw_cur(1:max_mode)           !aerosol number mixing ratio (cld borne) [#/kmol-air]
+        real(r8), intent(inout), optional :: qaercw_cur(1:max_aer, 1:max_mode)!aerosol molar mixing ratio (cld borne) [kmol/kmol-air]
 
-      real(r8), intent(inout), optional, dimension( 1:max_mode ) :: &
-         qnumcw_cur
-      real(r8), intent(inout), optional, dimension( 1:max_aer, 1:max_mode ) :: &
-         qaercw_cur
-      real(r8), intent(in   ), optional, dimension( 1:max_aer, 1:max_mode ) :: &
-         qaercw_del_grow4rnam
+        ! local variables
+        integer :: npair !number of pairs in different modes for the transfer
 
+        real(r8) :: deldryvol_a(ntot_amode)   !change in dry volume [m3/kmol-air]
+        real(r8) :: deldryvol_c(ntot_amode)   !change in dry volume (cld borne)[m3/kmol-air]
+        real(r8) :: diameter_cutoff(max_mode) !cutoff for threshold [m]
+        real(r8) :: diameter_threshold(max_mode) !Threshold to decide arosol transfer (99% of cutoff) [m]
+        real(r8) :: dryvol_a(ntot_amode)      !dry volume [m3/kmol-air]
+        real(r8) :: dryvol_c(ntot_amode)      !dry volume (cld borne)[m3/kmol-air]
+        real(r8) :: sz_factor(ntot_amode)     !size factor for each mode [unitless]
+        real(r8) :: fmode_dist_tail_fac(ntot_amode) !tail distribution factor for each mode [unitless]
+        real(r8) :: lndiameter_cutoff(max_mode) !log of diamter cutoff [m]
+        real(r8) :: ln_diameter(max_mode)     !log of diameter [m]
+        real(r8) :: v2nhirlx(ntot_amode), v2nlorlx(ntot_amode) !high and low volume to num ratios[m^-3]
 
-! !DESCRIPTION: 
-! computes TMR (tracer mixing ratio) tendencies for "mode renaming"
-!    during a continuous growth process
-! currently this transfers number and mass (and surface) from the aitken
-!    to accumulation mode after gas condensation or stratiform-cloud
-!    aqueous chemistry
-! (convective cloud aqueous chemistry not yet implemented)
-!
-! !REVISION HISTORY:
-!
+        !------------------------------------------------------------------------
+        !Find mapping between different modes, so that we can move aerosol
+        !particles from one mode to another
+        !------------------------------------------------------------------------
 
-! local variables
-      integer :: iaer
-      integer :: mfrm, mtoo
-      integer :: n, npair
+        !FIXME: All the arrays in find_renaming_pairs subroutine call should be
+        !initialized to HUGE or NaNs as they are partially populated
 
-      integer, parameter :: ldiag1 = 0
+        !Find (src->destination) pairs of modes (e.g., if only mode #1 and mode #2 can participate in the
+        !inter-mode transfer, number of pairs will be 1 and so on) which can participate in
+        !inter-mode species transfer
 
-      real(r8), parameter :: frelax = 27.0_r8
-      real(r8), parameter :: onethird = 1.0_r8/3.0_r8
+        call find_renaming_pairs (ntot_amode, dest_mode_of_mode, & !input
+             npair, sz_factor, fmode_dist_tail_fac, v2nlorlx, &    !output
+             v2nhirlx, ln_diameter, diameter_cutoff, &             !output
+             lndiameter_cutoff, diameter_threshold)                !output
 
-      real(r8) :: deldryvol_a(ntot_amode)
-      real(r8) :: deldryvol_c(ntot_amode)
-      real(r8) :: dp_belowcut(max_mode)
-      real(r8) :: dp_cut(max_mode)
-      real(r8) :: dgn_aftr, dgn_xfer
-      real(r8) :: dgn_t_new, dgn_t_old, dgn_t_oldaa
-      real(r8) :: dryvol_t_del, dryvol_t_new
-      real(r8) :: dryvol_t_old, dryvol_t_oldaa, dryvol_t_oldbnd
-      real(r8) :: dryvol_a(ntot_amode)
-      real(r8) :: dryvol_c(ntot_amode)
-      real(r8) :: dryvol_smallest(ntot_amode)
-      real(r8) :: factoraa(ntot_amode)
-      real(r8) :: factoryy(ntot_amode)
-      real(r8) :: lndp_cut(max_mode)
-      real(r8) :: lndgn_new, lndgn_old
-      real(r8) :: lndgv_new, lndgv_old
-      real(r8) :: num_t_old, num_t_oldbnd
-      real(r8) :: tailfr_volnew, tailfr_volold
-      real(r8) :: tailfr_numnew, tailfr_numold
-      real(r8) :: tmpa, tmpb, tmpd
-      real(r8) :: tmp_alnsg2(max_mode)
-      real(r8) :: v2nhirlx(ntot_amode), v2nlorlx(ntot_amode)
-      real(r8) :: xfercoef, xfertend
-      real(r8) :: xferfrac_vol, xferfrac_num, xferfrac_max
-      real(r8) :: yn_tail, yv_tail
+        if (npair <= 0) return ! if no transfer required, return
 
+        !Interstitial aerosols: Compute initial (before growth) aerosol dry volume and
+        !also the growth in dryvolume of the "src" mode
+        call compute_dryvol_change_in_src_mode(ntot_amode, naer, dest_mode_of_mode,  & !input
+             qaer_cur, qaer_del_grow4rnam, & !input
+             dryvol_a, deldryvol_a                 ) !output
 
-      xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
+        !Cloudborne aerosols: Compute initial (before growth) aerosol dry volume and
+        !also the growth in dryvolume of the "src" mode
+        if (iscldy) then
+           call compute_dryvol_change_in_src_mode(ntot_amode, naer, dest_mode_of_mode,  & !input
+                qaercw_cur, qaercw_del_grow4rnam, & !input
+                dryvol_c, deldryvol_c                     ) !output
+        endif
 
-! calculate variable used in the renamingm mode" of each renaming pair
-! also compute dry-volume change during the continuous growth process
-      npair = 0
-      do n = 1, ntot_amode
-         mtoo = mtoo_renamexf(n)
-         if (mtoo <= 0) cycle
+        !Find fractions (mass and number) to transfer and complete the transfer
+        call do_inter_mode_transfer(ntot_amode, naer, dest_mode_of_mode, &                         !input
+             iscldy, v2nlorlx, v2nhirlx, dryvol_a, dryvol_c, deldryvol_a, deldryvol_c, &           !input
+             sz_factor, fmode_dist_tail_fac, ln_diameter, lndiameter_cutoff, diameter_threshold, & !input
+             qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur ) !output
 
-         npair = npair + 1
-         mfrm = n
-         factoraa(mfrm) = (pi/6.)*exp(4.5*(alnsg_aer(mfrm)**2))
-         factoraa(mtoo) = (pi/6.)*exp(4.5*(alnsg_aer(mtoo)**2))
-         factoryy(mfrm) = sqrt( 0.5 )/alnsg_aer(mfrm)
-! dryvol_smallest is a very small volume mixing ratio (m3-AP/kmol-air)
-! used for avoiding overflow.  it corresponds to dp = 1 nm
-! and number = 1e-5 #/mg-air ~= 1e-5 #/cm3-air
-         dryvol_smallest(mfrm) = 1.0e-25
-!        v2nlorlx(mfrm) = voltonumblo_amode(mfrm)*frelax
-!        v2nhirlx(mfrm) = voltonumbhi_amode(mfrm)/frelax
-         v2nlorlx(mfrm) = ( 1._r8 / ( (pi/6._r8)* &
-            (dgnumlo_aer(mfrm)**3._r8)*exp(4.5_r8*alnsg_aer(mfrm)**2._r8) ) ) * frelax
-         v2nhirlx(mfrm) = ( 1._r8 / ( (pi/6._r8)* &
-            (dgnumhi_aer(mfrm)**3._r8)*exp(4.5_r8*alnsg_aer(mfrm)**2._r8) ) ) / frelax
-
-         tmp_alnsg2(mfrm) = 3.0 * (alnsg_aer(mfrm)**2)
-         dp_cut(mfrm) = sqrt(   &
-            dgnum_aer(mfrm)*exp(1.5*(alnsg_aer(mfrm)**2)) *   &
-            dgnum_aer(mtoo)*exp(1.5*(alnsg_aer(mtoo)**2)) )
-         lndp_cut(mfrm) = log( dp_cut(mfrm) )
-         dp_belowcut(mfrm) = 0.99*dp_cut(mfrm)
-      end do
-      if (npair <= 0) return
-
-! compute aerosol dry-volume for the "from mode" of each renaming pair
-! also compute dry-volume change during the continuous growth process
-      do n = 1, ntot_amode
-         mtoo = mtoo_renamexf(n)
-         if (mtoo <= 0) cycle
-
-         tmpa = 0.0_r8 ; tmpb = 0.0_r8
-         do iaer = 1, naer
-!   fac_m2v_aer converts (kmol-AP/kmol-air) to (m3-AP/kmol-air)
-            tmpa = tmpa + qaer_cur(iaer,n)*fac_m2v_aer(iaer)
-            tmpb = tmpb + qaer_del_grow4rnam(iaer,n)*fac_m2v_aer(iaer)
-         end do
-         dryvol_a(n) = tmpa-tmpb ! dry volume before growth
-         deldryvol_a(n) = tmpb   ! change to dry volume due to growth
-
-         if ( iscldy_subarea ) then
-         tmpa = 0.0_r8 ; tmpb = 0.0_r8
-         do iaer = 1, naer
-!   fac_m2v_aer converts (kmol-AP/kmol-air) to (m3-AP/kmol-air)
-            tmpa = tmpa + qaercw_cur(iaer,n)*fac_m2v_aer(iaer)
-            tmpb = tmpb + qaercw_del_grow4rnam(iaer,n)*fac_m2v_aer(iaer)
-         end do
-         dryvol_c(n) = tmpa-tmpb 
-         deldryvol_c(n) = tmpb
-         end if ! ( iscldy_subarea ) then
-
-      end do
-
-
-!
-!   loop over renaming pairs
-!
-mainloop1_ipair:  do n = 1, ntot_amode
-
-      mfrm = n
-      mtoo = mtoo_renamexf(n)
-      if (mtoo <= 0) cycle mainloop1_ipair
-
-!   dryvol_t_old is the old total (a+c) dry-volume for the "from" mode 
-!      in m^3-AP/kmol-air
-!   dryvol_t_new is the new total dry-volume
-!      (old/new = before/after the continuous growth)
-!   num_t_old is total number in particles/kmol-air
-      if ( iscldy_subarea ) then
-         dryvol_t_old = dryvol_a(mfrm) + dryvol_c(mfrm)
-         dryvol_t_del = deldryvol_a(mfrm) + deldryvol_c(mfrm)
-         num_t_old = (qnum_cur(mfrm) + qnumcw_cur(mfrm))
-      else
-         dryvol_t_old = dryvol_a(mfrm)
-         dryvol_t_del = deldryvol_a(mfrm)
-         num_t_old = qnum_cur(mfrm)
-      end if
-      dryvol_t_new = dryvol_t_old + dryvol_t_del
-
-!   no renaming if dryvol_t_new ~ 0 or dryvol_t_del ~ 0
-      if (dryvol_t_new .le. dryvol_smallest(mfrm)) cycle mainloop1_ipair
-      dryvol_t_oldbnd = max( dryvol_t_old, dryvol_smallest(mfrm) )
-      if (rename_method_optaa .ne. 40) then
-         if (dryvol_t_del .le. 1.0e-6*dryvol_t_oldbnd) cycle mainloop1_ipair
-      end if
-
-      num_t_old = max( 0.0_r8, num_t_old )
-      dryvol_t_oldbnd = max( dryvol_t_old, dryvol_smallest(mfrm) )
-      num_t_oldbnd = min( dryvol_t_oldbnd*v2nlorlx(mfrm), num_t_old )
-      num_t_oldbnd = max( dryvol_t_oldbnd*v2nhirlx(mfrm), num_t_oldbnd )
-
-!   no renaming if dgnum < "base" dgnum, 
-      dgn_t_new = (dryvol_t_new/(num_t_oldbnd*factoraa(mfrm)))**onethird
-      if (dgn_t_new .le. dgnum_aer(mfrm)) cycle mainloop1_ipair
-
-!   compute new fraction of number and mass in the tail (dp > dp_cut)
-      lndgn_new = log( dgn_t_new )
-      lndgv_new = lndgn_new + tmp_alnsg2(mfrm)
-      yn_tail = (lndp_cut(mfrm) - lndgn_new)*factoryy(mfrm)
-      yv_tail = (lndp_cut(mfrm) - lndgv_new)*factoryy(mfrm)
-      tailfr_numnew = 0.5_r8*erfc( yn_tail )
-      tailfr_volnew = 0.5_r8*erfc( yv_tail )
-
-!   compute old fraction of number and mass in the tail (dp > dp_cut)
-      dgn_t_old =   &
-            (dryvol_t_oldbnd/(num_t_oldbnd*factoraa(mfrm)))**onethird
-      dgn_t_oldaa = dgn_t_old
-      dryvol_t_oldaa = dryvol_t_old
-      
-      if (rename_method_optaa .eq. 40) then
-         if (dgn_t_old .gt. dp_belowcut(mfrm)) then
-            ! this revised volume corresponds to dgn_t_old == dp_belowcut, and same number conc
-            dryvol_t_old = dryvol_t_old * (dp_belowcut(mfrm)/dgn_t_old)**3
-            dgn_t_old = dp_belowcut(mfrm)
-         end if
-         if ((dryvol_t_new-dryvol_t_old) .le. 1.0e-6_r8*dryvol_t_oldbnd) cycle mainloop1_ipair
-      else if (dgn_t_new .ge. dp_cut(mfrm)) then
-!         if dgn_t_new exceeds dp_cut, use the minimum of dgn_t_old and 
-!         dp_belowcut to guarantee some transfer
-          dgn_t_old = min( dgn_t_old, dp_belowcut(mfrm) )
-      end if
-      lndgn_old = log( dgn_t_old )
-      lndgv_old = lndgn_old + tmp_alnsg2(mfrm)
-      yn_tail = (lndp_cut(mfrm) - lndgn_old)*factoryy(mfrm)
-      yv_tail = (lndp_cut(mfrm) - lndgv_old)*factoryy(mfrm)
-      tailfr_numold = 0.5_r8*erfc( yn_tail )
-      tailfr_volold = 0.5_r8*erfc( yv_tail )
-
-!   transfer fraction is difference between new and old tail-fractions
-!   transfer fraction for number cannot exceed that of mass
-      tmpa = tailfr_volnew*dryvol_t_new - tailfr_volold*dryvol_t_old
-      if (tmpa .le. 0.0_r8) cycle mainloop1_ipair
-
-      xferfrac_vol = min( tmpa, dryvol_t_new )/dryvol_t_new
-      xferfrac_vol = min( xferfrac_vol, xferfrac_max ) 
-      xferfrac_num = tailfr_numnew - tailfr_numold
-      xferfrac_num = max( 0.0_r8, min( xferfrac_num, xferfrac_vol ) )
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag98 ) write(lun98,'(/a,2i3,1p,10e11.3)') &
-         'rename i,k, xf n/v', i, k, xferfrac_num, xferfrac_vol
-#endif
-
-#if ( defined( CAMBOX_NEVER_ACTIVATE_THIS ) )
-!   diagnostic output start ----------------------------------------
-       if (ldiag1 > 0) then
-       icol_diag = -1
-       if ((lonndx(i) == 37) .and. (latndx(i) == 23)) icol_diag = i
-       if ((i == icol_diag) .and. (mod(k-1,5) == 0)) then
- !      write(lund,97010) fromwhere, nstep, lchnk, i, k, ipair
-       write(lund,97010) fromwhere, nstep, latndx(i), lonndx(i), k, ipair
-       write(lund,97020) 'drv olda/oldbnd/old/new/del',   &
-             dryvol_t_oldaa, dryvol_t_oldbnd, dryvol_t_old, dryvol_t_new, dryvol_t_del
-       write(lund,97020) 'num old/oldbnd, dgnold/new ',   &
-             num_t_old, num_t_oldbnd, dgn_t_old, dgn_t_new
-       write(lund,97020) 'tailfr v_old/new, n_old/new',   &
-             tailfr_volold, tailfr_volnew, tailfr_numold, tailfr_numnew
-       tmpa = max(1.0d-10,xferfrac_vol) / max(1.0d-10,xferfrac_num)
-       dgn_xfer = dgn_t_new * tmpa**onethird
-       tmpa = max(1.0d-10,(1.0d0-xferfrac_vol)) /   &
-               max(1.0d-10,(1.0d0-xferfrac_num))
-       dgn_aftr = dgn_t_new * tmpa**onethird
-       write(lund,97020) 'xferfrac_v/n; dgn_xfer/aftr',   &
-             xferfrac_vol, xferfrac_num, dgn_xfer, dgn_aftr
- !97010      format( / 'RENAME ', a, '  nx,lc,i,k,ip', i8, 4i4 )
- 97010      format( / 'RENAME ', a, '  nx,lat,lon,k,ip', i8, 4i4 )
- 97020      format( a, 6(1pe15.7) )
-       end if
-       end if ! (ldiag1 > 0)
-!   diagnostic output end   ------------------------------------------
-#endif
-
-
-!
-!   compute changes to number and species masses
-!
-      tmpd = qnum_cur(mfrm)*xferfrac_num
-      qnum_cur(mfrm) = qnum_cur(mfrm) - tmpd
-      qnum_cur(mtoo) = qnum_cur(mtoo) + tmpd
-      do iaer = 1, naer
-         tmpd = qaer_cur(iaer,mfrm)*xferfrac_vol
-         qaer_cur(iaer,mfrm) = qaer_cur(iaer,mfrm) - tmpd
-         qaer_cur(iaer,mtoo) = qaer_cur(iaer,mtoo) + tmpd
-      end do ! iaer
-
-      if ( iscldy_subarea ) then
-      tmpd = qnumcw_cur(mfrm)*xferfrac_num
-      qnumcw_cur(mfrm) = qnumcw_cur(mfrm) - tmpd
-      qnumcw_cur(mtoo) = qnumcw_cur(mtoo) + tmpd
-      do iaer = 1, naer
-         tmpd = qaercw_cur(iaer,mfrm)*xferfrac_vol
-         qaercw_cur(iaer,mfrm) = qaercw_cur(iaer,mfrm) - tmpd
-         qaercw_cur(iaer,mtoo) = qaercw_cur(iaer,mtoo) + tmpd
-      end do ! iaer
-      end if ! ( iscldy_subarea ) then
-
-
-#if ( defined( CAMBOX_NEVER_ACTIVATE_THIS ) )
-!   diagnostic output start ----------------------------------------
-                if (ldiag1 > 0) then
-                if ((i == icol_diag) .and. (mod(k-1,5) == 0)) then
-                  if (lstooa .gt. 0) then
-                    write(lund,'(a,i4,2(2x,a),1p,10e14.6)') 'RENAME qdels', iq,   &
-                        cnst_name(lsfrma+loffset), cnst_name(lstooa+loffset),   &
-                        deltat*dqdt(i,k,lsfrma), deltat*(dqdt(i,k,lsfrma) - xfertend),   &
-                        deltat*dqdt(i,k,lstooa), deltat*(dqdt(i,k,lstooa) + xfertend)
-                  else
-                    write(lund,'(a,i4,2(2x,a),1p,10e14.6)') 'RENAME qdels', iq,   &
-                        cnst_name(lsfrma+loffset), cnst_name(lstooa+loffset),   &
-                        deltat*dqdt(i,k,lsfrma), deltat*(dqdt(i,k,lsfrma) - xfertend)
-                  end if
-                end if
-                end if
-!   diagnostic output end   ------------------------------------------
-#endif
-
-
-      end do mainloop1_ipair
-
-
-      return
       end subroutine mam_rename_1subarea
 
+      !--------------------------------------------------------------------------------
+      !--------------------------------------------------------------------------------
+
+      subroutine find_renaming_pairs (nmodes, dest_mode_of_mode, &  !input
+           num_pairs, sz_factor, fmode_dist_tail_fac, v2n_lo_rlx, & !output
+           v2n_hi_rlx, ln_diameter_tail_fac, diameter_cutoff, &     !output
+           ln_dia_cutoff, diameter_threshold)    !output
+
+        !------------------------------------------------------------------------
+        !Find number of pairs which participates in the inter-mode transfer
+        !------------------------------------------------------------------------
+        !Number of mode pairs allowed to do inter-mode particle transfer
+        !(e.g. if we have a pair "mode_1<-->mode_2", mode_1 and mode_2 can
+        !participate in the inter-mode aerosol particle transfer where particles
+        !of the same species in mode_1 can be transferred to mode_2 and vice-versa)
+        !------------------------------------------------------------------------
+
+        !arguments (intent-ins)
+        integer, intent(in) :: nmodes               !total number of modes
+        integer, intent(in) :: dest_mode_of_mode(:) !array carry info about the destination mode of a particular mode
+
+        !intent-outs
+        integer,  intent(out) :: num_pairs          !total number of pairs to be found
+        real(r8), intent(out) :: sz_factor(:), fmode_dist_tail_fac(:) !precomputed factors to be used later [unitless]
+        real(r8), intent(out) :: v2n_lo_rlx(:), v2n_hi_rlx(:)         !relaxed volume to num high and low ratio limits [m^-3]
+        real(r8), intent(out) :: ln_diameter_tail_fac(:)              !log of diameter factor for distribution tail [unitless]
+        real(r8), intent(out) :: diameter_cutoff(:), ln_dia_cutoff(:) !cutoff (threshold) for deciding the  do inter-mode transfer [m]
+        real(r8), intent(out) :: diameter_threshold(:)                !threshold diameter(99% of cutoff)[m]
+
+! local variables
+        integer :: dest_mode, src_mode, imode
+
+        !some parameters
+        real(r8), parameter :: sqrt_half = sqrt(0.5)
+        real(r8), parameter :: frelax = 27.0_r8 !(3^3): relaxing 3*diameter, which makes it 3^3 for volume
+
+        ! Let us assume there are none to start with
+        num_pairs = 0
+
+        !if there can be no possible pairs, just return
+        if (all(dest_mode_of_mode(:)<=0)) return
+
+        !Go through all the modes to find if we have atleast one or more than one pairs
+        do imode = 1, nmodes
+           dest_mode   = dest_mode_of_mode(imode) ! "destination" mode for mode "imode"
+
+           !if dest_mode is <=0, transfer is not possible for this mode, cycle the loop for the next mode
+           if(dest_mode <= 0)cycle
+
+           src_mode = imode                  ! transfer "src" mode is the current mode (i.e. imode)
+
+           !^^At this point, we know that particles can be transferred from the
+           ! "src_mode" to "dest_mode". "src_mode" is the current mode (i.e. imode)
+
+           !update number of pairs found so far
+           num_pairs = num_pairs + 1    !increment npair
+
+           !-------------------------------------------------------
+           !Now precompute some common factors to be used later
+           !-------------------------------------------------------
+
+           call compute_size_factor (src_mode,  sz_factor) !size factor for "src mode"
+           call compute_size_factor (dest_mode, sz_factor) !size factor for "dest mode"
+
+           !---------------------------------------------------------------------------------------------------------
+           ! We compute few factors below for the "src_mode", which will be used for inter-mode particle transfer
+           !---------------------------------------------------------------------------------------------------------
+
+           fmode_dist_tail_fac(src_mode) = sqrt_half/alnsg_aer(src_mode) !factor for computing distribution tails of the  "src mode"
+
+           !compute volume to number high and low limits with relaxation coefficients (watch out for the repeated calculations)
+           v2n_lo_rlx(src_mode) = vol_to_num_ratio(src_mode, dgnumlo_aer) * frelax
+           v2n_hi_rlx(src_mode) = vol_to_num_ratio(src_mode, dgnumhi_aer) / frelax
+
+           !A factor for computing diameter at the tails of the distribution
+           ln_diameter_tail_fac(src_mode) = 3.0 * (alnsg_aer(src_mode)**2)
+
+           !cutoff (based on geometric mean) for making decision to do inter-mode transfers
+           !We took geommetric mean of the participating modes (source and destination)
+           !to find a cutoff or threshold from moving particles from the source to the
+           !destination mode.
+           diameter_cutoff(src_mode) = sqrt(   &
+                dgnum_aer(src_mode)*exp(1.5*(alnsg_aer(src_mode)**2)) *   &
+                dgnum_aer(dest_mode)*exp(1.5*(alnsg_aer(dest_mode)**2)) )
+
+           ln_dia_cutoff(src_mode) = log(diameter_cutoff(src_mode)) !log of cutoff
+           diameter_threshold(src_mode) = 0.99*diameter_cutoff(src_mode) !99% of the cutoff
+
+         end do
+
+      end subroutine find_renaming_pairs
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine compute_size_factor(imode, size_factor)
+
+        !--------------------------------------------------
+        ! Compute a common factor to be used in determining
+        ! size of a particle
+        !--------------------------------------------------
+
+        implicit none
+
+        integer,  intent(in) :: imode     !mode number
+        real(r8), intent(inout) :: size_factor(:) !size factor [unitless]
+
+        size_factor(imode) = (pi/6.)*exp(4.5*(alnsg_aer(imode)**2))
+
+      end subroutine compute_size_factor
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      pure function vol_to_num_ratio(imode, diameter) result(v2n)
+
+        !Compute volume to number ratio for a mode
+        !Defined as the number of particles larger than a specified, critical
+        !diameter divided by the  aerosol volume
+
+        implicit none
+        integer,  intent(in) :: imode
+        real(r8), intent(in) :: diameter(:) !particle diameter [m]
+
+        real(r8) :: v2n !return value [m^-3]
+
+        v2n = ( 1._r8 / ( (pi/6._r8)* &
+             (diameter(imode)**3._r8)*exp(4.5_r8*alnsg_aer(imode)**2._r8) ) )
+
+      end function vol_to_num_ratio
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine compute_dryvol_change_in_src_mode(nmode, nspec, dest_mode_of_mode, & !input
+           q_mmr, q_del_growth, & !input
+           dryvol, deldryvol ) !output
+
+        !--------------------------------------------------------
+        !Compute the change in the dryvolume of the source mode
+        !--------------------------------------------------------
+
+        !inputs
+        integer,  intent(in):: nmode !total number of modes
+        integer,  intent(in):: nspec !total number of species in a mode
+        integer,  intent(in):: dest_mode_of_mode(:) !destination mode for a mode
+
+        real(r8), intent(in) :: q_mmr(:,:)           !molar mixing ratios (mmr) [kmol/kmol-air]
+        real(r8), intent(in) :: q_del_growth(:,:)    !growth in mmr [kmol/kmol-air]
+
+        !intent-outs
+        real(r8), intent(out) :: dryvol(:)    !dry volumes (before growth)[m3/kmol-air]
+        real(r8), intent(out) :: deldryvol(:) !change in dry volumes [m3/kmol-air]
+
+        !local
+        integer :: imode
+        integer :: dest_mode
+
+        !For each mode, compute the initial (before growth) dryvolume and the growth in dryvolume
+        do imode = 1, nmode
+           !compute dry volume only for modes participating in inter-modal transfer
+           dest_mode = dest_mode_of_mode(imode)
+           if (dest_mode <= 0) cycle
+
+           !compute dry volumes (before growth) and its change for interstitial aerosols
+           call compute_dryvolume_change(imode, nspec, q_mmr, q_del_growth, & !input
+                dryvol(imode), deldryvol(imode)) !output
+         end do
+
+      end subroutine compute_dryvol_change_in_src_mode
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine compute_dryvolume_change (imode, nspec, q_mmr, q_del_growth, &!input
+           dryvol, deldryvol) !output
+
+        !--------------------------------------------------------
+        !Compute dry volume and change in dry volume due to growth
+        !--------------------------------------------------------
+
+        !intent-ins
+        integer,  intent(in) :: imode           !current mode number
+        integer,  intent(in) :: nspec           !number of species in the current mode
+        real(r8), intent(in) :: q_mmr(:,:)        !molar mixing ratio [kmol/kmol-air]
+        real(r8), intent(in) :: q_del_growth(:,:) !change (delta) in molar mixing ratio [kmol/kmol-air]
+
+        !intent-outs
+        real(r8), intent(out) :: dryvol, deldryvol !dry volume (before growth) and its grwoth [m3/kmol-air]
+
+        !local variables
+        integer  :: ispec, s_spec_ind, e_spec_ind
+        real(r8) :: tmp_dryvol, tmp_del_dryvol![m3/kmol-air]
+
+        !For each mode, we compute a dry volume by combining (accumulating) mass/density for each species in that mode.
+        !conversion from mass to volume is accomplished by multiplying with precomputed "mass_2_vol" factor
+
+        s_spec_ind = 1     !start species index for this mode [These will be subroutine args]
+        e_spec_ind = nspec !end species index for this mode
+
+        !initialize tmp accumulators
+        tmp_dryvol     = 0.0_r8 !dry volume accumulator
+        tmp_del_dryvol = 0.0_r8 !dry volume growth(change) accumulator
+
+        ! Notes on mass_2_vol factor:Units:[m3/kmol-species]; where kmol-species is the amount of a species "s"
+        ! This factor is obtained by  (molecular_weight/density) of a specie. That is,
+        ! [ (g/mol-species) / (kg-species/m3) ]; where molecular_weight has units [g/mol-species] and density units are [kg-specie/m3]
+        ! which results in the units of m3/kmol-specie
+
+        do ispec = s_spec_ind, e_spec_ind
+           !Multiply by mass_2_vol[m3/kmol-species] to convert q_mmr[kmol-specie/kmol-air]) to volume units[m3/kmol-air]
+           tmp_dryvol     = tmp_dryvol     + q_mmr(ispec,imode)*mass_2_vol(ispec)        !compute current dryvolume
+           !accumulate the "grwoth" in volume units as well
+           tmp_del_dryvol = tmp_del_dryvol + q_del_growth(ispec,imode)*mass_2_vol(ispec) !compute dryvolume growth
+      end do
+
+        dryvol    = tmp_dryvol-tmp_del_dryvol ! This is dry volume before the growth
+        deldryvol = tmp_del_dryvol          ! change in dry volume due to growth
+
+      end subroutine compute_dryvolume_change
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine do_inter_mode_transfer(nmode, nspec, dest_mode_of_mode, &
+           iscldy, v2nlorlx, v2nhirlx, dryvol_a, dryvol_c, deldryvol_a, deldryvol_c, &
+           sz_factor, fmode_dist_tail_fac, ln_diameter_tail_fac, ln_dia_cutoff, diameter_threshold, &
+           qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur)
+
+        !-------------------------------------------------------------------------
+        !Compute how much to transfer from one mode to another and do the transfer
+        !-------------------------------------------------------------------------
+
+        !intent-ins
+        integer,  intent(in) :: nmode, nspec, dest_mode_of_mode(:)
+        logical,  intent(in) :: iscldy !true if it is cloudy cell
+        real(r8), intent(in) :: v2nlorlx(:), v2nhirlx(:) !volume to number relaxation limits [m^-3]
+        real(r8), intent(in) :: dryvol_a(:), dryvol_c(:), deldryvol_a(:), deldryvol_c(:)!dryvolume and the change in dryvolume[m3/kmol-air]
+        real(r8), intent(in) :: sz_factor(:), fmode_dist_tail_fac(:) !Some precomputed factors [unitless]
+        real(r8), intent(in) :: ln_diameter_tail_fac(:), ln_dia_cutoff(:), diameter_threshold(:)! diameters and diameter thresholds [m]
+
+        !intent-inouts
+        real(r8), intent(inout) :: qaer_cur(:,:)!aerosol molar mixing ratio    [kmol/kmol-air]
+        real(r8), intent(inout) :: qnum_cur(:)  !aerosol number mixing ratio [#/kmol-air]
+
+        real(r8), intent(inout), optional :: qaercw_cur(:,:) !aerosol molar mixing ratio (cld borne) [kmol/kmol-air]
+        real(r8), intent(inout), optional :: qnumcw_cur(:)   !aerosol number mixing ratio (cld borne) [#/kmol-air]
+
+        !local variables
+        integer :: src_mode, dest_mode, imode, ispec
+        logical :: is_xfer_frac_zero
+
+        !before growth dryvolumes [m3/kmol-air]
+        real(r8) :: bef_grwth_dryvol, dryvol_del, bef_grwth_tail_fr_vol, xfer_vol_frac, bef_grwth_dryvolbnd
+
+        !after growth dryvolumes [m3/kmol-air]
+        real(r8) :: aft_grwth_tail_fr_vol, aft_grwth_dryvol
+
+        !before growth numbers [#/kmol-air]
+        real(r8) :: bef_grwth_num, bef_grwth_numbnd, bef_grwth_tail_fr_num, xfer_num_frac
+        real(r8) :: aft_grwth_tail_fr_num
+
+        !diameters [m]
+        real(r8) :: aft_grwth_diameter, ln_dia_aftgrwth, bef_grwth_diameter
+
+        !Loop through the modes and do the transfer
+        pair_loop:  do imode = 1, nmode
+
+           src_mode = imode                     !source mode
+           dest_mode = dest_mode_of_mode(imode) !destination mode
+
+           !if destination mode doesn't exist for the source mode, cycle loop
+           if (dest_mode <= 0) cycle pair_loop
+
+           !compute before growth dry volume and number
+
+           call compute_before_growth_dryvol_and_num(iscldy, src_mode, dryvol_a, dryvol_c,   & !input
+                qnum_cur, qnumcw_cur, v2nhirlx(src_mode), v2nlorlx(src_mode),        & !input
+                bef_grwth_dryvol, bef_grwth_dryvolbnd, bef_grwth_numbnd)               !output
+
+           !change (delta) in dryvol
+           dryvol_del = total_inter_cldbrn(iscldy, src_mode, deldryvol_a, deldryvol_c)
+
+           !Total dryvolume after growth (add delta growth)
+           aft_grwth_dryvol = bef_grwth_dryvol + dryvol_del
+
+           !Skip inter-mode transfer for this mode if dry after grwoth is ~ 0
+           if (aft_grwth_dryvol <= smallest_dryvol_value) cycle pair_loop
+
+           !compute before growth diameter
+           bef_grwth_diameter = mode_diameter(bef_grwth_dryvolbnd, bef_grwth_numbnd, sz_factor(src_mode))
+
+           !if the before growth diameter is more than the threshold (diameter_threshold), we restrict diameter
+           !to the threshold and change dry volume accorindgly
+           if (bef_grwth_diameter > diameter_threshold(src_mode)) then
+              ! this revised volume corresponds to bef_grwth_diameter == diameter_threshold, and same number conc
+              bef_grwth_dryvol = bef_grwth_dryvol * (diameter_threshold(src_mode)/bef_grwth_diameter)**3
+              bef_grwth_diameter = diameter_threshold(src_mode)
+      end if
+
+           if ((aft_grwth_dryvol-bef_grwth_dryvol) <= 1.0e-6_r8*bef_grwth_dryvolbnd) cycle pair_loop
+
+           !Compute after growth diameter; if it is less than the "nominal" or "base" diameter for
+           !the source mode, skip inter-mode transfer
+           aft_grwth_diameter = mode_diameter(aft_grwth_dryvol,bef_grwth_numbnd,sz_factor(src_mode))
+
+           if (aft_grwth_diameter <= dgnum_aer(src_mode)) cycle pair_loop
+
+           !compute before growth number fraction in the tail
+           call compute_tail_fraction(bef_grwth_diameter,ln_dia_cutoff(src_mode), fmode_dist_tail_fac(src_mode), & !input
+                tail_fraction = bef_grwth_tail_fr_num ) !output
+
+           !compute before growth volume (or mass) fraction in the tail
+           call compute_tail_fraction(bef_grwth_diameter,ln_dia_cutoff(src_mode), fmode_dist_tail_fac(src_mode), & !input
+                log_dia_tail_fac = ln_diameter_tail_fac(src_mode), & !optional input
+                tail_fraction = bef_grwth_tail_fr_vol ) !output
+
+           !compute after growth number fraction in the tail
+           call compute_tail_fraction(aft_grwth_diameter,ln_dia_cutoff(src_mode), fmode_dist_tail_fac(src_mode), & !input
+                tail_fraction = aft_grwth_tail_fr_num ) !output
+
+           !compute after growth volume (or mass) fraction in the tail
+           call compute_tail_fraction(aft_grwth_diameter,ln_dia_cutoff(src_mode), fmode_dist_tail_fac(src_mode), & !input
+                log_dia_tail_fac = ln_diameter_tail_fac(src_mode), & !optional input
+                tail_fraction = aft_grwth_tail_fr_vol ) !output
+
+           !compute transfer fraction (volume and mass) - if less than zero, cycle loop
+           call compute_xfer_fractions(bef_grwth_dryvol, aft_grwth_dryvol, bef_grwth_tail_fr_vol, aft_grwth_tail_fr_vol, & !input
+                aft_grwth_tail_fr_num, bef_grwth_tail_fr_num, &
+                is_xfer_frac_zero, xfer_vol_frac, xfer_num_frac) !output
+
+           if (is_xfer_frac_zero) cycle pair_loop
+
+           !do the transfer for the interstitial species
+           call do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+                qaer_cur, qnum_cur) !output
+
+           !do the traner for the cloud borne species
+           if ( iscldy ) then
+              call do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+                   qaercw_cur, qnumcw_cur) !output
+      end if
+
+        enddo pair_loop
+      end subroutine do_inter_mode_transfer
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      function total_inter_cldbrn(iscldy, imode, interstitial, cldbrn) result (total)
+
+        !compute total (dry volume or number) of interstitial and cloud borne species
+
+        logical,  intent(in) :: iscldy       !TRUE, if a cell has cloud
+        integer,  intent(in) :: imode
+        real(r8), intent(in) :: interstitial(:)     !interstital part [unit depends on the input]
+        real(r8), intent(in), optional :: cldbrn(:) !cloud borne part [unit depends on the input]
+
+        !return value
+        real(r8) :: total
+
+        total = interstitial(imode) !if there is no cloud, total is just the interstitial value
+
+        if(iscldy) then ! If there is cloud, add cloud borne part as well
+           if(.not.present(cldbrn))then
+              call endrun("If a grid cell is cloudy, cloud borne aerosol values must be present:"//errmsg(__FILE__,__LINE__))
+         end if
+           total = total + cldbrn(imode)
+      end if
+      end function total_inter_cldbrn
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      function mode_diameter(volume, number, size_factor) result(diameter)
+
+        !compute diameter
+        real(r8), intent(in) :: volume      ![m3]
+        real(r8), intent(in) :: number      ![#/kmol-air]
+        real(r8), intent(in) :: size_factor ![unitless]
+
+        !return value
+        real(r8) :: diameter ![m]
+        !local
+        real(r8), parameter :: onethird = 1.0_r8/3.0_r8
+
+        diameter = (volume/(number*size_factor))**onethird
+
+      end function mode_diameter
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine compute_before_growth_dryvol_and_num(iscldy, src_mode, dryvol_a, dryvol_c, & !input
+                qnum_cur, qnumcw_cur, v2nhi, v2nlo,                                 & !input
+                bef_grwth_dryvol, bef_grwth_dryvolbnd, bef_grwth_numbnd)              !output
+
+        !Compute before growth dry volume and number
+
+        implicit none
+
+        logical,  intent(in) :: iscldy       !TRUE, if a cell has cloud
+        integer,  intent(in) :: src_mode
+
+        real(r8), intent(in) :: dryvol_a(:), dryvol_c(:) ![m3/kmol-air]
+        real(r8), intent(in) :: qnum_cur(:)              ![#/kmol-air]
+
+        real(r8), intent(in), optional :: qnumcw_cur(:)  ![#/kmol-air]
+
+        real(r8), intent(in) :: v2nlo, v2nhi             ![m^-3]
+
+        !output
+        real(r8), intent(out) :: bef_grwth_dryvol,bef_grwth_dryvolbnd ![m3/kmol-air]
+        real(r8), intent(out) :: bef_grwth_numbnd ! [#/kmol-air]
+
+        !local
+        real(r8) :: bef_grwth_num ![#/kmol-air]
+
+        !Compute total(i.e. cloud borne and interstitial) of dry volume (before growth)
+        ! and delta in dry volume in the source mode [units: (m3 of specie)/(kmol of air)]
+        !NOTE: cloudborne input can be optional, so we are sending "src_mode" as a argument
+        !as we cannot refecence a member of an optional array if it is not present
+        bef_grwth_dryvol = total_inter_cldbrn(iscldy, src_mode, dryvol_a , dryvol_c)
+
+        bef_grwth_dryvolbnd = max( bef_grwth_dryvol, smallest_dryvol_value )
+
+        !Compute total before growth number [units: #/kmol-air]
+        bef_grwth_num    = total_inter_cldbrn(iscldy, src_mode, qnum_cur, qnumcw_cur)
+        bef_grwth_num = max( 0.0_r8, bef_grwth_num ) !bound to have minimum of 0
+
+        !bound number within min and max of the source mode
+        bef_grwth_numbnd = min_max_bound(bef_grwth_dryvolbnd*v2nhi, & !min value
+             bef_grwth_dryvolbnd*v2nlo, bef_grwth_num) !max value and input
+
+      end subroutine compute_before_growth_dryvol_and_num
+
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+      subroutine compute_tail_fraction(diameter,log_dia_cutoff, tail_dist_fac, & !input
+           log_dia_tail_fac, & !optional input
+           tail_fraction ) !output
+
+        !Compute tail fraction to be used for inter-mode species transfer
+
+        use shr_spfn_mod, only: erfc_shr => shr_spfn_erfc  !E3SM implementation of the erro function
+
+        implicit none
+
+        real(r8), intent(in) :: diameter       ![m]
+        real(r8), intent(in) :: log_dia_cutoff ![m]
+        real(r8), intent(in) :: tail_dist_fac  ![unitless]
+
+        real(r8), intent(in), optional :: log_dia_tail_fac! [m]
+
+        real(r8), intent(out) :: tail_fraction ![unitless]
+
+        real(r8) :: log_diameter, tail ![m]
+
+        log_diameter  = log(diameter)
+        if (present(log_dia_tail_fac)) log_diameter  = log_diameter + log_dia_tail_fac
+        tail          = ( log_dia_cutoff - log_diameter ) * tail_dist_fac
+        tail_fraction = 0.5_r8*erfc_shr( tail )
+
+      end subroutine compute_tail_fraction
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+      subroutine compute_xfer_fractions(bef_grwth_dryvol, aft_grwth_dryvol, bef_grwth_tail_fr_vol, aft_grwth_tail_fr_vol, & !input
+           aft_grwth_tail_fr_num, bef_grwth_tail_fr_num, & !input
+           is_xfer_frac_zero, xfer_vol_frac, xfer_num_frac) !output
+
+        implicit none
+
+        !Compute number and volume to transfer for inter-mode species transfer
+
+        !input
+        real(r8), intent(in) :: bef_grwth_dryvol      ![m3/kmol-air]
+        real(r8), intent(in) :: aft_grwth_dryvol      ![m3/kmol-air]
+        real(r8), intent(in) :: bef_grwth_tail_fr_vol ![unitless]
+        real(r8), intent(in) :: aft_grwth_tail_fr_vol ![unitless]
+        real(r8), intent(in) :: aft_grwth_tail_fr_num ![#/kmol-air]
+        real(r8), intent(in) :: bef_grwth_tail_fr_num ![#/kmol-air]
+
+        !output
+        logical,  intent(out) :: is_xfer_frac_zero
+        real(r8), intent(out) :: xfer_vol_frac ![m3/kmol-air]
+        real(r8), intent(out) :: xfer_num_frac ![#/kmol-air]
+
+        !local
+        real(r8), parameter :: xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8) !1-eps (this number is little less than 1, e.g. 0.99)
+        real(r8) :: volume_fraction
+
+        !assume we have fractions to transfer, so we will not skip the rest of the calculations
+        is_xfer_frac_zero = .false.
+
+!   transfer fraction is difference between new and old tail-fractions
+        volume_fraction = aft_grwth_tail_fr_vol*aft_grwth_dryvol - bef_grwth_tail_fr_vol*bef_grwth_dryvol
+
+        if (volume_fraction <= 0.0_r8) then
+           is_xfer_frac_zero = .true.
+           return
+        endif
+
+        xfer_vol_frac = min( volume_fraction, aft_grwth_dryvol )/aft_grwth_dryvol
+        xfer_vol_frac = min( xfer_vol_frac, xferfrac_max )
+        xfer_num_frac = aft_grwth_tail_fr_num - bef_grwth_tail_fr_num
+
+!   transfer fraction for number cannot exceed that of mass
+        xfer_num_frac = max( 0.0_r8, min( xfer_num_frac, xfer_vol_frac ) )
+
+      end subroutine compute_xfer_fractions
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+
+      subroutine do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+                qaer, qnum) !output
+
+        !Transfer species from source to destination model and update the mixing ratios
+
+        !input
+        integer,  intent(in) :: nspec, src_mode, dest_mode
+        real(r8), intent(in) :: xfer_vol_frac ![m3/kmol-air]
+        real(r8), intent(in) :: xfer_num_frac ![#/kmol-air]
+
+        !output
+        real(r8), intent(inout) :: qaer(:,:) ![kmol/kmol-air]
+        real(r8), intent(inout) :: qnum(:)   ![#/kmol-air]
+
+        !local
+        integer :: ispec
+        real(r8) :: num_trans, vol_trans
+
+        !compute changes to number and species masses
+        num_trans = qnum(src_mode)*xfer_num_frac
+        qnum(src_mode) = qnum(src_mode) - num_trans
+        qnum(dest_mode) = qnum(dest_mode) + num_trans
+        do ispec = 1, nspec
+           vol_trans = qaer(ispec,src_mode)*xfer_vol_frac
+           qaer(ispec,src_mode) = qaer(ispec,src_mode) - vol_trans
+           qaer(ispec,dest_mode) = qaer(ispec,dest_mode) + vol_trans
+        enddo
+
+      end subroutine do_num_and_mass_transfer
+
+      !----------------------------------------------------------------------
+      !----------------------------------------------------------------------
+      pure function min_max_bound(minlim, maxlim, input) result(bounded)
+
+        !Bound a quantity between a min limit and a max limit
+        real(r8), intent(in) :: minlim, maxlim
+        real(r8), intent(in) :: input
+
+        !return value
+        real(r8) :: bounded
+
+        bounded = max(min(maxlim, input), minlim)
+
+      end function min_max_bound
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
@@ -3755,7 +4067,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
       real(r8), intent(inout), dimension( 1:max_mode ) :: &
          qwtr_cur
 
-! DESCRIPTION: 
+! DESCRIPTION:
 !   computes changes due to aerosol nucleation (new particle formation)
 !       treats both nucleation and subsequent growth of new particles
 !          to aitken mode size
@@ -3789,7 +4101,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
       real(r8) :: dpnuc
       real(r8) :: dplom_mode(1), dphim_mode(1)
       real(r8) :: mass1p
-      real(r8) :: mass1p_aithi, mass1p_aitlo 
+      real(r8) :: mass1p_aithi, mass1p_aitlo
       real(r8) :: qh2so4_cur, qh2so4_avg, qh2so4_del
       real(r8) :: qnh3_cur, qnh3_del, qnh4a_del
       real(r8) :: qnuma_del
@@ -3972,7 +4284,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
       end if
 
 !   mass nuc rate (kg/kmol-air/s) from mass nuc amts
-      dmdt_ait = max( 0.0_r8, (tmpb/deltat) ) 
+      dmdt_ait = max( 0.0_r8, (tmpb/deltat) )
 
       dndt_aitsv1 = dndt_ait
       dmdt_aitsv1 = dmdt_ait
@@ -4083,10 +4395,10 @@ mainloop1_ipair:  do n = 1, ntot_amode
         write(lund,97020) 'qnh4a_del, qnh3_del          ',   &
                           qnh4a_del, qnh3_del
         write(lund,97020) 'dqdt(h2so4), (nh3)           ',   &
-              dqdt(i,k,l_h2so4), dqdt(i,k,l_nh3) 
+              dqdt(i,k,l_h2so4), dqdt(i,k,l_nh3)
         write(lund,97020) 'dqdt(so4a), (nh4a), (numa)   ',   &
               dqdt(i,k,lso4ait), dqdt(i,k,lnh4ait), dqdt(i,k,lnumait)
- 
+
        dpnuc = 0.0
        if (dndt_aitsv1 > 1.0e-5) dpnuc = (6.0*dmdt_aitsv1/   &
                    (pi*dens_so4a_host*dndt_aitsv1))**0.3333333
@@ -4096,7 +4408,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
        write(lund,97020) 'mass1p, mass1p_aitlo, _aithi ',   &
                     mass1p, mass1p_aitlo, mass1p_aithi
        end if
- 
+
 97010  format( / 'NEWNUC nstep,lat,lon,k,tk,cair', i8, 3i4, f8.2, 1pe12.4 )
 97020  format( a, 1p, 6e12.4 )
 97030  format( a, 1p, 2e12.4, 0p, 5f10.6 )
@@ -4118,7 +4430,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_pcarbon_aging_1subarea(                        &    
+      subroutine mam_pcarbon_aging_1subarea(                        &
          dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
@@ -4137,7 +4449,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur       ! aerosol mass mixing ratio [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond  ! change of aerosol mass mixing ratio due to condensation [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_coag  ! change of aerosol mass mixing ratio due to coagulation [mol/mol]
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation
                                                                                          ! from subrountine mam_coag_1subarea [mol/mol]
 ! *** need to add qaer_del_coag_nmoacc_in
 
@@ -4149,7 +4461,7 @@ mainloop1_ipair:  do n = 1, ntot_amode
       real(r8) :: xferfrac_pcage, frac_cond, frac_coag
 
 
-! 
+!
 agepair_loop1: &
       do ipair = 1, n_agepair         ! only execute for ipair = 1, ipair>=2 is for MAM9
 
@@ -4160,7 +4472,7 @@ agepair_loop1: &
             qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
             xferfrac_pcage, frac_cond, frac_coag)         ! output
 
-      do iaer = 1, naer
+            do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
             ! species is pom or bc
             ! transfer the aged fraction to accum mode
@@ -4168,15 +4480,15 @@ agepair_loop1: &
             call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                                                  ! input
                                                 xferfrac_pcage, frac_cond, frac_coag, &                         ! input
                                                 qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
-         else
+      else
             ! species is soa, so4, or nh4 produced by condensation or coagulation
             ! transfer all of it to accum mode
             ! also transfer the condensation and coagulation changes
             !    to accum mode (for mass budget)
             call transfer_cond_coag_mass_to_accum(nsrc, ndest, &                                                  ! input
                                                   qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
-         endif
-      enddo
+      end if
+            end do
       ! number - transfer the aged fraction to accum mode
       ! include this transfer change in the cond and/or coag change (for mass budget)
       call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                           ! input
@@ -4190,7 +4502,7 @@ agepair_loop1: &
 
 
       subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
-          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, & 
+          dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
           xferfrac_pcage, frac_cond, frac_coag)
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
@@ -4204,7 +4516,7 @@ agepair_loop1: &
       real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a    ! dry geometric mean diameter of number distribution [m]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur            ! aerosol mass mixing ratio [mol/mol]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond       ! change of aerosol mass mixing ratio due to condensation [mol/mol]
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation 
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_agepair ) :: qaer_del_coag_in ! change of aerosol mass mixing ratio due to coagulation
                                                                                          ! from subrountine mam_coag_1subarea [mol/mol]
       real(r8), intent(out) :: xferfrac_pcage    ! fraction of aged pom/bc transferred to accum [unitless]
       real(r8), intent(out) :: frac_cond         ! fraction of aerosol change due to condensation [unitless]
@@ -4214,42 +4526,42 @@ agepair_loop1: &
       integer :: iaer
 
       real(r8) :: fac_volsfc
-      real(r8) :: xferfrac_tmp1, xferfrac_tmp2 
+      real(r8) :: xferfrac_tmp1, xferfrac_tmp2
       real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
 
 ! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
 ! is set to 1 for default MAM4
-      vol_shell = qaer_cur(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+      vol_shell = qaer_cur(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
                   qaer_cur(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
-      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nsrc)*fac_m2v_aer(iaer_so4) + &
+      qaer_del_cond_tmp = qaer_del_cond(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
                           qaer_del_cond(iaer_soa,nsrc)*fac_m2v_eqvhyg_aer(iaer_soa)
-      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*fac_m2v_aer(iaer_so4) + &
-                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa) 
-      
-      
+      qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*mass_2_vol(iaer_so4) + &
+                          qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa)
+
+
       qaer_del_cond_tmp = max( qaer_del_cond_tmp, 1.0e-35_r8 )
       frac_cond = qaer_del_cond_tmp/(qaer_del_cond_tmp + max( qaer_del_coag_tmp, 0.0_r8 ))
       frac_coag = 1.0_r8 - frac_cond
 
       vol_core = 0.0_r8
       do iaer = 1, naer
-         ! for core volume, only include the mapped species 
+         ! for core volume, only include the mapped species
          !    which are primary and low hygroscopicity
          if (lmap_aer(iaer,nsrc) > 0) &
-         vol_core = vol_core + qaer_cur(iaer,nsrc)*fac_m2v_aer(iaer)
-      enddo
-!   ratio1 = vol_shell/vol_core = 
+         vol_core = vol_core + qaer_cur(iaer,nsrc)*mass_2_vol(iaer)
+      end do
+!   ratio1 = vol_shell/vol_core =
 !      actual hygroscopic-shell-volume/carbon-core-volume after gas uptake
 !   ratio2 = 6.0_r8*dr_so4_monolayers_pcage/(dgncur_a*fac_volsfc)
-!      = (shell-volume corresponding to n_so4_monolayers_pcage)/core-volume 
+!      = (shell-volume corresponding to n_so4_monolayers_pcage)/core-volume
 !      The 6.0/(dgncur_a*fac_volsfc) = (mode-surface-area/mode-volume)
 !   Note that vol_shell includes both so4+nh4 AND soa as "equivalent so4",
 !      The soa_equivso4_factor accounts for the lower hygroscopicity of soa.
 !
 !   Define xferfrac_pcage = min( 1.0, ratio1/ratio2)
-!   But ratio1/ratio2 == tmp1/tmp2, and coding below avoids possible overflow 
+!   But ratio1/ratio2 == tmp1/tmp2, and coding below avoids possible overflow
 !
       fac_volsfc = exp( 2.5*(alnsg_aer(nsrc)**2) )
       xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
@@ -4260,23 +4572,23 @@ agepair_loop1: &
          xferfrac_pcage = xferfrac_max
       else
          xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
-      endif
+      end if
 
       return
-      end subroutine mam_pcarbon_aging_frac 
+      end subroutine mam_pcarbon_aging_frac
 
-      
+
       subroutine transfer_aged_pcarbon_to_accum(nsrc, ndest, &
                                  xferfrac_pcage, frac_cond, frac_coag, &
                                  q_cur, q_del_cond, q_del_coag)
 
 ! transfer mass/number of aged pom and bc from pcarbon to accum mode
-! adjust the change of aerosol mass/number due to condenations/coagulation 
+! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon anc accum mode
 
       implicit none
-      
-! arguments      
+
+! arguments
       integer,  intent(in) :: nsrc            ! pcarbon mode index [unitless]
       integer,  intent(in) :: ndest           ! accum mode index [unitless]
       real(r8), intent(in) :: xferfrac_pcage  ! fraction of aged pom/bc transferred to accum [unitless]
@@ -4290,7 +4602,7 @@ agepair_loop1: &
       real(r8) q_tmp
 
       q_tmp = q_cur(nsrc)*xferfrac_pcage
-      
+
       q_cur(nsrc)       = q_cur(nsrc)  - q_tmp
       q_cur(ndest)      = q_cur(ndest) + q_tmp
 
@@ -4304,16 +4616,16 @@ agepair_loop1: &
       end subroutine transfer_aged_pcarbon_to_accum
 
 
-      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &  
+      subroutine transfer_cond_coag_mass_to_accum(nsrc, ndest, &
                                  qaer_cur, qaer_del_cond, qaer_del_coag)
 
-! transfer mass of aerosols contributing to aging (i.e., so4, soa) 
+! transfer mass of aerosols contributing to aging (i.e., so4, soa)
 ! from pcarbon to accum mode
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon and accum mode
 
       implicit none
-      
+
 ! arguments
       integer,  intent(in) :: nsrc          ! pcarbon mode index [unitless]
       integer,  intent(in) :: ndest         ! accum mode index [unitless]
@@ -4399,12 +4711,12 @@ agepair_loop1: &
                                ! mode-median wet diameter of number distribution (m)
       real(r8), intent(in)  :: lnsg(n_mode)
                                ! ln( sigmag )  (--)
-      real(r8), intent(out) :: uptkrate(n_mode)  
+      real(r8), intent(out) :: uptkrate(n_mode)
                                ! gas-to-aerosol mass transfer rates (1/s)
                                ! for number concentration = 1 #/m3
 
 
-! local 
+! local
       integer, parameter :: nghq = 2
       integer :: i, iq, k, l1, l2, la, n
 
@@ -4453,7 +4765,7 @@ agepair_loop1: &
          end if
 
          const  = tworootpi * exp( beta*lndpgn + 0.5_r8*(beta*lnsg(n))**2 )
-         
+
 !   sum over gauss-hermite quadrature points
          sumghq = 0.0
          do iq = 1, nghq
@@ -4470,7 +4782,7 @@ agepair_loop1: &
 
             sumghq = sumghq + wghq(iq)*dp*fuchs_sutugin/(dp**beta)
          end do
-         uptkrate(n) = const * gasdiffus * sumghq    
+         uptkrate(n) = const * gasdiffus * sumghq
 
       end do   ! "do n = 1, ntot_soamode"
 
@@ -4541,7 +4853,7 @@ implicit none
    character(128)                 :: msg, fmtaa
    character(2)                   :: tmpch2
    !-----------------------------------------------------------------------
- 
+
 !namelist variables
 n_so4_monolayers_pcage  = n_so4_monolayers_pcage_in
 dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
@@ -4553,7 +4865,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       ldiag98  = .true.  ; lun98  = 98
       ldiag13n = .true.  ; lun13n = 130
       ldiag15n = .true.  ; lun15n = 150
-      ldiagd1  = .true. 
+      ldiagd1  = .true.
 #else
       ldiag82  = .false. ; lun82  = iulog
       ldiag97  = .false. ; lun97  = iulog
@@ -4580,14 +4892,14 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       name_numcw  = "???"
 
       igas_h2so4 = 0 ; igas_nh3 = 0
-      iaer_bc  = 0 ; iaer_dst = 0 
-      iaer_ncl = 0 ; iaer_nh4 = 0 
-      iaer_pom = 0 ; iaer_soa = 0 
+      iaer_bc  = 0 ; iaer_dst = 0
+      iaer_ncl = 0 ; iaer_nh4 = 0
+      iaer_pom = 0 ; iaer_soa = 0
       iaer_so4 = 0
-      iaer_no3 = 0 ; iaer_cl  = 0 
-      iaer_ca  = 0 ; iaer_co3 = 0 
-      iaer_mpoly = 0 ; iaer_mprot = 0 
-      iaer_mlip  = 0 ; iaer_mhum = 0 
+      iaer_no3 = 0 ; iaer_cl  = 0
+      iaer_ca  = 0 ; iaer_co3 = 0
+      iaer_mpoly = 0 ; iaer_mprot = 0
+      iaer_mlip  = 0 ; iaer_mhum = 0
       iaer_mproc = 0 ; iaer_mom = 0
 
       if (nsoa == 1) then
@@ -4735,7 +5047,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
             msg = 'modal_aero_amicphys_init ERROR - lmap_gas for ' // name_gas(igas)
             call endrun( msg )
          end if
-         lmz = l - loffset 
+         lmz = l - loffset
          lmz2 = get_spc_ndx( name_gas(igas) )
          if (lmz /= lmz2 .or. lmz <= 0) then
             msg = 'modal_aero_amicphys_init ERROR - lmz /= lmz2 for ' // name_gas(igas)
@@ -4787,7 +5099,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
          do l1 = 1, nspec_amode(n)
             if (lac == 1) then
                l = lmassptr_amode(l1,n)
-               lmz = l - loffset 
+               lmz = l - loffset
                tmpnamea = cnst_name(l)
                tmpch2 = '_a'
             else
@@ -4835,7 +5147,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
                   mw_aer(iaer) = mwuse_poa(itmpa)
                end if
                fcvt_aer(iaer) = mwhost_aer(iaer)/mw_aer(iaer)
-               fac_m2v_aer(iaer) = mw_aer(iaer)/dens_aer(iaer)
+               mass_2_vol(iaer) = mw_aer(iaer)/dens_aer(iaer)
             else
                name_aercw(iaer,n) = tmpnamea
                lmap_aercw(iaer,n) = l - loffset
@@ -4862,7 +5174,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 
       do iaer = 1, naer
          fac_eqvso4hyg_aer(iaer) = hygro_aer(iaer)/hygro_aer(iaer_so4)
-         fac_m2v_eqvhyg_aer(iaer) = fac_m2v_aer(iaer) * fac_eqvso4hyg_aer(iaer)
+         fac_m2v_eqvhyg_aer(iaer) = mass_2_vol(iaer) * fac_eqvso4hyg_aer(iaer)
       end do ! naer
 
       sigmag_aer(:) = 1.8_r8
@@ -4948,7 +5260,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 !          aitken  + [ accum, pcarbon, maccum ]
 !          maitken + [ accum, pcarbon, maccum ]
 !    4 possible coagulation pairs involve similar sized modes
-!       the resulting particle is placed in the mode that is aged 
+!       the resulting particle is placed in the mode that is aged
 !       or contains the largest number of species
 !          pcarbon + accum   --> accum   (aged)
 !          maitken + aitken  --> aitken  (aged)
@@ -5009,8 +5321,6 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
             'gaexch_h2so4_uptake_optaa  ', gaexch_h2so4_uptake_optaa
          write(iulog,'( a,i12)') &
             'newnuc_h2so4_conc_optaa    ', newnuc_h2so4_conc_optaa
-         write(iulog,'( a,i12)') &
-            'rename_method_optaa        ', rename_method_optaa
          write(iulog,'( a,1p,e12.4)') &
             'newnuc_adjust_factor_pbl   ', newnuc_adjust_factor_pbl
 
@@ -5062,7 +5372,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
                   write(iulog,fmtaa) &
                      iaer, lmap_aer(iaer,n), name_aer(iaer,n), &
                      mwhost_aer(iaer), mw_aer(iaer), fcvt_aer(iaer), &
-                     dens_aer(iaer), fac_m2v_aer(iaer), hygro_aer(iaer)
+                     dens_aer(iaer), mass_2_vol(iaer), hygro_aer(iaer)
                   write(iulog,'(2i4,2x,a,2f10.4,1p,4e12.4)') &
                      iaer, lmap_aercw(iaer,n), name_aercw(iaer,n)
                end if
@@ -5089,7 +5399,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       return
       end subroutine modal_aero_amicphys_init
 
- 
+
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
       subroutine mam_set_lptr2_and_specxxx2
@@ -5195,11 +5505,11 @@ implicit none
    logical                        :: history_verbose      ! produce verbose history output
    logical                        :: history_aerocom    ! Output the aerocom history
    !-----------------------------------------------------------------------
- 
+
 
       call phys_getopts( history_aerosol_out = history_aerosol, &
                          history_verbose_out = history_verbose   )
-#if ( defined CAM_VERSION_IS_ACME ) 
+#if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
 #else
       call phys_getopts( history_aerocom_out        = history_aerocom )
@@ -5447,9 +5757,7 @@ implicit none
       return
       end subroutine m_a_amicphys_init_history
 
- 
+
 !----------------------------------------------------------------------
 
 end module modal_aero_amicphys
-
-
