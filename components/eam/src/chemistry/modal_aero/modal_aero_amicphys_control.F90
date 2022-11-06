@@ -182,10 +182,6 @@
   logical :: ldiag82, ldiag97, ldiag98, ldiag13n, ldiag15n
   logical :: ldiagd1
 
-  !NOTE:dryvol_smallest is a very small molar mixing ratio [m3-spc/kmol-air] (where m3-spc
-  !is meter cubed volume of a species "spc") used for avoiding overflow.  it corresponds to dp = 1 nm
-  !and number = 1e-5 #/mg-air ~= 1e-5 #/cm3-air
-  real(r8), parameter :: smallest_dryvol_value = 1.0e-25
 
   real(r8) :: accom_coef_gas(max_gas)
   real(r8) :: alnsg_aer(max_mode)
