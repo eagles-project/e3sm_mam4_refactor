@@ -1186,16 +1186,6 @@ i_loop_main_aa: &
 ! Zero out values at "top of cloudtop", "base of cloudbase"
       ktop = jt(i)
       kbot = mx(i)
-! usually the updraft ( & downdraft) start ( & end ) at kbot=pver, but sometimes kbot < pver
-! transport, activation, resuspension, and wet removal only occur between kbot >= k >= ktop
-! resuspension from evaporating precip can occur at k > kbot when kbot < pver
-! in the first version of this routine, the precp evap resusp tendencies for k > kbot were ignored, 
-!    but that is now fixed
-! this was a minor bug with quite minor affects on the aerosol, 
-!    because convective precip evap is (or used to be) much less than stratiform precip evap )
-!      kbot_prevap = kbot
-! apply this minor fix when doing resuspend to coarse mode      
-      kbot_prevap = pver
       mu_i(:) = 0.0
       md_i(:) = 0.0
       do k = ktop+1, kbot
@@ -1564,24 +1554,25 @@ k_loop_main_bb: &
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
 !    pairs to account any (or total) resuspension of convective-cloudborne aerosol
-      call ma_resuspend_convproc( dcondt, dcondt_resusp,   &
-                                  ktop, kbot_prevap, pcnst_extd ) ! REASTER 08/05/2015
+
+! usually the updraft ( & downdraft) start ( & end ) at kbot=pver, but sometimes kbot < pver
+! transport, activation, resuspension, and wet removal only occur between kbot >= k >= ktop
+! resuspension from evaporating precip can occur at k > kbot when kbot < pver
+! in the first version of this routine, the precp evap resusp tendencies for k > kbot were ignored,
+!    but that is now fixed
+! this was a minor bug with quite minor affects on the aerosol,
+!    because convective precip evap is (or used to be) much less than stratiform precip evap )
+!      kbot_prevap = kbot
+! apply this minor fix when doing resuspend to coarse mode
+      kbot_prevap = pver
+      call ma_resuspend_convproc( dcondt, dcondt_resusp,        &
+                                  ktop, kbot_prevap, pcnst_extd )
 
 ! calculate new column-tendency variables
-      sumresusp(:) = 0.0
-      sumprevap(:) = 0.0
-      sumprevap_hist(:) = 0.0
-      do m = 2, ncnst_extd
-         if (doconvproc_extd(m)) then
-            ! should go to k=pver for dcondt_prevap, and this should be safe for other sums
-            do k = ktop, kbot_prevap 
-               sumresusp(m) = sumresusp(m) + dcondt_resusp(m,k)*dp_i(k)
-               sumprevap(m) = sumprevap(m) + dcondt_prevap(m,k)*dp_i(k)
-               sumprevap_hist(m) = sumprevap_hist(m) + dcondt_prevap_hist(m,k)*dp_i(k)
-            end do
-         end if
-      end do ! m
-
+      call compute_tendency_resusp_evap(                                &
+                doconvproc_extd, ktop,          kbot_prevap,   dp_i,    & ! in
+                dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
+                sumresusp,      sumprevap,      sumprevap_hist          ) ! out
 
 !
 ! note again the ma_convproc_tend does not apply convective cloud processing
@@ -1803,6 +1794,48 @@ end subroutine ma_convproc_tend
    enddo ! "kk = ktop, kbot"
 
    end subroutine compute_fluxes_tendencies
+
+!=========================================================================================
+   subroutine compute_tendency_resusp_evap(                             &
+                doconvproc_extd, ktop,          kbot_prevap,  dp_i,     & ! in
+                dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
+                sumresusp,      sumprevap,      sumprevap_hist          ) ! out
+!-----------------------------------------------------------------------
+! calculate column-tendency of resuspension and evaporation
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver
+   use constituents, only: pcnst
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer, parameter :: pcnst_extd = pcnst*2
+   logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
+   integer, intent(in)  :: ktop                     ! top level index
+   integer, intent(in)  :: kbot_prevap              ! bottom level index, for resuspension and evaporation only
+   real(r8),intent(in)  :: dp_i(pver)               ! dp [mb]
+   real(r8),intent(in)    :: dcondt_resusp(pcnst_extd,pver)  ! portion of TMR tendency due to resuspension [kg/kg/s]
+   real(r8),intent(in)    :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
+   real(r8),intent(in)    :: dcondt_prevap_hist(pcnst_extd,pver) ! portion of TMR tendency due to precip evaporation, goes into the history [kg/kg/s]
+   real(r8),intent(out)  :: sumresusp(pcnst_extd)    ! sum (over layers) of dp*dconudt_resusp [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumprevap(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumprevap_hist(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap_hist [kg/kg/s * mb]
+
+   integer      :: kk           ! vertical index
+   integer      :: icnst        ! index of pcnst_extd
+
+      sumresusp(:) = 0.0
+      sumprevap(:) = 0.0
+      sumprevap_hist(:) = 0.0
+      do icnst = 2, pcnst_extd
+         if (doconvproc_extd(icnst)) then
+            ! should go to kk=pver for dcondt_prevap, and this should be safe for other sums
+            do kk = ktop, kbot_prevap
+               sumresusp(icnst) = sumresusp(icnst) + dcondt_resusp(icnst,kk)*dp_i(kk)
+               sumprevap(icnst) = sumprevap(icnst) + dcondt_prevap(icnst,kk)*dp_i(kk)
+               sumprevap_hist(icnst) = sumprevap_hist(icnst) + dcondt_prevap_hist(icnst,kk)*dp_i(kk)
+            enddo
+         endif
+      enddo 
+   end subroutine compute_tendency_resusp_evap
 
 !=========================================================================================
    subroutine ma_precpevap_convproc(                           &
