@@ -1003,17 +1003,6 @@ subroutine ma_convproc_tend(                                           &
    real(r8) dconudt_aqchem(pcnst_extd,pverp) ! d(conu)/dt by aqueous chem
    real(r8) dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal
 
-   real(r8) maxflux(pcnst_extd)      ! maximum (over layers) of fluxin and fluxout
-   real(r8) maxflux2(pcnst_extd)     ! ditto but computed using method-2 fluxes
-   real(r8) maxprevap(pcnst_extd)    ! maximum (over layers) of dcondt_prevap*dp
-   real(r8) maxresusp(pcnst_extd)    ! maximum (over layers) of dcondt_resusp*dp
-   real(r8) maxsrce(pcnst_extd)      ! maximum (over layers) of netsrce
-
-   real(r8) sumflux(pcnst_extd)      ! sum (over layers) of netflux
-   real(r8) sumflux2(pcnst_extd)     ! ditto but computed using method-2 fluxes
-   real(r8) sumsrce(pcnst_extd)      ! sum (over layers) of dp*netsrce
-   real(r8) sumchng(pcnst_extd)      ! sum (over layers) of dp*dcondt
-   real(r8) sumchng3(pcnst_extd)     ! ditto but after call to resusp_conv
    real(r8) sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa
    real(r8) sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem
    real(r8) sumprevap(pcnst_extd)    ! sum (over layers) of dp*dcondt_prevap
@@ -1553,11 +1542,6 @@ k_loop_main_bb: &
 ! Now computes fluxes and tendencies
 ! NOTE:  The approach used in convtran applies to inert tracers and
 !        must be modified to include source and sink terms
-      sumflux(:) = 0.0
-      sumflux2(:) = 0.0
-      sumsrce(:) = 0.0
-      sumchng(:) = 0.0
-      sumchng3(:) = 0.0
       sumactiva(:) = 0.0
       sumaqchem(:) = 0.0
       sumwetdep(:) = 0.0
@@ -1565,98 +1549,14 @@ k_loop_main_bb: &
       sumprevap(:) = 0.0
       sumprevap_hist(:) = 0.0 
 
-      maxflux(:) = 0.0
-      maxflux2(:) = 0.0
-      maxresusp(:) = 0.0
-      maxsrce(:) = 0.0
-      maxprevap(:) = 0.0
-
-k_loop_main_cc: &
-      do k = ktop, kbot
-         kp1 = k+1
-         km1 = k-1
-         kp1x = min( kp1, pver )
-         km1x = max( km1, 1 )
-         fa_u_dp = fa_u(k)*dp_i(k)
-         do m = 2, ncnst_extd
-            if (doconvproc_extd(m)) then
-
-! First compute fluxes using environment subsidence/lifting and 
-! entrainment/detrainment into up/downdrafts, 
-! to provide an additional mass balance check
-! (this could be deleted after the code is well tested)
-               fluxin  = mu_i(k)*min(chat(m,k),const(m,km1x))       &
-                       - md_i(kp1)*min(chat(m,kp1),const(m,kp1x))   &
-                       + dudp(k)*conu(m,k) + dddp(k)*cond(m,kp1)
-               fluxout = mu_i(kp1)*min(chat(m,kp1),const(m,k))      &
-                       - md_i(k)*min(chat(m,k),const(m,k))          &
-                       + (eudp(k) + eddp(k))*const(m,k)
-
-               netflux = fluxin - fluxout
-
-               sumflux2(m) = sumflux2(m) + netflux
-               maxflux2(m) = max( maxflux2(m), abs(fluxin), abs(fluxout) )
-
-! Now compute fluxes as in convtran, and also source/sink terms
-! (version 3 limit fluxes outside convection to mass in appropriate layer
-! (these limiters are probably only safe for positive definite quantitities
-! (it assumes that mu and md already satify a courant number limit of 1)
-            if (iflux_method /= 2) then
-               fluxin  =     mu_i(kp1)*conu(m,kp1)                     &
-                           + mu_i(k  )*min(chat(m,k  ),const(m,km1x))  &
-                         - ( md_i(k  )*cond(m,k)                       &
-                           + md_i(kp1)*min(chat(m,kp1),const(m,kp1x)) )
-               fluxout =     mu_i(k  )*conu(m,k)                       &
-                           + mu_i(kp1)*min(chat(m,kp1),const(m,k   ))  &
-                         - ( md_i(kp1)*cond(m,kp1)                     &
-                           + md_i(k  )*min(chat(m,k  ),const(m,k   )) )
-            else
-               fluxin  =     mu_i(kp1)*conu(m,kp1)                     &
-                         - ( md_i(k  )*cond(m,k) )
-               fluxout =     mu_i(k  )*conu(m,k)                       &
-                         - ( md_i(kp1)*cond(m,kp1) )
-               tmpveca(1) = fluxin ; tmpveca(4) = -fluxout
-
-               ! new method -- simple upstream method for the env subsidence
-               ! tmpa = net env mass flux (positive up) at top of layer k
-               tmpa = -( mu_i(k  ) + md_i(k  ) )
-               if (tmpa <= 0.0_r8) then
-                  fluxin  = fluxin  - tmpa*const(m,km1x)
-               else
-                  fluxout = fluxout + tmpa*const(m,k   )
-               end if
-               tmpveca(2) = fluxin ; tmpveca(5) = -fluxout
-               ! tmpa = net env mass flux (positive up) at base of layer k
-               tmpa = -( mu_i(kp1) + md_i(kp1) )
-               if (tmpa >= 0.0_r8) then
-                  fluxin  = fluxin  + tmpa*const(m,kp1x)
-               else
-                  fluxout = fluxout - tmpa*const(m,k   )
-               end if
-               tmpveca(3) = fluxin ; tmpveca(6) = -fluxout
-            end if
-
-            netflux = fluxin - fluxout
-            netsrce = fa_u_dp*(dconudt_aqchem(m,k) + &
-                        dconudt_activa(m,k) + dconudt_wetdep(m,k))
-            dcondt(m,k) = (netflux+netsrce)/dp_i(k)
-
-            dcondt_wetdep(m,k) = fa_u_dp*dconudt_wetdep(m,k)/dp_i(k)
-
-            sumflux(m) = sumflux(m) + netflux
-            maxflux(m) = max( maxflux(m), abs(fluxin), abs(fluxout) )
-            sumsrce(m) = sumsrce(m) + netsrce
-            maxsrce(m) = max( maxsrce(m), &
-               fa_u_dp*max( abs(dconudt_aqchem(m,k)), &
-                            abs(dconudt_activa(m,k)),  abs(dconudt_wetdep(m,k)) ) )
-            sumchng(m) = sumchng(m) + dcondt(m,k)*dp_i(k)
-            sumactiva(m) = sumactiva(m) + fa_u_dp*dconudt_activa(m,k)
-            sumaqchem(m) = sumaqchem(m) + fa_u_dp*dconudt_aqchem(m,k)
-            sumwetdep(m) = sumwetdep(m) + fa_u_dp*dconudt_wetdep(m,k)
-
-            end if   ! "(doconvproc_extd(m))"
-         end do      ! "m = 2,ncnst_extd"
-      end do k_loop_main_cc ! "k = ktop, kbot"
+      call compute_fluxes_tendencies(                           &
+                doconvproc_extd, iflux_method, ktop, kbot,      & ! in
+                dp_i,    fa_u,      mu_i,       md_i,           & ! in
+                chat,    const,     conu,       cond,           & ! in
+                dconudt_activa, dconudt_aqchem, dconudt_wetdep, & ! in
+                dudp,    dddp,      eudp,       eddp,           & ! in
+                sumactiva, sumaqchem, sumwetdep,                & ! out
+                dcondt,         dcondt_wetdep                   ) ! out
 
 
 ! calculate effects of precipitation evaporation
@@ -1680,13 +1580,8 @@ k_loop_main_cc: &
          if (doconvproc_extd(m)) then
             ! should go to k=pver for dcondt_prevap, and this should be safe for other sums
             do k = ktop, kbot_prevap 
-               sumchng3(m)  = sumchng3(m)  + dcondt(m,k)*dp_i(k)
                sumresusp(m) = sumresusp(m) + dcondt_resusp(m,k)*dp_i(k)
-               maxresusp(m) = max( maxresusp(m),   &
-                                         abs(dcondt_resusp(m,k)*dp_i(k)) )
                sumprevap(m) = sumprevap(m) + dcondt_prevap(m,k)*dp_i(k)
-               maxprevap(m) = max( maxprevap(m),   &
-                                         abs(dcondt_prevap(m,k)*dp_i(k)) )
                sumprevap_hist(m) = sumprevap_hist(m) + dcondt_prevap_hist(m,k)*dp_i(k)
             end do
          end if
@@ -1786,6 +1681,138 @@ k_loop_main_cc: &
    return
 end subroutine ma_convproc_tend
 
+!====================================================================================
+   subroutine compute_fluxes_tendencies(                        &
+                doconvproc_extd, iflux_method, ktop, kbot,      & ! in
+                dp_i,    fa_u,      mu_i,       md_i,           & ! in
+                chat,    const,     conu,       cond,           & ! in
+                dconudt_activa, dconudt_aqchem, dconudt_wetdep, & ! in
+                dudp,    dddp,      eudp,       eddp,           & ! in
+                sumactiva, sumaqchem, sumwetdep,                & ! out
+                dcondt,         dcondt_wetdep                   ) ! out
+!-----------------------------------------------------------------------
+! compute all fluxes and tendencies
+! NOTE:  The approach used in convtran applies to inert tracers and
+!        must be modified to include source and sink terms
+!-----------------------------------------------------------------------
+   use ppgrid, only: pcols, pver, pverp
+   use constituents, only: pcnst
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer, parameter :: pcnst_extd = pcnst*2
+   logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
+   integer, intent(in)  :: iflux_method             ! 1=as in convtran (deep), 2=uwsh
+   integer, intent(in)  :: ktop                     ! top level index
+   integer, intent(in)  :: kbot                     ! bottom level index
+   real(r8),intent(in)  :: dp_i(pver)               ! dp [mb]
+   real(r8),intent(in)  :: fa_u(pver)               ! fractional area of the updraft [fraction]
+   real(r8),intent(in)  :: mu_i(pverp)              ! mu at current i (note pverp dimension, see ma_convproc_tend) [mb/s] 
+   real(r8),intent(in)  :: md_i(pverp)              ! md at current i (note pverp dimension) [mb/s]
+   real(r8),intent(in)  :: chat(pcnst_extd,pverp)   ! mix ratio in env at interfaces [kg/kg]
+   real(r8),intent(in)  :: const(pcnst_extd,pver)   ! gathered tracer array [kg/kg]
+   real(r8),intent(in)  :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
+   real(r8),intent(in)  :: cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces [kg/kg]
+   real(r8),intent(in)  :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
+   real(r8),intent(in)  :: dconudt_aqchem(pcnst_extd,pverp) ! d(conu)/dt by aqueous chem [kg/kg/s]
+   real(r8),intent(in)  :: dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal[kg/kg/s]
+   real(r8),intent(in)  :: dudp(pver)           ! du(i,k)*dp(i,k) at current i [mb/s]
+   real(r8),intent(in)  :: dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
+   real(r8),intent(in)  :: eudp(pver)           ! eu(i,k)*dp(i,k) at current i [mb/s]
+   real(r8),intent(in)  :: eddp(pver)           ! ed(i,k)*dp(i,k) at current i [mb/s]
+   real(r8),intent(out)  :: sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
+   real(r8),intent(out)    :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
+   real(r8),intent(out)    :: dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition [kg/kg/s]
+
+
+   integer      :: kk           ! vertical index
+   integer      :: kp1, km1, kp1x, km1x ! index of kk+1 and kk-1. x: with bounds
+   integer      :: icnst        ! index of pcnst_extd
+   real(r8)     :: fa_u_dp      ! fa_u * dp at the current level [mb]
+   real(r8)     :: fluxin, fluxout, netflux   ! in, out and net flux [kg/kg/s * mb]
+   real(r8)     :: tmpa         ! working variable of mass flux [mb/s]
+   real(r8)     :: netsrce      ! working variable of flux source [kg/kg/s * mb]
+
+   ! initialize variables
+   sumactiva(:) = 0.0
+   sumaqchem(:) = 0.0
+   sumwetdep(:) = 0.0
+   dcondt(:,:) = 0.0
+   dcondt_wetdep(:,:) = 0.0
+
+   ! loop from ktop to kbot
+   do kk = ktop, kbot
+         kp1 = kk+1
+         km1 = kk-1
+         kp1x = min( kp1, pver )
+         km1x = max( km1, 1 )
+         fa_u_dp = fa_u(kk)*dp_i(kk)
+         do icnst = 2, pcnst_extd
+            if (doconvproc_extd(icnst)) then
+! First compute fluxes using environment subsidence/lifting and
+! entrainment/detrainment into up/downdrafts,
+! to provide an additional mass balance check
+! (this could be deleted after the code is well tested)
+               fluxin  = mu_i(kk)*min(chat(icnst,kk),const(icnst,km1x))       &
+                       - md_i(kp1)*min(chat(icnst,kp1),const(icnst,kp1x))   &
+                       + dudp(kk)*conu(icnst,kk) + dddp(kk)*cond(icnst,kp1)
+               fluxout = mu_i(kp1)*min(chat(icnst,kp1),const(icnst,kk))      &
+                       - md_i(kk)*min(chat(icnst,kk),const(icnst,kk))          &
+                       + (eudp(kk) + eddp(kk))*const(icnst,kk)
+
+               netflux = fluxin - fluxout
+
+! Now compute fluxes as in convtran, and also source/sink terms
+! (version 3 limit fluxes outside convection to mass in appropriate layer
+! (these limiters are probably only safe for positive definite quantitities
+! (it assumes that mu and md already satify a courant number limit of 1)
+            if (iflux_method /= 2) then
+               fluxin  =     mu_i(kp1)*conu(icnst,kp1)                     &
+                           + mu_i(kk )*min(chat(icnst,kk),const(icnst,km1x))  &
+                         - ( md_i(kk )*cond(icnst,kk)                       &
+                           + md_i(kp1)*min(chat(icnst,kp1),const(icnst,kp1x)) )
+               fluxout =     mu_i(kk )*conu(icnst,kk)                       &
+                           + mu_i(kp1)*min(chat(icnst,kp1),const(icnst,kk ))  &
+                         - ( md_i(kp1)*cond(icnst,kp1)                     &
+                           + md_i(kk )*min(chat(icnst,kk),const(icnst,kk )) )
+            else
+               fluxin  =     mu_i(kp1)*conu(icnst,kp1) - ( md_i(kk )*cond(icnst,kk) )
+               fluxout =     mu_i(kk )*conu(icnst,kk) - ( md_i(kp1)*cond(icnst,kp1) )
+
+               ! new method -- simple upstream method for the env subsidence
+               ! tmpa = net env mass flux (positive up) at top of layer k
+               tmpa = -( mu_i(kk  ) + md_i(kk  ) )
+               if (tmpa <= 0.0_r8) then
+                  fluxin  = fluxin  - tmpa*const(icnst,km1x)
+               else
+                  fluxout = fluxout + tmpa*const(icnst,kk   )
+               endif
+               ! tmpa = net env mass flux (positive up) at base of layer k
+               tmpa = -( mu_i(kp1) + md_i(kp1) )
+               if (tmpa >= 0.0_r8) then
+                  fluxin  = fluxin  + tmpa*const(icnst,kp1x)
+               else
+                  fluxout = fluxout - tmpa*const(icnst,kk   )
+               endif
+            endif
+            netflux = fluxin - fluxout
+            netsrce = fa_u_dp*(dconudt_aqchem(icnst,kk) + &
+                        dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
+            dcondt(icnst,kk) = (netflux+netsrce)/dp_i(kk)
+
+            dcondt_wetdep(icnst,kk) = fa_u_dp*dconudt_wetdep(icnst,kk)/dp_i(kk)
+
+            sumactiva(icnst) = sumactiva(icnst) + fa_u_dp*dconudt_activa(icnst,kk)
+            sumaqchem(icnst) = sumaqchem(icnst) + fa_u_dp*dconudt_aqchem(icnst,kk)
+            sumwetdep(icnst) = sumwetdep(icnst) + fa_u_dp*dconudt_wetdep(icnst,kk)
+
+            endif   ! "(doconvproc_extd"
+         enddo      ! "icnst = 2,pcnst_extd"
+      enddo ! "kk = ktop, kbot"
+
+
+   end subroutine compute_fluxes_tendencies
 
 !=========================================================================================
    subroutine ma_precpevap_convproc(                           &
