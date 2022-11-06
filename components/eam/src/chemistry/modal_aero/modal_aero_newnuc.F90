@@ -1465,7 +1465,7 @@ subroutine modal_aero_newnuc_init( mam_amicphys_optaa )
 !-----------------------------------------------------------------------
 
 use modal_aero_data
-use modal_aero_rename
+!use modal_aero_rename
 
 use cam_abortutils,   only:  endrun
 use cam_history,  only:  addfld, horiz_only, add_default, fieldname_len
