@@ -1512,22 +1512,10 @@ k_loop_main_bb: &
 
 
 ! Compute downdraft mixing ratios from cloudtop to cloudbase
-! No special treatment is needed at k=2
-! No transformation or removal is applied in the downdraft
-      do k = ktop, kbot
-         kp1 = k + 1
-! md_m_eddp = downdraft massflux at kp1, without detrainment between k,kp1
-         md_m_eddp = md_i(k) - eddp(k)
-         if (md_m_eddp < -mbsth) then
-            do m = 2, ncnst_extd
-               if (doconvproc_extd(m)) then
-                  cond(m,kp1) = ( md_i(k)*cond(m,k)		&
-                                - eddp(k)*const(m,k) ) / md_m_eddp
-               endif
-            end do
-         end if
-      end do ! k
-
+      call compute_downdraft_mixing_ratio(                      &
+                        doconvproc_extd,       ktop, kbot,      & ! in
+                        mbsth,          md_i,  eddp, const,     & ! in
+                        cond                                    ) ! inout
 
 ! Now computes fluxes and tendencies
 ! NOTE:  The approach used in convtran applies to inert tracers and
@@ -1661,6 +1649,51 @@ k_loop_main_bb: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine compute_downdraft_mixing_ratio(              &
+                doconvproc_extd,         ktop,  kbot,      & ! in
+                mbsth,          md_i,    eddp,  const,     & ! in
+                cond                                       ) ! inout
+!-----------------------------------------------------------------------
+! Compute downdraft mixing ratios from cloudtop to cloudbase
+! No special treatment is needed at k=2
+! No transformation or removal is applied in the downdraft
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp
+   use constituents, only: pcnst
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer, parameter   :: pcnst_extd = pcnst*2
+   logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
+   integer, intent(in)  :: ktop                     ! top level index
+   integer, intent(in)  :: kbot                     ! bottom level index
+   real(r8),intent(in)  :: mbsth                    ! threshold below which we treat the mass fluxes as zero [mb/s]
+   real(r8),intent(in)  :: md_i(pverp)              ! md at current i (note pverp dimension) [mb/s]
+   real(r8),intent(in)  :: eddp(pver)               ! ed(i,k)*dp(i,k) at current i [mb/s]
+   real(r8),intent(in)  :: const(pcnst_extd,pver)   ! gathered tracer array [kg/kg]
+   real(r8),intent(inout) :: cond(pcnst_extd,pverp) ! mix ratio in downdraft at interfaces [kg/kg]
+
+   integer      :: kk           ! vertical index
+   integer      :: kp1          ! index of kk+1
+   integer      :: icnst        ! index of pcnst_extd
+   real(r8)     :: md_m_eddp    ! downdraft massflux at kp1 [mb/s]
+
+      do kk = ktop, kbot
+         kp1 = kk + 1
+! md_m_eddp = downdraft massflux at kp1, without detrainment between k,kp1
+         md_m_eddp = md_i(kk) - eddp(kk)
+         if (md_m_eddp < -mbsth) then
+            do icnst = 2, pcnst_extd
+               if (doconvproc_extd(icnst)) then
+                  cond(icnst,kp1) = ( md_i(kk)*cond(icnst,kk)             &
+                                - eddp(kk)*const(icnst,kk) ) / md_m_eddp
+               endif
+            enddo
+         endif
+      enddo ! kk
+
+   end subroutine compute_downdraft_mixing_ratio
 
 !====================================================================================
    subroutine compute_fluxes_tendencies(                        &
