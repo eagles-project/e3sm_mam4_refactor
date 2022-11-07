@@ -1361,29 +1361,14 @@ k_loop_main_bb: &
                end if
             end do
 
-! estimate updraft velocity (wup) 
-            if (iconvtype /= 1) then
-! shallow - wup = (mup in kg/m2/s) / [rhoair * (updraft area)]
-               wup(k) = (mu_i(kp1) + mu_i(k))*0.5_r8*hund_ovr_g &
-                      / (rhoair_i(k) * (cldfrac_i(k)*0.5_r8))
-               wup(k) = max( 0.1_r8, wup(k) )
-            else
-! deep - the above method overestimates updraft area and underestimate wup
-!    the following is based lemone and zipser (j atmos sci, 1980, p. 2455)
-!    peak updraft (= 4 m/s) is sort of a "grand median" from their GATE data
-!       and Thunderstorm Project data which they also show
-!    the vertical profile shape is a crude fit to their median updraft profile
-               zkm = zmagl(k)*1.0e-3
-               if (zkm .ge. 1.0) then
-                  wup(k) = 4.0_r8*((zkm/4.0_r8)**0.21_r8)
-               else
-                  wup(k) = 2.9897_r8*(zkm**0.5_r8)
-               end if
-               wup(k) = max( 0.1_r8, min( 4.0_r8, wup(k) ) )
-            end if
+            ! estimate updraft velocity (wup) 
+            call compute_wup(                           &
+                        iconvtype,      k,     mu_i,    & ! in
+                        cldfrac_i,   rhoair_i, zmagl,   & ! in
+                        wup                             ) ! inout
 
-! compute lagrangian transport time (dt_u) and updraft fractional area (fa_u)
-! *** these must obey    dt_u(k)*mu_p_eudp(k) = dpdry_i(k)*fa_u(k)
+            ! compute lagrangian transport time (dt_u) and updraft fractional area (fa_u)
+            ! *** these must obey    dt_u(k)*mu_p_eudp(k) = dpdry_i(k)*fa_u(k)
             dt_u(k) = dz/wup(k)
             dt_u(k) = min( dt_u(k), dt )
             fa_u(k) = dt_u(k)*(mu_p_eudp(k)/dpdry_i(k))
@@ -1550,6 +1535,52 @@ k_loop_main_bb: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine compute_wup(                              &
+                        iconvtype,      kk,     mu_i,   & ! in
+                        cldfrac_i,   rhoair_i, zmagl,   & ! in
+                        wup                             ) ! inout
+!-----------------------------------------------------------------------
+! estimate updraft velocity (wup)
+! do it differently for deep and shallow convection
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp
+
+   integer,  intent(in) :: iconvtype            ! 1=deep, 2=uw shallow
+   integer,  intent(in) :: kk                   ! vertical level index
+   real(r8), intent(in) :: mu_i(pverp)          ! mu at current i (note pverp dimension) [mb/s]
+   real(r8), intent(in) :: cldfrac_i(pver)      ! cldfrac at current icol (with adjustments) [fraction]
+   real(r8), intent(in) :: rhoair_i(pver)       ! air density at current i [kg/m3]
+   real(r8), intent(in) :: zmagl(pver)          ! height above surface [m]
+   real(r8), intent(inout)      :: wup(pver)    ! mean updraft vertical velocity at current level updraft [m/s]
+
+   integer      :: kp1                  ! kk + 1
+   real(r8)     :: zkm                  ! height above surface [km]
+   real(r8), parameter  :: w_peak = 4.0_r8      ! pre-defined peak updraft [m/s]
+
+! shallow - wup = (mup in kg/m2/s) / [rhoair * (updraft area)]
+    if (iconvtype /= 1) then
+       wup(kk) = (mu_i(kp1) + mu_i(kk))*0.5_r8*hund_ovr_g &
+                      / (rhoair_i(kk) * (cldfrac_i(kk)*0.5_r8))
+       wup(kk) = max( 0.1_r8, wup(kk) )
+
+! deep - the above method overestimates updraft area and underestimate wup
+!    the following is based lemone and zipser (j atmos sci, 1980, p. 2455)
+!    peak updraft (= 4 m/s) is sort of a "grand median" from their GATE data
+!       and Thunderstorm Project data which they also show
+!    the vertical profile shape is a crude fit to their median updraft profile
+   else
+       zkm = zmagl(kk)*1.0e-3
+       if (zkm .ge. 1.0) then
+           wup(kk) = w_peak*((zkm/w_peak)**0.21_r8)
+       else
+           wup(kk) = 2.9897_r8*(zkm**0.5_r8)
+       endif
+       wup(kk) = min_max_bound(0.1_r8, w_peak, wup(kk))
+   endif
+
+   end subroutine compute_wup
 
 !====================================================================================
    subroutine compute_activation_tend(                          &
