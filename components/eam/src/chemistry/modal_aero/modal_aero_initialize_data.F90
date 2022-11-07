@@ -378,9 +378,7 @@ contains
        use modal_aero_calcsize,   only: modal_aero_calcsize_init
       !use modal_aero_coag,       only: modal_aero_coag_init
        use modal_aero_deposition, only: modal_aero_deposition_init
-       use modal_aero_gasaerexch, only: modal_aero_gasaerexch_init
        use modal_aero_newnuc,     only: modal_aero_newnuc_init
-       use modal_aero_rename,     only: modal_aero_rename_init
        use modal_aero_convproc,   only: ma_convproc_init  
        use chem_mods,             only: gas_pcnst  
        use phys_control,          only: phys_getopts
