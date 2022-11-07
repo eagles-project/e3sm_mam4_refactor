@@ -1449,62 +1449,12 @@ k_loop_main_bb: &
 
 ! wet removal
 !
-! mirage2
-!    rprd               = precip formation as a grid-cell average (kgW/kgA/s)
-!    icwmr              = cloud water MR within updraft area (kgW/kgA)
-!    fupdr              = updraft fractional area (--)
-!    A = rprd/fupdr     = precip formation rate within updraft area (kgW/kgA/s)
-!    B = A/icwmr = rprd/(icwmr*fupdr) 
-!                       = first-order removal rate (1/s)
-!    C = dp/(mup/fupdr) = updraft air residence time in the layer (s)
-!
-!    fraction removed = (1.0 - exp(-cdt)) where
-!                 cdt = B*C = (dp/mup)*rprd/icwmr
-!
-!    Note1:  fupdr cancels out in cdt, so need not be specified
-!    Note2:  dp & mup units need only be consistent (e.g., mb & mb/s)
-!    Note3:  for shallow conv, cdt = 1-beta (beta defined in Hack scheme)
-!    Note4:  the "dp" in C above and code below should be the moist dp
-!
-! cam5
-!    clw_preloss = cloud water MR before loss to precip
-!                = icwmr + dt*(rprd/fupdr)
-!    B = A/clw_preloss  = (rprd/fupdr)/(icwmr + dt*rprd/fupdr) 
-!                       = rprd/(fupdr*icwmr + dt*rprd) 
-!                       = first-order removal rate (1/s)
-!
-!    fraction removed = (1.0 - exp(-cdt)) where
-!                 cdt = B*C = (fupdr*dp/mup)*[rprd/(fupdr*icwmr + dt*rprd)]
-!
-!    Note1:  *** cdt is now sensitive to fupdr, which we do not really know,
-!                and is not the same as the convective cloud fraction
-!    Note2:  dt is appropriate in the above cdt expression, not dtsub
-!
-!    Apply wet removal at levels where 
-!       icwmr(icol,k) > clw_cut  AND  rprd(icol,k) > 0.0
-!    as wet removal occurs in both liquid and ice clouds
-!
-            cdt(k) = 0.0_r8
-            if ((icwmr(icol,k) > clw_cut) .and. (rprd(icol,k) > 0.0)) then 
-!              if (iconvtype == 1) then
-                  tmpf = 0.5_r8*cldfrac_i(k)
-                  cdt(k) = (tmpf*dp(i,k)/mu_p_eudp(k)) * rprd(icol,k) / &
-                        (tmpf*icwmr(icol,k) + dt*rprd(icol,k))
-!              else if (k < pver) then
-!                 if (eudp(k+1) > 0) cdt(k) =   &
-!                       rprd(icol,k)*dp(i,k)/(icwmr(icol,k)*eudp(k+1))
-!              end if
-            end if
-            if (cdt(k) > 0.0_r8) then
-               expcdtm1 = exp(-cdt(k)) - 1.0
-               do m = 2, ncnst_extd
-                  if (doconvproc_extd(m)) then
-                     dconudt_wetdep(m,k) = conu(m,k)*aqfrac(m)*expcdtm1
-                     conu(m,k) = conu(m,k) + dconudt_wetdep(m,k)
-                     dconudt_wetdep(m,k) = dconudt_wetdep(m,k) / dt_u(k)
-                  end if
-               enddo
-            end if
+            call compute_wetdep_tend(                              &
+                doconvproc_extd,        icol,   k,     dt,         & ! in
+                dt_u,   dp(i,:),        cldfrac_i,      mu_p_eudp, & ! in
+                aqfrac, icwmr,          rprd,           clw_cut,   & ! in
+                conu,                   dconudt_wetdep             ) ! inout
+
 
          end if    ! "(mu_p_eudp(k) > mbsth)"
       end do k_loop_main_bb ! "k = kbot, ktop, -1"
@@ -1649,6 +1599,83 @@ k_loop_main_bb: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine compute_wetdep_tend(                              &
+                doconvproc_extd,        icol,   kk,     dt,     & ! in
+                dt_u,   dpi,    cldfrac_i,      mu_p_eudp,      & ! in
+                aqfrac, icwmr,  rprd,           clw_cut,        & ! in
+                conu,           dconudt_wetdep                  ) ! inout
+!-----------------------------------------------------------------------
+! compute tendency from wet deposition
+! 
+!    rprd               = precip formation as a grid-cell average (kgW/kgA/s)
+!    icwmr              = cloud water MR within updraft area (kgW/kgA)
+!    fupdr              = updraft fractional area (--)
+!    A = rprd/fupdr     = precip formation rate within updraft area (kgW/kgA/s)
+!    clw_preloss = cloud water MR before loss to precip
+!                = icwmr + dt*(rprd/fupdr)
+!    B = A/clw_preloss  = (rprd/fupdr)/(icwmr + dt*rprd/fupdr)
+!                       = rprd/(fupdr*icwmr + dt*rprd)
+!                       = first-order removal rate (1/s)
+!    C = dp/(mup/fupdr) = updraft air residence time in the layer (s)
+!
+!    fraction removed = (1.0 - exp(-cdt)) where
+!                 cdt = B*C = (fupdr*dp/mup)*[rprd/(fupdr*icwmr + dt*rprd)]
+!
+!    Note1:  *** cdt is now sensitive to fupdr, which we do not really know,
+!                and is not the same as the convective cloud fraction
+!    Note2:  dt is appropriate in the above cdt expression, not dtsub
+!
+!    Apply wet removal at levels where
+!       icwmr(icol,k) > clw_cut  AND  rprd(icol,k) > 0.0
+!    as wet removal occurs in both liquid and ice clouds
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp, pcols
+   use constituents, only: pcnst
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer,  parameter  :: pcnst_extd = pcnst*2
+   logical,  intent(in) :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
+   integer,  intent(in) :: icol                 ! column index
+   integer,  intent(in) :: kk                   ! vertical level index
+   real(r8), intent(in) :: dt                   ! Model timestep [s]
+   real(r8), intent(in) :: dt_u(pver)           ! lagrangian transport time in the updraft[s]
+   real(r8), intent(in) :: dpi(pver)            ! dp [mb] *** refactor will change to dp_i ***
+   real(r8), intent(in) :: cldfrac_i(pver)      ! cldfrac at current icol (with adjustments) [fraction]
+   real(r8), intent(in) :: mu_p_eudp(pver)      ! = mu_i(kp1) + eudp(k) [mb/s]
+   real(r8), intent(in) :: aqfrac(pcnst_extd)   ! aqueous fraction of constituent in updraft [fraction]
+   real(r8), intent(in) :: icwmr(pcols,pver)    ! Convective cloud water from zm scheme [kg/kg]
+   real(r8), intent(in) :: rprd(pcols,pver)     ! Convective precipitation formation rate [kg/kg/s]
+   real(r8), intent(in) :: clw_cut              ! threshold clw value for doing updraft [kg/kg]
+   real(r8), intent(inout) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
+   real(r8), intent(inout) :: dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal[kg/kg/s]
+
+
+   integer      :: icnst        ! index of pcnst_extd
+   real(r8)     :: cdt          ! (in-updraft first order wet removal rate) * dt [unitless]
+   real(r8)     :: expcdtm1     ! exp(cdt) - 1 [unitless]
+   real(r8)     :: half_cld     ! 0.5 * cldfrac [fraction]
+
+   cdt = 0.0_r8
+   if ((icwmr(icol,kk) > clw_cut) .and. (rprd(icol,kk) > 0.0)) then
+         half_cld = 0.5_r8*cldfrac_i(kk)
+         cdt = (half_cld*dpi(kk)/mu_p_eudp(kk)) * rprd(icol,kk) / &
+                      (half_cld*icwmr(icol,kk) + dt*rprd(icol,kk))
+   endif
+
+   if (cdt > 0.0_r8) then
+      expcdtm1 = exp(-cdt) - 1.0
+      do icnst = 2, pcnst_extd
+         if (doconvproc_extd(icnst)) then
+            dconudt_wetdep(icnst,kk) = conu(icnst,kk)*aqfrac(icnst)*expcdtm1
+            conu(icnst,kk) = conu(icnst,kk) + dconudt_wetdep(icnst,kk)
+            dconudt_wetdep(icnst,kk) = dconudt_wetdep(icnst,kk) / dt_u(kk)
+         endif
+      enddo
+   endif
+
+   end subroutine compute_wetdep_tend
 
 !====================================================================================
    subroutine compute_downdraft_mixing_ratio(              &
