@@ -994,7 +994,6 @@ subroutine ma_convproc_tend(                                           &
 
    real(r8) dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition
    real(r8) dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation
-   real(r8) dconudt_aqchem(pcnst_extd,pverp) ! d(conu)/dt by aqueous chem
    real(r8) dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal
 
    real(r8) sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa
@@ -1269,7 +1268,6 @@ jtsub_loop_main_aa: &
       dcondt_wetdep(:,:) = 0.0
       dcondt_prevap(:,:) = 0.0
       dcondt_prevap_hist(:,:) = 0.0 
-      dconudt_aqchem(:,:) = 0.0
       dconudt_wetdep(:,:) = 0.0
 ! initialize the activation tendency 
       dconudt_activa(:,:) = 0.0
@@ -1344,7 +1342,7 @@ jtsub_loop_main_aa: &
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
-                dconudt_activa, dconudt_aqchem, dconudt_wetdep, & ! in
+                dconudt_activa,     dconudt_wetdep,             & ! in
                 dudp,    dddp,      eudp,       eddp,           & ! in
                 sumactiva, sumaqchem, sumwetdep,                & ! out
                 dcondt,         dcondt_wetdep                   ) ! out
@@ -1844,7 +1842,7 @@ end subroutine ma_convproc_tend
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
-                dconudt_activa, dconudt_aqchem, dconudt_wetdep, & ! in
+                dconudt_activa,     dconudt_wetdep,             & ! in
                 dudp,    dddp,      eudp,       eddp,           & ! in
                 sumactiva, sumaqchem, sumwetdep,                & ! out
                 dcondt,         dcondt_wetdep                   ) ! out
@@ -1871,7 +1869,6 @@ end subroutine ma_convproc_tend
    real(r8),intent(in)  :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
    real(r8),intent(in)  :: cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces [kg/kg]
    real(r8),intent(in)  :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
-   real(r8),intent(in)  :: dconudt_aqchem(pcnst_extd,pverp) ! d(conu)/dt by aqueous chem [kg/kg/s]
    real(r8),intent(in)  :: dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal[kg/kg/s]
    real(r8),intent(in)  :: dudp(pver)           ! du(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
@@ -1891,6 +1888,7 @@ end subroutine ma_convproc_tend
    real(r8)     :: fluxin, fluxout, netflux   ! in, out and net flux [kg/kg/s * mb]
    real(r8)     :: tmpa         ! working variable of mass flux [mb/s]
    real(r8)     :: netsrce      ! working variable of flux source [kg/kg/s * mb]
+   real(r8)     :: dconudt_aqchem(pcnst_extd,pverp)  ! d(conu)/dt by aqueous chem [kg/kg/s]
 
    ! initialize variables
    sumactiva(:) = 0.0
@@ -1898,6 +1896,7 @@ end subroutine ma_convproc_tend
    sumwetdep(:) = 0.0
    dcondt(:,:) = 0.0
    dcondt_wetdep(:,:) = 0.0
+   dconudt_aqchem(:,:) = 0.0    ! aqueous chemistry is ignored in current code
 
    ! loop from ktop to kbot
    do kk = ktop, kbot
