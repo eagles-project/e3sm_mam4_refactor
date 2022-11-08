@@ -1,9 +1,7 @@
 module modal_aero_calcsize
-
+#include "../yaml/f90_yaml/common_uses.ymlf90"
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
-use yaml_input_file_io
-use phys_grid,     only: get_rlat_p, get_rlon_p
 use shr_kind_mod,     only: r8 => shr_kind_r8, cs => shr_kind_cs
 use spmd_utils,       only: masterproc
 use physconst,        only: pi, gravit
@@ -47,7 +45,6 @@ save
 public :: modal_aero_calcsize_init, modal_aero_calcsize_sub, modal_aero_calcsize_diag
 public :: modal_aero_calcsize_reg
 
-integer :: print_time_step
 
 !Mimic enumerators for aerosol types
 integer, parameter:: inter_aero   = 1 !interstitial aerosols
@@ -600,42 +597,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    !-----------------------------------------------------------------------
    integer, parameter :: nsrflx = 4   ! last dimension of qsrflx
    real(r8) :: qsrflx(pcols,pcnst,nsrflx,2)
-
-   integer  :: kprint, unit_input, unit_output, ispec,ibcol,icnst, icnst1, kk, funit
-   real(r8) :: cldbrn(pcnst)
-   real(r8) :: fldcw_wrt(pcnst)
-   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
-    !-----------------------------------------------------------------------
-    ! YAML file input generation code- DO NOT PORT to C++
-    !print all inputs one-by-one at column "i"
-    icol = icolprnt(state%lchnk) !column to write data
-    kprint = 50
-    if(icol > 0 .and. one_print_ts(print_time_step)) then ! if this column exists in lchnk
-      !open I/O yaml files
-      call open_files('calcsz_sub', &  !intent-in
-           unit_input, unit_output) !intent-out
-
-      !start by adding an input string
-      call write_input_output_header(unit_input, unit_output,state%lchnk,icol,'compute_tendencies',deltat)
-
-      !start writing data
-      call write_aerosol_mmr(unit_input, unit_output,'interstitial',state%q(icol,kprint,:))
-      call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',state%q(icol,kprint,:),.true.)
-
-      !fldcw_wrt array will carry species at icol and kprint, initialize it with huge values
-      fldcw_wrt(:) = huge(fldcw_wrt)
-      do ispec = 16, pcnst !ensure that the loop starts from 16, as aerosols starts at 16th index
-         tmp_arr => qqcw_get_field(pbuf,ispec,state%lchnk)
-         fldcw_wrt(ispec) = tmp_arr(icol,kprint)
-      enddo
-      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne',fldcw_wrt)
-      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)
-
-      close(unit_input)
-      call freeunit(unit_input)
-   endif
-
-
+#include "../yaml/f90_yaml/calcsize_sub_beg.ymlf90"
    !-----------------------------------------------------------------------------------
    !Extract info about optional variables and initialize local variables accordingly
    !------------------------------------------------------------------------------------
@@ -763,7 +725,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
       !----------------------------------------------------------------------
       call compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, dryvol_a, dryvol_c, list_idx_local)
 
-      !tmp_arr => qqcw_get_field(pbuf,1,state%lchnk)
+
       ! do size adjustment based on computed dry diameter values and update the diameters
       call size_adjustment(list_idx_local, top_lev, ncol, lchnk, imode, dryvol_a, state_q, & !input
            dryvol_c, pdel, do_adjust, update_mmr, do_aitacc_transfer, deltatinv, fracadj, pbuf,  & !input
@@ -876,47 +838,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    endif!if(update_mmr)
 #endif
 
-
-   ! YAML file output generation code- DO NOT PORT to C++
-   if(icol > 0 .and. one_print_ts(print_time_step,.true.)) then ! if this column exists in lchnk
-
-      !write output header
-      call write_output_header(unit_output)
-
-      !start writing data
-      call write_output_aerosol_mmr(unit_output,'interstitial_ptend',dqdt(icol,kprint,:))
-      call write_output_aerosol_mmr(unit_output,'interstitial_ptend_num',dqdt(icol,kprint,:),.true.)
-
-      call write_output_aerosol_mmr(unit_output,'cloud_borne_ptend',dqqcwdt(icol,kprint,:))
-      call write_output_aerosol_mmr(unit_output,'cloud_borne_ptend_num',dqqcwdt(icol,kprint,:),.true.)
-
-      call write_1d_output_var(unit_output, 'diameter', 4, dgncur_a(icol,kprint,:))
-      !close the output file
-      close(unit_output)
-      call freeunit(unit_output)
-   endif
-
-if(update_mmr .and. list_idx_local == 0) then
-   do icnst = 16, pcnst
-      do kk = 1, pver
-         do ibcol = 1, ncol
-            !if (all(dqdt(ibcol,kk,36:36) .ne. 0.0_r8) )then !.and. all(dqqcwdt(ibcol,kk,:) .ne.0.0_r8)) then
-            !if (all(dqqcwdt(ibcol,kk,36:36) .ne.0.0_r8) then
-            if (dqdt(ibcol,kk,icnst) .ne.  0._r8 .and. abs(dqqcwdt(ibcol,kk,icnst)) >= 0.001_r8) then
-               funit = 102+get_nstep()
-               write(funit,*)get_nstep(),ibcol,kk,get_rlat_p(lchnk, ibcol)*57.296_r8, get_rlon_p(lchnk, ibcol)*57.296_r8
-               do icnst1 = 16, pcnst
-                  write(funit,*)dqdt(ibcol,kk,icnst1),dqqcwdt(ibcol,kk,icnst1)
-               enddo
-            endif
-         enddo
-      enddo
-   enddo
-endif
-
-
-   ! END - YAML file output generation code- DO NOT PORT to C++
-
+#include "../yaml/f90_yaml/calcsize_sub_end.ymlf90"
 
 return
 end subroutine modal_aero_calcsize_sub
