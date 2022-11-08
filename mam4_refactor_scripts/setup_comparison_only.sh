@@ -99,7 +99,7 @@ main() {
     echo '-------------------------------------------------------------------'
 
 
-    echo 'Comparison run should be building at this time, wait for a few minutes and check then comparison directory...'
+    echo 'Comparison run should be building at this time, wait for a few minutes (4-5 min) and then check the comparison directory...'
 
 
     newline && time_elapsed_min
