@@ -1530,16 +1530,6 @@ subroutine loadaer( &
 
    ! return aerosol number, volume concentrations, and bulk hygroscopicity
 
-
-!  add these for direct access to num,mmr in state q array.
-    use modal_aero_data,   only: numptr_amode
-    use modal_aero_data,   only: numptrcw_amode
-    use modal_aero_data,   only: lmassptr_amode
-    use modal_aero_data,   only: lmassptrcw_amode
-    use modal_aero_data,   only: lspectype_amode
-    use modal_aero_data,   only: specdens_amode
-    use modal_aero_data,   only: spechygro
-
    ! input arguments
    type(physics_state), target, intent(in) :: state
 
@@ -1557,6 +1547,88 @@ subroutine loadaer( &
 
    ! internal
 
+! BJG   real(r8) :: raer(pcols) ! interstitial aerosol mass, number mixing ratios [kg/kg]
+! BJG   real(r8) :: qqcw(pcols) ! cloud-borne aerosol mass, number mixing ratios [kg/kg]
+! BJG   real(r8) :: specdens_val    ! density at species / mode indices [kg/m3]
+! BJG   real(r8) :: spechygro_val   ! hygroscopicity at species / mode indices [dimensionless]
+! BJG   real(r8) :: vol ! aerosol volume mixing ratio [m3/kg]
+
+! BJG  integer  :: icol, lspec, mindex
+   integer  :: icol
+   !-------------------------------------------------------------------------------
+
+!  First compute bulk volume conc / hygroscopicity by summing over species per mode.
+
+   vaerosol(:) = 0._r8
+   hygro(:)    = 0._r8
+!  Here interstitial only.
+   if (phase == 1) then
+!          qqcw = state%q(:,kk,mindex)
+       call get_aer_mmr(imode, istart, istop, state, kk, phase, & !in
+            vaerosol, hygro)    !out
+!  Include cloud-borne mmr if phase == 3 requested (interstitial + cloud)
+   else if (phase == 3) then
+       call get_aer_mmr(imode, istart, istop, state, kk, phase, & !in
+            vaerosol, hygro)    !out
+!  No other phases should be possible if here in code
+   else
+       write(iulog,*)'phase=',phase,' in loadaer'
+       call endrun('phase error in loadaer')
+   endif
+
+!  Convert....
+
+   do icol = istart, istop
+       if (vaerosol(icol) > 1.0e-30_r8) then   ! +++xl add 8/2/2007                                                                                
+          hygro(icol)    = hygro(icol)/(vaerosol(icol))
+          vaerosol(icol) = vaerosol(icol)*cs(icol,kk)
+       else
+          hygro(icol)    = 0.0_r8
+          vaerosol(icol) = 0.0_r8
+       endif
+   enddo
+
+! aerosol number                                                                                                                                                                  
+   if (phase == 1) then
+      call get_aer_num(imode, istart, istop, state, cs, vaerosol, kk, phase, &!in
+           naerosol) !out
+   else
+      call get_aer_num(imode, istart, istop, state, cs, vaerosol, kk, phase, &!in
+           naerosol) !out
+   endif
+
+end subroutine loadaer
+
+
+!  BJG subroutine get_aer_mmr(imode, istart, istop, raer, kk,  & !in
+!  BJG            vaerosol, hygro,    &  !out
+!  BJG            qqcw)    !  optional-in   
+subroutine get_aer_mmr(imode, istart, istop, state, kk, phase, & !in
+            vaerosol, hygro)    !out
+
+!  add these for direct access to num,mmr in state q array.
+    use modal_aero_data,   only: lmassptr_amode
+    use modal_aero_data,   only: lmassptrcw_amode
+    use modal_aero_data,   only: lspectype_amode
+    use modal_aero_data,   only: specdens_amode
+    use modal_aero_data,   only: spechygro
+
+
+   ! input arguments
+   type(physics_state), target, intent(in) :: state
+
+   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
+   integer,  intent(in) :: istop       ! stop column index
+   integer,  intent(in) :: imode       ! mode index
+   integer,  intent(in) :: kk          ! level index
+   integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
+
+   ! output arguments
+   real(r8), intent(out) :: vaerosol(:)  ! volume conc [m3/m3]
+   real(r8), intent(out) :: hygro(:)     ! bulk hygroscopicity of mode [dimensionless]
+
+   ! internal
+
    real(r8) :: raer(pcols) ! interstitial aerosol mass, number mixing ratios [kg/kg]
    real(r8) :: qqcw(pcols) ! cloud-borne aerosol mass, number mixing ratios [kg/kg]
    real(r8) :: specdens_val    ! density at species / mode indices [kg/m3]
@@ -1564,67 +1636,67 @@ subroutine loadaer( &
    real(r8) :: vol ! aerosol volume mixing ratio [m3/kg]
 
    integer  :: icol, lspec, mindex
-   logical  :: first_pass, last_pass
-   !-------------------------------------------------------------------------------
 
-!  First compute bulk volume conc / hygroscopicity by summing over species per mode.
 
    do lspec = 1, nspec_amode(imode)
-      first_pass = .false.
-      last_pass = .false.
-
-      if( lspec == 1 ) then
-          first_pass = .true.
-      elseif( lspec == nspec_amode(imode) ) then
-          last_pass = .true.
-      end if
-
 !  Retrieve mass mixing ratio for species & mode at level kk from state q vector.
-!  Here interstitial only.
-
       mindex = lmassptr_amode(lspec,imode)
       raer = state%q(:,kk,mindex)
-
-!  Retrieve cloud-borne mmr if phase == 3 requested (interstitial + cloud)
-      if( phase == 3) then
+      qqcw(:) = 0._r8
+!  BJG:  not sure how to remove if loop below if needed for tight coupling..
+!  BJG:  maybe precompute  raer(all columns, all species, given kk), same for qqcw, pass as input
+!  BJG  conceivably same for specdens_val, spechygro
+      if (phase == 3) then
           mindex = lmassptrcw_amode(lspec,imode)
-          qqcw = state%q(:,kk,mindex)
+          qqcw = state%q(:,kk,mindex) 
       endif
 
       specdens_val = specdens_amode(lspectype_amode(lspec,imode))
       spechygro_val = spechygro(lspectype_amode(lspec,imode))     
 
-!  For each species & mode, find bulk hygro and volume conc over input columns
-
       do icol = istart, istop
-       
-         if( first_pass ) then
-             vaerosol(icol) = 0._r8
-             hygro(icol)    = 0._r8
-         endif
-
-         if (phase == 3) then
+! BJG  Ideally can set qqcw = 0.r8 and remove if-then-loop below.  Just need to test if BFB
+!         if (phase == 3) then
              vol = max(raer(icol) + qqcw(icol), 0._r8)/specdens_val
-         else if (phase == 1) then
-             vol = max(raer(icol), 0._r8)/specdens_val
-         endif
+!         else if (phase == 1) then
+!             vol = max(raer(icol), 0._r8)/specdens_val
+!         endif
 
          vaerosol(icol) = vaerosol(icol) + vol
          hygro(icol)    = hygro(icol) + vol*spechygro_val
-
-         if( last_pass ) then
-             if (vaerosol(icol) > 1.0e-30_r8) then   ! +++xl add 8/2/2007
-                 hygro(icol)    = hygro(icol)/(vaerosol(icol))
-                 vaerosol(icol) = vaerosol(icol)*cs(icol,kk)
-             else
-                 hygro(icol)    = 0.0_r8
-                 vaerosol(icol) = 0.0_r8
-             endif
-         endif
-
-      enddo  
-
+      enddo
    enddo
+
+end subroutine get_aer_mmr
+
+subroutine get_aer_num(imode, istart, istop, state, cs, vaerosol, kk, phase, &!in
+           naerosol) !out
+
+!  add these for direct access to num,mmr in state q array.
+    use modal_aero_data,   only: numptr_amode
+    use modal_aero_data,   only: numptrcw_amode
+
+   ! input arguments
+   type(physics_state), target, intent(in) :: state
+
+   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
+   integer,  intent(in) :: istop       ! stop column index
+   integer,  intent(in) :: imode       ! mode index
+   integer,  intent(in) :: kk          ! level index
+   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
+   real(r8), intent(in) :: vaerosol(:) ! volume conc [m3/m3]
+   integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
+
+   ! output arguments
+   real(r8), intent(out) :: naerosol(:)  ! number conc [1/m3]
+
+   ! internal
+
+   real(r8) :: raer(pcols) ! interstitial aerosol mass, number mixing ratios [kg/kg]
+   real(r8) :: qqcw(pcols) ! cloud-borne aerosol mass, number mixing ratios [kg/kg]
+
+   integer  :: icol, mindex
+
 
    ! aerosol number
    ! Uses bulk volume conc found above to bound value
@@ -1632,23 +1704,26 @@ subroutine loadaer( &
    mindex = numptr_amode(imode)
    raer = state%q(:,kk,mindex) 
 
+   qqcw(:) = 0._r8
    if (phase == 3) then
        mindex = numptrcw_amode(imode)
        qqcw = state%q(:,kk,mindex) 
    endif
 
+!  BJG  can remove if-then loop by setting qqcw to zero for phase 1, need to test BFB though.
+
    do icol = istart, istop
-       if (phase == 3) then
+!       if (phase == 3) then
           naerosol(icol) = (raer(icol) + qqcw(icol))*cs(icol,kk)
-       else
-          naerosol(icol) = raer(icol)*cs(icol,kk)
-       end if
+!       else
+!          naerosol(icol) = raer(icol)*cs(icol,kk)
+!       end if
    ! adjust number so that dgnumlo < dgnum < dgnumhi
       naerosol(icol) = max(naerosol(icol), vaerosol(icol)*voltonumbhi_amode(imode))
       naerosol(icol) = min(naerosol(icol), vaerosol(icol)*voltonumblo_amode(imode))
-   end do
+   enddo
 
-end subroutine loadaer
+end subroutine get_aer_num
 
 !===============================================================================
 
