@@ -20,7 +20,7 @@ main () {
     if_file_not_present_then_exit xmlquery " Please cd into the case directory"
 
     #source the enviroment to build E3SM
-    source .env_mach_specific.sh
+    source ./.env_mach_specific.sh
 
     #get the build directory path
     bld_dir=`./xmlquery -value EXEROOT`
@@ -39,7 +39,7 @@ main () {
     newline && time_elapsed_min
     echo  "Compiling just the atm model"
     cd $bld_dir/cmake-bld/cmake/atm/
-    make -j8
+    make -j40
     status=`echo $?` #DO NOT MOVE THIS LINE:Status should be captured just after make
 
     newline && time_elapsed_min
