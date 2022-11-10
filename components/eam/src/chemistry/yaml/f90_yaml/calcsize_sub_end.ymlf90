@@ -1,4 +1,4 @@
-
+#if 0
   ! YAML file output generation code- DO NOT PORT to C++
   if(icol > 0 .and. one_print_ts(print_time_step,.true.)) then ! if this column exists in lchnk
 
@@ -17,3 +17,4 @@
      close(unit_output)
      call freeunit(unit_output)
   endif
+#endif

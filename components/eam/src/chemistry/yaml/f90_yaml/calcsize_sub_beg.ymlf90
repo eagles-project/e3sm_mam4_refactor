@@ -1,5 +1,6 @@
-
-  integer  :: kprint, unit_input, unit_output, ispec, print_time_step
+#if 0
+  integer,save  :: print_time_step
+  integer  :: kprint, unit_input, unit_output, ispec
   real(r8) :: fldcw_wrt(pcnst)
   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
 
@@ -8,6 +9,7 @@
   icol = icolprnt(state%lchnk) !column to write data
   kprint = 50
   if(icol > 0 .and. one_print_ts(print_time_step)) then ! if this column exists in lchnk
+
      !open I/O yaml files
      call open_files('calcsz_sub', &  !intent-in
           unit_input, unit_output) !intent-out
@@ -31,3 +33,4 @@
      close(unit_input)
      call freeunit(unit_input)
   endif
+#endif
