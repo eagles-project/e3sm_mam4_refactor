@@ -657,8 +657,8 @@ subroutine dropmixnuc( &
             phase = 1 ! interstitial
             do m = 1, ntot_amode
                call loadaer( &
-                  state, i, i, k, &
-                  m, cs, phase, na, va, &
+                  state%q, lchnk, pbuf, i, i, k, &
+                  m, nspec_amode(m), cs, phase, na, va, &
                   hy )
                naermod(m)  = na(i)
                vaerosol(m) = va(i)
@@ -748,8 +748,8 @@ subroutine dropmixnuc( &
                   ! rce-comment - use kp1 here as old-cloud activation involves
                   !   aerosol from layer below
                   call loadaer( &
-                     state, i, i, kp1,  &
-                     m, cs, phase, na, va,   &
+                     state%q, lchnk, pbuf, i, i, kp1,  &
+                     m, nspec_amode(m), cs, phase, na, va,   &
                      hy )
                   naermod(m)  = na(i)
                   vaerosol(m) = va(i)
@@ -1495,8 +1495,8 @@ subroutine ccncalc(state, pbuf, cs, ccn)
          phase=3 ! interstitial+cloudborne
 
          call loadaer( &
-            state, 1, ncol, k, &
-            m, cs, phase, naerosol, vaerosol, &
+            state%q, lchnk, pbuf, 1, ncol, k, &
+            m, nspec_amode(m), cs, phase, naerosol, vaerosol, &
             hygro )
 
          where(naerosol(:ncol)>1.e-3_r8)
@@ -1524,187 +1524,186 @@ end subroutine ccncalc
 !===============================================================================
 
 subroutine loadaer( &
-   state, istart, istop, kk, &
-   imode, cs, phase, naerosol, &
-   vaerosol, hygro )
-   ! return aerosol number, volume concentrations, and bulk hygroscopicity
+     state_q, lchnk, pbuf, istart, istop, kk, &
+     imode, nspec, cs, phase, naerosol, &
+     vaerosol, hygro )
 
-!  add these for direct access to num, mmr in state q array.
-    use modal_aero_data,   only: lmassptr_amode
-    use modal_aero_data,   only: lmassptrcw_amode
-    use modal_aero_data,   only: numptr_amode
-    use modal_aero_data,   only: numptrcw_amode
+  ! return aerosol number, volume concentrations, and bulk hygroscopicity
 
-   ! input arguments
-   type(physics_state), target, intent(in) :: state
+  !add these for direct access to num, mmr in state_q array.
+  use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field
+  ! input arguments
+  real(r8), intent(in) :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
+  type(physics_buffer_desc), pointer :: pbuf(:) ! Physics buffer (C++ port: Get it from AD)
 
-   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
-   integer,  intent(in) :: istop       ! stop column index
-   integer,  intent(in) :: imode       ! mode index
-   integer,  intent(in) :: kk          ! level index
-   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
-   integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
+  integer,  intent(in) :: lchnk       ! chunk id
+  integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
+  integer,  intent(in) :: istop       ! stop column index
+  integer,  intent(in) :: imode       ! mode index
+  integer,  intent(in) :: nspec       ! total # of species in mode imde
+  integer,  intent(in) :: kk          ! level index
+  real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
+  integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
 
-   ! output arguments
-   real(r8), intent(out) :: naerosol(:)  ! number conc [#/m3]
-   real(r8), intent(out) :: vaerosol(:)  ! volume conc [m3/m3]
-   real(r8), intent(out) :: hygro(:)     ! bulk hygroscopicity of mode [dimensionless]
+  ! output arguments
+  real(r8), intent(out) :: naerosol(:)  ! number conc [#/m3]
+  real(r8), intent(out) :: vaerosol(:)  ! volume conc [m3/m3]
+  real(r8), intent(out) :: hygro(:)     ! bulk hygroscopicity of mode [dimensionless]
 
-   ! internal
+  ! internal
 
-   real(r8) :: raer(pcols,nspec_amode(imode)) ! interstitial aerosol mass mixing ratios [kg/kg]
-   real(r8) :: qqcw(pcols,nspec_amode(imode)) ! cloud-borne aerosol mass mixing ratios [kg/kg]
-   real(r8) :: raernum(pcols) ! interstitial aerosol number mixing ratios [#/kg]
-   real(r8) :: qqcwnum(pcols) ! cloud-borne aerosol number mixing ratios [#/kg]
-   real(r8) :: vaerosolsum(pcols)  ! sum to find volume conc [m3/kg]
-   real(r8) :: hygrosum(pcols)     ! sum to bulk hygroscopicity of mode [m3/kg]
-   integer  :: icol, lspec, mindex
-   !-------------------------------------------------------------------------------
+  real(r8) :: vaerosolsum(pcols)  ! sum to find volume conc [m3/kg]
+  real(r8) :: hygrosum(pcols)     ! sum to bulk hygroscopicity of mode [m3/kg]
 
+  real(r8) :: qcldbrn(pcols,nspec), qcldbrn_num(pcols)
+  real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
+  integer  :: icol, lspec, spc_idx, num_idx
+  !-------------------------------------------------------------------------------
 
-   vaerosolsum(:) = 0._r8
-   hygrosum(:)    = 0._r8
+  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code above
+  !Extract cloud borne MMRs from pbuf for phase 3 only
+  if ( phase == 3 ) then
+     qcldbrn(:,:) = huge(qcldbrn) !store invalid values
+     do lspec =1, nspec
+        spc_idx = lmassptrcw_amode(lspec,imode)
+        fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
+        qcldbrn(:,lspec) = fldcw(:,kk)
+     enddo
+     num_idx = numptrcw_amode(imode)
+     fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+     qcldbrn_num(:) = fldcw(:,kk)
+  endif
 
-   do lspec=1,nspec_amode(imode)
-!  Retrieve interstitial mass / number mixing ratio for species & mode at level kk from state q vector.
-       mindex = lmassptr_amode(lspec,imode)
-       raer(:,lspec) = state%q(:,kk,mindex)
-       mindex = numptr_amode(imode)
-       raernum(:) = state%q(:,kk,mindex) 
-!  Include cloud-borne mass / number mixing ratio if phase == 3 requested (interstitial + cloud)
-       if (phase == 3) then
-           mindex = lmassptrcw_amode(lspec,imode)
-           qqcw(:,lspec) = state%q(:,kk,mindex)
-           mindex = numptrcw_amode(imode)
-           qqcwnum(:) = state%q(:,kk,mindex) 
-       else if (phase /= 1) then
-!  Phase should only be 1 or 3 if this part of the code is called, otherwise error
-           write(iulog,*)'phase=',phase,' in loadaer'
-           call endrun('phase error in loadaer')
-       endif
-   enddo
-  
-!  Sum over all species within imode to get bulk hygroscopicity and volume conc
+  !Note for C++ port: Code to be ported starts below
 
-   if(phase == 1) then
-!  phase == 1 is interstitial only.       
-       call get_aer_mmr_sum(imode, istart, istop, raer, & !in
-            vaerosolsum, hygrosum)    !inout      
-   else if (phase == 3) then
-       call get_aer_mmr_sum(imode, istart, istop, raer, & !in
-            vaerosolsum, hygrosum,   & !inout
-            qqcw)  ! optional in
-   endif
+  !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
+  if (phase /= 1 .and. phase /=3) then
+     write(iulog,*)'phase=',phase,' in loadaer'
+     call endrun('phase error in loadaer')
+  endif
 
-!  Finalize computation of bulk hygrospopicity and volume conc
+  vaerosolsum(:) = 0._r8
+  hygrosum(:)    = 0._r8
 
-   do icol = istart, istop
-       if (vaerosolsum(icol) > 1.0e-30_r8) then   ! +++xl add 8/2/2007            
-          hygro(icol)    = hygrosum(icol)/(vaerosolsum(icol))
-          vaerosol(icol) = vaerosolsum(icol)*cs(icol,kk)
-       else
-          hygro(icol)    = 0.0_r8
-          vaerosol(icol) = 0.0_r8
-       endif
-   enddo
+  !Sum over all species within imode to get bulk hygroscopicity and volume conc
+  if(phase == 1) then
+     !phase == 1 is interstitial only.
+     call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,kk,:), & !in
+          vaerosolsum, hygrosum)    !inout
+  else
+     !phase == 3 is interstitial + cldborne
+     call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,kk,:), & !in
+          vaerosolsum, hygrosum,   & !inout
+          qcldbrn)  ! optional in
+  endif
 
-! Compute aerosol number concentration
+  !  Finalize computation of bulk hygrospopicity and volume conc
+  do icol = istart, istop
+     if (vaerosolsum(icol) > 1.0e-30_r8) then
+        hygro(icol)    = hygrosum(icol)/(vaerosolsum(icol))
+        vaerosol(icol) = vaerosolsum(icol)*cs(icol,kk)
+     else
+        hygro(icol)    = 0.0_r8
+        vaerosol(icol) = 0.0_r8
+     endif
+  enddo
 
-   if (phase == 1) then
-      call get_aer_num(imode, istart, istop, raernum, cs, vaerosol, kk, &!in
-           naerosol) !out
-   else
-      call get_aer_num(imode, istart, istop, raernum, cs, vaerosol, kk, &!in
-           naerosol, &!out
-           qqcwnum) !optional in
-   endif
+  ! Compute aerosol number concentration
+  if (phase == 1) then
+     call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, &!in
+          naerosol) !out
+  else
+     call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, &!in
+          naerosol, &!out
+          qcldbrn_num) !optional in
+  endif
 
 end subroutine loadaer
 
-subroutine get_aer_mmr_sum(imode, istart, istop, raer, & !in
-            vaerosolsum, hygrosum,   & !inout
-            qqcw) ! optional in
+!===============================================================================
 
-!  add these for direct access to num,mmr in state q array.
-    use modal_aero_data,   only: lspectype_amode
-    use modal_aero_data,   only: specdens_amode
-    use modal_aero_data,   only: spechygro
+subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, & !in
+     vaerosolsum, hygrosum,   & !inout
+     qcldbrn) ! optional in
 
-   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
-   integer,  intent(in) :: istop       ! stop column index
-   integer,  intent(in) :: imode       ! mode index
-   real(r8), intent(in) :: raer(:,:) ! interstitial aerosol mass mixing ratios [kg/kg]
-   real(r8), intent(in), optional :: qqcw(:,:) ! cloud-borne aerosol mass mixing ratios [kg/kg]
+  !add these for direct access to mmr (in state_q array), density and hygroscopicity
+  use modal_aero_data,   only: lspectype_amode, specdens_amode, spechygro, lmassptr_amode
 
-   ! in/out arguments
+  integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
+  integer,  intent(in) :: istop       ! stop column index
+  integer,  intent(in) :: imode       ! mode index
+  integer,  intent(in) :: nspec       ! total # of species in mode imde
+  real(r8), intent(in) :: state_q(:,:) ! interstitial aerosol mass mixing ratios [kg/kg]
+  real(r8), intent(in), optional :: qcldbrn(:,:) ! cloud-borne aerosol mass mixing ratios [kg/kg]
 
-   real(r8), intent(inout) :: vaerosolsum(:)  ! sum to find volume conc [m3/kg]  
-   real(r8), intent(inout) :: hygrosum(:)   ! sum to bulk hygroscopicity of mode [m3/kg]    
+  ! in/out arguments
 
-   ! internal
+  real(r8), intent(inout) :: vaerosolsum(:)  ! sum to find volume conc [m3/kg]
+  real(r8), intent(inout) :: hygrosum(:)   ! sum to bulk hygroscopicity of mode [m3/kg]
 
-   real(r8) :: specdens_val    ! density at species / mode indices [kg/m3]
-   real(r8) :: spechygro_val   ! hygroscopicity at species / mode indices [dimensionless]
-   real(r8) :: vol ! aerosol volume mixing ratio [m3/kg]
-   real(r8) :: qqcwlocal(pcols,nspec_amode(imode))  ! local cloud-borne aerosol mass mixing ratios [kg/kg]
+  ! internal
+  real(r8) :: density ! density at species / mode indices [kg/m3]
+  real(r8) :: hygro   ! hygroscopicity at species / mode indices [dimensionless]
+  real(r8) :: vol     !aerosol volume mixing ratio [m3/kg]
+  real(r8) :: qcldbrn_local(pcols,nspec)  ! local cloud-borne aerosol mass mixing ratios [kg/kg]
 
-   integer  :: icol, lspec
-   
-   qqcwlocal(:,:) = 0._r8
-   if(present(qqcw)) qqcwlocal(:,:) = qqcw(:,:)
+  integer  :: icol, lspec, spc_idx, type_idx
 
-! Start to compute bulk volume conc / hygroscopicity by summing over species per mode.
+  qcldbrn_local(:,:) = 0._r8
+  if(present(qcldbrn)) qcldbrn_local(:,:) = qcldbrn(:,:)
 
-   do lspec = 1, nspec_amode(imode)
-
-      specdens_val = specdens_amode(lspectype_amode(lspec,imode))
-      spechygro_val = spechygro(lspectype_amode(lspec,imode))     
-
+  !Start to compute bulk volume conc / hygroscopicity by summing over species per mode.
+   do lspec = 1, nspec
+      type_idx = lspectype_amode(lspec,imode)
+      density  = specdens_amode(type_idx) !species density
+      hygro    = spechygro(type_idx)      !species hygroscopicity
+      spc_idx   = lmassptr_amode(lspec,imode) !index of species in state_q array
       do icol = istart, istop
-         vol = max(raer(icol,lspec) + qqcwlocal(icol,lspec), 0._r8)/specdens_val
-         vaerosolsum(icol) = vaerosolsum(icol) + vol
-         hygrosum(icol)    = hygrosum(icol) + vol*spechygro_val
+         vol = max(state_q(icol,spc_idx) + qcldbrn_local(icol,lspec), 0._r8)/density !volume = mmr/density
+         vaerosolsum(icol) = vaerosolsum(icol) + vol        !bulk volume
+         hygrosum(icol)    = hygrosum(icol) + vol*hygro !bulk hygroscopicity
       enddo
-
    enddo
 
 end subroutine get_aer_mmr_sum
 
-subroutine get_aer_num(imode, istart, istop, raernum, cs, vaerosol, kk, &!in
+!===============================================================================
+
+subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, &!in
            naerosol, &!out
-           qqcwnum)  !optional in
+           qcldbrn_num)  !optional in
 
-   ! input arguments
-   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
-   integer,  intent(in) :: istop       ! stop column index
-   integer,  intent(in) :: imode       ! mode index
-   integer,  intent(in) :: kk          ! level index
-   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
-   real(r8), intent(in) :: vaerosol(:) ! volume conc [m3/m3]
-   real(r8), intent(in) :: raernum(:) ! interstitial aerosol number mixing ratios [#/kg]
-   real(r8), intent(in), optional :: qqcwnum(:) ! cloud-borne aerosol number mixing ratios [#/kg]
+  use modal_aero_data, only:numptrcw_amode
 
-   ! output arguments
-   real(r8), intent(out) :: naerosol(:)  ! number conc [#/m3]
+  ! input arguments
+  integer,  intent(in) :: istart       ! start column index (1 <= istart <= istop <= pcols)
+  integer,  intent(in) :: istop        ! stop column index
+  integer,  intent(in) :: imode        ! mode index
+  real(r8), intent(in) :: cs(:)        ! air density [kg/m3]
+  real(r8), intent(in) :: vaerosol(:)  ! volume conc [m3/m3]
+  real(r8), intent(in) :: state_q(:,:) ! interstitial aerosol number mixing ratios [#/kg]
+  real(r8), intent(in), optional :: qcldbrn_num(:) ! cloud-borne aerosol number mixing ratios [#/kg]
 
-   ! internal
+  !output arguments
+  real(r8), intent(out) :: naerosol(:)  ! number conc [#/m3]
 
-   integer  :: icol
-   real(r8) :: qqcwnumlocal(pcols) ! local cloud-borne aerosol number mixing ratios [#/kg]
+  !internal
+  integer  :: icol, num_idx
+  real(r8) :: qcldbrn_num_local(pcols) ! local cloud-borne aerosol number mixing ratios [#/kg]
 
-   ! convert number mixing ratios to number concentrations
-   ! Use bulk volume conc found previously to bound value
+  !convert number mixing ratios to number concentrations
+  !Use bulk volume conc found previously to bound value
 
-   qqcwnumlocal(:) = 0._r8
-   if(present(qqcwnum)) qqcwnumlocal(:) = qqcwnum(:)
+  qcldbrn_num_local(:) = 0._r8
+  if(present(qcldbrn_num)) qcldbrn_num_local(:) = qcldbrn_num(:)
 
-   do icol = istart, istop
-      naerosol(icol) = (raernum(icol) + qqcwnumlocal(icol))*cs(icol,kk)
-   ! adjust number so that dgnumlo < dgnum < dgnumhi
-      naerosol(icol) = max(naerosol(icol), vaerosol(icol)*voltonumbhi_amode(imode))
-      naerosol(icol) = min(naerosol(icol), vaerosol(icol)*voltonumblo_amode(imode))
-   enddo
-
+  num_idx = numptrcw_amode(imode)
+  do icol = istart, istop
+     naerosol(icol) = (state_q(icol,num_idx) + qcldbrn_num_local(icol))*cs(icol)
+     !adjust number so that dgnumlo < dgnum < dgnumhi
+     naerosol(icol) = max(naerosol(icol), vaerosol(icol)*voltonumbhi_amode(imode))
+     naerosol(icol) = min(naerosol(icol), vaerosol(icol)*voltonumblo_amode(imode))
+  enddo
 end subroutine get_aer_num
 
 !===============================================================================
