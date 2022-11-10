@@ -1540,7 +1540,7 @@ subroutine loadaer( &
   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
   integer,  intent(in) :: istop       ! stop column index
   integer,  intent(in) :: imode       ! mode index
-  integer,  intent(in) :: nspec       ! total # of species in mode imde
+  integer,  intent(in) :: nspec       ! total # of species in mode imode
   integer,  intent(in) :: kk          ! level index
   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
   integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
@@ -1555,12 +1555,18 @@ subroutine loadaer( &
   real(r8) :: vaerosolsum(pcols)  ! sum to find volume conc [m3/kg]
   real(r8) :: hygrosum(pcols)     ! sum to bulk hygroscopicity of mode [m3/kg]
 
-  real(r8) :: qcldbrn(pcols,nspec), qcldbrn_num(pcols)
+  real(r8) :: qcldbrn(pcols,nspec), qcldbrn_num(pcols) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
   real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
   integer  :: icol, lspec, spc_idx, num_idx
   !-------------------------------------------------------------------------------
 
-  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code above
+  !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
+  if (phase /= 1 .and. phase /=3) then
+     write(iulog,*)'phase=',phase,' in loadaer'
+     call endrun('phase error in loadaer')
+  endif
+
+  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
   !Extract cloud borne MMRs from pbuf for phase 3 only
   if ( phase == 3 ) then
      qcldbrn(:,:) = huge(qcldbrn) !store invalid values
@@ -1576,11 +1582,6 @@ subroutine loadaer( &
 
   !Note for C++ port: Code to be ported starts below
 
-  !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
-  if (phase /= 1 .and. phase /=3) then
-     write(iulog,*)'phase=',phase,' in loadaer'
-     call endrun('phase error in loadaer')
-  endif
 
   vaerosolsum(:) = 0._r8
   hygrosum(:)    = 0._r8
@@ -1632,18 +1633,17 @@ subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, & !in
   integer,  intent(in) :: istart      ! start column index (1 <= istart <= istop <= pcols)
   integer,  intent(in) :: istop       ! stop column index
   integer,  intent(in) :: imode       ! mode index
-  integer,  intent(in) :: nspec       ! total # of species in mode imde
+  integer,  intent(in) :: nspec       ! total # of species in mode imode
   real(r8), intent(in) :: state_q(:,:) ! interstitial aerosol mass mixing ratios [kg/kg]
   real(r8), intent(in), optional :: qcldbrn(:,:) ! cloud-borne aerosol mass mixing ratios [kg/kg]
-
   ! in/out arguments
 
   real(r8), intent(inout) :: vaerosolsum(:)  ! sum to find volume conc [m3/kg]
   real(r8), intent(inout) :: hygrosum(:)   ! sum to bulk hygroscopicity of mode [m3/kg]
 
   ! internal
-  real(r8) :: density ! density at species / mode indices [kg/m3]
-  real(r8) :: hygro   ! hygroscopicity at species / mode indices [dimensionless]
+  real(r8) :: density_sp ! density at species / mode indices [kg/m3]
+  real(r8) :: hygro_sp   ! hygroscopicity at species / mode indices [dimensionless]
   real(r8) :: vol     !aerosol volume mixing ratio [m3/kg]
   real(r8) :: qcldbrn_local(pcols,nspec)  ! local cloud-borne aerosol mass mixing ratios [kg/kg]
 
@@ -1655,13 +1655,13 @@ subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, & !in
   !Start to compute bulk volume conc / hygroscopicity by summing over species per mode.
    do lspec = 1, nspec
       type_idx = lspectype_amode(lspec,imode)
-      density  = specdens_amode(type_idx) !species density
-      hygro    = spechygro(type_idx)      !species hygroscopicity
+      density_sp  = specdens_amode(type_idx) !species density
+      hygro_sp    = spechygro(type_idx)      !species hygroscopicity
       spc_idx   = lmassptr_amode(lspec,imode) !index of species in state_q array
       do icol = istart, istop
-         vol = max(state_q(icol,spc_idx) + qcldbrn_local(icol,lspec), 0._r8)/density !volume = mmr/density
+         vol = max(state_q(icol,spc_idx) + qcldbrn_local(icol,lspec), 0._r8)/density_sp !volume = mmr/density
          vaerosolsum(icol) = vaerosolsum(icol) + vol        !bulk volume
-         hygrosum(icol)    = hygrosum(icol) + vol*hygro !bulk hygroscopicity
+         hygrosum(icol)    = hygrosum(icol) + vol*hygro_sp !bulk hygroscopicity
       enddo
    enddo
 
