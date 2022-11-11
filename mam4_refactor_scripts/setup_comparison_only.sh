@@ -87,7 +87,8 @@ main() {
         echo -n '.'
         sleep 2
     done
-
+    sleep 2
+    newline
     echo 'Link fast_compile_run.sh script in the comparison directory..'
     cd $comparison_dir
     /bin/ln -sf  `./xmlquery SRCROOT --value`/mam4_refactor_scripts/fast_compile_run.sh .
@@ -97,10 +98,14 @@ main() {
     echo '-------------------------------------------------------------------'
     echo "Comparison directory is: $comparison_dir"
     echo '-------------------------------------------------------------------'
+    newline
+    newline
+    newline
 
-
-    echo 'Comparison run should be building at this time, wait for a few minutes (4-5 min) and then check the comparison directory...'
-
+    echo '____________________________________________________________________________________________________________________________________'
+    newline
+    echo 'NOTE:Comparison run should be building at this time, wait for a few minutes (4-5 min) and then check the comparison directory...'
+    echo '____________________________________________________________________________________________________________________________________'
 
     newline && time_elapsed_min
 }
