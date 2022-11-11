@@ -91,10 +91,10 @@ subroutine mam_coag_1subarea(                                   &
 
       ! Arguments
 
-      real(wp), intent(in) :: deltat                ! timestep used for integrating the coag. equations [s]
-      real(wp), intent(in) :: temp                  ! temperature at layer center [K]
-      real(wp), intent(in) :: pmid                  ! pressure at layer center [Pa]
-      real(wp), intent(in) :: aircon                ! molar concentration of air [kmol/m3]
+      real(wp), intent(in) :: deltat             ! timestep used for integrating the coag. equations [s]
+      real(wp), intent(in) :: temp               ! temperature at layer center [K]
+      real(wp), intent(in) :: pmid               ! pressure at layer center [Pa]
+      real(wp), intent(in) :: aircon             ! molar concentration of air [kmol/m3]
       real(wp), intent(in) :: dgn_a(max_mode)    ! dry geometric mean diameter [m] of size distribution
       real(wp), intent(in) :: dgn_awet(max_mode) ! geometric mean diameter [m] of size distribution
       real(wp), intent(in) :: wetdens(max_mode)  ! interstitial aerosol wet density [kg/m3]
@@ -195,11 +195,11 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       real(wp), intent(in) :: ybetaij0(max_coagpair) ! coag rate coefficient
       real(wp), intent(in) :: ybetaii0(max_coagpair) ! coag rate coefficient
       real(wp), intent(in) :: ybetajj0(max_coagpair) ! coag rate coefficient
-      real(wp), intent(in) :: deltat
+      real(wp), intent(in) :: deltat                 ! timestep [s]
 
-      real(wp), intent(in)    :: qnum_bgn(1:max_mode)  ! beginning values of number mixing ratios
-      real(wp), intent(inout) :: qnum_end(1:max_mode)  ! end values of number mixing ratios
-      real(wp), intent(out)   :: qnum_tavg(1:max_mode) ! time average defined as 0.5*(bgn+end)
+      real(wp), intent(in)    :: qnum_bgn(1:max_mode)  ! beginning values of number mixing ratios [#/kmol-air]
+      real(wp), intent(inout) :: qnum_end(1:max_mode)  ! end values of number mixing ratios [#/kmol-air]
+      real(wp), intent(out)   :: qnum_tavg(1:max_mode) ! time average defined as 0.5*(bgn+end) [#/kmol-air]
 
       ! local variables
       real(wp) :: tmpa, rateij
@@ -245,10 +245,10 @@ subroutine qnum_update_selfcoag( ybetajj0, deltat, qnum_bgn, qnum_end )
 ! Purpose: update the number mixing ratio of a single mode by considering self-coagulation
 !-----------------------------------------------------------------------------------------
 
-    real(wp),intent(in)  :: qnum_bgn   ! qnum (number mixing ratio) start value
+    real(wp),intent(in)  :: qnum_bgn   ! number mixing ratio [#/kmol-air], start value
     real(wp),intent(in)  :: ybetajj0   ! self-coagulation coefficient
-    real(wp),intent(in)  :: deltat     ! timestep length
-    real(wp),intent(out) :: qnum_end   ! qnum (number mixing ratio) end value
+    real(wp),intent(in)  :: deltat     ! timestep length [s]
+    real(wp),intent(out) :: qnum_end   ! number mixing ratio [#/kmol-air], end value
 
     ! Analytical solution
     qnum_end = qnum_bgn / ( 1.0_wp + ybetajj0*deltat*qnum_bgn )
@@ -262,8 +262,8 @@ subroutine qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_
 !-----------------------------------------------------------------------------------------
 
     real(wp),intent(in)  :: rateij, rateii  ! inter-modal and self-coagulation rates
-    real(wp),intent(in)  :: qnum_bgn        ! qnum (number mixing ratio) start value
-    real(wp),intent(out) :: qnum_end        ! qnum (number mixing ratio) end value
+    real(wp),intent(in)  :: qnum_bgn        ! number mixing ratio [#/kmol-air], start value
+    real(wp),intent(out) :: qnum_end        ! number mixing ratio [#/kmol-air], end value
 
     real(wp) :: tmpc
 
@@ -405,8 +405,8 @@ subroutine getcoags_wrapper_f(&
 
     ! Arguments 
 
-    real(wp), intent(in) :: airtemp  ! air temperature [ k ]
-    real(wp), intent(in) :: airprs   ! air pressure in [ pa ]
+    real(wp), intent(in) :: airtemp  ! air temperature [K]
+    real(wp), intent(in) :: airprs   ! air pressure [Pa]
 
     real(wp), intent(in) :: dgatk    ! aitken mode geometric mean diameter [m]
     real(wp), intent(in) :: dgacc    ! accumulation mode geometric mean diam [m]
@@ -414,22 +414,22 @@ subroutine getcoags_wrapper_f(&
     real(wp), intent(in) :: sgatk    ! aitken mode geometric standard deviation
     real(wp), intent(in) :: sgacc    ! accumulation mode geometric standard deviation
 
-    real(wp), intent(in) :: xxlsgat  ! natural log of geometric standard
-    real(wp), intent(in) :: xxlsgac  !  deviations
+    real(wp), intent(in) :: xxlsgat  ! natural log of geometric std. dev. of aitken mode
+    real(wp), intent(in) :: xxlsgac  ! natural log of geometric std. dev. of accumulation mode
 
-    real(wp), intent(in) :: pdensat  ! aitken mode particle density [ kg / m**3 ]
-    real(wp), intent(in) :: pdensac  ! accumulation mode density [ kg / m**3 ]
+    real(wp), intent(in) :: pdensat  ! aitken mode particle density [kg/m**3]
+    real(wp), intent(in) :: pdensac  ! accumulation mode density [kg/m**3]
 
     real(wp), intent(out) :: betaij0, betaii0, betajj0, betaij3
 
     ! Local variables and parameters 
 
-    real(wp) :: t0  ! standard surface temperature (15 deg C) [ k ]
+    real(wp) :: t0  ! standard surface temperature (15 deg C) [K]
     real(wp), parameter :: two3 = 2.0_wp/3.0_wp
 
-    real(wp) amu            ! atmospheric dynamic viscosity [ kg/m s ]
+    real(wp) amu            ! atmospheric dynamic viscosity [kg/m s]
     real(wp) sqrt_temp      ! square root of ambient temperature
-    real(wp) lamda          ! mean free path [ m ]
+    real(wp) lamda          ! mean free path [m]
 
 
     ! Near-continnuum regime (independent of mode)
@@ -444,11 +444,11 @@ subroutine getcoags_wrapper_f(&
 
     ! Output from getcoags
 
-    real(wp)  qn11  ! aitken mode intramodal coagulation rate [ m**3/s ] for 0th moment 
-    real(wp)  qn22  ! accum. mode intramodal coagulation rate [ m**3/s ] for 0th moment 
+    real(wp)  qn11  ! aitken mode intramodal coagulation rate [m**3/s] for 0th moment 
+    real(wp)  qn22  ! accum. mode intramodal coagulation rate [m**3/s] for 0th moment 
 
-    real(wp)  qn12  ! aitken to accumulation intermodal coagulation rate [ m**3/s ] for 0th moment
-    real(wp)  qv12  ! aitken to accumulation intermodal coagulation rate [ m**3/s ] for 3rd moment
+    real(wp)  qn12  ! aitken to accumulation intermodal coagulation rate [m**3/s] for 0th moment
+    real(wp)  qv12  ! aitken to accumulation intermodal coagulation rate [m**3/s] for 3rd moment
 
     ! For unit conversion
     real(wp)  dumatk3
@@ -459,17 +459,17 @@ subroutine getcoags_wrapper_f(&
     t0 = tmelt + 15._wp
     sqrt_temp = sqrt( airtemp)
 
-    ! Calculate mean free path [ m ]:
+    ! Calculate mean free path [m]:
     ! 6.6328e-8 is the sea level value given in table i.2.8
     ! on page 10 of u.s. standard atmosphere 1962
 
     lamda = 6.6328e-8_wp * p0 * airtemp  / ( t0 * airprs )
 
-    ! Calculate dynamic viscosity [ kg m**-1 s**-1 ]:
+    ! Calculate dynamic viscosity [kg m**-1 s**-1]:
     ! u.s. standard atmosphere 1962 page 14 expression
     ! for dynamic viscosity is:
     ! dynamic viscosity =  beta * t * sqrt(t) / ( t + s)
-    ! where beta = 1.458e-6 [ kg sec^-1 k**-0.5 ], s = 110.4 [ k ].
+    ! where beta = 1.458e-6 [kg s^-1 K**-0.5], s = 110.4 [K].
 
     amu = 1.458e-6_wp * airtemp * sqrt_temp / ( airtemp + 110.4_wp )
 
@@ -552,7 +552,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     implicit none
 
-    real(wp), intent(in) ::  lamda     ! mean free path [ m ]
+    real(wp), intent(in) ::  lamda     ! mean free path [m]
 
     ! Coefficients for free molecular regime
 
@@ -562,7 +562,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     real(wp), intent(in) ::  knc   ! coefficient for near continnuum regime
 
-    ! Modal geometric mean diameters: [ m ]
+    ! Modal geometric mean diameters: [m]
 
     real(wp), intent(in) :: dgatk          ! aitken mode
     real(wp), intent(in) :: dgacc          ! accumulation mode
@@ -574,8 +574,8 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     ! Natural log of modal geometric standard deviation
 
-    real(wp), intent(in) :: xxlsgat         ! aitken mode
-    real(wp), intent(in) :: xxlsgac         ! accumulation mode
+    real(wp), intent(in) :: xxlsgat        ! aitken mode
+    real(wp), intent(in) :: xxlsgac        ! accumulation mode
 
     ! Coagulation coefficients
     real(wp), intent(out) :: qn11, qn22, qn12, qv12 
