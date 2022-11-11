@@ -46,14 +46,14 @@ subroutine set_coagulation_pairs( masterproc )
 
    integer :: ip                      ! coagulation pair index
 
-   integer, parameter :: big_neg_int = -huge(selected_int_kind(6))
+   integer, parameter :: huge_neg_int = -huge(huge_neg_int)
 
    !---------------------------------------------------------------------------------------------------
    ! Assign values to the bookkeeping arrays that specify the iner-modal mass/number transfer pathways.
    !---------------------------------------------------------------------------------------------------
-   modefrm_coagpair(:) = big_neg_int
-   modetoo_coagpair(:) = big_neg_int
-   modeend_coagpair(:) = big_neg_int
+   modefrm_coagpair(:) = huge_neg_int
+   modetoo_coagpair(:) = huge_neg_int
+   modeend_coagpair(:) = huge_neg_int
 
    ip=1; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
    ip=2; modefrm_coagpair(ip)=npca; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
