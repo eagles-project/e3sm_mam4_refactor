@@ -26,9 +26,9 @@ module modal_aero_coag
   integer, parameter,public :: n_coagpair = 3
   integer, parameter        :: max_coagpair = n_coagpair
 
-  integer, public :: modefrm_coagpair(max_coagpair)
-  integer, public :: modetoo_coagpair(max_coagpair)
-  integer, public :: modeend_coagpair(max_coagpair)
+  integer, public ::  src_mode_coagpair(max_coagpair)
+  integer, public :: dest_mode_coagpair(max_coagpair)
+  integer, public ::  end_mode_coagpair(max_coagpair)
 
 contains
 
@@ -51,22 +51,22 @@ subroutine set_coagulation_pairs( masterproc )
    !---------------------------------------------------------------------------------------------------
    ! Assign values to the bookkeeping arrays that specify the iner-modal mass/number transfer pathways.
    !---------------------------------------------------------------------------------------------------
-   modefrm_coagpair(:) = huge_neg_int
-   modetoo_coagpair(:) = huge_neg_int
-   modeend_coagpair(:) = huge_neg_int
+    src_mode_coagpair(:) = huge_neg_int
+   dest_mode_coagpair(:) = huge_neg_int
+    end_mode_coagpair(:) = huge_neg_int
 
-   ip=1; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
-   ip=2; modefrm_coagpair(ip)=npca; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
-   ip=3; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=npca; modeend_coagpair(ip)=nacc
+   ip=1; src_mode_coagpair(ip)=nait; dest_mode_coagpair(ip)=nacc; end_mode_coagpair(ip)=nacc
+   ip=2; src_mode_coagpair(ip)=npca; dest_mode_coagpair(ip)=nacc; end_mode_coagpair(ip)=nacc
+   ip=3; src_mode_coagpair(ip)=nait; dest_mode_coagpair(ip)=npca; end_mode_coagpair(ip)=nacc
 
    !------------------------------------
    ! Setup done. Write info to log file.
    !------------------------------------
    if (masterproc) then
       write(iulog,'(/a)') 'amicphys init, coagulation:'
-      write(iulog,'(4a12)') 'ipair','modefrm','modetoo','modeend'
+      write(iulog,'(4a12)') 'ipair','src_mode','dest_mode','end_mode'
       do ip = 1,n_coagpair
-         write(iulog,*) ip, modefrm_coagpair(ip), modetoo_coagpair(ip), modeend_coagpair(ip)
+         write(iulog,*) ip, src_mode_coagpair(ip), dest_mode_coagpair(ip), end_mode_coagpair(ip)
       end do
       write(iulog,'(a/)') 'amicphys init, coagulation: ----'
    end if
@@ -91,25 +91,24 @@ subroutine mam_coag_1subarea(                                   &
 
       ! Arguments
 
-      real(wp), intent(in) :: deltat                ! model timestep (s)
-      real(wp), intent(in) :: temp                  ! temperature at model levels (K)
-      real(wp), intent(in) :: pmid                  ! pressure at layer center (Pa)
-      real(wp), intent(in) :: aircon                ! air molar concentration (kmol/m3)
-      real(wp), intent(in) :: dgn_a(max_mode)
-      real(wp), intent(in) :: dgn_awet(max_mode) ! dry & wet geo. mean dia. (m) of number distrib.
-      real(wp), intent(in) :: wetdens(max_mode)  ! interstitial aerosol wet density (kg/m3)
-                                                 ! dry & wet geo. mean dia. (m) of number distrib.
+      real(wp), intent(in) :: deltat                ! timestep used for integrating the coag. equations [s]
+      real(wp), intent(in) :: temp                  ! temperature at layer center [K]
+      real(wp), intent(in) :: pmid                  ! pressure at layer center [Pa]
+      real(wp), intent(in) :: aircon                ! molar concentration of air [kmol/m3]
+      real(wp), intent(in) :: dgn_a(max_mode)    ! dry geometric mean diameter [m] of size distribution
+      real(wp), intent(in) :: dgn_awet(max_mode) ! geometric mean diameter [m] of size distribution
+      real(wp), intent(in) :: wetdens(max_mode)  ! interstitial aerosol wet density [kg/m3]
 
-      real(wp), intent(inout), dimension(1:max_mode)           :: qnum_cur  ! current number mixing ratios (#/kmol-air)
-      real(wp), intent(inout), dimension(1:max_aer,1:max_mode) :: qaer_cur  ! current mass mixing ratios (kmol/kmol-air)
+      real(wp), intent(inout), dimension(1:max_mode)           :: qnum_cur  ! current number mixing ratios [#/kmol-air]
+      real(wp), intent(inout), dimension(1:max_aer,1:max_mode) :: qaer_cur  ! current mass mixing ratios [kmol/kmol-air]
 
-      ! Mass mixing ratio changes (kmol-aer/kmol-air) to be passed to the aging parameterization
+      ! Mass mixing ratio changes [kmol-aer/kmol-air] to be passed to the aging parameterization
       real(wp), intent(out),   dimension(1:max_aer,1:max_agepair) :: qaer_del_coag_out  
 
       ! Local variables
 
-      integer :: ip                 ! coagulation pair index
-      integer :: modefrm, modetoo   ! mode indices corresponding to the origin and desination of mass transfer
+      integer :: ip                   ! coagulation pair index
+      integer :: src_mode, dest_mode  ! mode indices corresponding to the origin and desination of mass/number transfer
 
       ! Coagulation rate coefficients corresponding the 0th and 3rd moments of the size distribution.
 
@@ -117,8 +116,8 @@ subroutine mam_coag_1subarea(                                   &
                   ybetaii0(max_coagpair), ybetajj0(max_coagpair)
 
       real(wp), dimension(1:max_mode) :: qnum_bgn  ! number mixing ratios before coagulation
-      real(wp), dimension(1:max_mode) :: qnum_tavg ! average number mixing ratios during time step, calculated as
-                                                     ! as the arithmetic mean of the begin- and end-values
+      real(wp), dimension(1:max_mode) :: qnum_tavg ! average number mixing ratios during timestep, calculated as
+                                                   ! as the arithmetic mean of the begin- and end-values
 
       real(wp), dimension(1:max_aer,1:max_mode) :: qaer_bgn ! mass mixing ratios before coagulation
 
@@ -142,15 +141,15 @@ subroutine mam_coag_1subarea(                                   &
       !--------------------------------------------------------------
       do ip = 1, n_coagpair
 
-         modefrm = modefrm_coagpair(ip)
-         modetoo = modetoo_coagpair(ip)
+          src_mode =  src_mode_coagpair(ip)
+         dest_mode = dest_mode_coagpair(ip)
 
          call getcoags_wrapper_f(                      &
             temp,                pmid,                 &! in
-            dgn_awet(modefrm),   dgn_awet(modetoo),    &! in
-            sigmag_aer(modefrm), sigmag_aer(modetoo),  &! in
-            alnsg_aer(modefrm),  alnsg_aer(modetoo),   &! in
-            wetdens(modefrm),    wetdens(modetoo),     &! in
+            dgn_awet(src_mode),  dgn_awet(dest_mode),  &! in
+            sigmag_aer(src_mode),sigmag_aer(dest_mode),&! in
+            alnsg_aer(src_mode), alnsg_aer(dest_mode), &! in
+            wetdens(src_mode),   wetdens(dest_mode),   &! in
             ybetaij0(ip),        ybetaij3(ip),         &! out
             ybetaii0(ip),        ybetajj0(ip)          )! out
 

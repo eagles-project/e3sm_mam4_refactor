@@ -1361,7 +1361,7 @@ main_jsub_loop: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: modefrm, modetoo
+      integer :: src_mode, dest_mode
 ! if mtoo_renamexf(n) >  0, then mode n gets renamed into mode mtoo_renamexf(n)
 ! if mtoo_renamexf(n) <= 0, then mode n does not have renaming
       integer :: mtoo_renamexf(max_mode)
@@ -1802,7 +1802,7 @@ do_rename_if_block30: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: modefrm, modetoo
+      integer :: src_mode, dest_mode
 ! if mtoo_renamexf(n) >  0, then mode n gets renamed into mode mtoo_renamexf(n)
 ! if mtoo_renamexf(n) <= 0, then mode n does not have renaming
       integer :: mtoo_renamexf(max_mode)
@@ -5067,7 +5067,7 @@ use modal_aero_data, only : &
     modeptr_accum, modeptr_aitken, modeptr_pcarbon, modeptr_ufine
 !use modal_aero_rename
 
-use modal_aero_coag, only: n_coagpair, modefrm_coagpair, modetoo_coagpair, modeend_coagpair
+use modal_aero_coag, only: n_coagpair, src_mode_coagpair, dest_mode_coagpair, end_mode_coagpair
 
 implicit none
 
@@ -5231,9 +5231,9 @@ implicit none
 
 ! coagulation
       do ipair = 1, n_coagpair
-         na = modefrm_coagpair(ipair)
-         nb = modetoo_coagpair(ipair)
-         nc = modeend_coagpair(ipair)
+         na =  src_mode_coagpair(ipair)
+         nb = dest_mode_coagpair(ipair)
+         nc =  end_mode_coagpair(ipair)
          if (na < 1 .or. nb < 1 .or. nc < 1) cycle
 
          lmza = lmap_num(na)
