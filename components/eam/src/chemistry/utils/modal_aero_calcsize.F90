@@ -1,5 +1,5 @@
 module modal_aero_calcsize
-
+#include "../yaml/f90_yaml/common_uses.ymlf90"
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
 use shr_kind_mod,     only: r8 => shr_kind_r8, cs => shr_kind_cs
@@ -597,7 +597,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    !-----------------------------------------------------------------------
    integer, parameter :: nsrflx = 4   ! last dimension of qsrflx
    real(r8) :: qsrflx(pcols,pcnst,nsrflx,2)
-
+#include "../yaml/f90_yaml/calcsize_sub_beg.ymlf90"
    !-----------------------------------------------------------------------------------
    !Extract info about optional variables and initialize local variables accordingly
    !------------------------------------------------------------------------------------
@@ -837,6 +837,8 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
 
    endif!if(update_mmr)
 #endif
+
+#include "../yaml/f90_yaml/calcsize_sub_end.ymlf90"
 
 return
 end subroutine modal_aero_calcsize_sub
