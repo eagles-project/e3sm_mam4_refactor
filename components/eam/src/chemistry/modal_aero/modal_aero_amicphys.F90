@@ -4895,7 +4895,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       n_agepair = ipair
 
 ! coagulation pairs
-      call set_coagulation_pairs( big_neg_int )
+      call set_coagulation_pairs( masterproc, big_neg_int )
 
 ! diagnostics
       if ( masterproc ) then
@@ -4975,12 +4975,6 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
             write(iulog,'(4i5,2x,a)') &
                lmz+loffset, lmz, lmapcc_all(lmz), j, solsym(lmz)
          end do
-
-         write(iulog,'(/a)') 'coag: ipair, modefrm, modetoo, modeend'
-         do ipair = 1,n_coagpair
-            write(iulog,*) ipair, modefrm_coagpair(ipair), modetoo_coagpair(ipair), modeend_coagpair(ipair)
-         end do
-         write(iulog,'(a/)') 'coag: ----'
 
       end if ! ( masterproc )
 
@@ -5072,6 +5066,8 @@ use modal_aero_data, only : &
     cnst_name_cw, &
     modeptr_accum, modeptr_aitken, modeptr_pcarbon, modeptr_ufine
 !use modal_aero_rename
+
+use modal_aero_coag, only: n_coagpair, modefrm_coagpair, modetoo_coagpair, modeend_coagpair
 
 implicit none
 

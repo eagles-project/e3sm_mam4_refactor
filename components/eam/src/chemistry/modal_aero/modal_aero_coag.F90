@@ -6,14 +6,16 @@
 ! Revision history:
 !   Richard C. Easter, 07.04.13:  Adapted from MIRAGE2 code. Some of the 
 !                                 code came from the CMAQ model v4.6.
-!   Hui Wan 2022: Refactored code: memoved non-4-mode codes; restructured subroutines.
+!   Hui Wan 2022: Refactored code: removed non-4-mode codes; restructured subroutines.
 !--------------------------------------------------------------------------------------
 module modal_aero_coag
 
   use shr_kind_mod,    only:  wp => shr_kind_r8
   use cam_logfile,     only:  iulog
 
-  use modal_aero_amicphys_control
+  use modal_aero_amicphys_control, only: max_mode, alnsg_aer, sigmag_aer, nait, npca, nacc   ! parameters related to modes
+  use modal_aero_amicphys_control, only: max_aer, naer                                       ! parameters related to species
+  use modal_aero_amicphys_control, only: max_agepair, i_agepair_pca                          ! parameters related to other process
 
   implicit none
   private
@@ -21,9 +23,16 @@ module modal_aero_coag
   public :: set_coagulation_pairs
   public :: mam_coag_1subarea
 
+  integer, parameter,public :: n_coagpair = 3
+  integer, parameter        :: max_coagpair = n_coagpair
+
+  integer, public :: modefrm_coagpair(max_coagpair)
+  integer, public :: modetoo_coagpair(max_coagpair)
+  integer, public :: modeend_coagpair(max_coagpair)
+
 contains
 
-subroutine set_coagulation_pairs( big_neg_int )
+subroutine set_coagulation_pairs( masterproc, big_neg_int )
 !----------------------------------------------------------------------
 ! Purpose: Set up coagulation pairs during model initialization.
 !
@@ -33,17 +42,32 @@ subroutine set_coagulation_pairs( big_neg_int )
 ! 4 mode        accum, aitken, pcarbon/pca             3
 !----------------------------------------------------------------------
 
+   logical, intent(in) :: masterproc  ! if we are on the master process of an MPI run
    integer, intent(in) :: big_neg_int
-   integer :: ip
+   integer :: ip                      ! coagulation pair index
 
+   !---------------------------------------------------------------------------------------------------
+   ! Assign values to the bookkeeping arrays that specify the iner-modal mass/number transfer pathways.
+   !---------------------------------------------------------------------------------------------------
    modefrm_coagpair(:) = big_neg_int
    modetoo_coagpair(:) = big_neg_int
    modeend_coagpair(:) = big_neg_int
 
-   n_coagpair = 3
    ip=1; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
    ip=2; modefrm_coagpair(ip)=npca; modetoo_coagpair(ip)=nacc; modeend_coagpair(ip)=nacc
    ip=3; modefrm_coagpair(ip)=nait; modetoo_coagpair(ip)=npca; modeend_coagpair(ip)=nacc
+
+   !------------------------------------
+   ! Setup done. Write info to log file.
+   !------------------------------------
+   if (masterproc) then
+      write(iulog,'(/a)') 'amicphys init, coagulation:'
+      write(iulog,'(4a12)') 'ipair','modefrm','modetoo','modeend'
+      do ip = 1,n_coagpair
+         write(iulog,*) ip, modefrm_coagpair(ip), modetoo_coagpair(ip), modeend_coagpair(ip)
+      end do
+      write(iulog,'(a/)') 'amicphys init, coagulation: ----'
+   end if
 
 end subroutine set_coagulation_pairs
 

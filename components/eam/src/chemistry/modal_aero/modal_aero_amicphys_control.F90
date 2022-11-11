@@ -131,7 +131,6 @@
 
 
   integer, parameter :: max_agepair = 1
-  integer, parameter :: max_coagpair = 3 
 
   integer, parameter :: maxsubarea = 2
 
@@ -168,11 +167,9 @@
   integer :: ngas, naer
   integer :: nacc, nait, npca, nufi, nmacc, nmait
 
-  integer :: n_agepair, n_coagpair
+  integer :: n_agepair
   integer :: modefrm_agepair(max_agepair), modetoo_agepair(max_agepair)
   integer :: mode_aging_optaa(max_mode)
-  integer :: modefrm_coagpair(max_coagpair), modetoo_coagpair(max_coagpair), &
-             modeend_coagpair(max_coagpair)
 
   integer :: lun82,   lun97,   lun98,   lun13n,   lun15n
   logical :: ldiag82, ldiag97, ldiag98, ldiag13n, ldiag15n
