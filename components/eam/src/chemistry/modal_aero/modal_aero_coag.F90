@@ -603,13 +603,11 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     real(wp) r1, r2, r3, rx4
     real(wp) ri1, ri2, ri3
     real(wp) rat
-    real(wp) coagfm0, coagnc0
     real(wp) coagfm_at, coagfm_ac
     real(wp) coagnc_at, coagnc_ac
 
     ! Correction factors for coagulation rates
     real(wp), save :: bm0( 10 )           ! m0 intramodal fm - rpm values
-    real(wp), save :: bm0ij( 10, 10, 10 ) ! m0 intermodal fm
 
     ! Populate the arrays for the correction factors *************************************
 
@@ -620,7 +618,164 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
       0.936578814219156_wp, 0.960098926735545_wp, 0.975646823342881_wp,   &
       0.985397173215326_wp   /
 
+
+    ! *** end of data statements *************************************
+
+    !----------------------------------------------------------
+    ! Start calculations
+    !----------------------------------------------------------
+    ! Constants and parameters
+
+    sqrttwo = sqrt(two)
+    dlgsqt2 = one / log( sqrttwo )
+
+    esat01   = exp( 0.125_wp * xxlsgat * xxlsgat )
+    esac01   = exp( 0.125_wp * xxlsgac * xxlsgac )
+
+    esat04  = esat01 ** 4
+    esac04  = esac01 ** 4
+
+    esat05  = esat04 * esat01
+    esac05  = esac04 * esac01
+
+    esat08  = esat04 * esat04
+    esac08  = esac04 * esac04
+
+    esat09  = esat08 * esat01
+    esac09  = esac08 * esac01
+
+    esat16  = esat08 * esat08
+    esac16  = esac08 * esac08
+
+    esat20  = esat16 * esat04
+    esac20  = esac16 * esac04
+
+    esat24  = esat20 * esat04
+    esac24  = esac20 * esac04
+
+    esat25  = esat20 * esat05
+    esac25  = esac20 * esac05
+
+    esat36  = esat20 * esat16
+    esac36  = esac20 * esac16
+
+    esat49  = esat24 * esat25
+
+    esat64  = esat20 * esat20 * esat24
+    esac64  = esac20 * esac20 * esac24
+
+    esat100 = esat64 * esat36
+
+    dgat2   = dgatk * dgatk
+    dgat3   = dgatk * dgatk * dgatk
+    dgac2   = dgacc * dgacc
+    dgac3   = dgacc * dgacc * dgacc
+
+    sqdgat  = sqrt( dgatk )
+    sqdgac  = sqrt( dgacc )
+    sqdgat5 = dgat2 * sqdgat
+    sqdgac5 = dgac2 * sqdgac
+    sqdgat7 = dgat3 * sqdgat
+
+    !------------------------------------------------------------------
+    ! For the free molecular regime:  page h.3 of whitby et al. (1991)
+    !------------------------------------------------------------------
+    r1      = sqdgac / sqdgat
+    r2      = r1 * r1
+    r3      = r2 * r1
+    rx4     = r2 * r2
+    ri1     = one / r1
+    ri2     = one / r2
+    ri3     = one / r3
+    kngat   = two * lamda / dgatk
+    kngac   = two * lamda / dgacc
+
+    ! Calculate ratio of geometric mean diameters
+
+    rat = dgacc / dgatk
+
+    ! Trap subscripts for bm0 and bm0i, between 1 and 10.
+    ! See page h.5 of whitby et al. (1991)
+
+    n2n = max( 1, min( 10,   nint( 4.0_wp * ( sgatk - 0.75_wp ) ) ) )
+    n2a = max( 1, min( 10,   nint( 4.0_wp * ( sgacc - 0.75_wp ) ) ) )
+    n1  = max( 1, min( 10,   1 + nint( dlgsqt2 * log( rat ) ) ) )
+
+    !-----------------------------------------------------------------
+    ! Aitken to accumulation mode coagulation rate for the 0th moment 
+    !-----------------------------------------------------------------
+    call intermodal_coag_rate_for_0th_moment(        &
+           two, a_const, r1, r2, rx4, ri1, ri2, ri3, &! in 
+           knc, kngat, kngac, kfmatac, sqdgat,       &! in
+           esat01, esat04, esat09, esat16,           &! in 
+           esac01, esac04, esac09, esac16,           &! in
+           n1, n2a, n2n,                             &! in
+           qn12                                      )! out
+
+    !-----------------------------------------------------------------
+    ! Aitken to accumulation mode coagulation rate for the 3rd moment
+    !-----------------------------------------------------------------
+    call intermodal_coag_rate_for_3rd_moment(                      &
+           two, a_const, r1, r2, rx4, ri1, ri2, ri3,               &! in 
+           knc, kngat, kngac, dgat3, kfmatac, sqdgat7,             &! in
+           esat04, esat09, esat16, esat25, esat36, esat49, esat64, &! in
+           esac01, esac04, esac09, esac16, esat100,                &! in 
+           n1, n2a, n2n,                                           &! in
+           qv12 )
+
+    !-----------------------------------------------------
+    ! Intramodal coagulation
+    !-----------------------------------------------------
+    ! aitken mode
+    !--------------
+    ! Near-continuum form: equation h.12a of whitby et al. (1991)
+    coagnc_at = knc * (one + esat08 + a_const * kngat * (esat20 + esat04))
+
+    ! Free-molecular form: equation h.11a of whitby et al. (1991)
+    coagfm_at = kfmat * sqdgat * bm0(n2n) *  ( esat01 + esat25 + two * esat05 )
+
+    ! Harmonic mean
+    qn11 = coagfm_at * coagnc_at / ( coagfm_at + coagnc_at )
+
+    !-------------------
+    ! accumulation mode
+    !-------------------
+    ! Near-continuum form: equation h.12a of whitby et al. (1991)
+    coagnc_ac = knc * (one + esac08 + a_const * kngac * (esac20 + esac04))
+
+    ! Free-molecular form: equation h.11a of whitby et al. (1991)
+    coagfm_ac = kfmac * sqdgac * bm0(n2a) * ( esac01 + esac25 + two * esac05 )
+
+    ! Harmonic mean
+    qn22 = coagfm_ac * coagnc_ac / ( coagfm_ac + coagnc_ac )
+
+end subroutine getcoags
+
+
+subroutine intermodal_coag_rate_for_0th_moment(        &
+             two, a_const, r1, r2, rx4, ri1, ri2, ri3, &! in 
+             knc, kngat, kngac, kfmatac, sqdgat,       &! in
+             esat01, esat04, esat09, esat16,           &! in 
+             esac01, esac04, esac09, esac16,           &! in
+             n1, n2a, n2n,                             &! in
+             qn12                                      )! out
+
+    real(wp),intent(in) ::  two, a_const
+    real(wp),intent(in) ::  r1, r2, rx4, ri1, ri2, ri3
+    real(wp),intent(in) ::  knc, kngat, kngac, kfmatac, sqdgat
+    real(wp),intent(in) ::  esat01, esat04, esat09, esat16
+    real(wp),intent(in) ::  esac01, esac04, esac09, esac16 
+    integer, intent(in) ::  n1, n2a, n2n
+
+    real(wp),intent(out) ::  qn12  ! intermodal coagulation rate [m**3/s] for 0th moment
+
+    real(wp) :: coagfm0, coagnc0
+
     ! fsb new fm correction factors for m0 intermodal coagulation
+
+    real(wp), save :: bm0ij( 10, 10, 10 ) ! m0 intermodal fm
+
+    integer :: ibeta
 
     data (bm0ij (  1,  1,ibeta), ibeta = 1,10) /   &
       0.628539_wp,  0.639610_wp,  0.664514_wp,  0.696278_wp,  0.731558_wp,   &
@@ -924,91 +1079,6 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
       0.999244_wp,  0.999464_wp,  0.999622_wp,  0.999733_wp,  0.999811_wp/
 
 
-    ! *** end of data statements *************************************
-
-    !----------------------------------------------------------
-    ! Start calculations
-    !----------------------------------------------------------
-    ! Constants and parameters
-
-    sqrttwo = sqrt(two)
-    dlgsqt2 = one / log( sqrttwo )
-
-    esat01   = exp( 0.125_wp * xxlsgat * xxlsgat )
-    esac01   = exp( 0.125_wp * xxlsgac * xxlsgac )
-
-    esat04  = esat01 ** 4
-    esac04  = esac01 ** 4
-
-    esat05  = esat04 * esat01
-    esac05  = esac04 * esac01
-
-    esat08  = esat04 * esat04
-    esac08  = esac04 * esac04
-
-    esat09  = esat08 * esat01
-    esac09  = esac08 * esac01
-
-    esat16  = esat08 * esat08
-    esac16  = esac08 * esac08
-
-    esat20  = esat16 * esat04
-    esac20  = esac16 * esac04
-
-    esat24  = esat20 * esat04
-    esac24  = esac20 * esac04
-
-    esat25  = esat20 * esat05
-    esac25  = esac20 * esac05
-
-    esat36  = esat20 * esat16
-    esac36  = esac20 * esac16
-
-    esat49  = esat24 * esat25
-
-    esat64  = esat20 * esat20 * esat24
-    esac64  = esac20 * esac20 * esac24
-
-    esat100 = esat64 * esat36
-
-    dgat2   = dgatk * dgatk
-    dgat3   = dgatk * dgatk * dgatk
-    dgac2   = dgacc * dgacc
-    dgac3   = dgacc * dgacc * dgacc
-
-    sqdgat  = sqrt( dgatk )
-    sqdgac  = sqrt( dgacc )
-    sqdgat5 = dgat2 * sqdgat
-    sqdgac5 = dgac2 * sqdgac
-    sqdgat7 = dgat3 * sqdgat
-
-    !------------------------------------------------------------------
-    ! For the free molecular regime:  page h.3 of whitby et al. (1991)
-    !------------------------------------------------------------------
-    r1      = sqdgac / sqdgat
-    r2      = r1 * r1
-    r3      = r2 * r1
-    rx4     = r2 * r2
-    ri1     = one / r1
-    ri2     = one / r2
-    ri3     = one / r3
-    kngat   = two * lamda / dgatk
-    kngac   = two * lamda / dgacc
-
-    ! Calculate ratio of geometric mean diameters
-
-    rat = dgacc / dgatk
-
-    ! Trap subscripts for bm0 and bm0i, between 1 and 10.
-    ! See page h.5 of whitby et al. (1991)
-
-    n2n = max( 1, min( 10,   nint( 4.0_wp * ( sgatk - 0.75_wp ) ) ) )
-    n2a = max( 1, min( 10,   nint( 4.0_wp * ( sgacc - 0.75_wp ) ) ) )
-    n1  = max( 1, min( 10,   1 + nint( dlgsqt2 * log( rat ) ) ) )
-
-    !----------------------------------------------------
-    ! Intermodal coagulation, set up for zeroth moment
-    !----------------------------------------------------
     ! Near-continuum form:  equation h.10a of whitby et al. (1991)
 
     coagnc0 = knc * (   &
@@ -1027,63 +1097,26 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     qn12 = coagnc0 * coagfm0 / ( coagnc0 + coagfm0 )
 
-    !-----------------------------------------------------------------
-    ! Aitken to accumulation mode coagulation rate for the 3rd moment
-    !-----------------------------------------------------------------
-    call intermodal_coag_rate_for_3rd_moment(             &! in
-         two, a_const, r1, r2, rx4, ri1, ri2, ri3,        &! in 
-         knc, kngat, kngac, dgat3, kfmatac, sqdgat7,      &! in
-         esat04, esat16, esat36, esat64, esac04, esac16,  &! in 
-         esat09, esat25, esat49, esat100, esac01, esac09, &! in
-         n1, n2a, n2n,                                    &! in
-         qv12 )                                            ! out
-
-    !-----------------------------------------------------
-    ! Intramodal coagulation
-    !-----------------------------------------------------
-    ! aitken mode
-    !--------------
-    ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_at = knc * (one + esat08 + a_const * kngat * (esat20 + esat04))
-
-    ! Free-molecular form: equation h.11a of whitby et al. (1991)
-    coagfm_at = kfmat * sqdgat * bm0(n2n) *  ( esat01 + esat25 + two * esat05 )
-
-    ! Harmonic mean
-    qn11 = coagfm_at * coagnc_at / ( coagfm_at + coagnc_at )
-
-    !-------------------
-    ! accumulation mode
-    !-------------------
-    ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_ac = knc * (one + esac08 + a_const * kngac * (esac20 + esac04))
-
-    ! Free-molecular form: equation h.11a of whitby et al. (1991)
-    coagfm_ac = kfmac * sqdgac * bm0(n2a) * ( esac01 + esac25 + two * esac05 )
-
-    ! Harmonic mean
-    qn22 = coagfm_ac * coagnc_ac / ( coagfm_ac + coagnc_ac )
-
-end subroutine getcoags
+end subroutine intermodal_coag_rate_for_0th_moment
 
 
-subroutine intermodal_coag_rate_for_3rd_moment( two, a_const, r1, r2, rx4, ri1, ri2, ri3,        &! in 
-                                                knc, kngat, kngac, dgat3, kfmatac, sqdgat7,      &! in
-                                                esat04, esat16, esat36, esat64, esac04, esac16,  &! in 
-                                                esat09, esat25, esat49, esat100, esac01, esac09, &! in
-                                                n1, n2a, n2n,                                    &! in
-                                                qv12 )                                            ! out
+
+subroutine intermodal_coag_rate_for_3rd_moment(                      &
+             two, a_const, r1, r2, rx4, ri1, ri2, ri3,               &! in 
+             knc, kngat, kngac, dgat3, kfmatac, sqdgat7,             &! in
+             esat04, esat09, esat16, esat25, esat36, esat49, esat64, &! in
+             esac01, esac04, esac09, esac16, esat100,                &! in 
+             n1, n2a, n2n,                                           &! in
+             qv12 )                                                   ! out
 
     real(wp),intent(in)  :: two, a_const
     real(wp),intent(in)  :: r1, r2, rx4, ri1, ri2, ri3
 
     real(wp),intent(in)  :: knc, kngat, kngac, dgat3
-    real(wp),intent(in)  :: esat04, esat16, esat36, esat64
-    real(wp),intent(in)  :: esac04
-
     real(wp),intent(in)  :: kfmatac, sqdgat7 
-    real(wp),intent(in)  :: esat09, esat25, esat49, esat100
-    real(wp),intent(in)  :: esac01, esac09, esac16
+
+    real(wp),intent(in)  :: esat04, esat09, esat16, esat25, esat36, esat49, esat64
+    real(wp),intent(in)  :: esac01, esac04, esac09, esac16, esat100 
 
     integer, intent(in)  :: n1, n2a, n2n ! indices for correction factors
 
