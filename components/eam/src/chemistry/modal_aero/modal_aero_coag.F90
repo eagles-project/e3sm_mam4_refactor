@@ -584,7 +584,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     real(wp) :: kngat, kngac
     real(wp),parameter :: one = 1.0_wp, two = 2.0_wp, half = 0.5_wp
-    real(wp),parameter :: a = 1.246_wp
+    real(wp),parameter :: a_const = 1.246_wp
     real(wp),parameter :: two3rds = 2._wp / 3._wp
 
     real(wp) sqrttwo  !  sqrt(two)
@@ -1317,7 +1317,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     ! Near-continuum form:  equation h.10a of whitby et al. (1991)
 
     coagnc0 = knc * (   &
-      two + a * ( kngat * ( esat04 + r2 * esat16 * esac04 )   &
+      two + a_const * ( kngat * ( esat04 + r2 * esat16 * esac04 )   &
       + kngac * ( esac04 + ri2 * esac16 * esat04 ) )   &
       + ( r2 + ri2 ) * esat04 * esac04  )
 
@@ -1339,8 +1339,8 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     coagnc3 = knc * dgat3 * (   &
       two * esat36   &
-      + a * kngat * ( esat16 + r2 * esat04 * esac04 )   &
-      + a * kngac * ( esat36 * esac04 + ri2 * esat64 * esac16 )   &
+      + a_const * kngat * ( esat16 + r2 * esat04 * esac04 )   &
+      + a_const * kngac * ( esat36 * esac04 + ri2 * esat64 * esac16 )   &
       + r2 * esat16 * esac04 + ri2 * esat64 * esac04 )
 
     ! Free-molecular form: equation h.7b of whitby et al. (1991)
@@ -1363,7 +1363,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     ! aitken mode
     !--------------
     ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_at = knc * (one + esat08 + a * kngat * (esat20 + esat04))
+    coagnc_at = knc * (one + esat08 + a_const * kngat * (esat20 + esat04))
 
     ! Free-molecular form: equation h.11a of whitby et al. (1991)
     coagfm_at = kfmat * sqdgat * bm0(n2n) *  ( esat01 + esat25 + two * esat05 )
@@ -1375,7 +1375,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     ! accumulation mode
     !-------------------
     ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_ac = knc * (one + esac08 + a * kngac * (esac20 + esac04))
+    coagnc_ac = knc * (one + esac08 + a_const * kngac * (esac20 + esac04))
 
     ! Free-molecular form: equation h.11a of whitby et al. (1991)
     coagfm_ac = kfmac * sqdgac * bm0(n2a) * ( esac01 + esac25 + two * esac05 )
