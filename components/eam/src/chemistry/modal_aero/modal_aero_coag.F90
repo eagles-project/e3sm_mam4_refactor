@@ -32,7 +32,7 @@ module modal_aero_coag
 
 contains
 
-subroutine set_coagulation_pairs( masterproc, big_neg_int )
+subroutine set_coagulation_pairs( masterproc )
 !----------------------------------------------------------------------
 ! Purpose: Set up coagulation pairs during model initialization.
 !
@@ -43,8 +43,10 @@ subroutine set_coagulation_pairs( masterproc, big_neg_int )
 !----------------------------------------------------------------------
 
    logical, intent(in) :: masterproc  ! if we are on the master process of an MPI run
-   integer, intent(in) :: big_neg_int
+
    integer :: ip                      ! coagulation pair index
+
+   integer, parameter :: big_neg_int = -huge(selected_int_kind(6))
 
    !---------------------------------------------------------------------------------------------------
    ! Assign values to the bookkeeping arrays that specify the iner-modal mass/number transfer pathways.

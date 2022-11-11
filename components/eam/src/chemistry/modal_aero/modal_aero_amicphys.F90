@@ -4895,7 +4895,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       n_agepair = ipair
 
 ! coagulation pairs
-      call set_coagulation_pairs( masterproc, big_neg_int )
+      call set_coagulation_pairs( masterproc )
 
 ! diagnostics
       if ( masterproc ) then
