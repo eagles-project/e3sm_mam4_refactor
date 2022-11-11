@@ -600,7 +600,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     real(wp) sqdgat, sqdgac
     real(wp) sqdgat5, sqdgac5
     real(wp) sqdgat7
-    real(wp) r, r2, r3, rx4
+    real(wp) r1, r2, r3, rx4
     real(wp) ri1, ri2, ri3
     real(wp) rat
     real(wp) coagfm0, coagnc0
@@ -1290,11 +1290,11 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     !------------------------------------------------------------------
     ! For the free molecular regime:  page h.3 of whitby et al. (1991)
     !------------------------------------------------------------------
-    r       = sqdgac / sqdgat
-    r2      = r * r
-    r3      = r2 * r
+    r1      = sqdgac / sqdgat
+    r2      = r1 * r1
+    r3      = r2 * r1
     rx4     = r2 * r2
-    ri1     = one / r
+    ri1     = one / r1
     ri2     = one / r2
     ri3     = one / r3
     kngat   = two * lamda / dgatk
@@ -1324,7 +1324,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     ! Free-molecular form:  equation h.7a of whitby et al. (1991)
 
     coagfm0 = kfmatac * sqdgat * bm0ij(n1,n2n,n2a) * (   &
-      esat01 + r * esac01 + two * r2 * esat01 * esac04   &
+      esat01 + r1 * esac01 + two * r2 * esat01 * esac04   &
       + rx4 * esat09 * esac16 + ri3 * esat16 * esac09   &
       + two * ri1 * esat04 + esac01  )
 
@@ -1347,7 +1347,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 
     coagfm3 = kfmatac * sqdgat7 * bm3i( n1, n2n, n2a ) * (   &
       esat49   &
-      +  r * esat36  * esac01   &
+      +  r1 * esat36  * esac01   &
       + two * r2 * esat25  * esac04   &
       + rx4 * esat09  * esac16   &
       + ri3 * esat100 * esac09   &
