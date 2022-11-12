@@ -1405,17 +1405,12 @@ jtsub_loop_main_aa: &
                la = lmassptr_amode(ll,n)
                lc = lmassptrcw_amode(ll,n) + pcnst
             end if
-            if (doconvproc(la)) then
                sumactiva(la) = sumactiva(la) + sumactiva(lc)
                sumresusp(la) = sumresusp(la) + sumresusp(lc)
                sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
                sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
                sumprevap(la) = sumprevap(la) + sumprevap(lc)
                sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
-!              if (n==1 .and. ll==1) then
-!	           write(lun,*) 'la, sumaqchem(la) =', la, sumaqchem(la)
-!              endif
-            end if
          enddo ! ll
       enddo ! n
 
@@ -1424,43 +1419,28 @@ jtsub_loop_main_aa: &
 !
       do m = 2, ncnst
          if (doconvproc(m)) then
+            ! scatter overall dqdt tendency back
             do k = ktop, kbot_prevap  ! should go to k=pver because of prevap 
                dqdt_i(k,m) = dcondt(m,k)
                dqdt(icol,k,m) = dqdt(icol,k,m) + dqdt_i(k,m)*xinv_ntsub
-            end do
-!           dqdt_i(:,m) = 0.
-         end if
-      end do ! m
+               ! update the q_i for the next interation of the jtsub loop
+               if (jtsub < ntsub) then
+                  q_i(k,m) = max( (q_i(k,m) + dqdt_i(k,m)*dtsub), 0.0_r8 )
+               endif
+            enddo
 
-! scatter column burden tendencies for various processes to qsrflx
-      do m = 2, ncnst
-         if (doconvproc(m)) then
+            ! scatter column burden tendencies for various processes to qsrflx
             qsrflx_i(m,1) = sumactiva(m)*hund_ovr_g
             qsrflx_i(m,2) = sumresusp(m)*hund_ovr_g
             qsrflx_i(m,3) = sumaqchem(m)*hund_ovr_g
             qsrflx_i(m,4) = sumwetdep(m)*hund_ovr_g
             qsrflx_i(m,5) = sumprevap(m)*hund_ovr_g
-            qsrflx_i(m,6) = sumprevap_hist(m)*hund_ovr_g 
-!           qsrflx_i(m,1:4) = 0.
-            qsrflx(icol,m,1:6) = qsrflx(icol,m,1:6) + qsrflx_i(m,1:6)*xinv_ntsub 
-         end if
-      end do ! m
-
-
-      if (jtsub < ntsub) then
-         ! update the q_i for the next interation of the jtsub loop
-         do m = 2, ncnst
-            if (doconvproc(m)) then
-               do k = ktop, kbot_prevap  ! should go to k=pver because of prevap
-                  q_i(k,m) = max( (q_i(k,m) + dqdt_i(k,m)*dtsub), 0.0_r8 )
-               end do
-            end if
-         end do ! m
-      end if
-
+            qsrflx_i(m,6) = sumprevap_hist(m)*hund_ovr_g
+            qsrflx(icol,m,1:6) = qsrflx(icol,m,1:6) + qsrflx_i(m,1:6)*xinv_ntsub
+         endif
+      enddo ! m
 
       end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
-
 
    end do i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
 
