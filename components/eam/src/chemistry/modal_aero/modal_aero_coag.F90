@@ -483,11 +483,14 @@ subroutine getcoags_wrapper_f(&
     kfmac    = sqrt( 3.0_wp * boltz * airtemp / pdensac )
     kfmatac  = sqrt( 6.0_wp * boltz * airtemp / ( pdensat + pdensac ) )
 
-    !--------------------------------------------------------------------
-    ! Call subr. getcoags from CMAQ to 
-    ! calculate intermodal and intramodal coagulation coefficients
-    ! for zeroth and intermodal coagulation coefficient for third moment
-    !--------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------------
+    ! Call subr. getcoags ported from the CMAQ model to calculate
+    !  - intermodal coagulation coefficients of the 0th and 3rd moments;
+    !  - intramodal coagulation coefficients of the 0th moment.
+    ! Note: 
+    !  - Coag. coefficients of the 0th moment (qn11, qn22, qn12) correspond to aerosol number changes;
+    !  - Coag. coefficient  of the 3rd moment (qv12) correspond to aerosol mass changes.
+    !-------------------------------------------------------------------------------------------------
     call getcoags( lamda, kfmatac, kfmat, kfmac, knc,            &! in
                    dgatk, dgacc, sgatk, sgacc, xxlsgat, xxlsgac, &! in
                    qn11, qn22, qn12, qv12                        )! out
@@ -501,8 +504,8 @@ subroutine getcoags_wrapper_f(&
     betajj0  = max( 0.0_wp, qn22 )
     betaij0  = max( 0.0_wp, qn12 )
 
-    ! For the mass transfer, convert from the "cmaq" coag rate parameters 
-    ! to the "mirage2" parameters
+    ! For the mass transfer, convert from the CMAQ model's coag rate parameters 
+    ! to the MIRAGE2 model's parameters
 
     dumatk3 = ( (dgatk**3) * exp( 4.5_wp*xxlsgat*xxlsgat ) )
     betaij3  = max( 0.0_wp, qv12 / dumatk3 )
@@ -513,7 +516,6 @@ end subroutine getcoags_wrapper_f
 subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
                      dgatk, dgacc, sgatk, sgacc, xxlsgat,xxlsgac, &
                      qn11, qn22, qn12, qv12 )
-
 !//////////////////////////////////////////////////////////////////
 !  subroutine getcoags calculates the coagulation rates using a new
 !     approximate algorithm for the 2nd moment.  the 0th and 3rd moments
@@ -530,7 +532,10 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
 !    - added "intent" to subr arguments;
 !    - renamed "r4" & "dp" variables to "rx4" & "rx8";
 !    - changed "real*N" declarations to "real(rN)" (N = 4 or 8)
-!   Hui Wan, 2022 : removed unused calculations
+!   Hui Wan, 2022: removed unused calculations;
+!                  wrapped the calculation of different 
+!                  coagulation rates into separate subroutines
+!                  following a suggestion from Balwinder Singh.
 !
 !  References:
 !   1. whitby, e. r., p. h. mcmurry, u. shankar, and f. s. binkowski,
@@ -580,7 +585,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     ! Coagulation coefficients
     real(wp), intent(out) :: qn11, qn22, qn12, qv12 
 
-    integer ibeta, n1, n2a, n2n ! indices for correction factors
+    integer n1, n2a, n2n ! indices for correction factors
 
     real(wp) :: kngat, kngac
     real(wp),parameter :: one = 1.0_wp, two = 2.0_wp, half = 0.5_wp
@@ -590,8 +595,8 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     real(wp) sqrttwo  !  sqrt(two)
     real(wp) dlgsqt2  !  1/ln( sqrt( 2 ) )
 
-    real(wp) esat01         ! aitken mode exp( log^2( sigmag )/8 )
-    real(wp) esac01         ! accumulation mode exp( log^2( sigmag )/8 )
+    real(wp) esat01   ! aitken mode exp( log^2( sigmag )/8 )
+    real(wp) esac01   ! accumulation mode exp( log^2( sigmag )/8 )
 
     real(wp) esat04,esat05,esat08,esat09,esat16,esat20,esat24,esat25,esat36,esat49,esat64,esat100
     real(wp) esac04,esac05,esac08,esac09,esac16,esac20,esac24,esac25,esac36,       esac64
@@ -603,23 +608,6 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     real(wp) r1, r2, r3, rx4
     real(wp) ri1, ri2, ri3
     real(wp) rat
-    real(wp) coagfm_at, coagfm_ac
-    real(wp) coagnc_at, coagnc_ac
-
-    ! Correction factors for coagulation rates
-    real(wp), save :: bm0( 10 )           ! m0 intramodal fm - rpm values
-
-    ! Populate the arrays for the correction factors *************************************
-
-    ! rpm 0th moment correction factors for unimodal fm coagulation  rates
-    data      bm0  /   &
-      0.707106785165097_wp, 0.726148960080488_wp, 0.766430744110958_wp,   &
-      0.814106389441342_wp, 0.861679526483207_wp, 0.903600509090092_wp,   &
-      0.936578814219156_wp, 0.960098926735545_wp, 0.975646823342881_wp,   &
-      0.985397173215326_wp   /
-
-
-    ! *** end of data statements *************************************
 
     !----------------------------------------------------------
     ! Start calculations
@@ -677,9 +665,6 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     sqdgac5 = dgac2 * sqdgac
     sqdgat7 = dgat3 * sqdgat
 
-    !------------------------------------------------------------------
-    ! For the free molecular regime:  page h.3 of whitby et al. (1991)
-    !------------------------------------------------------------------
     r1      = sqdgac / sqdgat
     r2      = r1 * r1
     r3      = r2 * r1
@@ -721,33 +706,25 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
            esat04, esat09, esat16, esat25, esat36, esat49, esat64, &! in
            esac01, esac04, esac09, esac16, esat100,                &! in 
            n1, n2a, n2n,                                           &! in
-           qv12 )
+           qv12                                                    )! out
 
-    !-----------------------------------------------------
-    ! Intramodal coagulation
-    !-----------------------------------------------------
-    ! aitken mode
-    !--------------
-    ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_at = knc * (one + esat08 + a_const * kngat * (esat20 + esat04))
+    !--------------------------------------------------------
+    ! Intramodal coagulation (0th moment only), aitken mode
+    !--------------------------------------------------------
+    call intramodal_coag_rate_for_0th_moment(              &
+           one, two, a_const, knc, kngat, kfmat, sqdgat,   &! in
+           esat01, esat04, esat05, esat08, esat20, esat25, &! in
+           n2n,                                            &! in
+           qn11                                            )! out
 
-    ! Free-molecular form: equation h.11a of whitby et al. (1991)
-    coagfm_at = kfmat * sqdgat * bm0(n2n) *  ( esat01 + esat25 + two * esat05 )
-
-    ! Harmonic mean
-    qn11 = coagfm_at * coagnc_at / ( coagfm_at + coagnc_at )
-
-    !-------------------
-    ! accumulation mode
-    !-------------------
-    ! Near-continuum form: equation h.12a of whitby et al. (1991)
-    coagnc_ac = knc * (one + esac08 + a_const * kngac * (esac20 + esac04))
-
-    ! Free-molecular form: equation h.11a of whitby et al. (1991)
-    coagfm_ac = kfmac * sqdgac * bm0(n2a) * ( esac01 + esac25 + two * esac05 )
-
-    ! Harmonic mean
-    qn22 = coagfm_ac * coagnc_ac / ( coagfm_ac + coagnc_ac )
+    !--------------------------------------------------------------
+    ! Intramodal coagulation (0th moment only), accumulation mode
+    !--------------------------------------------------------------
+    call intramodal_coag_rate_for_0th_moment(              &
+           one, two, a_const, knc, kngac, kfmac, sqdgac,   &! in
+           esac01, esac04, esac05, esac08, esac20, esac25, &! in
+           n2a,                                            &! in
+           qn22                                            )! out
 
 end subroutine getcoags
 
@@ -759,6 +736,16 @@ subroutine intermodal_coag_rate_for_0th_moment(        &
              esac01, esac04, esac09, esac16,           &! in
              n1, n2a, n2n,                             &! in
              qn12                                      )! out
+!---------------------------------------------------------------
+! Purpose: calculate the intermodal coagulation rate for the 0th moment
+!          using an  analytic expression from Whitby et al. (1991).
+! History:
+!  - Original code taken from CMAG v4.6 code and ported to CAM
+!    by Richard C. Easter, 2007. 
+!  - Contents here wrapped in a separate subroutine by 
+!    Hui Wan, 2022 following a suggestion from Balwinder Singh.
+!---------------------------------------------------------------
+    implicit none
 
     real(wp),intent(in) ::  two, a_const
     real(wp),intent(in) ::  r1, r2, rx4, ri1, ri2, ri3
@@ -1078,7 +1065,9 @@ subroutine intermodal_coag_rate_for_0th_moment(        &
       0.997402_wp,  0.997632_wp,  0.998089_wp,  0.998554_wp,  0.998945_wp,   &
       0.999244_wp,  0.999464_wp,  0.999622_wp,  0.999733_wp,  0.999811_wp/
 
-
+    !--------------
+    ! Calculations
+    !--------------
     ! Near-continuum form:  equation h.10a of whitby et al. (1991)
 
     coagnc0 = knc * (   &
@@ -1093,12 +1082,13 @@ subroutine intermodal_coag_rate_for_0th_moment(        &
       + rx4 * esat09 * esac16 + ri3 * esat16 * esac09   &
       + two * ri1 * esat04 + esac01  )
 
-    ! Loss to accumulation mode, harmonic mean
+    ! Harmonic mean
 
     qn12 = coagnc0 * coagfm0 / ( coagnc0 + coagfm0 )
 
-end subroutine intermodal_coag_rate_for_0th_moment
+    !--------------
 
+end subroutine intermodal_coag_rate_for_0th_moment
 
 
 subroutine intermodal_coag_rate_for_3rd_moment(                      &
@@ -1108,6 +1098,16 @@ subroutine intermodal_coag_rate_for_3rd_moment(                      &
              esac01, esac04, esac09, esac16, esat100,                &! in 
              n1, n2a, n2n,                                           &! in
              qv12 )                                                   ! out
+!---------------------------------------------------------------------------
+! Purpose: calculate the intermodal coagulation rate for the 3rd moment
+!          using an  analytic expression from Whitby et al. (1991).
+! History:
+!  - Original code taken from CMAG v4.6 code and ported to CAM
+!    by Richard C. Easter, 2007. 
+!  - Contents here wrapped in a separate subroutine by 
+!    Hui Wan, 2022 following a suggestion from Balwinder Singh.
+!---------------------------------------------------------------------------
+    implicit none
 
     real(wp),intent(in)  :: two, a_const
     real(wp),intent(in)  :: r1, r2, rx4, ri1, ri2, ri3
@@ -1430,7 +1430,9 @@ subroutine intermodal_coag_rate_for_3rd_moment(                      &
       0.97977_wp,0.98071_wp,0.98270_wp,0.98492_wp,0.98695_wp,0.98858_wp,0.98970_wp,0.99027_wp,   &
       0.99026_wp,0.98968_wp/
 
-
+    !--------------
+    ! Calculations
+    !--------------
     ! Near-continuum form: equation h.10b of whitby et al. (1991)
 
     coagnc3 = knc * dgat3 * (   &
@@ -1449,10 +1451,67 @@ subroutine intermodal_coag_rate_for_3rd_moment(                      &
       + ri3 * esat100 * esac09   &
       + two * ri1 * esat64  * esac01 )
 
-    ! Gain by accumulation mode = loss from aitken mode. Harmonic mean
+    ! Harmonic mean
 
     qv12 = coagnc3 * coagfm3 / ( coagnc3 + coagfm3 )
+    !--------------
 
 end subroutine intermodal_coag_rate_for_3rd_moment
+
+
+subroutine intramodal_coag_rate_for_0th_moment(              &
+             one, two, a_const, knc, kngxx, kfmxx, sqdgxx,   &! in
+             esxx01, esxx04, esxx05, esxx08, esxx20, esxx25, &! in
+             n2x,                                            &! in
+             qnxx                                            )! out
+!---------------------------------------------------------------------------
+! Purpose: calculate the intramodal coagulation rate for the 0th moment
+!          using an  analytic expression from Whitby et al. (1991).
+! History:
+!  - Original code taken from CMAG v4.6 code and ported to CAM
+!    by Richard C. Easter, 2007. 
+!  - Contents here wrapped in a separate subroutine by 
+!    Hui Wan, 2022 following a suggestion from Balwinder Singh.
+!---------------------------------------------------------------------------
+    implicit none
+
+    ! Arguments
+            
+    real(wp),intent(in) :: one, two, a_const
+    real(wp),intent(in) :: knc
+    real(wp),intent(in) :: kngxx, kfmxx, sqdgxx     ! quantities of mode xx
+    real(wp),intent(in) :: esxx04, esxx08, esxx20   ! quantities of mode xx
+    real(wp),intent(in) :: esxx01, esxx05, esxx25   ! quantities of mode xx
+
+    integer, intent(in) :: n2x  ! index for finding correction factor from array bm0
+
+    real(wp),intent(out) :: qnxx
+
+    ! Local variables
+
+    real(wp) :: coagnc, coagfm
+
+    ! rpm 0th moment correction factors for unimodal fm coagulation  rates
+    real(wp), save :: bm0( 10 )           ! m0 intramodal fm - rpm values
+    data  bm0  /   &
+      0.707106785165097_wp, 0.726148960080488_wp, 0.766430744110958_wp,   &
+      0.814106389441342_wp, 0.861679526483207_wp, 0.903600509090092_wp,   &
+      0.936578814219156_wp, 0.960098926735545_wp, 0.975646823342881_wp,   &
+      0.985397173215326_wp   /
+
+    !-------------
+    ! Calculations
+    !--------------
+    ! Near-continuum form: equation h.12a of whitby et al. (1991)
+    coagnc = knc * (one + esxx08 + a_const * kngxx * (esxx20 + esxx04))
+
+    ! Free-molecular form: equation h.11a of whitby et al. (1991)
+    coagfm = kfmxx * sqdgxx * bm0(n2x) *  ( esxx01 + esxx25 + two * esxx05 )
+
+    ! Harmonic mean
+    qnxx = coagfm * coagnc / ( coagfm + coagnc )
+    !-------------
+
+end subroutine intramodal_coag_rate_for_0th_moment
 
 end module modal_aero_coag
