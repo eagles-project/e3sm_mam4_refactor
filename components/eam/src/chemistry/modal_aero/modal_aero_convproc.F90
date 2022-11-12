@@ -889,9 +889,7 @@ subroutine ma_convproc_tend(                                           &
    use constituents, only: pcnst, cnst_name
 
    use modal_aero_data, only:  cnst_name_cw, &
-      lmassptr_amode, lmassptrcw_amode, &
-      ntot_amode, ntot_amode, &
-      nspec_amode, numptr_amode, numptrcw_amode
+      ntot_amode,  nspec_amode
 !  use units, only: getunit
 
    implicit none
@@ -973,8 +971,9 @@ subroutine ma_convproc_tend(                                           &
                               !    updraft starts below the cloud base
    integer :: km1, km1x       ! Work index
    integer :: kp1, kp1x       ! Work index
-   integer :: l, ll, la, lc   ! Work index
-   integer :: m, n            ! Work index
+   integer :: l,  la, lc   ! Work index
+   integer :: m             ! Work index
+   integer :: imode, ispec    ! Work index
    integer :: merr            ! number of errors (i.e., failed diagnostics)
                               ! for current column
    integer :: nerr            ! number of errors for entire run
@@ -1094,15 +1093,9 @@ subroutine ma_convproc_tend(                                           &
    doconvproc_extd(:) = .false.
    doconvproc_extd(2:ncnst) = doconvproc(2:ncnst)
    aqfrac(:) = 0.0_r8
-   do n = 1, ntot_amode
-      do ll = 0, nspec_amode(n)
-         if (ll == 0) then
-            la = numptr_amode(n)
-            lc = numptrcw_amode(n) + pcnst
-         else
-            la = lmassptr_amode(ll,n)
-            lc = lmassptrcw_amode(ll,n) + pcnst
-         end if
+   do imode = 1, ntot_amode
+      do ispec = 0, nspec_amode(imode)
+         call assign_la_lc(imode, ispec, la, lc)
          if ( doconvproc(la) ) then
             doconvproc_extd(lc) = .true.
             aqfrac(lc) = 1.0_r8
@@ -1396,15 +1389,9 @@ jtsub_loop_main_aa: &
 ! currently, however, the interstitial and convective-cloudborne tendencies
 !    are combined (in the next code block) before being passed back (in qsrflx)
 !
-      do n = 1, ntot_amode
-         do ll = 0, nspec_amode(n)
-            if (ll == 0) then
-               la = numptr_amode(n)
-               lc = numptrcw_amode(n) + pcnst
-            else
-               la = lmassptr_amode(ll,n)
-               lc = lmassptrcw_amode(ll,n) + pcnst
-            end if
+      do imode = 1, ntot_amode
+         do ispec = 0, nspec_amode(imode)
+            call assign_la_lc(imode, ispec, la, lc)
                sumactiva(la) = sumactiva(la) + sumactiva(lc)
                sumresusp(la) = sumresusp(la) + sumresusp(lc)
                sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
@@ -2317,8 +2304,7 @@ end subroutine ma_convproc_tend
    use constituents, only: pcnst
    use ndrop, only: activate_modal
 
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-       nspec_amode, ntot_amode, numptr_amode, numptrcw_amode
+   use modal_aero_data, only:  nspec_amode, ntot_amode
 
    implicit none
 
@@ -2393,15 +2379,13 @@ end subroutine ma_convproc_tend
 
    do imode = 1, ntot_amode
         ! for aerosol number
-        la = numptr_amode(imode)
-        lc = numptrcw_amode(imode) + pcnst
+        call assign_la_lc(imode, 0, la, lc)
         act_frac = fn(imode)
         call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
                    pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
         ! for aerosol mass
         do ispec = 1, nspec_amode(imode)
-            la = lmassptr_amode(ispec,imode)
-            lc = lmassptrcw_amode(ispec,imode) + pcnst
+            call assign_la_lc(imode, ispec, la, lc)
             act_frac = fm(imode)
             call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
                    pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
@@ -2448,9 +2432,8 @@ end subroutine ma_convproc_tend
 !-----------------------------------------------------------------------
                                 
    use constituents, only: pcnst
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-      lspectype_amode, nspec_amode, ntot_amode,  &
-      numptr_amode, numptrcw_amode, &
+   use modal_aero_data, only:  lmassptr_amode, lspectype_amode, &
+         nspec_amode, ntot_amode, numptr_amode, &
       specdens_amode, spechygro, &
       voltonumblo_amode, voltonumbhi_amode
 
@@ -2542,8 +2525,7 @@ end subroutine ma_convproc_tend
    use ppgrid, only: pver
    use constituents, only: pcnst
 
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-      nspec_amode, ntot_amode, numptr_amode, numptrcw_amode
+   use modal_aero_data, only:  nspec_amode, ntot_amode
 
    implicit none
 
@@ -2562,21 +2544,13 @@ end subroutine ma_convproc_tend
 
 !-----------------------------------------------------------------------
 ! local variables
-   integer  :: ll, la, lc, nn      ! indices
+   integer  :: imode, ispec, la, lc      ! indices
 !-----------------------------------------------------------------------
 
 
-   do nn = 1, ntot_amode
-
-      ! TMR number
-      la = numptr_amode(nn)
-      lc = numptrcw_amode(nn) + pcnst
-      call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
-
-      ! TMR mass
-      do ll = 1, nspec_amode(nn)
-         la = lmassptr_amode(ll,nn)
-         lc = lmassptrcw_amode(ll,nn) + pcnst
+   do imode = 1, ntot_amode
+      do ispec = 0, nspec_amode(imode)
+         call assign_la_lc(imode, ispec, la, lc)
          call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
       enddo   ! "ll = -1, nspec_amode(n)"
    enddo      ! "n = 1, ntot_amode"
@@ -2621,8 +2595,32 @@ end subroutine ma_convproc_tend
    end subroutine tmr_tendency
 
 !=========================================================================================
+   subroutine assign_la_lc( imode,      ispec,          & ! in
+                            la,         lc              ) ! out
+!-----------------------------------------------------------------------
+! get the index of interstital (la) and cloudborne (lc) aerosols
+! from mode index and species index
+!-----------------------------------------------------------------------
+   use constituents, only: pcnst
+   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
+                               numptr_amode, numptrcw_amode
 
+   integer, intent(in)     :: imode            ! index of MAM4 modes
+   integer, intent(in)     :: ispec            ! index of species, in which:
+                                               ! 0 = number concentration
+                                               ! other = mass concentration
+   integer, intent(out)    :: la               ! index of interstitial aerosol
+   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la + pcnst)
 
+   if (ispec == 0) then
+      la = numptr_amode(imode)
+      lc = numptrcw_amode(imode) + pcnst
+   else
+      la = lmassptr_amode(ispec,imode)
+      lc = lmassptrcw_amode(ispec,imode) + pcnst
+   endif
+
+   end subroutine assign_la_lc
 
 !=========================================================================================
 
