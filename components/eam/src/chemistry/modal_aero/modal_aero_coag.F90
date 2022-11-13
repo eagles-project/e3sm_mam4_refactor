@@ -38,8 +38,8 @@ subroutine set_coagulation_pairs( masterproc )
 !
 ! The coagulation pairs are
 ! mam version   modes involved in coagulation          # of coag pairs
-! -----------   -----------------------------          ---------------
-! 4 mode        accum, aitken, pcarbon/pca             3
+! -----------   ---------------------------------      ---------------
+! 4 mode        accumulation, aitken, pcarbon/pca      3
 !----------------------------------------------------------------------
 
    logical, intent(in) :: masterproc  ! if we are on the master process of an MPI run
@@ -81,7 +81,7 @@ subroutine mam_coag_1subarea(                                   &
      qaer_cur,          qaer_del_coag_out                       )
 !-----------------------------------------------------------------------------------
 ! Purpose: 
-! Considers the coagulation between aitken, pcarbon, and accum modes and
+! Considers the coagulation between aitken, pcarbon, and accumulation modes and
 ! updates aerosol mass and number mixing ratios.
 ! 
 ! This subroutine is called by MAM4's microphysics driver for clear-air conditions.
@@ -179,16 +179,16 @@ end subroutine mam_coag_1subarea
 
 subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
 !----------------------------------------------------------------------------------------------------
-! Purpose: update aerosol number mixing ratios by taking into account self-coagulation (i.e., 
-!          intra-modal coagulation) and inter-modal coagulation.
+! Purpose: update aerosol number mixing ratios by taking into account both the intramodal and 
+!          intermodal coagulation.
 !
 ! Numerical treatment:
 !  - Note that the updates for different modes are calculated in a sequential manner using a specific 
 !    ordering because
-!    - accum   number loss depends on accum number
-!    - pcarbon number loss depends on pcarbon and accum number
+!    - accumulation number loss depends on accumulation number
+!    - pcarbon number loss depends on pcarbon and accumulation number
 !
-!  - The average number mixing ratio over current time step
+!  - The average number mixing ratio over current timestep
 !    of other modes are used to calculate the number loss of a mode.
 !----------------------------------------------------------------------------------------------------
 
@@ -205,34 +205,34 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       real(wp) :: tmpa, rateij
       real(wp) ::       rateii
 
-      !--------------------------------------------
-      ! accum mode number loss due to self-coag
-      !--------------------------------------------
-      call qnum_update_selfcoag( ybetajj0(1), deltat, qnum_bgn(nacc), qnum_end(nacc) )
+      !-------------------------------------------------------
+      ! accumulaiton mode number loss due to intramodal coag
+      !-------------------------------------------------------
+      call update_qnum_for_intramodal_coag( ybetajj0(1), deltat, qnum_bgn(nacc), qnum_end(nacc) )
 
       qnum_tavg(nacc) = (qnum_bgn(nacc) + qnum_end(nacc))*0.5_wp
 
       !----------------------------------------------------------------------------
       ! pcarbon mode number loss - approximate analytical solution 
-      ! using average number conc. for accum mode
+      ! using average number conc. for accumulaiton mode
       !----------------------------------------------------------------------------
       rateij = max( 0.0_wp, deltat*ybetaij0(2)*qnum_tavg(nacc) )
       rateii = max( 0.0_wp, deltat*ybetaii0(2) )
 
-      call qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn(npca), qnum_end(npca) )
+      call update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn(npca), qnum_end(npca) )
 
       qnum_tavg(npca) = (qnum_bgn(npca) + qnum_end(npca))*0.5_wp
 
       !-----------------------------------------------------------------------------------------
       ! aitken mode number loss - approximate analytical solution
-      ! using average number conc. for accum, pcarbon, and marine-org accum modes
+      ! using average number conc. for accumulaiton and pcarbon modes
       !-----------------------------------------------------------------------------------------
       tmpa = ybetaij0(1)*qnum_tavg(nacc)
       tmpa = tmpa + ybetaij0(3)*qnum_tavg(npca)
       rateij = max( 0.0_wp, deltat*tmpa )
       rateii = max( 0.0_wp, deltat*ybetaii0(1) )
 
-      call qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn(nait), qnum_end(nait) )
+      call update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn(nait), qnum_end(nait) )
 
       qnum_tavg(nait) = (qnum_bgn(nait) + qnum_end(nait))*0.5_wp
 
@@ -240,28 +240,28 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
 end subroutine mam_coag_num_update
 
 
-subroutine qnum_update_selfcoag( ybetajj0, deltat, qnum_bgn, qnum_end )
-!-----------------------------------------------------------------------------------------
-! Purpose: update the number mixing ratio of a single mode by considering self-coagulation
-!-----------------------------------------------------------------------------------------
+subroutine update_qnum_for_intramodal_coag( ybetajj0, deltat, qnum_bgn, qnum_end )
+!------------------------------------------------------------------------------------------------
+! Purpose: update the number mixing ratio of a single mode by considering intramodal coagulation
+!-------------------------------------------------------------------------------------------------
 
     real(wp),intent(in)  :: qnum_bgn   ! number mixing ratio [#/kmol-air], start value
-    real(wp),intent(in)  :: ybetajj0   ! self-coagulation coefficient
+    real(wp),intent(in)  :: ybetajj0   ! intramodal coagulation coefficient
     real(wp),intent(in)  :: deltat     ! timestep length [s]
     real(wp),intent(out) :: qnum_end   ! number mixing ratio [#/kmol-air], end value
 
     ! Analytical solution
     qnum_end = qnum_bgn / ( 1.0_wp + ybetajj0*deltat*qnum_bgn )
 
-end subroutine qnum_update_selfcoag
+end subroutine update_qnum_for_intramodal_coag
 
-subroutine qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_end )
+subroutine update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_end )
 !-----------------------------------------------------------------------------------------
-! Purpose: update the number mixing ratio of a single mode considering self-coagulation 
-!          and inter-modal coagulation
+! Purpose: update the number mixing ratio of a single mode considering both the intramodal 
+!          and intermodal coagulation
 !-----------------------------------------------------------------------------------------
 
-    real(wp),intent(in)  :: rateij, rateii  ! inter-modal and self-coagulation rates
+    real(wp),intent(in)  :: rateij, rateii  ! intermodal and intramodal coagulation rates
     real(wp),intent(in)  :: qnum_bgn        ! number mixing ratio [#/kmol-air], start value
     real(wp),intent(out) :: qnum_end        ! number mixing ratio [#/kmol-air], end value
 
@@ -274,7 +274,7 @@ subroutine qnum_update_self_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_
        qnum_end = qnum_bgn*tmpc / ( 1.0_wp + (rateii*qnum_bgn/rateij)*(1.0_wp-tmpc) )
     end if
 
-end subroutine qnum_update_self_and_intermodal_coag
+end subroutine update_qnum_for_intra_and_intermodal_coag
 
 
 subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
