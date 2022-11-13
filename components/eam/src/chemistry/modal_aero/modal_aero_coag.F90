@@ -202,8 +202,11 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       real(wp), intent(out)   :: qnum_tavg(1:max_mode) ! time average defined as 0.5*(bgn+end) [#/kmol-air]
 
       ! local variables
-      real(wp) :: tmpa, rateij
-      real(wp) ::       rateii
+
+      real(wp) :: biidt       ! intramodal coag coefficient bii multiplied by timestep dt
+      real(wp) :: bijqnumj    ! intermodal coag coefficient bij multiplied by number mixing ratio of mode j
+      real(wp) :: bijdtqnumj  ! intermodal coag coefficient bij multiplied by time step dt and the
+                              ! number mixing ratio of mode j
 
       !-------------------------------------------------------
       ! accumulaiton mode number loss due to intramodal coag
@@ -216,10 +219,10 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       ! pcarbon mode number loss - approximate analytical solution 
       ! using average number conc. for accumulaiton mode
       !----------------------------------------------------------------------------
-      rateij = max( 0.0_wp, deltat*ybetaij0(2)*qnum_tavg(nacc) )
-      rateii = max( 0.0_wp, deltat*ybetaii0(2) )
+      bijdtqnumj = max( 0.0_wp, deltat*ybetaij0(2)*qnum_tavg(nacc) )
+      biidt      = max( 0.0_wp, deltat*ybetaii0(2) )
 
-      call update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn(npca), qnum_end(npca) )
+      call update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnum_bgn(npca), qnum_end(npca) )
 
       qnum_tavg(npca) = (qnum_bgn(npca) + qnum_end(npca))*0.5_wp
 
@@ -227,12 +230,12 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       ! aitken mode number loss - approximate analytical solution
       ! using average number conc. for accumulaiton and pcarbon modes
       !-----------------------------------------------------------------------------------------
-      tmpa = ybetaij0(1)*qnum_tavg(nacc)
-      tmpa = tmpa + ybetaij0(3)*qnum_tavg(npca)
-      rateij = max( 0.0_wp, deltat*tmpa )
-      rateii = max( 0.0_wp, deltat*ybetaii0(1) )
+      bijqnumj = ybetaij0(1)*qnum_tavg(nacc)
+      bijqnumj = bijqnumj + ybetaij0(3)*qnum_tavg(npca)
+      bijdtqnumj = max( 0.0_wp, deltat*bijqnumj )
+      biidt      = max( 0.0_wp, deltat*ybetaii0(1) )
 
-      call update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn(nait), qnum_end(nait) )
+      call update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnum_bgn(nait), qnum_end(nait) )
 
       qnum_tavg(nait) = (qnum_bgn(nait) + qnum_end(nait))*0.5_wp
 
@@ -250,28 +253,35 @@ subroutine update_qnum_for_intramodal_coag( ybetajj0, deltat, qnum_bgn, qnum_end
     real(wp),intent(in)  :: deltat     ! timestep length [s]
     real(wp),intent(out) :: qnum_end   ! number mixing ratio [#/kmol-air], end value
 
-    ! Analytical solution
+    ! Analytical solution under the assumption that ybetajj0 is constant over deltat
+
     qnum_end = qnum_bgn / ( 1.0_wp + ybetajj0*deltat*qnum_bgn )
 
 end subroutine update_qnum_for_intramodal_coag
 
-subroutine update_qnum_for_intra_and_intermodal_coag( rateij, rateii, qnum_bgn, qnum_end )
+subroutine update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnumi_bgn, qnumi_end )
 !-----------------------------------------------------------------------------------------
 ! Purpose: update the number mixing ratio of a single mode considering both the intramodal 
 !          and intermodal coagulation
 !-----------------------------------------------------------------------------------------
 
-    real(wp),intent(in)  :: rateij, rateii  ! intermodal and intramodal coagulation rates
-    real(wp),intent(in)  :: qnum_bgn        ! number mixing ratio [#/kmol-air], start value
-    real(wp),intent(out) :: qnum_end        ! number mixing ratio [#/kmol-air], end value
+    real(wp),intent(in)  :: biidt       ! intramodal coag rate coeff. bii multiplied by timestep dt
+    real(wp),intent(in)  :: bijdtqnumj  ! intramodal coag rate coeff. bij multiplied by timestep dt and 
+                                        ! qnum of mode j
 
-    real(wp) :: tmpc
+    real(wp),intent(in)  :: qnumi_bgn   ! number mixing ratio [#/kmol-air] of mode i, start value
+    real(wp),intent(out) :: qnumi_end   ! number mixing ratio [#/kmol-air] of mode i, end value
 
-    if (rateij < 1.0e-5_wp) then
-       qnum_end = qnum_bgn / ( 1.0_wp + (rateij + rateii*qnum_bgn)*(1.0_wp + 0.5_wp*rateij) )
+    real(wp),parameter :: eps_denominator = 1.0e-5_wp   ! a threshold value used to avoid having 
+                                                        ! a very small denominator
+
+    real(wp) :: tmp_exp
+
+    if (bijdtqnumj < eps_denominator) then
+       qnumi_end = qnumi_bgn / ( 1.0_wp + (bijdtqnumj + biidt*qnumi_bgn)*(1.0_wp + 0.5_wp*bijdtqnumj) )
     else
-       tmpc = exp(-rateij)
-       qnum_end = qnum_bgn*tmpc / ( 1.0_wp + (rateii*qnum_bgn/rateij)*(1.0_wp-tmpc) )
+       tmp_exp = exp(-bijdtqnumj)
+       qnumi_end = qnumi_bgn*tmp_exp / ( 1.0_wp + (biidt*qnumi_bgn/bijdtqnumj)*(1.0_wp-tmp_exp) )
     end if
 
 end subroutine update_qnum_for_intra_and_intermodal_coag
