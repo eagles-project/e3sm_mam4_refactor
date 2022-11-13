@@ -1363,8 +1363,9 @@ jtsub_loop_main_aa: &
 !      kbot_prevap = kbot
 ! apply this minor fix when doing resuspend to coarse mode
       kbot_prevap = pver
-      call ma_resuspend_convproc( dcondt, dcondt_resusp,        &
-                                  ktop, kbot_prevap, pcnst_extd )
+
+      call ma_resuspend_convproc( dcondt, dcondt_resusp,        & ! inout
+                                  ktop, kbot_prevap, pcnst_extd ) ! in
 
 ! calculate new column-tendency variables
       call compute_tendency_resusp_evap(                                &
@@ -1372,8 +1373,30 @@ jtsub_loop_main_aa: &
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
                 sumresusp,      sumprevap,      sumprevap_hist          ) ! out
 
+! update tendencies
+      call update_tendency_final(                               &
+                        ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
+                        ncnst,  nsrflx,         icol,           & ! in
+                        dt,     dcondt,         doconvproc,     & ! in
+                        dqdt,   q_i,            qsrflx          ) ! inout
+
+      end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
+
+   end do i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
+
+   return
+end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine update_tendency_final(                            &
+                        ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
+                        ncnst,  nsrflx,         icol,           & ! in
+                        dt,     dcondt,         doconvproc,     & ! in
+                        dqdt,   q_i,            qsrflx          ) ! inout
+!-----------------------------------------------------------------------
+! update tendencies to final output of ma_convproc_tend
 !
-! note again the ma_convproc_tend does not apply convective cloud processing
+! note that the ma_convproc_tend does not apply convective cloud processing
 !    to the stratiform-cloudborne aerosol
 ! within this routine, cloudborne aerosols are convective-cloudborne
 !
@@ -1388,7 +1411,53 @@ jtsub_loop_main_aa: &
 !    both be passed back and output, if desired
 ! currently, however, the interstitial and convective-cloudborne tendencies
 !    are combined (in the next code block) before being passed back (in qsrflx)
-!
+!-----------------------------------------------------------------------
+   use constituents, only: pcnst
+   use modal_aero_data, only:  nspec_amode, ntot_amode
+
+   integer, parameter   :: pcnst_extd = pcnst*2
+   integer, intent(in)  :: ktop              ! top level index
+   integer, intent(in)  :: kbot_prevap       ! bottom level index, for resuspension and evaporation only
+   integer, intent(in)  :: ntsub             ! number of sub timesteps
+   integer, intent(in)  :: jtsub             ! index of sub timesteps from the outer loop
+   integer, intent(in)  :: ncnst             ! number of tracers to transport
+   integer, intent(in)  :: nsrflx            ! last dimension of qsrflx
+   integer, intent(in)  :: icol              ! column index
+   real(r8),intent(in)  :: dt                ! delta t (model time increment) [s]
+   real(r8),intent(in)  :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
+   logical, intent(in)  :: doconvproc(ncnst) ! flag for doing convective transport
+   real(r8), intent(inout) :: dqdt(pcols,pver,ncnst)    ! Tracer tendency array
+   real(r8), intent(inout) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
+                              ! process-specific column tracer tendencies
+                              !  1 = activation   of interstial to conv-cloudborne
+                              !  2 = resuspension of conv-cloudborne to interstital
+                              !  3 = aqueous chemistry (not implemented yet, so zero)
+                              !  4 = wet removal
+                              !  5 = actual precip-evap resuspension (what actually is applied to a species)
+                              !  6 = pseudo precip-evap resuspension (for history file)
+
+   ! local variables
+   integer  :: la, lc, imode, ispec             ! indices
+   integer  :: icnst                            ! index
+   integer  :: kk                               ! vertical index
+   real(r8) :: dtsub                            ! delta t of sub timestep (dt/ntsub) [s]
+   real(r8) :: xinv_ntsub                       ! inverse of ntsub (1.0/ntsub)
+   real(r8) :: sumactiva(pcnst_extd)            ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
+   real(r8) :: sumaqchem(pcnst_extd)            ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
+   real(r8) :: sumprevap(pcnst_extd)            ! sum (over layers) of dp*dcondt_prevap [kg/kg/s * mb]
+   real(r8) :: sumprevap_hist(pcnst_extd)       ! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s * mb]
+   real(r8) :: sumresusp(pcnst_extd)            ! sum (over layers) of dp*dcondt_resusp [kg/kg/s * mb]
+   real(r8) :: sumwetdep(pcnst_extd)            ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
+   real(r8) :: dqdt_i(pver,pcnst)               ! dqdt(icol,kk,icnst) at current icol
+   real(r8) :: qsrflx_i(pcnst,nsrflx)           ! qsrflx(i,m,n) at current i
+
+   ! initiate variables
+   qsrflx_i(:,:) = 0.0
+   dqdt_i(:,:) = 0.0
+   xinv_ntsub = 1.0_r8/ntsub
+   dtsub = dt*xinv_ntsub
+
       do imode = 1, ntot_amode
          do ispec = 0, nspec_amode(imode)
             call assign_la_lc(imode, ispec, la, lc)
@@ -1398,41 +1467,34 @@ jtsub_loop_main_aa: &
                sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
                sumprevap(la) = sumprevap(la) + sumprevap(lc)
                sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
-         enddo ! ll
-      enddo ! n
+         enddo ! ispec
+      enddo ! imode
 
-!
 ! scatter overall tendency back to full array
-!
-      do m = 2, ncnst
-         if (doconvproc(m)) then
+      do icnst = 2, ncnst
+         if (doconvproc(icnst)) then
             ! scatter overall dqdt tendency back
-            do k = ktop, kbot_prevap  ! should go to k=pver because of prevap 
-               dqdt_i(k,m) = dcondt(m,k)
-               dqdt(icol,k,m) = dqdt(icol,k,m) + dqdt_i(k,m)*xinv_ntsub
+            do kk = ktop, kbot_prevap  ! should go to k=pver because of prevap
+               dqdt_i(kk,icnst) = dcondt(icnst,kk)
+               dqdt(icol,kk,icnst) = dqdt(icol,kk,icnst) + dqdt_i(kk,icnst)*xinv_ntsub
                ! update the q_i for the next interation of the jtsub loop
                if (jtsub < ntsub) then
-                  q_i(k,m) = max( (q_i(k,m) + dqdt_i(k,m)*dtsub), 0.0_r8 )
+                  q_i(kk,icnst) = max( (q_i(kk,icnst) + dqdt_i(kk,icnst)*dtsub), 0.0_r8 )
                endif
             enddo
 
             ! scatter column burden tendencies for various processes to qsrflx
-            qsrflx_i(m,1) = sumactiva(m)*hund_ovr_g
-            qsrflx_i(m,2) = sumresusp(m)*hund_ovr_g
-            qsrflx_i(m,3) = sumaqchem(m)*hund_ovr_g
-            qsrflx_i(m,4) = sumwetdep(m)*hund_ovr_g
-            qsrflx_i(m,5) = sumprevap(m)*hund_ovr_g
-            qsrflx_i(m,6) = sumprevap_hist(m)*hund_ovr_g
-            qsrflx(icol,m,1:6) = qsrflx(icol,m,1:6) + qsrflx_i(m,1:6)*xinv_ntsub
+            qsrflx_i(icnst,1) = sumactiva(icnst)*hund_ovr_g
+            qsrflx_i(icnst,2) = sumresusp(icnst)*hund_ovr_g
+            qsrflx_i(icnst,3) = sumaqchem(icnst)*hund_ovr_g
+            qsrflx_i(icnst,4) = sumwetdep(icnst)*hund_ovr_g
+            qsrflx_i(icnst,5) = sumprevap(icnst)*hund_ovr_g
+            qsrflx_i(icnst,6) = sumprevap_hist(icnst)*hund_ovr_g
+            qsrflx(icol,icnst,1:6) = qsrflx(icol,icnst,1:6) + qsrflx_i(icnst,1:6)*xinv_ntsub
          endif
-      enddo ! m
+      enddo ! icnst
 
-      end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
-
-   end do i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
-
-   return
-end subroutine ma_convproc_tend
+   end subroutine update_tendency_final
 
 !====================================================================================
    subroutine compute_updraft_mixing_ratio(                             &
@@ -2486,9 +2548,9 @@ end subroutine ma_convproc_tend
    end subroutine aer_vol_num_hygro
 
 !=========================================================================================
-   subroutine ma_resuspend_convproc(                           &
-              dcondt,  dcondt_resusp,                          &
-              ktop,  kbot_prevap,  pcnst_extd )
+   subroutine ma_resuspend_convproc(                    &
+              dcondt,  dcondt_resusp,                   & ! inout
+              ktop,  kbot_prevap,  pcnst_extd           ) ! in
 
 !-----------------------------------------------------------------------
 !
