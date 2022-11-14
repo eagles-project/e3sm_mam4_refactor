@@ -1248,9 +1248,10 @@ i_loop_main_aa: &
 jtsub_loop_main_aa: &
       do jtsub = 1, ntsub
 
-         call initialize_tmr_array(                             &
-                        ncnst,  iconvtype, doconvproc_extd, q_i,& ! in
-                        const,  chat,      conu,       cond     ) ! out
+        ! initialize some tracer mixing ratio arrays
+        call initialize_tmr_array(     ncnst,                  & ! in
+                       iconvtype,      doconvproc_extd,  q_i,  & ! in
+                       const,          chat,    conu,    cond  ) ! out
 
         ! Compute updraft mixing ratios from cloudbase to cloudtop
         call compute_updraft_mixing_ratio(                              &
@@ -1282,13 +1283,14 @@ jtsub_loop_main_aa: &
 
 
         ! calculate effects of precipitation evaporation
-        call ma_precpevap_convproc(                                              & 
-                                dcondt,  dcondt_prevap,  dcondt_prevap_hist,     & ! inout
-                                dcondt_wetdep,                                   & ! in
-                                rprd,   evapc,           dpdry_i,                & ! in
-                                icol,   ktop,            pcnst_extd,             & ! in
-                                doconvproc_extd,         species_class           & ! in
-                                ) 
+        call ma_precpevap_convproc(                             & 
+               dcondt_wetdep,                                   & ! in
+               rprd,   evapc,           dpdry_i,                & ! in
+               icol,   ktop,            pcnst_extd,             & ! in
+               doconvproc_extd,         species_class,          & ! in
+               dcondt_prevap,          dcondt_prevap_hist,      & ! out
+               dcondt                                           & ! inout
+               ) 
 
 
 ! make adjustments to dcondt for activated & unactivated aerosol species
@@ -1305,8 +1307,9 @@ jtsub_loop_main_aa: &
 ! apply this minor fix when doing resuspend to coarse mode
         kbot_prevap = pver
 
-        call ma_resuspend_convproc( dcondt, dcondt_resusp,      & ! inout
-                                  ktop, kbot_prevap, pcnst_extd ) ! in
+        call ma_resuspend_convproc( dcondt,                             & ! inout
+                                    ktop, kbot_prevap, pcnst_extd,      & ! in
+                                    dcondt_resusp                       ) ! out
 
         ! calculate new column-tendency variables
         call compute_tendency_resusp_evap(                              &
@@ -1329,9 +1332,9 @@ jtsub_loop_main_aa: &
 end subroutine ma_convproc_tend
 
 !====================================================================================
-   subroutine initialize_tmr_array(                             &
-                        ncnst,  iconvtype, doconvproc_extd, q_i,& ! in
-                        const,  chat,      conu,       cond     ) ! out
+   subroutine initialize_tmr_array(     ncnst,                  &
+                        iconvtype,      doconvproc_extd,  q_i,  & ! in
+                        const,          chat,      conu,  cond  ) ! out
 !-----------------------------------------------------------------------
 ! initialize tracer mixing ratio arrays (const, chat, conu, cond)
 ! chat, conu and cond are at interfaces; interpolation needed
@@ -2066,11 +2069,12 @@ end subroutine ma_convproc_tend
 
 !=========================================================================================
    subroutine ma_precpevap_convproc(                           &
-              dcondt,  dcondt_prevap,  dcondt_prevap_hist,     & ! inout
               dcondt_wetdep,                                   & ! in
               rprd,    evapc,         dpdry_i,                 & ! in
               icol,    ktop,          pcnst_extd,              & ! in
-              doconvproc_extd,        species_class            & ! in
+              doconvproc_extd,        species_class,           & ! in
+              dcondt_prevap,          dcondt_prevap_hist,      & ! out
+              dcondt                                           & ! inout
               ) 
 !-----------------------------------------------------------------------
 !
@@ -2096,11 +2100,11 @@ end subroutine ma_convproc_tend
                               ! overall TMR tendency from convection [kg/kg/s]
    real(r8), intent(in)    :: dcondt_wetdep(pcnst_extd,pver)
                               ! portion of TMR tendency due to wet removal [kg/kg/s]
-   real(r8), intent(inout) :: dcondt_prevap(pcnst_extd,pver)
+   real(r8), intent(out)   :: dcondt_prevap(pcnst_extd,pver)
                               ! portion of TMR tendency due to precip evaporation [kg/kg/s]
                               ! (actually, due to the adjustments made here)
                               ! (on entry, this is 0.0)
-   real(r8), intent(inout) :: dcondt_prevap_hist(pcnst_extd,pver) 
+   real(r8), intent(out)   :: dcondt_prevap_hist(pcnst_extd,pver) 
                               ! this determines what goes into the history 
                               !    precip-evap SFSEC variables
                               ! currently, the SFSEC resuspension are attributed
@@ -2164,6 +2168,8 @@ end subroutine ma_convproc_tend
    pr_flux = 0.0_r8
    pr_flux_base = 0.0_r8
    wd_flux(:) = 0.0_r8
+   dcondt_prevap(:,:) = 0.0
+   dcondt_prevap_hist(:,:) = 0.0
 
    do kk = ktop, pver
 ! step 1 - precip evaporation and aerosol resuspension
@@ -2579,9 +2585,9 @@ end subroutine ma_convproc_tend
    end subroutine aer_vol_num_hygro
 
 !=========================================================================================
-   subroutine ma_resuspend_convproc(                    &
-              dcondt,  dcondt_resusp,                   & ! inout
-              ktop,  kbot_prevap,  pcnst_extd           ) ! in
+   subroutine ma_resuspend_convproc(   dcondt,          & ! inout
+              ktop,  kbot_prevap,  pcnst_extd,          & ! in
+              dcondt_resusp                             ) ! out
 
 !-----------------------------------------------------------------------
 !
@@ -2628,7 +2634,7 @@ end subroutine ma_convproc_tend
    integer,  intent(in)    :: pcnst_extd ! cloudborne aerosol dimension [unitless]
    real(r8), intent(inout) :: dcondt(pcnst_extd,pver)
                               ! overall TMR tendency from convection [#/kg/s or kg/kg/s] 
-   real(r8), intent(inout) :: dcondt_resusp(pcnst_extd,pver)
+   real(r8), intent(out)   :: dcondt_resusp(pcnst_extd,pver)
                               ! portion of TMR tendency due to resuspension [#/kg/s or kg/kg/s]
                               ! (actually, due to the adjustments made here)
 
@@ -2640,6 +2646,7 @@ end subroutine ma_convproc_tend
    integer  :: imode, ispec, la, lc      ! indices
 !-----------------------------------------------------------------------
 
+   dcondt_resusp(:,:) = 0.0
 
    do imode = 1, ntot_amode
       do ispec = 0, nspec_amode(imode)
