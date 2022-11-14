@@ -1363,7 +1363,6 @@ main_jsub_loop: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: src_mode, dest_mode
 ! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
 ! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
       integer :: dest_mode_of_mode(max_mode)
@@ -1796,7 +1795,6 @@ do_rename_if_block30: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: src_mode, dest_mode
 ! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
 ! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
       integer :: dest_mode_of_mode(max_mode)
