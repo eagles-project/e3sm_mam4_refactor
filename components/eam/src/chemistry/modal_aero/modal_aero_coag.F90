@@ -308,7 +308,7 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
 !
 ! The transfer amounts are calculated using as an exponential decay of
 ! the initial mass mixing ratios,
-! where the decay rate is calculated using the average (over one timestep)
+! where the decay constant is calculated using the average (over one timestep)
 ! number mixing ratios for each mode
 !
 ! The mass transfer calculations are first-order accurate in time,
@@ -330,10 +330,15 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
 
       ! Local variables
 
-      real(wp) :: rate1, rate2  ! coag rates = coag coeff * qnum
-      real(wp) :: ratesum       ! coag rate summed over all modes
+      real(wp) :: bijqnumj1   ! coag coefficient bij multiplied by the number mixing ratio of mode j1
+      real(wp) :: bijqnumj2   ! coag coefficient bij multiplied by the number mixing ratio of mode j2
+
+      real(wp) :: decay_const   ! the exponential decay constant k in the ODE dq/dt = -kq.
+                                ! The ODE is an approximate form of the equation describing the mass mixing
+                                ! ratio change due to coagulation.
+      real(wp) :: decay_factor  ! = deltat * decay_const
+
       real(wp) :: prtn1, prtn2  ! portions of mass going into different desitination modes 
-      real(wp) :: tmpc
       real(wp) :: tmp_dq, tmp_xf
 
       integer :: iaer   ! aerosol species index
@@ -352,18 +357,18 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
       !--------------------------------------------------------------------
       ! Calculate the rate of mass transfer into different destination modes and the sum over all modes
 
-      rate1 = max( 0.0_wp, ybetaij3(1)*qnum_tavg(nacc) )
-      rate2 = max( 0.0_wp, ybetaij3(3)*qnum_tavg(npca) )
-      ratesum = rate1 + rate2
+      bijqnumj1 = max( 0.0_wp, ybetaij3(1)*qnum_tavg(nacc) )
+      bijqnumj2 = max( 0.0_wp, ybetaij3(3)*qnum_tavg(npca) )
+      decay_const = bijqnumj1 + bijqnumj2
 
-      tmpc = deltat*ratesum ! calculate coag-induced changes only when this number is not ~= zero
-      if (tmpc > epsilonx2) then
+      decay_factor = deltat*decay_const ! calculate coag-induced changes only when this number is not ~= zero
+      if (decay_factor > epsilonx2) then
 
          ! Portions of mass going into different modes
-         prtn2 = rate2/ratesum
+         prtn2 = bijqnumj2/decay_const
          prtn1 = 1.0_wp - prtn2
 
-         tmp_xf = 1.0_wp - exp(-tmpc)    ! total fraction lost from aitken mode
+         tmp_xf = 1.0_wp - exp(-decay_factor)    ! total fraction lost from aitken mode
          do iaer = 1, naer
 
             tmp_dq = tmp_xf*qaer_bgn(iaer,nait)  ! total amount lost from aitken mode
@@ -385,12 +390,12 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
       ! Mass transfer out of pcarbon mode. Only one coag pair is involved:
       ! - coag pair 2: pca + accumulation -> accumulation
       !--------------------------------------------------------------------
-      ratesum = max( 0.0_wp, ybetaij3(2)*qnum_tavg(nacc) )  ! there is only 1 destination
+      decay_const = max( 0.0_wp, ybetaij3(2)*qnum_tavg(nacc) )  ! there is only 1 destination
 
-      tmpc = deltat*ratesum ! calculate coag-induced changes only when this number is not ~= zero
-      if (tmpc > epsilonx2) then
+      decay_factor = deltat*decay_const ! calculate coag-induced changes only when this number is not ~= zero
+      if (decay_factor > epsilonx2) then
 
-         tmp_xf = 1.0_wp - exp(-tmpc) ! total fraction lost from pca mode
+         tmp_xf = 1.0_wp - exp(-decay_factor) ! total fraction lost from pca mode
          do iaer = 1, naer
             tmp_dq = tmp_xf*qaer_bgn(iaer,npca)                   ! total amount lost from pca mode
             qaer_end(iaer,npca) = qaer_end(iaer,npca) - tmp_dq    ! subtract from pca mode
