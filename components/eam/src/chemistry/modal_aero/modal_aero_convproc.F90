@@ -62,6 +62,8 @@ module modal_aero_convproc
    real(r8), parameter :: small_massflux = 1.0e-7_r8  ! if mass-flux < 1e-7 kg/m2/s ~= 1e-7 m/s ~= 1 cm/day, treat as zero
    real(r8), parameter :: small_value = 1.0e-30_r8   ! a small value that variables smaller than it are considered as zero
    real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
+   real(r8), parameter :: small_rel = 1.0e-6_r8         ! small value for relative comparison
+
 
 !
 ! Private module data
@@ -1246,73 +1248,12 @@ i_loop_main_aa: &
 jtsub_loop_main_aa: &
       do jtsub = 1, ntsub
 
+         call initialize_tmr_array(                             &
+                        ncnst,  iconvtype, doconvproc_extd, q_i,& ! in
+                        const,  chat,      conu,       cond     ) ! out
 
-      qsrflx_i(:,:) = 0.0
-      dqdt_i(:,:) = 0.0
-
-      const(:,:) = 0.0 ! zero cloud-phase species
-      chat(:,:) = 0.0 ! zero cloud-phase species
-      conu(:,:) = 0.0
-      cond(:,:) = 0.0
-
-      dcondt(:,:) = 0.0
-      dcondt_resusp(:,:) = 0.0
-      dcondt_wetdep(:,:) = 0.0
-      dcondt_prevap(:,:) = 0.0
-      dcondt_prevap_hist(:,:) = 0.0 
-      dconudt_wetdep(:,:) = 0.0
-! initialize the activation tendency 
-      dconudt_activa(:,:) = 0.0
-
-! initialize mixing ratio arrays (chat, const, conu, cond)
-      do m = 2, ncnst
-      if ( doconvproc_extd(m) ) then
-
-! Gather up the constituent
-         do k = 1,pver
-            const(m,k) = q_i(k,m)
-         end do
-         
-! From now on work only with gathered data
-! Interpolate environment tracer values to interfaces
-         do k = 1,pver
-            km1 = max(1,k-1)
-            minc = min(const(m,km1),const(m,k))
-            maxc = max(const(m,km1),const(m,k))
-            if (minc < 0) then
-               cdifr = 0.
-            else
-               cdifr = abs(const(m,k)-const(m,km1))/max(maxc,small_con)
-            endif
-
-! If the two layers differ significantly use a geometric averaging procedure
-! But only do that for deep convection.  For shallow, use the simple
-! averaging which is used in subr cmfmca
-            if (iconvtype /= 1) then
-               chat(m,k) = 0.5* (const(m,k)+const(m,km1))
-            else if (cdifr > 1.E-6) then
-!           if (cdifr > 1.E-6) then
-               cabv = max(const(m,km1),maxc*1.e-12_r8)
-               cbel = max(const(m,k),maxc*1.e-12_r8)
-               chat(m,k) = log(cabv/cbel)/(cabv-cbel)*cabv*cbel
-            else             ! Small diff, so just arithmetic mean
-               chat(m,k) = 0.5* (const(m,k)+const(m,km1))
-            end if
-
-! Set provisional up and down draft values, and tendencies
-            conu(m,k) = chat(m,k)
-            cond(m,k) = chat(m,k)
-         end do ! k
-
-! Values at surface inferface == values in lowest layer
-         chat(m,pver+1) = const(m,pver)
-         conu(m,pver+1) = const(m,pver)
-         cond(m,pver+1) = const(m,pver)
-      end if
-      end do ! m
-
-! Compute updraft mixing ratios from cloudbase to cloudtop
-      call compute_updraft_mixing_ratio(                                &
+        ! Compute updraft mixing ratios from cloudbase to cloudtop
+        call compute_updraft_mixing_ratio(                              &
                 doconvproc_extd, icol,  ktop,   kbot,   iconvtype,      & ! in
                 dt,     dp_i,   dpdry_i,        cldfrac,                & ! in
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
@@ -1321,16 +1262,16 @@ jtsub_loop_main_aa: &
                 conu                                                    ) ! inout
 
 
-! Compute downdraft mixing ratios from cloudtop to cloudbase
-      call compute_downdraft_mixing_ratio(                      &
+        ! Compute downdraft mixing ratios from cloudtop to cloudbase
+        call compute_downdraft_mixing_ratio(                    &
                         doconvproc_extd,       ktop, kbot,      & ! in
                         md_i,           eddp,        const,     & ! in
                         cond                                    ) ! inout
 
-! Now computes fluxes and tendencies
-! NOTE:  The approach used in convtran applies to inert tracers and
-!        must be modified to include source and sink terms
-      call compute_fluxes_tendencies(                           &
+        ! Now computes fluxes and tendencies
+        ! NOTE:  The approach used in convtran applies to inert tracers and
+        !        must be modified to include source and sink terms
+        call compute_fluxes_tendencies(                         &
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
@@ -1340,8 +1281,8 @@ jtsub_loop_main_aa: &
                 dcondt,         dcondt_wetdep                   ) ! out
 
 
-! calculate effects of precipitation evaporation
-      call ma_precpevap_convproc(                                                & 
+        ! calculate effects of precipitation evaporation
+        call ma_precpevap_convproc(                                              & 
                                 dcondt,  dcondt_prevap,  dcondt_prevap_hist,     & ! inout
                                 dcondt_wetdep,                                   & ! in
                                 rprd,   evapc,           dpdry_i,                & ! in
@@ -1362,19 +1303,19 @@ jtsub_loop_main_aa: &
 !    because convective precip evap is (or used to be) much less than stratiform precip evap )
 !      kbot_prevap = kbot
 ! apply this minor fix when doing resuspend to coarse mode
-      kbot_prevap = pver
+        kbot_prevap = pver
 
-      call ma_resuspend_convproc( dcondt, dcondt_resusp,        & ! inout
+        call ma_resuspend_convproc( dcondt, dcondt_resusp,      & ! inout
                                   ktop, kbot_prevap, pcnst_extd ) ! in
 
-! calculate new column-tendency variables
-      call compute_tendency_resusp_evap(                                &
+        ! calculate new column-tendency variables
+        call compute_tendency_resusp_evap(                              &
                 doconvproc_extd, ktop,          kbot_prevap,   dpdry_i, & ! in
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
                 sumresusp,      sumprevap,      sumprevap_hist          ) ! out
 
-! update tendencies
-      call update_tendency_final(                               &
+        ! update tendencies
+        call update_tendency_final(                             &
                         ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
                         ncnst,  nsrflx,         icol,           & ! in
                         dt,     dcondt,         doconvproc,     & ! in
@@ -1386,6 +1327,96 @@ jtsub_loop_main_aa: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine initialize_tmr_array(                             &
+                        ncnst,  iconvtype, doconvproc_extd, q_i,& ! in
+                        const,  chat,      conu,       cond     ) ! out
+!-----------------------------------------------------------------------
+! initialize tracer mixing ratio arrays (const, chat, conu, cond)
+! chat, conu and cond are at interfaces; interpolation needed
+! Note: for deep convection, some values between the two layers 
+! differ significantly, use geometric averaging under certain conditions
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp
+   use constituents, only: pcnst
+
+   integer,  parameter  :: pcnst_extd = pcnst*2
+
+   integer, intent(in)  :: ncnst                     ! number of tracers to transport
+   integer, intent(in)  :: iconvtype                 ! 1=deep, 2=uw shallow
+   logical, intent(in)  :: doconvproc_extd(pcnst_extd)    ! flag for doing convective transport
+   real(r8), intent(in) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
+
+   real(r8), intent(out) :: const(pcnst_extd,pver)   ! gathered tracer array [kg/kg]
+   real(r8), intent(out) :: chat(pcnst_extd,pverp)   ! mix ratio in env at interfaces [kg/kg]
+   real(r8), intent(out) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
+   real(r8), intent(out) :: cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces [kg/kg]
+
+   ! local variables
+   integer  :: icnst            ! index
+   integer  :: kk               ! vertical index
+   integer  :: km1              ! index of kk-1
+   real(r8) :: max_con          ! max const concentration at level kk and kk-1 [kg/kg]
+   real(r8) :: min_con          ! min const concentration at level kk and kk-1 [kg/kg]
+   real(r8) :: c_dif_rel        ! relative difference between level kk and kk-1 [unitless]
+   real(r8) :: c_above          ! const at the above (kk-1 level) [kg/kg]
+   real(r8) :: c_below          ! const at the below (kk level) [kg/kg]
+
+
+   ! initiate variables
+    const(:,:) = 0.0
+    chat(:,:) = 0.0 
+    conu(:,:) = 0.0
+    cond(:,:) = 0.0   
+
+    do icnst = 2, ncnst
+        if ( doconvproc_extd(icnst) ) then
+            ! Gather up the constituent
+            do kk = 1,pver
+                const(icnst,kk) = q_i(kk,icnst)
+            enddo
+
+           ! Interpolate environment tracer values to interfaces
+           do kk = 1,pver
+                km1 = max(1,kk-1)
+
+                ! get relative difference between the two levels
+                min_con = min(const(icnst,km1),const(icnst,kk))
+                max_con = max(const(icnst,km1),const(icnst,kk))
+                if (min_con < 0) then
+                   c_dif_rel = 0.
+                else
+                   c_dif_rel = abs(const(icnst,kk)-const(icnst,km1))/max(max_con,small_con)
+                endif
+
+                ! If the two layers differ significantly use a geometric averaging procedure
+                ! But only do that for deep convection.  For shallow, use the simple
+                ! averaging which is used in subr cmfmca
+                if (iconvtype /= 1) then ! simple averaging for non-deep convection
+                    chat(icnst,kk) = 0.5* (const(icnst,kk)+const(icnst,km1))
+                elseif (c_dif_rel > small_rel) then ! deep convection using geometric averaging
+                    c_above = max(const(icnst,km1),max_con*1.e-12_r8)
+                    c_below = max(const(icnst,kk),max_con*1.e-12_r8)
+                    chat(icnst,kk) = log(c_above/c_below)/(c_above-c_below)*c_above*c_below
+                else             ! Small diff, so just arithmetic mean
+                    chat(icnst,kk) = 0.5* (const(icnst,kk)+const(icnst,km1))
+                endif
+
+                ! Set provisional up and down draft values, and tendencies
+                conu(icnst,kk) = chat(icnst,kk)
+                cond(icnst,kk) = chat(icnst,kk)
+            enddo ! kk
+
+            ! Values at surface inferface == values in lowest layer
+            chat(icnst,pver+1) = const(icnst,pver)
+            conu(icnst,pver+1) = const(icnst,pver)
+            cond(icnst,pver+1) = const(icnst,pver)
+
+        endif ! doconvproc_extd(icnst)
+   enddo ! icnst
+
+   end subroutine initialize_tmr_array
 
 !====================================================================================
    subroutine update_tendency_final(                            &
