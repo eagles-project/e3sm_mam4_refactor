@@ -372,9 +372,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, wsubi, pbuf
    real(r8) :: coarse_pom(pcols,pver)   ! mass m.r. of coarse pom
    real(r8) :: coarse_soa(pcols,pver)   ! mass m.r. of coarse soa 
 
-   real(r8), pointer :: aer_mmr(:,:)    ! aerosol mass mixing ratio
    real(r8), pointer :: dgnum(:,:,:)    ! mode dry radius
-
    real(r8), pointer :: ast(:,:)
    real(r8) :: icecldf(pcols,pver)  ! ice cloud fraction
 
@@ -388,8 +386,8 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, wsubi, pbuf
    real(r8) :: icldm(pcols,pver)   ! ice cloud fraction
 
    real(r8) :: so4_num                               ! so4 aerosol number [#/cm^3]
-   real(r8) :: dst3_num                              ! dust aerosol number (#/cm^3)
-   real(r8) :: dst_num                               ! total dust aerosol number (#/cm^3)
+   real(r8) :: dst3_num                              ! dust aerosol number [#/cm^3]
+   real(r8) :: dst_num                               ! total dust aerosol number [#/cm^3]
    real(r8) :: wght
    real(r8) :: dmc
    real(r8) :: ssmc

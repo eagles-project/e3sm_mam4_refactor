@@ -275,16 +275,6 @@ subroutine microp_aero_init
          end select
       end do
       
-      if(dem_in) then
-         call rad_cnst_get_info(0, mode_accum_idx, nspec=nspec)
-         do n = 1, nspec
-            call rad_cnst_get_info(0, mode_accum_idx, n, spec_type=str32)
-            select case (trim(str32))
-            case ('dust')
-               accum_dust_idx = n
-            end select
-         end do
-      endif
 
       ! Check that required mode specie types were found
       if ( coarse_dust_idx == -1 .or. coarse_nacl_idx == -1) then
@@ -292,29 +282,6 @@ subroutine microp_aero_init
             coarse_dust_idx, coarse_nacl_idx
          call endrun(routine//': ERROR required mode-species type not found')
       end if
-
-   else
-
-      ! Props needed for BAM number concentration calcs.
-
-      call rad_cnst_get_info(0, naero=naer_all)
-      allocate( &
-         aername(naer_all),        &
-         num_to_mass_aer(naer_all) )
-
-      do iaer = 1, naer_all
-         call rad_cnst_get_aer_props(0, iaer, &
-            aername         = aername(iaer), &
-            num_to_mass_aer = num_to_mass_aer(iaer) )
-
-         ! Look for sulfate, dust, and soot in this list (Bulk aerosol only)
-         if (trim(aername(iaer)) == 'SULFATE') idxsul = iaer
-         if (trim(aername(iaer)) == 'DUST2') idxdst2 = iaer
-         if (trim(aername(iaer)) == 'DUST3') idxdst3 = iaer
-         if (trim(aername(iaer)) == 'DUST4') idxdst4 = iaer
-      end do
-
-      call ndrop_bam_init()
 
    end if
 
@@ -496,43 +463,33 @@ subroutine microp_aero_run ( &
 
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   if(liqcf_fix) then
-      call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-      call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   endif
-
-   if(liqcf_fix) then !BSINGH(09/22/2014): It mimics compl treatment
-      liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
-      icecldf(:ncol,:pver) = aist(:ncol,:pver)
-   else
-      liqcldf(:ncol,:pver) = ast(:ncol,:pver)
-      icecldf(:ncol,:pver) = ast(:ncol,:pver)
-   endif
+   call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+ 
+   liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
+   icecldf(:ncol,:pver) = aist(:ncol,:pver)
+  
 
    call pbuf_get_field(pbuf, npccn_idx, npccn)
 
    call pbuf_get_field(pbuf, nacon_idx, nacon)
    call pbuf_get_field(pbuf, rndst_idx, rndst)
 
-   if (clim_modal_aero) then
-
-      itim_old = pbuf_old_tim_idx()
+   itim_old = pbuf_old_tim_idx()
       
-      if (micro_do_icesupersat) then
-        call pbuf_get_field(pbuf, cldo_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))        
-      else
-        call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-      endif
+   if (micro_do_icesupersat) then
+      call pbuf_get_field(pbuf, cldo_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))        
+   else
+      call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   endif
 
-      call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
+   call rad_cnst_get_info(0, nmodes=nmodes)
+   call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
 
-      call rad_cnst_get_info(0, nmodes=nmodes)
-      call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+   allocate(factnum(pcols,pver,nmodes))
 
-      allocate(factnum(pcols,pver,nmodes))
-
-   end if
 
    ! initialize output
    npccn(1:ncol,1:pver)    = 0._r8  
@@ -546,9 +503,8 @@ subroutine microp_aero_run ( &
    rndst(1:ncol,1:pver,4) = rn_dst4
 
    ! save copy of cloud borne aerosols for use in heterogeneous freezing
-   if (use_hetfrz_classnuc) then
-      call hetfrz_classnuc_cam_save_cbaero(state, pbuf)
-   end if
+   call hetfrz_classnuc_cam_save_cbaero(state, pbuf)
+
 
    ! initialize time-varying parameters
    do k = top_lev, pver
@@ -557,14 +513,14 @@ subroutine microp_aero_run ( &
       end do
    end do
 
-   if (clim_modal_aero) then
-      ! mode number mixing ratios
-      call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state, pbuf, num_coarse)
+  
+   ! mode number mixing ratios
+   call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state, pbuf, num_coarse)
 
-      ! mode specie mass m.r.
-      call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state, pbuf, coarse_dust)
-      call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state, pbuf, coarse_nacl)
-   end if
+   ! mode specie mass m.r.
+   call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state, pbuf, coarse_dust)
+   call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state, pbuf, coarse_nacl)
+
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! More refined computation of sub-grid vertical velocity 
@@ -734,60 +690,14 @@ subroutine microp_aero_run ( &
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! Contact freezing  (-40<T<-3 C) (Young, 1974) with hooks into simulated dust
    ! estimate rndst and nanco for 4 dust bins here to pass to MG microphysics
-
-   do k = top_lev, pver
-      do i = 1, ncol
-
-         if (t(i,k) < 269.15_r8) then
-
-            if (clim_modal_aero) then
-
-               ! For modal aerosols:
-               !  use size '3' for dust coarse mode...
-               !  scale by dust fraction in coarse mode
-               
-               dmc  = coarse_dust(i,k)
-               ssmc = coarse_nacl(i,k)
-
-               if ( separate_dust ) then
-                  ! 7-mode -- has separate dust and seasalt mode types and no need for weighting 
-                  wght = 1._r8
-               else
-                  ! 3-mode -- needs weighting for dust since dust and seasalt are combined in the "coarse" mode type
-                  wght = dmc/(ssmc + dmc)
-               endif
-
-               if (dmc > 0.0_r8) then
-                  nacon(i,k,3) = wght*num_coarse(i,k)*rho(i,k)
-               else
-                  nacon(i,k,3) = 0._r8
-               end if
-
-               !also redefine parameters based on size...
-
-               rndst(i,k,3) = 0.5_r8*dgnumwet(i,k,mode_coarse_dst_idx)
-               if (rndst(i,k,3) <= 0._r8) then 
-                  rndst(i,k,3) = rn_dst3
-               end if
-            end if
-
-         end if
-      end do
-   end do
-
+   ! removed because the default contact freezing scheme is now CNT
 
    ! heterogeneous freezing
-   if (use_hetfrz_classnuc) then
+   call t_startf('hetfrz_classnuc_cam_calc')
+   call hetfrz_classnuc_cam_calc(state, deltatin, factnum, pbuf)
+   call t_stopf('hetfrz_classnuc_cam_calc')
 
-      call t_startf('hetfrz_classnuc_cam_calc')
-      call hetfrz_classnuc_cam_calc(state, deltatin, factnum, pbuf)
-      call t_stopf('hetfrz_classnuc_cam_calc')
-
-   end if
-
-   if (clim_modal_aero) then
-      deallocate(factnum)
-   end if
+   deallocate(factnum)
 
    end associate
 
