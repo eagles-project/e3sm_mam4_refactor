@@ -560,31 +560,10 @@ subroutine microp_aero_run ( &
    if (clim_modal_aero) then
       ! mode number mixing ratios
       call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state, pbuf, num_coarse)
-      if(dem_in)then
-         if(mode_fine_dst_idx > 0)call rad_cnst_get_mode_num(0, mode_fine_dst_idx, 'a', state, pbuf, num_fine)
-         if(mode_pcarbon_idx  > 0)call rad_cnst_get_mode_num(0, mode_pcarbon_idx, 'a', state, pbuf, num_pcarbon)      
-      endif
+
       ! mode specie mass m.r.
       call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state, pbuf, coarse_dust)
       call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state, pbuf, coarse_nacl)
-      if(dem_in)call rad_cnst_get_aer_mmr(0, mode_accum_idx, accum_dust_idx, 'a', state, pbuf, accum_dust) 
-
-   else
-      ! init number/mass arrays for bulk aerosols
-      allocate( &
-         naer2(pcols,pver,naer_all), &
-         maerosol(pcols,pver,naer_all))
-
-      do m = 1, naer_all
-         call rad_cnst_get_aer_mmr(0, m, state, pbuf, aer_mmr)
-         maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
-         
-         if (m .eq. idxsul) then
-            naer2(:ncol,:,m) = maerosol(:ncol,:,m)*num_to_mass_aer(m)*bulk_scale
-         else
-            naer2(:ncol,:,m) = maerosol(:ncol,:,m)*num_to_mass_aer(m)
-         end if
-      end do
    end if
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -702,7 +681,7 @@ subroutine microp_aero_run ( &
    !ICE Nucleation
 
    call t_startf('nucleate_ice_cam_calc')
-   call nucleate_ice_cam_calc(state, wsubice, pbuf)
+   call nucleate_ice_cam_calc(ncol, lchnk, t, state%q, pmid, wsubice, pbuf)
    call t_stopf('nucleate_ice_cam_calc')
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -749,35 +728,6 @@ subroutine microp_aero_run ( &
 
       npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 
-   else
-
-      ! for bulk aerosol
-
-      ! no tendencies returned from ndrop_bam_run, so just init ptend here
-      call physics_ptend_init(ptend, state%psetcols, 'mic_aero_run')
-
-      call t_startf('droplet_act_bulk_aero')
-      do k = top_lev, pver
-         do i = 1, ncol
-
-            if (qc(i,k) >= qsmall) then
-
-               ! get droplet activation rate
-
-               call ndrop_bam_run( &
-                  wsub(i,k), t(i,k), rho(i,k), naer2(i,k,:), naer_all, &
-                  naer_all, maerosol(i,k,:),  &
-                  dum2)
-               dum = dum2
-            else
-               dum = 0._r8
-            end if
-
-            npccn(i,k) = (dum*lcldm(i,k) - nc(i,k))/deltatin
-         end do
-      end do
-      call t_stopf('droplet_act_bulk_aero')
-
    end if
 
 
@@ -819,41 +769,12 @@ subroutine microp_aero_run ( &
                if (rndst(i,k,3) <= 0._r8) then 
                   rndst(i,k,3) = rn_dst3
                end if
-
-            else
-
-               !For Bulk Aerosols: set equal to aerosol number for dust for bins 2-4 (bin 1=0)
-
-               if (idxdst2 > 0) then 
-                  nacon(i,k,2) = naer2(i,k,idxdst2)
-               end if
-               if (idxdst3 > 0) then 
-                  nacon(i,k,3) = naer2(i,k,idxdst3)
-               end if
-               if (idxdst4 > 0) then 
-                  nacon(i,k,4) = naer2(i,k,idxdst4)
-               end if
             end if
 
          end if
       end do
    end do
 
-   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-   !bulk aerosol ccn concentration (modal does it in ndrop, from dropmixnuc)
-
-   if (.not. clim_modal_aero) then
-
-      ! ccn concentration as diagnostic
-      call t_startf('ndrop_bam_ccn')
-      call ndrop_bam_ccn(lchnk, ncol, maerosol, naer2)
-      call t_stopf('ndrop_bam_ccn')
-
-      deallocate( &
-         naer2,    &
-         maerosol)
-
-   end if
 
    ! heterogeneous freezing
    if (use_hetfrz_classnuc) then
