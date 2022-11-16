@@ -1363,7 +1363,6 @@ main_jsub_loop: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: modefrm, modetoo
 ! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
 ! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
       integer :: dest_mode_of_mode(max_mode)
@@ -1796,7 +1795,6 @@ do_rename_if_block30: &
       integer :: iaer, igas, ip
       integer :: jtsubstep
       integer :: ll
-      integer :: modefrm, modetoo
 ! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
 ! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
       integer :: dest_mode_of_mode(max_mode)
@@ -2064,16 +2062,10 @@ do_newnuc_if_block50: &
       qaer_sv1 = qaer_cur
 
       call mam_coag_1subarea(                                       &
-         nstep,             lchnk,                                  &
-         i,                 k,                jsub,                 &
-         latndx,            lonndx,           lund,                 &
-         dtsubstep,                                                 &
-         temp,              pmid,             aircon,               &
-         dgn_a,             dgn_awet,         wetdens,              &
-         n_mode,                                                    &
-         qnum_cur,                                                  &
-         qaer_cur,          qaer_delsub_coag_in,                    &
-         qwtr_cur                                                   )
+         dtsubstep,                                                 &! in
+         temp,              pmid,             aircon,               &! in
+         dgn_a,             dgn_awet,         wetdens,              &! in
+         qnum_cur,          qaer_cur,         qaer_delsub_coag_in   )! inout, inout, out
 
       qnum_delsub_coag = qnum_cur - qnum_sv1
       qaer_delsub_coag = qaer_cur - qaer_sv1
@@ -4180,6 +4172,8 @@ use modal_aero_data, only : &
     nspec_amode, &
     numptr_amode, numptrcw_amode, sigmag_amode
 
+use modal_aero_coag, only: set_coagulation_pairs
+
 implicit none
 
 !-----------------------------------------------------------------------
@@ -4598,72 +4592,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       n_agepair = ipair
 
 ! coagulation pairs
-!
-! mam version	modes involved in coagulation          # of coag pairs
-! -----------   -----------------------------          ---------------
-! 3 mode	accum, aitken                              1
-! 4,7 mode	accum, aitken, pcarbon                     3
-! 9 mode	accum, aitken, pcarbon, maccum, maitken   10
-! (pcarbon = primary carbon)
-! (maccum  = primary marine-organics accum)
-! (maitken = primary marine-organics aitken)
-!
-! 9 mode -- 5 participating modes and 10 possible coagulation pairs
-!    6 possible coagulation pairs involve a smaller and a larger sized mode
-!       the resulting particle is placed in the larger-sized mode
-!          aitken  + [ accum, pcarbon, maccum ]
-!          maitken + [ accum, pcarbon, maccum ]
-!    4 possible coagulation pairs involve similar sized modes
-!       the resulting particle is placed in the mode that is aged
-!       or contains the largest number of species
-!          pcarbon + accum   --> accum   (aged)
-!          maitken + aitken  --> aitken  (aged)
-!          maccum  + accum   --> accum   (aged)
-!          maccum  + pcarbon --> pcarbon (largest number of species)
-!    note that 2 of the coagulation pairs results in aging, so
-!          aitken  + pcarbon --> pcarbon (temporary) --> accum
-!          aitken  + maccum  --> maccum  (temporary) --> accum
-!    each mode also has self-coagulation which only affects number
-      ipair = 0
-      modefrm_coagpair(:) = big_neg_int
-      modetoo_coagpair(:) = big_neg_int
-      modeend_coagpair(:) = big_neg_int
-      do ip = 1, 11
-         na = big_neg_int ; nb = big_neg_int
-         nc = big_pos_int
-         if (ip == 1) then
-            na = nait ; nb = nacc
-         else if (ip == 2) then
-            na = npca ; nb = nacc
-         else if (ip == 3) then
-            na = nait ; nb = npca
-            nc = nacc
-         else if (ip == 4) then
-            na = nait ; nb = nmacc
-            nc = nacc
-         else if (ip == 5) then
-            na = nmait ; nb = nacc
-         else if (ip == 6) then
-            na = nmait ; nb = npca
-         else if (ip == 7) then
-            na = nmait ; nb = nait
-         else if (ip == 8) then
-            na = nmait ; nb = nmacc
-         else if (ip == 9) then
-            na = nmacc ; nb = nacc
-         else if (ip == 10) then
-            na = nmacc ; nb = npca
-         end if
-         if (nc == big_pos_int) nc = nb
-
-         if (na < 1 .or. nb < 1 .or. nc < 1) cycle
-         ipair = ipair + 1
-         modefrm_coagpair(ipair) = na
-         modetoo_coagpair(ipair) = nb
-         modeend_coagpair(ipair) = nc
-      end do
-      n_coagpair = ipair
-
+      call set_coagulation_pairs( masterproc )
 
 ! diagnostics
       if ( masterproc ) then
@@ -4833,6 +4762,8 @@ use modal_aero_data, only : &
     modeptr_accum, modeptr_aitken, modeptr_pcarbon, modeptr_ufine
 !use modal_aero_rename
 
+use modal_aero_coag, only: n_coagpair, src_mode_coagpair, dest_mode_coagpair, end_mode_coagpair
+
 implicit none
 
 !-----------------------------------------------------------------------
@@ -4995,9 +4926,9 @@ implicit none
 
 ! coagulation
       do ipair = 1, n_coagpair
-         na = modefrm_coagpair(ipair)
-         nb = modetoo_coagpair(ipair)
-         nc = modeend_coagpair(ipair)
+         na =  src_mode_coagpair(ipair)
+         nb = dest_mode_coagpair(ipair)
+         nc =  end_mode_coagpair(ipair)
          if (na < 1 .or. nb < 1 .or. nc < 1) cycle
 
          lmza = lmap_num(na)
