@@ -92,7 +92,6 @@ subroutine ma_convproc_init
 
   implicit none
 
-  integer :: npass_calc_updraft
   logical :: history_aerosol      ! Output the MAM aerosol tendencies
   logical :: resus_fix
   character(len=100) :: msg
@@ -145,7 +144,6 @@ subroutine ma_convproc_init
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
       factor_reduce_actfrac
 
-   npass_calc_updraft = 1
 
    return
 end subroutine ma_convproc_init
@@ -981,7 +979,6 @@ subroutine ma_convproc_tend(                                           &
    integer :: nerr            ! number of errors for entire run
    integer :: nerrmax         ! maximum number of errors to report
    integer :: ncnst_extd
-   integer :: npass_calc_updraft
    integer :: ntsub           ! 
 
    logical  do_act_this_lev             ! flag for doing activation at current level
@@ -1228,21 +1225,11 @@ i_loop_main_aa: &
       dtsub = dt*xinv_ntsub
       courantmax = courantmax*xinv_ntsub
 
-! zmagl(k) = height above surface for middle of level k
-      zmagl(pver) = 0.0
-      do k = pver, 1, -1
-         if (k < pver) then
-            zmagl(k) = zmagl(k+1) + 0.5*dz
-         end if
-         dz = dpdry_i(k)*hund_ovr_g/rhoair_i(k)
-         zmagl(k) = zmagl(k) + 0.5*dz
-      end do
+      call compute_midlev_height( dpdry_i, rhoair_i, & ! in
+                                  zmagl              ) ! out
 
 !  load tracer mixing ratio array, which will be updated at the end of each jtsub interation
       q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
-
-!
-      npass_calc_updraft = 1
 
 
 jtsub_loop_main_aa: &
@@ -1254,6 +1241,10 @@ jtsub_loop_main_aa: &
                        const,          chat,    conu,    cond  ) ! out
 
         ! Compute updraft mixing ratios from cloudbase to cloudtop
+        ! there is a bug here for dz. 
+        ! see the subroutine compute_updraft_mixing_ratio for the bug information
+        dz = dpdry_i(1)*hund_ovr_g/rhoair_i(1)
+
         call compute_updraft_mixing_ratio(                              &
                 doconvproc_extd, icol,  ktop,   kbot,   iconvtype,      & ! in
                 dt,     dp_i,   dpdry_i,        cldfrac,                & ! in
@@ -1330,6 +1321,37 @@ jtsub_loop_main_aa: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+
+
+!====================================================================================
+   subroutine compute_midlev_height( dpdry_i, rhoair_i, & ! in
+                                     zmagl              ) ! out
+!-----------------------------------------------------------------------
+! compute height above surface for middle of level kk
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver
+
+   real(r8), intent(in)  :: dpdry_i(pver)       ! dp [mb]
+   real(r8), intent(in)  :: rhoair_i(pver)      ! air density [kg/m3]
+   real(r8), intent(out) :: zmagl(pver)         ! height above surface at middle level [m]   
+   
+   ! local variables
+   integer  :: kk            ! index
+   real(r8) :: dz            ! layer thickness [m]
+
+   ! at surface (level pver)
+   dz = dpdry_i(pver)*hund_ovr_g/rhoair_i(pver)
+   zmagl(pver) = 0.5*dz
+   ! other levels
+   do kk = pver-1, 1, -1
+       zmagl(kk) = zmagl(kk+1) + 0.5*dz         ! add half layer below
+       dz = dpdry_i(kk)*hund_ovr_g/rhoair_i(kk) ! update layer thickness at level kk
+       zmagl(kk) = zmagl(kk) + 0.5*dz           ! add half layer in this level
+   enddo
+
+   end subroutine compute_midlev_height
 
 !====================================================================================
    subroutine initialize_tmr_array(     ncnst,                  &
@@ -1633,6 +1655,10 @@ end subroutine ma_convproc_tend
                         cldfrac_i,   rhoair_i, zmagl,   & ! in
                         wup                             ) ! inout
             ! compute lagrangian transport time (dt_u)
+            ! There is a bug here that dz is not vertically varying but fixed as
+            ! the thickness of the lowest level calculated previously in the
+            ! subroutine ma_convproc_tend. keep it here for C++ refacoring but
+            ! may need to fix later
             dt_u(kk) = dz/wup(kk)
             dt_u(kk) = min( dt_u(kk), dt )
 
