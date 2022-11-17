@@ -1139,52 +1139,21 @@ i_loop_main_aa: &
    end if
 
 
-!
-! cloudtop and cloudbase indices are valid so proceed with calculations
-!
-
-! Load dp_i,dpdry_i and cldfrac_i, and calc rhoair_i
+! Load some variables in current column for further subroutine use
       do k = 1, pver
          dp_i(k) = dp(i,k)
          dpdry_i(k) = dpdry(i,k)
          cldfrac_i(k) = cldfrac(icol,k)
          rhoair_i(k) = pmid(icol,k)/(rair*t(icol,k))
       end do
-
-! Calc dry mass fluxes
-!    This is approximate because the updraft air is has different temp and qv than
-!    the grid mean, but the whole convective parameterization is highly approximate
-      mu_x(:) = 0.0
-      md_x(:) = 0.0
-! (eu-du) = d(mu)/dp -- integrate upwards, multiplying by dpdry
-      do k = pver, 1, -1
-         mu_x(k) = mu_x(k+1) + (eu(i,k)-du(i,k))*dpdry_i(k)
-         xx_mfup_max(icol) = max( xx_mfup_max(icol), mu_x(k) )
-      end do
-! (ed) = d(md)/dp -- integrate downwards, multiplying by dpdry
-      do k = 2, pver
-         md_x(k) = md_x(k-1) - ed(i,k-1)*dpdry_i(k-1)
-      end do
-
-! Load mass fluxes over cloud layers
-! (Note - use of arrays dimensioned k=1,pver+1 simplifies later coding)
-! Zero out values below threshold
-! Zero out values at "top of cloudtop", "base of cloudbase"
       ktop = jt(i)
       kbot = mx(i)
-      mu_i(:) = 0.0
-      md_i(:) = 0.0
-      do k = ktop+1, kbot
-         mu_i(k) = mu_x(k)
-         if (mu_i(k) <= mbsth) mu_i(k) = 0.0
-         md_i(k) = md_x(k)
-         if (md_i(k) >= -mbsth) md_i(k) = 0.0
-      end do
-      mu_i(ktop) = 0.0
-      md_i(ktop) = 0.0
-      mu_i(kbot+1) = 0.0
-      md_i(kbot+1) = 0.0
 
+      ! calculate dry mass fluxes at cloud layer
+      call compute_massflux(                            &
+                        i,      ktop,   kbot,   dpdry_i,& ! in
+                        du,     eu,     ed,             & ! in
+                        mu_i,   md_i                    ) ! out
 
       ! compute entraintment*dp and detraintment*dp and calculate ntsub
       call compute_ent_det_dp(                                  &
@@ -1289,6 +1258,61 @@ jtsub_loop_main_aa: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine compute_massflux(                         &
+                        ii,     ktop,   kbot,   dpdry_i,& ! in
+                        du,     eu,     ed,             & ! in
+                        mu_i,   md_i                    ) ! out
+!-----------------------------------------------------------------------
+! compute dry mass fluxes
+! This is approximate because the updraft air is has different temp and qv than
+! the grid mean, but the whole convective parameterization is highly approximate
+! values below a threshold and at "top of cloudtop", "base of cloudbase" are set as zero
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp, pcols
+
+   integer,  intent(in)  :: ii                   ! index to gathered arrays
+   integer,  intent(in)  :: ktop                 ! top level index
+   integer,  intent(in)  :: kbot                 ! bottom level index
+   real(r8), intent(in)  :: dpdry_i(pver)        ! dp [mb]
+   real(r8), intent(in)  :: du(pcols,pver)       ! Mass detrain rate from updraft [1/s]
+   real(r8), intent(in)  :: eu(pcols,pver)       ! Mass entrain rate into updraft [1/s]
+   real(r8), intent(in)  :: ed(pcols,pver)       ! Mass entrain rate into downdraft [1/s]
+   real(r8), intent(out) :: mu_i(pverp)          ! mu at current i (note pverp dimension, see ma_convproc_tend) [mb/s]
+   real(r8), intent(out) :: md_i(pverp)          ! md at current i (note pverp dimension) [mb/s]
+
+   ! local variables
+   integer  :: kk            ! index
+   real(r8) :: mu_x(pverp)   ! updraft mass flux calculated for all interface layers [mb/s]
+   real(r8) :: md_x(pverp)   ! downdraft mass flux calculated for all interface layers [mb/s]
+
+! first calculate updraft and downdraft mass fluxes for all layers
+   mu_x(:) = 0.0
+   md_x(:) = 0.0
+   ! (eu-du) = d(mu)/dp -- integrate upwards, multiplying by dpdry
+   do kk = pver, 1, -1
+         mu_x(kk) = mu_x(kk+1) + (eu(ii,kk)-du(ii,kk))*dpdry_i(kk)
+   enddo
+   ! (ed) = d(md)/dp -- integrate downwards, multiplying by dpdry
+   do kk = 2, pver
+         md_x(kk) = md_x(kk-1) - ed(ii,kk-1)*dpdry_i(kk-1)
+   enddo
+
+! then load mass fluxes only over cloud layers
+! excluding "top of cloudtop", "base of cloudbase"
+   mu_i(:) = 0.0
+   md_i(:) = 0.0
+   do kk = ktop+1, kbot
+      ! load mass fluxes at cloud layers
+      mu_i(kk) = mu_x(kk)
+      md_i(kk) = md_x(kk)
+      ! zero out values below threshold
+      if (mu_i(kk) <= mbsth) mu_i(kk) = 0.0
+      if (md_i(kk) >= -mbsth) md_i(kk) = 0.0
+   enddo
+
+   end subroutine compute_massflux
 
 !====================================================================================
    subroutine compute_ent_det_dp(                               &
