@@ -1026,19 +1026,9 @@ subroutine ma_convproc_tend(                                           &
 
 ! set doconvproc_extd (extended array) values
 ! inititialize aqfrac to 1.0 for activated aerosol species, 0.0 otherwise
-   doconvproc_extd(:) = .false.
-   doconvproc_extd(2:ncnst) = doconvproc(2:ncnst)
-   aqfrac(:) = 0.0_r8
-   do imode = 1, ntot_amode
-      do ispec = 0, nspec_amode(imode)
-         call assign_la_lc(imode, ispec, la, lc)
-         if ( doconvproc(la) ) then
-            doconvproc_extd(lc) = .true.
-            aqfrac(lc) = 1.0_r8
-         end if
-      enddo
-   enddo ! n
-
+   call set_cloudborne_vars(                            &
+                                ncnst,  doconvproc,     & ! in
+                                aqfrac, doconvproc_extd ) ! out
 
 ! Loop ever each column that has convection
 ! *** i is index to gathered arrays; ideep(i) is index to "normal" chunk arrays
@@ -1186,6 +1176,46 @@ jtsub_loop_main_aa: &
 
    return
 end subroutine ma_convproc_tend
+
+!====================================================================================
+   subroutine set_cloudborne_vars(                      &
+                                ncnst,  doconvproc,     & ! in
+                                aqfrac, doconvproc_extd ) ! out
+!-----------------------------------------------------------------------
+! set cloudborne aerosol related variables:
+! doconvproc_extd: extended array for both activated and unactivated aerosols
+! aqfrac: set as 1.0 for activated aerosols and 0.0 otherwise
+!-----------------------------------------------------------------------
+   use constituents, only: pcnst
+   use modal_aero_data, only:  nspec_amode, ntot_amode
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer,  parameter  :: pcnst_extd = pcnst*2
+   integer,  intent(in) :: ncnst                ! number of tracers to transport
+   logical,  intent(in) :: doconvproc(ncnst)    ! flag for doing convective transport
+
+
+   logical,  intent(out) :: doconvproc_extd(pcnst_extd)    ! flag for doing convective transport
+   real(r8), intent(out) :: aqfrac(pcnst_extd)  ! aqueous fraction of constituent in updraft [fraction]
+
+   ! local variables
+   integer  :: la, lc, imode, ispec   ! indices
+
+
+   doconvproc_extd(:) = .false.
+   doconvproc_extd(2:ncnst) = doconvproc(2:ncnst)
+   aqfrac(:) = 0.0_r8
+   do imode = 1, ntot_amode
+      do ispec = 0, nspec_amode(imode)
+         call assign_la_lc(imode, ispec, la, lc)
+         if ( doconvproc(la) ) then
+            doconvproc_extd(lc) = .true.
+            aqfrac(lc) = 1.0_r8
+         end if
+      enddo
+   enddo 
+
+   end subroutine set_cloudborne_vars
 
 !====================================================================================
    subroutine compute_massflux(                         &
