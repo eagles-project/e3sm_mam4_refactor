@@ -421,7 +421,6 @@ subroutine ma_convproc_dp_intr(                &
    integer :: ii
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
-   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols) !these variables may be removed
 
 !
 ! Initialize
@@ -464,8 +463,7 @@ subroutine ma_convproc_dp_intr(                &
                      dqdt,                                           & ! out
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
-                     species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
+                     species_class                                   )
 
 end subroutine ma_convproc_dp_intr
 
@@ -521,7 +519,6 @@ subroutine ma_convproc_sh_intr(                 &
    integer :: icol, ncol
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
-   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)  ! output of ma_convproc_tend, may not used
 
 ! variables that mimic the zm-deep counterparts
                                                ! mu, md, ..., ideep, lengath are all deep conv variables
@@ -593,8 +590,7 @@ subroutine ma_convproc_sh_intr(                 &
                      dqdt,                                           & ! out
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
-                     species_class,                                  &
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
+                     species_class                                   )
 
 
 end subroutine ma_convproc_sh_intr
@@ -843,8 +839,7 @@ subroutine ma_convproc_tend(                                           &
                      dqdt,                                           & ! out
                      doconvproc, nsrflx,                             & ! in
                      qsrflx,                                         & ! out
-                     species_class,                                  & ! in
-                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
+                     species_class                                   ) ! in
 
 !----------------------------------------------------------------------- 
 ! 
@@ -944,9 +939,6 @@ subroutine ma_convproc_tend(                                           &
                               !  5 = actual precip-evap resuspension (what actually is applied to a species)
                               !  6 = pseudo precip-evap resuspension (for history file) 
    integer,  intent(in) :: species_class(:) 
-   real(r8), intent(out):: xx_mfup_max(pcols)
-   real(r8), intent(out):: xx_wcldbase(pcols)
-   real(r8), intent(out):: xx_kcldbase(pcols)
 
 
 !--------------------------Local Variables------------------------------
@@ -958,35 +950,22 @@ subroutine ma_convproc_tend(                                           &
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
-   integer :: j, jtsub        ! Work index
+   integer :: jtsub        ! Work index
    integer :: k               ! Work index
-   integer :: kactcnt         ! Counter for no. of levels having activation
-   integer :: kactcntb        ! Counter for activation diagnostic output
-   integer :: kactfirst       ! Lowest layer with activation (= cloudbase)
    integer :: kbot            ! Cloud-flux bottom layer for current i (=mx(i))
    integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip 
    integer :: ktop            ! Cloud-flux top    layer for current i (=jt(i))
                               ! Layers between kbot,ktop have mass fluxes
                               !    but not all have cloud water, because the
                               !    updraft starts below the cloud base
-   integer :: km1, km1x       ! Work index
-   integer :: kp1, kp1x       ! Work index
-   integer :: l,  la, lc   ! Work index
-   integer :: m             ! Work index
+   integer :: la, lc   ! Work index
    integer :: imode, ispec    ! Work index
-   integer :: merr            ! number of errors (i.e., failed diagnostics)
-                              ! for current column
-   integer :: nerr            ! number of errors for entire run
-   integer :: nerrmax         ! maximum number of errors to report
-   integer :: ncnst_extd
    integer :: ntsub           ! 
 
-   logical  do_act_this_lev             ! flag for doing activation at current level
    logical  doconvproc_extd(pcnst_extd) ! flag for doing convective transport
 
    real(r8) aqfrac(pcnst_extd)       ! aqueous fraction of constituent in updraft
    real(r8) cldfrac_i(pver)          ! cldfrac at current i (with adjustments)
-
    real(r8) chat(pcnst_extd,pverp)   ! mix ratio in env at interfaces
    real(r8) cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces
    real(r8) const(pcnst_extd,pver)   ! gathered tracer array
@@ -996,7 +975,6 @@ subroutine ma_convproc_tend(                                           &
    real(r8) dcondt_prevap(pcnst_extd,pver) ! portion of dcondt from precip evaporation
    real(r8) dcondt_prevap_hist(pcnst_extd,pver) ! similar but used for history output 
    real(r8) dcondt_resusp(pcnst_extd,pver) ! portion of dcondt from resuspension
-
    real(r8) dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition
    real(r8) dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation
    real(r8) dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal
@@ -1008,56 +986,23 @@ subroutine ma_convproc_tend(                                           &
    real(r8) sumresusp(pcnst_extd)    ! sum (over layers) of dp*dcondt_resusp
    real(r8) sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep
 
-   real(r8) cabv                 ! mix ratio of constituent above
-   real(r8) cbel                 ! mix ratio of constituent below
-   real(r8) cdifr                ! normalized diff between cabv and cbel
-   real(r8) cdt(pver)            ! (in-updraft first order wet removal rate) * dt
-   real(r8) courantmax           ! maximum courant no.
    real(r8) dddp(pver)           ! dd(i,k)*dp(i,k) at current i
    real(r8) dp_i(pver)           ! dp(i,k) at current i
    real(r8) dpdry_i(pver)        ! dpdry(i,k) at current i
-   real(r8) dt_u(pver)           ! lagrangian transport time in the updraft  
    real(r8) dudp(pver)           ! du(i,k)*dp(i,k) at current i
-   real(r8) dqdt_i(pver,pcnst)   ! dqdt(i,k,m) at current i
-   real(r8) dtsub                ! dt/ntsub
    real(r8) dz                   ! working layer thickness (m) 
    real(r8) eddp(pver)           ! ed(i,k)*dp(i,k) at current i
    real(r8) eudp(pver)           ! eu(i,k)*dp(i,k) at current i
-   real(r8) expcdtm1             ! a work variable
    real(r8) fa_u(pver)           ! fractional area of in the updraft  
-   real(r8) fa_u_dp              ! current fa_u(k)*dp_i(k)
-   real(r8) f_ent                ! fraction of the "before-detrainment" updraft
-                                 ! massflux at k/k-1 interface resulting from
-                                 ! entrainment of level k air
-   real(r8) fluxin               ! a work variable
-   real(r8) fluxout              ! a work variable
-   real(r8) maxc                 ! a work variable
-   real(r8) minc                 ! a work variable
-   real(r8) md_m_eddp            ! a work variable
    real(r8) md_i(pverp)          ! md(i,k) at current i (note pverp dimension)
-   real(r8) md_x(pverp)          ! md(i,k) at current i (note pverp dimension)
    real(r8) mu_i(pverp)          ! mu(i,k) at current i (note pverp dimension)
-   real(r8) mu_x(pverp)          ! mu(i,k) at current i (note pverp dimension)
    ! md_i, md_x, mu_i, mu_x are all "dry" mass fluxes
    ! the mu_x/md_x are initially calculated from the incoming mu/md by applying dp/dpdry
    ! the mu_i/md_i are next calculated by applying the mbsth threshold
-   real(r8) mu_p_eudp(pver)      ! = mu_i(kp1) + eudp(k)
-   real(r8) netflux              ! a work variable
-   real(r8) netsrce              ! a work variable
    real(r8) q_i(pver,pcnst)      ! q(i,k,m) at current i
-   real(r8) qsrflx_i(pcnst,nsrflx) ! qsrflx(i,m,n) at current i
-   real(r8) relerr_cut           ! relative error criterion for diagnostics
    real(r8) rhoair_i(pver)       ! air density at current i
-   real(r8) tmpa, tmpb, tmpc     ! work variables
-   real(r8) tmpf                 ! work variables
-   real(r8) tmpveca(pcnst_extd)  ! work variables
-   real(r8) tmpmata(pcnst_extd,3) ! work variables
-   real(r8) xinv_ntsub           ! 1.0/ntsub
-   real(r8) wup(pver)            ! working updraft velocity (m/s)
    real(r8) zmagl(pver)          ! working height above surface (m)
-   real(r8) zkm                  ! working height above surface (km)
 
-   character(len=16) :: cnst_name_extd(pcnst_extd)
 
 !-----------------------------------------------------------------------
 !
@@ -1075,17 +1020,9 @@ subroutine ma_convproc_tend(                                           &
       call endrun( '*** ma_convproc_tend -- convtype is not |deep| or |uwsh|' )
    end if
 
-   nerr = 0
-   nerrmax = 99
-
-   ncnst_extd = pcnst_extd
-
-
+   ! initiate output variables
    qsrflx(:,:,:) = 0.0_r8
    dqdt(:,:,:) = 0.0_r8
-   xx_mfup_max(:) = 0.0_r8
-   xx_wcldbase(:) = 0.0_r8
-   xx_kcldbase(:) = 0.0_r8
 
 ! set doconvproc_extd (extended array) values
 ! inititialize aqfrac to 1.0 for activated aerosol species, 0.0 otherwise
@@ -1102,14 +1039,6 @@ subroutine ma_convproc_tend(                                           &
       enddo
    enddo ! n
 
-   do l = 1, pcnst_extd
-      if (l <= pcnst) then
-         cnst_name_extd(l) = cnst_name(l)
-      else
-         cnst_name_extd(l) = trim(cnst_name(l-pcnst)) // '_cw'
-      end if
-   end do
-
 
 ! Loop ever each column that has convection
 ! *** i is index to gathered arrays; ideep(i) is index to "normal" chunk arrays
@@ -1117,26 +1046,25 @@ i_loop_main_aa: &
    do i = il1g, il2g
    icol = ideep(i)
 
-
+! skip some columns
    if ( (jt(i) <= 0) .and. (mx(i) <= 0) .and. (iconvtype /= 1) ) then
-! shallow conv case with jt,mx <= 0, which means there is no shallow conv
-! in this column -- skip this column
-      cycle i_loop_main_aa
+        ! shallow conv case with jt,mx <= 0, which means there is no shallow conv
+        ! in this column -- skip this column
+        cycle i_loop_main_aa
 
-   else if ( (jt(i) < 1) .or. (mx(i) > pver) .or. (jt(i) > mx(i)) ) then
-! invalid cloudtop and cloudbase indices -- skip this column
-      write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, i,    &
-                                      jt(i), mx(i)
-9010  format( '*** ma_convproc_tend error -- ', a, 5x, 'convtype = ', a /   &
+   elseif ( (jt(i) < 1) .or. (mx(i) > pver) .or. (jt(i) > mx(i)) ) then
+        ! invalid cloudtop and cloudbase indices -- skip this column
+        write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, i, jt(i), mx(i)
+        cycle i_loop_main_aa
+
+   elseif (jt(i) == mx(i)) then
+        ! cloudtop = cloudbase (1 layer cloud) -- skip this column
+        write(lun,9010) 'jt == mx', convtype, lchnk, icol, i, jt(i), mx(i)
+        cycle i_loop_main_aa
+
+   endif
+9010    format( '*** ma_convproc_tend error -- ', a, 5x, 'convtype = ', a /   &
               '*** lchnk, icol, il, jt, mx = ', 5(1x,i10) )
-      cycle i_loop_main_aa
-
-   else if (jt(i) == mx(i)) then
-! cloudtop = cloudbase (1 layer cloud) -- skip this column
-      write(lun,9010) 'jt == mx', convtype, lchnk, icol, i, jt(i), mx(i)
-      cycle i_loop_main_aa
-
-   end if
 
 
 ! Load some variables in current column for further subroutine use
