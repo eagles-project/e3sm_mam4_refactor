@@ -1185,46 +1185,14 @@ i_loop_main_aa: &
       mu_i(kbot+1) = 0.0
       md_i(kbot+1) = 0.0
 
-!  Compute updraft and downdraft "entrainment*dp" from eu and ed
-!  Compute "detrainment*dp" from mass conservation
-      eudp(:) = 0.0
-      dudp(:) = 0.0
-      eddp(:) = 0.0
-      dddp(:) = 0.0
-      courantmax = 0.0
-      do k = ktop, kbot
-         if ((mu_i(k) > 0) .or. (mu_i(k+1) > 0)) then
-            if (du(i,k) <= 0.0) then
-               eudp(k) = mu_i(k) - mu_i(k+1) 
-            else
-               eudp(k) = max( eu(i,k)*dpdry_i(k), 0.0_r8 )
-               dudp(k) = (mu_i(k+1) + eudp(k)) - mu_i(k) 
-               if (dudp(k) < 1.0e-12*eudp(k)) then
-                  eudp(k) = mu_i(k) - mu_i(k+1) 
-                  dudp(k) = 0.0
-               end if
-            end if
-         end if
-         if ((md_i(k) < 0) .or. (md_i(k+1) < 0)) then
-            eddp(k) = max( ed(i,k)*dpdry_i(k), 0.0_r8 )
-            dddp(k) = (md_i(k+1) + eddp(k)) - md_i(k) 
-            if (dddp(k) < 1.0e-12*eddp(k)) then
-               eddp(k) = md_i(k) - md_i(k+1) 
-               dddp(k) = 0.0
-            end if
-         end if
-         courantmax = max( courantmax, ( mu_i(k+1)+eudp(k)-md_i(k)+eddp(k) )*dt/dpdry_i(k) )
-      end do ! k
 
-! number of time substeps needed to maintain "courant number" <= 1
-      ntsub = 1
-      if (courantmax > (1.0_r8 + 1.0e-6_r8)) then
-         ntsub = 1 + int( courantmax )
-      end if
-      xinv_ntsub = 1.0_r8/ntsub
-      dtsub = dt*xinv_ntsub
-      courantmax = courantmax*xinv_ntsub
+      ! compute entraintment*dp and detraintment*dp and calculate ntsub
+      call compute_ent_det_dp(                                  &
+                        i,      ktop,   kbot,   dt,     dpdry_i,& ! in
+                        mu_i,   md_i,   du,     eu,     ed,     & ! in
+                        ntsub,  eudp,   dudp,   eddp,   dddp    ) ! out
 
+      ! calculate height of layer interface above ground
       call compute_midlev_height( dpdry_i, rhoair_i, & ! in
                                   zmagl              ) ! out
 
@@ -1323,7 +1291,82 @@ jtsub_loop_main_aa: &
 end subroutine ma_convproc_tend
 
 !====================================================================================
+   subroutine compute_ent_det_dp(                               &
+                        ii,     ktop,   kbot,   dt,     dpdry_i,& ! in
+                        mu_i,   md_i,   du,     eu,     ed,     & ! in
+                        ntsub,  eudp,   dudp,   eddp,   dddp    ) ! out
+!-----------------------------------------------------------------------
+! calculate mass flux change (from entrainment or detrainment) in the current dp
+! also get number of time substeps
+!-----------------------------------------------------------------------
+   use ppgrid, only: pver, pverp, pcols
 
+   implicit none
+
+   integer,  intent(in)  :: ii                   ! index to gathered arrays
+   integer,  intent(in)  :: ktop                 ! top level index
+   integer,  intent(in)  :: kbot                 ! bottom level index
+   real(r8), intent(in)  :: dt                   ! delta t (model time increment) [s]
+   real(r8), intent(in)  :: dpdry_i(pver)        ! dp [mb]
+   real(r8), intent(in)  :: mu_i(pverp)          ! mu at current i (note pverp dimension, see ma_convproc_tend) [mb/s]
+   real(r8), intent(in)  :: md_i(pverp)          ! md at current i (note pverp dimension) [mb/s]
+   real(r8), intent(in)  :: du(pcols,pver)       ! Mass detrain rate from updraft [1/s]
+   real(r8), intent(in)  :: eu(pcols,pver)       ! Mass entrain rate into updraft [1/s]
+   real(r8), intent(in)  :: ed(pcols,pver)       ! Mass entrain rate into downdraft [1/s]
+
+   integer,  intent(out) :: ntsub               ! number of sub timesteps
+   real(r8), intent(out) :: eudp(pver)          ! eu(i,k)*dp(i,k) at current i [mb/s]
+   real(r8), intent(out) :: dudp(pver)          ! du(i,k)*dp(i,k) at current i [mb/s]
+   real(r8), intent(out) :: eddp(pver)          ! ed(i,k)*dp(i,k) at current i [mb/s]
+   real(r8), intent(out) :: dddp(pver)          ! dd(i,k)*dp(i,k) at current i [mb/s]
+
+   ! local variables
+   integer  :: kk            ! index
+   real(r8) :: courantmax    ! maximum value of courant number [unitless]
+
+
+   ! initiate variables
+   eudp(:) = 0.0
+   dudp(:) = 0.0
+   eddp(:) = 0.0
+   dddp(:) = 0.0
+   courantmax = 0.0
+   ntsub = 1
+
+   !  Compute updraft and downdraft "entrainment*dp" from eu and ed
+   !  Compute "detrainment*dp" from mass conservation (total is mass flux
+   !  difference between the top an bottom interface of this layer)
+   do kk = ktop, kbot
+       if ((mu_i(kk) > 0) .or. (mu_i(kk+1) > 0)) then
+            if (du(ii,kk) <= 0.0) then
+               eudp(kk) = mu_i(kk) - mu_i(kk+1)
+            else
+               eudp(kk) = max( eu(ii,kk)*dpdry_i(kk), 0.0_r8 )
+               dudp(kk) = (mu_i(kk+1) + eudp(kk)) - mu_i(kk)
+               if (dudp(kk) < 1.0e-12*eudp(kk)) then
+                  eudp(kk) = mu_i(kk) - mu_i(kk+1)
+                  dudp(kk) = 0.0
+               endif
+            endif
+       endif
+       if ((md_i(kk) < 0) .or. (md_i(kk+1) < 0)) then
+            eddp(kk) = max( ed(ii,kk)*dpdry_i(kk), 0.0_r8 )
+            dddp(kk) = (md_i(kk+1) + eddp(kk)) - md_i(kk)
+            if (dddp(kk) < 1.0e-12*eddp(kk)) then
+               eddp(kk) = md_i(kk) - md_i(kk+1)
+               dddp(kk) = 0.0
+            endif
+       endif
+       ! get courantmax to calculate ntsub
+       courantmax = max( courantmax, ( mu_i(kk+1)+eudp(kk)-md_i(kk)+eddp(kk))*dt/dpdry_i(kk) )
+   enddo ! kk
+
+   ! number of time substeps needed to maintain "courant number" <= 1
+   if (courantmax > (1.0_r8 + 1.0e-6_r8)) then
+       ntsub = 1 + int( courantmax )
+   endif
+
+   end subroutine compute_ent_det_dp
 
 !====================================================================================
    subroutine compute_midlev_height( dpdry_i, rhoair_i, & ! in
