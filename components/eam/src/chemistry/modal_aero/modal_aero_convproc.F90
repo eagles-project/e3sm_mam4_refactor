@@ -828,7 +828,7 @@ subroutine calculate_ent_det(                   &
 end subroutine calculate_ent_det
 
 !=========================================================================================
-subroutine ma_convproc_tend(                                           &
+subroutine ma_convproc_tend(                                         &
                      convtype,                                       & ! in
                      lchnk,      ncnst,      dt,                     & ! in
                      t,          pmid,       pdel,       q,          & ! in
@@ -1034,36 +1034,36 @@ subroutine ma_convproc_tend(                                           &
 ! *** i is index to gathered arrays; ideep(i) is index to "normal" chunk arrays
 i_loop_main_aa: &
    do i = il1g, il2g
-   icol = ideep(i)
+      icol = ideep(i)
 
-! skip some columns
-   if ( (jt(i) <= 0) .and. (mx(i) <= 0) .and. (iconvtype /= 1) ) then
-        ! shallow conv case with jt,mx <= 0, which means there is no shallow conv
-        ! in this column -- skip this column
-        cycle i_loop_main_aa
-
-   elseif ( (jt(i) < 1) .or. (mx(i) > pver) .or. (jt(i) > mx(i)) ) then
-        ! invalid cloudtop and cloudbase indices -- skip this column
-        write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, i, jt(i), mx(i)
-        cycle i_loop_main_aa
-
-   elseif (jt(i) == mx(i)) then
-        ! cloudtop = cloudbase (1 layer cloud) -- skip this column
-        write(lun,9010) 'jt == mx', convtype, lchnk, icol, i, jt(i), mx(i)
-        cycle i_loop_main_aa
-
-   endif
-9010    format( '*** ma_convproc_tend error -- ', a, 5x, 'convtype = ', a /   &
+      ! skip some columns
+      if ( (jt(i) <= 0) .and. (mx(i) <= 0) .and. (iconvtype /= 1) ) then
+          ! shallow conv case with jt,mx <= 0, which means there is no shallow conv
+          ! in this column -- skip this column
+          cycle i_loop_main_aa
+      elseif ( (jt(i) < 1) .or. (mx(i) > pver) .or. (jt(i) > mx(i)) ) then
+          ! invalid cloudtop and cloudbase indices -- skip this column
+          write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, i, jt(i), mx(i)
+          cycle i_loop_main_aa
+      elseif (jt(i) == mx(i)) then
+          ! cloudtop = cloudbase (1 layer cloud) -- skip this column
+          write(lun,9010) 'jt == mx', convtype, lchnk, icol, i, jt(i), mx(i)
+          cycle i_loop_main_aa
+      endif
+9010  format( '*** ma_convproc_tend error -- ', a, 5x, 'convtype = ', a /   &
               '*** lchnk, icol, il, jt, mx = ', 5(1x,i10) )
 
 
-! Load some variables in current column for further subroutine use
+      ! Load some variables in current column for further subroutine use
       do k = 1, pver
          dp_i(k) = dp(i,k)
          dpdry_i(k) = dpdry(i,k)
          cldfrac_i(k) = cldfrac(icol,k)
          rhoair_i(k) = pmid(icol,k)/(rair*t(icol,k))
-      end do
+      enddo
+!  load tracer mixing ratio array, which will be updated at the end of each
+!  jtsub interation
+      q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
       ktop = jt(i)
       kbot = mx(i)
 
@@ -1083,9 +1083,6 @@ i_loop_main_aa: &
       call compute_midlev_height( dpdry_i, rhoair_i, & ! in
                                   zmagl              ) ! out
 
-!  load tracer mixing ratio array, which will be updated at the end of each jtsub interation
-      q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
-
 
 jtsub_loop_main_aa: &
       do jtsub = 1, ntsub
@@ -1096,8 +1093,11 @@ jtsub_loop_main_aa: &
                        const,          chat,    conu,    cond  ) ! out
 
         ! Compute updraft mixing ratios from cloudbase to cloudtop
-        ! there is a bug here for dz. 
+        ! ---------------------------------------------------------------------------
+        ! there is a bug here for dz, which is not a vertically-varying profile. 
         ! see the subroutine compute_updraft_mixing_ratio for the bug information
+        ! by Shuaiqi Tang, 2022
+        ! ---------------------------------------------------------------------------
         dz = dpdry_i(1)*hund_ovr_g/rhoair_i(1)
 
         call compute_updraft_mixing_ratio(                              &
@@ -1170,12 +1170,11 @@ jtsub_loop_main_aa: &
                         dt,     dcondt,         doconvproc,     & ! in
                         dqdt,   q_i,            qsrflx          ) ! inout
 
-      end do jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
-
-   end do i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
+      enddo jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
+   enddo i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
 
    return
-end subroutine ma_convproc_tend
+   end subroutine ma_convproc_tend
 
 !====================================================================================
    subroutine set_cloudborne_vars(                      &
@@ -1551,7 +1550,7 @@ end subroutine ma_convproc_tend
          enddo ! ispec
       enddo ! imode
 
-! scatter overall tendency back to full array
+      ! scatter overall tendency back to full array
       do icnst = 2, ncnst
          if (doconvproc(icnst)) then
             ! scatter overall dqdt tendency back
@@ -1660,12 +1659,12 @@ end subroutine ma_convproc_tend
         ! mu_p_eudp(k) = updraft massflux at k, without detrainment between kp1,k
         mu_p_eudp(kk) = mu_i(kp1) + eudp(kk)
         if (mu_p_eudp(kk) > mbsth) then
-! if (mu_p_eudp(k) <= mbsth) the updraft mass flux is negligible at base and top
-!    of current layer,
-! so current layer is a "gap" between two unconnected updrafts,
-! so essentially skip all the updraft calculations for this layer
+        ! if (mu_p_eudp(k) <= mbsth) the updraft mass flux is negligible 
+        ! at base and top of current layer,
+        ! so current layer is a "gap" between two unconnected updrafts,
+        ! so essentially skip all the updraft calculations for this layer
 
-! First apply changes from entrainment
+            ! First apply changes from entrainment
             f_ent = eudp(kk)/mu_p_eudp(kk)
             f_ent = min_max_bound(0.0_r8, 1.0_r8, f_ent)
             do icnst = 2, pcnst_extd
@@ -1680,10 +1679,13 @@ end subroutine ma_convproc_tend
                         cldfrac_i,   rhoair_i, zmagl,   & ! in
                         wup                             ) ! inout
             ! compute lagrangian transport time (dt_u)
+            ! -------------------------------------------------------------------
             ! There is a bug here that dz is not vertically varying but fixed as
             ! the thickness of the lowest level calculated previously in the
             ! subroutine ma_convproc_tend. keep it here for C++ refacoring but
             ! may need to fix later
+            ! found by Shuaiqi Tang, 2022
+            ! -------------------------------------------------------------------
             dt_u(kk) = dz/wup(kk)
             dt_u(kk) = min( dt_u(kk), dt )
 
