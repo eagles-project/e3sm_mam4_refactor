@@ -346,7 +346,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    integer, intent(in) :: ncol
    integer, intent(in) :: lchnk
    real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
-   real(r8), intent(in) :: q(:,:,:)             ! input mixing ratio for all water and chem species
+   real(r8), intent(in) :: q(:,:,:)             ! input mixing ratio for all water and chem species [#/kg,kg/kg]
    real(r8), intent(in) :: pmid(:,:)            ! pressure at layer midpoints [pa]
    real(r8), intent(in) :: rho(:,:)             ! air density [kg/m^3]
    real(r8),                    intent(in)    :: wsubi(:,:)   ! updraft velocity for ice nucleation [m/s]  
@@ -365,7 +365,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    integer :: itim_old
    integer :: i, k, m
 
-   real(r8) :: qn(pcols,pver)
+   real(r8) :: qn(pcols,pver)           ! water vapor mixing ratio [kg/kg]
    real(r8) :: num_aitken(pcols,pver)   ! number m.r. of aitken mode [#/kg]
    real(r8) :: num_coarse(pcols,pver)   ! number m.r. of coarse mode [#/kg]
    real(r8) :: coarse_dust(pcols,pver)  ! mass m.r. of coarse dust [kg/kg]
@@ -388,14 +388,14 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    real(r8) :: so4_num                  ! so4 aerosol number [#/cm^3]
    real(r8) :: dst3_num                 ! dust aerosol number [#/cm^3]
    real(r8) :: dst_num                  ! total dust aerosol number [#/cm^3]
-   real(r8) :: wght
-   real(r8) :: dmc
-   real(r8) :: ssmc
-   real(r8) :: so4mc
-   real(r8) :: mommc
-   real(r8) :: bcmc
-   real(r8) :: pommc
-   real(r8) :: soamc
+   real(r8) :: wght                     ! mass weight [unitless]
+   real(r8) :: dmc                      ! dust mass concentration [kg/m^3]
+   real(r8) :: ssmc                     ! sea salt mass concentration [kg/m^3]
+   real(r8) :: so4mc                    ! sulfate mass concentration [kg/m^3]
+   real(r8) :: mommc                    ! marine organic mass concentration [kg/m^3]
+   real(r8) :: bcmc                     ! black carbon mass concentration [kg/m^3]
+   real(r8) :: pommc                    ! primary organic carbon mass concentration [kg/m^3]
+   real(r8) :: soamc                    ! secondary organic carbon mass concentration [kg/m^3]
 
    ! history output for ice nucleation
    real(r8) :: nihf(pcols,pver)  !output number conc of ice nuclei due to heterogenous freezing [1/m3]
@@ -407,7 +407,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
 
    !-------------------------------------------------------------------------------
 
-   ! note for converting to C++
+   ! note for C++ porting
    ! read ast, dgnum, naai, naai_hom from pbuf
    ! will need to change according to how pbuf variables are stored in C++ structure
    itim_old = pbuf_old_tim_idx()
