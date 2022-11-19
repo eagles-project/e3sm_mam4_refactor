@@ -455,7 +455,7 @@ subroutine ma_convproc_dp_intr(                &
    call ma_convproc_tend(                                            &
                      'deep',                                         &
                      state%lchnk,      pcnst,            dt,         &
-                     state%t,    state%pmid, state%pdel, qnew,       &   
+                     state%t,    state%pmid,             qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -582,7 +582,7 @@ subroutine ma_convproc_sh_intr(                 &
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
                      state%lchnk,      pcnst,            dt,         &
-                     state%t,    state%pmid, state%pdel, qnew,       &   
+                     state%t,    state%pmid,             qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -831,7 +831,7 @@ end subroutine calculate_ent_det
 subroutine ma_convproc_tend(                                         &
                      convtype,                                       & ! in
                      lchnk,      ncnst,      dt,                     & ! in
-                     t,          pmid,       pdel,       q,          & ! in
+                     t,          pmid,       q,                      & ! in
                      mu,         md,         du,         eu,         & ! in
                      ed,         dp,         dpdry,      jt,         & ! in
                      mx,         ideep,      il1g,       il2g,       & ! in  
@@ -883,9 +883,7 @@ subroutine ma_convproc_tend(                                         &
    use physconst, only: gravit, rair, rhoh2o
    use constituents, only: pcnst, cnst_name
 
-   use modal_aero_data, only:  cnst_name_cw, &
-      ntot_amode,  nspec_amode
-!  use units, only: getunit
+   use modal_aero_data, only: ntot_amode,  nspec_amode
 
    implicit none
 
@@ -897,48 +895,52 @@ subroutine ma_convproc_tend(                                         &
                                              ! convection ("deep", "shcu")
    integer,  intent(in) :: lchnk             ! chunk identifier
    integer,  intent(in) :: ncnst             ! number of tracers to transport
-   real(r8), intent(in) :: dt                ! Model timestep
-   real(r8), intent(in) :: t(pcols,pver)     ! Temperature
-   real(r8), intent(in) :: pmid(pcols,pver)  ! Pressure at model levels
-   real(r8), intent(in) :: pdel(pcols,pver)  ! Pressure thickness of levels
-   real(r8), intent(in) :: q(pcols,pver,ncnst) ! Tracer array including moisture
+   real(r8), intent(in) :: dt                ! Model timestep [s]
+   real(r8), intent(in) :: t(pcols,pver)     ! Temperature [K]
+   real(r8), intent(in) :: pmid(pcols,pver)  ! Pressure at model levels [Pa]
+   real(r8), intent(in) :: q(pcols,pver,ncnst) ! Tracer array including moisture [kg/kg]
 
-   real(r8), intent(in) :: mu(pcols,pver)    ! Updraft mass flux (positive)
-   real(r8), intent(in) :: md(pcols,pver)    ! Downdraft mass flux (negative)
-   real(r8), intent(in) :: du(pcols,pver)    ! Mass detrain rate from updraft
-   real(r8), intent(in) :: eu(pcols,pver)    ! Mass entrain rate into updraft
-   real(r8), intent(in) :: ed(pcols,pver)    ! Mass entrain rate into downdraft
+   real(r8), intent(in) :: mu(pcols,pver)    ! Updraft mass flux (positive) [mb/s]
+   real(r8), intent(in) :: md(pcols,pver)    ! Downdraft mass flux (negative) [mb/s]
+   real(r8), intent(in) :: du(pcols,pver)    ! Mass detrain rate from updraft [1/s]
+   real(r8), intent(in) :: eu(pcols,pver)    ! Mass entrain rate into updraft [1/s]
+   real(r8), intent(in) :: ed(pcols,pver)    ! Mass entrain rate into downdraft [1/s]
 ! *** note1 - mu, md, eu, ed, du, dp, dpdry are GATHERED ARRAYS ***
 ! *** note2 - mu and md units are (mb/s), which is used in the zm_conv code
 !           - eventually these should be changed to (kg/m2/s)
 ! *** note3 - eu, ed, du are "d(massflux)/dp" (with dp units = mb), and are all >= 0
 
-   real(r8), intent(in) :: dp(pcols,pver)    ! Delta pressure between interfaces (mb)
-   real(r8), intent(in) :: dpdry(pcols,pver) ! Delta dry-pressure (mb)
+   real(r8), intent(in) :: dp(pcols,pver)    ! Delta pressure between interfaces [mb]
+   real(r8), intent(in) :: dpdry(pcols,pver) ! Delta dry-pressure [mb]
    integer,  intent(in) :: jt(pcols)         ! Index of cloud top for each column
-   integer,  intent(in) :: mx(pcols)         ! Index of cloud top for each column
+   integer,  intent(in) :: mx(pcols)         ! Index of cloud bottom for each column
    integer,  intent(in) :: ideep(pcols)      ! Gathering array indices 
    integer,  intent(in) :: il1g              ! Gathered min lon indices over which to operate
    integer,  intent(in) :: il2g              ! Gathered max lon indices over which to operate
 ! *** note4 -- for il1g <= i <= il2g,  icol = ideep(i) is the "normal" chunk column index
 
-   real(r8), intent(in) :: cldfrac(pcols,pver)  ! Convective cloud fractional area
-   real(r8), intent(in) :: icwmr(pcols,pver)    ! Convective cloud water from zhang
-   real(r8), intent(in) :: rprd(pcols,pver)     ! Convective precipitation formation rate
-   real(r8), intent(in) :: evapc(pcols,pver)    ! Convective precipitation evaporation rate
+   real(r8), intent(in) :: cldfrac(pcols,pver)  ! Convective cloud fractional area [fraction]
+   real(r8), intent(in) :: icwmr(pcols,pver)    ! Convective cloud water from zhang [kg/kg]
+   real(r8), intent(in) :: rprd(pcols,pver)     ! Convective precipitation formation rate [kg/kg/s]
+   real(r8), intent(in) :: evapc(pcols,pver)    ! Convective precipitation evaporation rate [kg/kg/s]
 
-   real(r8), intent(out):: dqdt(pcols,pver,ncnst)  ! Tracer tendency array
+   real(r8), intent(out):: dqdt(pcols,pver,ncnst)  ! Tracer tendency array [kg/kg/s]
    logical,  intent(in) :: doconvproc(ncnst) ! flag for doing convective transport
    integer,  intent(in) :: nsrflx            ! last dimension of qsrflx
    real(r8), intent(out):: qsrflx(pcols,pcnst,nsrflx)
-                              ! process-specific column tracer tendencies
+                              ! process-specific column tracer tendencies [kg/m2/s]
                               !  1 = activation   of interstial to conv-cloudborne
                               !  2 = resuspension of conv-cloudborne to interstital
                               !  3 = aqueous chemistry (not implemented yet, so zero)
                               !  4 = wet removal
                               !  5 = actual precip-evap resuspension (what actually is applied to a species)
                               !  6 = pseudo precip-evap resuspension (for history file) 
-   integer,  intent(in) :: species_class(:) 
+   integer,  intent(in) :: species_class(:)  ! specify what kind of species it is. defined at physconst.F90
+                                                ! undefined  = 0
+                                                ! cldphysics = 1
+                                                ! aerosol    = 2
+                                                ! gas        = 3
+                                                ! other      = 4
 
 
 !--------------------------Local Variables------------------------------
@@ -950,7 +952,7 @@ subroutine ma_convproc_tend(                                         &
    integer :: i, icol         ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
-   integer :: jtsub        ! Work index
+   integer :: jtsub           ! Work index
    integer :: k               ! Work index
    integer :: kbot            ! Cloud-flux bottom layer for current i (=mx(i))
    integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip 
@@ -958,50 +960,50 @@ subroutine ma_convproc_tend(                                         &
                               ! Layers between kbot,ktop have mass fluxes
                               !    but not all have cloud water, because the
                               !    updraft starts below the cloud base
-   integer :: la, lc   ! Work index
+   integer :: la, lc          ! Work index
    integer :: imode, ispec    ! Work index
    integer :: ntsub           ! 
 
    logical  doconvproc_extd(pcnst_extd) ! flag for doing convective transport
 
-   real(r8) aqfrac(pcnst_extd)       ! aqueous fraction of constituent in updraft
-   real(r8) cldfrac_i(pver)          ! cldfrac at current i (with adjustments)
-   real(r8) chat(pcnst_extd,pverp)   ! mix ratio in env at interfaces
-   real(r8) cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces
-   real(r8) const(pcnst_extd,pver)   ! gathered tracer array
-   real(r8) conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces
+   real(r8) aqfrac(pcnst_extd)       ! aqueous fraction of constituent in updraft [fraction]
+   real(r8) cldfrac_i(pver)          ! cldfrac at current i (with adjustments) [fraction]
+   real(r8) chat(pcnst_extd,pverp)   ! mix ratio in env at interfaces  [kg/kg]
+   real(r8) cond(pcnst_extd,pverp)   ! mix ratio in downdraft at interfaces [kg/kg]
+   real(r8) const(pcnst_extd,pver)   ! gathered tracer array [kg/kg]
+   real(r8) conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
 
-   real(r8) dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column
-   real(r8) dcondt_prevap(pcnst_extd,pver) ! portion of dcondt from precip evaporation
-   real(r8) dcondt_prevap_hist(pcnst_extd,pver) ! similar but used for history output 
-   real(r8) dcondt_resusp(pcnst_extd,pver) ! portion of dcondt from resuspension
-   real(r8) dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition
-   real(r8) dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation
-   real(r8) dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal
+   real(r8) dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column [kg/kg/s]
+   real(r8) dcondt_prevap(pcnst_extd,pver) ! portion of dcondt from precip evaporation [kg/kg/s]
+   real(r8) dcondt_prevap_hist(pcnst_extd,pver) ! similar but used for history output [kg/kg/s]
+   real(r8) dcondt_resusp(pcnst_extd,pver) ! portion of dcondt from resuspension [kg/kg/s]
+   real(r8) dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition [kg/kg/s]
+   real(r8) dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
+   real(r8) dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal [kg/kg/s]
 
-   real(r8) sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa
-   real(r8) sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem
-   real(r8) sumprevap(pcnst_extd)    ! sum (over layers) of dp*dcondt_prevap
-   real(r8) sumprevap_hist(pcnst_extd) ! sum (over layers) of dp*dcondt_prevap_hist 
-   real(r8) sumresusp(pcnst_extd)    ! sum (over layers) of dp*dcondt_resusp
-   real(r8) sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep
+   real(r8) sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa [kg/kg/s]
+   real(r8) sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s]
+   real(r8) sumprevap(pcnst_extd)    ! sum (over layers) of dp*dcondt_prevap [kg/kg/s]
+   real(r8) sumprevap_hist(pcnst_extd) ! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s]
+   real(r8) sumresusp(pcnst_extd)    ! sum (over layers) of dp*dcondt_resusp [kg/kg/s]
+   real(r8) sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s]
 
-   real(r8) dddp(pver)           ! dd(i,k)*dp(i,k) at current i
-   real(r8) dp_i(pver)           ! dp(i,k) at current i
-   real(r8) dpdry_i(pver)        ! dpdry(i,k) at current i
-   real(r8) dudp(pver)           ! du(i,k)*dp(i,k) at current i
-   real(r8) dz                   ! working layer thickness (m) 
-   real(r8) eddp(pver)           ! ed(i,k)*dp(i,k) at current i
-   real(r8) eudp(pver)           ! eu(i,k)*dp(i,k) at current i
-   real(r8) fa_u(pver)           ! fractional area of in the updraft  
-   real(r8) md_i(pverp)          ! md(i,k) at current i (note pverp dimension)
-   real(r8) mu_i(pverp)          ! mu(i,k) at current i (note pverp dimension)
+   real(r8) dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
+   real(r8) dp_i(pver)           ! dp(i,k) at current i [mb]
+   real(r8) dpdry_i(pver)        ! dpdry(i,k) at current i [mb]
+   real(r8) dudp(pver)           ! du(i,k)*dp(i,k) at current i [mb/s]
+   real(r8) dz                   ! working layer thickness [m] 
+   real(r8) eddp(pver)           ! ed(i,k)*dp(i,k) at current i [mb/s]
+   real(r8) eudp(pver)           ! eu(i,k)*dp(i,k) at current i [mb/s]
+   real(r8) fa_u(pver)           ! fractional area of in the updraft [fraction]
+   real(r8) md_i(pverp)          ! md(i,k) at current i (note pverp dimension) [mb/s]
+   real(r8) mu_i(pverp)          ! mu(i,k) at current i (note pverp dimension) [mb/s]
    ! md_i, md_x, mu_i, mu_x are all "dry" mass fluxes
    ! the mu_x/md_x are initially calculated from the incoming mu/md by applying dp/dpdry
    ! the mu_i/md_i are next calculated by applying the mbsth threshold
-   real(r8) q_i(pver,pcnst)      ! q(i,k,m) at current i
-   real(r8) rhoair_i(pver)       ! air density at current i
-   real(r8) zmagl(pver)          ! working height above surface (m)
+   real(r8) q_i(pver,pcnst)      ! q(i,k,m) at current i [kg/kg]
+   real(r8) rhoair_i(pver)       ! air density at current i [kg/m3]
+   real(r8) zmagl(pver)          ! working height above surface [m]
 
 
 !-----------------------------------------------------------------------
