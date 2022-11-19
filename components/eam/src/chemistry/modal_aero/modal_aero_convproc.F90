@@ -949,11 +949,11 @@ subroutine ma_convproc_tend(                                         &
    integer, parameter :: pcnst_extd = pcnst*2
 
    integer :: lun             ! unit number for diagnostic output
-   integer :: i, icol         ! Work index
+   integer :: ii, icol        ! Work index
    integer :: iconvtype       ! 1=deep, 2=uw shallow
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
    integer :: jtsub           ! Work index
-   integer :: k               ! Work index
+   integer :: kk              ! Work index
    integer :: kbot            ! Cloud-flux bottom layer for current i (=mx(i))
    integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip 
    integer :: ktop            ! Cloud-flux top    layer for current i (=jt(i))
@@ -1035,21 +1035,21 @@ subroutine ma_convproc_tend(                                         &
 ! Loop ever each column that has convection
 ! *** i is index to gathered arrays; ideep(i) is index to "normal" chunk arrays
 i_loop_main_aa: &
-   do i = il1g, il2g
-      icol = ideep(i)
+   do ii = il1g, il2g
+      icol = ideep(ii)
 
       ! skip some columns
-      if ( (jt(i) <= 0) .and. (mx(i) <= 0) .and. (iconvtype /= 1) ) then
+      if ( (jt(ii) <= 0) .and. (mx(ii) <= 0) .and. (iconvtype /= 1) ) then
           ! shallow conv case with jt,mx <= 0, which means there is no shallow conv
           ! in this column -- skip this column
           cycle i_loop_main_aa
-      elseif ( (jt(i) < 1) .or. (mx(i) > pver) .or. (jt(i) > mx(i)) ) then
+      elseif ( (jt(ii) < 1) .or. (mx(ii) > pver) .or. (jt(ii) > mx(ii)) ) then
           ! invalid cloudtop and cloudbase indices -- skip this column
-          write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, i, jt(i), mx(i)
+          write(lun,9010) 'illegal jt, mx', convtype, lchnk, icol, ii, jt(ii), mx(ii)
           cycle i_loop_main_aa
-      elseif (jt(i) == mx(i)) then
+      elseif (jt(ii) == mx(ii)) then
           ! cloudtop = cloudbase (1 layer cloud) -- skip this column
-          write(lun,9010) 'jt == mx', convtype, lchnk, icol, i, jt(i), mx(i)
+          write(lun,9010) 'jt == mx', convtype, lchnk, icol, ii, jt(ii), mx(ii)
           cycle i_loop_main_aa
       endif
 9010  format( '*** ma_convproc_tend error -- ', a, 5x, 'convtype = ', a /   &
@@ -1057,27 +1057,27 @@ i_loop_main_aa: &
 
 
       ! Load some variables in current column for further subroutine use
-      do k = 1, pver
-         dp_i(k) = dp(i,k)
-         dpdry_i(k) = dpdry(i,k)
-         cldfrac_i(k) = cldfrac(icol,k)
-         rhoair_i(k) = pmid(icol,k)/(rair*t(icol,k))
+      do kk = 1, pver
+         dp_i(kk) = dp(ii,kk)
+         dpdry_i(kk) = dpdry(ii,kk)
+         cldfrac_i(kk) = cldfrac(icol,kk)
+         rhoair_i(kk) = pmid(icol,kk)/(rair*t(icol,kk))
       enddo
 !  load tracer mixing ratio array, which will be updated at the end of each
 !  jtsub interation
       q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
-      ktop = jt(i)
-      kbot = mx(i)
+      ktop = jt(ii)
+      kbot = mx(ii)
 
       ! calculate dry mass fluxes at cloud layer
       call compute_massflux(                            &
-                        i,      ktop,   kbot,   dpdry_i,& ! in
+                        ii,     ktop,   kbot,   dpdry_i,& ! in
                         du,     eu,     ed,             & ! in
                         mu_i,   md_i                    ) ! out
 
       ! compute entraintment*dp and detraintment*dp and calculate ntsub
       call compute_ent_det_dp(                                  &
-                        i,      ktop,   kbot,   dt,     dpdry_i,& ! in
+                        ii,     ktop,   kbot,   dt,     dpdry_i,& ! in
                         mu_i,   md_i,   du,     eu,     ed,     & ! in
                         ntsub,  eudp,   dudp,   eddp,   dddp    ) ! out
 
