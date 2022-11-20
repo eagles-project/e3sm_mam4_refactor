@@ -1,21 +1,4 @@
 
-      relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
-      if (ncldy_subarea <= 0) then
-         relhumsub(:) = relhumgcm
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      else if (cldy_rh_sameas_clear > 0) then
-         relhumsub(:) = relhumgcm
-#endif
-      else
-         relhumsub(jcldy) = 1.0_r8
-         if (jclea > 0) then
-            tmpa = (relhumgcm - afracsub(jcldy))/afracsub(jclea)
-            relhumsub(jclea) = max( 0.0_r8, min( 1.0_r8, tmpa ) )
-         end if
-      end if
-
-
-
 
       do lmz = 1, gas_pcnst
          qgcm1(lmz)    = max( 0.0_r8, q_pregaschem(i,k,lmz) )
