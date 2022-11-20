@@ -66,4 +66,42 @@ contains
 
   end subroutine setup_subareas
 
+  subroutine set_subarea_relhum( maxsubarea,ncldy_subarea,jclea,jcldy, &! in
+                                 afracsub,relhumgcm,                   &! in
+                                 relhumsub                             )! out
+
+      integer,  intent(in) :: maxsubarea
+      integer,  intent(in) :: ncldy_subarea
+      integer,  intent(in) :: jclea, jcldy
+      real(wp), intent(in) :: afracsub(maxsubarea)
+      real(wp), intent(in) :: relhumgcm
+
+      real(wp), intent(out) :: relhumsub(maxsubarea)
+
+      real(wp) :: relhum_tmp
+
+      if (ncldy_subarea <= 0) then
+      ! Entire grid cell is cloud-free. There is only one (i.e., clear) subarea; RH = grid cell mean.
+         relhumsub(:) = relhumgcm
+
+#if ( defined( MAM_STANDALONE ) )
+      else if (cldy_rh_sameas_clear > 0) then
+         relhumsub(:) = relhumgcm
+#endif
+
+      else
+         ! Grid cell has a cloudy subarea. Set RH in that part to 1.0.
+         relhumsub(jcldy) = 1.0_wp
+
+         ! If the grid cell also has a clear portion, back out the RH from the
+         ! grid-cell mean RH and the cloud fraction.
+
+         if (jclea > 0) then
+            relhum_tmp = (relhumgcm - afracsub(jcldy))/afracsub(jclea)
+            relhumsub(jclea) = max( 0.0_wp, min( 1.0_wp, relhum_tmp ) )
+         end if
+      end if
+
+  end subroutine set_subarea_relhum
+
 end module modal_aero_amicphys_subareas
