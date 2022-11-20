@@ -50,7 +50,10 @@
 
          lcopy(:) = lmapcc_all(:).eq.lmapcc_val_gas 
 
-         ! assume gas in both sub-areas before gas-chem and cloud-chem equal grid-cell mean
+         !----------------------------------------------------------------------------------------
+         ! Right before and right after gas chemistry, assume the gas concentrations are the same
+         ! in all subareas (i.e., they all equal the grid cell mean) 
+         !----------------------------------------------------------------------------------------
          do isub = 1,nsubarea
             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,isub) )
             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,isub) )
@@ -66,14 +69,23 @@
         !== to be removed --
 
 
+         !----------------------------------------------------------------------------------------
+         ! Partition gases to subareas after cloud chemistry. 
+         !----------------------------------------------------------------------------------------
+         ! Cloud chemistry (aka aqueous-phase chemistry) converts some gases to aerosols.
+         !----------------------------------------------------------------------------------------
          do lmz = 1, gas_pcnst
             if (lmapcc_all(lmz) /= lmapcc_val_gas) cycle
 
-            ! assume gas in clear sub-area after cloud-chem equals before cloud-chem value
+            ! Gases in the clear subarea remain the same as their values before cloud chemistry.
             qsub3(lmz,jclea) = qsub2(lmz,jclea)
-            ! gas in cloud sub-area then determined by grid-cell mean and clear values
+
+            ! Calculater the gas mixing ratios in the cloudy subarea from the grid-cell mean, 
+            ! cloud fraction and the clear-sky values
+
             qsub3(lmz,jcldy) = (qgcm3(lmz) - fclea*qsub3(lmz,jclea))/fcldy
-            ! check that this does not produce a negative value
+
+            ! Check that this does not produce a negative value
             if (qsub3(lmz,jcldy) < 0.0_r8) then
                qsub3(lmz,jcldy) = 0.0_r8
                qsub3(lmz,jclea) = qgcm3(lmz)/fclea
