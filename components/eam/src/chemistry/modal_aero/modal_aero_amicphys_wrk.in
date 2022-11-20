@@ -139,14 +139,23 @@
 !    because the grid-cell-mean cloud-borne aerosol will be left unchanged
 !    (i.e., this routine only changes qqcw when cld >= 1e-5)
 !
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) <= 0) cycle
-            qsub1(lmz,jclea) = qgcm1(lmz)
-            qsub2(lmz,jclea) = qgcm2(lmz)
-            qsub3(lmz,jclea) = qgcm3(lmz)
-            qqcwsub2(lmz,jclea) = qqcwgcm2(lmz)
-            qqcwsub3(lmz,jclea) = qqcwgcm3(lmz)
-         end do
+     lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
+
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jclea) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jclea) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jclea) )
+
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jclea) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jclea) )
+
+     !   do lmz = 1, gas_pcnst
+     !      if (lmapcc_all(lmz) <= 0) cycle
+     !      qsub1(lmz,jclea) = qgcm1(lmz)
+     !      qsub2(lmz,jclea) = qgcm2(lmz)
+     !      qsub3(lmz,jclea) = qgcm3(lmz)
+     !      qqcwsub2(lmz,jclea) = qqcwgcm2(lmz)
+     !      qqcwsub3(lmz,jclea) = qqcwgcm3(lmz)
+     !   end do
 
       else if ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1)) then
 ! all cloudy, or cld > 0.999
@@ -155,14 +164,24 @@
 ! put all the gases and interstitial aerosols in the cloudy sub-area
 !    and set mix-ratios = 0 in clear sub-area
 !
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) <= 0) cycle
-            qsub1(lmz,jcldy) = qgcm1(lmz)
-            qsub2(lmz,jcldy) = qgcm2(lmz)
-            qsub3(lmz,jcldy) = qgcm3(lmz)
-            qqcwsub2(lmz,jcldy) = qqcwgcm2(lmz)
-            qqcwsub3(lmz,jcldy) = qqcwgcm3(lmz)
-         end do
+
+     lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
+
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jcldy) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jcldy) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jcldy) )
+
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jcldy) )
+     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jcldy) )
+
+    !    do lmz = 1, gas_pcnst
+    !       if (lmapcc_all(lmz) <= 0) cycle
+    !       qsub1(lmz,jcldy) = qgcm1(lmz)
+    !       qsub2(lmz,jcldy) = qgcm2(lmz)
+    !       qsub3(lmz,jcldy) = qgcm3(lmz)
+    !       qqcwsub2(lmz,jcldy) = qqcwgcm2(lmz)
+    !       qqcwsub3(lmz,jcldy) = qqcwgcm3(lmz)
+    !    end do
 
       else
 ! this should not happen
