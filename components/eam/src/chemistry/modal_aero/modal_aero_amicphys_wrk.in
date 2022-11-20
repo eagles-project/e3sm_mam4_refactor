@@ -1,9 +1,33 @@
 
-      !--------------------------------------------------------------------------------
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! Aerosol water
+      !
+      ! Notes from Dick Easter/Steve Ghan: how to treat aerosol water in subareas needs more work/thinking
+      ! Currently modal_aero_water_uptake calculates qaerwat using
+      ! the grid-cell mean interstital-aerosol mix-rats and the clear-area RH.
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      qaerwatsub3(:,:) = 0.0_r8
+
+      if ( present( qaerwat ) ) then
+      ! If provided, the grid cell mean values of aerosol water mixing ratios are clipped
+      ! and then assigned to all subareas.
+
+         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
+         do jsub = 1, nsubarea
+            qaerwatsub3(:,jsub) = qaerwatgcm3(:)
+         end do
+      end if
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! Gases, interstitial aerosols, and cloud-borne aerosols
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !----------------------------------------------------------------------------
       ! Copy grid cell mean mixing ratios; clip negative values if any.
       ! These values, together with cloud fraction and a few assumptions, are used
       ! in the remainder of the subroutine to calculate the sub-area mean mixing ratios.
-      !--------------------------------------------------------------------------------
+      !----------------------------------------------------------------------------
+
       ! Gases and interstitial aerosols
       qgcm1(:) = max( 0.0_r8, q_pregaschem(i,k,:) )
       qgcm2(:) = max( 0.0_r8, q_precldchem(i,k,:) )
@@ -13,11 +37,6 @@
       qqcwgcm2(:) = max( 0.0_r8, qqcw_precldchem(i,k,:) )
       qqcwgcm3(:) = max( 0.0_r8, qqcw(i,k,:) )
 
-      ! Aerosol water
-      qaerwatgcm3(:) = 0.0_r8
-      if ( present( qaerwat ) ) then
-         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
-      end if
 
       !----------------------------------------------------------------------------
       ! Initialize the mean mixing ratios in subareas
@@ -32,19 +51,37 @@
       qqcwsub2(:,:) = 0.0_r8
       qqcwsub3(:,:) = 0.0_r8
 
-      ! Aerosol water
-      qaerwatsub3(:,:) = 0.0_r8
-
       !------------------------------------------------------------------------------------------------
       ! Calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
       !------------------------------------------------------------------------------------------------
-      if ( (jclea > 0) .and. (jcldy > 0) .and. (jclea+jcldy == 3) .and. (nsubarea == 2) ) then
+      grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
+      grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
+      gird_cell_is_partly_cldy = (jclea > 0) .and. (jcldy > 0) .and.  (jclea+jcldy == 3) .and. (nsubarea == 2)
+
       !*************************************************************************************************
-      ! Category I: partly cloudy grid cell. Tracer mixing ratios are generally are different
+      ! Category I: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
+      !*************************************************************************************************
+      if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
+
+         lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
+
+         do jsub = 1,nsubarea
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jsub) )
+
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jsub) )
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jsub) )
+         end do
+
+      !*************************************************************************************************
+      ! Category II: partly cloudy grid cell. Tracer mixing ratios are generally are different
       ! in clear and cloudy subareas.  This is primarily because the
       ! interstitial aerosol mixing ratios are assumed to be lower in the cloudy sub-area than in
       ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
       !*************************************************************************************************
+      else if ( gird_cell_is_partly_cldy ) then
+
          ! set gas mixing ratios in sub-areas (for the condensing gases only!!)
 
          lcopy(:) = lmapcc_all(:).eq.lmapcc_val_gas 
@@ -88,10 +125,10 @@
             end if
          end do
 
-!-------------------------------------------------------------------------------
-! set aerosol mixing ratios in sub-areas. Only needed for points 2 and 3 in the
-! time integraion loop
-!-------------------------------------------------------------------------------
+         !-------------------------------------------------------------------------------
+         ! set aerosol mixing ratios in sub-areas. Only needed for points 2 and 3 in the
+         ! time integraion loop
+         !-------------------------------------------------------------------------------
          do n = 1, ntot_amode
 
          do l2 = 0, nspec_amode(n)
@@ -152,47 +189,17 @@
 
             end do ! l2
          end do ! n
-!-------------------------------------------------------------------------------
-! Done setting aerosol mixing ratios
-!-------------------------------------------------------------------------------
+         !-------------------------------------------------------------------------------
+         ! Done setting aerosol mixing ratios
+         !-------------------------------------------------------------------------------
 
 
-      else 
-      !*************************************************************************************************
-      ! Category II: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
-      !*************************************************************************************************
-
-       grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
-       grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
-
-       if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
-
-          lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
-
-          do jsub = 1,nsubarea
-             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
-             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
-             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jsub) )
-
-             call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jsub) )
-             call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jsub) )
-          end do
-
-       else
+      else ! This should not happen
          write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
          call endrun( tmp_str )
-       end if
-
       end if
       !*************************************************************************************************
       ! Done partitioning gases and aerosols
       !*************************************************************************************************
 
-!----------------------------------------------------------------------------------------------
-! aerosol water -- how to treat this in sub-areas needs more work/thinking
-! currently modal_aero_water_uptake calculates qaerwat using
-!    the grid-cell mean interstital-aerosol mix-rats and the clear-area rh
-      do jsub = 1, nsubarea
-         qaerwatsub3(:,jsub) = qaerwatgcm3(:)
-      end do
 
