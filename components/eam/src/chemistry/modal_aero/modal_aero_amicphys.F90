@@ -202,8 +202,10 @@ implicit none
       real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
       real(r8) :: wetdens(max_mode)
 
-      integer :: isub
       logical, dimension( 1:gas_pcnst ) :: lcopy 
+
+      logical :: grid_cell_has_only_clea_area
+      logical :: grid_cell_has_only_cldy_area
 
 ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
 !    N=1 - before gas-phase chemistry
