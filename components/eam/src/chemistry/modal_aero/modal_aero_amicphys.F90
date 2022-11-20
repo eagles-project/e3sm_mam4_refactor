@@ -66,6 +66,7 @@ subroutine modal_aero_amicphys_intr(                             &
 
 
 ! !USES:
+use shr_kind_mod,      only:  r8 => shr_kind_r8
 use cam_history,       only:  outfld, fieldname_len
 use chem_mods,         only:  adv_mass
 use constituents,      only:  cnst_name
@@ -79,6 +80,8 @@ use modal_aero_data,   only:  &
     nspec_amode, &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
+
+use modal_aero_amicphys_subareas, only: setup_subareas
 
 
 implicit none
@@ -182,16 +185,10 @@ implicit none
    logical   :: history_aerocom    ! Output the aerocom history
 !-----------------------------------------------------------------------
 
-
-      real(8), parameter :: fcld_locutoff = 1.0e-5_r8
-! cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
-! it may be that the macrophysics has a higher threshold that this
-      real(8), parameter :: fcld_hicutoff = 0.999_r8
-
       real(r8) :: afracsub(maxsubarea)
       real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
       real(r8) :: ev_sat(pcols,pver)
-      real(r8) :: fclea, fcldy, fcldybb
+      real(r8) :: fclea, fcldy
       real(r8) :: nufine_3dtend_nnuc(pcols,pver)
       real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
       real(r8) :: qv_sat(pcols,pver)
@@ -319,7 +316,15 @@ main_i_loop: &
       if ( ldiag13n ) lun13n = 129 + i
 
 !--------
-#include "modal_aero_amicphys_wrk.F90"
+
+      call setup_subareas( &
+           cld(i,k), maxsubarea,                    &! in
+           nsubarea, ncldy_subarea, jclea, jcldy,   &! out
+           iscldy_subarea, afracsub, fclea, fcldy   )! out
+
+!--------
+#include "modal_aero_amicphys_wrk.in"
+!--------
 
 
 !--------
