@@ -1,29 +1,39 @@
 
+      !--------------------------------------------------------------------------------
+      ! Copy grid cell mean mixing ratios; clip negative values if any.
+      ! These values, together with cloud fraction and a few assumptions, are used
+      ! in the remainder of the subroutine to calculate the sub-area mean mixing ratios.
+      !--------------------------------------------------------------------------------
+      ! Gases and interstitial aerosols
+      qgcm1(:) = max( 0.0_r8, q_pregaschem(i,k,:) )
+      qgcm2(:) = max( 0.0_r8, q_precldchem(i,k,:) )
+      qgcm3(:) = max( 0.0_r8, q(i,k,:) )
 
-      do lmz = 1, gas_pcnst
-         qgcm1(lmz)    = max( 0.0_r8, q_pregaschem(i,k,lmz) )
-         qgcm2(lmz)    = max( 0.0_r8, q_precldchem(i,k,lmz) )
-         qqcwgcm2(lmz) = max( 0.0_r8, qqcw_precldchem(i,k,lmz) )
-         qgcm3(lmz)    = max( 0.0_r8, q(i,k,lmz) )
-         qqcwgcm3(lmz) = max( 0.0_r8, qqcw(i,k,lmz) )
-      end do
+      ! Cloud-borne aerosols
+      qqcwgcm2(:) = max( 0.0_r8, qqcw_precldchem(i,k,:) )
+      qqcwgcm3(:) = max( 0.0_r8, qqcw(i,k,:) )
+
+      ! Aerosol water
       qaerwatgcm3(:) = 0.0_r8
       if ( present( qaerwat ) ) then
          qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
       end if
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      n = min( maxsubarea, nsubarea+1 )
-#else
-      n = nsubarea
-#endif
-      qsub1(:,1:n) = 0.0_r8
-      qsub2(:,1:n) = 0.0_r8
-      qsub3(:,1:n) = 0.0_r8
-      qqcwsub1(:,1:n) = 0.0_r8
-      qqcwsub2(:,1:n) = 0.0_r8
-      qqcwsub3(:,1:n) = 0.0_r8
-      qaerwatsub3(:,1:n) = 0.0_r8
+      !----------------------------------------------------------------------------
+      ! Initialize the mean mixing ratios in subareas
+      !----------------------------------------------------------------------------
+      ! Gases and interstitial aerosols
+      qsub1(:,:) = 0.0_r8
+      qsub2(:,:) = 0.0_r8
+      qsub3(:,:) = 0.0_r8
+
+      ! Cloud-borne aerosols
+      qqcwsub1(:,:) = 0.0_r8
+      qqcwsub2(:,:) = 0.0_r8
+      qqcwsub3(:,:) = 0.0_r8
+
+      ! Aerosol water
+      qaerwatsub3(:,:) = 0.0_r8
 
 !
 ! calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
@@ -109,18 +119,6 @@
                tmp_aa_clea = tmp_aa/fclea
                tmp_aa_cldy = (1.0_r8-tmp_aa)/fcldy
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-               if ( n <= 2 .and. ldiag13n ) then
-                  if (n==1 .and. l2==0) write(lun13n,'(a)')
-                  write(lun13n,'(a,2i3, 1p,6e12.4)') 'n, l2, tmp_aa, tmp_aa_clea, tmp_aa_cldy', &
-                     n, l2, tmp_aa, tmp_aa_clea, tmp_aa_cldy
-                  tmpa = 1.0e-6_r8*mwhost_num/mwdry
-                  if (l2 > 0) tmpa = 1.0e9_r8
-                  write(lun13n,'(a, 6x, 1p,6e12.4)') 'qct, qcy, qat, qay, qax, qtt           ', &
-                     tmpa*tmp_qc_gcav, tmpa*tmp_qc_cldy, tmpa*tmp_qa_gcav, &
-                     tmpa*tmp_qa_cldy, tmpa*tmp_qa_clea, tmpa*(tmp_qc_gcav+tmp_qa_gcav)
-               end if
-#endif
             end if ! (l2 <= 1)
 
             if (l2 == 0) then
@@ -216,15 +214,4 @@
       do jsub = 1, nsubarea
          qaerwatsub3(:,jsub) = qaerwatgcm3(:)
       end do
-
-      if (nsubarea == 1) then
-! the j=2 subarea is used for some diagnostics
-! but is not used in actual calculations
-         j = 2
-         qsub1(:,j) = 0.0_r8
-         qsub2(:,j) = 0.0_r8
-         qsub3(:,j) = 0.0_r8
-         qqcwsub2(:,j) = 0.0_r8
-         qqcwsub3(:,j) = 0.0_r8
-      end if
 
