@@ -1,36 +1,4 @@
 
-!
-! determine the number of sub-areas, their fractional areas, and relative humidities
-!
-! if cloud fraction ~= 0, the grid-cell has a single clear  sub-area      (nsubarea = 1)
-! if cloud fraction ~= 1, the grid-cell has a single cloudy sub-area      (nsubarea = 1)
-! otherwise,              the grid-cell has a clear and a cloudy sub-area (nsubarea = 2)
-!
-      if (cld(i,k) < fcld_locutoff) then
-! note that cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
-! it may be that the macrophysics has a higher threshold that this
-         fcldy = 0.0_r8
-         nsubarea = 1 ; ncldy_subarea = 0
-         jclea = 1 ; jcldy = 0
-      else if (cld(i,k) > fcld_hicutoff) then
-         fcldy = 1.0_r8
-         nsubarea = 1 ; ncldy_subarea = 1
-         jclea = 0 ; jcldy = 1
-      else
-         fcldy = cld(i,k)
-         nsubarea = 2 ; ncldy_subarea = 1
-         jclea = 1 ; jcldy = 2
-      end if
-      fclea = 1.0_r8 - fcldy
-      fcldybb = max( cld(i,k), 1.0e-6_r8 )
-
-      iscldy_subarea(:) = .false.
-      if (jcldy > 0) iscldy_subarea(jcldy) = .true.
-
-      afracsub(:) = 0.0_r8
-      if (jclea > 0) afracsub(jclea) = fclea
-      if (jcldy > 0) afracsub(jcldy) = fcldy
-
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
       if (ncldy_subarea <= 0) then
          relhumsub(:) = relhumgcm
@@ -46,17 +14,7 @@
          end if
       end if
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag13n ) then
-      write(lun13n,'(/a,3i5)') 'modal_aero_amicphys_intr mapping at nstep, i, k', nstep, i, k
-      write(lun13n,'(a,1p,5i12  )') 'jclea, jcldy, ncldy, nsubc', &
-         jclea, jcldy, ncldy_subarea, nsubarea
-      write(lun13n,'(a,1p,5e12.4)') 'cld, fcldy, fcldybb, fclea', &
-         cld(i,k), fcldy, fcldybb, fclea
-      write(lun13n,'(a,1p,5e12.4)') 'relhumav, relhumsub(1:2)  ', &
-         relhumgcm, relhumsub(1:2)
-      end if
-#endif
+
 
 
       do lmz = 1, gas_pcnst
