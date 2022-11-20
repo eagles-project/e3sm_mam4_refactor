@@ -206,6 +206,7 @@ implicit none
 
       logical :: grid_cell_has_only_clea_area
       logical :: grid_cell_has_only_cldy_area
+      logical :: gird_cell_is_partly_cldy
 
 ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
 !    N=1 - before gas-phase chemistry
