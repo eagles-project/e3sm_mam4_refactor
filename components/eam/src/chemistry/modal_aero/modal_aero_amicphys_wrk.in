@@ -35,44 +35,40 @@
       ! Aerosol water
       qaerwatsub3(:,:) = 0.0_r8
 
-!
-! calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
-!    for all-clear or all-cloudy cases, the sub-area TMRs are equal to the grid-cell means
-!    for partly cloudy case, they are different.  This is primarily because the
-!       interstitial aerosol mixing ratios are assumed lower in the cloudy sub-area than in
-!       the clear sub-area, because much of the aerosol is activated in the cloudy sub-area.
-!
-      if ( (jclea > 0) .and. (jcldy > 0) .and. &
-           (jclea+jcldy == 3) .and. (nsubarea == 2) ) then
-! partly cloudy case
-
-! set gas mixing ratios in sub-areas (for the condensing gases only!!)
+      !------------------------------------------------------------------------------------------------
+      ! Calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
+      !------------------------------------------------------------------------------------------------
+      if ( (jclea > 0) .and. (jcldy > 0) .and. (jclea+jcldy == 3) .and. (nsubarea == 2) ) then
+      !*************************************************************************************************
+      ! Category I: partly cloudy grid cell. Tracer mixing ratios are generally are different
+      ! in clear and cloudy subareas.  This is primarily because the
+      ! interstitial aerosol mixing ratios are assumed to be lower in the cloudy sub-area than in
+      ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
+      !*************************************************************************************************
+         ! set gas mixing ratios in sub-areas (for the condensing gases only!!)
 
          lcopy(:) = lmapcc_all(:).eq.lmapcc_val_gas 
 
-         !----------------------------------------------------------------------------------------
-         ! Right before and right after gas chemistry, assume the gas concentrations are the same
-         ! in all subareas (i.e., they all equal the grid cell mean) 
-         !----------------------------------------------------------------------------------------
-         do isub = 1,nsubarea
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,isub) )
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,isub) )
+         !------------------------------------------------------------------------------------------
+         ! Before gas chemistry, the gas concentrations are assumed to be the same in all subareas,
+         ! i.e., they all equal the grid cell mean.
+         !------------------------------------------------------------------------------------------
+         do jsub = 1,nsubarea
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
          end do
 
-        !++ to be removed --
-        !do lmz = 1, gas_pcnst
-        !   if (lmapcc_all(lmz) /= lmapcc_val_gas) cycle
-        !   ! assume gas in both sub-areas before gas-chem and cloud-chem equal grid-cell mean
-        !   qsub1(lmz,1:nsubarea) = qgcm1(lmz)
-        !   qsub2(lmz,1:nsubarea) = qgcm2(lmz)
-        !end do
-        !== to be removed --
-
+         !------------------------------------------------------------------------------------------
+         ! After gas chemistry, still assume gas concentrations are the same in all subareas.
+         !------------------------------------------------------------------------------------------
+         do jsub = 1,nsubarea
+            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
+         end do
 
          !----------------------------------------------------------------------------------------
-         ! Partition gases to subareas after cloud chemistry. 
-         !----------------------------------------------------------------------------------------
-         ! Cloud chemistry (aka aqueous-phase chemistry) converts some gases to aerosols.
+         ! After cloud chemistry, the gas mixing ratios and aerosol mass mixing ratios
+         ! in the clear subarea are assumed to be the same as their values before cloud chemistry
+         ! (because nothing has happend), while the mixing ratios in the cloudy subarea likely 
+         ! have changed.
          !----------------------------------------------------------------------------------------
          do lmz = 1, gas_pcnst
             if (lmapcc_all(lmz) /= lmapcc_val_gas) cycle
@@ -92,7 +88,10 @@
             end if
          end do
 
-! set aerosol mixing ratios in sub-areas
+!-------------------------------------------------------------------------------
+! set aerosol mixing ratios in sub-areas. Only needed for points 2 and 3 in the
+! time integraion loop
+!-------------------------------------------------------------------------------
          do n = 1, ntot_amode
 
          do l2 = 0, nspec_amode(n)
@@ -153,73 +152,43 @@
 
             end do ! l2
          end do ! n
+!-------------------------------------------------------------------------------
+! Done setting aerosol mixing ratios
+!-------------------------------------------------------------------------------
 
-      else if ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1)) then
-! all clear, or cld < 1e-5
-! in this case, fclea=1 and fcldy=0
-!
-! put all the gases and interstitial aerosols in the clear sub-area
-!    and set mix-ratios = 0 in cloudy sub-area
-! for cloud-borne aerosol, do nothing
-!    because the grid-cell-mean cloud-borne aerosol will be left unchanged
-!    (i.e., this routine only changes qqcw when cld >= 1e-5)
-!
-     lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
 
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jclea) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jclea) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jclea) )
+      else 
+      !*************************************************************************************************
+      ! Category II: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
+      !*************************************************************************************************
 
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jclea) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jclea) )
+       grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
+       grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
 
-     !++ to be removed --
-     !   do lmz = 1, gas_pcnst
-     !      if (lmapcc_all(lmz) <= 0) cycle
-     !      qsub1(lmz,jclea) = qgcm1(lmz)
-     !      qsub2(lmz,jclea) = qgcm2(lmz)
-     !      qsub3(lmz,jclea) = qgcm3(lmz)
-     !      qqcwsub2(lmz,jclea) = qqcwgcm2(lmz)
-     !      qqcwsub3(lmz,jclea) = qqcwgcm3(lmz)
-     !   end do
-     !== to be removed --
+       if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
 
-      else if ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1)) then
-! all cloudy, or cld > 0.999
-! in this case, fcldy= and fclea=0
-!
-! put all the gases and interstitial aerosols in the cloudy sub-area
-!    and set mix-ratios = 0 in clear sub-area
-!
+          lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
 
-     lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
+          do jsub = 1,nsubarea
+             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
+             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
+             call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jsub) )
 
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jcldy) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jcldy) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jcldy) )
+             call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jsub) )
+             call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jsub) )
+          end do
 
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jcldy) )
-     call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jcldy) )
-
-    !++ to be removed --
-    !    do lmz = 1, gas_pcnst
-    !       if (lmapcc_all(lmz) <= 0) cycle
-    !       qsub1(lmz,jcldy) = qgcm1(lmz)
-    !       qsub2(lmz,jcldy) = qgcm2(lmz)
-    !       qsub3(lmz,jcldy) = qgcm3(lmz)
-    !       qqcwsub2(lmz,jcldy) = qqcwgcm2(lmz)
-    !       qqcwsub3(lmz,jcldy) = qqcwgcm3(lmz)
-    !    end do
-    !== to be removed --
-
-      else
-! this should not happen
-         write(tmp_str,'(a,3(1x,i10))') &
-            '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', &
-            jclea, jcldy, nsubarea
+       else
+         write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
          call endrun( tmp_str )
-      end if
+       end if
 
+      end if
+      !*************************************************************************************************
+      ! Done partitioning gases and aerosols
+      !*************************************************************************************************
+
+!----------------------------------------------------------------------------------------------
 ! aerosol water -- how to treat this in sub-areas needs more work/thinking
 ! currently modal_aero_water_uptake calculates qaerwat using
 !    the grid-cell mean interstital-aerosol mix-rats and the clear-area rh
