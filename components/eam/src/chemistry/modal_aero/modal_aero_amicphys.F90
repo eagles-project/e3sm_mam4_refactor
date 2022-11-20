@@ -202,6 +202,8 @@ implicit none
       real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
       real(r8) :: wetdens(max_mode)
 
+      integer :: isub
+      logical, dimension( 1:gas_pcnst ) :: lcopy 
 
 ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
 !    N=1 - before gas-phase chemistry
@@ -209,7 +211,6 @@ implicit none
 !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
 
-      logical, dimension( 1:gas_pcnst ) :: lcopy 
 
       real(r8), dimension( 1:gas_pcnst ) :: &
          qgcm1, qgcm2, qgcm3, qgcm4, &
