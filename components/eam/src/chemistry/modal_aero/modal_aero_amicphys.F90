@@ -81,7 +81,7 @@ use modal_aero_data,   only:  &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_gcm_to_subarea
 
 
 implicit none
@@ -208,6 +208,9 @@ implicit none
 !    N=2 - before cloud chemistry
 !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
+
+      logical, dimension( 1:gas_pcnst ) :: lcopy 
+
       real(r8), dimension( 1:gas_pcnst ) :: &
          qgcm1, qgcm2, qgcm3, qgcm4, &
          qqcwgcm1, qqcwgcm2, qqcwgcm3, qqcwgcm4
