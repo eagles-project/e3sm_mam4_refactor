@@ -132,24 +132,11 @@
          ! set aerosol mixing ratios in sub-areas. Only needed for points 2 and 3 in the
          ! time integraion loop
          !-------------------------------------------------------------------------------
-         do n = 1, ntot_amode
+         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
 
-         do l2 = 0, nspec_amode(n)
-
-            if (l2 == 0) then
-               lc = numptrcw_amode(n) - loffset
-            else
-               lc = lmassptrcw_amode(l2,n) - loffset
-            end if
-
-            qqcwsub2(lc,jclea) = 0.0_r8
-            qqcwsub2(lc,jcldy) = qqcwgcm2(lc)/fcldy
-
-            qqcwsub3(lc,jclea) = 0.0_r8
-            qqcwsub3(lc,jcldy) = qqcwgcm3(lc)/fcldy
-
-            end do ! l2
-         end do ! n
+         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
 
          !-----
 
