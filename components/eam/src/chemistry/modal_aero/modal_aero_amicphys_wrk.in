@@ -63,7 +63,7 @@
       !*************************************************************************************************
       if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
 
-         lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
+         lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0     ! copy all gases and aerosols
 
          do jsub = 1,nsubarea
             call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, lcopy )
@@ -75,7 +75,7 @@
          end do
 
       !*************************************************************************************************
-      ! Category II: partly cloudy grid cell. Tracer mixing ratios are generally are different
+      ! Category II: partly cloudy grid cell. Tracer mixing ratios are generally assumed different
       ! in clear and cloudy subareas.  This is primarily because the
       ! interstitial aerosol mixing ratios are assumed to be lower in the cloudy sub-area than in
       ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
@@ -83,37 +83,37 @@
       else if ( gird_cell_is_partly_cldy ) then
 
          !===================================
-         ! set gas mixing ratios in sub-areas
+         ! Set gas mixing ratios in subareas
          !===================================
 
          cnst_is_gas(:) = lmapcc_all(:).eq.lmapcc_val_gas 
 
          !------------------------------------------------------------------------------------------
-         ! Before gas chemistry, the gas concentrations are assumed to be the same in all subareas,
+         ! Before gas chemistry, gas mixing ratios are assumed to be the same in all subareas,
          ! i.e., they all equal the grid cell mean.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
          end do
 
          !------------------------------------------------------------------------------------------
-         ! After gas chemistry, still assume gas concentrations are the same in all subareas.
+         ! After gas chemistry, still assume gas mixing ratios are the same in all subareas.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, cnst_is_gas )
+            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
          end do
 
          !----------------------------------------------------------------------------------------
-         ! After cloud chemistry, the gas mixing ratios and aerosol mass mixing ratios
-         ! in the clear subarea are assumed to be the same as their values before cloud chemistry
-         ! (because nothing has happend), while the mixing ratios in the cloudy subarea likely 
-         ! have changed.
+         ! After cloud chemistry, gas and aerosol mass mixing ratios in the clear subarea are 
+         ! assumed to be the same as their values before cloud chemistry  (because by definition,
+         ! cloud chemistry did not happen in clear sky), while the mixing ratios in the cloudy 
+         ! subarea likely have changed.
          !----------------------------------------------------------------------------------------
          ! Gases in the clear subarea remain the same as their values before cloud chemistry.
 
-         call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), gas_pcnst, cnst_is_gas )
+         call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
 
-         ! Calculater the gas mixing ratios in the cloudy subarea from the grid-cell mean, 
+         ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
          ! cloud fraction and the clear-sky values
 
          do icnst = 1, gas_pcnst
@@ -132,8 +132,8 @@
 
          !=========================================================================
          ! Set cloud-borne aerosol mixing ratios in subareas.
-         ! Only need to do this for points 2 and 3 in the time integraion loop
-         ! (the before-cloud-chem and after-cloud-chem states).
+         ! Only need to do this for points 2 and 3 in the time integraion loop,
+         ! the before-cloud-chem and after-cloud-chem states.
          !=========================================================================
          call set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
          call set_subarea_q_mass_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
