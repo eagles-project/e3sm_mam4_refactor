@@ -144,38 +144,39 @@
          !=========================================================================
          ! Set interstitial aerosol mixing ratios in suareas.
          !=========================================================================
-         do n = 1, ntot_amode
+         do imode = 1, ntot_amode
 
             ! calculate partitioning factors
 
-            tmp_qa_gcav = qgcm2( numptr_amode(n)-loffset )
-            tmp_qc_gcav = qqcwgcm2( numptrcw_amode(n)-loffset )
+            tmp_qa_gcav = qgcm2( numptr_amode(imode)-loffset )
+            tmp_qc_gcav = qqcwgcm2( numptrcw_amode(imode)-loffset )
 
             call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
                                         tmp_aa_clea, tmp_aa_cldy )
 
             ! apply partitioning factors
 
-            la = numptr_amode(n) - loffset
+            icnst = numptr_amode(imode) - loffset
 
-            qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
-            qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
+            qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
+            qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
 
-            qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
-            qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
+            qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
+            qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
 
-         end do ! n
+         end do ! imode
 
 
-         do n = 1, ntot_amode
+         do imode = 1, ntot_amode
 
             ! calculcate partitioning factors
 
             tmp_qa_gcav = 0.0_r8
             tmp_qc_gcav = 0.0_r8
-            do l3 = 1, nspec_amode(n)
-               tmp_qa_gcav = tmp_qa_gcav + qgcm2( lmassptr_amode(l3,n) - loffset )
-               tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2( lmassptrcw_amode(l3,n) - loffset )
+
+            do ispec = 1, nspec_amode(imode)
+               tmp_qa_gcav = tmp_qa_gcav + qgcm2( lmassptr_amode(ispec,imode) - loffset )
+               tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2( lmassptrcw_amode(ispec,imode) - loffset )
             end do
 
             call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
@@ -183,18 +184,18 @@
 
             ! apply partitioning factors
 
-            do l2 = 1, nspec_amode(n)
+            do ispec = 1, nspec_amode(imode)
 
-               la = lmassptr_amode(l2,n) - loffset
+               icnst = lmassptr_amode(ispec,imode) - loffset
 
-               qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
-               qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
+               qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
+               qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
 
-               qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
-               qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
+               qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
+               qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
 
-               end do ! l2
-            end do ! n
+               end do ! ispec 
+            end do ! imode
 
          !-------------------------------------------------------------------------------
          ! Done setting aerosol mixing ratios
