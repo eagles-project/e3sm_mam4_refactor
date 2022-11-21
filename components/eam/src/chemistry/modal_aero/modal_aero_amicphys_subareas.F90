@@ -104,17 +104,17 @@ contains
 
   end subroutine set_subarea_relhum
 
-  subroutine copy_gcm_to_subarea( ncnst, lcopy, qgcm, qsub )
+  subroutine copy_cnst( q_in, q_copy, ncnst, lcopy )
 
       integer, intent(in)    :: ncnst         ! # of constituents that might need to be copied
-      logical, intent(in)    :: lcopy(ncnst)  ! whetherr individual constituents should be copied
-      real(wp),intent(in)    :: qgcm(ncnst)   ! grid cell mean values
-      real(wp),intent(inout) :: qsub(ncnst)   ! values in subarea
+      logical, intent(in)    :: lcopy(ncnst)  ! whether individual constituents should be copied
+      real(wp),intent(in)    :: q_in(ncnst)   ! values to be copied
+      real(wp),intent(inout) :: q_copy(ncnst) ! copy of input values 
 
       where( lcopy )
-        qsub = qgcm
+        q_copy = q_in
       end where
 
-  end subroutine copy_gcm_to_subarea
+  end subroutine copy_cnst
 
 end module modal_aero_amicphys_subareas
