@@ -146,11 +146,15 @@
          !=========================================================================
          do n = 1, ntot_amode
 
+            ! calculate partitioning factors
+
             tmp_qa_gcav = qgcm2( numptr_amode(n)-loffset )
             tmp_qc_gcav = qqcwgcm2( numptrcw_amode(n)-loffset )
 
             call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
                                         tmp_aa_clea, tmp_aa_cldy )
+
+            ! apply partitioning factors
 
             la = numptr_amode(n) - loffset
 
@@ -165,34 +169,33 @@
 
          do n = 1, ntot_amode
 
-         do l2 = 1, nspec_amode(n)
-
-            if (l2 == 1) then
             ! calculcate partitioning factors
-                  tmp_qa_gcav = 0.0_r8
-                  tmp_qc_gcav = 0.0_r8
-                  do l3 = 1, nspec_amode(n)
-                     la = lmassptr_amode(l3,n) - loffset
-                     tmp_qa_gcav = tmp_qa_gcav + qgcm2(la)
-                     lc = lmassptrcw_amode(l3,n) - loffset
-                     tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2(lc)
-                  end do
 
-               call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
-                                           tmp_aa_clea, tmp_aa_cldy )
+            tmp_qa_gcav = 0.0_r8
+            tmp_qc_gcav = 0.0_r8
+            do l3 = 1, nspec_amode(n)
+               tmp_qa_gcav = tmp_qa_gcav + qgcm2( lmassptr_amode(l3,n) - loffset )
+               tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2( lmassptrcw_amode(l3,n) - loffset )
+            end do
 
-            end if ! (l2 <= 1)
+            call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
+                                        tmp_aa_clea, tmp_aa_cldy )
 
-            la = lmassptr_amode(l2,n) - loffset
+            ! apply partitioning factors
 
-            qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
-            qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
+            do l2 = 1, nspec_amode(n)
 
-            qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
-            qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
+               la = lmassptr_amode(l2,n) - loffset
 
-            end do ! l2
-         end do ! n
+               qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
+               qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
+
+               qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
+               qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
+
+               end do ! l2
+            end do ! n
+
          !-------------------------------------------------------------------------------
          ! Done setting aerosol mixing ratios
          !-------------------------------------------------------------------------------
