@@ -66,12 +66,12 @@
          lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0
 
          do jsub = 1,nsubarea
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm3, qsub3(:,jsub) )
+            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qgcm3, qsub3(:,jsub), gas_pcnst, lcopy )
 
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm2, qqcwsub2(:,jsub) )
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qqcwgcm3, qqcwsub3(:,jsub) )
+            call copy_cnst( qqcwgcm2, qqcwsub2(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qqcwgcm3, qqcwsub3(:,jsub), gas_pcnst, lcopy )
          end do
 
       !*************************************************************************************************
@@ -84,21 +84,21 @@
 
          ! set gas mixing ratios in sub-areas (for the condensing gases only!!)
 
-         lcopy(:) = lmapcc_all(:).eq.lmapcc_val_gas 
+         cnst_is_gas(:) = lmapcc_all(:).eq.lmapcc_val_gas 
 
          !------------------------------------------------------------------------------------------
          ! Before gas chemistry, the gas concentrations are assumed to be the same in all subareas,
          ! i.e., they all equal the grid cell mean.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm1, qsub1(:,jsub) )
+            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, lcopy )
          end do
 
          !------------------------------------------------------------------------------------------
          ! After gas chemistry, still assume gas concentrations are the same in all subareas.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_gcm_to_subarea( gas_pcnst, lcopy, qgcm2, qsub2(:,jsub) )
+            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, cnst_is_gas )
          end do
 
          !----------------------------------------------------------------------------------------
@@ -107,22 +107,25 @@
          ! (because nothing has happend), while the mixing ratios in the cloudy subarea likely 
          ! have changed.
          !----------------------------------------------------------------------------------------
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) /= lmapcc_val_gas) cycle
+         ! Gases in the clear subarea remain the same as their values before cloud chemistry.
 
-            ! Gases in the clear subarea remain the same as their values before cloud chemistry.
-            qsub3(lmz,jclea) = qsub2(lmz,jclea)
+         call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), gas_pcnst, cnst_is_gas )
 
-            ! Calculater the gas mixing ratios in the cloudy subarea from the grid-cell mean, 
-            ! cloud fraction and the clear-sky values
+         ! Calculater the gas mixing ratios in the cloudy subarea from the grid-cell mean, 
+         ! cloud fraction and the clear-sky values
 
-            qsub3(lmz,jcldy) = (qgcm3(lmz) - fclea*qsub3(lmz,jclea))/fcldy
+         do icnst = 1, gas_pcnst
+          if (cnst_is_gas(icnst)) then
+
+            qsub3(icnst,jcldy) = (qgcm3(icnst) - fclea*qsub3(icnst,jclea))/fcldy
 
             ! Check that this does not produce a negative value
-            if (qsub3(lmz,jcldy) < 0.0_r8) then
-               qsub3(lmz,jcldy) = 0.0_r8
-               qsub3(lmz,jclea) = qgcm3(lmz)/fclea
+            if (qsub3(icnst,jcldy) < 0.0_r8) then
+               qsub3(icnst,jcldy) = 0.0_r8
+               qsub3(icnst,jclea) = qgcm3(icnst)/fclea
             end if
+
+          end if
          end do
 
          !-------------------------------------------------------------------------------

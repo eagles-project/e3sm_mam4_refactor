@@ -81,7 +81,7 @@ use modal_aero_data,   only:  &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_gcm_to_subarea
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_cnst
 
 
 implicit none
@@ -202,11 +202,15 @@ implicit none
       real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
       real(r8) :: wetdens(max_mode)
 
-      logical, dimension( 1:gas_pcnst ) :: lcopy 
 
       logical :: grid_cell_has_only_clea_area
       logical :: grid_cell_has_only_cldy_area
       logical :: gird_cell_is_partly_cldy
+
+      integer :: icnst
+      logical :: lcopy(gas_pcnst)
+      logical :: cnst_is_gas(gas_pcnst)
+
 
 ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
 !    N=1 - before gas-phase chemistry
