@@ -135,11 +135,11 @@
          ! Only need to do this for points 2 and 3 in the time integraion loop,
          ! i.e., the before-cloud-chem and after-cloud-chem states.
          !=========================================================================
-         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
-         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
 
-         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
-         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
 
          !=========================================================================
          ! Set interstitial aerosol mixing ratios in suareas.
