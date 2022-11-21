@@ -144,27 +144,31 @@
          !=========================================================================
          ! Set interstitial aerosol mixing ratios in suareas.
          !=========================================================================
-         do imode = 1, ntot_amode
+         call set_subarea_q_numb_for_intrst_aerosols( &
+              loffset, jclea, jcldy, fclea, fcldy, qgcm2, qqcwgcm2, qgcm3, &! in
+              qsub2, qsub3    )! inout
 
-            ! calculate partitioning factors
+       ! do imode = 1, ntot_amode
 
-            tmp_qa_gcav = qgcm2( numptr_amode(imode)-loffset )
-            tmp_qc_gcav = qqcwgcm2( numptrcw_amode(imode)-loffset )
+       !    ! calculate partitioning factors
 
-            call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
-                                        tmp_aa_clea, tmp_aa_cldy )
+       !    tmp_qa_gcav = qgcm2( numptr_amode(imode)-loffset )
+       !    tmp_qc_gcav = qqcwgcm2( numptrcw_amode(imode)-loffset )
 
-            ! apply partitioning factors
+       !    call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
+       !                                tmp_aa_clea, tmp_aa_cldy )
 
-            icnst = numptr_amode(imode) - loffset
+       !    ! apply partitioning factors
 
-            qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
-            qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
+       !    icnst = numptr_amode(imode) - loffset
 
-            qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
-            qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
+       !    qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
+       !    qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
 
-         end do ! imode
+       !    qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
+       !    qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
+
+       ! end do ! imode
 
 
          do imode = 1, ntot_amode

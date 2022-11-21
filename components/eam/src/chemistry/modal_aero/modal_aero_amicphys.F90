@@ -84,7 +84,8 @@ use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_cnst &
                                       , set_subarea_q_numb_for_cldbrn_aerosols &
                                       , set_subarea_q_mass_for_cldbrn_aerosols &
-                                      , get_partition_factors
+                                      , get_partition_factors &
+                                      , set_subarea_q_numb_for_intrst_aerosols
 
 implicit none
 
@@ -209,7 +210,7 @@ implicit none
       logical :: grid_cell_has_only_cldy_area
       logical :: gird_cell_is_partly_cldy
 
-      integer :: icnst
+      integer :: imode, ispec, icnst
       logical :: lcopy(gas_pcnst)
       logical :: cnst_is_gas(gas_pcnst)
 
