@@ -117,4 +117,62 @@ contains
 
   end subroutine copy_cnst
 
+  subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+
+     use modal_aero_data, only: ntot_amode, nspec_amode, numptrcw_amode
+
+     integer, intent(in)    :: loffset 
+     integer, intent(in)    :: maxsubarea, gas_pcnst
+     integer, intent(in)    :: jclea, jcldy
+     real(wp),intent(in)    :: fcldy
+     real(wp),intent(in)    :: qqcwgcm(gas_pcnst)
+     real(wp),intent(inout) :: qqcwsub(gas_pcnst,maxsubarea)
+
+     integer :: imode    ! mode index
+     integer :: icnst    ! consitituent index 
+
+     !----------------------------------------------------------------
+     do imode = 1, ntot_amode  ! loop thru log-normal modes
+
+        icnst = numptrcw_amode(imode) - loffset
+
+        qqcwsub(icnst,jclea) = 0.0_wp
+        qqcwsub(icnst,jcldy) = qqcwgcm(icnst)/fcldy
+
+     end do
+     !----------------------------------------------------------------
+
+  end subroutine set_subarea_q_numb_for_cldbrn_aerosols
+
+  subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset,maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+
+     use modal_aero_data, only: ntot_amode, nspec_amode, lmassptrcw_amode
+
+     integer, intent(in)    :: loffset 
+     integer, intent(in)    :: maxsubarea, gas_pcnst
+     integer, intent(in)    :: jclea, jcldy
+     real(wp),intent(in)    :: fcldy
+     real(wp),intent(in)    :: qqcwgcm(gas_pcnst)
+     real(wp),intent(inout) :: qqcwsub(gas_pcnst,maxsubarea)
+
+     integer :: imode    ! mode index
+     integer :: ispec    ! aerosol species index
+     integer :: icnst    ! consitituent index 
+
+     !----------------------------------------------------------------
+     do imode = 1, ntot_amode          ! loop thru log-normal modes
+      do ispec = 1, nspec_amode(imode) ! mass of individual species in a mode
+
+           icnst = lmassptrcw_amode(ispec,imode) - loffset
+
+           qqcwsub(icnst,jclea) = 0.0_wp
+           qqcwsub(icnst,jcldy) = qqcwgcm(icnst)/fcldy
+
+      end do ! ispec - species loop
+     end do ! imode - mode loop
+     !----------------------------------------------------------------
+
+  end subroutine set_subarea_q_mass_for_cldbrn_aerosols
+
+
 end module modal_aero_amicphys_subareas
