@@ -174,5 +174,41 @@ contains
 
   end subroutine set_subarea_q_mass_for_cldbrn_aerosols
 
+!--------------------------------------------------------------------------------
+  subroutine get_partition_factors(  q_intrst_gcm, q_cldbrn_gcm, fcldy, fclea, &! in
+                                     part_fac_q_intrst_clea, part_fac_q_intrst_cldy  )! out
+
+      real(wp), intent(in)  ::  q_intrst_gcm  ! grid cell mean interstitial aerosol mixing ratio
+      real(wp), intent(in)  ::  q_cldbrn_gcm  ! grid cell mean cloud-borne aerosol mixing ratio
+
+      real(wp), intent(in)  ::  fcldy           ! cloudy fraction of the grid cell
+      real(wp), intent(in)  ::  fclea           ! clear  fraction of the grid cell
+
+      real(wp), intent(out) ::  part_fac_q_intrst_clea
+      real(wp), intent(out) ::  part_fac_q_intrst_cldy
+
+      real(wp) :: tmp_q_intrst_clea, tmp_q_intrst_cldy
+      real(wp) :: tmp_q_cldbrn_cldy
+      real(wp) :: tmp_aa
+
+      ! Calculate mixing ratios of each subarea
+
+      tmp_q_cldbrn_cldy = q_cldbrn_gcm/fcldy ! cloud-borne,  cloudy subarea
+      tmp_q_intrst_cldy = max( 0.0_wp, ((q_intrst_gcm+q_cldbrn_gcm) - tmp_q_cldbrn_cldy) ) ! interstitial, cloudy subarea
+
+      tmp_q_intrst_clea = (q_intrst_gcm - fcldy*tmp_q_intrst_cldy)/fclea ! interstitial, clear  subarea
+
+      ! Calculate the corresponding paritioning factors for interstitial aerosols
+      ! using the above-derived subarea mixing ratios plus the constraint that
+      ! the cloud fraction weighted average of subarea mean need to match grid box mean.
+
+      tmp_aa = max( 1.e-35_wp, tmp_q_intrst_clea*fclea ) / max( 1.e-35_wp, q_intrst_gcm )
+      tmp_aa = max( 0.0_wp, min( 1.0_wp, tmp_aa ) )
+
+      part_fac_q_intrst_clea = tmp_aa/fclea
+      part_fac_q_intrst_cldy = (1.0_wp-tmp_aa)/fcldy
+
+  end subroutine get_partition_factors
+
 
 end module modal_aero_amicphys_subareas
