@@ -174,6 +174,63 @@ contains
 
   end subroutine set_subarea_q_mass_for_cldbrn_aerosols
 
+  subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
+                                                     qgcm2, qqcwgcm2, qgcm3, &
+                                                     qsub2, qsub3    )! inout
+
+     use modal_aero_data, only: ntot_amode, numptr_amode, numptrcw_amode
+     use modal_aero_amicphys_control, only: gas_pcnst, maxsubarea
+
+     integer, intent(in)    :: loffset 
+     integer, intent(in)    :: jclea, jcldy
+     real(wp),intent(in)    :: fclea, fcldy
+     real(wp),intent(in)    :: qgcm2   (gas_pcnst)
+     real(wp),intent(in)    :: qgcm3   (gas_pcnst)
+     real(wp),intent(in)    :: qqcwgcm2(gas_pcnst)
+
+     real(wp),intent(inout) :: qsub2(gas_pcnst,maxsubarea)
+     real(wp),intent(inout) :: qsub3(gas_pcnst,maxsubarea)
+
+     integer :: imode    ! mode index
+     integer :: ispec    ! aerosol species index
+     integer :: icnst    ! consitituent index 
+
+     real(wp) :: tmp_qa_gcav
+     real(wp) :: tmp_qc_gcav
+
+     real(wp) :: tmp_aa_clea
+     real(wp) :: tmp_aa_cldy
+
+     do imode = 1, ntot_amode
+
+        ! calculate partitioning factors
+
+        tmp_qa_gcav = qgcm2( numptr_amode(imode)-loffset )
+        tmp_qc_gcav = qqcwgcm2( numptrcw_amode(imode)-loffset )
+
+        call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
+                                    tmp_aa_clea, tmp_aa_cldy )
+
+        ! apply partitioning factors
+
+        icnst = numptr_amode(imode) - loffset
+
+        qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
+        qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
+
+        qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
+        qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
+
+     end do ! imode
+
+  end subroutine set_subarea_q_numb_for_intrst_aerosols
+
+  subroutine set_subarea_q_mass_for_intrst_aerosols
+
+     use modal_aero_data, only: ntot_amode, nspec_amode, lmassptrcw_amode
+
+  end subroutine set_subarea_q_mass_for_intrst_aerosols
+
 !--------------------------------------------------------------------------------
   subroutine get_partition_factors(  q_intrst_gcm, q_cldbrn_gcm, fcldy, fclea, &! in
                                      part_fac_q_intrst_clea, part_fac_q_intrst_cldy  )! out
