@@ -136,6 +136,27 @@
 
          do l2 = 0, nspec_amode(n)
 
+            if (l2 == 0) then
+               lc = numptrcw_amode(n) - loffset
+            else
+               lc = lmassptrcw_amode(l2,n) - loffset
+            end if
+
+            qqcwsub2(lc,jclea) = 0.0_r8
+            qqcwsub2(lc,jcldy) = qqcwgcm2(lc)/fcldy
+
+            qqcwsub3(lc,jclea) = 0.0_r8
+            qqcwsub3(lc,jcldy) = qqcwgcm3(lc)/fcldy
+
+            end do ! l2
+         end do ! n
+
+         !-----
+
+         do n = 1, ntot_amode
+
+         do l2 = 0, nspec_amode(n)
+
             if (l2 <= 1) then
             ! calculcate partitioning factors
                if (l2 == 0) then
@@ -174,21 +195,21 @@
 
             if (l2 == 0) then
                la = numptr_amode(n) - loffset
-               lc = numptrcw_amode(n) - loffset
+           !   lc = numptrcw_amode(n) - loffset
             else
                la = lmassptr_amode(l2,n) - loffset
-               lc = lmassptrcw_amode(l2,n) - loffset
+           !   lc = lmassptrcw_amode(l2,n) - loffset
             end if
 
             qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
             qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
-            qqcwsub2(lc,jclea) = 0.0_r8
-            qqcwsub2(lc,jcldy) = qqcwgcm2(lc)/fcldy
+           !qqcwsub2(lc,jclea) = 0.0_r8
+           !qqcwsub2(lc,jcldy) = qqcwgcm2(lc)/fcldy
 
             qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
             qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
-            qqcwsub3(lc,jclea) = 0.0_r8
-            qqcwsub3(lc,jcldy) = qqcwgcm3(lc)/fcldy
+           !qqcwsub3(lc,jclea) = 0.0_r8
+           !qqcwsub3(lc,jcldy) = qqcwgcm3(lc)/fcldy
 
             end do ! l2
          end do ! n
