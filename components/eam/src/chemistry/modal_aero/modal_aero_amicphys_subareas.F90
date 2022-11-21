@@ -117,12 +117,12 @@ contains
 
   end subroutine copy_cnst
 
-  subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+  subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
 
+     use modal_aero_amicphys_control, only: gas_pcnst, maxsubarea
      use modal_aero_data, only: ntot_amode, nspec_amode, numptrcw_amode
 
      integer, intent(in)    :: loffset 
-     integer, intent(in)    :: maxsubarea, gas_pcnst
      integer, intent(in)    :: jclea, jcldy
      real(wp),intent(in)    :: fcldy
      real(wp),intent(in)    :: qqcwgcm(gas_pcnst)
@@ -144,12 +144,12 @@ contains
 
   end subroutine set_subarea_q_numb_for_cldbrn_aerosols
 
-  subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset,maxsubarea, gas_pcnst, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+  subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
 
      use modal_aero_data, only: ntot_amode, nspec_amode, lmassptrcw_amode
+     use modal_aero_amicphys_control, only: gas_pcnst, maxsubarea
 
      integer, intent(in)    :: loffset 
-     integer, intent(in)    :: maxsubarea, gas_pcnst
      integer, intent(in)    :: jclea, jcldy
      real(wp),intent(in)    :: fcldy
      real(wp),intent(in)    :: qqcwgcm(gas_pcnst)
