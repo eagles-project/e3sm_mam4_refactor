@@ -492,7 +492,10 @@ subroutine ma_convproc_dp_intr(                &
    integer :: ii
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
-   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols) !these variables may be removed
+   ! diagnostics variables to write out. 
+   ! xx_kcldbase is filled with index kk. maybe better define as integer
+   ! keep it in C++ refactoring for BFB comparison (by Shuaiqi Tang, 2022)
+   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
 
 !
 ! Initialize
@@ -1199,7 +1202,7 @@ jtsub_loop_main_aa: &
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
                 const,  t,      aqfrac, icwmr,          rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
-                conu                                                    ) ! inout
+                conu,           xx_wcldbase,    xx_kcldbase             ) ! inout
 
 
         ! Compute downdraft mixing ratios from cloudtop to cloudbase
@@ -1681,7 +1684,7 @@ jtsub_loop_main_aa: &
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
                 const,  t,      aqfrac, icwmr,          rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
-                conu                                                    ) ! inout 
+                conu,           xx_wcldbase,    xx_kcldbase             ) ! inout 
 !-----------------------------------------------------------------------
 ! Compute updraft mixing ratios from cloudbase to cloudtop
 ! No special treatment is needed at k=pver because arrays are dimensioned 1:pver+1
@@ -1720,6 +1723,8 @@ jtsub_loop_main_aa: &
    real(r8), intent(out) :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
    real(r8), intent(out) :: fa_u(pver)           ! fractional area of in the updraft
    real(r8), intent(inout) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
+   real(r8), intent(inout) :: xx_wcldbase(pcols) ! w at first cloudy layer [m/s]
+   real(r8), intent(inout) :: xx_kcldbase(pcols) ! level of cloud base
 
    ! local variables
    integer      :: icnst        ! index of pcnst_extd
@@ -1792,10 +1797,12 @@ jtsub_loop_main_aa: &
             ! aerosol activation - method 2
             call compute_activation_tend(                       &
                         icol,           kk,             f_ent,  & ! in
-                        cldfrac_i,      rhoair_i,               & ! in
+
+                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
                         dt_u,   wup,    icwmr,          t,      & ! in
                         kactcnt,        kactfirst,              & ! inout
-                        conu,           dconudt_activa          ) ! inout
+                        conu,           dconudt_activa,         & ! inout
+                        xx_wcldbase,    xx_kcldbase             ) ! inout
 
             ! wet removal
             call compute_wetdep_tend(                              &
@@ -1862,10 +1869,11 @@ jtsub_loop_main_aa: &
 !====================================================================================
    subroutine compute_activation_tend(                          &
                         icol,           kk,             f_ent,  & ! in
-                        cldfrac_i,      rhoair_i,               & ! in
+                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
                         dt_u,   wup,    icwmr,          t,      & ! in
                         kactcnt,        kactfirst,              & ! inout
-                        conu,           dconudt_activa          ) ! inout
+                        conu,           dconudt_activa,         & ! inout
+                        xx_wcldbase,    xx_kcldbase             ) ! inout
 !-----------------------------------------------------------------------
 ! aerosol activation - method 2
 !    when kactcnt=1 (first/lowest layer with cloud water)
@@ -1882,9 +1890,10 @@ jtsub_loop_main_aa: &
    integer,  parameter  :: pcnst_extd = pcnst*2
    integer,  intent(in) :: icol                 ! column index
    integer,  intent(in) :: kk                   ! vertical level index
+   real(r8), intent(in) :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
    real(r8), intent(in) :: cldfrac_i(pver)      ! cldfrac at current icol (with adjustments) [fraction]
    real(r8), intent(in) :: rhoair_i(pver)       ! air density at current i [kg/m3]
-   real(r8), intent(in) :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
+   real(r8), intent(in) :: mu_i(pverp)          ! mu at current i (note pverp dimension) [mb/s]
    real(r8), intent(in) :: dt_u(pver)           ! lagrangian transport time in the updraft at current level [s]
    real(r8), intent(in) :: wup(pver)            ! mean updraft vertical velocity at current level updraft [m/s]
    real(r8), intent(in) :: t(pcols,pver)        ! Temperature [K]
@@ -1893,6 +1902,9 @@ jtsub_loop_main_aa: &
    integer,  intent(inout) :: kactfirst         ! Lowest layer with activation (= cloudbase)
    real(r8), intent(inout) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
    real(r8), intent(inout) :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
+   real(r8), intent(inout) :: xx_wcldbase(pcols) ! w at first cloudy layer [m/s]
+   real(r8), intent(inout) :: xx_kcldbase(pcols) ! level of cloud base
+                                ! xx_kcldbase is filled with index kk. maybe better define as integer
 
    logical      :: do_act_this_lev      ! flag for doing activation at current level
    integer      :: kp1                  ! kk + 1
@@ -1906,6 +1918,11 @@ jtsub_loop_main_aa: &
             do_act_this_lev = .true.
             kactcnt = 1
             kactfirst = kk
+            ! diagnostic fields
+            ! xx_wcldbase = w at first cloudy layer, estimated from mu and cldfrac
+            xx_wcldbase(icol) = (mu_i(kp1) + mu_i(kk))*0.5_r8*hund_ovr_g &
+                         / (rhoair_i(kk) * (cldfrac_i(kk)*0.5_r8))
+            xx_kcldbase(icol) = kk
         endif
    else
         do_act_this_lev = .true.
