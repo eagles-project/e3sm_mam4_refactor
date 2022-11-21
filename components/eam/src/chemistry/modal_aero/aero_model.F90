@@ -2132,6 +2132,7 @@ do_lphase2_conditional: &
             dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
             sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
+            nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr,           & ! in
             mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
             ideep, lengath,  species_class,                   & ! in
             ptend, aerdepwetis                                ) ! inout
