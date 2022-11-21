@@ -144,20 +144,31 @@
          !=========================================================================
          ! Set interstitial aerosol mixing ratios in suareas.
          !=========================================================================
+         do n = 1, ntot_amode
+
+            tmp_qa_gcav = qgcm2( numptr_amode(n)-loffset )
+            tmp_qc_gcav = qqcwgcm2( numptrcw_amode(n)-loffset )
+
+            call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
+                                        tmp_aa_clea, tmp_aa_cldy )
+
+            la = numptr_amode(n) - loffset
+
+            qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
+            qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
+
+            qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
+            qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
+
+         end do ! n
 
 
          do n = 1, ntot_amode
 
-         do l2 = 0, nspec_amode(n)
+         do l2 = 1, nspec_amode(n)
 
-            if (l2 <= 1) then
+            if (l2 == 1) then
             ! calculcate partitioning factors
-               if (l2 == 0) then
-                  la = numptr_amode(n) - loffset
-                  lc = numptrcw_amode(n) - loffset
-                  tmp_qa_gcav = qgcm2(la)
-                  tmp_qc_gcav = qqcwgcm2(lc)
-               else
                   tmp_qa_gcav = 0.0_r8
                   tmp_qc_gcav = 0.0_r8
                   do l3 = 1, nspec_amode(n)
@@ -166,34 +177,13 @@
                      lc = lmassptrcw_amode(l3,n) - loffset
                      tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2(lc)
                   end do
-               end if
 
                call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
                                            tmp_aa_clea, tmp_aa_cldy )
 
-           !   tmp_qc_cldy = tmp_qc_gcav/fcldy
-           !   tmp_qa_cldy = max( 0.0_r8, ((tmp_qa_gcav+tmp_qc_gcav) - tmp_qc_cldy) )
-           !   tmp_qa_clea = (tmp_qa_gcav - fcldy*tmp_qa_cldy)/fclea
-
-           !   ! *** question ***
-           !   !    use same tmp_aa_clea/cldy for everything ?
-           !   !    use one for number and one for all masses (based on total mass) ?
-           !   !    use separate ones for everything ?
-           !   ! maybe one for number and one for all masses is best,
-           !   !    because number and mass have different activation fractions
-           !   ! *** question ***
-           !   tmp_aa = max( 1.e-35_r8, tmp_qa_clea*fclea ) / max( 1.e-35_r8, tmp_qa_gcav )
-           !   tmp_aa = max( 0.0_r8, min( 1.0_r8, tmp_aa ) )
-           !   tmp_aa_clea = tmp_aa/fclea
-           !   tmp_aa_cldy = (1.0_r8-tmp_aa)/fcldy
-
             end if ! (l2 <= 1)
 
-            if (l2 == 0) then
-               la = numptr_amode(n) - loffset
-            else
-               la = lmassptr_amode(l2,n) - loffset
-            end if
+            la = lmassptr_amode(l2,n) - loffset
 
             qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
             qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
