@@ -83,7 +83,8 @@ use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_cnst &
                                       , set_subarea_q_numb_for_cldbrn_aerosols &
-                                      , set_subarea_q_mass_for_cldbrn_aerosols
+                                      , set_subarea_q_mass_for_cldbrn_aerosols &
+                                      , get_partition_factors
 
 implicit none
 
