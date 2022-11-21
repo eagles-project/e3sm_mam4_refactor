@@ -1446,8 +1446,10 @@ subroutine ccncalc(state, pbuf, cs, ccn)
 
    real(r8) amcube(pcols)  ! [m3]
    real(r8) super(psat) ! supersaturation [fraction]
-   real(r8), allocatable :: amcubecoef(:)
-   real(r8), allocatable :: argfactor(:)
+!! BJG   real(r8), allocatable :: amcubecoef(:)
+   real(r8) :: amcubecoef(ntot_amode)
+!! BJG   real(r8), allocatable :: argfactor(:)
+   real(r8) :: argfactor(ntot_amode)
    real(r8) :: surften       ! surface tension of water w/respect to air [N/m]
    real(r8) surften_coef  ! [m-K]
    real(r8) a(pcols) ! surface tension parameter  [m]
@@ -1457,13 +1459,14 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    !     mathematical constants
    real(r8) twothird,sq2
    integer lsat,imode,icol,kk
-!! BJG   integer l,m,n,i,k
-!! BJG   real(r8) log,cc
    real(r8) smcoefcoef   ! [dimensionless]
    real(r8) smcoef(pcols)  ! [m^(3/2)]
    real(r8) pct_to_fraction, per_m3_to_per_cm3
    integer phase ! phase of aerosol
    !-------------------------------------------------------------------------------
+
+
+   phase=3 ! interstitial+cloudborne
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -1472,11 +1475,10 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    pct_to_fraction = 0.01_r8
    per_m3_to_per_cm3 = 1.e-6_r8 
 
-   allocate( &
-      amcubecoef(ntot_amode), &
-      argfactor(ntot_amode)   )
+!! BJG   allocate( &
+!! BJG      amcubecoef(ntot_amode), &
+!! BJG      argfactor(ntot_amode)   )
 
-!! BJG   super(:)=supersat(:)*0.01_r8
    super(:)=supersat(:)*pct_to_fraction
    sq2=sqrt(2._r8)
    twothird=2._r8/3._r8
@@ -1484,28 +1486,38 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
    smcoefcoef=2._r8/sqrt(27._r8)
 
+!! BJG   do imode=1,ntot_amode
+!! BJG      amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
+!! BJG      argfactor(imode)=twothird/(sq2*alogsig(imode))
+!! BJG   end do
+
+   ccn(:,:,:) = 0._r8
+
    do imode=1,ntot_amode
+
       amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
       argfactor(imode)=twothird/(sq2*alogsig(imode))
-   end do
 
-!! BJG   ccn = 0._r8
-   ccn(:,:,:) = 0._r8
+
    do kk=top_lev,pver
 
-      do icol=1,ncol
-         a(icol)=surften_coef/tair(icol,kk)
-         smcoef(icol)=smcoefcoef*a(icol)*sqrt(a(icol))
-      end do
 
-      do imode=1,ntot_amode
+!! BJG      do icol=1,ncol
+!! BJG      a(icol)=surften_coef/tair(icol,kk)
+!! BJG      smcoef(icol)=smcoefcoef*a(icol)*sqrt(a(icol))
+!! BJG      end do
 
-         phase=3 ! interstitial+cloudborne
+!! BJG      do imode=1,ntot_amode
+
 
          call loadaer( &
             state%q, lchnk, pbuf, 1, ncol, kk, &
             imode, nspec_amode(imode), cs, phase, naerosol, vaerosol, &
             hygro )
+
+
+         a(1:ncol) = surften_coef/tair(1:ncol,kk)
+         smcoef(1:ncol)=smcoefcoef*a(1:ncol)*sqrt(a(1:ncol))
 
          where(naerosol(:ncol)>1.e-3_r8)
             amcube(:ncol)=amcubecoef(imode)*vaerosol(:ncol)/naerosol(:ncol)
@@ -1513,21 +1525,23 @@ subroutine ccncalc(state, pbuf, cs, ccn)
          elsewhere
             sm(:ncol)=1._r8 ! value shouldn't matter much since naerosol is small
          endwhere
+
          do lsat=1,psat
             do icol=1,ncol
                arg(icol)=argfactor(imode)*log(sm(icol)/super(lsat))
                ccn(icol,kk,lsat)=ccn(icol,kk,lsat)+naerosol(icol)*0.5_r8*(1._r8-erf(arg(icol)))
             enddo
          enddo
+
       enddo
+
    enddo
-!! BJG   ccn(:ncol,:,:)=ccn(:ncol,:,:)*1.e-6_r8 ! convert from #/m3 to #/cm3
 
    ccn(:ncol,:,:)=ccn(:ncol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
 
-   deallocate( &
-      amcubecoef, &
-      argfactor   )
+!! BJG   deallocate( &
+!! BJG      amcubecoef, &
+!! BJG      argfactor   )
 
 end subroutine ccncalc
 
