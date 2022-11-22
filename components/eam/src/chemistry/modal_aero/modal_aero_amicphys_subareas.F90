@@ -294,8 +294,8 @@ subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
 end subroutine set_subarea_q_numb_for_intrst_aerosols
 
 subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
-                                                   qgcm2, qqcwgcm2, qgcm3, &
-                                                   qsub2, qsub3    )! inout
+                                                   qgcm,  qqcwgcm, &
+                                                   qgcmx, qsubx    )! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the mass mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -310,12 +310,11 @@ subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
   integer, intent(in)    :: loffset 
   integer, intent(in)    :: jclea, jcldy
   real(wp),intent(in)    :: fclea, fcldy
-  real(wp),intent(in)    :: qgcm2   (ncnst)
-  real(wp),intent(in)    :: qgcm3   (ncnst)
-  real(wp),intent(in)    :: qqcwgcm2(ncnst)
+  real(wp),intent(in)    :: qgcm   (ncnst)
+  real(wp),intent(in)    :: qqcwgcm(ncnst)
 
-  real(wp),intent(inout) :: qsub2(ncnst,maxsubarea)
-  real(wp),intent(inout) :: qsub3(ncnst,maxsubarea)
+  real(wp),intent(in)    :: qgcmx(ncnst)
+  real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)
 
   integer :: imode    ! mode index
   integer :: ispec    ! aerosol species index
@@ -335,8 +334,8 @@ subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
      tmp_qc_gcav = 0.0_wp
 
      do ispec = 1, nspec_amode(imode)
-        tmp_qa_gcav = tmp_qa_gcav + qgcm2( lmassptr_amode(ispec,imode) - loffset )
-        tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2( lmassptrcw_amode(ispec,imode) - loffset )
+        tmp_qa_gcav = tmp_qa_gcav + qgcm( lmassptr_amode(ispec,imode) - loffset )
+        tmp_qc_gcav = tmp_qc_gcav + qqcwgcm( lmassptrcw_amode(ispec,imode) - loffset )
      end do
 
      call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
@@ -348,13 +347,10 @@ subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
 
         icnst = lmassptr_amode(ispec,imode) - loffset
 
-        qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
-        qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
+        qsubx(icnst,jclea) = qgcmx(icnst)*tmp_aa_clea
+        qsubx(icnst,jcldy) = qgcmx(icnst)*tmp_aa_cldy
 
-        qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
-        qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
-
-        end do ! ispec 
+     end do ! ispec 
   end do ! imode
 
 
