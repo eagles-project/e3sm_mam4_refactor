@@ -1,12 +1,11 @@
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! Aerosol water
-      !
+      !====================================================================================================
+      ! Aerosol water.
+      !====================================================================================================
       ! Notes from Dick Easter/Steve Ghan: how to treat aerosol water in subareas needs more work/thinking
       ! Currently modal_aero_water_uptake calculates qaerwat using
       ! the grid-cell mean interstital-aerosol mix-rats and the clear-area RH.
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+      !====================================================================================================
       qaerwatsub3(:,:) = 0.0_r8
 
       if ( present( qaerwat ) ) then
@@ -19,14 +18,14 @@
          end do
       end if
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !====================================================================================================
       ! Gases, interstitial aerosols, and cloud-borne aerosols
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      !----------------------------------------------------------------------------
+      !====================================================================================================
+      !-------------------------------------------------------------------------------------
       ! Copy grid cell mean mixing ratios; clip negative values if any.
       ! These values, together with cloud fraction and a few assumptions, are used
       ! in the remainder of the subroutine to calculate the sub-area mean mixing ratios.
-      !----------------------------------------------------------------------------
+      !-------------------------------------------------------------------------------------
 
       ! Gases and interstitial aerosols
       qgcm1(:) = max( 0.0_r8, q_pregaschem(i,k,:) )
@@ -37,10 +36,9 @@
       qqcwgcm2(:) = max( 0.0_r8, qqcw_precldchem(i,k,:) )
       qqcwgcm3(:) = max( 0.0_r8, qqcw(i,k,:) )
 
-
-      !----------------------------------------------------------------------------
-      ! Initialize the mean mixing ratios in subareas
-      !----------------------------------------------------------------------------
+      !------------------------------------------------------------------------------------
+      ! Initialize mixing ratios in subareas before the aerosol microphysics calculations
+      !------------------------------------------------------------------------------------
       ! Gases and interstitial aerosols
       qsub1(:,:) = 0.0_r8
       qsub2(:,:) = 0.0_r8
@@ -52,7 +50,7 @@
       qqcwsub3(:,:) = 0.0_r8
 
       !------------------------------------------------------------------------------------------------
-      ! Calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
+      ! Determine the category the cell belongs to (i.e., partly cloud, all cloudy, or all clear
       !------------------------------------------------------------------------------------------------
       grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
       grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
@@ -66,12 +64,12 @@
          lcopy(1:gas_pcnst) = lmapcc_all(1:gas_pcnst) > 0     ! copy all gases and aerosols
 
          do jsub = 1,nsubarea
-            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, lcopy )
-            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, lcopy )
-            call copy_cnst( qgcm3, qsub3(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qgcm1, qsub1(:,jsub), lcopy ) !from, to, flag
+            call copy_cnst( qgcm2, qsub2(:,jsub), lcopy ) !from, to, flag
+            call copy_cnst( qgcm3, qsub3(:,jsub), lcopy ) !from, to, flag
 
-            call copy_cnst( qqcwgcm2, qqcwsub2(:,jsub), gas_pcnst, lcopy )
-            call copy_cnst( qqcwgcm3, qqcwsub3(:,jsub), gas_pcnst, lcopy )
+            call copy_cnst( qqcwgcm2, qqcwsub2(:,jsub), lcopy ) !from, to, flag
+            call copy_cnst( qqcwgcm3, qqcwsub3(:,jsub), lcopy ) !from, to, flag
          end do
 
       !*************************************************************************************************
@@ -85,7 +83,6 @@
          !===================================
          ! Set gas mixing ratios in subareas
          !===================================
-
          cnst_is_gas(:) = lmapcc_all(:).eq.lmapcc_val_gas 
 
          !------------------------------------------------------------------------------------------
@@ -93,14 +90,14 @@
          ! i.e., they all equal the grid cell mean.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_cnst( qgcm1, qsub1(:,jsub), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
+            call copy_cnst( qgcm1, qsub1(:,jsub), cnst_is_gas ) !from, to, flag
          end do
 
          !------------------------------------------------------------------------------------------
          ! After gas chemistry, still assume gas mixing ratios are the same in all subareas.
          !------------------------------------------------------------------------------------------
          do jsub = 1,nsubarea
-            call copy_cnst( qgcm2, qsub2(:,jsub), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
+            call copy_cnst( qgcm2, qsub2(:,jsub), cnst_is_gas ) !from, to, flag
          end do
 
          !----------------------------------------------------------------------------------------
@@ -111,7 +108,7 @@
          !----------------------------------------------------------------------------------------
          ! Gases in the clear subarea remain the same as their values before cloud chemistry.
 
-         call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), gas_pcnst, cnst_is_gas ) !from, to, dim.size, flag
+         call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), cnst_is_gas ) !from, to, flag
 
          ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
          ! cloud fraction and the clear-sky values
@@ -119,51 +116,34 @@
          call compute_qsub_from_gbm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
                                                                qsub3(:,jclea), qsub3(:,jcldy)    )! inout
 
-       ! do icnst = 1, gas_pcnst
-       !  if (cnst_is_gas(icnst)) then
-
-       !    qsub3(icnst,jcldy) = (qgcm3(icnst) - fclea*qsub3(icnst,jclea))/fcldy
-
-       !    ! Check that this does not produce a negative value
-       !    if (qsub3(icnst,jcldy) < 0.0_r8) then
-       !       qsub3(icnst,jcldy) = 0.0_r8
-       !       qsub3(icnst,jclea) = qgcm3(icnst)/fclea
-       !    end if
-
-       !  end if
-       ! end do
-
          !=========================================================================
-         ! Set cloud-borne aerosol mixing ratios in subareas.
+         ! Set AEROSOL mixing ratios in subareas.
          ! Only need to do this for points 2 and 3 in the time integraion loop,
          ! i.e., the before-cloud-chem and after-cloud-chem states.
          !=========================================================================
+         ! Cloud-borne aerosols.
+         ! They are straightforward to partition, as they only exist in the cloudy subarea.
+
          call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
          call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
 
          call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
          call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
 
-         !=========================================================================
-         ! Set interstitial aerosol mixing ratios in suareas.
-         !=========================================================================
-         call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, qgcm2, qqcwgcm2, qgcm3, &! in
-                                                      qsub2, qsub3    )! inout
+         ! Interstitial aerosols.
+         ! They can exist in both cloudy and clear subareas. Need to be partitioned. 
 
-         call set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, qgcm2, qqcwgcm2, qgcm3, &! in
-                                                      qsub2, qsub3    )! inout
+         call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                      qgcm2, qqcwgcm2, qgcm3,              &! in
+                                                      qsub2, qsub3                         )! inout
 
-         !-------------------------------------------------------------------------------
-         ! Done setting aerosol mixing ratios
-         !-------------------------------------------------------------------------------
+         call set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                      qgcm2, qqcwgcm2, qgcm3,              &! in
+                                                      qsub2, qsub3                         )! inout
 
-
-      else ! This should not happen
+      else ! Cell is neither partly cloudy nor all cloudy/all clear. This should not happen
          write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
          call endrun( tmp_str )
       end if
-      !*************************************************************************************************
-      ! Done partitioning gases and aerosols
-      !*************************************************************************************************
 
 
