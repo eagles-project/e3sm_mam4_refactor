@@ -116,19 +116,22 @@
          ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
          ! cloud fraction and the clear-sky values
 
-         do icnst = 1, gas_pcnst
-          if (cnst_is_gas(icnst)) then
+         call compute_qsub_from_gbm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
+                                                               qsub3(:,jclea), qsub3(:,jcldy)    )! inout
 
-            qsub3(icnst,jcldy) = (qgcm3(icnst) - fclea*qsub3(icnst,jclea))/fcldy
+       ! do icnst = 1, gas_pcnst
+       !  if (cnst_is_gas(icnst)) then
 
-            ! Check that this does not produce a negative value
-            if (qsub3(icnst,jcldy) < 0.0_r8) then
-               qsub3(icnst,jcldy) = 0.0_r8
-               qsub3(icnst,jclea) = qgcm3(icnst)/fclea
-            end if
+       !    qsub3(icnst,jcldy) = (qgcm3(icnst) - fclea*qsub3(icnst,jclea))/fcldy
 
-          end if
-         end do
+       !    ! Check that this does not produce a negative value
+       !    if (qsub3(icnst,jcldy) < 0.0_r8) then
+       !       qsub3(icnst,jcldy) = 0.0_r8
+       !       qsub3(icnst,jclea) = qgcm3(icnst)/fclea
+       !    end if
+
+       !  end if
+       ! end do
 
          !=========================================================================
          ! Set cloud-borne aerosol mixing ratios in subareas.
