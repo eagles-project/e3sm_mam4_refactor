@@ -134,8 +134,12 @@
          ! They can exist in both cloudy and clear subareas. Need to be partitioned. 
 
          call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                      qgcm2, qqcwgcm2, qgcm2,              &! in
+                                                      qsub2                                )! inout
+
+         call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                       qgcm2, qqcwgcm2, qgcm3,              &! in
-                                                      qsub2, qsub3                         )! inout
+                                                      qsub3                                )! inout
 
          call set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                       qgcm2, qqcwgcm2, qgcm3,              &! in
