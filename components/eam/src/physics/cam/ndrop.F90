@@ -1426,13 +1426,12 @@ subroutine ccncalc(state, pbuf, cs, ccn)
 
    ! Ghan et al., Atmos. Res., 1993, 198-221.
 
-   ! arguments
-
+  ! input arguments
    type(physics_state), target, intent(in)    :: state
    type(physics_buffer_desc),   pointer       :: pbuf(:)
-
-
    real(r8), intent(in)  :: cs(pcols,pver)       ! air density [kg/m3]
+
+  ! output arguments
    real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
@@ -1440,29 +1439,24 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    integer :: lchnk ! chunk index
    integer :: ncol  ! number of columns
    real(r8), pointer :: tair(:,:)     ! air temperature [K]
-
    real(r8) naerosol(pcols) ! interstit+activated aerosol number conc [#/m3]
    real(r8) vaerosol(pcols) ! interstit+activated aerosol volume conc [m3/m3]
-
    real(r8) amcube(pcols)  ! [m3]
    real(r8) super(psat) ! supersaturation [fraction]
-!! BJG   real(r8), allocatable :: amcubecoef(:)
-   real(r8) :: amcubecoef(ntot_amode)
-!! BJG   real(r8), allocatable :: argfactor(:)
-   real(r8) :: argfactor(ntot_amode)
-   real(r8) :: surften       ! surface tension of water w/respect to air [N/m]
+   real(r8) :: amcubecoef(ntot_amode) ! [dimensionless]
+   real(r8) :: argfactor(ntot_amode)  ! [dimensionless]
    real(r8) surften_coef  ! [m-K]
-   real(r8) a(pcols) ! surface tension parameter  [m]
+   real(r8) aparam(pcols) ! surface tension parameter  [m]
    real(r8) hygro(pcols)  ! aerosol hygroscopicity [dimensionless]
    real(r8) sm(pcols)  ! critical supersaturation at mode radius [fraction]
-   real(r8) arg(pcols)
-   !     mathematical constants
-   real(r8) twothird,sq2
+   real(r8) arg_erf_ccn(pcols) ! [dimensionless] 
    integer lsat,imode,icol,kk
    real(r8) smcoefcoef   ! [dimensionless]
    real(r8) smcoef(pcols)  ! [m^(3/2)]
-   real(r8) pct_to_fraction, per_m3_to_per_cm3
    integer phase ! phase of aerosol
+   !     mathematical constants
+   real(r8) pct_to_fraction, per_m3_to_per_cm3
+
    !-------------------------------------------------------------------------------
 
 
@@ -1475,21 +1469,9 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    pct_to_fraction = 0.01_r8
    per_m3_to_per_cm3 = 1.e-6_r8 
 
-!! BJG   allocate( &
-!! BJG      amcubecoef(ntot_amode), &
-!! BJG      argfactor(ntot_amode)   )
-
    super(:)=supersat(:)*pct_to_fraction
-   sq2=sqrt(2._r8)
-   twothird=2._r8/3._r8
-   surften=0.076_r8
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
    smcoefcoef=2._r8/sqrt(27._r8)
-
-!! BJG   do imode=1,ntot_amode
-!! BJG      amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
-!! BJG      argfactor(imode)=twothird/(sq2*alogsig(imode))
-!! BJG   end do
 
    ccn(:,:,:) = 0._r8
 
@@ -1498,26 +1480,15 @@ subroutine ccncalc(state, pbuf, cs, ccn)
       amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
       argfactor(imode)=twothird/(sq2*alogsig(imode))
 
-
-   do kk=top_lev,pver
-
-
-!! BJG      do icol=1,ncol
-!! BJG      a(icol)=surften_coef/tair(icol,kk)
-!! BJG      smcoef(icol)=smcoefcoef*a(icol)*sqrt(a(icol))
-!! BJG      end do
-
-!! BJG      do imode=1,ntot_amode
-
+      do kk=top_lev,pver
 
          call loadaer( &
             state%q, lchnk, pbuf, 1, ncol, kk, &
             imode, nspec_amode(imode), cs, phase, naerosol, vaerosol, &
             hygro )
 
-
-         a(1:ncol) = surften_coef/tair(1:ncol,kk)
-         smcoef(1:ncol)=smcoefcoef*a(1:ncol)*sqrt(a(1:ncol))
+         aparam(1:ncol) = surften_coef/tair(1:ncol,kk)
+         smcoef(1:ncol)=smcoefcoef*aparam(1:ncol)*sqrt(aparam(1:ncol))
 
          where(naerosol(:ncol)>1.e-3_r8)
             amcube(:ncol)=amcubecoef(imode)*vaerosol(:ncol)/naerosol(:ncol)
@@ -1528,8 +1499,8 @@ subroutine ccncalc(state, pbuf, cs, ccn)
 
          do lsat=1,psat
             do icol=1,ncol
-               arg(icol)=argfactor(imode)*log(sm(icol)/super(lsat))
-               ccn(icol,kk,lsat)=ccn(icol,kk,lsat)+naerosol(icol)*0.5_r8*(1._r8-erf(arg(icol)))
+               arg_erf_ccn(icol)=argfactor(imode)*log(sm(icol)/super(lsat))
+               ccn(icol,kk,lsat)=ccn(icol,kk,lsat)+naerosol(icol)*0.5_r8*(1._r8-erf(arg_erf_ccn(icol)))
             enddo
          enddo
 
@@ -1538,10 +1509,6 @@ subroutine ccncalc(state, pbuf, cs, ccn)
    enddo
 
    ccn(:ncol,:,:)=ccn(:ncol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
-
-!! BJG   deallocate( &
-!! BJG      amcubecoef, &
-!! BJG      argfactor   )
 
 end subroutine ccncalc
 
