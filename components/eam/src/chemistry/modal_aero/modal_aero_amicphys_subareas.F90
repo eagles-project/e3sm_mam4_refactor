@@ -242,9 +242,9 @@ subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy,
 
 end subroutine set_subarea_q_mass_for_cldbrn_aerosols
 
-subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
-                                                   qgcm2, qqcwgcm2, qgcm3, &
-                                                   qsub2, qsub3    )! inout
+subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                   qgcm, qqcwgcm,                       &! in
+                                                   qgcmx,qsubx                          )! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the number mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -257,12 +257,11 @@ subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
    integer, intent(in)    :: loffset 
    integer, intent(in)    :: jclea, jcldy    ! subarea indices 
    real(wp),intent(in)    :: fclea, fcldy    ! area fraction [unitless] of the clear and cloudy subareas
-   real(wp),intent(in)    :: qgcm2   (ncnst) ! grid cell mean of interstitial aerosol mixing ratio [unit does not matter)
-   real(wp),intent(in)    :: qqcwgcm2(ncnst) ! grid cell mean of cloud-borne aerosol mixing ratio [unit does not matter)
-   real(wp),intent(in)    :: qgcm3   (ncnst)
+   real(wp),intent(in)    :: qgcm   (ncnst) ! grid cell mean of interstitial aerosol mixing ratio [unit does not matter)
+   real(wp),intent(in)    :: qqcwgcm(ncnst) ! grid cell mean of cloud-borne aerosol mixing ratio [unit does not matter)
+   real(wp),intent(in)    :: qgcmx  (ncnst)
 
-   real(wp),intent(inout) :: qsub2(ncnst,maxsubarea)
-   real(wp),intent(inout) :: qsub3(ncnst,maxsubarea)
+   real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)
 
    integer :: imode    ! mode index
    integer :: icnst    ! consitituent index 
@@ -277,8 +276,8 @@ subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
 
       ! calculate partitioning factors
 
-      tmp_qa_gcav = qgcm2( numptr_amode(imode)-loffset )
-      tmp_qc_gcav = qqcwgcm2( numptrcw_amode(imode)-loffset )
+      tmp_qa_gcav = qgcm   ( numptr_amode(imode)-loffset )
+      tmp_qc_gcav = qqcwgcm( numptrcw_amode(imode)-loffset )
 
       call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
                                   tmp_aa_clea, tmp_aa_cldy )
@@ -287,11 +286,8 @@ subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
 
       icnst = numptr_amode(imode) - loffset
 
-      qsub2(icnst,jclea) = qgcm2(icnst)*tmp_aa_clea
-      qsub2(icnst,jcldy) = qgcm2(icnst)*tmp_aa_cldy
-
-      qsub3(icnst,jclea) = qgcm3(icnst)*tmp_aa_clea
-      qsub3(icnst,jcldy) = qgcm3(icnst)*tmp_aa_cldy
+      qsubx(icnst,jclea) = qgcmx(icnst)*tmp_aa_clea
+      qsubx(icnst,jcldy) = qgcmx(icnst)*tmp_aa_cldy
 
    end do ! imode
 
