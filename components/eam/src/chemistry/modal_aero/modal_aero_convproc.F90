@@ -677,9 +677,9 @@ subroutine ma_convproc_sh_intr(                 &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
     ! output diagnostics fields
-    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
-    call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
-    call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
+    call outfld( 'SH_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
+    call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
+    call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
 
 end subroutine ma_convproc_sh_intr
 
