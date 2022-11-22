@@ -334,14 +334,14 @@ main_i_loop: &
 !--------
 
       call setup_subareas( &
-           cld(i,k), maxsubarea,                    &! in
+           cld(i,k),                                &! in
            nsubarea, ncldy_subarea, jclea, jcldy,   &! out
            iscldy_subarea, afracsub, fclea, fcldy   )! out
 
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
 
       call set_subarea_relhum( &
-           maxsubarea, ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
+           ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
            relhumsub )! out
 
 !--------
