@@ -117,6 +117,42 @@ contains
 
   end subroutine copy_cnst
 
+  subroutine compute_qsub_from_gbm_and_qsub_of_other_subarea( lcompute, f_a, f_b, qgcm, &! in
+                                                              qsub_a, qsub_b            )! inout
+  !-----------------------------------------------------------------------------------------
+  ! Calculate the value of qsub_b assuming qgcm is a weighted average defined as
+  !    qgcm = f_a*qsub_a + f_b*qsub_b.
+  !-----------------------------------------------------------------------------------------
+     use modal_aero_amicphys_control, only: ncnst=>gas_pcnst
+
+     logical, intent(in)    :: lcompute(ncnst)
+     real(wp),intent(in)    :: f_a, f_b
+     real(wp),intent(in)    :: qgcm  (ncnst)
+     real(wp),intent(inout) :: qsub_a(ncnst)
+     real(wp),intent(inout) :: qsub_b(ncnst)
+
+     integer :: icnst    ! consitituent index
+ 
+     do icnst = 1, ncnst
+      if (lcompute(icnst)) then
+
+        ! Calculate qsub_b
+
+        qsub_b(icnst) = ( qgcm(icnst) - f_a*qsub_a(icnst) )/f_b
+
+        ! Check that this does not produce a negative value.
+        ! If so, set qsub_b to zero and adjust the value of qsub_a.
+
+        if (qsub_b(icnst) < 0.0_wp) then
+           qsub_b(icnst) = 0.0_wp
+           qsub_a(icnst) = qgcm(icnst)/f_a
+        end if
+
+      end if
+     end do
+
+  end subroutine compute_qsub_from_gbm_and_qsub_of_other_subarea
+
   subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
 
      use modal_aero_amicphys_control, only: gas_pcnst, maxsubarea
