@@ -418,36 +418,31 @@ main_i_loop: do i = 1, ncol
       !================================================================
       ! form new grid-mean mix-ratios
       !================================================================
-      if (nsubarea == 1) then
-         qgcm4(:) = qsub4(:,1)
-         qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
-         qaerwatgcm4(1:ntot_amode) = qaerwatsub4(1:ntot_amode,1)
-      else
+      ! Gases and interstitial aerosols
+
+     !if (nsubarea == 1) then
+     !   qgcm4(:) = qsub4(:,1)
+     !else
          qgcm4(:) = 0.0_r8
-         qgcm_tendaa(:,:) = 0.0_r8
          do j = 1, nsubarea
             qgcm4(:) = qgcm4(:) + qsub4(:,j)*afracsub(j)
-            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) + qsub_tendaa(:,:,j)*afracsub(j)
          end do
-         ! for aerosol water use the clear sub-area value
-         qaerwatgcm4(1:ntot_amode) = qaerwatsub4(1:ntot_amode,jclea)
-      end if
+     !end if
 
+      ! Cloud-borne aerosols
+ 
       if (ncldy_subarea <= 0) then
          qqcwgcm4(:) = qqcwgcm3(:)
-         qqcwgcm_tendaa(:,:) = 0.0_r8
-      else if (nsubarea == 1) then
-         qqcwgcm4(:) = qqcwsub4(:,1)
-         qqcwgcm_tendaa(:,:) = qqcwsub_tendaa(:,:,1)
+    ! else if (nsubarea == 1) then
+    !    qqcwgcm4(:) = qqcwsub4(:,1)
       else
          qqcwgcm4(:) = 0.0_r8
-         qqcwgcm_tendaa(:,:) = 0.0_r8
          do j = 1, nsubarea
             if ( .not. iscldy_subarea(j) ) cycle
             qqcwgcm4(:) = qqcwgcm4(:) + qqcwsub4(:,j)*afracsub(j)
-            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) + qqcwsub_tendaa(:,:,j)*afracsub(j)
          end do
       end if
+
 
       do lmz = 1, gas_pcnst
          if (lmapcc_all(lmz) > 0) then
@@ -458,6 +453,40 @@ main_i_loop: do i = 1, ncol
          end if
       end do
 
+!----
+      !----------------------
+      ! Aerosol water
+      !----------------------
+      ! Take values from either the single subarea or the clear subarea to grid cell mean,
+      ! depending on what subarea(s) exist in the grid cell.
+
+      if ( update_qaerwat > 0 .and. present( qaerwat ) ) then
+         jsub = 1;  if (nsubarea>1) jsub = jclea
+         qaerwat(i,k,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
+      end if
+
+!------------------------------
+      if (nsubarea == 1) then
+         qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
+      else
+         qgcm_tendaa(:,:) = 0.0_r8
+         do j = 1, nsubarea
+            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) + qsub_tendaa(:,:,j)*afracsub(j)
+         end do
+      end if
+
+!----
+      if (ncldy_subarea <= 0) then
+         qqcwgcm_tendaa(:,:) = 0.0_r8
+      else if (nsubarea == 1) then
+         qqcwgcm_tendaa(:,:) = qqcwsub_tendaa(:,:,1)
+      else
+         qqcwgcm_tendaa(:,:) = 0.0_r8
+         do j = 1, nsubarea
+            if ( .not. iscldy_subarea(j) ) cycle
+            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) + qqcwsub_tendaa(:,:,j)*afracsub(j)
+         end do
+      end if
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
       if (iqtend_cond <= nqtendbb) q_tendbb(i,k,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
       if (iqtend_rnam <= nqtendbb) q_tendbb(i,k,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
@@ -465,9 +494,8 @@ main_i_loop: do i = 1, ncol
       if (iqtend_coag <= nqtendbb) q_tendbb(i,k,:,iqtend_coag) = qgcm_tendaa(:,iqtend_coag)
       if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(i,k,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
 #endif
-      if ( update_qaerwat > 0 .and. present( qaerwat ) ) then
-         qaerwat(i,k,1:ntot_amode) = qaerwatgcm4(1:ntot_amode)
-      end if
+
+
 
 
 
