@@ -1,6 +1,22 @@
 
       !====================================================================================================
-      ! Aerosol water.
+      ! The subareas
+      !====================================================================================================
+      call setup_subareas( &
+           cld(i,k),                                &! in
+           nsubarea, ncldy_subarea, jclea, jcldy,   &! out
+           iscldy_subarea, afracsub, fclea, fcldy   )! out
+
+      !====================================================================================================
+      ! Relative humidity
+      !====================================================================================================
+
+      call set_subarea_relhum( &
+           ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
+           relhumsub )! out
+
+      !====================================================================================================
+      ! Aerosol water
       !====================================================================================================
       ! Notes from Dick Easter/Steve Ghan: how to treat aerosol water in subareas needs more work/thinking
       ! Currently modal_aero_water_uptake calculates qaerwat using
@@ -21,7 +37,6 @@
       !====================================================================================================
       ! Gases, interstitial aerosols, and cloud-borne aerosols
       !====================================================================================================
-      !-------------------------------------------------------------------------------------
       ! Copy grid cell mean mixing ratios; clip negative values if any.
       ! These values, together with cloud fraction and a few assumptions, are used
       ! in the remainder of the subroutine to calculate the sub-area mean mixing ratios.
@@ -49,9 +64,9 @@
       qqcwsub2(:,:) = 0.0_r8
       qqcwsub3(:,:) = 0.0_r8
 
-      !------------------------------------------------------------------------------------------------
-      ! Determine the category the cell belongs to (i.e., partly cloud, all cloudy, or all clear
-      !------------------------------------------------------------------------------------------------
+      !---------------------------------------------------------------------------------------------------
+      ! Determine which category the current grid cell belongs to: partly cloud, all cloudy, or all clear
+      !---------------------------------------------------------------------------------------------------
       grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
       grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
       gird_cell_is_partly_cldy = (jclea > 0) .and. (jcldy > 0) .and.  (jclea+jcldy == 3) .and. (nsubarea == 2)
@@ -113,7 +128,7 @@
          ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
          ! cloud fraction and the clear-sky values
 
-         call compute_qsub_from_gbm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
+         call compute_qsub_from_gcm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
                                                                qsub3(:,jclea), qsub3(:,jcldy)    )! inout
 
          !=========================================================================
@@ -126,13 +141,13 @@
          !----------------------------------------------------------------------------------------
          ! Partition mass and number before cloud chemistry
 
-         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
-         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+         call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+         call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
 
          ! Partition mass and number before cloud chemistry
 
-         call set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
-         call set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+         call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+         call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
 
          !----------------------------------------------------------------------------------------
          ! Interstitial aerosols. (They can exist in both cloudy and clear subareas, and hence 
@@ -140,23 +155,23 @@
          !----------------------------------------------------------------------------------------
          ! Partition mass and number before cloud chemistry
 
-         call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
-                                                      qgcm2, qqcwgcm2,                     &! in
-                                                      qgcm2, qsub2                         )! in, inout
+         call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                     qgcm2, qqcwgcm2,                     &! in
+                                                     qgcm2, qsub2                         )! in, inout
 
-         call set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
-                                                      qgcm2, qqcwgcm2,                     &! in
-                                                      qgcm2, qsub2                         )! in, inout
+         call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                     qgcm2, qqcwgcm2,                     &! in
+                                                     qgcm2, qsub2                         )! in, inout
 
          ! Partition mass and number before cloud chemistry
 
-         call set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
-                                                      qgcm2, qqcwgcm2,                     &! in
-                                                      qgcm3, qsub3                         )! in, inout
+         call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                     qgcm2, qqcwgcm2,                     &! in
+                                                     qgcm3, qsub3                         )! in, inout
 
-         call set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
-                                                      qgcm2, qqcwgcm2,                     &! in
-                                                      qgcm3, qsub3                         )! in, inout
+         call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                     qgcm2, qqcwgcm2,                     &! in
+                                                     qgcm3, qsub3                         )! in, inout
 
       else ! Cell is neither partly cloudy nor all cloudy/all clear. This should not happen
          write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
