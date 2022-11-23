@@ -81,13 +81,8 @@ use modal_aero_data,   only:  &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh, copy_cnst &
-                                      , set_subarea_qnumb_for_cldbrn_aerosols &
-                                      , set_subarea_qmass_for_cldbrn_aerosols &
-                                      , get_partition_factors &
-                                      , set_subarea_qnumb_for_intrst_aerosols &
-                                      , set_subarea_qmass_for_intrst_aerosols &
-                                      , compute_qsub_from_gcm_and_qsub_of_other_subarea
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh
+use modal_aero_amicphys_subareas, only: set_subarea_gases_and_aerosols
 
 implicit none
 
@@ -139,20 +134,21 @@ implicit none
 !----
   real(r8) :: fclea, fcldy
 
-  logical :: grid_cell_has_only_clea_area
-  logical :: grid_cell_has_only_cldy_area
-  logical :: gird_cell_is_partly_cldy
+! logical :: grid_cell_has_only_clea_area
+! logical :: grid_cell_has_only_cldy_area
+! logical :: gird_cell_is_partly_cldy
 
-  logical :: lcopy(gas_pcnst)
-  logical :: cnst_is_gas(gas_pcnst)
+! logical :: lcopy(gas_pcnst)
+! logical :: cnst_is_gas(gas_pcnst)
 
-  integer :: imode, ispec, icnst
+! integer :: imode, ispec, icnst
+  integer :: icnst
 
   real(r8) :: qgcm1(gas_pcnst)
-  real(r8) :: qgcm2(gas_pcnst)
-  real(r8) :: qgcm3(gas_pcnst)
+
+  real(r8) :: qgcm2   (gas_pcnst)
   real(r8) :: qqcwgcm2(gas_pcnst)
-  real(r8) :: qqcwsub1(gas_pcnst,maxsubarea)
+  real(r8) :: qgcm3   (gas_pcnst)
 
 !----
 
@@ -313,55 +309,82 @@ implicit none
          do_q_coltendaa(:,iqtend_rnam) = .false.
          do_qqcw_coltendaa(:,iqqcwtend_rnam) = .false.
       end if
-      if ( .not. do_newnuc ) then
-         do_q_coltendaa(:,iqtend_nnuc) = .false.
-      end if
-      if ( .not. do_coag ) then
-         do_q_coltendaa(:,iqtend_coag) = .false.
-      end if
+      if (.not.do_newnuc) do_q_coltendaa(:,iqtend_nnuc) = .false.
+      if (.not.do_coag)   do_q_coltendaa(:,iqtend_coag) = .false.
 
 ! get saturation mixing ratio
-      call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), &
-                 ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
+      call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
-main_k_loop: &
-      do k = top_lev, pver
-main_i_loop: &
-      do i = 1, ncol
+main_k_loop: do k = top_lev, pver
+main_i_loop: do i = 1, ncol
 
-      if ( ldiag13n ) lun13n = 129 + i
-
-!--------
-
-      !====================================================================================================
+      !=========================================================================
+      ! Construct cloudy and clear (cloud-free) subareas within each grid cell
+      !=========================================================================
       ! Define subareas; set RH
-      !====================================================================================================
+      !--------------------------
       call setup_subareas( cld(i,k),                              &! in
                            nsubarea, ncldy_subarea, jclea, jcldy, &! out
                            iscldy_subarea, afracsub, fclea, fcldy )! out
 
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
+
       call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
 
-!--------
-#include "modal_aero_amicphys_wrk.in"
-!--------
+      !-------------------------------
+      ! Set aerosol water in subareas
+      !-------------------------------
+      ! Notes from Dick Easter/Steve Ghan: how to treat aerosol water in subareas needs more work/thinking
+      ! Currently modal_aero_water_uptake calculates qaerwat using
+      ! the grid-cell mean interstital-aerosol mix-rats and the clear-area RH.
 
+      qaerwatsub3(:,:) = 0.0_r8
 
-!--------
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      n = min( maxsubarea, nsubarea+1 )
-#else
-      n = nsubarea
-#endif
-      qsub4(:,1:n) = 0.0_r8
-      qqcwsub4(:,1:n) = 0.0_r8
-      qaerwatsub4(:,1:n) = 0.0_r8
-!--------
+      if ( present( qaerwat ) ) then
+      ! If provided, the grid cell mean values of aerosol water mixing ratios are clipped
+      ! and then assigned to all subareas.
 
-!
-! start integration
-!
+         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
+         do jsub = 1, nsubarea
+            qaerwatsub3(:,jsub) = qaerwatgcm3(:)
+         end do
+      end if
+
+      !-------------------------------------------------------------------------
+      ! Set gases, interstitial aerosols, and cloud-borne aerosols in subareas
+      !-------------------------------------------------------------------------
+      ! Copy grid cell mean mixing ratios; clip negative values if any.
+
+      do icnst = 1,gas_pcnst
+
+         ! Gases and interstitial aerosols
+         qgcm1(icnst) = max( 0.0_r8, q_pregaschem(i,k,icnst) )
+         qgcm2(icnst) = max( 0.0_r8, q_precldchem(i,k,icnst) )
+         qgcm3(icnst) = max( 0.0_r8, q(i,k,icnst) )
+
+         ! Cloud-borne aerosols
+         qqcwgcm2(icnst:) = max( 0.0_r8, qqcw_precldchem(i,k,icnst) )
+         qqcwgcm3(icnst:) = max( 0.0_r8, qqcw(i,k,icnst) )
+
+      end do
+
+      ! Partition grid cell mean to subareas
+
+      call  set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy,    &! in
+                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3, &! in
+                                            qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3  )! out
+
+      !======================================================================
+      ! Calculate aerosol microphysics and update mixing ratios in subareas
+      !======================================================================
+      ! Initialize mixing ratios
+
+            qsub4(:,:) = 0.0_r8
+         qqcwsub4(:,:) = 0.0_r8
+      qaerwatsub4(:,:) = 0.0_r8
+
+      ! Copy aerosol size and density info
+
       do n = 1, max_mode
          if (n <= ntot_amode) then
             dgn_a(n)           = dgncur_a(i,k,n)
@@ -380,7 +403,6 @@ main_i_loop: &
       misc_vars_aa%max_kelvin_iter_1grid = max_kelvin_iter(i,k)
       misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = xnerr_astem_negative(pcols,pver,1:5,1:4)
 #endif
-
 
       lund = iulog  ! for cambox, iulog=93 at this point
 
@@ -403,9 +425,9 @@ main_i_loop: &
          misc_vars_aa                             )
 
 
-!
-! form new grid-mean mix-ratios
-!
+      !================================================================
+      ! form new grid-mean mix-ratios
+      !================================================================
       if (nsubarea == 1) then
          qgcm4(:) = qsub4(:,1)
          qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
@@ -3865,22 +3887,11 @@ n_so4_monolayers_pcage  = n_so4_monolayers_pcage_in
 dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      ldiag82  = .true.  ; lun82  = 82
-      ldiag97  = .true.  ; lun97  = 97
-      ldiag98  = .true.  ; lun98  = 98
-      ldiag13n = .true.  ; lun13n = 130
-      ldiag15n = .true.  ; lun15n = 150
-      ldiagd1  = .true.
-#else
       ldiag82  = .false. ; lun82  = iulog
       ldiag97  = .false. ; lun97  = iulog
       ldiag98  = .false. ; lun98  = iulog
-      ldiag13n = .false. ; lun13n = iulog
       ldiag15n = .false. ; lun15n = iulog
       ldiagd1  = .false.
-#endif
-
 
       call mam_set_lptr2_and_specxxx2
 
