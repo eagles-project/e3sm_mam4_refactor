@@ -82,12 +82,12 @@ use modal_aero_data,   only:  &
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_cnst &
-                                      , set_subarea_q_numb_for_cldbrn_aerosols &
-                                      , set_subarea_q_mass_for_cldbrn_aerosols &
+                                      , set_subarea_qnumb_for_cldbrn_aerosols &
+                                      , set_subarea_qmass_for_cldbrn_aerosols &
                                       , get_partition_factors &
-                                      , set_subarea_q_numb_for_intrst_aerosols &
-                                      , set_subarea_q_mass_for_intrst_aerosols &
-                                      , compute_qsub_from_gbm_and_qsub_of_other_subarea
+                                      , set_subarea_qnumb_for_intrst_aerosols &
+                                      , set_subarea_qmass_for_intrst_aerosols &
+                                      , compute_qsub_from_gcm_and_qsub_of_other_subarea
 
 implicit none
 
@@ -136,6 +136,25 @@ implicit none
    real(r8), intent(inout), optional :: &
                               qaerwat(pcols,pver,ntot_amode)
                                  ! aerosol water mixing ratio (kg/kg, NOT mol/mol)
+!----
+  real(r8) :: fclea, fcldy
+
+  logical :: grid_cell_has_only_clea_area
+  logical :: grid_cell_has_only_cldy_area
+  logical :: gird_cell_is_partly_cldy
+
+  logical :: lcopy(gas_pcnst)
+  logical :: cnst_is_gas(gas_pcnst)
+
+  integer :: imode, ispec, icnst
+
+  real(r8) :: qgcm1(gas_pcnst)
+  real(r8) :: qgcm2(gas_pcnst)
+  real(r8) :: qgcm3(gas_pcnst)
+  real(r8) :: qqcwgcm2(gas_pcnst)
+  real(r8) :: qqcwsub1(gas_pcnst,maxsubarea)
+
+!----
 
 ! !DESCRIPTION:
 ! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
@@ -193,7 +212,6 @@ implicit none
       real(r8) :: afracsub(maxsubarea)
       real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
       real(r8) :: ev_sat(pcols,pver)
-      real(r8) :: fclea, fcldy
       real(r8) :: nufine_3dtend_nnuc(pcols,pver)
       real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
       real(r8) :: qv_sat(pcols,pver)
@@ -208,15 +226,6 @@ implicit none
       real(r8) :: wetdens(max_mode)
 
 
-      logical :: grid_cell_has_only_clea_area
-      logical :: grid_cell_has_only_cldy_area
-      logical :: gird_cell_is_partly_cldy
-
-      integer :: imode, ispec, icnst
-      logical :: lcopy(gas_pcnst)
-      logical :: cnst_is_gas(gas_pcnst)
-
-
 ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
 !    N=1 - before gas-phase chemistry
 !    N=2 - before cloud chemistry
@@ -224,37 +233,28 @@ implicit none
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
 
 
-      real(r8), dimension( 1:gas_pcnst ) :: &
-         qgcm1, qgcm2, qgcm3, qgcm4, &
-         qqcwgcm1, qqcwgcm2, qqcwgcm3, qqcwgcm4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: &
-         qgcm_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: &
-         qqcwgcm_tendaa
+      real(r8), dimension( 1:gas_pcnst ) :: qgcm4
+      real(r8), dimension( 1:gas_pcnst ) :: qqcwgcm3, qqcwgcm4
+      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
+      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
       real(r8), dimension( 1:ntot_amode_extd ) :: &
          qaerwatgcm3, qaerwatgcm4   ! aerosol water mixing ratios (mol/mol)
 
 ! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
 !    currently there are just clear and cloudy sub-areas
 !    the N=1:4 have same meanings as for qgcmN
-      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub1, qsub2, qsub3, qsub4, &
-         qqcwsub1, qqcwsub2, qqcwsub3, qqcwsub4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) :: &
-         qsub_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: &
-         qqcwsub_tendaa
-      real(r8), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: &
-         qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub1, qsub2, qsub3, qsub4
+      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qqcwsub2, qqcwsub3, qqcwsub4
+      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
+      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: qqcwsub_tendaa
+      real(r8), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
 
 ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
 !    for different processes, which are output to history
 ! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) :: &
-         q_coltendaa
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) :: &
-         qqcw_coltendaa
+      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) ::  q_coltendaa
+      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) ::  qqcw_coltendaa
 
 #if ( defined( MOSAIC_SPECIES ) )
       real(r8) :: cnvrg_fail(pcols,pver) !BSINGH -  For tracking MOSAIC convergence failures
@@ -333,16 +333,7 @@ main_i_loop: &
 
 !--------
 
-      call setup_subareas( &
-           cld(i,k),                                &! in
-           nsubarea, ncldy_subarea, jclea, jcldy,   &! out
-           iscldy_subarea, afracsub, fclea, fcldy   )! out
-
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
-
-      call set_subarea_relhum( &
-           ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
-           relhumsub )! out
 
 !--------
 #include "modal_aero_amicphys_wrk.in"
@@ -384,23 +375,6 @@ main_i_loop: &
 
 
       lund = iulog  ! for cambox, iulog=93 at this point
-
-!      ubroutine mam_amicphys_1gridcell(          &
-!        do_cond,            do_rename,           &
-!        do_newnuc,          do_coag,             &
-!        nstep,    lchnk,    i,         k,        &
-!        latndx,   lonndx,   lund,                &
-!        loffset,  deltat,                        &
-!        nsubarea,  ncldy_subarea,                &
-!        iscldy_subarea,     afracsub,            &
-!        temp,     pmid,     pdel,                &
-!        zmid,     pblh,     relhumsub,           &
-!        dgn_a,    dgn_awet, wetdens,             &
-!        qsub1,                                   &
-!        qsub2, qqcwsub2,                         &
-!        qsub3, qqcwsub3,                         &
-!        qsub4, qqcwsub4,                         &
-!        qsub_tendaa, qqcwsub_tendaa              )
 
       call mam_amicphys_1gridcell(                &
          do_cond,             do_rename,          &
@@ -475,43 +449,6 @@ main_i_loop: &
          qaerwat(i,k,1:ntot_amode) = qaerwatgcm4(1:ntot_amode)
       end if
 
-
-! diagnostics after forming sub-areas
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag13n ) then
-      do l2 = 1, 4
-         if (l2 == 1) then
-            igas = igas_h2so4
-         else if (l2 == 3) then
-            igas = igas_nh3
-            if (igas <= 0) cycle
-         else if (l2 == 4) then
-            igas = -3
-         else
-            igas = 1
-         end if
-         if (igas > 0) then
-            l = lmap_gas(igas)
-            tmpch6a = name_gas(igas)
-         else
-            l = -igas
-            tmpch6a = cnst_name(l+loffset)
-         end if
-         tmpa = 1.0e9
-         write(lun13n,'(a)')
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' host  1-4', &
-            q_pregaschem(i,k,l)*tmpa, q_precldchem(i,k,l)*tmpa, 0.0, q(i,k,l)*tmpa
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' gm    1-4', &
-            qgcm1(l)*tmpa, qgcm2(l)*tmpa, qgcm3(l)*tmpa, qgcm4(l)*tmpa
-         j = jclea ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' clear 1-4', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa, qsub4(l,j)*tmpa
-         j = jcldy ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' cloud 1-4', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa, qsub4(l,j)*tmpa
-      end do ! l2
-      end if ! ( ldiag13n )
-#endif
 
 
 ! increment column tendencies
