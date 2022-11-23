@@ -74,7 +74,10 @@ _TESTS = {
         "tests"   : (
             "SMS_D.ne4pg2_oQU480.F2010",
             "SMS_D_Ln5_P32x1.ne4pg2_oQU480.F2010",
+            "SMS_Ly1.ne4pg2_oQU480.F2010",
+            "SMS.ne30pg2_EC30to60E2r2.F2010",
             "ERS.ne4pg2_oQU480.F2010",
+            "ERP_P64x1.ne4pg2_oQU480.F2010",
             "PET.ne4pg2_oQU480.F2010",
             "PEM_P64x1.ne4pg2_oQU480.F2010"
             )
