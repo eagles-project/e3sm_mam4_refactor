@@ -81,7 +81,7 @@ use modal_aero_data,   only:  &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_relhum, copy_cnst &
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh, copy_cnst &
                                       , set_subarea_qnumb_for_cldbrn_aerosols &
                                       , set_subarea_qmass_for_cldbrn_aerosols &
                                       , get_partition_factors &
@@ -333,23 +333,15 @@ main_i_loop: &
 
 !--------
 
-
       !====================================================================================================
-      ! The subareas
+      ! Define subareas; set RH
       !====================================================================================================
-      call setup_subareas( &
-           cld(i,k),                                &! in
-           nsubarea, ncldy_subarea, jclea, jcldy,   &! out
-           iscldy_subarea, afracsub, fclea, fcldy   )! out
-
-      !====================================================================================================
-      ! Relative humidity
-      !====================================================================================================
+      call setup_subareas( cld(i,k),                              &! in
+                           nsubarea, ncldy_subarea, jclea, jcldy, &! out
+                           iscldy_subarea, afracsub, fclea, fcldy )! out
 
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
-      call set_subarea_relhum( &
-           ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
-           relhumsub )! out
+      call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
 
 !--------
 #include "modal_aero_amicphys_wrk.in"
