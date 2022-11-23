@@ -155,6 +155,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
                            dp_frac, icwmrdp, rprddp, evapcdp,       & ! in
                            sh_frac, icwmrsh, rprdsh, evapcsh,       & ! in
                            dlf, dlfsh, cmfmcsh, sh_e_ed_ratio,      & ! in
+                           nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr,  & ! in
                            mu, md, du, eu,ed, dp,                   & ! in
                            jt, maxg, ideep, lengath, species_class, & ! in
                            ptend, aerdepwetis                       ) ! inout
@@ -176,7 +177,9 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 !-----------------------------------------------------------------------
 
    use physics_types, only: physics_state, physics_ptend
-   use constituents,  only: pcnst
+   use constituents,  only: pcnst, cnst_name
+   use modal_aero_data, only: ntot_amode, nspec_amode,  &
+                        numptr_amode, lmassptr_amode
  
 ! Arguments
    type(physics_state), intent(in )   :: state          ! Physics state variables
@@ -194,6 +197,8 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
    real(r8), intent(in)    :: dlfsh(pcols,pver)         ! Shal conv cldwtr detrainment (grid avg) [kg/kg/s]
    real(r8), intent(in)    :: cmfmcsh(pcols,pverp)      ! Shal conv mass flux [kg/m2/s]
    real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver) ! shallow conv [ent/(ent+det)] ratio [fraction]
+   integer,  intent(in)    :: nsrflx_mzaer2cnvpr
+   real(r8), intent(in)    :: qsrflx_mzaer2cnvpr(pcols,pcnst,nsrflx_mzaer2cnvpr)
    real(r8), intent(inout) :: aerdepwetis(pcols,pcnst)  ! aerosol wet deposition (interstitial) [kg/m2/s]
 
                                                 ! mu, md, ..., ideep, lengath are all deep conv variables
@@ -214,12 +219,17 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 
 ! Local variables
    integer  :: ncol             ! total column number. from state%ncol
+   integer  :: n, ll, l,lc, lchnk  ! indices
    logical  :: dotend(pcnst)    ! if do tendency
 
    real(r8) :: dlfdp(pcols,pver)                ! Deep (Total-Shallow) conv cldwtr detrainment (grid avg) [kg/kg/s] 
    real(r8) :: dqdt(pcols,pver,pcnst)           ! time tendency of q [kg/kg/s]
    real(r8) :: qnew(pcols,pver,pcnst)           ! tracer mixing ratio from state%q [kg/kg]
                                                 ! qnew is updated through the processes in this subroutine but does not update into state
+   real(r8) :: sflxic(pcols,pcnst)
+   real(r8) :: sflxid(pcols,pcnst)
+   real(r8) :: sflxec(pcols,pcnst)
+   real(r8) :: sflxed(pcols,pcnst)
 
    integer, parameter :: nsrflx = 6             ! last dimension of qsrflx
    real(r8) :: qsrflx(pcols,pcnst,nsrflx)       ! process-specific column tracer tendencies
@@ -235,6 +245,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 ! Initialize
 !
   ncol  = state%ncol
+  lchnk = state%lchnk
   qnew(1:ncol,:,:) = state%q(1:ncol,:,:)
   dotend(:) = ptend%lq(:)
   dqdt(:,:,:) = ptend%q(:,:,:)
@@ -249,11 +260,22 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 !
   qsrflx(:,:,:) = 0.0_r8
   call update_qnew_ptend(                                         &
-                         dotend,   .false.,         .false.,      &  ! in
+                         dotend,                    .false.,      &  ! in
                          ncol,     species_class,   dqdt,         &  ! in
                          qsrflx,   ztodt,                         &  ! in
-                         ptend,    qnew,          aerdepwetis     )  ! inout
+                         ptend,    qnew                           )  ! inout
 
+  ! calculate variables for output
+   sflxic(:,:) = 0.0_r8
+   sflxid(:,:) = 0.0_r8
+   sflxec(:,:) = 0.0_r8
+   sflxed(:,:) = 0.0_r8
+   do l = 1, pcnst
+      if ( (species_class(l) == spec_class_aerosol) .and. ptend%lq(l) ) then
+         sflxec(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,1)
+         sflxed(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,2)
+      endif
+   enddo
 
   if (convproc_do_aer .or. convproc_do_gas) then
      !
@@ -273,10 +295,29 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 
      ! apply deep conv processing tendency and prepare for shallow conv processing
      call update_qnew_ptend(                       &
-            dotend, .true.,          .true.,       &  ! in
+            dotend,                  .true.,       &  ! in
             ncol,   species_class,   dqdt,         &  ! in
             qsrflx, ztodt,                         &  ! in
-            ptend,  qnew,          aerdepwetis     )  ! inout
+            ptend,  qnew                           )  ! inout
+
+     ! update variables for output
+     do l = 1, pcnst
+        if ( .not. dotend(l) ) cycle
+        if ((species_class(l) == spec_class_aerosol) .or. &
+            (species_class(l) == spec_class_gas    )) then
+           ! these used for history file wetdep diagnostics
+           sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4)
+           sflxid(1:ncol,l) = sflxid(1:ncol,l) + qsrflx(1:ncol,l,4)
+           sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6)
+           sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,6)
+        endif
+
+        if (species_class(l) == spec_class_aerosol) then
+           ! this used for surface coupling
+           aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
+                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5)
+        endif
+     enddo
 
      !
      ! do shallow conv processing
@@ -293,23 +334,64 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 
      ! apply shallow conv processing tendency
      call update_qnew_ptend(                         &
-              dotend, .true.,          .true.,       &  ! in
+              dotend,                  .true.,       &  ! in
               ncol,   species_class,   dqdt,         &  ! in
               qsrflx, ztodt,                         &  ! in
-              ptend,  qnew,          aerdepwetis     )  ! inout
+              ptend,  qnew                           )  ! inout
+
+     ! update variables for output
+     do l = 1, pcnst
+        if ( .not. dotend(l) ) cycle
+        if ((species_class(l) == spec_class_aerosol) .or. &
+            (species_class(l) == spec_class_gas    )) then
+           sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4)
+           sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6)
+        endif
+
+        if (species_class(l) == spec_class_aerosol) then
+           ! this used for surface coupling
+           aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
+                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5)
+        endif
+     enddo
+
+
   endif ! (convproc_do_aer  .or. convproc_do_gas) then
 
+
+! output wet deposition fields to history
+!    I = in-cloud removal;     E = precip-evap resuspension
+!    C = convective (total);   D = deep convective
+! note that the precip-evap resuspension includes that resulting from
+!    below-cloud removal, calculated in mz_aero_wet_intr
+  if (convproc_do_aer) then
+     do n = 1, ntot_amode
+     do ll = 0, nspec_amode(n)
+
+        call assign_la_lc( n,   ll,   l,   lc   )
+
+        call outfld( trim(cnst_name(l))//'SFWET', aerdepwetis(:,l), pcols, lchnk)
+        call outfld( trim(cnst_name(l))//'SFSIC', sflxic(:,l), pcols, lchnk )
+        call outfld( trim(cnst_name(l))//'SFSEC', sflxec(:,l), pcols, lchnk )
+
+        if ( deepconv_wetdep_history ) then
+           call outfld( trim(cnst_name(l))//'SFSID', sflxid(:,l), pcols, lchnk )
+           call outfld( trim(cnst_name(l))//'SFSED', sflxed(:,l), pcols, lchnk )
+        endif
+     enddo ! ll
+     enddo ! n
+  endif
 
 end subroutine ma_convproc_intr
 
 !=========================================================================================
 subroutine update_qnew_ptend(                                         &
-                           dotend, is_update_ptend, is_update_wetdep, &  ! in
+                           dotend, is_update_ptend,                   &  ! in
                            ncol,   species_class,   dqdt,             &  ! in
                            qsrflx, ztodt,                             &  ! in
-                           ptend,  qnew,            aerdepwetis       )  ! inout
+                           ptend,  qnew                               )  ! inout
 ! ---------------------------------------------------------------------------------------
-! update qnew, ptend (%q and %lq) and wet deposition variable aerdepwetis
+! update qnew, ptend (%q and %lq)
 ! ---------------------------------------------------------------------------------------  
 use physics_types, only: physics_ptend
 use constituents,  only: pcnst
@@ -318,14 +400,12 @@ use constituents,  only: pcnst
    type(physics_ptend), intent(inout) :: ptend          ! indivdual parameterization tendencies. ptend%q [kg/kg/s] and ptend%lq [logical] will be updated
    logical,  intent(in)    :: dotend(pcnst)             ! if do tendency
    logical,  intent(in)    :: is_update_ptend           ! if add dqdt onto ptend%q
-   logical,  intent(in)    :: is_update_wetdep          ! if calculate aerdepwetis
    integer,  intent(in)    :: ncol                      ! index
    integer,  intent(in)    :: species_class(:)          ! species index
    real(r8), intent(in)    :: dqdt(pcols,pver,pcnst)    ! time tendency of tracer [kg/kg/s]
    real(r8), intent(in)    :: qsrflx(:,:,:)             ! process-specific column tracer tendencies. see ma_convproc_tend for detail info [kg/m2/s]
    real(r8), intent(in)    :: ztodt                     ! 2 delta t (model time step, not sure why it is "2" delta t) [s]
    real(r8), intent(inout) :: qnew(pcols,pver,pcnst)    ! Tracer array including moisture [kg/kg]
-   real(r8), intent(inout) :: aerdepwetis(pcols,pcnst)  ! aerosol wet deposition (interstitial) [kg/m2/s]
 
    ! Local variables
    integer  :: ll                         ! index
@@ -343,12 +423,6 @@ use constituents,  only: pcnst
      if ( is_update_ptend ) then
         ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
         ptend%lq(ll) = .true.
-     endif
-
-     ! this is used in surface coupling
-     if (is_update_wetdep .and. species_class(ll) == spec_class_aerosol) then
-        aerdepwetis(1:ncol,ll) = aerdepwetis(1:ncol,ll) &
-           + qsrflx(1:ncol,ll,4) + qsrflx(1:ncol,ll,5)
      endif
 
    enddo ! ll
@@ -421,6 +495,10 @@ subroutine ma_convproc_dp_intr(                &
    integer :: ii
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
+   ! diagnostics variables to write out. 
+   ! xx_kcldbase is filled with index kk. maybe better define as integer
+   ! keep it in C++ refactoring for BFB comparison (by Shuaiqi Tang, 2022)
+   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
 
 !
 ! Initialize
@@ -463,7 +541,14 @@ subroutine ma_convproc_dp_intr(                &
                      dqdt,                                           & ! out
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
-                     species_class                                   )
+                     species_class,                                  &
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
+
+
+    ! output diagnostics fields
+    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
+    call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
+    call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
 
 end subroutine ma_convproc_dp_intr
 
@@ -519,6 +604,7 @@ subroutine ma_convproc_sh_intr(                 &
    integer :: icol, ncol
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
+   real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)  ! output of ma_convproc_tend, may not used
 
 ! variables that mimic the zm-deep counterparts
                                                ! mu, md, ..., ideep, lengath are all deep conv variables
@@ -590,8 +676,13 @@ subroutine ma_convproc_sh_intr(                 &
                      dqdt,                                           & ! out
                      dotend,     nsrflx,                             &
                      qsrflx,                                         & ! out
-                     species_class                                   )
+                     species_class,                                  &
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
+    ! output diagnostics fields
+    call outfld( 'SH_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
+    call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
+    call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
 
 end subroutine ma_convproc_sh_intr
 
@@ -839,7 +930,8 @@ subroutine ma_convproc_tend(                                         &
                      dqdt,                                           & ! out
                      doconvproc, nsrflx,                             & ! in
                      qsrflx,                                         & ! out
-                     species_class                                   ) ! in
+                     species_class,                                  & ! in
+                     xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
 !----------------------------------------------------------------------- 
 ! 
@@ -941,6 +1033,9 @@ subroutine ma_convproc_tend(                                         &
                                                 ! aerosol    = 2
                                                 ! gas        = 3
                                                 ! other      = 4
+   real(r8), intent(out):: xx_mfup_max(pcols)   ! diagnostic field of column maximum updraft mass flux [mb/s]
+   real(r8), intent(out):: xx_wcldbase(pcols)
+   real(r8), intent(out):: xx_kcldbase(pcols)
 
 
 !--------------------------Local Variables------------------------------
@@ -998,9 +1093,7 @@ subroutine ma_convproc_tend(                                         &
    real(r8) fa_u(pver)           ! fractional area of in the updraft [fraction]
    real(r8) md_i(pverp)          ! md(i,k) at current i (note pverp dimension) [mb/s]
    real(r8) mu_i(pverp)          ! mu(i,k) at current i (note pverp dimension) [mb/s]
-   ! md_i, md_x, mu_i, mu_x are all "dry" mass fluxes
-   ! the mu_x/md_x are initially calculated from the incoming mu/md by applying dp/dpdry
-   ! the mu_i/md_i are next calculated by applying the mbsth threshold
+   ! md_i, mu_i, are all "dry" mass fluxes
    real(r8) q_i(pver,pcnst)      ! q(i,k,m) at current i [kg/kg]
    real(r8) rhoair_i(pver)       ! air density at current i [kg/m3]
    real(r8) zmagl(pver)          ! working height above surface [m]
@@ -1025,6 +1118,9 @@ subroutine ma_convproc_tend(                                         &
    ! initiate output variables
    qsrflx(:,:,:) = 0.0_r8
    dqdt(:,:,:) = 0.0_r8
+   xx_mfup_max(:) = 0.0_r8
+   xx_wcldbase(:) = 0.0_r8
+   xx_kcldbase(:) = 0.0_r8
 
 ! set doconvproc_extd (extended array) values
 ! inititialize aqfrac to 1.0 for activated aerosol species, 0.0 otherwise
@@ -1071,9 +1167,10 @@ i_loop_main_aa: &
 
       ! calculate dry mass fluxes at cloud layer
       call compute_massflux(                            &
-                        ii,     ktop,   kbot,   dpdry_i,& ! in
-                        du,     eu,     ed,             & ! in
-                        mu_i,   md_i                    ) ! out
+                        ii,     icol,   ktop,   kbot,   & ! in
+                        dpdry_i,du,     eu,     ed,     & ! in
+                        mu_i,   md_i,                   & ! out
+                        xx_mfup_max                     ) ! inout
 
       ! compute entraintment*dp and detraintment*dp and calculate ntsub
       call compute_ent_det_dp(                                  &
@@ -1108,7 +1205,7 @@ jtsub_loop_main_aa: &
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
                 const,  t,      aqfrac, icwmr,          rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
-                conu                                                    ) ! inout
+                conu,           xx_wcldbase,    xx_kcldbase             ) ! inout
 
 
         ! Compute downdraft mixing ratios from cloudtop to cloudbase
@@ -1170,6 +1267,9 @@ jtsub_loop_main_aa: &
                         ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
                         ncnst,  nsrflx,         icol,           & ! in
                         dt,     dcondt,         doconvproc,     & ! in
+                        sumactiva,              sumaqchem,      & ! inout
+                        sumwetdep,              sumresusp,      & ! inout
+                        sumprevap,              sumprevap_hist, & ! inout
                         dqdt,   q_i,            qsrflx          ) ! inout
 
       enddo jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
@@ -1220,9 +1320,10 @@ jtsub_loop_main_aa: &
 
 !====================================================================================
    subroutine compute_massflux(                         &
-                        ii,     ktop,   kbot,   dpdry_i,& ! in
-                        du,     eu,     ed,             & ! in
-                        mu_i,   md_i                    ) ! out
+                        ii,     icol,   ktop,   kbot,   & ! in
+                        dpdry_i,du,     eu,     ed,     & ! in
+                        mu_i,   md_i,                   & ! out
+                        xx_mfup_max                     ) ! inout
 !-----------------------------------------------------------------------
 ! compute dry mass fluxes
 ! This is approximate because the updraft air is has different temp and qv than
@@ -1232,6 +1333,7 @@ jtsub_loop_main_aa: &
    use ppgrid, only: pver, pverp, pcols
 
    integer,  intent(in)  :: ii                   ! index to gathered arrays
+   integer,  intent(in)  :: icol                 ! column index
    integer,  intent(in)  :: ktop                 ! top level index
    integer,  intent(in)  :: kbot                 ! bottom level index
    real(r8), intent(in)  :: dpdry_i(pver)        ! dp [mb]
@@ -1240,6 +1342,8 @@ jtsub_loop_main_aa: &
    real(r8), intent(in)  :: ed(pcols,pver)       ! Mass entrain rate into downdraft [1/s]
    real(r8), intent(out) :: mu_i(pverp)          ! mu at current i (note pverp dimension, see ma_convproc_tend) [mb/s]
    real(r8), intent(out) :: md_i(pverp)          ! md at current i (note pverp dimension) [mb/s]
+   real(r8), intent(inout) :: xx_mfup_max(pcols) ! diagnostic field of column maximum updraft mass flux [mb/s]
+
 
    ! local variables
    integer  :: kk            ! index
@@ -1252,6 +1356,7 @@ jtsub_loop_main_aa: &
    ! (eu-du) = d(mu)/dp -- integrate upwards, multiplying by dpdry
    do kk = pver, 1, -1
          mu_x(kk) = mu_x(kk+1) + (eu(ii,kk)-du(ii,kk))*dpdry_i(kk)
+         xx_mfup_max(icol) = max( xx_mfup_max(icol), mu_x(kk) )
    enddo
    ! (ed) = d(md)/dp -- integrate downwards, multiplying by dpdry
    do kk = 2, pver
@@ -1474,6 +1579,9 @@ jtsub_loop_main_aa: &
                         ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
                         ncnst,  nsrflx,         icol,           & ! in
                         dt,     dcondt,         doconvproc,     & ! in
+                        sumactiva,              sumaqchem,      & ! inout
+                        sumwetdep,              sumresusp,      & ! inout
+                        sumprevap,              sumprevap_hist, & ! inout
                         dqdt,   q_i,            qsrflx          ) ! inout
 !-----------------------------------------------------------------------
 ! update tendencies to final output of ma_convproc_tend
@@ -1508,6 +1616,12 @@ jtsub_loop_main_aa: &
    real(r8),intent(in)  :: dt                ! delta t (model time increment) [s]
    real(r8),intent(in)  :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
    logical, intent(in)  :: doconvproc(ncnst) ! flag for doing convective transport
+   real(r8), intent(inout) :: sumactiva(pcnst_extd)            ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumaqchem(pcnst_extd)            ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumwetdep(pcnst_extd)            ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumresusp(pcnst_extd)     ! sum (over layers) of dp*dcondt_resusp [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumprevap(pcnst_extd)     ! sum (over layers) of dp*dcondt_prevap [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumprevap_hist(pcnst_extd)! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s * mb]
    real(r8), intent(inout) :: dqdt(pcols,pver,ncnst)    ! Tracer tendency array
    real(r8), intent(inout) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
    real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
@@ -1525,12 +1639,6 @@ jtsub_loop_main_aa: &
    integer  :: kk                               ! vertical index
    real(r8) :: dtsub                            ! delta t of sub timestep (dt/ntsub) [s]
    real(r8) :: xinv_ntsub                       ! inverse of ntsub (1.0/ntsub)
-   real(r8) :: sumactiva(pcnst_extd)            ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
-   real(r8) :: sumaqchem(pcnst_extd)            ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
-   real(r8) :: sumprevap(pcnst_extd)            ! sum (over layers) of dp*dcondt_prevap [kg/kg/s * mb]
-   real(r8) :: sumprevap_hist(pcnst_extd)       ! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s * mb]
-   real(r8) :: sumresusp(pcnst_extd)            ! sum (over layers) of dp*dcondt_resusp [kg/kg/s * mb]
-   real(r8) :: sumwetdep(pcnst_extd)            ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
    real(r8) :: dqdt_i(pver,pcnst)               ! dqdt(icol,kk,icnst) at current icol
    real(r8) :: qsrflx_i(pcnst,nsrflx)           ! qsrflx(i,m,n) at current i
 
@@ -1540,21 +1648,24 @@ jtsub_loop_main_aa: &
    xinv_ntsub = 1.0_r8/ntsub
    dtsub = dt*xinv_ntsub
 
-      do imode = 1, ntot_amode
-         do ispec = 0, nspec_amode(imode)
-            call assign_la_lc(imode, ispec, la, lc)
-               sumactiva(la) = sumactiva(la) + sumactiva(lc)
-               sumresusp(la) = sumresusp(la) + sumresusp(lc)
-               sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
-               sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
-               sumprevap(la) = sumprevap(la) + sumprevap(lc)
-               sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
-         enddo ! ispec
-      enddo ! imode
 
-      ! scatter overall tendency back to full array
-      do icnst = 2, ncnst
-         if (doconvproc(icnst)) then
+   do imode = 1, ntot_amode
+        do ispec = 0, nspec_amode(imode)
+             call assign_la_lc(imode, ispec, la, lc)
+             if (doconvproc(la)) then
+                   sumactiva(la) = sumactiva(la) + sumactiva(lc)
+                   sumresusp(la) = sumresusp(la) + sumresusp(lc)
+                   sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
+                   sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
+                   sumprevap(la) = sumprevap(la) + sumprevap(lc)
+                   sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
+             endif
+        enddo ! ispec
+   enddo ! imode
+
+   ! scatter overall tendency back to full array
+   do icnst = 2, ncnst
+        if (doconvproc(icnst)) then
             ! scatter overall dqdt tendency back
             do kk = ktop, kbot_prevap  ! should go to k=pver because of prevap
                dqdt_i(kk,icnst) = dcondt(icnst,kk)
@@ -1573,8 +1684,8 @@ jtsub_loop_main_aa: &
             qsrflx_i(icnst,5) = sumprevap(icnst)*hund_ovr_g
             qsrflx_i(icnst,6) = sumprevap_hist(icnst)*hund_ovr_g
             qsrflx(icol,icnst,1:6) = qsrflx(icol,icnst,1:6) + qsrflx_i(icnst,1:6)*xinv_ntsub
-         endif
-      enddo ! icnst
+       endif
+   enddo ! icnst
 
    end subroutine update_tendency_final
 
@@ -1585,7 +1696,7 @@ jtsub_loop_main_aa: &
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
                 const,  t,      aqfrac, icwmr,          rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
-                conu                                                    ) ! inout 
+                conu,           xx_wcldbase,    xx_kcldbase             ) ! inout 
 !-----------------------------------------------------------------------
 ! Compute updraft mixing ratios from cloudbase to cloudtop
 ! No special treatment is needed at k=pver because arrays are dimensioned 1:pver+1
@@ -1624,6 +1735,8 @@ jtsub_loop_main_aa: &
    real(r8), intent(out) :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
    real(r8), intent(out) :: fa_u(pver)           ! fractional area of in the updraft
    real(r8), intent(inout) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
+   real(r8), intent(inout) :: xx_wcldbase(pcols) ! w at first cloudy layer [m/s]
+   real(r8), intent(inout) :: xx_kcldbase(pcols) ! level of cloud base
 
    ! local variables
    integer      :: icnst        ! index of pcnst_extd
@@ -1696,10 +1809,12 @@ jtsub_loop_main_aa: &
             ! aerosol activation - method 2
             call compute_activation_tend(                       &
                         icol,           kk,             f_ent,  & ! in
-                        cldfrac_i,      rhoair_i,               & ! in
+
+                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
                         dt_u,   wup,    icwmr,          t,      & ! in
                         kactcnt,        kactfirst,              & ! inout
-                        conu,           dconudt_activa          ) ! inout
+                        conu,           dconudt_activa,         & ! inout
+                        xx_wcldbase,    xx_kcldbase             ) ! inout
 
             ! wet removal
             call compute_wetdep_tend(                              &
@@ -1766,10 +1881,11 @@ jtsub_loop_main_aa: &
 !====================================================================================
    subroutine compute_activation_tend(                          &
                         icol,           kk,             f_ent,  & ! in
-                        cldfrac_i,      rhoair_i,               & ! in
+                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
                         dt_u,   wup,    icwmr,          t,      & ! in
                         kactcnt,        kactfirst,              & ! inout
-                        conu,           dconudt_activa          ) ! inout
+                        conu,           dconudt_activa,         & ! inout
+                        xx_wcldbase,    xx_kcldbase             ) ! inout
 !-----------------------------------------------------------------------
 ! aerosol activation - method 2
 !    when kactcnt=1 (first/lowest layer with cloud water)
@@ -1786,9 +1902,10 @@ jtsub_loop_main_aa: &
    integer,  parameter  :: pcnst_extd = pcnst*2
    integer,  intent(in) :: icol                 ! column index
    integer,  intent(in) :: kk                   ! vertical level index
+   real(r8), intent(in) :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
    real(r8), intent(in) :: cldfrac_i(pver)      ! cldfrac at current icol (with adjustments) [fraction]
    real(r8), intent(in) :: rhoair_i(pver)       ! air density at current i [kg/m3]
-   real(r8), intent(in) :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
+   real(r8), intent(in) :: mu_i(pverp)          ! mu at current i (note pverp dimension) [mb/s]
    real(r8), intent(in) :: dt_u(pver)           ! lagrangian transport time in the updraft at current level [s]
    real(r8), intent(in) :: wup(pver)            ! mean updraft vertical velocity at current level updraft [m/s]
    real(r8), intent(in) :: t(pcols,pver)        ! Temperature [K]
@@ -1797,6 +1914,9 @@ jtsub_loop_main_aa: &
    integer,  intent(inout) :: kactfirst         ! Lowest layer with activation (= cloudbase)
    real(r8), intent(inout) :: conu(pcnst_extd,pverp)   ! mix ratio in updraft at interfaces [kg/kg]
    real(r8), intent(inout) :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
+   real(r8), intent(inout) :: xx_wcldbase(pcols) ! w at first cloudy layer [m/s]
+   real(r8), intent(inout) :: xx_kcldbase(pcols) ! level of cloud base
+                                ! xx_kcldbase is filled with index kk. maybe better define as integer
 
    logical      :: do_act_this_lev      ! flag for doing activation at current level
    integer      :: kp1                  ! kk + 1
@@ -1810,6 +1930,11 @@ jtsub_loop_main_aa: &
             do_act_this_lev = .true.
             kactcnt = 1
             kactfirst = kk
+            ! diagnostic fields
+            ! xx_wcldbase = w at first cloudy layer, estimated from mu and cldfrac
+            xx_wcldbase(icol) = (mu_i(kp1) + mu_i(kk))*0.5_r8*hund_ovr_g &
+                         / (rhoair_i(kk) * (cldfrac_i(kk)*0.5_r8))
+            xx_kcldbase(icol) = kk
         endif
    else
         do_act_this_lev = .true.
