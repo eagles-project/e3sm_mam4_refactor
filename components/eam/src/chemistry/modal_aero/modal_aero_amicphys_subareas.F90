@@ -596,8 +596,43 @@ end subroutine get_partition_factors
 
 !==================================================
 
-!subroutine derive_grid_cell_mean_from_subarea_values( nsubarea, 
-! )
-!  real(wp), intent(out):: qgcm
+subroutine get_gcm_gases_and_aerosols_from_subares( nsubarea, ncldy_subarea, afracsub, iscldy_subarea, &! in
+                                                    qsub, qqcwsub, qqcwgcm_old, &! in
+                                                    qgcm, qqcwgcm )
+
+  integer,  intent(in) :: nsubarea              ! # of active subareas
+  integer,  intent(in) :: ncldy_subarea         ! # of cloudy subareas
+  real(wp), intent(in) :: afracsub(maxsubarea)  ! area fraction in subareas [unitless]
+  logical,  intent(in) :: iscldy_subarea(maxsubarea)  ! 
+
+  real(wp), intent(in) :: qsub   (ncnst, maxsubarea)  !
+  real(wp), intent(in) :: qqcwsub(ncnst, maxsubarea)  !
+  real(wp), intent(in):: qqcwgcm_old(ncnst)
+
+  real(wp), intent(out):: qgcm   (ncnst)
+  real(wp), intent(out):: qqcwgcm(ncnst)
+
+  integer :: jsub
+
+  ! Gases and interstitial aerosols
+
+     qgcm(:) = 0.0_wp
+     do jsub = 1, nsubarea
+        qgcm(:) = qgcm(:) + qsub(:,jsub)*afracsub(jsub)
+     end do
+
+  ! Cloud-borne aerosols
+
+  if (ncldy_subarea <= 0) then
+     qqcwgcm(:) = qqcwgcm_old(:)
+  else
+     qqcwgcm(:) = 0.0_wp
+     do jsub = 1, nsubarea
+        if ( .not. iscldy_subarea(jsub) ) cycle
+        qqcwgcm(:) = qqcwgcm(:) + qqcwsub(:,jsub)*afracsub(jsub)
+     end do
+  end if
+
+end subroutine get_gcm_gases_and_aerosols_from_subares
 
 end module modal_aero_amicphys_subareas

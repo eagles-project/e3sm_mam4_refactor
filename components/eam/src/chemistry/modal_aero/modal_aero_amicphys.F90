@@ -81,8 +81,10 @@ use modal_aero_data,   only:  &
     numptr_amode, numptrcw_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh
-use modal_aero_amicphys_subareas, only: set_subarea_gases_and_aerosols
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
+                                      , set_subarea_gases_and_aerosols &
+                                      , get_gcm_gases_and_aerosols_from_subares &
+                                      , copy_cnst
 
 implicit none
 
@@ -418,37 +420,36 @@ main_i_loop: do i = 1, ncol
       !================================================================
       ! form new grid-mean mix-ratios
       !================================================================
-      ! Gases and interstitial aerosols
+    ! ! Gases and interstitial aerosols
 
-     !if (nsubarea == 1) then
-     !   qgcm4(:) = qsub4(:,1)
-     !else
-         qgcm4(:) = 0.0_r8
-         do j = 1, nsubarea
-            qgcm4(:) = qgcm4(:) + qsub4(:,j)*afracsub(j)
-         end do
-     !end if
+    !    qgcm4(:) = 0.0_r8
+    !    do j = 1, nsubarea
+    !       qgcm4(:) = qgcm4(:) + qsub4(:,j)*afracsub(j)
+    !    end do
 
-      ! Cloud-borne aerosols
- 
-      if (ncldy_subarea <= 0) then
-         qqcwgcm4(:) = qqcwgcm3(:)
-    ! else if (nsubarea == 1) then
-    !    qqcwgcm4(:) = qqcwsub4(:,1)
-      else
-         qqcwgcm4(:) = 0.0_r8
-         do j = 1, nsubarea
-            if ( .not. iscldy_subarea(j) ) cycle
-            qqcwgcm4(:) = qqcwgcm4(:) + qqcwsub4(:,j)*afracsub(j)
-         end do
-      end if
+    ! ! Cloud-borne aerosols
+!
+!     if (ncldy_subarea <= 0) then
+!        qqcwgcm4(:) = qqcwgcm3(:)
+!     else
+!        qqcwgcm4(:) = 0.0_r8
+!        do j = 1, nsubarea
+!           if ( .not. iscldy_subarea(j) ) cycle
+!           qqcwgcm4(:) = qqcwgcm4(:) + qqcwsub4(:,j)*afracsub(j)
+!        end do
+!     end if
 
+      call get_gcm_gases_and_aerosols_from_subares( &
+         nsubarea, ncldy_subarea, afracsub, iscldy_subarea, &! in
+         qsub4, qqcwsub4, qqcwgcm3, &!in
+         qgcm4, qqcwgcm4            )! out
 
-      do lmz = 1, gas_pcnst
-         if (lmapcc_all(lmz) > 0) then
-            q(i,k,lmz) = max(qgcm4(lmz),0.0_r8)  ! HW, to ensure non-negative
-            if (lmapcc_all(lmz) >= lmapcc_val_aer) then
-               qqcw(i,k,lmz) = max(qqcwgcm4(lmz),0.0_r8)  !HW, to ensure non-negative
+      ! Clipp negative values and copy to output array
+      do icnst = 1, gas_pcnst
+         if (lmapcc_all(icnst) > 0) then
+            q(i,k,icnst) = max(qgcm4(icnst),0.0_r8)
+            if (lmapcc_all(icnst) >= lmapcc_val_aer) then
+               qqcw(i,k,icnst) = max(qqcwgcm4(icnst),0.0_r8)
             end if
          end if
       end do
