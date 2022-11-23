@@ -85,9 +85,8 @@ subroutine setup_subareas( cld,                                     &! in
 
 end subroutine setup_subareas
 
-subroutine set_subarea_relhum( ncldy_subarea,jclea,jcldy, &! in
-                               afracsub,relhumgcm,        &! in
-                               relhumsub                  )! out
+subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
+                           relhumsub                                     )! out
 !----------------------------------------------------------------------------
 ! Purpose: Set relative humidity in subareas.
 !----------------------------------------------------------------------------
@@ -124,7 +123,7 @@ subroutine set_subarea_relhum( ncldy_subarea,jclea,jcldy, &! in
      end if
   end if
 
-end subroutine set_subarea_relhum
+end subroutine set_subarea_rh
 
 subroutine copy_cnst( q_in, q_copy, lcopy )
 !------------------------------------------------------
