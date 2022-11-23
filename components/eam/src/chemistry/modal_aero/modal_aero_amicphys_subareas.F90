@@ -29,19 +29,20 @@ subroutine setup_subareas( cld,                                     &! in
 
   implicit none
 
-  real(wp), intent(in)  :: cld            ! cloud fraction in the grid cell [unitless]
+  real(wp), intent(in)  :: cld                        ! cloud fraction in the grid cell [unitless]
 
-  integer,  intent(out) :: nsubarea       ! total number of subareas to do calculations for
-  integer,  intent(out) :: ncldy_subarea  ! total # of cloudy subareas
-  integer,  intent(out) :: jclea, jcldy   ! indices of the clear and cloudy subareas
-  logical,  intent(out) :: iscldy_subarea(maxsubarea) 
-  real(wp), intent(out) :: afracsub(maxsubarea)  ! area fraction of each active subarea
-  real(wp), intent(out) :: fclea, fcldy          ! area fraction of clear/cloudy subarea
+  integer,  intent(out) :: nsubarea                   ! total # of subareas to do calculations for
+  integer,  intent(out) :: ncldy_subarea              ! total # of cloudy subareas
+  integer,  intent(out) :: jclea, jcldy               ! indices of the clear and cloudy subareas
+  logical,  intent(out) :: iscldy_subarea(maxsubarea) ! whether a subarea is cloudy
+  real(wp), intent(out) :: afracsub(maxsubarea)       ! area fraction of each active subarea [unitless]
+  real(wp), intent(out) :: fclea, fcldy               ! area fraction of clear/cloudy subarea [unitless]
 
-  ! Cloud chemistry is only on when cld(i,k) >= 1.0e-5_wp
+  ! Cloud chemistry is only active when cld(i,k) >= 1.0e-5_wp
   ! It may be that the macrophysics has a higher threshold that this
   real(wp), parameter :: fcld_locutoff = 1.0e-5_wp
 
+  ! Grid cells with cloud fraction larger than this cutoff is considered to be overcast
   real(wp), parameter :: fcld_hicutoff = 0.999_wp
 
   ! if cloud fraction ~= 0, the grid-cell has a single clear  sub-area      (nsubarea = 1)
@@ -93,7 +94,7 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 
   integer,  intent(in) :: ncldy_subarea         ! # of cloudy subareas
   integer,  intent(in) :: jclea, jcldy          ! indices of clear and cloudy subareas
-  real(wp), intent(in) :: afracsub(maxsubarea)  ! area fraction [unitless] of subareas
+  real(wp), intent(in) :: afracsub(maxsubarea)  ! area fraction in subareas [unitless]
   real(wp), intent(in) :: relhumgcm             ! grid cell mean relative humidity [unitless]
 
   real(wp), intent(out) :: relhumsub(maxsubarea) ! relative humidity in subareas [unitless]
@@ -135,20 +136,36 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   use cam_abortutils,              only: endrun
   use modal_aero_amicphys_control, only: lmapcc_all, lmapcc_val_gas
 
-  integer, intent(in) :: loffset 
-  integer, intent(in) :: nsubarea, jclea, jcldy
-  real(wp),intent(in) :: fclea, fcldy
+  integer, intent(in) :: loffset         ! # of tracers in the host model that are not part of MAM
+  integer, intent(in) :: nsubarea        ! # of active subareas in the current grid cell
+  integer, intent(in) :: jclea, jcldy    ! indices of the clear and cloudy subareas
+  real(wp),intent(in) :: fclea, fcldy    ! area fractions of the clear and cloudy subareas [unitless]
+
+  ! The next set of argument variables are tracer mixing ratios.
+  !  - The units are different for gases, aerosol number, and aerosol mass. The exact units do not
+  !    matter for this subroutine, as long as the grid cell mean values ("gcm") and the corresponding 
+  !    subarea values ("sub") have the same units.
+  !  - q* and qqcw* are correspond to the interstitial and cloud-borne species, respectively
+  !  - The numbers 1-3 correspond to different locations in the host model's time integration loop.
+
+  ! Grid cell mean mixing ratios
+
   real(wp),intent(in) :: qgcm1(ncnst)
+
   real(wp),intent(in) :: qgcm2(ncnst)
-  real(wp),intent(in) :: qgcm3(ncnst)
   real(wp),intent(in) :: qqcwgcm2(ncnst)
+
+  real(wp),intent(in) :: qgcm3(ncnst)
   real(wp),intent(in) :: qqcwgcm3(ncnst)
+
+  ! Subarea mixing ratios
 
   real(wp),intent(out) :: qsub1(ncnst,maxsubarea)
   real(wp),intent(out) :: qsub2(ncnst,maxsubarea)
   real(wp),intent(out) :: qsub3(ncnst,maxsubarea)
   real(wp),intent(out) :: qqcwsub2(ncnst,maxsubarea)
   real(wp),intent(out) :: qqcwsub3(ncnst,maxsubarea)
+  !----
 
   logical :: grid_cell_has_only_clea_area
   logical :: grid_cell_has_only_cldy_area
@@ -179,6 +196,16 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
   grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
   gird_cell_is_partly_cldy = (jclea > 0) .and. (jcldy > 0) .and.  (jclea+jcldy == 3) .and. (nsubarea == 2)
+
+  ! Sanity check
+  if ( (.not.grid_cell_has_only_clea_area) .and. &
+       (.not.grid_cell_has_only_cldy_area) .and. &
+       (.not.gird_cell_is_partly_cldy)           ) then
+
+     write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
+     call endrun( tmp_str )
+
+  end if
 
   !*************************************************************************************************
   ! Category I: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
@@ -282,12 +309,9 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
                                                  qgcm2, qqcwgcm2,                     &! in
                                                  qgcm3, qsub3                         )! in, inout
 
-  else ! Cell is neither partly cloudy nor all cloudy/all clear. This should not happen
-     write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
-     call endrun( tmp_str )
-  end if
+  end if ! different categories
 
- end subroutine set_subarea_gases_and_aerosols
+end subroutine set_subarea_gases_and_aerosols
 
 subroutine copy_cnst( q_in, q_copy, lcopy )
 !------------------------------------------------------
@@ -348,11 +372,11 @@ subroutine set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
 
    use modal_aero_data, only: ntot_amode, nspec_amode, numptrcw_amode
 
-   integer, intent(in)    :: loffset 
-   integer, intent(in)    :: jclea, jcldy               ! indices of subareas
-   real(wp),intent(in)    :: fcldy                      ! area fraction [unitless] of the cloudy subarea
-   real(wp),intent(in)    :: qqcwgcm(ncnst)             ! grid cell mean (unit does not matter for this subr.)
-   real(wp),intent(inout) :: qqcwsub(ncnst,maxsubarea)  ! values in subareas (unit does not matter for this subr.)
+   integer, intent(in)    :: loffset                   ! # of tracers in the host model that are not part of MAM
+   integer, intent(in)    :: jclea, jcldy              ! indices of subareas
+   real(wp),intent(in)    :: fcldy                     ! area fraction [unitless] of the cloudy subarea
+   real(wp),intent(in)    :: qqcwgcm(ncnst)            ! grid cell mean (unit does not matter for this subr.)
+   real(wp),intent(inout) :: qqcwsub(ncnst,maxsubarea) ! values in subareas (unit does not matter for this subr.)
 
    integer :: imode    ! mode index
    integer :: icnst    ! consitituent index 
@@ -380,7 +404,7 @@ subroutine set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
 
    use modal_aero_data, only: ntot_amode, nspec_amode, lmassptrcw_amode
 
-   integer, intent(in)    :: loffset 
+   integer, intent(in)    :: loffset                   ! # of tracers in the host model that are not part of MAM
    integer, intent(in)    :: jclea, jcldy              ! subarea indices 
    real(wp),intent(in)    :: fcldy                     ! area fraction [unitless] of the cloudy subarea 
    real(wp),intent(in)    :: qqcwgcm(ncnst)            ! grid cell mean (unit does not matter for this subr.)
@@ -414,45 +438,49 @@ subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 !          grid cell mean needs to be partitioned. Different lognormal modes are
 !          partitioned differently based on the mode-specific number mixing ratios.
 !-----------------------------------------------------------------------------------------
+  use modal_aero_data, only: ntot_amode, numptr_amode, numptrcw_amode
 
-   use modal_aero_data, only: ntot_amode, numptr_amode, numptrcw_amode
+  integer, intent(in) :: loffset        ! # of tracers in the host model that are not part of MAM
+  integer, intent(in) :: jclea, jcldy   ! subarea indices 
+  real(wp),intent(in) :: fclea, fcldy   ! area fraction [unitless] of the clear and cloudy subareas
+  real(wp),intent(in) :: qgcm   (ncnst) ! grid cell mean, interstitial constituents (unit does not matter)
+  real(wp),intent(in) :: qqcwgcm(ncnst) ! grid cell mean, cloud-borne  constituents (unit does not matter)
 
-   integer, intent(in)    :: loffset 
-   integer, intent(in)    :: jclea, jcldy    ! subarea indices 
-   real(wp),intent(in)    :: fclea, fcldy    ! area fraction [unitless] of the clear and cloudy subareas
-   real(wp),intent(in)    :: qgcm   (ncnst) ! grid cell mean of interstitial aerosol mixing ratio [unit does not matter)
-   real(wp),intent(in)    :: qqcwgcm(ncnst) ! grid cell mean of cloud-borne aerosol mixing ratio [unit does not matter)
-   real(wp),intent(in)    :: qgcmx  (ncnst)
+  real(wp),intent(in) :: qgcmx  (ncnst) ! grid cell mean, interstitial constituents (unit does not matter)
+  real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)  ! subarea mixing ratios of interst. constituents 
+                                                     ! (unit does not matter as long as they are consistent
+                                                     ! with the grid cell mean values)
 
-   real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)
+  ! Note: qgcm and qqcwgcm are used for calculating the patitioning factors.
+  ! qgcmx is the actual grid cell mean that is partitioned into qsubx.
 
-   integer :: imode    ! mode index
-   integer :: icnst    ! consitituent index 
+  integer :: imode    ! mode index
+  integer :: icnst    ! consitituent index 
 
-   real(wp) :: tmp_qa_gcav
-   real(wp) :: tmp_qc_gcav
+  real(wp) :: qgcm_intrst  ! grid cell mean of interstitial aerosol mixing ratio of a single mode
+  real(wp) :: qgcm_cldbrn  ! grid cell mean of cloud-borne  aerosol mixing ratio of a single mode
 
-   real(wp) :: tmp_aa_clea
-   real(wp) :: tmp_aa_cldy
+  real(wp) :: factor_clea  ! partitioning factor for clear  subarea [unitless]
+  real(wp) :: factor_cldy  ! partitioning factor for cloudy subarea [unitless]
 
-   do imode = 1, ntot_amode
+  do imode = 1, ntot_amode
 
-      ! calculate partitioning factors
+     ! calculate partitioning factors
 
-      tmp_qa_gcav = qgcm   ( numptr_amode(imode)-loffset )
-      tmp_qc_gcav = qqcwgcm( numptrcw_amode(imode)-loffset )
+     qgcm_intrst = qgcm   ( numptr_amode(imode)-loffset )
+     qgcm_cldbrn = qqcwgcm( numptrcw_amode(imode)-loffset )
 
-      call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
-                                  tmp_aa_clea, tmp_aa_cldy )
+     call get_partition_factors( qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &
+                                 factor_clea, factor_cldy )
 
-      ! apply partitioning factors
+     ! apply partitioning factors
 
-      icnst = numptr_amode(imode) - loffset
+     icnst = numptr_amode(imode) - loffset
 
-      qsubx(icnst,jclea) = qgcmx(icnst)*tmp_aa_clea
-      qsubx(icnst,jcldy) = qgcmx(icnst)*tmp_aa_cldy
+     qsubx(icnst,jclea) = qgcmx(icnst)*factor_clea
+     qsubx(icnst,jcldy) = qgcmx(icnst)*factor_cldy
 
-   end do ! imode
+  end do ! imode
 
 end subroutine set_subarea_qnumb_for_intrst_aerosols
 
@@ -467,42 +495,46 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 !          All species in the same mode are partitioned the same way, consistent
 !          with the internal mixing assumption used in MAM.
 !-----------------------------------------------------------------------------------------
-
   use modal_aero_data, only: ntot_amode, nspec_amode, lmassptr_amode, lmassptrcw_amode
 
-  integer, intent(in)    :: loffset 
-  integer, intent(in)    :: jclea, jcldy
-  real(wp),intent(in)    :: fclea, fcldy
-  real(wp),intent(in)    :: qgcm   (ncnst)
-  real(wp),intent(in)    :: qqcwgcm(ncnst)
+  integer, intent(in) :: loffset        ! # of tracers in the host model that are not part of MAM
+  integer, intent(in) :: jclea, jcldy   ! subarea indices 
+  real(wp),intent(in) :: fclea, fcldy   ! area fraction [unitless] of the clear and cloudy subareas
+  real(wp),intent(in) :: qgcm   (ncnst) ! grid cell mean, interstitial constituents (unit does not matter)
+  real(wp),intent(in) :: qqcwgcm(ncnst) ! grid cell mean, cloud-borne  constituents (unit does not matter)
 
-  real(wp),intent(in)    :: qgcmx(ncnst)
-  real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)
+  real(wp),intent(in) :: qgcmx  (ncnst) ! grid cell mean, interstitial constituents (unit does not matter)
+  real(wp),intent(inout) :: qsubx(ncnst,maxsubarea)  ! subarea mixing ratios of interst. constituents 
+                                                     ! (unit does not matter as long as they are consistent
+                                                     ! with the grid cell mean values)
+
+  ! Note: qgcm and qqcwgcm are used for calculating the patitioning factors.
+  ! qgcmx is the actual grid cell mean that is partitioned into qsubx.
 
   integer :: imode    ! mode index
-  integer :: ispec    ! aerosol species index
+  integer :: ispec    ! species index
   integer :: icnst    ! consitituent index 
 
-  real(wp) :: tmp_qa_gcav
-  real(wp) :: tmp_qc_gcav
+  real(wp) :: qgcm_intrst  ! grid cell mean of interstitial aerosol mixing ratio of a single mode
+  real(wp) :: qgcm_cldbrn  ! grid cell mean of cloud-borne  aerosol mixing ratio of a single mode
 
-  real(wp) :: tmp_aa_clea
-  real(wp) :: tmp_aa_cldy
+  real(wp) :: factor_clea  ! partitioning factor for clear  subarea [unitless]
+  real(wp) :: factor_cldy  ! partitioning factor for cloudy subarea [unitless]
 
   do imode = 1, ntot_amode
 
      ! calculcate partitioning factors
 
-     tmp_qa_gcav = 0.0_wp
-     tmp_qc_gcav = 0.0_wp
+     qgcm_intrst = 0.0_wp
+     qgcm_cldbrn = 0.0_wp
 
      do ispec = 1, nspec_amode(imode)
-        tmp_qa_gcav = tmp_qa_gcav + qgcm( lmassptr_amode(ispec,imode) - loffset )
-        tmp_qc_gcav = tmp_qc_gcav + qqcwgcm( lmassptrcw_amode(ispec,imode) - loffset )
+        qgcm_intrst = qgcm_intrst + qgcm( lmassptr_amode(ispec,imode) - loffset )
+        qgcm_cldbrn = qgcm_cldbrn + qqcwgcm( lmassptrcw_amode(ispec,imode) - loffset )
      end do
 
-     call get_partition_factors( tmp_qa_gcav, tmp_qc_gcav, fcldy, fclea, &
-                                 tmp_aa_clea, tmp_aa_cldy )
+     call get_partition_factors( qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &
+                                 factor_clea, factor_cldy )
 
      ! apply partitioning factors
 
@@ -510,8 +542,8 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 
         icnst = lmassptr_amode(ispec,imode) - loffset
 
-        qsubx(icnst,jclea) = qgcmx(icnst)*tmp_aa_clea
-        qsubx(icnst,jcldy) = qgcmx(icnst)*tmp_aa_cldy
+        qsubx(icnst,jclea) = qgcmx(icnst)*factor_clea
+        qsubx(icnst,jcldy) = qgcmx(icnst)*factor_cldy
 
      end do ! ispec 
   end do ! imode
@@ -519,8 +551,8 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 
 end subroutine set_subarea_qmass_for_intrst_aerosols
 
-subroutine get_partition_factors(  q_intrst_gcm, q_cldbrn_gcm, fcldy, fclea, &! in
-                                   part_fac_q_intrst_clea, part_fac_q_intrst_cldy  )! out
+subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
+                                   factor_clea, factor_cldy                )! out
 !------------------------------------------------------------------------------------
 ! Purpose: Calculate the partitioning factors for distributing interstitial aerosol
 !          mixing ratios to cloudy and clear subareas in a grid box.
@@ -528,37 +560,37 @@ subroutine get_partition_factors(  q_intrst_gcm, q_cldbrn_gcm, fcldy, fclea, &! 
 !          both interstitial and cloud-borne aerosols.
 !------------------------------------------------------------------------------------
 
-  real(wp), intent(in)  ::  q_intrst_gcm  ! grid cell mean interstitial aerosol mixing ratio
-  real(wp), intent(in)  ::  q_cldbrn_gcm  ! grid cell mean cloud-borne aerosol mixing ratio
+  real(wp), intent(in)  ::  qgcm_intrst  ! grid cell mean interstitial aerosol mixing ratio
+  real(wp), intent(in)  ::  qgcm_cldbrn  ! grid cell mean cloud-borne aerosol mixing ratio
 
-  real(wp), intent(in)  ::  fcldy           ! cloudy fraction of the grid cell
-  real(wp), intent(in)  ::  fclea           ! clear  fraction of the grid cell
+  real(wp), intent(in)  ::  fcldy        ! cloudy fraction of the grid cell [unitless]
+  real(wp), intent(in)  ::  fclea        ! clear  fraction of the grid cell [unitless]
 
-  real(wp), intent(out) ::  part_fac_q_intrst_clea
-  real(wp), intent(out) ::  part_fac_q_intrst_cldy
+  real(wp), intent(out) ::  factor_clea  ! partitioning factor for clear  subarea
+  real(wp), intent(out) ::  factor_cldy  ! partitioning factor for cloudy subarea
 
   real(wp) :: tmp_q_intrst_clea, tmp_q_intrst_cldy
   real(wp) :: tmp_q_cldbrn_cldy
-  real(wp) :: tmp_aa
+  real(wp) :: clea2gcm_ratio
 
   real(wp),parameter :: eps = 1.e-35_wp
 
-  ! Calculate mixing ratios of each subarea
+  ! Calculate subarea-mean mixing ratios
 
-  tmp_q_cldbrn_cldy = q_cldbrn_gcm/fcldy ! cloud-borne,  cloudy subarea
-  tmp_q_intrst_cldy = max( 0.0_wp, ((q_intrst_gcm+q_cldbrn_gcm) - tmp_q_cldbrn_cldy) ) ! interstitial, cloudy subarea
+  tmp_q_cldbrn_cldy = qgcm_cldbrn/fcldy                                              ! cloud-borne,  cloudy subarea
+  tmp_q_intrst_cldy = max( 0.0_wp, ((qgcm_intrst+qgcm_cldbrn) - tmp_q_cldbrn_cldy) ) ! interstitial, cloudy subarea
 
-  tmp_q_intrst_clea = (q_intrst_gcm - fcldy*tmp_q_intrst_cldy)/fclea ! interstitial, clear  subarea
+  tmp_q_intrst_clea = (qgcm_intrst - fcldy*tmp_q_intrst_cldy)/fclea                  ! interstitial, clear  subarea
 
   ! Calculate the corresponding paritioning factors for interstitial aerosols
-  ! using the above-derived subarea mixing ratios plus the constraint that
+  ! using the above-derived subarea-mean mixing ratios plus the constraint that
   ! the cloud fraction weighted average of subarea mean need to match grid box mean.
 
-  tmp_aa = max( eps, tmp_q_intrst_clea*fclea ) / max( eps, q_intrst_gcm )
-  tmp_aa = max( 0.0_wp, min( 1.0_wp, tmp_aa ) )
+  clea2gcm_ratio = max( eps, tmp_q_intrst_clea*fclea ) / max( eps, qgcm_intrst )
+  clea2gcm_ratio = max( 0.0_wp, min( 1.0_wp, clea2gcm_ratio ) )
 
-  part_fac_q_intrst_clea = tmp_aa/fclea
-  part_fac_q_intrst_cldy = (1.0_wp-tmp_aa)/fcldy
+  factor_clea = clea2gcm_ratio/fclea
+  factor_cldy = (1.0_wp-clea2gcm_ratio)/fcldy
 
 end subroutine get_partition_factors
 

@@ -134,20 +134,13 @@ implicit none
 !----
   real(r8) :: fclea, fcldy
 
-! logical :: grid_cell_has_only_clea_area
-! logical :: grid_cell_has_only_cldy_area
-! logical :: gird_cell_is_partly_cldy
-
-! logical :: lcopy(gas_pcnst)
-! logical :: cnst_is_gas(gas_pcnst)
-
-! integer :: imode, ispec, icnst
   integer :: icnst
 
   real(r8) :: qgcm1(gas_pcnst)
 
   real(r8) :: qgcm2   (gas_pcnst)
   real(r8) :: qqcwgcm2(gas_pcnst)
+
   real(r8) :: qgcm3   (gas_pcnst)
 
 !----
@@ -214,9 +207,6 @@ implicit none
       real(r8) :: relhumgcm, relhumsub(maxsubarea)
       real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
       real(r8) :: tmpa, tmpb, tmpc
-      real(r8) :: tmp_qa_clea, tmp_qa_cldy, tmp_qa_gcav
-      real(r8) :: tmp_qc_cldy, tmp_qc_gcav
-      real(r8) :: tmp_aa, tmp_aa_clea, tmp_aa_cldy
       real(r8) :: tmp_kxt, tmp_kxt2, tmp_pxt, tmp_pok
       real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
       real(r8) :: wetdens(max_mode)
@@ -370,13 +360,13 @@ main_i_loop: do i = 1, ncol
 
       ! Partition grid cell mean to subareas
 
-      call  set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy,    &! in
-                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3, &! in
-                                            qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3  )! out
+      call  set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
+                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
+                                            qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
 
-      !======================================================================
-      ! Calculate aerosol microphysics and update mixing ratios in subareas
-      !======================================================================
+      !================================================================================
+      ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
+      !================================================================================
       ! Initialize mixing ratios
 
             qsub4(:,:) = 0.0_r8
