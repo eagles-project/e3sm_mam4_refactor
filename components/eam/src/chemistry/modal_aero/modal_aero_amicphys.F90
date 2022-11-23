@@ -333,7 +333,23 @@ main_i_loop: &
 
 !--------
 
+
+      !====================================================================================================
+      ! The subareas
+      !====================================================================================================
+      call setup_subareas( &
+           cld(i,k),                                &! in
+           nsubarea, ncldy_subarea, jclea, jcldy,   &! out
+           iscldy_subarea, afracsub, fclea, fcldy   )! out
+
+      !====================================================================================================
+      ! Relative humidity
+      !====================================================================================================
+
       relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
+      call set_subarea_relhum( &
+           ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &!in
+           relhumsub )! out
 
 !--------
 #include "modal_aero_amicphys_wrk.in"
