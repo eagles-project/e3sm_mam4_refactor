@@ -594,5 +594,10 @@ subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
 
 end subroutine get_partition_factors
 
+!==================================================
+
+!subroutine derive_grid_cell_mean_from_subarea_values( nsubarea, 
+! )
+!  real(wp), intent(out):: qgcm
 
 end module modal_aero_amicphys_subareas
