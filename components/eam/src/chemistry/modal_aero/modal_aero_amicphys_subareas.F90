@@ -140,7 +140,7 @@ subroutine copy_cnst( q_in, q_copy, lcopy )
 
 end subroutine copy_cnst
 
-subroutine compute_qsub_from_gbm_and_qsub_of_other_subarea( lcompute, f_a, f_b, qgcm, &! in
+subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea( lcompute, f_a, f_b, qgcm, &! in
                                                             qsub_a, qsub_b            )! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Calculate the value of qsub_b assuming qgcm is a weighted average defined as
@@ -173,9 +173,9 @@ subroutine compute_qsub_from_gbm_and_qsub_of_other_subarea( lcompute, f_a, f_b, 
    end if
   end do
 
-end subroutine compute_qsub_from_gbm_and_qsub_of_other_subarea
+end subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea
 
-subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+subroutine set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the number mixing ratios of cloud-borne aerosols in subareas:
 !          - zero in clear air;
@@ -205,9 +205,9 @@ subroutine set_subarea_q_numb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy,
    end do
    !----------------------------------------------------------------
 
-end subroutine set_subarea_q_numb_for_cldbrn_aerosols
+end subroutine set_subarea_qnumb_for_cldbrn_aerosols
 
-subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
+subroutine set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the mass mixing ratios of cloud-borne aerosols in subareas:
 !          - zero in clear air;
@@ -240,11 +240,11 @@ subroutine set_subarea_q_mass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy,
    end do ! imode - mode loop
    !----------------------------------------------------------------
 
-end subroutine set_subarea_q_mass_for_cldbrn_aerosols
+end subroutine set_subarea_qmass_for_cldbrn_aerosols
 
-subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
-                                                   qgcm, qqcwgcm,                       &! in
-                                                   qgcmx,qsubx                          )! inout
+subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                  qgcm, qqcwgcm,                       &! in
+                                                  qgcmx,qsubx                          )! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the number mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -291,11 +291,11 @@ subroutine set_subarea_q_numb_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
 
    end do ! imode
 
-end subroutine set_subarea_q_numb_for_intrst_aerosols
+end subroutine set_subarea_qnumb_for_intrst_aerosols
 
-subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
-                                                   qgcm,  qqcwgcm, &
-                                                   qgcmx, qsubx    )! inout
+subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
+                                                  qgcm,  qqcwgcm, &
+                                                  qgcmx, qsubx    )! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the mass mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -354,7 +354,7 @@ subroutine set_subarea_q_mass_for_intrst_aerosols( loffset, jclea, jcldy, fclea,
   end do ! imode
 
 
-end subroutine set_subarea_q_mass_for_intrst_aerosols
+end subroutine set_subarea_qmass_for_intrst_aerosols
 
 subroutine get_partition_factors(  q_intrst_gcm, q_cldbrn_gcm, fcldy, fclea, &! in
                                    part_fac_q_intrst_clea, part_fac_q_intrst_cldy  )! out
