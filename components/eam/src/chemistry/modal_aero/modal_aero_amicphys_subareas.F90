@@ -125,6 +125,170 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 
 end subroutine set_subarea_rh
 
+subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
+                                           qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
+                                           qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
+!------------------------------------------------------------------------------------------------
+! Purpose: Partition grid cell mean mixing ratios to clear/cloudy subareas.
+!------------------------------------------------------------------------------------------------
+
+  use cam_abortutils,              only: endrun
+  use modal_aero_amicphys_control, only: lmapcc_all, lmapcc_val_gas
+
+  integer, intent(in) :: loffset 
+  integer, intent(in) :: nsubarea, jclea, jcldy
+  real(wp),intent(in) :: fclea, fcldy
+  real(wp),intent(in) :: qgcm1(ncnst)
+  real(wp),intent(in) :: qgcm2(ncnst)
+  real(wp),intent(in) :: qgcm3(ncnst)
+  real(wp),intent(in) :: qqcwgcm2(ncnst)
+  real(wp),intent(in) :: qqcwgcm3(ncnst)
+
+  real(wp),intent(out) :: qsub1(ncnst,maxsubarea)
+  real(wp),intent(out) :: qsub2(ncnst,maxsubarea)
+  real(wp),intent(out) :: qsub3(ncnst,maxsubarea)
+  real(wp),intent(out) :: qqcwsub2(ncnst,maxsubarea)
+  real(wp),intent(out) :: qqcwsub3(ncnst,maxsubarea)
+
+  logical :: grid_cell_has_only_clea_area
+  logical :: grid_cell_has_only_cldy_area
+  logical :: gird_cell_is_partly_cldy
+
+  logical :: lcopy(ncnst)
+  logical :: cnst_is_gas(ncnst)
+
+  integer :: imode, ispec, icnst, jsub
+
+  character(len=200) :: tmp_str
+
+  !------------------------------------------------------------------------------------
+  ! Initialize mixing ratios in subareas before the aerosol microphysics calculations
+  !------------------------------------------------------------------------------------
+  ! Gases and interstitial aerosols
+  qsub1(:,:) = 0.0_wp
+  qsub2(:,:) = 0.0_wp
+  qsub3(:,:) = 0.0_wp
+
+  ! Cloud-borne aerosols
+  qqcwsub2(:,:) = 0.0_wp
+  qqcwsub3(:,:) = 0.0_wp
+
+  !---------------------------------------------------------------------------------------------------
+  ! Determine which category the current grid cell belongs to: partly cloudy, all cloudy, or all clear
+  !---------------------------------------------------------------------------------------------------
+  grid_cell_has_only_clea_area = ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1))
+  grid_cell_has_only_cldy_area = ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1))
+  gird_cell_is_partly_cldy = (jclea > 0) .and. (jcldy > 0) .and.  (jclea+jcldy == 3) .and. (nsubarea == 2)
+
+  !*************************************************************************************************
+  ! Category I: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
+  !*************************************************************************************************
+  if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
+
+     lcopy(1:ncnst) = lmapcc_all(1:ncnst) > 0     ! copy all gases and aerosols
+
+     do jsub = 1,nsubarea
+        call copy_cnst( qgcm1, qsub1(:,jsub), lcopy ) !from, to, flag
+        call copy_cnst( qgcm2, qsub2(:,jsub), lcopy ) !from, to, flag
+        call copy_cnst( qgcm3, qsub3(:,jsub), lcopy ) !from, to, flag
+
+        call copy_cnst( qqcwgcm2, qqcwsub2(:,jsub), lcopy ) !from, to, flag
+        call copy_cnst( qqcwgcm3, qqcwsub3(:,jsub), lcopy ) !from, to, flag
+     end do
+
+  !*************************************************************************************************
+  ! Category II: partly cloudy grid cell. Tracer mixing ratios are generally assumed different
+  ! in clear and cloudy subareas.  This is primarily because the
+  ! interstitial aerosol mixing ratios are assumed to be lower in the cloudy sub-area than in
+  ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
+  !*************************************************************************************************
+  else if ( gird_cell_is_partly_cldy ) then
+
+     !===================================
+     ! Set gas mixing ratios in subareas
+     !===================================
+     cnst_is_gas(:) = lmapcc_all(:).eq.lmapcc_val_gas 
+
+     !------------------------------------------------------------------------------------------
+     ! Before gas chemistry, gas mixing ratios are assumed to be the same in all subareas,
+     ! i.e., they all equal the grid cell mean.
+     !------------------------------------------------------------------------------------------
+     do jsub = 1,nsubarea
+        call copy_cnst( qgcm1, qsub1(:,jsub), cnst_is_gas ) !from, to, flag
+     end do
+
+     !------------------------------------------------------------------------------------------
+     ! After gas chemistry, still assume gas mixing ratios are the same in all subareas.
+     !------------------------------------------------------------------------------------------
+     do jsub = 1,nsubarea
+        call copy_cnst( qgcm2, qsub2(:,jsub), cnst_is_gas ) !from, to, flag
+     end do
+
+     !----------------------------------------------------------------------------------------
+     ! After cloud chemistry, gas and aerosol mass mixing ratios in the clear subarea are 
+     ! assumed to be the same as their values before cloud chemistry  (because by definition,
+     ! cloud chemistry did not happen in clear sky), while the mixing ratios in the cloudy 
+     ! subarea likely have changed.
+     !----------------------------------------------------------------------------------------
+     ! Gases in the clear subarea remain the same as their values before cloud chemistry.
+
+     call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), cnst_is_gas ) !from, to, flag
+
+     ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
+     ! cloud fraction and the clear-sky values
+
+     call compute_qsub_from_gcm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
+                                                           qsub3(:,jclea), qsub3(:,jcldy)    )! inout
+
+     !=========================================================================
+     ! Set AEROSOL mixing ratios in subareas.
+     ! Only need to do this for points 2 and 3 in the time integraion loop,
+     ! i.e., the before-cloud-chem and after-cloud-chem states.
+     !=========================================================================
+     ! Cloud-borne aerosols. (They are straightforward to partition, 
+     ! as they only exist in the cloudy subarea.)
+     !----------------------------------------------------------------------------------------
+     ! Partition mass and number before cloud chemistry
+
+     call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+     call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+
+     ! Partition mass and number before cloud chemistry
+
+     call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+     call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+
+     !----------------------------------------------------------------------------------------
+     ! Interstitial aerosols. (They can exist in both cloudy and clear subareas, and hence 
+     ! need to be partitioned.)
+     !----------------------------------------------------------------------------------------
+     ! Partition mass and number before cloud chemistry
+
+     call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                 qgcm2, qqcwgcm2,                     &! in
+                                                 qgcm2, qsub2                         )! in, inout
+
+     call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                 qgcm2, qqcwgcm2,                     &! in
+                                                 qgcm2, qsub2                         )! in, inout
+
+     ! Partition mass and number before cloud chemistry
+
+     call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                 qgcm2, qqcwgcm2,                     &! in
+                                                 qgcm3, qsub3                         )! in, inout
+
+     call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+                                                 qgcm2, qqcwgcm2,                     &! in
+                                                 qgcm3, qsub3                         )! in, inout
+
+  else ! Cell is neither partly cloudy nor all cloudy/all clear. This should not happen
+     write(tmp_str,'(a,3(1x,i10))') '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', jclea, jcldy, nsubarea
+     call endrun( tmp_str )
+  end if
+
+ end subroutine set_subarea_gases_and_aerosols
+
 subroutine copy_cnst( q_in, q_copy, lcopy )
 !------------------------------------------------------
 ! Purpose: copy values from one array to another
