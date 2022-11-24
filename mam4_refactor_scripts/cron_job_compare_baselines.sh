@@ -1,10 +1,16 @@
 #!/bin/sh
 
+#Unlimited stack
+ulimit -d unlimited
+ulimit -s unlimited
+ulimit -c unlimited
+
+
 #===========#===========#===========#===========#===========#===========#===========#===========
 # USAGE:
 # 1. This script can be launched from anywhere as it doesn't depend on the local directory
 # 2. Issue command:
-#           $bash  compare_baselines_all_tests.sh -b <branch-to-test> -t <temporary-directory-name>
+#           $bash  cron_job_compare_baselines.sh
 
 # 3. The command above will create a temporary directory, clone the code and launch the comparison
 #    tests
@@ -16,7 +22,7 @@ main() {
 #---------------------------------------------------------------
 # User input
 #---------------------------------------------------------------
-scratch_dir="/compyfs/$USER/e3sm_scratch/" #scratch directory to clone the code and run the tests
+scratch_dir="/compyfs/$USER/cron_jobs_refactor" #scratch directory to clone the code and run the tests
 baselines="mam4_org_v2_baselines_created_11_23_2022"
 #---------------------------------------------------------------
 # User input ENDs
@@ -25,8 +31,14 @@ baselines="mam4_org_v2_baselines_created_11_23_2022"
 #===================================================================
 #===================================================================
 
+#cronjobs are very lightweight, so source the modules so that they are available
+source /etc/profile.d/modules.sh
+
+
+#form a unique temporary directory name
+temp_dir="test_`date +'%m-%d-%Y__%H_%M_%S'`"
+
 newline && time_elapsed_min
-echo "Testing branch:$branch_name"
 
 #cd into the scratch directory
 cd $scratch_dir
@@ -48,10 +60,6 @@ cd e3sm_mam4_refactor
 
 #Merge branch into the maint-2.0 branch
 newline && time_elapsed_min
-echo "Check out and merge branch:$branch_name"
-git checkout $branch_name > /dev/null
-git checkout refactor-maint-2.0 > /dev/null
-git merge $branch_name > /dev/null
 
 #update submodules
 newline && time_elapsed_min
@@ -68,7 +76,7 @@ cd cime/scripts
 newline && time_elapsed_min
 echo "Launch Tests:"
 ./create_test eagles_mam -c -b $baselines -t comp_${temp_dir}_mam4_org_v2_baselines \
-    -p esmd -r $scratch_dir/$temp_dir --output-root $scratch_dir/$temp_dir > /dev/null
+    -p esmd -r $scratch_dir/$temp_dir --output-root $scratch_dir/$temp_dir  > /dev/null
 
 newline && time_elapsed_min
 
@@ -97,40 +105,6 @@ time_elapsed_min() {
     seconds=$((total_time % 60))
     echo "Time elapsed (min): " $minutes:$seconds
 }
-
-
-#parse command line args
-while getopts ":b:t:" opt; do
-  case $opt in
-    b) branch_name="$OPTARG"
-    ;;
-    \?) echo "Invalid option -$OPTARG; please set branch name using -b command line option" >&2
-    exit 1
-    ;;
-    t) temp_dir="$OPTARG"
-    ;;
-    \?) echo "Invalid option -$OPTARG; please set temp directory name using -t command line option" >&2
-    exit 1
-    ;;
-  esac
-
-  case $OPTARG in
-    -*) echo "Option $opt needs a valid argument"
-    exit 1
-    ;;
-  esac
-done
-
-if [ -z "${branch_name}" ]; then
-    echo "branch name is not set, please set it using -b command line option"
-    exit 1
-fi
-
-if [ -z "${temp_dir}" ]; then
-    echo "temporary directory is not set, please set it using -t command line option"
-    exit 1
-fi
-
 
 if_dir_exists_then_exit () {
     if [ -d $1 ]; then
