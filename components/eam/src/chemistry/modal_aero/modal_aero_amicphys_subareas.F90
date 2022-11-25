@@ -596,30 +596,40 @@ end subroutine get_partition_factors
 
 !==================================================
 
-subroutine get_gcm_gases_and_aerosols_from_subares( nsubarea, ncldy_subarea, afracsub, iscldy_subarea, &! in
-                                                    qsub, qqcwsub, qqcwgcm_old, &! in
-                                                    qgcm, qqcwgcm )
+subroutine form_gcm_of_gases_and_aerosols_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
+                                                         qsub, qqcwsub, qqcwgcm_old,        &! in
+                                                         qgcm, qqcwgcm )
+!---------------------------------------------------- ------------------------------------------------------
+! Purpose: Form grid cell mean values by calculating area-weighted averages of the subareas.
+!           - For gases and interstitial aerosols, sum over all active subareas. 
+!           - For cloud-borne aerosols, 
+!----------------------------------------------------------------------------------------------------------
 
-  integer,  intent(in) :: nsubarea              ! # of active subareas
-  integer,  intent(in) :: ncldy_subarea         ! # of cloudy subareas
-  real(wp), intent(in) :: afracsub(maxsubarea)  ! area fraction in subareas [unitless]
-  logical,  intent(in) :: iscldy_subarea(maxsubarea)  ! 
+  integer,  intent(in) :: nsubarea                   ! # of active subareas
+  integer,  intent(in) :: ncldy_subarea              ! # of cloudy subareas
+  real(wp), intent(in) :: afracsub(maxsubarea)       ! area fraction of subareas [unitless]
 
-  real(wp), intent(in) :: qsub   (ncnst, maxsubarea)  !
-  real(wp), intent(in) :: qqcwsub(ncnst, maxsubarea)  !
-  real(wp), intent(in):: qqcwgcm_old(ncnst)
+  ! The following arguments are mixing ratios. Their units do not matter for this subroutine.
 
-  real(wp), intent(out):: qgcm   (ncnst)
-  real(wp), intent(out):: qqcwgcm(ncnst)
+  real(wp), intent(in) :: qsub   (ncnst, maxsubarea)  ! gas and interst. aerosol mixing ratios in subareas
+  real(wp), intent(in) :: qqcwsub(ncnst, maxsubarea)  ! cloud-borne aerosol mixing ratios in subareas
+  real(wp), intent(in) :: qqcwgcm_old(ncnst)          ! grid cell mean cloud-borne aerosol mixing ratios
+                                                      ! before aerosol microphysics calculations
+
+  real(wp), intent(out):: qgcm   (ncnst)  ! grid cell mean gas and interst.  aerosol mixing ratios
+  real(wp), intent(out):: qqcwgcm(ncnst)  ! cloud-borne aerosol mixing ratios in subareas
+  !---
 
   integer :: jsub
 
   ! Gases and interstitial aerosols
 
-     qgcm(:) = 0.0_wp
-     do jsub = 1, nsubarea
-        qgcm(:) = qgcm(:) + qsub(:,jsub)*afracsub(jsub)
-     end do
+  qgcm(:) = 0.0_wp
+  do jsub = 1, nsubarea
+     qgcm(:) = qgcm(:) + qsub(:,jsub)*afracsub(jsub)
+  end do
+
+  qgcm(:) = max( 0._wp, qgcm(:) )
 
   ! Cloud-borne aerosols
 
@@ -628,11 +638,12 @@ subroutine get_gcm_gases_and_aerosols_from_subares( nsubarea, ncldy_subarea, afr
   else
      qqcwgcm(:) = 0.0_wp
      do jsub = 1, nsubarea
-        if ( .not. iscldy_subarea(jsub) ) cycle
         qqcwgcm(:) = qqcwgcm(:) + qqcwsub(:,jsub)*afracsub(jsub)
      end do
   end if
 
-end subroutine get_gcm_gases_and_aerosols_from_subares
+  qqcwgcm(:) = max( 0._wp, qqcwgcm(:) )
+
+end subroutine form_gcm_of_gases_and_aerosols_from_subareas
 
 end module modal_aero_amicphys_subareas
