@@ -83,7 +83,7 @@ use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
                                       , set_subarea_gases_and_aerosols &
-                                      , get_gcm_gases_and_aerosols_from_subares &
+                                      , form_gcm_of_gases_and_aerosols_from_subareas &
                                       , copy_cnst
 
 implicit none
@@ -253,7 +253,7 @@ implicit none
       type ( misc_vars_aa_type ) :: misc_vars_aa
 
 
-
+      logical :: lcopy(gas_pcnst)
 
       adjust_factor_pbl_ratenucl = newnuc_adjust_factor_pbl
 
@@ -416,45 +416,24 @@ main_i_loop: do i = 1, ncol
          qsub_tendaa, qqcwsub_tendaa,             &
          misc_vars_aa                             )
 
-
       !================================================================
-      ! form new grid-mean mix-ratios
+      ! form new grid cell mean mixing ratios
       !================================================================
-    ! ! Gases and interstitial aerosols
+      ! Gases and aerosols
+      !----------------------
+      call form_gcm_of_gases_and_aerosols_from_subareas( &
+         nsubarea, ncldy_subarea, afracsub,              &! in
+         qsub4, qqcwsub4, qqcwgcm3,                      &! in
+         qgcm4, qqcwgcm4                                 )! out
 
-    !    qgcm4(:) = 0.0_r8
-    !    do j = 1, nsubarea
-    !       qgcm4(:) = qgcm4(:) + qsub4(:,j)*afracsub(j)
-    !    end do
+      ! Clip negative values and copy to output array
 
-    ! ! Cloud-borne aerosols
-!
-!     if (ncldy_subarea <= 0) then
-!        qqcwgcm4(:) = qqcwgcm3(:)
-!     else
-!        qqcwgcm4(:) = 0.0_r8
-!        do j = 1, nsubarea
-!           if ( .not. iscldy_subarea(j) ) cycle
-!           qqcwgcm4(:) = qqcwgcm4(:) + qqcwsub4(:,j)*afracsub(j)
-!        end do
-!     end if
+      lcopy(:) = lmapcc_all(:) > 0
+      call copy_cnst( qgcm4, q(i,k,:), lcopy ) !from, to, flag
 
-      call get_gcm_gases_and_aerosols_from_subares( &
-         nsubarea, ncldy_subarea, afracsub, iscldy_subarea, &! in
-         qsub4, qqcwsub4, qqcwgcm3, &!in
-         qgcm4, qqcwgcm4            )! out
+      lcopy(:) = lmapcc_all(:) >= lmapcc_val_aer
+      call copy_cnst( qqcwgcm4, qqcw(i,k,:), lcopy ) !from, to, flag
 
-      ! Clipp negative values and copy to output array
-      do icnst = 1, gas_pcnst
-         if (lmapcc_all(icnst) > 0) then
-            q(i,k,icnst) = max(qgcm4(icnst),0.0_r8)
-            if (lmapcc_all(icnst) >= lmapcc_val_aer) then
-               qqcw(i,k,icnst) = max(qqcwgcm4(icnst),0.0_r8)
-            end if
-         end if
-      end do
-
-!----
       !----------------------
       ! Aerosol water
       !----------------------
