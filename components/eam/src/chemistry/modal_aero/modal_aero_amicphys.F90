@@ -15,7 +15,6 @@
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
 
-  use modal_aero_amicphys_control
 
   implicit none
   private
@@ -78,13 +77,26 @@ use modal_aero_data,   only:  &
     cnst_name_cw, &
     lmassptr_amode, lmassptrcw_amode, lptr2_soa_g_amode, &
     nspec_amode, &
-    numptr_amode, numptrcw_amode
+    numptr_amode, numptrcw_amode, ntot_amode
 use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
                                       , set_subarea_gases_and_aerosols &
                                       , form_gcm_of_gases_and_aerosols_from_subareas &
                                       , copy_cnst
+
+use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
+                                       maxsubarea, top_lev, &
+                                       update_qaerwat, &
+                                       ntot_amode_extd, max_mode, nait, nsoa, &
+                                       misc_vars_aa_type, &
+                                       newnuc_adjust_factor_pbl, &
+                                       nqtendaa, nqqcwtendaa, &
+                                       do_q_coltendaa, do_qqcw_coltendaa, iqtend_cond, &
+                                       iqtend_rnam, iqqcwtend_rnam, &
+                                       iqtend_nnuc, &
+                                       iqtend_coag, &
+                                       suffix_q_coltendaa, suffix_qqcw_coltendaa
 
 implicit none
 
@@ -102,20 +114,20 @@ implicit none
 
    real(r8), intent(in)    :: deltat               ! time step (s)
 
-   real(r8), intent(inout) :: q(ncol,pver,pcnstxx) ! current tracer mixing ratios (TMRs)
+   real(r8), intent(inout) :: q(ncol,pver,gas_pcnst) ! current tracer mixing ratios (TMRs)
                                                    ! these values are updated (so out /= in)
                                                    ! *** MUST BE  #/kmol-air for number
                                                    ! *** MUST BE mol/mol-air for mass
                                                    ! *** NOTE ncol dimension
-   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx)
+   real(r8), intent(inout) :: qqcw(ncol,pver,gas_pcnst)
                                                    ! like q but for cloud-borner tracers
                                                    ! these values are updated
-   real(r8), intent(in)    :: q_pregaschem(ncol,pver,pcnstxx)    ! q TMRs    before gas-phase chemistry
-   real(r8), intent(in)    :: q_precldchem(ncol,pver,pcnstxx)    ! q TMRs    before cloud chemistry
-   real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,pcnstxx) ! qqcw TMRs before cloud chemistry
+   real(r8), intent(in)    :: q_pregaschem(ncol,pver,gas_pcnst)    ! q TMRs    before gas-phase chemistry
+   real(r8), intent(in)    :: q_precldchem(ncol,pver,gas_pcnst)    ! q TMRs    before cloud chemistry
+   real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,gas_pcnst) ! qqcw TMRs before cloud chemistry
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
-   real(r8), intent(inout) :: q_tendbb(ncol,pver,pcnstxx,nqtendbb)    ! TMR tendencies for box-model diagnostic output
-   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb)
+   real(r8), intent(inout) :: q_tendbb(ncol,pver,gas_pcnst,nqtendbb)    ! TMR tendencies for box-model diagnostic output
+   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,gas_pcnst,nqqcwtendbb)
 #endif
 
    real(r8), intent(in)    :: t(pcols,pver)        ! temperature at model levels (K)
@@ -181,7 +193,7 @@ implicit none
    integer :: j, jac, jsoa, jsub
    integer :: jclea, jcldy
    integer :: k
-   integer :: l, l2, l3, la, lb, lc, lmz, lsfrm, lstoo
+   integer :: l
    integer :: lun, lund
    integer :: m
    integer :: n, niter, niter_max, ntot_soamode
@@ -616,6 +628,8 @@ main_i_loop: do i = 1, ncol
 ! qsub3 and qqcwsub3 are the incoming current TMRs
 ! qsub4 and qqcwsub4 are the outgoing updated TMRs
 !
+  use modal_aero_amicphys_control
+
       logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
       logical,  intent(in)    :: iscldy_subarea(maxsubarea)
 
@@ -947,6 +961,7 @@ main_jsub_loop: &
 !    new particle nucleation - because h2so4 gas conc. should be very low in cloudy air
 !    coagulation - because cloud-borne aerosol would need to be included
 !
+  use modal_aero_amicphys_control
 
       use physconst, only:  r_universal
       use modal_aero_rename, only: mam_rename_1subarea
@@ -1379,6 +1394,8 @@ do_rename_if_block30: &
          qaer3,      qaer4,      qaer_delaa,         &
          qwtr3,      qwtr4,                          &
          misc_vars_aa_sub                            )
+
+  use modal_aero_amicphys_control
 !
 ! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
 !    for a single clear sub-area (with indices = lchnk,i,k,jsub)
@@ -2481,6 +2498,7 @@ do_newnuc_if_block50: &
          uptkaer,           uptkrate_h2so4                          )
 
 ! uses
+  use modal_aero_amicphys_control
 
       implicit none
 
@@ -2731,6 +2749,9 @@ do_newnuc_if_block50: &
 
 ! uses
       use modal_aero_data, only: lptr2_soa_a_amode
+      use modal_aero_amicphys_control, only: r8, max_gas, max_aer, max_mode, &
+                                            npca,npoa, nsoa, nufi, ntot_amode, &
+                                            iaer_pom, mode_aging_optaa
 
 
       implicit none
@@ -3050,7 +3071,17 @@ time_loop: &
          qwtr_cur,                                                  &
          dnclusterdt                                                )
 
-! uses
+
+      use modal_aero_amicphys_control, only: &
+          r8, max_gas, max_aer, max_mode, &
+          iaer_so4, iaer_nh4, igas_h2so4, igas_nh3, nait, &
+          dgnum_aer, dgnumlo_aer, dgnumhi_aer, &
+          gaexch_h2so4_uptake_optaa, &
+          newnuc_h2so4_conc_optaa , &
+          dens_so4a_host, mw_so4a_host, pi, &
+          newnuc_adjust_factor_dnaitdt, &
+          mw_nh4a_host
+
       use chem_mods,     only: adv_mass
 
       use modal_aero_newnuc, only: &
@@ -3461,6 +3492,10 @@ time_loop: &
          qaer_del_coag_in)
 
 ! uses
+      use modal_aero_amicphys_control, only: &
+          r8, max_mode, max_aer, max_agepair, n_agepair, &
+          naer, lmap_aer, &
+          modefrm_agepair, modetoo_agepair
 
       implicit none
 
@@ -3531,6 +3566,12 @@ agepair_loop1: &
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
 ! change due to condenstion and coagulation
+
+      use modal_aero_amicphys_control, only: r8, &
+          max_mode, max_aer, max_agepair, naer, lmap_aer, &
+          iaer_so4, iaer_soa,&
+          mass_2_vol, fac_m2v_eqvhyg_aer, alnsg_aer, &
+          dr_so4_monolayers_pcage
 
       implicit none
 
@@ -3610,6 +3651,8 @@ agepair_loop1: &
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon anc accum mode
 
+      use modal_aero_amicphys_control, only: r8, max_mode
+
       implicit none
 
 ! arguments
@@ -3647,6 +3690,8 @@ agepair_loop1: &
 ! from pcarbon to accum mode
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon and accum mode
+
+      use modal_aero_amicphys_control, only: r8, max_mode
 
       implicit none
 
@@ -3852,6 +3897,8 @@ use modal_aero_data, only : &
 
 use modal_aero_coag, only: set_coagulation_pairs
 
+use modal_aero_amicphys_control
+
 implicit none
 
 !-----------------------------------------------------------------------
@@ -3884,12 +3931,6 @@ implicit none
 n_so4_monolayers_pcage  = n_so4_monolayers_pcage_in
 dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 
-
-      ldiag82  = .false. ; lun82  = iulog
-      ldiag97  = .false. ; lun97  = iulog
-      ldiag98  = .false. ; lun98  = iulog
-      ldiag15n = .false. ; lun15n = iulog
-      ldiagd1  = .false.
 
       call mam_set_lptr2_and_specxxx2
 
@@ -4369,6 +4410,9 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
           nspec_amode, ntot_amode, &
           specdens_amode, spechygro, specmw_amode
 
+      use modal_aero_amicphys_control, only: nsoa, &
+          specmw2_amode, specdens2_amode, spechygro2
+
       implicit none
 
       integer :: jsoa
@@ -4430,6 +4474,7 @@ use modal_aero_data, only : &
 !use modal_aero_rename
 
 use modal_aero_coag, only: n_coagpair, src_mode_coagpair, dest_mode_coagpair, end_mode_coagpair
+use modal_aero_amicphys_control
 
 implicit none
 
