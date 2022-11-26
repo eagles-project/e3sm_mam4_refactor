@@ -88,7 +88,8 @@ use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
                                        iqtend_coag, &
                                        suffix_q_coltendaa, suffix_qqcw_coltendaa
 
-use modal_aero_amicphys_diags, only: amicphys_diags_init
+use modal_aero_amicphys_diags, only: amicphys_diags_init &
+                                   , get_gcm_tend_diags_from_subareas
 
 implicit none
 
@@ -380,28 +381,10 @@ implicit none
       !================================================================
       ! Budget diagnostics
       !================================================================
-      if (nsubarea == 1) then
-         qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
-      else
-         qgcm_tendaa(:,:) = 0.0_r8
-         do jsub = 1, nsubarea
-            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) &
-                             + qsub_tendaa(:,:,jsub)*afracsub(jsub)
-         end do
-      end if
+      call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
+                                             qsub_tendaa, qqcwsub_tendaa,       &! in
+                                             qgcm_tendaa, qqcwgcm_tendaa        )! out 
 
-      if (ncldy_subarea <= 0) then
-         qqcwgcm_tendaa(:,:) = 0.0_r8
-      else if (nsubarea == 1) then
-         qqcwgcm_tendaa(:,:) = qqcwsub_tendaa(:,:,1)
-      else
-         qqcwgcm_tendaa(:,:) = 0.0_r8
-         do jsub = 1, nsubarea
-            if ( .not. iscldy_subarea(jsub) ) cycle
-            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) &
-                                + qqcwsub_tendaa(:,:,jsub)*afracsub(jsub)
-         end do
-      end if
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
       if (iqtend_cond <= nqtendbb) q_tendbb(ii,kk,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
@@ -433,7 +416,7 @@ implicit none
       ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
    end do ! main_ii_loop
-   end do ! main_ki_loop
+   end do ! main_kk_loop
 
 !==========================================================
 ! output column tendencies to history
