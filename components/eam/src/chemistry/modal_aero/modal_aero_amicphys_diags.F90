@@ -1,16 +1,16 @@
 module modal_aero_amicphys_diags
 
-!                                         suffix_q_coltendaa, suffix_qqcw_coltendaa
   implicit none
 
-public
+  public
 
 contains
 
-subroutine amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 !-----------------------------------------------------------------------------------
 ! Purpose: set switches that turn on or off column-integrated tendency diagnostics.
 !-----------------------------------------------------------------------------------
+subroutine amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
+
   use modal_aero_amicphys_control, only: do_q_coltendaa, do_qqcw_coltendaa, &
                                          iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, &
                                          iqqcwtend_rnam
@@ -27,13 +27,14 @@ subroutine amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
 end subroutine amicphys_diags_init
 
-subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
-                                             qsub_tendaa, qqcwsub_tendaa,       &! in
-                                             qgcm_tendaa, qqcwgcm_tendaa        )! out 
 !--------------------------------------------------------------------------------
 ! Purpose: Get grid cell mean tendencies by calculating area-weighted averages
 !          of the values in different subareas.
 !--------------------------------------------------------------------------------
+subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
+                                             qsub_tendaa, qqcwsub_tendaa,       &! in
+                                             qgcm_tendaa, qqcwgcm_tendaa        )! out
+
   use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst, maxsubarea, nqtendaa, nqqcwtendaa
 
   integer,  intent(in) :: nsubarea                   ! # of active subareas
@@ -70,12 +71,12 @@ subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, 
 
 end subroutine get_gcm_tend_diags_from_subareas
 
-subroutine accumulate_column_tend_integrals( pdel, gravit,                &! in
-                                             qgcm_tendaa, qqcwgcm_tendaa, &! in
-                                             q_coltendaa, qqcw_coltendaa  )! inout
 !-------------------------------------------------------------------------------
 ! Purpose: add mass-weighted tendencies to the corresponding vertical integrals
 !-------------------------------------------------------------------------------
+subroutine accumulate_column_tend_integrals( pdel, gravit,                &! in
+                                             qgcm_tendaa, qqcwgcm_tendaa, &! in
+                                             q_coltendaa, qqcw_coltendaa  )! inout
 
   use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst
   use modal_aero_amicphys_control, only: do_q_coltendaa, do_qqcw_coltendaa, &
@@ -119,5 +120,49 @@ subroutine accumulate_column_tend_integrals( pdel, gravit,                &! in
 
 end subroutine accumulate_column_tend_integrals
 
+!---------------------------------------------------------------------------------
+! Purpose: output vertically integrated tendencies of one process and different
+!          constituents (tracers)
+!---------------------------------------------------------------------------------
+subroutine outfld_1proc_all_cnst( qcoltend, pcols, ntend, itend, lout, &
+                                  cnst_name, tendname_suffix, &
+                                  mwdry, loffset, ncol, lchnk )
+
+  use cam_history,                 only: outfld, fieldname_len
+  use chem_mods,                   only: adv_mass
+  use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst
+
+  integer, intent(in)    :: pcols
+  integer, intent(in)    :: ntend
+  real(wp),intent(inout) :: qcoltend(pcols,ncnst,ntend)
+
+  integer, intent(in)    :: itend
+  logical, intent(in)    :: lout(ncnst,ntend)
+
+  character(len=*),intent(in) :: cnst_name(:)
+  character(len=*),intent(in) :: tendname_suffix(:)
+
+  real(wp),intent(in)    :: mwdry
+  integer, intent(in)    :: loffset
+  integer, intent(in)    :: ncol
+  integer, intent(in)    :: lchnk
+
+  integer :: icnst
+  character(len=fieldname_len+3) :: fieldname
+
+  do icnst = 1,ncnst
+    if ( lout(icnst,itend) .and. (itend>0) ) then
+
+       ! Convert unit
+       qcoltend(1:ncol,icnst,itend) = qcoltend(1:ncol,icnst,itend)* (adv_mass(icnst)/mwdry)
+
+       ! Send to history output
+       fieldname = trim(cnst_name(icnst+loffset))//tendname_suffix(itend)
+       call outfld( fieldname, qcoltend(1:ncol,icnst,itend), ncol, lchnk )
+
+    end if
+  end do ! icnst
+
+end subroutine outfld_1proc_all_cnst
 
 end module modal_aero_amicphys_diags
