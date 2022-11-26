@@ -78,7 +78,6 @@ use modal_aero_data,   only:  &
     lmassptr_amode, lmassptrcw_amode, lptr2_soa_g_amode, &
     nspec_amode, &
     numptr_amode, numptrcw_amode, ntot_amode
-use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
 
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
                                       , set_subarea_gases_and_aerosols &
@@ -190,13 +189,12 @@ implicit none
    integer :: itmpa, itmpb, itmpc, itmpd
    integer :: iqtend, iqqcwtend
    integer :: iaer, igas
-   integer :: j, jac, jsoa, jsub
+   integer :: j, jsoa, jsub
    integer :: jclea, jcldy
    integer :: k
    integer :: l
-   integer :: lun, lund
-   integer :: m
-   integer :: n, niter, niter_max, ntot_soamode
+ ! integer :: m
+ ! integer :: n
    integer :: nsubarea, ncldy_subarea
 
    logical :: do_cond, do_rename, do_newnuc, do_coag
@@ -220,9 +218,6 @@ implicit none
       real(r8) :: qv_sat(pcols,pver)
       real(r8) :: relhumgcm, relhumsub(maxsubarea)
       real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
-      real(r8) :: tmpa, tmpb, tmpc
-      real(r8) :: tmp_kxt, tmp_kxt2, tmp_pxt, tmp_pok
-      real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
       real(r8) :: wetdens(max_mode)
 
 
@@ -261,7 +256,6 @@ implicit none
 
       logical :: lcopy(gas_pcnst)
 
-      adjust_factor_pbl_ratenucl = newnuc_adjust_factor_pbl
 
 #if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
@@ -294,7 +288,7 @@ implicit none
       if (.not.do_newnuc) do_q_coltendaa(:,iqtend_nnuc) = .false.
       if (.not.do_coag)   do_q_coltendaa(:,iqtend_coag) = .false.
 
-! get saturation mixing ratio
+      ! get saturation mixing ratio
       call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
 main_k_loop: do k = top_lev, pver
@@ -381,13 +375,11 @@ main_i_loop: do i = 1, ncol
 
       misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(i,k)
 
-      lund = iulog  ! for cambox, iulog=93 at this point
-
       call mam_amicphys_1gridcell(                &
          do_cond,             do_rename,          &
          do_newnuc,           do_coag,            &
          nstep,    lchnk,     i,         k,       &
-         latndx(i),           lonndx(i), lund,    &
+         latndx(i),           lonndx(i), iulog,   &
          loffset,  deltat,                        &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,      afracsub,           &
