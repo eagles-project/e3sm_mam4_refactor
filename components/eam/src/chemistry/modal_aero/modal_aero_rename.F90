@@ -507,8 +507,9 @@ contains
        qnum_cur, qnumcw_cur, v2nhi, v2nlo,                                 & !input
        bef_grwth_dryvol, bef_grwth_dryvolbnd, bef_grwth_numbnd)              !output
 
-    !Compute before growth dry volume and number
+    use mam_support, only: min_max_bound
 
+    !Compute before growth dry volume and number
     implicit none
 
     logical,  intent(in) :: iscldy       !TRUE, if a cell has cloud
@@ -655,19 +656,4 @@ contains
     enddo
 
   end subroutine do_num_and_mass_transfer
-
-  !----------------------------------------------------------------------
-  !----------------------------------------------------------------------
-  pure function min_max_bound(minlim, maxlim, input) result(bounded)
-
-    !Bound a quantity between a min limit and a max limit
-    real(r8), intent(in) :: minlim, maxlim
-    real(r8), intent(in) :: input
-
-    !return value
-    real(r8) :: bounded
-
-    bounded = max(min(maxlim, input), minlim)
-
-  end function min_max_bound
 end module modal_aero_rename
