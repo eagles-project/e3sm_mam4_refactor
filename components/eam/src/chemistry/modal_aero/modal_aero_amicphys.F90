@@ -1,48 +1,23 @@
 #define CAM_VERSION_IS_ACME
 
-
+module modal_aero_amicphys
 !----------------------------------------------------------------------
-!----------------------------------------------------------------------
-!BOP
-!
-! !MODULE: modal_aero_amicphys --- does modal aerosol gas-aerosol exchange
-!
-! !INTERFACE:
-   module modal_aero_amicphys
+! MODULE: modal_aero_amicphys --- does modal aerosol gas-aerosol exchange
 
-! !USES:
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
 
-
   implicit none
   private
-
-! !PUBLIC MEMBER FUNCTIONS:
   public modal_aero_amicphys_intr, modal_aero_amicphys_init
 
-! !DESCRIPTION: This module implements ...
-!
 ! !REVISION HISTORY:
-!
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
-!
-!EOP
-!----------------------------------------------------------------------
-!BOC
-
-! list private module data here
-
-!EOC
 !----------------------------------------------------------------------
 
+contains
 
-  contains
-
-
-!--------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------
 subroutine modal_aero_amicphys_intr(                             &
                         mdo_gasaerexch,     mdo_rename,          &
                         mdo_newnuc,         mdo_coag,            &
@@ -62,9 +37,25 @@ subroutine modal_aero_amicphys_intr(                             &
                         dgncur_a,           dgncur_awet,         &
                         wetdens_host,                            &
                         qaerwat                                  )
+!----------------------------------------------------------------------
+! !DESCRIPTION:
+! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
+!    gas-aerosol exchange (condensation/evaporation)
+!    growth from smaller to larger modes (renaming) due to both
+!       condensation and cloud chemistry
+!    new particle nucleation
+!    coagulation
+!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
+!       due to condensation and coagulation
+!
+! the incoming mixing ratios (q and qqcw) are updated before output
+!
+! !REVISION HISTORY:
+!   RCE 07.04.13:  Adapted from earlier version of CAM5 modal aerosol routines
+!                  for these processes
+!
+!----------------------------------------------------------------------
 
-
-! !USES:
 use shr_kind_mod,      only:  r8 => shr_kind_r8
 use cam_history,       only:  outfld, fieldname_len
 use chem_mods,         only:  adv_mass
@@ -124,6 +115,7 @@ implicit none
    real(r8), intent(in)    :: q_pregaschem(ncol,pver,gas_pcnst)    ! q TMRs    before gas-phase chemistry
    real(r8), intent(in)    :: q_precldchem(ncol,pver,gas_pcnst)    ! q TMRs    before cloud chemistry
    real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,gas_pcnst) ! qqcw TMRs before cloud chemistry
+
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
    real(r8), intent(inout) :: q_tendbb(ncol,pver,gas_pcnst,nqtendbb)    ! TMR tendencies for box-model diagnostic output
    real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,gas_pcnst,nqqcwtendbb)
@@ -140,55 +132,23 @@ implicit none
    real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode) ! wet geo. mean diameter [m] of number distrib.
    real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode) ! interstitial aerosol wet density [kg/m3]
    real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio [kg/kg, NOT mol/mol]
-!----
-!----
 
-! !DESCRIPTION:
-! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
-!    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to both
-!       condensation and cloud chemistry
-!    new particle nucleation
-!    coagulation
-!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
-!       due to condensation and coagulation
-!
-! the incoming mixing ratios (q and qqcw) are updated before output
-!
-! !REVISION HISTORY:
-!   RCE 07.04.13:  Adapted from earlier version of CAM5 modal aerosol routines
-!                  for these processes
-!
-!EOP
-!----------------------------------------------------------------------
-!BOC
+   !----
+   ! local variables
+   !----
+   ! Variables for grid cell mean values
 
-! local variables
-   integer, parameter :: ldiag1=-1, ldiag2=-1, ldiag3=-1, ldiag4=-1
-   integer, parameter :: method_soa = 2
-!     method_soa=0 is no uptake
-!     method_soa=1 is irreversible uptake done like h2so4 uptake
-!     method_soa=2 is reversible uptake using subr modal_aero_soaexch
+   real(r8) :: relhumgcm                   
+   real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
+   real(r8) :: ev_sat(pcols,pver)
+   real(r8) :: qv_sat(pcols,pver)
+   real(r8) :: wetdens(max_mode)
 
-   integer :: ipass, iq
-   integer :: itmpa, itmpb, itmpc, itmpd
-   integer :: iqtend, iqqcwtend
-   integer :: iaer, igas
-
-   ! Loop indices
-
-   integer :: ii, kk ! grid column and vertical level
-   integer :: icnst  ! constituent (tracer) 
-   integer :: imode  ! lognormal mode
-   integer :: jsub   ! subarea
-   integer :: jsoa   ! soa species
-
-   integer  :: jclea, jcldy
-   real(r8) :: fclea, fcldy
-   integer  :: nsubarea, ncldy_subarea
-   real(r8) :: afracsub(maxsubarea)
-   real(r8) :: relhumgcm, relhumsub(maxsubarea)
-   logical  :: lcopy(gas_pcnst)
+   ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
+   !    N=1 - before gas-phase chemistry
+   !    N=2 - before cloud chemistry
+   !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
+   !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
 
    real(r8) :: qgcm1   (gas_pcnst)
 
@@ -196,50 +156,63 @@ implicit none
    real(r8) :: qqcwgcm2(gas_pcnst)
 
    real(r8) :: qgcm3   (gas_pcnst)
+   real(r8) :: qqcwgcm3(gas_pcnst)
+   real(r8) :: qaerwatgcm3(ntot_amode_extd) 
+
+   real(r8) :: qgcm4   (gas_pcnst)
+   real(r8) :: qqcwgcm4(gas_pcnst)
+   real(r8) :: qaerwatgcm4(ntot_amode_extd)   ! aerosol water mixing ratios (mol/mol)
+
+   ! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
+   !    currently there are just clear and cloudy sub-areas
+   !    the N=1:4 have same meanings as for qgcmN
+
+   real(r8), dimension(gas_pcnst,maxsubarea) :: qsub1, qsub2,    qsub3,       qsub4
+   real(r8), dimension(gas_pcnst,maxsubarea) ::        qqcwsub2, qqcwsub3,    qqcwsub4
+   real(r8), dimension(ntot_amode_extd,maxsubarea) ::            qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+
+   ! Loop indices
+
+   integer :: ii, kk ! grid column and vertical level
+   integer :: icnst  ! constituent (tracer) 
+   integer :: imode  ! lognormal mode
+   integer :: jsoa   ! soa species
+
+   ! Variables related to subareas
+
+   integer  :: jsub                 ! loop index for subarea
+   integer  :: jclea, jcldy         ! index of clear and cloudy subareas
+   real(r8) :: fclea, fcldy         ! area fraction [unitless] of clear and cloudy subareas
+   real(r8) :: afracsub(maxsubarea) ! area fraction [unitless] of each subarea
+   integer  :: nsubarea             ! # of active subareas in this grid cell
+   integer  :: ncldy_subarea        ! # of cloudy subareas in this grid cell
+   logical  :: iscldy_subarea(maxsubarea)  ! whether a subarea is cloudy
+   real(r8) :: relhumsub(maxsubarea)       ! relative humidity in subareas
+
+   ! misc
 
    logical :: do_cond, do_rename, do_newnuc, do_coag
-   logical :: iscldy_subarea(maxsubarea)
+   logical :: lcopy(gas_pcnst)
 
    character(len=fieldname_len+3) :: fieldname
    character(len=200) :: tmp_str
 
    real (r8) :: pdel_fac
 
-!----------------------------------------------------------------------
-   logical   :: history_aerocom    ! Output the aerocom history
-!-----------------------------------------------------------------------
-
-      real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
-      real(r8) :: ev_sat(pcols,pver)
-      real(r8) :: nufine_3dtend_nnuc(pcols,pver)
-      real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
-      real(r8) :: qv_sat(pcols,pver)
-      real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
-      real(r8) :: wetdens(max_mode)
+   integer :: ipass, iq
+   integer :: itmpa, itmpb, itmpc, itmpd
+   integer :: iqtend, iqqcwtend
 
 
-! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
-!    N=1 - before gas-phase chemistry
-!    N=2 - before cloud chemistry
-!    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
-!    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
+   real(r8) :: nufine_3dtend_nnuc(pcols,pver)
+   real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
+   real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
 
+   real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
+   real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
 
-      real(r8), dimension( 1:gas_pcnst ) :: qgcm4
-      real(r8), dimension( 1:gas_pcnst ) :: qqcwgcm3, qqcwgcm4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
-      real(r8), dimension( 1:ntot_amode_extd ) :: &
-         qaerwatgcm3, qaerwatgcm4   ! aerosol water mixing ratios (mol/mol)
-
-! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
-!    currently there are just clear and cloudy sub-areas
-!    the N=1:4 have same meanings as for qgcmN
-      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub1, qsub2, qsub3, qsub4
-      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qqcwsub2, qqcwsub3, qqcwsub4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: qqcwsub_tendaa
-      real(r8), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+   real(r8), dimension(gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
+   real(r8), dimension(gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: qqcwsub_tendaa
 
 ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
 !    for different processes, which are output to history
@@ -249,13 +222,6 @@ implicit none
       real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) ::  qqcw_coltendaa
 
       type ( misc_vars_aa_type ) :: misc_vars_aa
-
-
-#if ( defined CAM_VERSION_IS_ACME )
-      history_aerocom = .false.
-#else
-      call phys_getopts( history_aerocom_out        = history_aerocom )
-#endif
 
       do_cond   = ( mdo_gasaerexch > 0 )
       do_rename = ( mdo_rename > 0 )
@@ -416,26 +382,29 @@ main_i_loop: do ii = 1, ncol
          qaerwat(ii,kk,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
       end if
 
-!------------------------------
+      !================================================================
+      ! Budget diagnostics
+      !================================================================
       if (nsubarea == 1) then
          qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
       else
          qgcm_tendaa(:,:) = 0.0_r8
-         do j = 1, nsubarea
-            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) + qsub_tendaa(:,:,j)*afracsub(j)
+         do jsub = 1, nsubarea
+            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) &
+                             + qsub_tendaa(:,:,jsub)*afracsub(jsub)
          end do
       end if
 
-!----
       if (ncldy_subarea <= 0) then
          qqcwgcm_tendaa(:,:) = 0.0_r8
       else if (nsubarea == 1) then
          qqcwgcm_tendaa(:,:) = qqcwsub_tendaa(:,:,1)
       else
          qqcwgcm_tendaa(:,:) = 0.0_r8
-         do j = 1, nsubarea
-            if ( .not. iscldy_subarea(j) ) cycle
-            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) + qqcwsub_tendaa(:,:,j)*afracsub(j)
+         do jsub = 1, nsubarea
+            if ( .not. iscldy_subarea(jsub) ) cycle
+            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) &
+                                + qqcwsub_tendaa(:,:,jsub)*afracsub(jsub)
          end do
       end if
 
@@ -465,20 +434,6 @@ main_i_loop: do ii = 1, ncol
          end if
       end do ! icnst
       end do ! iqtend
-
-      if ( history_aerocom ) then
-         ! 3d soa tendency for aerocom
-         ! note that flux units (kg/m2/s) are used here instead of tendency units (kg/kg/s or kg/m3/s)
-         do jsoa = 1, nsoa
-            icnst = lptr2_soa_g_amode(jsoa) - loffset
-            soag_3dtend_cond(ii,kk,jsoa) = qgcm_tendaa(icnst,iqtend_cond)*(adv_mass(icnst)/mwdry)*(pdel(ii,kk)/gravit)
-         end do
-         ! 3d number nucleation tendency for aerocom - units are (#/m3/s)
-         ! so multiply qgcm_tendaa (#/kmol/s) by air molar density (kmol/m3)
-         icnst = numptr_amode(nait) - loffset
-         nufine_3dtend_nnuc(ii,kk) = qgcm_tendaa(icnst,iqtend_nnuc) * (pmid(ii,kk)/(r_universal*t(ii,kk)))
-      end if
-
 
       ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
@@ -520,20 +475,7 @@ main_i_loop: do ii = 1, ncol
                   call outfld( fieldname, qqcw_coltendaa(1:ncol,icnst,iqqcwtend), ncol, lchnk )
                end if
             end do ! iqqcwtend
-         end do ! l
-
-         if ( ipass==1 .and. history_aerocom ) then
-            do jsoa = 1, nsoa
-               icnst = lptr2_soa_g_amode(jsoa)
-               fieldname = trim(cnst_name(icnst)) // '_sfgaex3d'
-               call outfld( fieldname, soag_3dtend_cond(1:ncol,:,jsoa), ncol, lchnk )
-            end do
-            icnst = numptr_amode(nait)
-            fieldname = trim(cnst_name(icnst)) // '_nuc1'
-            call outfld( fieldname, nufine_3dtend_nnuc(1:ncol,:), ncol, lchnk )
-            fieldname = trim(cnst_name(icnst)) // '_nuc2'
-            call outfld( fieldname, ncluster_3dtend_nnuc(1:ncol,:), ncol, lchnk )
-         end if
+         end do ! icnst
 
       end do ! ipass
 
