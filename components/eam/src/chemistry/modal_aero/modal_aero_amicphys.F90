@@ -89,7 +89,8 @@ use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
                                        suffix_q_coltendaa, suffix_qqcw_coltendaa
 
 use modal_aero_amicphys_diags, only: amicphys_diags_init &
-                                   , get_gcm_tend_diags_from_subareas
+                                   , get_gcm_tend_diags_from_subareas &
+                                   , accumulate_column_tend_integrals
 
 implicit none
 
@@ -200,8 +201,6 @@ implicit none
    character(len=fieldname_len+3) :: fieldname
    character(len=200) :: tmp_str
 
-   real (r8) :: pdel_fac
-
    integer :: ipass, iq
    integer :: itmpa, itmpb, itmpc, itmpd
    integer :: iqtend, iqqcwtend
@@ -215,32 +214,36 @@ implicit none
    real(r8), dimension(gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
    real(r8), dimension(gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: qqcwsub_tendaa
 
-! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
-!    for different processes, which are output to history
-! the processes are condensation/evaporation (and associated aging),
-!    renaming, coagulation, and nucleation
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) ::  q_coltendaa
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) ::  qqcw_coltendaa
+   ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
+   !    for different processes, which are output to history
+   ! the processes are condensation/evaporation (and associated aging),
+   !    renaming, coagulation, and nucleation
 
-      type ( misc_vars_aa_type ) :: misc_vars_aa
+   real(r8), dimension(pcols,gas_pcnst,   nqtendaa) ::     q_coltendaa
+   real(r8), dimension(pcols,gas_pcnst,nqqcwtendaa) ::  qqcw_coltendaa
 
-      do_cond   = ( mdo_gasaerexch > 0 )
-      do_rename = ( mdo_rename > 0 )
-      do_newnuc = ( mdo_newnuc > 0 )
-      do_coag   = ( mdo_coag > 0 )
+   type ( misc_vars_aa_type ) :: misc_vars_aa
 
-      !====================================================
-      ! Initialization for budget diagnostics
-      !====================================================
-      q_coltendaa = 0.0_r8 ; qqcw_coltendaa = 0.0_r8
-      ncluster_3dtend_nnuc = 0.0_r8
+   do_cond   = ( mdo_gasaerexch > 0 )
+   do_rename = ( mdo_rename > 0 )
+   do_newnuc = ( mdo_newnuc > 0 )
+   do_coag   = ( mdo_coag > 0 )
+
+   !====================================================
+   ! Initialization for budget diagnostics
+   !====================================================
+   ncluster_3dtend_nnuc = 0.0_r8
+
+   ! Column integrals need to be initialized with zeros
+      q_coltendaa = 0.0_r8 
+   qqcw_coltendaa = 0.0_r8
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
 ! these variables otherwise undefined
-      q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
+   q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
 #endif
 
-      call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
+   call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
    !====================================================
    ! get saturation mixing ratio
@@ -394,24 +397,9 @@ implicit none
       if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(ii,kk,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
 #endif
 
-
-
-
-
-! increment column tendencies
-      pdel_fac = pdel(ii,kk)/gravit
-      do iqtend = 1, nqtendaa
-      do icnst = 1, gas_pcnst
-         if ( do_q_coltendaa(icnst,iqtend) ) then
-            q_coltendaa(ii,icnst,iqtend) = q_coltendaa(ii,icnst,iqtend) + qgcm_tendaa(icnst,iqtend)*pdel_fac
-         end if
-         if (iqtend <= nqqcwtendaa) then
-         if ( do_qqcw_coltendaa(icnst,iqtend) ) then
-            qqcw_coltendaa(ii,icnst,iqtend) = qqcw_coltendaa(ii,icnst,iqtend) + qqcwgcm_tendaa(icnst,iqtend)*pdel_fac
-         end if
-         end if
-      end do ! icnst
-      end do ! iqtend
+      call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
+                                             qgcm_tendaa,         qqcwgcm_tendaa,         &! in
+                                             q_coltendaa(ii,:,:), qqcw_coltendaa(ii,:,:)  )! inout
 
       ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
