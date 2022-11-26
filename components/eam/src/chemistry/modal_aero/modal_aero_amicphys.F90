@@ -79,18 +79,21 @@ use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
                                        maxsubarea, top_lev, &
                                        update_qaerwat, &
                                        ntot_amode_extd, max_mode, nait, nsoa, &
-                                       misc_vars_aa_type, &
-                                       newnuc_adjust_factor_pbl, &
-                                       nqtendaa, nqqcwtendaa, &
-                                       do_q_coltendaa, do_qqcw_coltendaa, iqtend_cond, &
-                                       iqtend_rnam, iqqcwtend_rnam, &
-                                       iqtend_nnuc, &
-                                       iqtend_coag, &
+                                       misc_vars_aa_type
+
+! For output of diagnostics
+use modal_aero_amicphys_control, only: nqtendaa, nqqcwtendaa, &
+                                       do_q_coltendaa, do_qqcw_coltendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam,  &
                                        suffix_q_coltendaa, suffix_qqcw_coltendaa
 
+! For diagnostics
 use modal_aero_amicphys_diags, only: amicphys_diags_init &
                                    , get_gcm_tend_diags_from_subareas &
-                                   , accumulate_column_tend_integrals
+                                   , accumulate_column_tend_integrals &
+                                   , outfld_1proc_all_cnst
 
 implicit none
 
@@ -137,9 +140,9 @@ implicit none
    real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode) ! interstitial aerosol wet density [kg/m3]
    real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio [kg/kg, NOT mol/mol]
 
-   !----
+   !---------------------
    ! local variables
-   !----
+   !---------------------
    ! Variables for grid cell mean values
 
    real(r8) :: relhumgcm                   
@@ -148,6 +151,7 @@ implicit none
    real(r8) :: qv_sat(pcols,pver)
    real(r8) :: wetdens(max_mode)
 
+   ! Constituent (tracer) mixing ratios.
    ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
    !    N=1 - before gas-phase chemistry
    !    N=2 - before cloud chemistry
@@ -198,16 +202,12 @@ implicit none
    logical :: do_cond, do_rename, do_newnuc, do_coag
    logical :: lcopy(gas_pcnst)
 
-   character(len=fieldname_len+3) :: fieldname
-   character(len=200) :: tmp_str
-
-   integer :: ipass, iq
-   integer :: itmpa, itmpb, itmpc, itmpd
-   integer :: iqtend, iqqcwtend
-
-
+   type ( misc_vars_aa_type ) :: misc_vars_aa
    real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
 
+   !----------------------------
+   ! For diagnostics
+   !----------------------------
    real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
    real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
 
@@ -221,8 +221,7 @@ implicit none
 
    real(r8), dimension(pcols,gas_pcnst,   nqtendaa) ::     q_coltendaa
    real(r8), dimension(pcols,gas_pcnst,nqqcwtendaa) ::  qqcw_coltendaa
-
-   type ( misc_vars_aa_type ) :: misc_vars_aa
+   !------------------------------------------------------------------
 
    do_cond   = ( mdo_gasaerexch > 0 )
    do_rename = ( mdo_rename > 0 )
@@ -246,7 +245,7 @@ implicit none
    call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
    !====================================================
-   ! get saturation mixing ratio
+   ! Get saturation mixing ratio
    !====================================================
    call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
@@ -312,7 +311,7 @@ implicit none
       !================================================================================
       ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
       !================================================================================
-      ! Initialize mixing ratios
+      ! Initialize mixing ratios in all subareas
 
             qsub4(:,:) = 0.0_r8
          qqcwsub4(:,:) = 0.0_r8
@@ -352,9 +351,9 @@ implicit none
          qsub_tendaa, qqcwsub_tendaa,             &
          misc_vars_aa                             )
 
-      !================================================================
-      ! form new grid cell mean mixing ratios
-      !================================================================
+      !=================================================================================================
+      ! Aerosol microphysics calculations done for all subareas. Form new grid cell mean mixing ratios.
+      !=================================================================================================
       ! Gases and aerosols
       !----------------------
       call form_gcm_of_gases_and_aerosols_from_subareas( &
@@ -362,7 +361,7 @@ implicit none
          qsub4, qqcwsub4, qqcwgcm3,                      &! in
          qgcm4, qqcwgcm4                                 )! out
 
-      ! Clip negative values and copy to output array
+      ! Clip negative values and copy grid cell mean to output array
 
       lcopy(:) = lmapcc_all(:) > 0
       call copy_cnst( qgcm4, q(ii,kk,:), lcopy ) !from, to, flag
@@ -382,12 +381,11 @@ implicit none
       end if
 
       !================================================================
-      ! Budget diagnostics
+      ! Process diagnostics of the current grid cell
       !================================================================
       call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
                                              qgcm_tendaa, qqcwgcm_tendaa        )! out 
-
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
       if (iqtend_cond <= nqtendbb) q_tendbb(ii,kk,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
@@ -406,51 +404,24 @@ implicit none
    end do ! main_ii_loop
    end do ! main_kk_loop
 
-!==========================================================
-! output column tendencies to history
-!==========================================================
-! the ordering here is to allow comparison of fort.90 files from box model testing
-!    but is not important for regular cam simulations
-      do ipass = 1, 3
+   !==========================================================
+   ! Output column tendencies to history
+   !==========================================================
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_cond, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_rnam, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_nnuc, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_coag, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
 
-         if (ipass == 1) then
-            itmpa = iqtend_cond ; itmpb = iqtend_rnam
-            itmpc = iqqcwtend_rnam ; itmpd = iqqcwtend_rnam
-         else if (ipass == 2) then
-            itmpa = iqtend_nnuc ; itmpb = iqtend_nnuc
-            itmpc = 0 ; itmpd = 0
-         else
-            itmpa = iqtend_coag ; itmpb = iqtend_coag
-            itmpc = 0 ; itmpd = 0
-         end if
+   call outfld_1proc_all_cnst( qqcw_coltendaa,pcols,nqqcwtendaa, iqqcwtend_rnam,       &
+                               do_qqcw_coltendaa, cnst_name_cw, suffix_qqcw_coltendaa, &
+                               mwdry, loffset, ncol, lchnk                             )
 
-         do icnst = 1, gas_pcnst
-            do iqtend = itmpa, itmpb
-               if (iqtend <= 0) cycle
-               if ( do_q_coltendaa(icnst,iqtend) ) then
-                  q_coltendaa(1:ncol,icnst,iqtend) = q_coltendaa(1:ncol,icnst,iqtend)*(adv_mass(icnst)/mwdry)
-                  fieldname = trim(cnst_name(icnst+loffset)) // suffix_q_coltendaa(iqtend)
-                  call outfld( fieldname, q_coltendaa(1:ncol,icnst,iqtend), ncol, lchnk )
-               end if
-            end do ! iqtend
-            do iqqcwtend = itmpc, itmpd
-               if (iqqcwtend <= 0) cycle
-               if ( do_qqcw_coltendaa(icnst,iqqcwtend) ) then
-                  qqcw_coltendaa(1:ncol,icnst,iqqcwtend) = qqcw_coltendaa(1:ncol,icnst,iqqcwtend)* (adv_mass(icnst)/mwdry)
-                  fieldname = trim(cnst_name_cw(icnst+loffset)) // suffix_qqcw_coltendaa(iqqcwtend)
-                  call outfld( fieldname, qqcw_coltendaa(1:ncol,icnst,iqqcwtend), ncol, lchnk )
-               end if
-            end do ! iqqcwtend
-         end do ! icnst
-
-      end do ! ipass
-
-      end subroutine modal_aero_amicphys_intr
+end subroutine modal_aero_amicphys_intr
 
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-      subroutine mam_amicphys_1gridcell(          &
+subroutine mam_amicphys_1gridcell(          &
          do_cond,            do_rename,           &
          do_newnuc,          do_coag,             &
          nstep,    lchnk,    i,        k,         &
