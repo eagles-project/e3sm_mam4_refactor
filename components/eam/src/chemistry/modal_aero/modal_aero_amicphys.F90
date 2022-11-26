@@ -56,7 +56,7 @@ subroutine modal_aero_amicphys_intr(                             &
 !
 !----------------------------------------------------------------------
 
-use shr_kind_mod,      only:  r8 => shr_kind_r8
+use modal_aero_amicphys_control, only: r8
 use cam_history,       only:  outfld, fieldname_len
 use chem_mods,         only:  adv_mass
 use constituents,      only:  cnst_name
@@ -87,6 +87,8 @@ use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
                                        iqtend_nnuc, &
                                        iqtend_coag, &
                                        suffix_q_coltendaa, suffix_qqcw_coltendaa
+
+use modal_aero_amicphys_diags, only: amicphys_diags_init
 
 implicit none
 
@@ -204,9 +206,7 @@ implicit none
    integer :: iqtend, iqqcwtend
 
 
-   real(r8) :: nufine_3dtend_nnuc(pcols,pver)
    real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
-   real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
 
    real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
    real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
@@ -228,31 +228,26 @@ implicit none
       do_newnuc = ( mdo_newnuc > 0 )
       do_coag   = ( mdo_coag > 0 )
 
+      !====================================================
+      ! Initialization for budget diagnostics
+      !====================================================
       q_coltendaa = 0.0_r8 ; qqcw_coltendaa = 0.0_r8
-      nufine_3dtend_nnuc = 0.0_r8
       ncluster_3dtend_nnuc = 0.0_r8
-      soag_3dtend_cond = 0.0_r8
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
 ! these variables otherwise undefined
       q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
 #endif
 
+      call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
-! turn off history selectively for comparison with dd06f
-      if ( (.not. do_cond) .and. (.not. do_rename) ) then
-         do_q_coltendaa(:,iqtend_cond) = .false.
-         do_q_coltendaa(:,iqtend_rnam) = .false.
-         do_qqcw_coltendaa(:,iqqcwtend_rnam) = .false.
-      end if
-      if (.not.do_newnuc) do_q_coltendaa(:,iqtend_nnuc) = .false.
-      if (.not.do_coag)   do_q_coltendaa(:,iqtend_coag) = .false.
+   !====================================================
+   ! get saturation mixing ratio
+   !====================================================
+   call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
-      ! get saturation mixing ratio
-      call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
-
-main_k_loop: do kk = top_lev, pver
-main_i_loop: do ii = 1, ncol
+   do kk = top_lev, pver
+   do ii = 1, ncol
 
       !=========================================================================
       ! Construct cloudy and clear (cloud-free) subareas within each grid cell
@@ -437,12 +432,12 @@ main_i_loop: do ii = 1, ncol
 
       ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
-      end do main_i_loop
+   end do ! main_ii_loop
+   end do ! main_ki_loop
 
-      end do main_k_loop
-
-
+!==========================================================
 ! output column tendencies to history
+!==========================================================
 ! the ordering here is to allow comparison of fort.90 files from box model testing
 !    but is not important for regular cam simulations
       do ipass = 1, 3
