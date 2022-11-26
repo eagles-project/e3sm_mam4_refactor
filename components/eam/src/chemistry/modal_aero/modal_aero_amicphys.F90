@@ -186,7 +186,7 @@ implicit none
 !     method_soa=1 is irreversible uptake done like h2so4 uptake
 !     method_soa=2 is reversible uptake using subr modal_aero_soaexch
 
-   integer :: i, icol_diag, ipass, iq
+   integer :: i, ipass, iq
    integer :: itmpa, itmpb, itmpc, itmpd
    integer :: iqtend, iqqcwtend
    integer :: iaer, igas
@@ -256,12 +256,6 @@ implicit none
       real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) ::  q_coltendaa
       real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) ::  qqcw_coltendaa
 
-#if ( defined( MOSAIC_SPECIES ) )
-      real(r8) :: cnvrg_fail(pcols,pver) !BSINGH -  For tracking MOSAIC convergence failures
-      real(r8) :: max_kelvin_iter(pcols,pver)  !BSINGH -  For tracking when max is hit for kelvin iterations
-      real(r8) :: xnerr_astem_negative(pcols,pver,5,4)
-#endif
-
       type ( misc_vars_aa_type ) :: misc_vars_aa
 
 
@@ -274,17 +268,6 @@ implicit none
 #else
       call phys_getopts( history_aerocom_out        = history_aerocom )
 #endif
-
-
-      icol_diag = -1
-      if (ldiag1 > 0) then
-      if (nstep < 3) then
-         do i = 1, ncol
-!           if ((latndx(i) == 23) .and. (lonndx(i) == 37)) icol_diag = i
-            if ((latndx(i) == 47) .and. (lonndx(i) ==121)) icol_diag = i  ! amazon
-         end do
-      end if
-      end if
 
       do_cond   = ( mdo_gasaerexch > 0 )
       do_rename = ( mdo_rename > 0 )
@@ -301,11 +284,6 @@ implicit none
       q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
 #endif
 
-#if ( defined( MOSAIC_SPECIES ) )
-      cnvrg_fail(1:pcols,1:pver) = 0.0_r8
-      max_kelvin_iter(1:pcols,1:pver)  = 0.0_r8
-      xnerr_astem_negative(1:pcols,1:pver,1:5,1:4) = 0.0_r8
-#endif
 
 ! turn off history selectively for comparison with dd06f
       if ( (.not. do_cond) .and. (.not. do_rename) ) then
@@ -402,11 +380,6 @@ main_i_loop: do i = 1, ncol
       end do
 
       misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(i,k)
-#if ( defined ( MOSAIC_SPECIES ) )
-      misc_vars_aa%cnvrg_fail_1grid = cnvrg_fail(i,k)
-      misc_vars_aa%max_kelvin_iter_1grid = max_kelvin_iter(i,k)
-      misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = xnerr_astem_negative(pcols,pver,1:5,1:4)
-#endif
 
       lund = iulog  ! for cambox, iulog=93 at this point
 
@@ -479,6 +452,7 @@ main_i_loop: do i = 1, ncol
             qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) + qqcwsub_tendaa(:,:,j)*afracsub(j)
          end do
       end if
+
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
       if (iqtend_cond <= nqtendbb) q_tendbb(i,k,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
       if (iqtend_rnam <= nqtendbb) q_tendbb(i,k,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
@@ -521,11 +495,6 @@ main_i_loop: do i = 1, ncol
 
 
       ncluster_3dtend_nnuc(i,k) = misc_vars_aa%ncluster_tend_nnuc_1grid
-#if ( defined ( MOSAIC_SPECIES ) )
-      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid
-      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid
-      xnerr_astem_negative(pcols,pver,1:5,1:4) = misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4)
-#endif
 
       end do main_i_loop
 
@@ -582,24 +551,6 @@ main_i_loop: do i = 1, ncol
 
       end do ! ipass
 
-#if ( defined( MOSAIC_SPECIES ) )
-      if ( mosaic ) then
-         !BSINGH - output MOSAIC convergence fail tracking:
-         call outfld( 'convergence_fail', cnvrg_fail(1:ncol,:), ncol, lchnk )
-         call outfld( 'max_kelvin_iter' , max_kelvin_iter(1:ncol,:),  ncol, lchnk )
-
-         do n = 1, 4
-         do m = 1, 5
-            fieldname = ' '
-            write( fieldname(1:16), '(a,i1,a,i1)') 'astem_negval_', m, '_', n
-            call outfld( fieldname, xnerr_astem_negative(1:ncol,1:pver,m,n), ncol, lchnk )
-         end do
-         end do
-      end if
-#endif
-
-      return
-!EOC
       end subroutine modal_aero_amicphys_intr
 
 
