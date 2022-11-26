@@ -136,26 +136,11 @@ implicit none
    real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth (m)
    real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity (kg/kg)
    real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction (-) *** NOTE ncol dimension
-   real(r8), intent(inout) :: dgncur_a(pcols,pver,ntot_amode)
-   real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode)
-                                 ! dry & wet geo. mean dia. (m) of number distrib.
-   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode)
-                                 ! interstitial aerosol wet density (kg/m3)
-   real(r8), intent(inout), optional :: &
-                              qaerwat(pcols,pver,ntot_amode)
-                                 ! aerosol water mixing ratio (kg/kg, NOT mol/mol)
+   real(r8), intent(inout) :: dgncur_a   (pcols,pver,ntot_amode) ! dry geo. mean diameter [m] of number distrib.
+   real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode) ! wet geo. mean diameter [m] of number distrib.
+   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode) ! interstitial aerosol wet density [kg/m3]
+   real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio [kg/kg, NOT mol/mol]
 !----
-  real(r8) :: fclea, fcldy
-
-  integer :: icnst
-
-  real(r8) :: qgcm1(gas_pcnst)
-
-  real(r8) :: qgcm2   (gas_pcnst)
-  real(r8) :: qqcwgcm2(gas_pcnst)
-
-  real(r8) :: qgcm3   (gas_pcnst)
-
 !----
 
 ! !DESCRIPTION:
@@ -185,23 +170,37 @@ implicit none
 !     method_soa=1 is irreversible uptake done like h2so4 uptake
 !     method_soa=2 is reversible uptake using subr modal_aero_soaexch
 
-   integer :: i, ipass, iq
+   integer :: ipass, iq
    integer :: itmpa, itmpb, itmpc, itmpd
    integer :: iqtend, iqqcwtend
    integer :: iaer, igas
-   integer :: j, jsoa, jsub
-   integer :: jclea, jcldy
-   integer :: k
-   integer :: l
- ! integer :: m
- ! integer :: n
-   integer :: nsubarea, ncldy_subarea
+
+   ! Loop indices
+
+   integer :: ii, kk ! grid column and vertical level
+   integer :: icnst  ! constituent (tracer) 
+   integer :: imode  ! lognormal mode
+   integer :: jsub   ! subarea
+   integer :: jsoa   ! soa species
+
+   integer  :: jclea, jcldy
+   real(r8) :: fclea, fcldy
+   integer  :: nsubarea, ncldy_subarea
+   real(r8) :: afracsub(maxsubarea)
+   real(r8) :: relhumgcm, relhumsub(maxsubarea)
+   logical  :: lcopy(gas_pcnst)
+
+   real(r8) :: qgcm1   (gas_pcnst)
+
+   real(r8) :: qgcm2   (gas_pcnst)
+   real(r8) :: qqcwgcm2(gas_pcnst)
+
+   real(r8) :: qgcm3   (gas_pcnst)
 
    logical :: do_cond, do_rename, do_newnuc, do_coag
    logical :: iscldy_subarea(maxsubarea)
 
    character(len=fieldname_len+3) :: fieldname
-   character(len=6)   :: tmpch6a, tmpch6c
    character(len=200) :: tmp_str
 
    real (r8) :: pdel_fac
@@ -210,13 +209,11 @@ implicit none
    logical   :: history_aerocom    ! Output the aerocom history
 !-----------------------------------------------------------------------
 
-      real(r8) :: afracsub(maxsubarea)
       real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
       real(r8) :: ev_sat(pcols,pver)
       real(r8) :: nufine_3dtend_nnuc(pcols,pver)
       real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
       real(r8) :: qv_sat(pcols,pver)
-      real(r8) :: relhumgcm, relhumsub(maxsubarea)
       real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
       real(r8) :: wetdens(max_mode)
 
@@ -254,9 +251,6 @@ implicit none
       type ( misc_vars_aa_type ) :: misc_vars_aa
 
 
-      logical :: lcopy(gas_pcnst)
-
-
 #if ( defined CAM_VERSION_IS_ACME )
       history_aerocom = .false.
 #else
@@ -291,19 +285,19 @@ implicit none
       ! get saturation mixing ratio
       call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
-main_k_loop: do k = top_lev, pver
-main_i_loop: do i = 1, ncol
+main_k_loop: do kk = top_lev, pver
+main_i_loop: do ii = 1, ncol
 
       !=========================================================================
       ! Construct cloudy and clear (cloud-free) subareas within each grid cell
       !=========================================================================
       ! Define subareas; set RH
       !--------------------------
-      call setup_subareas( cld(i,k),                              &! in
+      call setup_subareas( cld(ii,kk),                              &! in
                            nsubarea, ncldy_subarea, jclea, jcldy, &! out
                            iscldy_subarea, afracsub, fclea, fcldy )! out
 
-      relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
+      relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(ii,kk)/qv_sat(ii,kk) ) )
 
       call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
 
@@ -320,7 +314,7 @@ main_i_loop: do i = 1, ncol
       ! If provided, the grid cell mean values of aerosol water mixing ratios are clipped
       ! and then assigned to all subareas.
 
-         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
+         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(ii,kk,1:ntot_amode) )
          do jsub = 1, nsubarea
             qaerwatsub3(:,jsub) = qaerwatgcm3(:)
          end do
@@ -334,13 +328,13 @@ main_i_loop: do i = 1, ncol
       do icnst = 1,gas_pcnst
 
          ! Gases and interstitial aerosols
-         qgcm1(icnst) = max( 0.0_r8, q_pregaschem(i,k,icnst) )
-         qgcm2(icnst) = max( 0.0_r8, q_precldchem(i,k,icnst) )
-         qgcm3(icnst) = max( 0.0_r8, q(i,k,icnst) )
+         qgcm1(icnst) = max( 0.0_r8, q_pregaschem(ii,kk,icnst) )
+         qgcm2(icnst) = max( 0.0_r8, q_precldchem(ii,kk,icnst) )
+         qgcm3(icnst) = max( 0.0_r8, q(ii,kk,icnst) )
 
          ! Cloud-borne aerosols
-         qqcwgcm2(icnst:) = max( 0.0_r8, qqcw_precldchem(i,k,icnst) )
-         qqcwgcm3(icnst:) = max( 0.0_r8, qqcw(i,k,icnst) )
+         qqcwgcm2(icnst:) = max( 0.0_r8, qqcw_precldchem(ii,kk,icnst) )
+         qqcwgcm3(icnst:) = max( 0.0_r8, qqcw(ii,kk,icnst) )
 
       end do
 
@@ -361,30 +355,30 @@ main_i_loop: do i = 1, ncol
 
       ! Copy aerosol size and density info
 
-      do n = 1, max_mode
-         if (n <= ntot_amode) then
-            dgn_a(n)           = dgncur_a(i,k,n)
-            dgn_awet(n)        = dgncur_awet(i,k,n)
-            wetdens(n)         = max( 1000.0_r8, wetdens_host(i,k,n) )
+      do imode = 1, max_mode
+         if (imode <= ntot_amode) then
+            dgn_a(imode)           = dgncur_a(ii,kk,imode)
+            dgn_awet(imode)        = dgncur_awet(ii,kk,imode)
+            wetdens(imode)         = max( 1000.0_r8, wetdens_host(ii,kk,imode) )
          else
-            dgn_a(n) = 0.0_r8
-            dgn_awet(n) = 0.0_r8
-            wetdens(n) = 1000.0_r8
+            dgn_a(imode) = 0.0_r8
+            dgn_awet(imode) = 0.0_r8
+            wetdens(imode) = 1000.0_r8
          end if
       end do
 
-      misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(i,k)
+      misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(ii,kk)
 
       call mam_amicphys_1gridcell(                &
          do_cond,             do_rename,          &
          do_newnuc,           do_coag,            &
-         nstep,    lchnk,     i,         k,       &
-         latndx(i),           lonndx(i), iulog,   &
+         nstep,    lchnk,     ii,        kk,      &
+         latndx(ii),          lonndx(ii), iulog,  &
          loffset,  deltat,                        &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,      afracsub,           &
-         t(i,k),   pmid(i,k), pdel(i,k),          &
-         zm(i,k),  pblh(i),   relhumsub,          &
+         t(ii,kk),   pmid(ii,kk), pdel(ii,kk),    &
+         zm(ii,kk),  pblh(ii),   relhumsub,       &
          dgn_a,    dgn_awet,  wetdens,            &
          qsub1,                                   &
          qsub2, qqcwsub2,                         &
@@ -406,10 +400,10 @@ main_i_loop: do i = 1, ncol
       ! Clip negative values and copy to output array
 
       lcopy(:) = lmapcc_all(:) > 0
-      call copy_cnst( qgcm4, q(i,k,:), lcopy ) !from, to, flag
+      call copy_cnst( qgcm4, q(ii,kk,:), lcopy ) !from, to, flag
 
       lcopy(:) = lmapcc_all(:) >= lmapcc_val_aer
-      call copy_cnst( qqcwgcm4, qqcw(i,k,:), lcopy ) !from, to, flag
+      call copy_cnst( qqcwgcm4, qqcw(ii,kk,:), lcopy ) !from, to, flag
 
       !----------------------
       ! Aerosol water
@@ -419,7 +413,7 @@ main_i_loop: do i = 1, ncol
 
       if ( update_qaerwat > 0 .and. present( qaerwat ) ) then
          jsub = 1;  if (nsubarea>1) jsub = jclea
-         qaerwat(i,k,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
+         qaerwat(ii,kk,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
       end if
 
 !------------------------------
@@ -446,11 +440,11 @@ main_i_loop: do i = 1, ncol
       end if
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if (iqtend_cond <= nqtendbb) q_tendbb(i,k,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
-      if (iqtend_rnam <= nqtendbb) q_tendbb(i,k,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
-      if (iqtend_nnuc <= nqtendbb) q_tendbb(i,k,:,iqtend_nnuc) = qgcm_tendaa(:,iqtend_nnuc)
-      if (iqtend_coag <= nqtendbb) q_tendbb(i,k,:,iqtend_coag) = qgcm_tendaa(:,iqtend_coag)
-      if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(i,k,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
+      if (iqtend_cond <= nqtendbb) q_tendbb(ii,kk,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
+      if (iqtend_rnam <= nqtendbb) q_tendbb(ii,kk,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
+      if (iqtend_nnuc <= nqtendbb) q_tendbb(ii,kk,:,iqtend_nnuc) = qgcm_tendaa(:,iqtend_nnuc)
+      if (iqtend_coag <= nqtendbb) q_tendbb(ii,kk,:,iqtend_coag) = qgcm_tendaa(:,iqtend_coag)
+      if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(ii,kk,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
 #endif
 
 
@@ -458,35 +452,35 @@ main_i_loop: do i = 1, ncol
 
 
 ! increment column tendencies
-      pdel_fac = pdel(i,k)/gravit
+      pdel_fac = pdel(ii,kk)/gravit
       do iqtend = 1, nqtendaa
-      do l = 1, gas_pcnst
-         if ( do_q_coltendaa(l,iqtend) ) then
-            q_coltendaa(i,l,iqtend) = q_coltendaa(i,l,iqtend) + qgcm_tendaa(l,iqtend)*pdel_fac
+      do icnst = 1, gas_pcnst
+         if ( do_q_coltendaa(icnst,iqtend) ) then
+            q_coltendaa(ii,icnst,iqtend) = q_coltendaa(ii,icnst,iqtend) + qgcm_tendaa(icnst,iqtend)*pdel_fac
          end if
          if (iqtend <= nqqcwtendaa) then
-         if ( do_qqcw_coltendaa(l,iqtend) ) then
-            qqcw_coltendaa(i,l,iqtend) = qqcw_coltendaa(i,l,iqtend) + qqcwgcm_tendaa(l,iqtend)*pdel_fac
+         if ( do_qqcw_coltendaa(icnst,iqtend) ) then
+            qqcw_coltendaa(ii,icnst,iqtend) = qqcw_coltendaa(ii,icnst,iqtend) + qqcwgcm_tendaa(icnst,iqtend)*pdel_fac
          end if
          end if
-      end do ! l
+      end do ! icnst
       end do ! iqtend
 
       if ( history_aerocom ) then
          ! 3d soa tendency for aerocom
          ! note that flux units (kg/m2/s) are used here instead of tendency units (kg/kg/s or kg/m3/s)
          do jsoa = 1, nsoa
-            l = lptr2_soa_g_amode(jsoa) - loffset
-            soag_3dtend_cond(i,k,jsoa) = qgcm_tendaa(l,iqtend_cond)*(adv_mass(l)/mwdry)*(pdel(i,k)/gravit)
+            icnst = lptr2_soa_g_amode(jsoa) - loffset
+            soag_3dtend_cond(ii,kk,jsoa) = qgcm_tendaa(icnst,iqtend_cond)*(adv_mass(icnst)/mwdry)*(pdel(ii,kk)/gravit)
          end do
          ! 3d number nucleation tendency for aerocom - units are (#/m3/s)
          ! so multiply qgcm_tendaa (#/kmol/s) by air molar density (kmol/m3)
-         l = numptr_amode(nait) - loffset
-         nufine_3dtend_nnuc(i,k) = qgcm_tendaa(l,iqtend_nnuc) * (pmid(i,k)/(r_universal*t(i,k)))
+         icnst = numptr_amode(nait) - loffset
+         nufine_3dtend_nnuc(ii,kk) = qgcm_tendaa(icnst,iqtend_nnuc) * (pmid(ii,kk)/(r_universal*t(ii,kk)))
       end if
 
 
-      ncluster_3dtend_nnuc(i,k) = misc_vars_aa%ncluster_tend_nnuc_1grid
+      ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
       end do main_i_loop
 
@@ -509,35 +503,35 @@ main_i_loop: do i = 1, ncol
             itmpc = 0 ; itmpd = 0
          end if
 
-         do l = 1, gas_pcnst
+         do icnst = 1, gas_pcnst
             do iqtend = itmpa, itmpb
                if (iqtend <= 0) cycle
-               if ( do_q_coltendaa(l,iqtend) ) then
-                  q_coltendaa(1:ncol,l,iqtend) = q_coltendaa(1:ncol,l,iqtend)*(adv_mass(l)/mwdry)
-                  fieldname = trim(cnst_name(l+loffset)) // suffix_q_coltendaa(iqtend)
-                  call outfld( fieldname, q_coltendaa(1:ncol,l,iqtend), ncol, lchnk )
+               if ( do_q_coltendaa(icnst,iqtend) ) then
+                  q_coltendaa(1:ncol,icnst,iqtend) = q_coltendaa(1:ncol,icnst,iqtend)*(adv_mass(icnst)/mwdry)
+                  fieldname = trim(cnst_name(icnst+loffset)) // suffix_q_coltendaa(iqtend)
+                  call outfld( fieldname, q_coltendaa(1:ncol,icnst,iqtend), ncol, lchnk )
                end if
             end do ! iqtend
             do iqqcwtend = itmpc, itmpd
                if (iqqcwtend <= 0) cycle
-               if ( do_qqcw_coltendaa(l,iqqcwtend) ) then
-                  qqcw_coltendaa(1:ncol,l,iqqcwtend) = qqcw_coltendaa(1:ncol,l,iqqcwtend)* (adv_mass(l)/mwdry)
-                  fieldname = trim(cnst_name_cw(l+loffset)) // suffix_qqcw_coltendaa(iqqcwtend)
-                  call outfld( fieldname, qqcw_coltendaa(1:ncol,l,iqqcwtend), ncol, lchnk )
+               if ( do_qqcw_coltendaa(icnst,iqqcwtend) ) then
+                  qqcw_coltendaa(1:ncol,icnst,iqqcwtend) = qqcw_coltendaa(1:ncol,icnst,iqqcwtend)* (adv_mass(icnst)/mwdry)
+                  fieldname = trim(cnst_name_cw(icnst+loffset)) // suffix_qqcw_coltendaa(iqqcwtend)
+                  call outfld( fieldname, qqcw_coltendaa(1:ncol,icnst,iqqcwtend), ncol, lchnk )
                end if
             end do ! iqqcwtend
          end do ! l
 
          if ( ipass==1 .and. history_aerocom ) then
             do jsoa = 1, nsoa
-               l = lptr2_soa_g_amode(jsoa)
-               fieldname = trim(cnst_name(l)) // '_sfgaex3d'
+               icnst = lptr2_soa_g_amode(jsoa)
+               fieldname = trim(cnst_name(icnst)) // '_sfgaex3d'
                call outfld( fieldname, soag_3dtend_cond(1:ncol,:,jsoa), ncol, lchnk )
             end do
-            l = numptr_amode(nait)
-            fieldname = trim(cnst_name(l)) // '_nuc1'
+            icnst = numptr_amode(nait)
+            fieldname = trim(cnst_name(icnst)) // '_nuc1'
             call outfld( fieldname, nufine_3dtend_nnuc(1:ncol,:), ncol, lchnk )
-            fieldname = trim(cnst_name(l)) // '_nuc2'
+            fieldname = trim(cnst_name(icnst)) // '_nuc2'
             call outfld( fieldname, ncluster_3dtend_nnuc(1:ncol,:), ncol, lchnk )
          end if
 
