@@ -17,7 +17,7 @@ module modal_aero_convproc
 
    use shr_kind_mod, only: r8=>shr_kind_r8
    use physconst,    only: gravit                              
-   use ppgrid,       only: pver, pcols, pverp, begchunk, endchunk
+   use ppgrid,       only: pver, pcols, pverp
    use cam_history,  only: outfld, addfld, horiz_only, add_default
    use cam_logfile,  only: iulog
    use cam_abortutils, only: endrun
@@ -38,11 +38,6 @@ module modal_aero_convproc
 !
 ! module data
 !
-   !deepconv_wetdep_history variable controls history output of additonal deep-convection wet deposition fields 
-   !(in addition to the normal fields for total-convection wet deposition)
-   logical, parameter, public :: deepconv_wetdep_history = .true.
-   logical, parameter :: use_cwaer_for_activate_maxsat = .false.
-   logical, parameter :: apply_convproc_tend_to_ptend = .true.
 
    real(r8) :: hund_ovr_g  != 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p
@@ -135,10 +130,6 @@ subroutine ma_convproc_init
       convproc_do_aer
    write(*,'(a,l12)')     'ma_convproc_init - convproc_do_gas               = ', &
       convproc_do_gas
-   write(*,'(a,l12)')     'ma_convproc_init - use_cwaer_for_activate_maxsat = ', &
-      use_cwaer_for_activate_maxsat
-   write(*,'(a,l12)')     'ma_convproc_init - apply_convproc_tend_to_ptend  = ', &
-      apply_convproc_tend_to_ptend
    write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
       activate_smaxmax
    write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
@@ -373,11 +364,8 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
         call outfld( trim(cnst_name(l))//'SFWET', aerdepwetis(:,l), pcols, lchnk)
         call outfld( trim(cnst_name(l))//'SFSIC', sflxic(:,l), pcols, lchnk )
         call outfld( trim(cnst_name(l))//'SFSEC', sflxec(:,l), pcols, lchnk )
-
-        if ( deepconv_wetdep_history ) then
-           call outfld( trim(cnst_name(l))//'SFSID', sflxid(:,l), pcols, lchnk )
-           call outfld( trim(cnst_name(l))//'SFSED', sflxed(:,l), pcols, lchnk )
-        endif
+        call outfld( trim(cnst_name(l))//'SFSID', sflxid(:,l), pcols, lchnk )
+        call outfld( trim(cnst_name(l))//'SFSED', sflxed(:,l), pcols, lchnk )
      enddo ! ll
      enddo ! n
   endif

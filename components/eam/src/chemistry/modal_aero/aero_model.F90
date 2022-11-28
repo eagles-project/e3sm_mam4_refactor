@@ -188,7 +188,6 @@ contains
     use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
     use modal_aero_data, only: cnst_name_cw
     use modal_aero_initialize_data, only: modal_aero_initialize
-    use modal_aero_convproc, only: deepconv_wetdep_history
     use rad_constituents,           only: rad_cnst_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
     use seasalt_model,   only: seasalt_init, seasalt_names, seasalt_active,seasalt_nbin
@@ -513,12 +512,12 @@ contains
                horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, convective) at surface')  !RCE
           call addfld (trim(wetdep_list(m))//'SFSES', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, stratiform) at surface')  !RCE
-          if (convproc_do_aer .and. deepconv_wetdep_history) then
+          if (convproc_do_aer) then
           call addfld (trim(wetdep_list(m))//'SFSED', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, deep convective) at surface')  !RCE
           endif
        endif
-       if (convproc_do_aer .and. deepconv_wetdep_history) then
+       if (convproc_do_aer) then
                     call addfld (trim(wetdep_list(m))//'SFSID', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (incloud, deep convective) at surface')  !RCE
           call addfld (trim(wetdep_list(m))//'SFSBD', &
@@ -1311,7 +1310,7 @@ contains
     use modal_aero_data
     use modal_aero_calcsize,   only: modal_aero_calcsize_sub
     use modal_aero_wateruptake,only: modal_aero_wateruptake_dr
-    use modal_aero_convproc,   only: deepconv_wetdep_history, ma_convproc_intr
+    use modal_aero_convproc,   only: ma_convproc_intr
     use mo_constants,          only: pi
     use infnan,                only: nan, assignment(=)
 
@@ -1898,8 +1897,7 @@ lphase_jnmw_conditional: &
                 ! only do this for interstitial aerosol, because conv clouds to not
                 !    affect the stratiform-cloudborne aerosol
                 if ( convproc_do_aer ) then
-                   if ( deepconv_wetdep_history ) then
-                      do i = 1, ncol
+                   do i = 1, ncol
                          tmp_precdp = max( rprddpsum(i),  1.0e-35_r8 )
                          tmp_precsh = max( rprdshsum(i),  1.0e-35_r8 )
                          tmp_evapdp = max( evapcdpsum(i), 0.1e-35_r8 )
@@ -1921,11 +1919,8 @@ lphase_jnmw_conditional: &
                          else
                             sflxecdp(i) = 0.0_r8
                          end if
-                      end do
-                      call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
-                   else
-                      sflxecdp(1:ncol) = 0.0_r8
-                   end if
+                   end do
+                   call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
                    ! when ma_convproc_intr is used, convective in-cloud wet removal is done there
                    ! the convective (total and deep) precip-evap-resuspension includes in- and below-cloud
                    ! contributions, so pass the below-cloud contribution to ma_convproc_intr
