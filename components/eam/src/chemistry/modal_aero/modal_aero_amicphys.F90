@@ -2,7 +2,16 @@
 
 module modal_aero_amicphys
 !----------------------------------------------------------------------
-! MODULE: modal_aero_amicphys --- does modal aerosol gas-aerosol exchange
+! Purpose: does modal aerosol gas-aerosol exchange
+!          and additional aerosol microphysics processes:
+!          - intermodal transfer of particle mass and number (renaming),
+!          - nucleation,
+!          - coagulation,
+!          - aging of hydrophobic particles.
+!
+! History:
+!   RCE 07.04.13:  Adapted from MIRAGE2 code
+!----------------------------------------------------------------------
 
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
@@ -12,8 +21,6 @@ module modal_aero_amicphys
   private
   public modal_aero_amicphys_intr, modal_aero_amicphys_init
 
-! !REVISION HISTORY:
-!   RCE 07.04.13:  Adapted from MIRAGE2 code
 !----------------------------------------------------------------------
 
 contains
@@ -40,20 +47,19 @@ subroutine modal_aero_amicphys_intr(                             &
 !----------------------------------------------------------------------
 ! !DESCRIPTION:
 ! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
-!    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to both
-!       condensation and cloud chemistry
-!    new particle nucleation
-!    coagulation
-!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
+!  - gas-aerosol exchange (condensation/evaporation)
+!  - growth from smaller to larger modes (renaming) due to both condensation and cloud chemistry
+!  - new particle nucleation
+!  - coagulation
+!  - transfer of particles from hydrophobic modes to hydrophilic modes (aging)
 !       due to condensation and coagulation
 !
-! the incoming mixing ratios (q and qqcw) are updated before output
+! The incoming mixing ratios (q and qqcw) are updated before output.
 !
 ! !REVISION HISTORY:
 !   RCE 07.04.13:  Adapted from earlier version of CAM5 modal aerosol routines
 !                  for these processes
-!
+!   Hui Wan 2022:  Restructured loops and created subroutines.
 !----------------------------------------------------------------------
 
 use modal_aero_amicphys_control, only: r8
@@ -64,22 +70,25 @@ use physconst,         only:  gravit, mwdry, r_universal
 use wv_saturation,     only:  qsat
 use phys_control,      only:  phys_getopts
 
+! Parameters, bookkeeping info, switches, runtime options
 use modal_aero_data,   only:  &
     cnst_name_cw, &
     lmassptr_amode, lmassptrcw_amode, lptr2_soa_g_amode, &
     nspec_amode, &
     numptr_amode, numptrcw_amode, ntot_amode
 
-use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
-                                      , set_subarea_gases_and_aerosols &
-                                      , form_gcm_of_gases_and_aerosols_from_subareas &
-                                      , copy_cnst
-
 use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
                                        maxsubarea, top_lev, &
                                        update_qaerwat, &
                                        ntot_amode_extd, max_mode, nait, nsoa, &
                                        misc_vars_aa_type
+
+! Subroutines for conversion from grid cell mean to subareas and back
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
+                                      , set_subarea_gases_and_aerosols &
+                                      , form_gcm_of_gases_and_aerosols_from_subareas &
+                                      , copy_cnst
+
 
 ! For output of diagnostics
 use modal_aero_amicphys_control, only: nqtendaa, nqqcwtendaa, &
@@ -104,21 +113,27 @@ implicit none
    integer,  intent(in)    :: nstep                ! model time-step number
    integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
    integer,  intent(in)    :: latndx(pcols), lonndx(pcols)
+
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
    integer,  intent(in)    :: nqtendbb             ! dimension for q_tendbb
    integer,  intent(in)    :: nqqcwtendbb          ! dimension for qqcw_tendbb
 #endif
 
-   real(r8), intent(in)    :: deltat               ! time step (s)
+   real(r8), intent(in)    :: deltat               ! time step [s]
 
+   !---------------------------------------------------------------------------------------
+   ! Tracer mixing ratios: current values as well as some "old" values used
+   ! for the numerical coupling of physical processes
+   !---------------------------------------------------------------------------------------
    real(r8), intent(inout) :: q(ncol,pver,gas_pcnst) ! current tracer mixing ratios (TMRs)
-                                                   ! these values are updated (so out /= in)
-                                                   ! *** MUST BE  #/kmol-air for number
-                                                   ! *** MUST BE mol/mol-air for mass
-                                                   ! *** NOTE ncol dimension
-   real(r8), intent(inout) :: qqcw(ncol,pver,gas_pcnst)
-                                                   ! like q but for cloud-borner tracers
-                                                   ! these values are updated
+                                                     ! of gases and interstitial aerosol tracers
+                                                     ! these values are updated (so out /= in)
+                                                     ! *** MUST BE  #/kmol-air for number
+                                                     ! *** MUST BE kmol/kmol-air for mass
+                                                     ! *** NOTE ncol dimension
+   real(r8), intent(inout) :: qqcw(ncol,pver,gas_pcnst) ! like q but for cloud-borner tracers
+                                                        ! these values are updated
+
    real(r8), intent(in)    :: q_pregaschem(ncol,pver,gas_pcnst)    ! q TMRs    before gas-phase chemistry
    real(r8), intent(in)    :: q_precldchem(ncol,pver,gas_pcnst)    ! q TMRs    before cloud chemistry
    real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,gas_pcnst) ! qqcw TMRs before cloud chemistry
@@ -128,31 +143,41 @@ implicit none
    real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,gas_pcnst,nqqcwtendbb)
 #endif
 
-   real(r8), intent(in)    :: t(pcols,pver)        ! temperature at model levels (K)
-   real(r8), intent(in)    :: pmid(pcols,pver)     ! pressure at model level centers (Pa)
-   real(r8), intent(in)    :: pdel(pcols,pver)     ! pressure thickness of levels (Pa)
-   real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers (m)
-   real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth (m)
-   real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity (kg/kg)
-   real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction (-) *** NOTE ncol dimension
+   !---------------------------------------------------------------------------------------
+   ! Ambient environment
+   !---------------------------------------------------------------------------------------
+   real(r8), intent(in)    :: t(pcols,pver)        ! air temperature [K]
+   real(r8), intent(in)    :: pmid(pcols,pver)     ! air pressure [Pa]
+   real(r8), intent(in)    :: pdel(pcols,pver)     ! pressure layer thickness [Pa]
+   real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers [m]
+   real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth [m]
+   real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity [kg/kg]
+   real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction [unitless] *** NOTE ncol dimension
+
+
+   !---------------------------------------------------------------------------------------
+   ! Particle sizes
+   !---------------------------------------------------------------------------------------
    real(r8), intent(inout) :: dgncur_a   (pcols,pver,ntot_amode) ! dry geo. mean diameter [m] of number distrib.
    real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode) ! wet geo. mean diameter [m] of number distrib.
-   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode) ! interstitial aerosol wet density [kg/m3]
-   real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio [kg/kg, NOT mol/mol]
+
+   ! misc.
+   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode)      ! interstitial aerosol wet density [kg/m3]
+   real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio
 
    !---------------------
    ! local variables
    !---------------------
-   ! Variables for grid cell mean values
+   ! Variables used for saving grid cell mean values
 
-   real(r8) :: relhumgcm                   
-   real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
-   real(r8) :: ev_sat(pcols,pver)
-   real(r8) :: qv_sat(pcols,pver)
-   real(r8) :: wetdens(max_mode)
+   real(r8) :: relhumgcm                           ! relative humidity [unitless] 
+   real(r8) :: dgn_a(max_mode), dgn_awet(max_mode) ! dry and wet geo. mean diameter [m]
+   real(r8) :: ev_sat(pcols,pver)                  ! (water) saturation vapor pressure [Pa]
+   real(r8) :: qv_sat(pcols,pver)                  ! (water) saturation mixing ratio [kg/kg]
+   real(r8) :: wetdens(max_mode)                   ! interstitial aerosol wet density [kg/m3]
 
-   ! Constituent (tracer) mixing ratios.
-   ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
+   ! Constituent (tracer) mixing ratios. These are local, 1D copies
+   ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs) [kmol/kmol or #/kmol]
    !    N=1 - before gas-phase chemistry
    !    N=2 - before cloud chemistry
    !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
@@ -165,11 +190,11 @@ implicit none
 
    real(r8) :: qgcm3   (gas_pcnst)
    real(r8) :: qqcwgcm3(gas_pcnst)
-   real(r8) :: qaerwatgcm3(ntot_amode_extd) 
+   real(r8) :: qaerwatgcm3(ntot_amode_extd)   ! aerosol water mixing ratios [kmol/kmol]
 
    real(r8) :: qgcm4   (gas_pcnst)
    real(r8) :: qqcwgcm4(gas_pcnst)
-   real(r8) :: qaerwatgcm4(ntot_amode_extd)   ! aerosol water mixing ratios (mol/mol)
+   real(r8) :: qaerwatgcm4(ntot_amode_extd)   ! aerosol water mixing ratios [kmol/kmol]
 
    ! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
    !    currently there are just clear and cloudy sub-areas
@@ -177,7 +202,7 @@ implicit none
 
    real(r8), dimension(gas_pcnst,maxsubarea) :: qsub1, qsub2,    qsub3,       qsub4
    real(r8), dimension(gas_pcnst,maxsubarea) ::        qqcwsub2, qqcwsub3,    qqcwsub4
-   real(r8), dimension(ntot_amode_extd,maxsubarea) ::            qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+   real(r8), dimension(ntot_amode_extd,maxsubarea) ::            qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios [kmol/kmol]
 
    ! Loop indices
 
@@ -195,7 +220,7 @@ implicit none
    integer  :: nsubarea             ! # of active subareas in this grid cell
    integer  :: ncldy_subarea        ! # of cloudy subareas in this grid cell
    logical  :: iscldy_subarea(maxsubarea)  ! whether a subarea is cloudy
-   real(r8) :: relhumsub(maxsubarea)       ! relative humidity in subareas
+   real(r8) :: relhumsub(maxsubarea)       ! relative humidity in subareas [unitless]
 
    ! misc
 
