@@ -336,7 +336,10 @@ end subroutine nucleate_ice_cam_init
 
 !================================================================================================
 
-subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi, pbuf)
+subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
+                                  rho, wsubi, ast, dgnum, & 
+                                  naai, naai_hom)
+
    use modal_aero_data,   only: modeptr_accum, modeptr_aitken, modeptr_coarse
    use modal_aero_data,   only: numptr_amode, alnsg_amode
    use modal_aero_data,   only: lptr_dust_a_amode, lptr_nacl_a_amode, lptr_so4_a_amode, &
@@ -346,24 +349,18 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    integer, intent(in) :: ncol
    integer, intent(in) :: lchnk
    real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
-   real(r8), intent(in) :: q(:,:,:)             ! input mixing ratio for all water and chem species [#/kg,kg/kg]
+   real(r8), intent(in) :: state_q(:,:,:)       ! input mixing ratio for all water and chem species [#/kg,kg/kg]
    real(r8), intent(in) :: pmid(:,:)            ! pressure at layer midpoints [pa]
    real(r8), intent(in) :: rho(:,:)             ! air density [kg/m^3]
-   real(r8),                    intent(in)    :: wsubi(:,:)   ! updraft velocity for ice nucleation [m/s]  
-   type(physics_buffer_desc),   pointer       :: pbuf(:)
+   real(r8), intent(in) :: wsubi(:,:)           ! updraft velocity for ice nucleation [m/s]  
+   real(r8), intent(in) :: ast(:,:)             ! cloud fraction [unitless]
+   real(r8), intent(in) :: dgnum(:,:,:)         ! mode dry radius [m]   
+
+   real(r8), intent(out) :: naai(:,:)           ! number of activated aerosol for ice nucleation [#/kg]
+   real(r8), intent(out) :: naai_hom(:,:)       ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
  
    ! local workspace
-
-   ! naai and naai_hom are the outputs shared with the microphysics
-   real(r8), pointer :: naai(:,:)       ! number of activated aerosol for ice nucleation [#/kg]
-   real(r8), pointer :: naai_hom(:,:)   ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
-
-   real(r8), pointer :: dgnum(:,:,:)    ! mode dry radius [m]
-   real(r8), pointer :: ast(:,:)        ! cloud fraction [unitless]
-
-
-   integer :: itim_old
-   integer :: i, k, m
+   integer :: icol, kk, m
 
    real(r8) :: qn(pcols,pver)           ! water vapor mixing ratio [kg/kg]
    real(r8) :: num_aitken(pcols,pver)   ! number m.r. of aitken mode [#/kg]
@@ -376,7 +373,6 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    real(r8) :: coarse_bc(pcols,pver)    ! mass m.r. of coarse bc [kg/kg]
    real(r8) :: coarse_pom(pcols,pver)   ! mass m.r. of coarse pom [kg/kg] 
    real(r8) :: coarse_soa(pcols,pver)   ! mass m.r. of coarse soa [kg/kg]
-   real(r8) :: icecldf(pcols,pver)      ! ice cloud fraction [unitless]
 
    real(r8) :: qs(pcols)                ! liquid-ice weighted sat mixing rat [kg/kg]
    real(r8) :: es(pcols)                ! liquid-ice weighted sat vapor press [pa]
@@ -387,7 +383,6 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
 
    real(r8) :: so4_num                  ! so4 aerosol number [#/cm^3]
    real(r8) :: dst3_num                 ! dust aerosol number [#/cm^3]
-   real(r8) :: dst_num                  ! total dust aerosol number [#/cm^3]
    real(r8) :: wght                     ! mass weight [unitless]
    real(r8) :: dmc                      ! dust mass concentration [kg/m^3]
    real(r8) :: ssmc                     ! sea salt mass concentration [kg/m^3]
@@ -407,35 +402,21 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
 
    !-------------------------------------------------------------------------------
 
-   ! note for C++ porting
-   ! read ast, dgnum, naai, naai_hom from pbuf
-   ! will need to change according to how pbuf variables are stored in C++ structure
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
-   icecldf(:ncol,:pver) = ast(:ncol,:pver)
-
-   call pbuf_get_field(pbuf, dgnum_idx, dgnum)
-
-   ! naai and naai_hom are the outputs from this parameterization
-   call pbuf_get_field(pbuf, naai_idx, naai)
-   call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
-
-
-   qn(:ncol,:pver) = q(:ncol,:pver,1)
+   qn(:ncol,:pver) = state_q(:ncol,:pver,1)
 
    ! mode number mixing ratios
-   num_aitken(:ncol,:pver) = q(:ncol,:pver,numptr_amode(modeptr_aitken))
-   num_coarse(:ncol,:pver) = q(:ncol,:pver,numptr_amode(modeptr_coarse))
+   num_aitken(:ncol,:pver) = state_q(:ncol,:pver,numptr_amode(modeptr_aitken))
+   num_coarse(:ncol,:pver) = state_q(:ncol,:pver,numptr_amode(modeptr_coarse))
 
    ! mode specie mass m.r. 
-   coarse_dust(:ncol,:pver) = q(:ncol,:pver,lptr_dust_a_amode(modeptr_coarse))
-   coarse_nacl(:ncol,:pver) = q(:ncol,:pver,lptr_nacl_a_amode(modeptr_coarse))
-   coarse_so4(:ncol,:pver)  = q(:ncol,:pver,lptr_so4_a_amode(modeptr_coarse))
-   coarse_mom(:ncol,:pver)  = q(:ncol,:pver,lptr_mom_a_amode(modeptr_coarse))
-   coarse_bc(:ncol,:pver)   = q(:ncol,:pver,lptr_bc_a_amode(modeptr_coarse))
-   coarse_pom(:ncol,:pver)  = q(:ncol,:pver,lptr_pom_a_amode(modeptr_coarse))
-   coarse_soa(:ncol,:pver)  = q(:ncol,:pver,lptr_soa_a_amode(modeptr_coarse))
+   coarse_dust(:ncol,:pver) = state_q(:ncol,:pver,lptr_dust_a_amode(modeptr_coarse))
+   coarse_nacl(:ncol,:pver) = state_q(:ncol,:pver,lptr_nacl_a_amode(modeptr_coarse))
+   coarse_so4(:ncol,:pver)  = state_q(:ncol,:pver,lptr_so4_a_amode(modeptr_coarse))
+   coarse_mom(:ncol,:pver)  = state_q(:ncol,:pver,lptr_mom_a_amode(modeptr_coarse))
+   coarse_bc(:ncol,:pver)   = state_q(:ncol,:pver,lptr_bc_a_amode(modeptr_coarse))
+   coarse_pom(:ncol,:pver)  = state_q(:ncol,:pver,lptr_pom_a_amode(modeptr_coarse))
+   coarse_soa(:ncol,:pver)  = state_q(:ncol,:pver,lptr_soa_a_amode(modeptr_coarse))
 
 
    naai(1:ncol,1:pver)     = 0._r8  
@@ -447,35 +428,34 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
    nidep(1:ncol,1:pver) = 0._r8 
    nimey(1:ncol,1:pver) = 0._r8 
 
-   do k = top_lev, pver
+   do kk = top_lev, pver
 
       ! Get humidity and saturation vapor pressures
       ! This subsoutine is also used in MG cloud microphysics
       ! Probably done by SCREAM team, leave it as it is.
-      call qsat_water(temperature(:ncol,k), pmid(:ncol,k), &
+      call qsat_water(temperature(:ncol,kk), pmid(:ncol,kk), &
            es(:ncol), qs(:ncol), gam=gammas(:ncol))
 
-      do i = 1, ncol
+      do icol = 1, ncol
 
-         relhum(i,k) = qn(i,k)/qs(i)
+         relhum(icol,kk) = qn(icol,kk)/qs(icol)
 
          ! get cloud fraction, check for minimum
-         icldm(i,k) = max(icecldf(i,k), mincld)
+         icldm(icol,kk) = max(ast(icol,kk), mincld)
 
       enddo
    enddo
 
 
-   do k = top_lev, pver
-      do i = 1, ncol
+   do kk = top_lev, pver
+      do icol = 1, ncol
 
-         if (temperature(i,k) < tmelt - 5._r8) then
+         if (temperature(icol,kk) < tmelt - 5._r8) then
 
             ! compute aerosol number for so4, soot, and dust with units #/cm^3
             ! remove soot number, because it is set to zero
             so4_num  = 0._r8
             dst3_num = 0._r8
-            dst_num  = 0._r8
 
             
             !For modal aerosols, assume for the upper troposphere:
@@ -483,44 +463,41 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, q, pmid, rho, wsubi,
             ! sulfate = aiken mode
             ! dust = coarse mode
             ! since modal has internal mixtures.
-            dmc  = coarse_dust(i,k)*rho(i,k)      
-            ssmc = coarse_nacl(i,k)*rho(i,k)
-            so4mc  = coarse_so4(i,k)*rho(i,k)
+            dmc    = coarse_dust(icol,kk)*rho(icol,kk)      
+            ssmc   = coarse_nacl(icol,kk)*rho(icol,kk)
+            so4mc  = coarse_so4(icol,kk)*rho(icol,kk)
 
-            mommc  = coarse_mom(i,k)*rho(i,k)
-            bcmc   = coarse_bc(i,k)*rho(i,k)
-            pommc  = coarse_pom(i,k)*rho(i,k)
-            soamc  = coarse_soa(i,k)*rho(i,k)
+            mommc  = coarse_mom(icol,kk)*rho(icol,kk)
+            bcmc   = coarse_bc(icol,kk)*rho(icol,kk)
+            pommc  = coarse_pom(icol,kk)*rho(icol,kk)
+            soamc  = coarse_soa(icol,kk)*rho(icol,kk)
 
             if (dmc > 0._r8) then
                wght = dmc/(ssmc + dmc + so4mc + bcmc + pommc + soamc + mommc)
-               dst3_num = wght * num_coarse(i,k)*rho(i,k)*num_m3_to_cm3
+               dst3_num = wght * num_coarse(icol,kk)*rho(icol,kk)*num_m3_to_cm3
             endif
 
-            dst_num = dst3_num
-
-            if (dgnum(i,k,mode_aitken_idx) > 0._r8) then
+            if (dgnum(icol,kk,mode_aitken_idx) > 0._r8) then
                ! only allow so4 with D>0.1 um in ice nucleation
-               so4_num  = num_aitken(i,k)*rho(i,k)*num_m3_to_cm3 &
-                          * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(i,k,mode_aitken_idx))/  &
+               so4_num  = num_aitken(icol,kk)*rho(icol,kk)*num_m3_to_cm3 &
+                          * (0.5_r8 - 0.5_r8*erf(log(so4_sz_thresh_icenuc/dgnum(icol,kk,mode_aitken_idx))/  &
                           (2._r8**0.5_r8*alnsg_amode(modeptr_aitken))))
             endif
             so4_num = max(0.0_r8, so4_num)
 
             call nucleati( &
-               wsubi(i,k), temperature(i,k), pmid(i,k), relhum(i,k), icldm(i,k),   &
-               rho(i,k), so4_num, dst_num,                               &
-               naai(i,k), nihf(i,k), niimm(i,k), nidep(i,k), nimey(i,k), &
-               dst3_num)
+               wsubi(icol,kk), temperature(icol,kk), pmid(icol,kk), relhum(icol,kk), icldm(icol,kk),   &   ! input
+               rho(icol,kk), so4_num, dst3_num,  &                                                         ! input
+               naai(icol,kk), nihf(icol,kk), niimm(icol,kk), nidep(icol,kk), nimey(icol,kk))               ! output
 
 
-            naai_hom(i,k) = nihf(i,k)
+            naai_hom(icol,kk) = nihf(icol,kk)
 
             ! output activated ice (convert from #/kg -> #/m3)
-            nihf(i,k)     = nihf(i,k) *rho(i,k)
-            niimm(i,k)    = niimm(i,k)*rho(i,k)
-            nidep(i,k)    = nidep(i,k)*rho(i,k)
-            nimey(i,k)    = nimey(i,k)*rho(i,k)
+            nihf(icol,kk)     = nihf(icol,kk) *rho(icol,kk)
+            niimm(icol,kk)    = niimm(icol,kk)*rho(icol,kk)
+            nidep(icol,kk)    = nidep(icol,kk)*rho(icol,kk)
+            nimey(icol,kk)    = nimey(icol,kk)*rho(icol,kk)
 
          endif
       enddo

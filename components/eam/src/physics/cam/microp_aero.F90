@@ -92,6 +92,10 @@ integer :: aist_idx = -1
 
 integer :: cldo_idx = -1
 integer :: dgnumwet_idx = -1
+integer :: dgnum_idx = -1
+
+integer :: naai_idx
+integer :: naai_hom_idx
 
 ! Bulk aerosols
 character(len=20), allocatable :: aername(:)
@@ -116,7 +120,7 @@ integer :: coarse_nacl_idx = -1  ! index of nacl in coarse mode
 integer :: mode_fine_dst_idx = -1   ! index of dust in fine dust mode
 integer :: mode_pcarbon_idx  = -1  ! index of dust in accum mode
 integer :: accum_dust_idx    = -1  ! index of dust in accum mode
-logical :: dem_in            = .false.           ! use DeMott IN
+logical :: dem_in            = .false.
 
 integer :: npccn_idx, rndst_idx, nacon_idx
 
@@ -145,8 +149,10 @@ subroutine microp_aero_register
 
    call pbuf_add_field('RNDST',      'physpkg',dtype_r8,(/pcols,pver,4/), rndst_idx)
    call pbuf_add_field('NACON',      'physpkg',dtype_r8,(/pcols,pver,4/), nacon_idx)
+
+   call pbuf_add_field('NAAI',     'physpkg', dtype_r8, (/pcols,pver/), naai_idx)
+   call pbuf_add_field('NAAI_HOM', 'physpkg', dtype_r8, (/pcols,pver/), naai_hom_idx)   
  
-   call nucleate_ice_cam_register()
    call hetfrz_classnuc_cam_register()
 
 end subroutine microp_aero_register
@@ -206,15 +212,14 @@ subroutine microp_aero_init
    clim_modal_aero = (nmodes > 0)
 
    ast_idx      = pbuf_get_index('AST')
-   if(liqcf_fix) then
-      alst_idx      = pbuf_get_index('ALST')
-      aist_idx      = pbuf_get_index('AIST')
-   endif
+   alst_idx      = pbuf_get_index('ALST')
+   aist_idx      = pbuf_get_index('AIST')
 
    if (clim_modal_aero) then
 
       cldo_idx     = pbuf_get_index('CLDO')
       dgnumwet_idx = pbuf_get_index('DGNUMWET')
+      dgnum_idx    = pbuf_get_index('DGNUM' )      
 
       call ndrop_init()
 
@@ -376,7 +381,8 @@ subroutine microp_aero_run ( &
    integer :: i, k, m
    integer :: itim_old
    integer :: nmodes 
-
+ 
+   real(r8), pointer :: state_q(:,:,:)
    real(r8), pointer :: ast(:,:)        
    real(r8), pointer :: alst(:,:)        
    real(r8), pointer :: aist(:,:)        
@@ -391,6 +397,11 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: cldo(:,:)       ! old cloud fraction
 
    real(r8), pointer :: dgnumwet(:,:,:) ! aerosol mode diameter
+   real(r8), pointer :: dgnum(:,:,:)
+
+   ! naai and naai_hom are the outputs from nucleate_ice_cam_calc shared with the microphysics
+   real(r8), pointer :: naai(:,:)       ! number of activated aerosol for ice nucleation [#/kg]
+   real(r8), pointer :: naai_hom(:,:)   ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
 
 
    real(r8)          :: icecldf(pcols,pver)    ! ice cloud fraction   
@@ -441,26 +452,22 @@ subroutine microp_aero_run ( &
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
- 
-   liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
-   icecldf(:ncol,:pver) = aist(:ncol,:pver)
+   call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
   
-
-   call pbuf_get_field(pbuf, npccn_idx, npccn)
-
-
-   itim_old = pbuf_old_tim_idx()
-      
-   if (micro_do_icesupersat) then
-      call pbuf_get_field(pbuf, cldo_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))        
-   else
-      call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-   endif
-
-   call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
+   call pbuf_get_field(pbuf, npccn_idx, npccn) 
    call rad_cnst_get_info(0, nmodes=nmodes)
    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+   call pbuf_get_field(pbuf, dgnum_idx, dgnum) 
+ 
+   call pbuf_get_field(pbuf, naai_idx, naai)
+   call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
+
+
+   state_q => state%q
+
+   liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
+   icecldf(:ncol,:pver) = aist(:ncol,:pver)
 
    allocate(factnum(pcols,pver,nmodes))
 
@@ -567,17 +574,11 @@ subroutine microp_aero_run ( &
    !ICE Nucleation
 
    call t_startf('nucleate_ice_cam_calc')
-   call nucleate_ice_cam_calc(ncol, lchnk, t, state%q, pmid, rho, wsubice, pbuf)
+   call nucleate_ice_cam_calc(ncol, lchnk, t, state_q, pmid, &      ! input
+                              rho, wsubice, ast, dgnum, &           ! input
+                              naai, naai_hom)                       ! output
    call t_stopf('nucleate_ice_cam_calc')
 
-   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-   ! get liquid cloud fraction, check for minimum
-
-   do k = top_lev, pver
-      do i = 1, ncol
-         lcldm(i,k) = max(ast(i,k), mincld)
-      end do
-   end do
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! Droplet Activation
@@ -591,13 +592,8 @@ subroutine microp_aero_run ( &
          do i = 1, ncol
             qcld = qc(i,k) + qi(i,k)
             if (qcld > qsmall) then
-               if(liqcf_fix) then
-                  lcldn(i,k)=liqcldf(i,k)
-                  lcldo(i,k)=liqcldfo(i,k)
-               else
-                  lcldn(i,k) = cldn(i,k)*qc(i,k)/qcld
-                  lcldo(i,k) = cldo(i,k)*qc(i,k)/qcld
-               endif
+               lcldn(i,k)=liqcldf(i,k)
+               lcldo(i,k)=liqcldfo(i,k)
             end if
          end do
       end do
@@ -617,7 +613,11 @@ subroutine microp_aero_run ( &
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! Contact freezing  (-40<T<-3 C) (Young, 1974) with hooks into simulated dust
    ! estimate rndst and nanco for 4 dust bins here to pass to MG microphysics
-   ! removed because the default contact freezing scheme is now CNT
+   ! 
+   ! The contact freezing scheme by Young, 1974 is executed but the results are
+   ! not used in the cloud microphysics scheme. It is replaced by the below CNT
+   ! (subroutine hetfrz_classnuc_cam_calc) scheme.
+   ! In that case, the calculation of contact freezing by Young, 1974 is removed
 
    ! heterogeneous freezing
    call t_startf('hetfrz_classnuc_cam_calc')

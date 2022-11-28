@@ -91,9 +91,8 @@ end subroutine nucleati_init
 
 subroutine nucleati(  &
    wbar, tair, pmid, relhum, cldn,      &
-   rhoair, so4_num, dst_num,            &
-   nuci, onihf, oniimm, onidep, onimey, &
-   dst3_num)
+   rhoair, so4_num, dst3_num,  &
+   nuci, onihf, oniimm, onidep, onimey)
 
    !---------------------------------------------------------------
    ! Purpose:
@@ -115,7 +114,6 @@ subroutine nucleati(  &
    real(r8), intent(in) :: cldn        ! new value of cloud fraction    [fraction]
    real(r8), intent(in) :: rhoair      ! air density [kg/m3]
    real(r8), intent(in) :: so4_num     ! so4 aerosol number [#/cm^3]
-   real(r8), intent(in) :: dst_num     ! total dust aerosol number [#/cm^3]
    real(r8), intent(in) :: dst3_num     ! dust aerosol number [#/cm^3]
 
    ! Output Arguments
