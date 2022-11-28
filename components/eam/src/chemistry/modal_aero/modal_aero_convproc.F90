@@ -88,8 +88,6 @@ subroutine ma_convproc_init
   implicit none
 
   logical :: history_aerosol      ! Output the MAM aerosol tendencies
-  logical :: resus_fix
-  character(len=100) :: msg
 
 ! 
 ! Add history fields
@@ -119,22 +117,21 @@ subroutine ma_convproc_init
        call add_default( 'DP_MFUP_MAX', 1, ' ' )
        call add_default( 'DP_WCLDBASE', 1, ' ' )
        call add_default( 'DP_KCLDBASE', 1, ' ' )
-    end if
+    endif
 
 !
 ! Print control variable settings
 !
-   if ( .not. masterproc ) return
-
-   write(*,'(a,l12)')     'ma_convproc_init - convproc_do_aer               = ', &
-      convproc_do_aer
-   write(*,'(a,l12)')     'ma_convproc_init - convproc_do_gas               = ', &
-      convproc_do_gas
-   write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
-      activate_smaxmax
-   write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
-      factor_reduce_actfrac
-
+   if ( masterproc ) then 
+           write(*,'(a,l12)')     'ma_convproc_init - convproc_do_aer               = ', &
+                 convproc_do_aer
+           write(*,'(a,l12)')     'ma_convproc_init - convproc_do_gas               = ', &
+                 convproc_do_gas
+           write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
+                 activate_smaxmax
+           write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
+                 factor_reduce_actfrac
+   endif
 
    return
 end subroutine ma_convproc_init
