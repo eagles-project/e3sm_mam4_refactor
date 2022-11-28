@@ -344,19 +344,17 @@ implicit none
 
       ! Copy aerosol size and density info
 
-      do imode = 1, max_mode
-         if (imode <= ntot_amode) then
-            dgn_a(imode)           = dgncur_a(ii,kk,imode)
-            dgn_awet(imode)        = dgncur_awet(ii,kk,imode)
-            wetdens(imode)         = max( 1000.0_r8, wetdens_host(ii,kk,imode) )
-         else
-            dgn_a(imode) = 0.0_r8
-            dgn_awet(imode) = 0.0_r8
-            wetdens(imode) = 1000.0_r8
-         end if
-      end do
+      dgn_a   (:) = 0.0_r8
+      dgn_awet(:) = 0.0_r8
+      wetdens (:) = 1000.0_r8
+
+      dgn_a   (1:ntot_amode) = dgncur_a(ii,kk,1:ntot_amode)
+      dgn_awet(1:ntot_amode) = dgncur_awet(ii,kk,1:ntot_amode)
+      wetdens (1:ntot_amode) = max( 1000.0_r8, wetdens_host(ii,kk,1:ntot_amode) )
 
       misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(ii,kk)
+
+      ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
 
       call mam_amicphys_1gridcell(                &
          do_cond,             do_rename,          &
