@@ -383,6 +383,7 @@ subroutine microp_aero_run ( &
    integer :: nmodes 
  
    real(r8), pointer :: state_q(:,:,:)
+   real(r8), pointer :: temperature(:,:)
    real(r8), pointer :: ast(:,:)        
    real(r8), pointer :: alst(:,:)        
    real(r8), pointer :: aist(:,:)        
@@ -465,6 +466,7 @@ subroutine microp_aero_run ( &
 
 
    state_q => state%q
+   temperature => state%t
 
    liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
    icecldf(:ncol,:pver) = aist(:ncol,:pver)
@@ -483,7 +485,7 @@ subroutine microp_aero_run ( &
    ! initialize time-varying parameters
    do k = top_lev, pver
       do i = 1, ncol
-         rho(i,k) = pmid(i,k)/(rair*t(i,k))
+         rho(i,k) = pmid(i,k)/(rair*temperature(i,k))
       end do
    end do
 
@@ -574,7 +576,7 @@ subroutine microp_aero_run ( &
    !ICE Nucleation
 
    call t_startf('nucleate_ice_cam_calc')
-   call nucleate_ice_cam_calc(ncol, lchnk, t, state_q, pmid, &      ! input
+   call nucleate_ice_cam_calc(ncol, lchnk, temperature, state_q, pmid, &      ! input
                               rho, wsubice, ast, dgnum, &           ! input
                               naai, naai_hom)                       ! output
    call t_stopf('nucleate_ice_cam_calc')

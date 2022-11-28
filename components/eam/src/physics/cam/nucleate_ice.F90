@@ -124,22 +124,19 @@ subroutine nucleati(  &
    real(r8), intent(out) :: onimey     ! nucleated number from deposition nucleation  (meyers: mixed phase) [#/kg]
 
    ! Local workspace
-   real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4
-   real(r8) :: niimm                     ! nucleated number from immersion freezing
-   real(r8) :: nidep                     ! nucleated number from deposition nucleation
-   real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers)
-   real(r8) :: n1, ni                    ! nucleated number
-   real(r8) :: tc, regm                  ! work variable  
-   real(r8) :: wbar1, wbar2
+   real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4 [#/cm^3]
+   real(r8) :: niimm                     ! nucleated number from immersion freezing [#/cm^3]
+   real(r8) :: nidep                     ! nucleated number from deposition nucleation [#/cm^3]
+   real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers) [#/cm^3]
+   real(r8) :: n1, ni                    ! nucleated number [#/cm^3]
+   real(r8) :: tc                        ! air temperature [C]
+   real(r8) :: regm                      ! air temperature [C]              
 
+   real(r8), parameter :: num_threshold = 1.0e-10_r8
    !-------------------------------------------------------------------------------
 
-   ! temp variables that depend on use_preexisting_ice
-   wbar1 = wbar
-   wbar2 = wbar
-
    ni = 0._r8
-   tc = tair - 273.15_r8
+   tc = tair - 273.15_r8  ! temperature in celcius
 
    ! initialize
    niimm = 0._r8
@@ -147,25 +144,25 @@ subroutine nucleati(  &
    nihf  = 0._r8
 
 
-   if(so4_num >= 1.0e-10_r8 .and. dst3_num >= 1.0e-10_r8 .and. cldn > 0._r8) then
+   if(so4_num >= num_threshold .and. dst3_num >= num_threshold .and. cldn > 0._r8) then
 
       if((tc <= -35.0_r8) .and. ((relhum*svp_water(tair)/svp_ice(tair)*subgrid) >= 1.2_r8)) then ! use higher RHi threshold
 
-            call calculate_regm_nucleati(wbar1, dst3_num, regm)
+            call calculate_regm_nucleati(wbar, dst3_num, regm)
 
             ! heterogeneous nucleation only
             if (tc > regm) then
 
-               if(tc < -40._r8 .and. wbar1 > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
+               if(tc < -40._r8 .and. wbar > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
-                  call hf(tc,wbar1,relhum,so4_num,nihf)
+                  call hf(tc,wbar,relhum,so4_num,nihf)
                   niimm=0._r8
                   nidep=0._r8   
                   n1=nihf
                   
                else
 
-                  call hetero(tc,wbar2,dst3_num,niimm,nidep)
+                  call hetero(tc,wbar,dst3_num,niimm,nidep)
                   nihf=0._r8
                   n1=niimm+nidep
 
@@ -174,7 +171,7 @@ subroutine nucleati(  &
             ! homogeneous nucleation only
             else if (tc < regm-5._r8) then
 
-               call hf(tc,wbar1,relhum,so4_num,nihf)
+               call hf(tc,wbar,relhum,so4_num,nihf)
                niimm=0._r8
                nidep=0._r8
                n1=nihf
@@ -182,17 +179,17 @@ subroutine nucleati(  &
             ! transition between homogeneous and heterogeneous: interpolate in-between
             else
 
-               if (tc < -40._r8 .and. wbar1 > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
+               if (tc < -40._r8 .and. wbar > 1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
-                  call hf(tc, wbar1, relhum, so4_num, nihf)
+                  call hf(tc, wbar, relhum, so4_num, nihf)
                   niimm = 0._r8
                   nidep = 0._r8
                   n1 = nihf
                   
                else
 
-                  call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
-                  call hetero(regm,wbar2,dst3_num,niimm,nidep)
+                  call hf(regm-5._r8,wbar,relhum,so4_num,nihf)
+                  call hetero(regm,wbar,dst3_num,niimm,nidep)
 
                   if (nihf <= (niimm+nidep)) then
                      n1 = nihf
