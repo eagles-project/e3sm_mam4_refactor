@@ -31,6 +31,7 @@ module modal_aero_convproc
    use wetdep, only: faer_resusp_vs_fprec_evap_mpln
    use ndrop,  only: activate_modal
 
+   use mam_support,     only: min_max_bound
    use modal_aero_data, only: ntot_amode, nspec_amode,  &
                         lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
                         numptr_amode,  numptrcw_amode, &
@@ -506,8 +507,6 @@ subroutine ma_convproc_dp_intr(                &
 
 end subroutine ma_convproc_dp_intr
 
-
-
 !=========================================================================================
 subroutine ma_convproc_sh_intr(                 &
      state, dt,                                 & ! in
@@ -647,10 +646,10 @@ subroutine assign_dotend( species_class,  & ! in
 
 use constituents,   only: pcnst
 
-integer,  intent(in)    :: species_class(:)
-logical,  intent(out)   :: dotend(pcnst)
+   integer,  intent(in)    :: species_class(:)
+   logical,  intent(out)   :: dotend(pcnst)
 
-integer  :: ll
+   integer  :: ll
 
 ! turn on/off calculations for aerosols and trace gases
    do ll = 1, pcnst
@@ -1516,119 +1515,6 @@ jtsub_loop_main_aa: &
    end subroutine initialize_tmr_array
 
 !====================================================================================
-   subroutine update_tendency_final(                            &
-                        ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
-                        ncnst,  nsrflx,         icol,           & ! in
-                        dt,     dcondt,         doconvproc,     & ! in
-                        sumactiva,              sumaqchem,      & ! inout
-                        sumwetdep,              sumresusp,      & ! inout
-                        sumprevap,              sumprevap_hist, & ! inout
-                        dqdt,   q_i,            qsrflx          ) ! inout
-!-----------------------------------------------------------------------
-! update tendencies to final output of ma_convproc_tend
-!
-! note that the ma_convproc_tend does not apply convective cloud processing
-!    to the stratiform-cloudborne aerosol
-! within this routine, cloudborne aerosols are convective-cloudborne
-!
-! before tendencies (dcondt, which is loaded into dqdt) are returned,
-!    the convective-cloudborne aerosol tendencies must be combined
-!    with the interstitial tendencies
-! ma_resuspend_convproc has already done this for the dcondt
-!
-! the individual process column tendencies (sumwetdep, sumprevap, ...)
-!    are just diagnostic fields that can be written to history
-! tendencies for interstitial and convective-cloudborne aerosol could
-!    both be passed back and output, if desired
-! currently, however, the interstitial and convective-cloudborne tendencies
-!    are combined (in the next code block) before being passed back (in qsrflx)
-!-----------------------------------------------------------------------
-
-   integer, parameter   :: pcnst_extd = pcnst*2
-   integer, intent(in)  :: ktop              ! top level index
-   integer, intent(in)  :: kbot_prevap       ! bottom level index, for resuspension and evaporation only
-   integer, intent(in)  :: ntsub             ! number of sub timesteps
-   integer, intent(in)  :: jtsub             ! index of sub timesteps from the outer loop
-   integer, intent(in)  :: ncnst             ! number of tracers to transport
-   integer, intent(in)  :: nsrflx            ! last dimension of qsrflx
-   integer, intent(in)  :: icol              ! column index
-   real(r8),intent(in)  :: dt                ! delta t (model time increment) [s]
-   real(r8),intent(in)  :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
-   logical, intent(in)  :: doconvproc(ncnst) ! flag for doing convective transport
-   real(r8), intent(inout) :: sumactiva(pcnst_extd)            ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
-   real(r8), intent(inout) :: sumaqchem(pcnst_extd)            ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
-   real(r8), intent(inout) :: sumwetdep(pcnst_extd)            ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
-   real(r8), intent(inout) :: sumresusp(pcnst_extd)     ! sum (over layers) of dp*dcondt_resusp [kg/kg/s * mb]
-   real(r8), intent(inout) :: sumprevap(pcnst_extd)     ! sum (over layers) of dp*dcondt_prevap [kg/kg/s * mb]
-   real(r8), intent(inout) :: sumprevap_hist(pcnst_extd)! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s * mb]
-   real(r8), intent(inout) :: dqdt(pcols,pver,ncnst)    ! Tracer tendency array
-   real(r8), intent(inout) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
-                              ! process-specific column tracer tendencies
-                              !  1 = activation   of interstial to conv-cloudborne
-                              !  2 = resuspension of conv-cloudborne to interstital
-                              !  3 = aqueous chemistry (not implemented yet, so zero)
-                              !  4 = wet removal
-                              !  5 = actual precip-evap resuspension (what actually is applied to a species)
-                              !  6 = pseudo precip-evap resuspension (for history file)
-
-   ! local variables
-   integer  :: la, lc, imode, ispec             ! indices
-   integer  :: icnst                            ! index
-   integer  :: kk                               ! vertical index
-   real(r8) :: dtsub                            ! delta t of sub timestep (dt/ntsub) [s]
-   real(r8) :: xinv_ntsub                       ! inverse of ntsub (1.0/ntsub)
-   real(r8) :: dqdt_i(pver,pcnst)               ! dqdt(icol,kk,icnst) at current icol
-   real(r8) :: qsrflx_i(pcnst,nsrflx)           ! qsrflx(i,m,n) at current i
-
-   ! initiate variables
-   qsrflx_i(:,:) = 0.0
-   dqdt_i(:,:) = 0.0
-   xinv_ntsub = 1.0_r8/ntsub
-   dtsub = dt*xinv_ntsub
-
-
-   do imode = 1, ntot_amode
-        do ispec = 0, nspec_amode(imode)
-             call assign_la_lc(imode, ispec, la, lc)
-             if (doconvproc(la)) then
-                   sumactiva(la) = sumactiva(la) + sumactiva(lc)
-                   sumresusp(la) = sumresusp(la) + sumresusp(lc)
-                   sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
-                   sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
-                   sumprevap(la) = sumprevap(la) + sumprevap(lc)
-                   sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
-             endif
-        enddo ! ispec
-   enddo ! imode
-
-   ! scatter overall tendency back to full array
-   do icnst = 2, ncnst
-        if (doconvproc(icnst)) then
-            ! scatter overall dqdt tendency back
-            do kk = ktop, kbot_prevap  ! should go to k=pver because of prevap
-               dqdt_i(kk,icnst) = dcondt(icnst,kk)
-               dqdt(icol,kk,icnst) = dqdt(icol,kk,icnst) + dqdt_i(kk,icnst)*xinv_ntsub
-               ! update the q_i for the next interation of the jtsub loop
-               if (jtsub < ntsub) then
-                  q_i(kk,icnst) = max( (q_i(kk,icnst) + dqdt_i(kk,icnst)*dtsub), 0.0_r8 )
-               endif
-            enddo
-
-            ! scatter column burden tendencies for various processes to qsrflx
-            qsrflx_i(icnst,1) = sumactiva(icnst)*hund_ovr_g
-            qsrflx_i(icnst,2) = sumresusp(icnst)*hund_ovr_g
-            qsrflx_i(icnst,3) = sumaqchem(icnst)*hund_ovr_g
-            qsrflx_i(icnst,4) = sumwetdep(icnst)*hund_ovr_g
-            qsrflx_i(icnst,5) = sumprevap(icnst)*hund_ovr_g
-            qsrflx_i(icnst,6) = sumprevap_hist(icnst)*hund_ovr_g
-            qsrflx(icol,icnst,1:6) = qsrflx(icol,icnst,1:6) + qsrflx_i(icnst,1:6)*xinv_ntsub
-       endif
-   enddo ! icnst
-
-   end subroutine update_tendency_final
-
-!====================================================================================
    subroutine compute_updraft_mixing_ratio(                             &
                 doconvproc_extd, icol,  ktop,   kbot,   iconvtype,      & ! in
                 dt,     dp_i,   dpdry_i,        cldfrac,                & ! in
@@ -1890,6 +1776,234 @@ jtsub_loop_main_aa: &
 
    end subroutine compute_activation_tend
 
+!=========================================================================================
+   subroutine ma_activate_convproc(             &
+              conu,       dconudt,              & ! inout
+              f_ent,      dt_u,      wup,       & ! in
+              tair,       rhoair,               & ! in
+              pcnst_extd, kk,        kactfirst  ) ! in
+!-----------------------------------------------------------------------
+!
+! Purpose:
+! Calculate activation of aerosol species in convective updraft
+! for a single column and level
+!
+! Method:
+! conu(l)    = Updraft TMR (tracer mixing ratio) at k/k-1 interface
+! f_ent      = Fraction of the "before-detrainment" updraft massflux at
+!              k/k-1 interface" resulting from entrainment of level k air
+!              (where k is the current level in subr ma_convproc_tend)
+!
+! On entry to this routine, the conu(l) represents the updraft TMR
+! after entrainment, but before chemistry/physics and detrainment.
+!
+! This routine applies aerosol activation to the conu tracer mixing ratios,
+! then adjusts the conu so that on exit,
+!   conu(la) = conu_incoming(la) - conu(la)*f_act(la)
+!   conu(lc) = conu_incoming(lc) + conu(la)*f_act(la)
+! where
+!   la, lc   = indices for an unactivated/activated aerosol component pair
+!   f_act    = fraction of conu(la) that is activated.  The f_act are
+!              calculated with the Razzak-Ghan activation parameterization.
+!              The f_act differ for each mode, and for number/surface/mass.
+!
+! At cloud base (k==kactfirst), primary activation is done using the
+! "standard" code in subr activate do diagnose maximum supersaturation.
+! Above cloud base, secondary activation is done using a
+! prescribed supersaturation.
+!
+! *** The updraft velocity used for activation calculations is rather
+!     uncertain and needs more work.  However, an updraft of 1-3 m/s
+!     will activate essentially all of accumulation and coarse mode particles.
+!
+! Author: R. Easter
+!
+!-----------------------------------------------------------------------
+
+   implicit none
+
+!-----------------------------------------------------------------------
+! arguments  (note:  TMR = tracer mixing ratio)
+   integer, intent(in)     :: pcnst_extd        ! indices
+   ! conu = tracer mixing ratios in updraft at top of this (current) level. The
+   ! conu are changed by activation
+   real(r8), intent(inout) :: conu(pcnst_extd)    ! [#/kg or kg/kg]
+   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
+   real(r8), intent(in)    :: f_ent     ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
+   real(r8), intent(in)    :: dt_u      ! lagrangian transport time in the updraft at current level [s]
+   real(r8), intent(in)    :: wup       ! mean updraft vertical velocity at current level updraft [m/s]
+   real(r8), intent(in)    :: tair      ! Temperature [K]
+   real(r8), intent(in)    :: rhoair    ! air density [kg/m3]
+   integer,  intent(in)    :: kk        ! level index
+   integer,  intent(in)    :: kactfirst ! k at cloud base
+
+!-----------------------------------------------------------------------
+! local variables
+   integer  :: la, lc, imode, ispec   ! indices
+
+   real(r8) :: dt_u_inv               ! 1.0/dt_u [1/s]
+   real(r8) :: fluxm(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: fluxn(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: flux_fullact           ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
+   real(r8) :: fm(ntot_amode)         ! mass fraction of aerosols activated [fraction]
+   real(r8) :: fn(ntot_amode)         ! number fraction of aerosols activated [fraction]
+   real(r8) :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
+   real(r8) :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
+   real(r8) :: sigw                   ! standard deviation of updraft velocity [m/s]
+   real(r8) :: act_frac               ! activation fraction [fraction]
+   real(r8) :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
+   real(r8) :: wbar                   ! mean updraft velocity [m/s]
+   real(r8) :: wdiab                  ! diabatic vertical velocity [m/s]
+   real(r8) :: wminf, wmaxf           ! limits for integration over updraft spectrum [m/s]
+
+!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction =
+!  percent*0.01)
+   real(r8), parameter :: activate_smaxmax = 0.003_r8
+
+!-----------------------------------------------------------------------
+
+! check f_ent > 0
+   if (f_ent <= 0.0_r8) return
+
+! calculate aerosol (or a+cw) volume, number and hygroscopicity
+   call aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                           vaerosol,   naerosol, hygro      ) ! out
+
+
+! call Razzak-Ghan activation routine with single updraft
+   wbar = max( wup, 0.5_r8 )  ! force wbar >= 0.5 m/s for now
+   sigw = 0.0_r8
+   wdiab = 0.0_r8
+   wminf = wbar
+   wmaxf = wbar
+
+   if (kk == kactfirst) then
+! at cloud base - do primary activation
+      call activate_modal(                                             &
+         wbar, wmaxf, tair, rhoair,                                    & ! in
+         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
+         fn, fm, fluxn, fluxm, flux_fullact                            ) ! out
+   else
+! above cloud base - do secondary activation with prescribed supersat
+! that is constant with height
+      call activate_modal(                                             &
+         wbar, wmaxf, tair, rhoair,                                    & ! in
+         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
+         fn, fm, fluxn, fluxm, flux_fullact,                           & ! out
+         activate_smaxmax                                              ) ! optional in
+   endif
+
+! apply the activation fractions to the updraft aerosol mixing ratios
+   dt_u_inv = 1.0_r8/dt_u
+
+   do imode = 1, ntot_amode
+        ! for aerosol number
+        call assign_la_lc(imode, 0, la, lc)
+        act_frac = fn(imode)
+        call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
+        ! for aerosol mass
+        do ispec = 1, nspec_amode(imode)
+            call assign_la_lc(imode, ispec, la, lc)
+            act_frac = fm(imode)
+            call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                   pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
+        enddo  ! ispec
+   enddo   ! imode
+
+   return
+   end subroutine ma_activate_convproc
+
+!========================================================================================
+   subroutine aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
+                                 vaerosol,   naerosol, hygro      ) ! out
+!-----------------------------------------------------------------------
+! calculate aerosol volume, number and hygroscopicity
+!-----------------------------------------------------------------------
+
+!-----------------------------------------------------------------------
+! arguments:
+   implicit none
+   integer, intent(in)     :: pcnst_extd             ! TMR index
+   ! conu = tracer mixing ratios in updraft at top of this (current) level. The
+   ! conu are changed by activation
+   real(r8), intent(in)    :: conu(pcnst_extd)       ! TMR [#/kg or kg/kg]
+   real(r8), intent(in)    :: rhoair                 ! air density [kg/m3]
+   real(r8), intent(out)   :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
+   real(r8), intent(out)   :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
+   real(r8), intent(out)   :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
+
+! local variables
+   integer  :: imode, ispec          ! index
+   real(r8) :: tmp_vol_spec          ! aerosol volume for a single species [m3/kg]
+   real(r8) :: tmp_vol               ! aerosol volume [m3/kg]
+   real(r8) :: tmp_num               ! aerosol number [#/kg]
+   real(r8) :: tmp_hygro             ! aerosol hygroscopicity * volume [m3/kg]
+   real(r8) :: n_min, n_max          ! min and max bound of naerosol
+
+   real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
+
+!-----------------------------------------------------------------------
+
+   do imode = 1, ntot_amode
+
+      ! compute aerosol (or a+cw) volume and hygroscopicity
+      tmp_vol = 0.0_r8
+      tmp_hygro = 0.0_r8
+      do ispec = 1, nspec_amode(imode)
+         tmp_vol_spec = max( conu(lmassptr_amode(ispec,imode)), 0.0_r8 ) / specdens_amode(lspectype_amode(ispec,imode))    ! mass divided by density
+         tmp_vol = tmp_vol + tmp_vol_spec ! total aerosol volume
+         tmp_hygro = tmp_hygro + tmp_vol_spec * spechygro(lspectype_amode(ispec,imode))   ! volume*hygro suming up for all species
+      enddo
+      vaerosol(imode) = tmp_vol * rhoair   ! change volume from m3/kgair to m3/m3air
+      if (tmp_vol < small_vol) then
+         hygro(imode) = 0.2_r8
+      else
+         hygro(imode) = tmp_hygro/tmp_vol
+      endif
+
+      ! computer a (or a+cw) number and bound it
+      tmp_num = max( conu(numptr_amode(imode)), 0.0_r8 )
+      n_min = vaerosol(imode)*voltonumbhi_amode(imode)
+      n_max = vaerosol(imode)*voltonumblo_amode(imode)
+      naerosol(imode) = min_max_bound(n_min, n_max, tmp_num*rhoair)
+
+   enddo  ! imode
+
+   return
+   end subroutine aer_vol_num_hygro
+
+!========================================================================================
+   subroutine update_conu_from_act_frac ( conu,      dconudt,          & ! inout
+                                        pcnst_extd,  la,    lc,        & ! in
+                                        act_frac,    dt_u_inv          ) ! in
+!-----------------------------------------------------------------------
+! update conu and dconudt from activation fraction
+!-----------------------------------------------------------------------
+! arguments:
+   integer, intent(in)     :: pcnst_extd
+   real(r8), intent(inout) :: conu(pcnst_extd)    ! TMR concentration [#/kg or kg/kg]
+   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
+   real(r8), intent(in)    :: act_frac            ! activation fraction [fraction]
+   real(r8), intent(in)    :: dt_u_inv            ! 1.0/dt_u  [1/s]
+   integer, intent(in)     :: la                  ! indices for interstitial aerosols
+   integer, intent(in)     :: lc                  ! indices for in-cloud water aerosols
+! local variable
+   real(r8)     :: delact   ! change of aerosols due to activation [#/kg or kg/kg]
+
+   delact = min_max_bound(0.0_r8, conu(la), conu(la)*act_frac)
+   ! update conu in interstitial and in-cloud condition
+   conu(la) = conu(la) - delact
+   conu(lc) = conu(lc) + delact
+   ! update dconu/dt
+   dconudt(la) = -delact*dt_u_inv
+   dconudt(lc) =  delact*dt_u_inv
+
+   return
+   end subroutine update_conu_from_act_frac
+
+
+
 !====================================================================================
    subroutine compute_wetdep_tend(                              &
                 doconvproc_extd,        icol,   kk,     dt,     & ! in
@@ -2141,46 +2255,6 @@ jtsub_loop_main_aa: &
    enddo ! "kk = ktop, kbot"
 
    end subroutine compute_fluxes_tendencies
-
-!=========================================================================================
-   subroutine compute_tendency_resusp_evap(                             &
-                doconvproc_extd, ktop,          kbot_prevap,  dpdry_i,  & ! in
-                dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
-                sumresusp,      sumprevap,      sumprevap_hist          ) ! out
-!-----------------------------------------------------------------------
-! calculate column-tendency of resuspension and evaporation
-!-----------------------------------------------------------------------
-
-   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
-   integer, parameter :: pcnst_extd = pcnst*2
-   logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
-   integer, intent(in)  :: ktop                     ! top level index
-   integer, intent(in)  :: kbot_prevap              ! bottom level index, for resuspension and evaporation only
-   real(r8),intent(in)  :: dpdry_i(pver)            ! dp [mb]
-   real(r8),intent(in)    :: dcondt_resusp(pcnst_extd,pver)  ! portion of TMR tendency due to resuspension [kg/kg/s]
-   real(r8),intent(in)    :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
-   real(r8),intent(in)    :: dcondt_prevap_hist(pcnst_extd,pver) ! portion of TMR tendency due to precip evaporation, goes into the history [kg/kg/s]
-   real(r8),intent(out)  :: sumresusp(pcnst_extd)    ! sum (over layers) of dp*dconudt_resusp [kg/kg/s * mb]
-   real(r8),intent(out)  :: sumprevap(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap [kg/kg/s * mb]
-   real(r8),intent(out)  :: sumprevap_hist(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap_hist [kg/kg/s * mb]
-
-   integer      :: kk           ! vertical index
-   integer      :: icnst        ! index of pcnst_extd
-
-      sumresusp(:) = 0.0
-      sumprevap(:) = 0.0
-      sumprevap_hist(:) = 0.0
-      do icnst = 2, pcnst_extd
-         if (doconvproc_extd(icnst)) then
-            ! should go to kk=pver for dcondt_prevap, and this should be safe for other sums
-            do kk = ktop, kbot_prevap
-               sumresusp(icnst) = sumresusp(icnst) + dcondt_resusp(icnst,kk)*dpdry_i(kk)
-               sumprevap(icnst) = sumprevap(icnst) + dcondt_prevap(icnst,kk)*dpdry_i(kk)
-               sumprevap_hist(icnst) = sumprevap_hist(icnst) + dcondt_prevap_hist(icnst,kk)*dpdry_i(kk)
-            enddo
-         endif
-      enddo 
-   end subroutine compute_tendency_resusp_evap
 
 !=========================================================================================
    subroutine ma_precpevap_convproc(                           &
@@ -2452,245 +2526,6 @@ jtsub_loop_main_aa: &
 
     end subroutine ma_precpprod
 
-
-
-! ================================================================
-   pure function min_max_bound(minlim, maxlim, input) result(bounded)
-
-        real(r8), intent(in) :: minlim, maxlim
-        real(r8), intent(in) :: input
-
-        !return value
-        real(r8) :: bounded
-
-        bounded = max(min(maxlim, input), minlim)
-
-   end function min_max_bound
-
-!=========================================================================================
-   subroutine ma_activate_convproc(             &
-              conu,       dconudt,              & ! inout
-              f_ent,      dt_u,      wup,       & ! in
-              tair,       rhoair,               & ! in
-              pcnst_extd, kk,        kactfirst  ) ! in
-!-----------------------------------------------------------------------
-!
-! Purpose:
-! Calculate activation of aerosol species in convective updraft
-! for a single column and level
-!
-! Method:
-! conu(l)    = Updraft TMR (tracer mixing ratio) at k/k-1 interface
-! f_ent      = Fraction of the "before-detrainment" updraft massflux at 
-!              k/k-1 interface" resulting from entrainment of level k air
-!              (where k is the current level in subr ma_convproc_tend)
-!
-! On entry to this routine, the conu(l) represents the updraft TMR
-! after entrainment, but before chemistry/physics and detrainment. 
-!
-! This routine applies aerosol activation to the conu tracer mixing ratios,
-! then adjusts the conu so that on exit,
-!   conu(la) = conu_incoming(la) - conu(la)*f_act(la)
-!   conu(lc) = conu_incoming(lc) + conu(la)*f_act(la)
-! where 
-!   la, lc   = indices for an unactivated/activated aerosol component pair
-!   f_act    = fraction of conu(la) that is activated.  The f_act are
-!              calculated with the Razzak-Ghan activation parameterization.
-!              The f_act differ for each mode, and for number/surface/mass.
-!
-! At cloud base (k==kactfirst), primary activation is done using the
-! "standard" code in subr activate do diagnose maximum supersaturation.
-! Above cloud base, secondary activation is done using a
-! prescribed supersaturation.
-!
-! *** The updraft velocity used for activation calculations is rather 
-!     uncertain and needs more work.  However, an updraft of 1-3 m/s 
-!     will activate essentially all of accumulation and coarse mode particles.
-!
-! Author: R. Easter
-!
-!-----------------------------------------------------------------------
-
-
-   implicit none
-
-!-----------------------------------------------------------------------
-! arguments  (note:  TMR = tracer mixing ratio)
-   integer, intent(in)     :: pcnst_extd        ! indices
-   ! conu = tracer mixing ratios in updraft at top of this (current) level. The conu are changed by activation
-   real(r8), intent(inout) :: conu(pcnst_extd)    ! [#/kg or kg/kg]
-   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
-   real(r8), intent(in)    :: f_ent     ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
-   real(r8), intent(in)    :: dt_u      ! lagrangian transport time in the updraft at current level [s]
-   real(r8), intent(in)    :: wup       ! mean updraft vertical velocity at current level updraft [m/s]
-   real(r8), intent(in)    :: tair      ! Temperature [K]
-   real(r8), intent(in)    :: rhoair    ! air density [kg/m3]
-   integer,  intent(in)    :: kk        ! level index
-   integer,  intent(in)    :: kactfirst ! k at cloud base
-
-!-----------------------------------------------------------------------
-! local variables
-   integer  :: la, lc, imode, ispec   ! indices
-
-   real(r8) :: dt_u_inv               ! 1.0/dt_u [1/s]
-   real(r8) :: fluxm(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
-   real(r8) :: fluxn(ntot_amode)      ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
-   real(r8) :: flux_fullact           ! output of activate_modal not used in this subroutine. to understand this, see subr activate_modal
-   real(r8) :: fm(ntot_amode)         ! mass fraction of aerosols activated [fraction]
-   real(r8) :: fn(ntot_amode)         ! number fraction of aerosols activated [fraction] 
-   real(r8) :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
-   real(r8) :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
-   real(r8) :: sigw                   ! standard deviation of updraft velocity [m/s]
-   real(r8) :: act_frac               ! activation fraction [fraction]
-   real(r8) :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
-   real(r8) :: wbar                   ! mean updraft velocity [m/s]
-   real(r8) :: wdiab                  ! diabatic vertical velocity [m/s]
-   real(r8) :: wminf, wmaxf           ! limits for integration over updraft spectrum [m/s]
-
-!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction =  percent*0.01)
-   real(r8), parameter :: activate_smaxmax = 0.003_r8
-
-!-----------------------------------------------------------------------
-
-! check f_ent > 0
-   if (f_ent <= 0.0_r8) return
-
-! calculate aerosol (or a+cw) volume, number and hygroscopicity
-   call aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
-                           vaerosol,   naerosol, hygro      ) ! out
-
-
-! call Razzak-Ghan activation routine with single updraft
-   wbar = max( wup, 0.5_r8 )  ! force wbar >= 0.5 m/s for now
-   sigw = 0.0_r8
-   wdiab = 0.0_r8
-   wminf = wbar
-   wmaxf = wbar
-
-   if (kk == kactfirst) then
-! at cloud base - do primary activation
-      call activate_modal(                                             &
-         wbar, wmaxf, tair, rhoair,                                    & ! in
-         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
-         fn, fm, fluxn, fluxm, flux_fullact                            ) ! out
-   else
-! above cloud base - do secondary activation with prescribed supersat 
-! that is constant with height
-      call activate_modal(                                             &
-         wbar, wmaxf, tair, rhoair,                                    & ! in
-         naerosol, ntot_amode, vaerosol, hygro,                        & ! in
-         fn, fm, fluxn, fluxm, flux_fullact,                           & ! out
-         activate_smaxmax                                              ) ! optional in
-   endif
-      
-! apply the activation fractions to the updraft aerosol mixing ratios
-   dt_u_inv = 1.0_r8/dt_u
-
-   do imode = 1, ntot_amode
-        ! for aerosol number
-        call assign_la_lc(imode, 0, la, lc)
-        act_frac = fn(imode)
-        call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
-                   pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
-        ! for aerosol mass
-        do ispec = 1, nspec_amode(imode)
-            call assign_la_lc(imode, ispec, la, lc)
-            act_frac = fm(imode)
-            call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
-                   pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
-        enddo  ! ispec
-   enddo   ! imode
-
-   return
-   end subroutine ma_activate_convproc
-
-!========================================================================================
-   subroutine update_conu_from_act_frac ( conu,      dconudt,          & ! inout
-                                        pcnst_extd,  la,    lc,        & ! in
-                                        act_frac,    dt_u_inv          ) ! in
-!-----------------------------------------------------------------------
-! update conu and dconudt from activation fraction
-!-----------------------------------------------------------------------
-! arguments:
-   integer, intent(in)     :: pcnst_extd
-   real(r8), intent(inout) :: conu(pcnst_extd)    ! TMR concentration [#/kg or kg/kg]
-   real(r8), intent(inout) :: dconudt(pcnst_extd) ! TMR tendencies due to activation [#/kg/s or kg/kg/s]
-   real(r8), intent(in)    :: act_frac            ! activation fraction [fraction]
-   real(r8), intent(in)    :: dt_u_inv            ! 1.0/dt_u  [1/s]
-   integer, intent(in)     :: la                  ! indices for interstitial aerosols
-   integer, intent(in)     :: lc                  ! indices for in-cloud water aerosols
-! local variable
-   real(r8)     :: delact   ! change of aerosols due to activation [#/kg or kg/kg]
-
-   delact = min_max_bound(0.0_r8, conu(la), conu(la)*act_frac)
-   ! update conu in interstitial and in-cloud condition
-   conu(la) = conu(la) - delact
-   conu(lc) = conu(lc) + delact
-   ! update dconu/dt
-   dconudt(la) = -delact*dt_u_inv
-   dconudt(lc) =  delact*dt_u_inv
-
-   return
-   end subroutine update_conu_from_act_frac
-
-!========================================================================================
-   subroutine aer_vol_num_hygro( pcnst_extd, conu,     rhoair,    & ! in
-                                 vaerosol,   naerosol, hygro      ) ! out
-!-----------------------------------------------------------------------
-! calculate aerosol volume, number and hygroscopicity 
-!-----------------------------------------------------------------------
-                                
-!-----------------------------------------------------------------------
-! arguments:
-   implicit none
-   integer, intent(in)     :: pcnst_extd             ! TMR index
-   ! conu = tracer mixing ratios in updraft at top of this (current) level. The conu are changed by activation
-   real(r8), intent(in)    :: conu(pcnst_extd)       ! TMR [#/kg or kg/kg]
-   real(r8), intent(in)    :: rhoair                 ! air density [kg/m3]
-   real(r8), intent(out)   :: vaerosol(ntot_amode)   ! int+act volume [m3/m3]
-   real(r8), intent(out)   :: naerosol(ntot_amode)   ! interstitial+activated number conc [#/m3]
-   real(r8), intent(out)   :: hygro(ntot_amode)      ! current hygroscopicity for int+act [unitless]
-
-! local variables
-   integer  :: imode, ispec          ! index
-   real(r8) :: tmp_vol_spec          ! aerosol volume for a single species [m3/kg]
-   real(r8) :: tmp_vol               ! aerosol volume [m3/kg]
-   real(r8) :: tmp_num               ! aerosol number [#/kg]
-   real(r8) :: tmp_hygro             ! aerosol hygroscopicity * volume [m3/kg]
-   real(r8) :: n_min, n_max          ! min and max bound of naerosol
-
-   real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
-
-!-----------------------------------------------------------------------
-
-   do imode = 1, ntot_amode
-
-      ! compute aerosol (or a+cw) volume and hygroscopicity
-      tmp_vol = 0.0_r8
-      tmp_hygro = 0.0_r8
-      do ispec = 1, nspec_amode(imode)
-         tmp_vol_spec = max( conu(lmassptr_amode(ispec,imode)), 0.0_r8 ) / specdens_amode(lspectype_amode(ispec,imode))    ! mass divided by density
-         tmp_vol = tmp_vol + tmp_vol_spec ! total aerosol volume
-         tmp_hygro = tmp_hygro + tmp_vol_spec * spechygro(lspectype_amode(ispec,imode))   ! volume*hygro suming up for all species
-      enddo
-      vaerosol(imode) = tmp_vol * rhoair   ! change volume from m3/kgair to m3/m3air
-      if (tmp_vol < small_vol) then
-         hygro(imode) = 0.2_r8
-      else
-         hygro(imode) = tmp_hygro/tmp_vol
-      endif
-
-      ! computer a (or a+cw) number and bound it
-      tmp_num = max( conu(numptr_amode(imode)), 0.0_r8 )
-      n_min = vaerosol(imode)*voltonumbhi_amode(imode)
-      n_max = vaerosol(imode)*voltonumblo_amode(imode)
-      naerosol(imode) = min_max_bound(n_min, n_max, tmp_num*rhoair)
-
-   enddo  ! imode
-
-   return
-   end subroutine aer_vol_num_hygro
-
 !=========================================================================================
    subroutine ma_resuspend_convproc(   dcondt,          & ! inout
               ktop,  kbot_prevap,  pcnst_extd,          & ! in
@@ -2707,14 +2542,14 @@ jtsub_loop_main_aa: &
 ! Method:
 ! Three possible approaches were considered:
 !
-! 1. Ad-hoc #1 approach.  At each level, adjust dcondt for the activated 
-!    and unactivated portions of a particular aerosol species so that the 
-!    ratio of dcondt (activated/unactivate) is equal to the ratio of the 
-!    mixing ratios before convection.  
+! 1. Ad-hoc #1 approach.  At each level, adjust dcondt for the activated
+!    and unactivated portions of a particular aerosol species so that the
+!    ratio of dcondt (activated/unactivate) is equal to the ratio of the
+!    mixing ratios before convection.
 !    THIS WAS IMPLEMENTED IN MIRAGE2
 !
-! 2. Ad-hoc #2 approach.  At each level, adjust dcondt for the activated 
-!    and unactivated portions of a particular aerosol species so that the 
+! 2. Ad-hoc #2 approach.  At each level, adjust dcondt for the activated
+!    and unactivated portions of a particular aerosol species so that the
 !    change to the activated portion is minimized (zero if possible).  The
 !    would minimize effects of convection on the large-scale cloud.
 !    THIS IS CURRENTLY IMPLEMENTED IN CAM5 where we assume that convective
@@ -2735,7 +2570,7 @@ jtsub_loop_main_aa: &
 ! (note:  TMR = tracer mixing ratio)
    integer,  intent(in)    :: pcnst_extd ! cloudborne aerosol dimension [unitless]
    real(r8), intent(inout) :: dcondt(pcnst_extd,pver)
-                              ! overall TMR tendency from convection [#/kg/s or kg/kg/s] 
+                              ! overall TMR tendency from convection [#/kg/s or kg/kg/s]
    real(r8), intent(out)   :: dcondt_resusp(pcnst_extd,pver)
                               ! portion of TMR tendency due to resuspension [#/kg/s or kg/kg/s]
                               ! (actually, due to the adjustments made here)
@@ -2761,7 +2596,6 @@ jtsub_loop_main_aa: &
    return
    end subroutine ma_resuspend_convproc
 
-
 !=========================================================================================
    subroutine tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, &
                         la, lc, ktop, kbot_prevap)
@@ -2781,7 +2615,8 @@ jtsub_loop_main_aa: &
    ! local variables
    integer  :: kk   ! indices of vertical levels
 
-   ! only apply adjustments to dcondt for pairs of unactivated (la) and activated (lc) aerosol species
+   ! only apply adjustments to dcondt for pairs of unactivated (la) and
+   ! activated (lc) aerosol species
    if ((la > 0) .and. (la <= pcnst_extd) .and. (lc > 0) .and. (lc <= pcnst_extd)) then
        do kk = ktop, kbot_prevap
             ! cam5 approach
@@ -2794,6 +2629,161 @@ jtsub_loop_main_aa: &
 
    return
    end subroutine tmr_tendency
+
+
+!=========================================================================================
+   subroutine compute_tendency_resusp_evap(                             &
+                doconvproc_extd, ktop,          kbot_prevap,  dpdry_i,  & ! in
+                dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
+                sumresusp,      sumprevap,      sumprevap_hist          ) ! out
+!-----------------------------------------------------------------------
+! calculate column-tendency of resuspension and evaporation
+!-----------------------------------------------------------------------
+
+   ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
+   integer, parameter :: pcnst_extd = pcnst*2
+   logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
+   integer, intent(in)  :: ktop                     ! top level index
+   integer, intent(in)  :: kbot_prevap              ! bottom level index, for resuspension and evaporation only
+   real(r8),intent(in)  :: dpdry_i(pver)            ! dp [mb]
+   real(r8),intent(in)    :: dcondt_resusp(pcnst_extd,pver)  ! portion of TMR tendency due to resuspension [kg/kg/s]
+   real(r8),intent(in)    :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
+   real(r8),intent(in)    :: dcondt_prevap_hist(pcnst_extd,pver) ! portion of TMR tendency due to precip evaporation, goes into the history [kg/kg/s]
+   real(r8),intent(out)  :: sumresusp(pcnst_extd)    ! sum (over layers) of dp*dconudt_resusp [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumprevap(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumprevap_hist(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap_hist [kg/kg/s * mb]
+
+   integer      :: kk           ! vertical index
+   integer      :: icnst        ! index of pcnst_extd
+
+      sumresusp(:) = 0.0
+      sumprevap(:) = 0.0
+      sumprevap_hist(:) = 0.0
+      do icnst = 2, pcnst_extd
+         if (doconvproc_extd(icnst)) then
+            ! should go to kk=pver for dcondt_prevap, and this should be safe for other sums
+            do kk = ktop, kbot_prevap
+               sumresusp(icnst) = sumresusp(icnst) + dcondt_resusp(icnst,kk)*dpdry_i(kk)
+               sumprevap(icnst) = sumprevap(icnst) + dcondt_prevap(icnst,kk)*dpdry_i(kk)
+               sumprevap_hist(icnst) = sumprevap_hist(icnst) + dcondt_prevap_hist(icnst,kk)*dpdry_i(kk)
+            enddo
+         endif
+      enddo
+   end subroutine compute_tendency_resusp_evap
+
+!====================================================================================
+   subroutine update_tendency_final(                            &
+                        ktop,   kbot_prevap,    ntsub,  jtsub,  & ! in
+                        ncnst,  nsrflx,         icol,           & ! in
+                        dt,     dcondt,         doconvproc,     & ! in
+                        sumactiva,              sumaqchem,      & ! inout
+                        sumwetdep,              sumresusp,      & ! inout
+                        sumprevap,              sumprevap_hist, & ! inout
+                        dqdt,   q_i,            qsrflx          ) ! inout
+!-----------------------------------------------------------------------
+! update tendencies to final output of ma_convproc_tend
+!
+! note that the ma_convproc_tend does not apply convective cloud processing
+!    to the stratiform-cloudborne aerosol
+! within this routine, cloudborne aerosols are convective-cloudborne
+!
+! before tendencies (dcondt, which is loaded into dqdt) are returned,
+!    the convective-cloudborne aerosol tendencies must be combined
+!    with the interstitial tendencies
+! ma_resuspend_convproc has already done this for the dcondt
+!
+! the individual process column tendencies (sumwetdep, sumprevap, ...)
+!    are just diagnostic fields that can be written to history
+! tendencies for interstitial and convective-cloudborne aerosol could
+!    both be passed back and output, if desired
+! currently, however, the interstitial and convective-cloudborne tendencies
+!    are combined (in the next code block) before being passed back (in qsrflx)
+!-----------------------------------------------------------------------
+
+   integer, parameter   :: pcnst_extd = pcnst*2
+   integer, intent(in)  :: ktop              ! top level index
+   integer, intent(in)  :: kbot_prevap       ! bottom level index, for resuspension and evaporation only
+   integer, intent(in)  :: ntsub             ! number of sub timesteps
+   integer, intent(in)  :: jtsub             ! index of sub timesteps from the outer loop
+   integer, intent(in)  :: ncnst             ! number of tracers to transport
+   integer, intent(in)  :: nsrflx            ! last dimension of qsrflx
+   integer, intent(in)  :: icol              ! column index
+   real(r8),intent(in)  :: dt                ! delta t (model time increment) [s]
+   real(r8),intent(in)  :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
+   logical, intent(in)  :: doconvproc(ncnst) ! flag for doing convective transport
+   real(r8), intent(inout) :: sumactiva(pcnst_extd)            ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumaqchem(pcnst_extd)            ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumwetdep(pcnst_extd)            ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumresusp(pcnst_extd)     ! sum (over layers) of dp*dcondt_resusp [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumprevap(pcnst_extd)     ! sum (over layers) of dp*dcondt_prevap [kg/kg/s * mb]
+   real(r8), intent(inout) :: sumprevap_hist(pcnst_extd)! sum (over layers) of dp*dcondt_prevap_hist [kg/kg/s * mb]
+   real(r8), intent(inout) :: dqdt(pcols,pver,ncnst)    ! Tracer tendency array
+   real(r8), intent(inout) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
+                              ! process-specific column tracer tendencies
+                              !  1 = activation   of interstial to conv-cloudborne
+                              !  2 = resuspension of conv-cloudborne to interstital
+                              !  3 = aqueous chemistry (not implemented yet, so zero)
+                              !  4 = wet removal
+                              !  5 = actual precip-evap resuspension (what actually is applied to a species)
+                              !  6 = pseudo precip-evap resuspension (for history file)
+
+   ! local variables
+   integer  :: la, lc, imode, ispec             ! indices
+   integer  :: icnst                            ! index
+   integer  :: kk                               ! vertical index
+   real(r8) :: dtsub                            ! delta t of sub timestep (dt/ntsub) [s]
+   real(r8) :: xinv_ntsub                       ! inverse of ntsub (1.0/ntsub)
+   real(r8) :: dqdt_i(pver,pcnst)               ! dqdt(icol,kk,icnst) at current icol
+   real(r8) :: qsrflx_i(pcnst,nsrflx)           ! qsrflx(i,m,n) at current i
+
+   ! initiate variables
+   qsrflx_i(:,:) = 0.0
+   dqdt_i(:,:) = 0.0
+   xinv_ntsub = 1.0_r8/ntsub
+   dtsub = dt*xinv_ntsub
+
+
+   do imode = 1, ntot_amode
+        do ispec = 0, nspec_amode(imode)
+             call assign_la_lc(imode, ispec, la, lc)
+             if (doconvproc(la)) then
+                   sumactiva(la) = sumactiva(la) + sumactiva(lc)
+                   sumresusp(la) = sumresusp(la) + sumresusp(lc)
+                   sumaqchem(la) = sumaqchem(la) + sumaqchem(lc)
+                   sumwetdep(la) = sumwetdep(la) + sumwetdep(lc)
+                   sumprevap(la) = sumprevap(la) + sumprevap(lc)
+                   sumprevap_hist(la) = sumprevap_hist(la) + sumprevap_hist(lc)
+             endif
+        enddo ! ispec
+   enddo ! imode
+
+   ! scatter overall tendency back to full array
+   do icnst = 2, ncnst
+        if (doconvproc(icnst)) then
+            ! scatter overall dqdt tendency back
+            do kk = ktop, kbot_prevap  ! should go to k=pver because of prevap
+               dqdt_i(kk,icnst) = dcondt(icnst,kk)
+               dqdt(icol,kk,icnst) = dqdt(icol,kk,icnst) + dqdt_i(kk,icnst)*xinv_ntsub
+               ! update the q_i for the next interation of the jtsub loop
+               if (jtsub < ntsub) then
+                  q_i(kk,icnst) = max( (q_i(kk,icnst) + dqdt_i(kk,icnst)*dtsub), 0.0_r8 )
+               endif
+            enddo
+
+            ! scatter column burden tendencies for various processes to qsrflx
+            qsrflx_i(icnst,1) = sumactiva(icnst)*hund_ovr_g
+            qsrflx_i(icnst,2) = sumresusp(icnst)*hund_ovr_g
+            qsrflx_i(icnst,3) = sumaqchem(icnst)*hund_ovr_g
+            qsrflx_i(icnst,4) = sumwetdep(icnst)*hund_ovr_g
+            qsrflx_i(icnst,5) = sumprevap(icnst)*hund_ovr_g
+            qsrflx_i(icnst,6) = sumprevap_hist(icnst)*hund_ovr_g
+            qsrflx(icol,icnst,1:6) = qsrflx(icol,icnst,1:6) + qsrflx_i(icnst,1:6)*xinv_ntsub
+       endif
+   enddo ! icnst
+
+   end subroutine update_tendency_final
+
 
 !=========================================================================================
    subroutine assign_la_lc( imode,      ispec,          & ! in
