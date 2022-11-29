@@ -451,9 +451,8 @@ subroutine microp_aero_run ( &
 
    call t_startf('microp_aero_run_init')
 
-   ! note for C++ porting, those variables are obtained from pbuf (Fortran MAM code)
-   ! which will not be used in C++ MAM code. It should be ported in
-   ! a different way.
+   ! note for C++ porting, the following variables that are obtained using pbuf
+   ! should be obtained from AD for the previous time step
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
@@ -462,6 +461,8 @@ subroutine microp_aero_run ( &
    call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
 
+   ! note for C++ porting, the following variables that are obtained using pbuf
+   ! should be obtained from AD
    call pbuf_get_field(pbuf, npccn_idx, npccn) 
    call rad_cnst_get_info(0, nmodes=nmodes)
    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
