@@ -367,6 +367,8 @@ end subroutine microp_aero_readnl
 
 subroutine microp_aero_run ( &
    state, ptend, deltatin, pbuf, liqcldfo )
+   
+   use mam_support, only: min_max_bound
 
    ! input arguments
    type(physics_state), target, intent(in)    :: state
@@ -378,7 +380,7 @@ subroutine microp_aero_run ( &
    ! local workspace
    ! all units mks unless otherwise stated
 
-   integer :: i, k, m
+   integer :: icol, kk, m
    integer :: itim_old
    integer :: nmodes 
  
@@ -449,13 +451,17 @@ subroutine microp_aero_run ( &
 
    call t_startf('microp_aero_run_init')
 
+   ! note for C++ porting, those variables are obtained from pbuf (Fortran MAM code)
+   ! which will not be used in C++ MAM code. It should be ported in
+   ! a different way.
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
-  
+   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
+
    call pbuf_get_field(pbuf, npccn_idx, npccn) 
    call rad_cnst_get_info(0, nmodes=nmodes)
    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
@@ -483,9 +489,9 @@ subroutine microp_aero_run ( &
 
 
    ! initialize time-varying parameters
-   do k = top_lev, pver
-      do i = 1, ncol
-         rho(i,k) = pmid(i,k)/(rair*temperature(i,k))
+   do kk = top_lev, pver
+      do icol = 1, ncol
+         rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
       end do
    end do
 
@@ -494,8 +500,6 @@ subroutine microp_aero_run ( &
    ! More refined computation of sub-grid vertical velocity 
    ! Set to be zero at the surface by initialization.
 
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))
    allocate(tke(pcols,pverp))
    tke(:ncol,:) = (3._r8/2._r8)*wp2(:ncol,:)
 
@@ -506,17 +510,14 @@ subroutine microp_aero_run ( &
    wsubi(:ncol,:top_lev-1) = 0.001_r8
    wsig(:ncol,:top_lev-1)  = 0.001_r8
 
-   do k = top_lev, pver
-      do i = 1, ncol
+   do kk = top_lev, pver
+      do icol = 1, ncol
 
-         wsub(i,k) = sqrt(0.5_r8*(tke(i,k) + tke(i,k+1))*(2._r8/3._r8))
-         wsub(i,k) = min(wsub(i,k),10._r8)
-         wsig(i,k) = max(0.001_r8, wsub(i,k))
-        
-         wsubi(i,k) = max(0.2_r8, wsub(i,k))
-         wsubi(i,k) = min(wsubi(i,k), 10.0_r8)
+         wsub(icol,kk)  = sqrt(0.5_r8*(tke(icol,kk) + tke(icol,kk+1))*(2._r8/3._r8))      
+         wsig(icol,kk)  = min_max_bound(0.001_r8, 10._r8, wsub(icol,kk))        
+         wsubi(icol,kk) = min_max_bound(0.2_r8, 10._r8, wsub(icol,kk))
 
-         wsub(i,k)  = max(wsubmin, wsub(i,k))
+         wsub(icol,kk)  = max(wsubmin, wsub(icol,kk))
 
       end do
    end do
@@ -534,9 +535,9 @@ subroutine microp_aero_run ( &
    !!  Negative omega means rising motion
    !!.......................................................... 
 
-   do k = top_lev, pver
-      do i = 1, ncol
-         w0(i,k) = -1._r8*omega(i,k)/(rho(i,k)*gravit)
+   do kk = top_lev, pver
+      do icol = 1, ncol
+         w0(icol,kk) = -1._r8*omega(icol,kk)/(rho(icol,kk)*gravit)
       enddo
    enddo
 
@@ -551,16 +552,7 @@ subroutine microp_aero_run ( &
    call subgrid_mean_updraft(ncol, w0, wsig, w2)
    call t_stopf('subgrid_mean_updraft')
 
-
-   select case (icenul_wsub_scheme)
-
-   case(1)
-         wsubice(1:ncol,1:pver) = wsubi(1:ncol,1:pver)
-   case(2)
-         wsubice(1:ncol,1:pver) = w2(1:ncol,1:pver)
-   case default
-         call endrun('nucleate_ice_cam_calc : icenul_wsub_scheme not set')
-   end select
+   wsubice(1:ncol,1:pver) = wsubi(1:ncol,1:pver)
 
    call outfld('WSUB',   wsub, pcols, lchnk)
    call outfld('WSUBI',  wsubice, pcols, lchnk)
@@ -577,49 +569,39 @@ subroutine microp_aero_run ( &
 
    call t_startf('nucleate_ice_cam_calc')
    call nucleate_ice_cam_calc(ncol, lchnk, temperature, state_q, pmid, &      ! input
-                              rho, wsubice, ast, dgnum, &           ! input
-                              naai, naai_hom)                       ! output
+                              rho, wsubice, ast, dgnum, &                     ! input
+                              naai, naai_hom)                                 ! output
    call t_stopf('nucleate_ice_cam_calc')
 
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! Droplet Activation
 
-      ! for modal aerosol
+   ! for modal aerosol
 
-      ! partition cloud fraction into liquid water part
-      lcldn = 0._r8
-      lcldo = 0._r8
-      do k = top_lev, pver
-         do i = 1, ncol
-            qcld = qc(i,k) + qi(i,k)
-            if (qcld > qsmall) then
-               lcldn(i,k)=liqcldf(i,k)
-               lcldo(i,k)=liqcldfo(i,k)
-            end if
-         end do
+   ! partition cloud fraction into liquid water part
+   lcldn = 0._r8
+   lcldo = 0._r8
+   do kk = top_lev, pver
+      do icol = 1, ncol
+         qcld = qc(icol,kk) + qi(icol,kk)
+         if (qcld > qsmall) then
+            lcldn(icol,kk)=liqcldf(icol,kk)
+            lcldo(icol,kk)=liqcldfo(icol,kk)
+         end if
       end do
+   end do
+    
+   call outfld('LCLOUD', lcldn, pcols, lchnk)
 
-      call outfld('LCLOUD', lcldn, pcols, lchnk)
-
-      call t_startf('dropmixnuc')
-      call dropmixnuc( &
+   call t_startf('dropmixnuc')
+   call dropmixnuc( &
          state, ptend, deltatin, pbuf, wsub, &
          lcldn, lcldo, nctend_mixnuc, factnum)
-      call t_stopf('dropmixnuc')
+   call t_stopf('dropmixnuc')
 
-      npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
+   npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 
-
-
-   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-   ! Contact freezing  (-40<T<-3 C) (Young, 1974) with hooks into simulated dust
-   ! estimate rndst and nanco for 4 dust bins here to pass to MG microphysics
-   ! 
-   ! The contact freezing scheme by Young, 1974 is executed but the results are
-   ! not used in the cloud microphysics scheme. It is replaced by the below CNT
-   ! (subroutine hetfrz_classnuc_cam_calc) scheme.
-   ! In that case, the calculation of contact freezing by Young, 1974 is removed
 
    ! heterogeneous freezing
    call t_startf('hetfrz_classnuc_cam_calc')
