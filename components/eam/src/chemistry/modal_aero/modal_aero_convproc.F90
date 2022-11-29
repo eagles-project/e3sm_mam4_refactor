@@ -15,57 +15,44 @@ module modal_aero_convproc
 !
 !---------------------------------------------------------------------------------
 
-   use shr_kind_mod, only: r8=>shr_kind_r8
-   use physconst,    only: gravit                              
-   use ppgrid,       only: pver, pcols, pverp
-   use cam_history,  only: outfld, addfld, horiz_only, add_default
-   use cam_logfile,  only: iulog
-   use cam_abortutils, only: endrun
-   use physconst,    only: spec_class_aerosol, spec_class_gas
+   use shr_kind_mod,  only: r8=>shr_kind_r8
+   use ppgrid,        only: pver, pcols, pverp
+   use cam_history,   only: outfld, addfld, horiz_only, add_default
+   use cam_logfile,   only: iulog
+   use cam_abortutils,only: endrun
+   use spmd_utils,    only: masterproc
+
+   use physconst,     only: gravit, rair, rhoh2o,             &
+                            spec_class_aerosol, spec_class_gas
+   use physics_types, only: physics_state, physics_ptend
+   use phys_control,  only: phys_getopts
+   use constituents,  only: pcnst, cnst_name
+
+   use wetdep, only: faer_resusp_vs_fprec_evap_mpln
+   use ndrop,  only: activate_modal
+
+   use modal_aero_data, only: ntot_amode, nspec_amode,  &
+                        lmassptr_amode, lmassptrcw_amode, lspectype_amode, &
+                        numptr_amode,  numptrcw_amode, &
+                        specdens_amode, spechygro, &
+                        voltonumblo_amode, voltonumbhi_amode, &
+                        mmtoo_prevap_resusp
 
    implicit none
 
    save
-   private                         ! Make default type private to the module
+   private   ! Make default type private to the module
 
 ! Public methods
-
    public :: &
       ma_convproc_init,             &!
       ma_convproc_intr               !
 
 
-!
 ! module data
-!
-
-   real(r8) :: hund_ovr_g  != 100.0_r8/gravit
-!  used with zm_conv mass fluxes and delta-p
-!     for mu = [mbar/s],   mu*hund_ovr_g = [kg/m2/s]
-!     for dp = [mbar] and q = [kg/kg],   q*dp*hund_ovr_g = [kg/m2]
-
-!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction = percent*0.01)
-   real(r8), parameter :: activate_smaxmax = 0.003_r8
-
-   real(r8), parameter :: factor_reduce_actfrac = 0.5_r8
-   real(r8), parameter :: cldfrac_cut = 0.005_r8        ! cutoff value of cloud fraction to remove zero cloud [fraction]
-   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
-                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
-                ! eliminate occasional very small icwmr values from the ZM module
+   real(r8) :: hund_ovr_g  ! = 100.0_r8/gravit, calculated once and used frequently
    real(r8), parameter :: mbsth = 1.e-15 ! threshold below which we treat the mass fluxes as zero [mb/s]
-   real(r8), parameter :: small_con = 1.e-36        ! threshold of constitute as zero [kg/kg]
-   real(r8), parameter :: small_massflux = 1.0e-7_r8  ! if mass-flux < 1e-7 kg/m2/s ~= 1e-7 m/s ~= 1 cm/day, treat as zero
-   real(r8), parameter :: small_value = 1.0e-30_r8   ! a small value that variables smaller than it are considered as zero
-   real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
-   real(r8), parameter :: small_rel = 1.0e-6_r8         ! small value for relative comparison
-
-
-!
-! Private module data
-!
-
-   logical, private :: convproc_do_gas, convproc_do_aer
-   !  convproc_method_fixaa - see explanation in subr. ma_convproc_tend(                                           &
+   logical  :: convproc_do_gas, convproc_do_aer
 
 !=========================================================================================
   contains
@@ -78,12 +65,6 @@ subroutine ma_convproc_init
 !----------------------------------------
 ! Purpose:  declare output fields, initialize variables needed by convection
 !----------------------------------------
-
-  use cam_history,    only: outfld, addfld, horiz_only, add_default
-  use phys_control,   only: phys_getopts
-  use ppgrid,         only: pcols, pver
-  use spmd_utils,     only: masterproc
-  use error_messages, only: alloc_err	
 
   implicit none
 
@@ -127,10 +108,6 @@ subroutine ma_convproc_init
                  convproc_do_aer
            write(*,'(a,l12)')     'ma_convproc_init - convproc_do_gas               = ', &
                  convproc_do_gas
-           write(*,'(a,1pe12.4)') 'ma_convproc_init - activate_smaxmax              = ', &
-                 activate_smaxmax
-           write(*,'(a,1pe12.4)') 'ma_convproc_init - factor_reduce_actfrac         = ', &
-                 factor_reduce_actfrac
    endif
 
    return
@@ -164,10 +141,6 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 ! 
 !-----------------------------------------------------------------------
 
-   use physics_types, only: physics_state, physics_ptend
-   use constituents,  only: pcnst, cnst_name
-   use modal_aero_data, only: ntot_amode, nspec_amode,  &
-                        numptr_amode, lmassptr_amode
  
 ! Arguments
    type(physics_state), intent(in )   :: state          ! Physics state variables
@@ -439,10 +412,6 @@ subroutine ma_convproc_dp_intr(                &
 ! 
 !-----------------------------------------------------------------------
 
-   use physics_types,  only: physics_state
-   use constituents,   only: pcnst
-
-
  
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
@@ -564,9 +533,6 @@ subroutine ma_convproc_sh_intr(                 &
 ! 
 !-----------------------------------------------------------------------
 
-   use physics_types,  only: physics_state
-   use constituents,   only: pcnst
- 
 ! Arguments
    type(physics_state), intent(in ) :: state          ! Physics state variables
    real(r8), intent(in)    :: dt                      ! delta t (model time increment) [s]
@@ -771,8 +737,9 @@ subroutine load_updraft_massflux(               &
    integer,  intent(out)   :: maxg(pcols)      ! Index of cloud bot for each column
    real(r8), intent(out)   :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
 
-
    integer              :: kk
+   real(r8), parameter :: small_massflux = 1.0e-7_r8  ! if mass-flux < 1e-7 kg/m2/s ~= 1e-7 m/s ~= 1 cm/day, treat as zero
+
 
    ! initiate variables
    tot_conv_layer = 0 ! total layers of convection in this column
@@ -954,13 +921,6 @@ subroutine ma_convproc_tend(                                         &
 ! Authors: O. Seland and R. Easter, based on convtran by P. Rasch
 ! 
 !-----------------------------------------------------------------------
-
-   use shr_kind_mod, only: r8=>shr_kind_r8
-   use ppgrid, only: pcols, pver
-   use physconst, only: gravit, rair, rhoh2o
-   use constituents, only: pcnst, cnst_name
-
-   use modal_aero_data, only: ntot_amode,  nspec_amode
 
    implicit none
 
@@ -1272,8 +1232,6 @@ jtsub_loop_main_aa: &
 ! doconvproc_extd: extended array for both activated and unactivated aerosols
 ! aqfrac: set as 1.0 for activated aerosols and 0.0 otherwise
 !-----------------------------------------------------------------------
-   use constituents, only: pcnst
-   use modal_aero_data, only:  nspec_amode, ntot_amode
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer,  parameter  :: pcnst_extd = pcnst*2
@@ -1315,7 +1273,6 @@ jtsub_loop_main_aa: &
 ! the grid mean, but the whole convective parameterization is highly approximate
 ! values below a threshold and at "top of cloudtop", "base of cloudbase" are set as zero
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp, pcols
 
    integer,  intent(in)  :: ii                   ! index to gathered arrays
    integer,  intent(in)  :: icol                 ! column index
@@ -1372,7 +1329,6 @@ jtsub_loop_main_aa: &
 ! calculate mass flux change (from entrainment or detrainment) in the current dp
 ! also get number of time substeps
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp, pcols
 
    implicit none
 
@@ -1447,7 +1403,6 @@ jtsub_loop_main_aa: &
 !-----------------------------------------------------------------------
 ! compute height above surface for middle of level kk
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver
 
    real(r8), intent(in)  :: dpdry_i(pver)       ! dp [mb]
    real(r8), intent(in)  :: rhoair_i(pver)      ! air density [kg/m3]
@@ -1479,8 +1434,6 @@ jtsub_loop_main_aa: &
 ! Note: for deep convection, some values between the two layers 
 ! differ significantly, use geometric averaging under certain conditions
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp
-   use constituents, only: pcnst
 
    integer,  parameter  :: pcnst_extd = pcnst*2
 
@@ -1503,6 +1456,9 @@ jtsub_loop_main_aa: &
    real(r8) :: c_dif_rel        ! relative difference between level kk and kk-1 [unitless]
    real(r8) :: c_above          ! const at the above (kk-1 level) [kg/kg]
    real(r8) :: c_below          ! const at the below (kk level) [kg/kg]
+
+   real(r8), parameter :: small_con = 1.e-36        ! threshold of constitute as zero [kg/kg]
+   real(r8), parameter :: small_rel = 1.0e-6_r8         ! small value for relative comparison
 
 
    ! initiate variables
@@ -1587,8 +1543,6 @@ jtsub_loop_main_aa: &
 ! currently, however, the interstitial and convective-cloudborne tendencies
 !    are combined (in the next code block) before being passed back (in qsrflx)
 !-----------------------------------------------------------------------
-   use constituents, only: pcnst
-   use modal_aero_data, only:  nspec_amode, ntot_amode
 
    integer, parameter   :: pcnst_extd = pcnst*2
    integer, intent(in)  :: ktop              ! top level index
@@ -1691,8 +1645,6 @@ jtsub_loop_main_aa: &
 !    Detrainment from the updraft uses this final conu(m,k).
 ! Note that different time-split approaches would give somewhat different results
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp, pcols
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer,  parameter  :: pcnst_extd = pcnst*2
@@ -1734,6 +1686,8 @@ jtsub_loop_main_aa: &
    real(r8)     :: cldfrac_i(pver)      ! cldfrac at current icol (with adjustments) [fraction]
    real(r8)     :: wup(pver)            ! mean updraft vertical velocity at current level updraft [m/s]
    real(r8)     :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
+
+   real(r8), parameter :: cldfrac_cut = 0.005_r8        ! cutoff value of cloud fraction to remove zero cloud [fraction]
 
     ! initiate variables
     kactcnt = 0 ; kactfirst = 1
@@ -1826,7 +1780,6 @@ jtsub_loop_main_aa: &
 ! estimate updraft velocity (wup)
 ! do it differently for deep and shallow convection
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp
 
    integer,  intent(in) :: iconvtype            ! 1=deep, 2=uw shallow
    integer,  intent(in) :: kk                   ! vertical level index
@@ -1880,8 +1833,6 @@ jtsub_loop_main_aa: &
 !       do this for all levels above cloud base (even if completely glaciated)
 !          (this is something for sensitivity testing)
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp, pcols
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer,  parameter  :: pcnst_extd = pcnst*2
@@ -1905,6 +1856,9 @@ jtsub_loop_main_aa: &
 
    logical      :: do_act_this_lev      ! flag for doing activation at current level
    integer      :: kp1                  ! kk + 1
+   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
+                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
+                ! eliminate occasional very small icwmr values from the ZM module
 
    ! initiate variables
    do_act_this_lev = .false.
@@ -1967,8 +1921,6 @@ jtsub_loop_main_aa: &
 !       icwmr(icol,k) > clw_cut  AND  rprd(icol,k) > 0.0
 !    as wet removal occurs in both liquid and ice clouds
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp, pcols
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer,  parameter  :: pcnst_extd = pcnst*2
@@ -1991,6 +1943,10 @@ jtsub_loop_main_aa: &
    real(r8)     :: cdt          ! (in-updraft first order wet removal rate) * dt [unitless]
    real(r8)     :: expcdtm1     ! exp(cdt) - 1 [unitless]
    real(r8)     :: half_cld     ! 0.5 * cldfrac [fraction]
+
+   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
+                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
+                ! eliminate occasional very small icwmr values from the ZM module
 
    cdt = 0.0_r8
    if ((icwmr(icol,kk) > clw_cut) .and. (rprd(icol,kk) > 0.0)) then
@@ -2022,8 +1978,6 @@ jtsub_loop_main_aa: &
 ! No special treatment is needed at k=2
 ! No transformation or removal is applied in the downdraft
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver, pverp
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer, parameter   :: pcnst_extd = pcnst*2
@@ -2070,8 +2024,6 @@ jtsub_loop_main_aa: &
 ! NOTE:  The approach used in convtran applies to inert tracers and
 !        must be modified to include source and sink terms
 !-----------------------------------------------------------------------
-   use ppgrid, only: pcols, pver, pverp
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer, parameter :: pcnst_extd = pcnst*2
@@ -2198,8 +2150,6 @@ jtsub_loop_main_aa: &
 !-----------------------------------------------------------------------
 ! calculate column-tendency of resuspension and evaporation
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver
-   use constituents, only: pcnst
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
    integer, parameter :: pcnst_extd = pcnst*2
@@ -2253,7 +2203,6 @@ jtsub_loop_main_aa: &
 !
 !-----------------------------------------------------------------------
 
-   use ppgrid, only: pcols, pver
 
    implicit none
 
@@ -2368,8 +2317,6 @@ jtsub_loop_main_aa: &
 !------------------------------------------
 ! step 1 in ma_precpevap_convproc: aerosol resuspension from precipitation evaporation
 !------------------------------------------
-   use ppgrid, only: pcols,pver
-   use wetdep, only:  faer_resusp_vs_fprec_evap_mpln
 
    integer,  intent(in)      :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)      :: kk    ! vertical level
@@ -2384,6 +2331,9 @@ jtsub_loop_main_aa: &
    real(r8) :: ev_flux_local ! local precip flux from evaporation [(kg/kg/s)*mb]
    real(r8) :: pr_ratio_old, pr_ratio_tmp  ! ratio of pr_flux and pr_flux_base, before and after adjustment in step 1
    real(r8) :: frac_aer_resusp_old, frac_aer_resusp_tmp  ! fraction of precipitation-borne aerosol flux that is NOT resuspended, before and after adjustment in step 1
+
+   real(r8), parameter :: small_value = 1.0e-30_r8   ! a small value that variables smaller than it are considered as zero
+
 
    ! adjust pr_flux due to local evaporation
    ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dpdry_i(kk) )
@@ -2430,10 +2380,6 @@ jtsub_loop_main_aa: &
 !------------------------------------------
 ! step 2 in ma_precpevap_convproc: aerosol scavenging from precipitation production
 !------------------------------------------
-   use ppgrid, only: pcols,pver
-   use constituents, only: pcnst
-   use physconst, only: spec_class_aerosol
-   use modal_aero_data, only: mmtoo_prevap_resusp
 
    integer,  intent(in)    :: icol  ! normal (ungathered) i index for current column
    integer,  intent(in)    :: kk
@@ -2565,10 +2511,6 @@ jtsub_loop_main_aa: &
 !
 !-----------------------------------------------------------------------
 
-   use constituents, only: pcnst
-   use ndrop, only: activate_modal
-
-   use modal_aero_data, only:  nspec_amode, ntot_amode
 
    implicit none
 
@@ -2604,6 +2546,9 @@ jtsub_loop_main_aa: &
    real(r8) :: wbar                   ! mean updraft velocity [m/s]
    real(r8) :: wdiab                  ! diabatic vertical velocity [m/s]
    real(r8) :: wminf, wmaxf           ! limits for integration over updraft spectrum [m/s]
+
+!  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction =  percent*0.01)
+   real(r8), parameter :: activate_smaxmax = 0.003_r8
 
 !-----------------------------------------------------------------------
 
@@ -2695,12 +2640,6 @@ jtsub_loop_main_aa: &
 ! calculate aerosol volume, number and hygroscopicity 
 !-----------------------------------------------------------------------
                                 
-   use constituents, only: pcnst
-   use modal_aero_data, only:  lmassptr_amode, lspectype_amode, &
-         nspec_amode, ntot_amode, numptr_amode, &
-      specdens_amode, spechygro, &
-      voltonumblo_amode, voltonumbhi_amode
-
 !-----------------------------------------------------------------------
 ! arguments:
    implicit none
@@ -2719,6 +2658,9 @@ jtsub_loop_main_aa: &
    real(r8) :: tmp_num               ! aerosol number [#/kg]
    real(r8) :: tmp_hygro             ! aerosol hygroscopicity * volume [m3/kg]
    real(r8) :: n_min, n_max          ! min and max bound of naerosol
+
+   real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
+
 !-----------------------------------------------------------------------
 
    do imode = 1, ntot_amode
@@ -2786,11 +2728,6 @@ jtsub_loop_main_aa: &
 ! C++ porting: only method #2 is implemented.
 !-----------------------------------------------------------------------
 
-   use ppgrid, only: pver
-   use constituents, only: pcnst
-
-   use modal_aero_data, only:  nspec_amode, ntot_amode
-
    implicit none
 
 !-----------------------------------------------------------------------
@@ -2831,7 +2768,6 @@ jtsub_loop_main_aa: &
 !-----------------------------------------------------------------------
 ! calculate tendency of TMR
 !-----------------------------------------------------------------------
-   use ppgrid, only: pver
 
    implicit none
 
@@ -2866,9 +2802,6 @@ jtsub_loop_main_aa: &
 ! get the index of interstital (la) and cloudborne (lc) aerosols
 ! from mode index and species index
 !-----------------------------------------------------------------------
-   use constituents, only: pcnst
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-                               numptr_amode, numptrcw_amode
 
    integer, intent(in)     :: imode            ! index of MAM4 modes
    integer, intent(in)     :: ispec            ! index of species, in which:
