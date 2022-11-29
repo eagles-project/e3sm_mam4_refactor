@@ -1212,7 +1212,7 @@ jtsub_loop_main_aa: &
                                     dcondt_resusp                       ) ! out
 
         ! calculate new column-tendency variables
-        call compute_tendency_resusp_evap(                              &
+        call compute_column_tendency(                                   &
                 doconvproc_extd, ktop,          kbot_prevap,   dpdry_i, & ! in
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
                 dconudt_activa, dconudt_wetdep, fa_u,                   & ! in
@@ -2628,7 +2628,7 @@ jtsub_loop_main_aa: &
 
 
 !=========================================================================================
-   subroutine compute_tendency_resusp_evap(                             &
+   subroutine compute_column_tendency(                                  &
                 doconvproc_extd, ktop,          kbot_prevap,  dpdry_i,  & ! in
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
                 dconudt_activa, dconudt_wetdep, fa_u,                   & ! in
@@ -2686,7 +2686,7 @@ jtsub_loop_main_aa: &
          enddo
       endif
    enddo
-   end subroutine compute_tendency_resusp_evap
+   end subroutine compute_column_tendency
 
 !====================================================================================
    subroutine update_tendency_final(                            &
