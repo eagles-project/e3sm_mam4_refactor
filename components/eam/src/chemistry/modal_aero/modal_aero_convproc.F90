@@ -993,6 +993,7 @@ subroutine ma_convproc_tend(                                         &
    integer :: iflux_method    ! 1=as in convtran (deep), 2=simpler
    integer :: jtsub           ! Work index
    integer :: kk              ! Work index
+   integer :: icnst           ! work index
    integer :: kbot            ! Cloud-flux bottom layer for current i (=mx(i))
    integer :: kbot_prevap     ! Lowest layer for doing resuspension from evaporating precip 
    integer :: ktop            ! Cloud-flux top    layer for current i (=jt(i))
@@ -1030,6 +1031,7 @@ subroutine ma_convproc_tend(                                         &
    real(r8) dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
    real(r8) dp_i(pver)           ! dp(i,k) at current i [mb]
    real(r8) dpdry_i(pver)        ! dpdry(i,k) at current i [mb]
+   real(r8) fa_u_dp              ! fa_u * dp at the current level [mb]
    real(r8) dudp(pver)           ! du(i,k)*dp(i,k) at current i [mb/s]
    real(r8) dz                   ! working layer thickness [m] 
    real(r8) eddp(pver)           ! ed(i,k)*dp(i,k) at current i [mb/s]
@@ -1161,15 +1163,24 @@ jtsub_loop_main_aa: &
         ! Now computes fluxes and tendencies
         ! NOTE:  The approach used in convtran applies to inert tracers and
         !        must be modified to include source and sink terms
-        call compute_fluxes_tendencies(                         &
+        call initialize_dcondt(                                 &
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
                 dconudt_activa,     dconudt_wetdep,             & ! in
                 dudp,    dddp,      eudp,       eddp,           & ! in
-                sumactiva, sumaqchem, sumwetdep,                & ! out
-                dcondt,         dcondt_wetdep                   ) ! out
+                dcondt                                          ) ! out
 
+        ! compute dcondt_wetdep for next subroutine
+        dcondt_wetdep(:,:) = 0.0
+        do kk = ktop, kbot
+           fa_u_dp = fa_u(kk)*dpdry_i(kk) ! simply cancelling dpdry_i causes BFB test fail
+           do icnst = 2, pcnst_extd
+              if (doconvproc_extd(icnst)) then
+                 dcondt_wetdep(icnst,kk) = fa_u_dp*dconudt_wetdep(icnst,kk)/dpdry_i(kk)
+              endif
+           enddo
+        enddo
 
         ! calculate effects of precipitation evaporation
         call ma_precpevap_convproc(                             & 
@@ -1204,6 +1215,8 @@ jtsub_loop_main_aa: &
         call compute_tendency_resusp_evap(                              &
                 doconvproc_extd, ktop,          kbot_prevap,   dpdry_i, & ! in
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
+                dconudt_activa, dconudt_wetdep, fa_u,                   & ! in
+                sumactiva,      sumaqchem,      sumwetdep,              & ! out
                 sumresusp,      sumprevap,      sumprevap_hist          ) ! out
 
         ! update tendencies
@@ -1648,7 +1661,7 @@ jtsub_loop_main_aa: &
                 aqfrac,                 icwmr,          rprd,      & ! in
                 conu,                   dconudt_wetdep             ) ! inout
 
-            ! compute updraft fractional area; for compute_fluxes_tendencies use
+            ! compute updraft fractional area; for update fluxes use
             ! *** these must obey  dt_u(k)*mu_p_eudp(k) = dpdry_i(k)*fa_u(k)
             fa_u(kk) = dt_u(kk)*(mu_p_eudp(kk)/dpdry_i(kk))
 
@@ -2125,16 +2138,16 @@ jtsub_loop_main_aa: &
    end subroutine compute_downdraft_mixing_ratio
 
 !====================================================================================
-   subroutine compute_fluxes_tendencies(                        &
+   subroutine initialize_dcondt (                               &
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
                 dconudt_activa,     dconudt_wetdep,             & ! in
                 dudp,    dddp,      eudp,       eddp,           & ! in
-                sumactiva, sumaqchem, sumwetdep,                & ! out
-                dcondt,         dcondt_wetdep                   ) ! out
+                dcondt                                          ) ! out
 !-----------------------------------------------------------------------
-! compute all fluxes and tendencies
+! initialize dondt and update with aerosol activation and wetdeposition
+! will update later with dcondt_prevap and dcondt_resusp
 ! NOTE:  The approach used in convtran applies to inert tracers and
 !        must be modified to include source and sink terms
 !-----------------------------------------------------------------------
@@ -2159,11 +2172,7 @@ jtsub_loop_main_aa: &
    real(r8),intent(in)  :: dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: eudp(pver)           ! eu(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: eddp(pver)           ! ed(i,k)*dp(i,k) at current i [mb/s]
-   real(r8),intent(out)  :: sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
-   real(r8),intent(out)  :: sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
-   real(r8),intent(out)  :: sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
    real(r8),intent(out)    :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
-   real(r8),intent(out)    :: dcondt_wetdep(pcnst_extd,pver) ! portion of dcondt from wet deposition [kg/kg/s]
 
 
    integer      :: kk           ! vertical index
@@ -2173,15 +2182,9 @@ jtsub_loop_main_aa: &
    real(r8)     :: fluxin, fluxout, netflux   ! in, out and net flux [kg/kg/s * mb]
    real(r8)     :: tmpa         ! working variable of mass flux [mb/s]
    real(r8)     :: netsrce      ! working variable of flux source [kg/kg/s * mb]
-   real(r8)     :: dconudt_aqchem(pcnst_extd,pverp)  ! d(conu)/dt by aqueous chem [kg/kg/s]
 
    ! initialize variables
-   sumactiva(:) = 0.0
-   sumaqchem(:) = 0.0
-   sumwetdep(:) = 0.0
    dcondt(:,:) = 0.0
-   dcondt_wetdep(:,:) = 0.0
-   dconudt_aqchem(:,:) = 0.0    ! aqueous chemistry is ignored in current code
 
    ! loop from ktop to kbot
    do kk = ktop, kbot
@@ -2239,22 +2242,15 @@ jtsub_loop_main_aa: &
                endif
             endif
             netflux = fluxin - fluxout
-            netsrce = fa_u_dp*(dconudt_aqchem(icnst,kk) + &
-                        dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
+            netsrce = fa_u_dp*(dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
 
             dcondt(icnst,kk) = (netflux+netsrce)/dpdry_i(kk)
-            dcondt_wetdep(icnst,kk) = fa_u_dp*dconudt_wetdep(icnst,kk)/dpdry_i(kk)
-
-            ! update column-tendency
-            sumactiva(icnst) = sumactiva(icnst) + fa_u_dp*dconudt_activa(icnst,kk)
-            sumaqchem(icnst) = sumaqchem(icnst) + fa_u_dp*dconudt_aqchem(icnst,kk)
-            sumwetdep(icnst) = sumwetdep(icnst) + fa_u_dp*dconudt_wetdep(icnst,kk)
 
          endif   ! "doconvproc_extd"
       enddo      ! "icnst = 2,pcnst_extd"
    enddo ! "kk = ktop, kbot"
 
-   end subroutine compute_fluxes_tendencies
+   end subroutine initialize_dcondt
 
 !=========================================================================================
    subroutine ma_precpevap_convproc(                           &
@@ -2635,6 +2631,8 @@ jtsub_loop_main_aa: &
    subroutine compute_tendency_resusp_evap(                             &
                 doconvproc_extd, ktop,          kbot_prevap,  dpdry_i,  & ! in
                 dcondt_resusp,  dcondt_prevap,  dcondt_prevap_hist,     & ! in
+                dconudt_activa, dconudt_wetdep, fa_u,                   & ! in
+                sumactiva,      sumaqchem,      sumwetdep,              & ! out
                 sumresusp,      sumprevap,      sumprevap_hist          ) ! out
 !-----------------------------------------------------------------------
 ! calculate column-tendency of resuspension and evaporation
@@ -2646,29 +2644,48 @@ jtsub_loop_main_aa: &
    integer, intent(in)  :: ktop                     ! top level index
    integer, intent(in)  :: kbot_prevap              ! bottom level index, for resuspension and evaporation only
    real(r8),intent(in)  :: dpdry_i(pver)            ! dp [mb]
-   real(r8),intent(in)    :: dcondt_resusp(pcnst_extd,pver)  ! portion of TMR tendency due to resuspension [kg/kg/s]
-   real(r8),intent(in)    :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
-   real(r8),intent(in)    :: dcondt_prevap_hist(pcnst_extd,pver) ! portion of TMR tendency due to precip evaporation, goes into the history [kg/kg/s]
+   real(r8),intent(in)  :: fa_u(pver)               ! fractional area of the updraft [fraction]
+   real(r8),intent(in)  :: dconudt_activa(pcnst_extd,pverp) ! d(conu)/dt by activation [kg/kg/s]
+   real(r8),intent(in)  :: dconudt_wetdep(pcnst_extd,pverp) ! d(conu)/dt by wet removal[kg/kg/s]
+   real(r8),intent(in)  :: dcondt_resusp(pcnst_extd,pver)  ! portion of TMR tendency due to resuspension [kg/kg/s]
+   real(r8),intent(in)  :: dcondt_prevap(pcnst_extd,pver)  ! portion of TMR tendency due to precip evaporation [kg/kg/s]
+   real(r8),intent(in)  :: dcondt_prevap_hist(pcnst_extd,pver) ! portion of TMR tendency due to precip evaporation, goes into the history [kg/kg/s]
+
+   real(r8),intent(out)  :: sumactiva(pcnst_extd)    ! sum (over layers) of dp*dconudt_activa [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumaqchem(pcnst_extd)    ! sum (over layers) of dp*dconudt_aqchem [kg/kg/s * mb]
+   real(r8),intent(out)  :: sumwetdep(pcnst_extd)    ! sum (over layers) of dp*dconudt_wetdep [kg/kg/s * mb]
    real(r8),intent(out)  :: sumresusp(pcnst_extd)    ! sum (over layers) of dp*dconudt_resusp [kg/kg/s * mb]
    real(r8),intent(out)  :: sumprevap(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap [kg/kg/s * mb]
    real(r8),intent(out)  :: sumprevap_hist(pcnst_extd)    ! sum (over layers) of dp*dconudt_prevap_hist [kg/kg/s * mb]
 
    integer      :: kk           ! vertical index
    integer      :: icnst        ! index of pcnst_extd
+   real(r8)     :: dconudt_aqchem(pcnst_extd,pverp)  ! d(conu)/dt by aqueous chem [kg/kg/s]
 
-      sumresusp(:) = 0.0
-      sumprevap(:) = 0.0
-      sumprevap_hist(:) = 0.0
-      do icnst = 2, pcnst_extd
-         if (doconvproc_extd(icnst)) then
-            ! should go to kk=pver for dcondt_prevap, and this should be safe for other sums
-            do kk = ktop, kbot_prevap
-               sumresusp(icnst) = sumresusp(icnst) + dcondt_resusp(icnst,kk)*dpdry_i(kk)
-               sumprevap(icnst) = sumprevap(icnst) + dcondt_prevap(icnst,kk)*dpdry_i(kk)
-               sumprevap_hist(icnst) = sumprevap_hist(icnst) + dcondt_prevap_hist(icnst,kk)*dpdry_i(kk)
-            enddo
-         endif
-      enddo
+
+   ! initialize variables
+   sumactiva(:) = 0.0
+   sumaqchem(:) = 0.0
+   sumwetdep(:) = 0.0
+   sumresusp(:) = 0.0
+   sumprevap(:) = 0.0
+   sumprevap_hist(:) = 0.0
+   dconudt_aqchem(:,:) = 0.0    ! aqueous chemistry is ignored in current code
+ 
+   do icnst = 2, pcnst_extd
+      if (doconvproc_extd(icnst)) then
+         ! should go to kk=pver for dcondt_prevap, and this should be safe for other sums
+         do kk = ktop, kbot_prevap
+            sumactiva(icnst) = sumactiva(icnst) + dconudt_activa(icnst,kk)*dpdry_i(kk)*fa_u(kk)
+            sumaqchem(icnst) = sumaqchem(icnst) + dconudt_aqchem(icnst,kk)*dpdry_i(kk)*fa_u(kk)
+            sumwetdep(icnst) = sumwetdep(icnst) + dconudt_wetdep(icnst,kk)*dpdry_i(kk)*fa_u(kk)
+
+            sumresusp(icnst) = sumresusp(icnst) + dcondt_resusp(icnst,kk)*dpdry_i(kk)
+            sumprevap(icnst) = sumprevap(icnst) + dcondt_prevap(icnst,kk)*dpdry_i(kk)
+            sumprevap_hist(icnst) = sumprevap_hist(icnst) + dcondt_prevap_hist(icnst,kk)*dpdry_i(kk)
+         enddo
+      endif
+   enddo
    end subroutine compute_tendency_resusp_evap
 
 !====================================================================================
