@@ -626,7 +626,8 @@ main_jsub_loop: &
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
 
-      call mam_amicphys_1subarea_cloudy(             &
+     !call mam_amicphys_1subarea_cloudy(             &
+      call mam_amicphys_1subarea(                    &
          do_cond_sub,            do_rename_sub,      &
          do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
@@ -652,7 +653,25 @@ main_jsub_loop: &
 
       else
 
-      call mam_amicphys_1subarea_clear(              &
+     !call mam_amicphys_1subarea_clear(              &
+     !   do_cond_sub,            do_rename_sub,      &
+     !   do_newnuc_sub,          do_coag_sub,        &
+     !   nstep,      lchnk,      i,        k,        &
+     !   latndx,     lonndx,     lund,               &
+     !   loffset,    deltat,                         &
+     !   jsub,                   nsubarea,           &
+     !   iscldy_subarea(jsub),   afracsub(jsub),     &
+     !   temp,       pmid,       pdel,               &
+     !   zmid,       pblh,       relhumsub(jsub),    &
+     !   dgn_a,      dgn_awet,   wetdens,            &
+     !   qgas1,      qgas3,      qgas4,              &
+     !   qgas_delaa,                                 &
+     !   qnum3,      qnum4,      qnum_delaa,         &
+     !   qaer3,      qaer4,      qaer_delaa,         &
+     !   qwtr3,      qwtr4,                          &
+     !   misc_vars_aa_sub(jsub)                      )
+
+      call mam_amicphys_1subarea( &
          do_cond_sub,            do_rename_sub,      &
          do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
@@ -665,9 +684,15 @@ main_jsub_loop: &
          dgn_a,      dgn_awet,   wetdens,            &
          qgas1,      qgas3,      qgas4,              &
          qgas_delaa,                                 &
-         qnum3,      qnum4,      qnum_delaa,         &
-         qaer3,      qaer4,      qaer_delaa,         &
+         qnum3,      qnum4,                          &
+         qnum_delaa,                                 &
+         qaer2,      qaer3,      qaer4,              &
+         qaer_delaa,                                 &
          qwtr3,      qwtr4,                          &
+         qnumcw3,    qnumcw4,                        &
+         qnumcw_delaa,                               &
+         qaercw2,    qaercw3,    qaercw4,            &
+         qaercw_delaa,                               &
          misc_vars_aa_sub(jsub)                      )
 
       end if
@@ -729,6 +754,7 @@ main_jsub_loop: &
       return
       end subroutine mam_amicphys_1gridcell
 
+#include "1subarea.F90"
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
