@@ -117,7 +117,7 @@ end subroutine ma_convproc_init
 
 
 !=========================================================================================
-subroutine ma_convproc_intr( state, ztodt,                          & ! in
+subroutine ma_convproc_intr( state, dt,                             & ! in
                            dp_frac, icwmrdp, rprddp, evapcdp,       & ! in
                            sh_frac, icwmrsh, rprdsh, evapcsh,       & ! in
                            dlf, dlfsh, cmfmcsh, sh_e_ed_ratio,      & ! in
@@ -146,7 +146,9 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
 ! Arguments
    type(physics_state), intent(in )   :: state          ! Physics state variables
    type(physics_ptend), intent(inout) :: ptend          ! indivdual parameterization tendencies
-   real(r8), intent(in)    :: ztodt                     ! 2 delta t (model time step, not sure why it is "2" delta t) [s]
+   real(r8), intent(in)    :: dt                        ! 2 delta t [s]
+                                                        ! from input this is just model time step, 
+                                                        ! not sure why it is "2" delta t. Shuaiqi Tang 2022
    real(r8), intent(in)    :: dp_frac(pcols,pver)       ! Deep conv cloud frac [fraction]
    real(r8), intent(in)    :: icwmrdp(pcols,pver)       ! Deep conv cloud condensate (in cloud) [kg/kg]
    real(r8), intent(in)    :: rprddp(pcols,pver)        ! Deep conv precip production (grid avg) [kg/kg/s]
@@ -224,7 +226,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
   call update_qnew_ptend(                                         &
                          dotend,                    .false.,      &  ! in
                          ncol,     species_class,   dqdt,         &  ! in
-                         qsrflx,   ztodt,                         &  ! in
+                         qsrflx,   dt,                            &  ! in
                          ptend,    qnew                           )  ! inout
 
   ! calculate variables for output
@@ -247,7 +249,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      qsrflx(:,:,:) = 0.0_r8
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
-        state, ztodt,                             & ! in
+        state,   dt,                              & ! in
         dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
         mu, md, du, eu, ed, dp,                   & ! in
         jt, maxg, ideep, lengath, qnew,           & ! in
@@ -259,7 +261,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      call update_qnew_ptend(                       &
             dotend,                  .true.,       &  ! in
             ncol,   species_class,   dqdt,         &  ! in
-            qsrflx, ztodt,                         &  ! in
+            qsrflx, dt,                            &  ! in
             ptend,  qnew                           )  ! inout
 
      ! update variables for output
@@ -287,7 +289,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
      call ma_convproc_sh_intr(                    &
-        state, ztodt,                             & ! in
+        state,   dt,                              & ! in
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, & ! in
         cmfmcsh, sh_e_ed_ratio,   qnew,           & ! in
         nsrflx,  species_class,                   & ! in
@@ -298,7 +300,7 @@ subroutine ma_convproc_intr( state, ztodt,                          & ! in
      call update_qnew_ptend(                         &
               dotend,                  .true.,       &  ! in
               ncol,   species_class,   dqdt,         &  ! in
-              qsrflx, ztodt,                         &  ! in
+              qsrflx, dt,                            &  ! in
               ptend,  qnew                           )  ! inout
 
      ! update variables for output
@@ -347,7 +349,7 @@ end subroutine ma_convproc_intr
 subroutine update_qnew_ptend(                                         &
                            dotend, is_update_ptend,                   &  ! in
                            ncol,   species_class,   dqdt,             &  ! in
-                           qsrflx, ztodt,                             &  ! in
+                           qsrflx, dt,                                &  ! in
                            ptend,  qnew                               )  ! inout
 ! ---------------------------------------------------------------------------------------
 ! update qnew, ptend (%q and %lq)
@@ -363,7 +365,7 @@ use constituents,  only: pcnst
    integer,  intent(in)    :: species_class(:)          ! species index
    real(r8), intent(in)    :: dqdt(pcols,pver,pcnst)    ! time tendency of tracer [kg/kg/s]
    real(r8), intent(in)    :: qsrflx(:,:,:)             ! process-specific column tracer tendencies. see ma_convproc_tend for detail info [kg/m2/s]
-   real(r8), intent(in)    :: ztodt                     ! 2 delta t (model time step, not sure why it is "2" delta t) [s]
+   real(r8), intent(in)    :: dt                        ! model time step [s]
    real(r8), intent(inout) :: qnew(pcols,pver,pcnst)    ! Tracer array including moisture [kg/kg]
 
    ! Local variables
@@ -375,7 +377,7 @@ use constituents,  only: pcnst
      if ( .not. dotend(ll) ) cycle
 
      ! calc new q (after ma_convproc_sh_intr)
-     qtmp(1:ncol,:,ll) = qnew(1:ncol,:,ll) + ztodt*dqdt(1:ncol,:,ll)
+     qtmp(1:ncol,:,ll) = qnew(1:ncol,:,ll) + dt*dqdt(1:ncol,:,ll)
      qnew(1:ncol,:,ll) = max( 0.0_r8, qtmp(1:ncol,:,ll) )
 
      ! add dqdt onto ptend%q and set ptend%lq
