@@ -161,8 +161,9 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    real(r8), intent(in)    :: dlfsh(pcols,pver)         ! Shal conv cldwtr detrainment (grid avg) [kg/kg/s]
    real(r8), intent(in)    :: cmfmcsh(pcols,pverp)      ! Shal conv mass flux [kg/m2/s]
    real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver) ! shallow conv [ent/(ent+det)] ratio [fraction]
-   integer,  intent(in)    :: nsrflx_mzaer2cnvpr
+   integer,  intent(in)    :: nsrflx_mzaer2cnvpr        ! last dimension of qsrflx_mzaer2cnvpr
    real(r8), intent(in)    :: qsrflx_mzaer2cnvpr(pcols,pcnst,nsrflx_mzaer2cnvpr)
+                                                        ! process-specific column tracer tendencies [kg/m2/s]
    real(r8), intent(inout) :: aerdepwetis(pcols,pcnst)  ! aerosol wet deposition (interstitial) [kg/m2/s]
 
                                                 ! mu, md, ..., ideep, lengath are all deep conv variables
@@ -183,7 +184,10 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 
 ! Local variables
    integer  :: ncol             ! total column number. from state%ncol
-   integer  :: n, ll, l,lc, lchnk  ! indices
+   integer  :: la, lc, lchnk    ! indices
+   integer  :: icnst
+   integer  :: imode, ispec
+
    logical  :: dotend(pcnst)    ! if do tendency
 
    real(r8) :: dlfdp(pcols,pver)                ! Deep (Total-Shallow) conv cldwtr detrainment (grid avg) [kg/kg/s] 
@@ -196,7 +200,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    real(r8) :: sflxed(pcols,pcnst)
 
    integer, parameter :: nsrflx = 6             ! last dimension of qsrflx
-   real(r8) :: qsrflx(pcols,pcnst,nsrflx)       ! process-specific column tracer tendencies
+   real(r8) :: qsrflx(pcols,pcnst,nsrflx)       ! process-specific column tracer tendencies [kg/m2/s]
                             !  1 = activation   of interstial to  conv-cloudborne
                             !  2 = resuspension of conv-cloudborne to interstital
                             !  3 = aqueous chemistry (not implemented yet, so  zero)
@@ -234,10 +238,10 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    sflxid(:,:) = 0.0_r8
    sflxec(:,:) = 0.0_r8
    sflxed(:,:) = 0.0_r8
-   do l = 1, pcnst
-      if ( (species_class(l) == spec_class_aerosol) .and. ptend%lq(l) ) then
-         sflxec(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,1)
-         sflxed(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,2)
+   do icnst = 1, pcnst
+      if ( (species_class(icnst) == spec_class_aerosol) .and. ptend%lq(icnst) ) then
+         sflxec(1:ncol,icnst) = qsrflx_mzaer2cnvpr(1:ncol,icnst,1)
+         sflxed(1:ncol,icnst) = qsrflx_mzaer2cnvpr(1:ncol,icnst,2)
       endif
    enddo
 
@@ -265,21 +269,21 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
             ptend,  qnew                           )  ! inout
 
      ! update variables for output
-     do l = 1, pcnst
-        if ( .not. dotend(l) ) cycle
-        if ((species_class(l) == spec_class_aerosol) .or. &
-            (species_class(l) == spec_class_gas    )) then
+     do icnst = 1, pcnst
+        if ( .not. dotend(icnst) ) cycle
+        if ((species_class(icnst) == spec_class_aerosol) .or. &
+            (species_class(icnst) == spec_class_gas    )) then
            ! these used for history file wetdep diagnostics
-           sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4)
-           sflxid(1:ncol,l) = sflxid(1:ncol,l) + qsrflx(1:ncol,l,4)
-           sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6)
-           sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,6)
+           sflxic(1:ncol,icnst) = sflxic(1:ncol,icnst) + qsrflx(1:ncol,icnst,4)
+           sflxid(1:ncol,icnst) = sflxid(1:ncol,icnst) + qsrflx(1:ncol,icnst,4)
+           sflxec(1:ncol,icnst) = sflxec(1:ncol,icnst) + qsrflx(1:ncol,icnst,6)
+           sflxed(1:ncol,icnst) = sflxed(1:ncol,icnst) + qsrflx(1:ncol,icnst,6)
         endif
 
-        if (species_class(l) == spec_class_aerosol) then
+        if (species_class(icnst) == spec_class_aerosol) then
            ! this used for surface coupling
-           aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
-                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5)
+           aerdepwetis(1:ncol,icnst) = aerdepwetis(1:ncol,icnst) &
+                + qsrflx(1:ncol,icnst,4) + qsrflx(1:ncol,icnst,5)
         endif
      enddo
 
@@ -304,24 +308,22 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
               ptend,  qnew                           )  ! inout
 
      ! update variables for output
-     do l = 1, pcnst
-        if ( .not. dotend(l) ) cycle
-        if ((species_class(l) == spec_class_aerosol) .or. &
-            (species_class(l) == spec_class_gas    )) then
-           sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4)
-           sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,6)
+     do icnst = 1, pcnst
+        if ( .not. dotend(icnst) ) cycle
+        if ((species_class(icnst) == spec_class_aerosol) .or. &
+            (species_class(icnst) == spec_class_gas    )) then
+           sflxic(1:ncol,icnst) = sflxic(1:ncol,icnst) + qsrflx(1:ncol,icnst,4)
+           sflxec(1:ncol,icnst) = sflxec(1:ncol,icnst) + qsrflx(1:ncol,icnst,6)
         endif
 
-        if (species_class(l) == spec_class_aerosol) then
+        if (species_class(icnst) == spec_class_aerosol) then
            ! this used for surface coupling
-           aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
-                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5)
+           aerdepwetis(1:ncol,icnst) = aerdepwetis(1:ncol,icnst) &
+                + qsrflx(1:ncol,icnst,4) + qsrflx(1:ncol,icnst,5)
         endif
      enddo
 
-
   endif ! (convproc_do_aer  .or. convproc_do_gas) then
-
 
 ! output wet deposition fields to history
 !    I = in-cloud removal;     E = precip-evap resuspension
@@ -329,17 +331,18 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 ! note that the precip-evap resuspension includes that resulting from
 !    below-cloud removal, calculated in mz_aero_wet_intr
   if (convproc_do_aer) then
-     do n = 1, ntot_amode
-     do ll = 0, nspec_amode(n)
+     do imode = 1, ntot_amode
+        do ispec = 0, nspec_amode(imode)
 
-        call assign_la_lc( n,   ll,   l,   lc   )
+           call assign_la_lc( imode,   ispec,   la,   lc   )
 
-        call outfld( trim(cnst_name(l))//'SFWET', aerdepwetis(:,l), pcols, lchnk)
-        call outfld( trim(cnst_name(l))//'SFSIC', sflxic(:,l), pcols, lchnk )
-        call outfld( trim(cnst_name(l))//'SFSEC', sflxec(:,l), pcols, lchnk )
-        call outfld( trim(cnst_name(l))//'SFSID', sflxid(:,l), pcols, lchnk )
-        call outfld( trim(cnst_name(l))//'SFSED', sflxed(:,l), pcols, lchnk )
-     enddo ! ll
+           call outfld( trim(cnst_name(la))//'SFWET', aerdepwetis(:,la), pcols, lchnk)
+           call outfld( trim(cnst_name(la))//'SFSIC', sflxic(:,la), pcols, lchnk )
+           call outfld( trim(cnst_name(la))//'SFSEC', sflxec(:,la), pcols, lchnk )
+           call outfld( trim(cnst_name(la))//'SFSID', sflxid(:,la), pcols, lchnk )
+           call outfld( trim(cnst_name(la))//'SFSED', sflxed(:,la), pcols, lchnk )
+
+        enddo ! ll
      enddo ! n
   endif
 
@@ -425,7 +428,7 @@ subroutine ma_convproc_dp_intr(                &
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)     ! time tendency of q [kg/kg/s]
    logical,  intent(out)   :: dotend(pcnst)              ! if do tendency
    integer,  intent(in)    :: nsrflx                     ! last dimension of qsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx) ! process-specific column tracer tendencies (see ma_convproc_intr for more information)
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx) ! process-specific column tracer tendencies (see ma_convproc_intr for more information) [kg/m2/s]
 
    real(r8), intent(in)    :: dp_frac(pcols,pver) ! Deep conv cloud fraction [0-1]
    real(r8), intent(in)    :: icwmrdp(pcols,pver) ! Deep conv cloud condensate (in cloud) [kg/kg]
@@ -541,7 +544,7 @@ subroutine ma_convproc_sh_intr(                 &
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)  ! time tendency of TMR [kg/kg/s]
    logical,  intent(out)   :: dotend(pcnst)           ! flag if do tendency
    integer,  intent(in)    :: nsrflx                  ! last dimension of qsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)  ! process-specific column tracer tendencies  (see ma_convproc_intr for more information)
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)  ! process-specific column tracer tendencies  (see ma_convproc_intr for more information) [kg/m2/s]
 
    real(r8), intent(in)    :: sh_frac(pcols,pver)       ! Shallow conv cloud frac [0-1]
    real(r8), intent(in)    :: icwmrsh(pcols,pver)       ! Shallow conv cloud condensate (in cloud) [kg/kg]
@@ -2729,7 +2732,7 @@ jtsub_loop_main_aa: &
    real(r8), intent(inout) :: dqdt(pcols,pver,ncnst)    ! Tracer tendency array
    real(r8), intent(inout) :: q_i(pver,pcnst)           ! q(icol,kk,icnst) at current icol
    real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)
-                              ! process-specific column tracer tendencies
+                              ! process-specific column tracer tendencies [kg/m2/s]
                               !  1 = activation   of interstial to conv-cloudborne
                               !  2 = resuspension of conv-cloudborne to interstital
                               !  3 = aqueous chemistry (not implemented yet, so zero)
