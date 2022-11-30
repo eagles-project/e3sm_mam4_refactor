@@ -571,6 +571,8 @@ subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
   ! Calculate the corresponding paritioning factors for interstitial aerosols
   ! using the above-derived subarea-mean mixing ratios plus the constraint that
   ! the cloud fraction weighted average of subarea mean need to match grid box mean.
+  ! Note that this subroutine is designed for partially cloudy grid cells,
+  ! hence both fclea and fcldy are assumed to be nonzero.
 
   clea2gcm_ratio = max( eps, tmp_q_intrst_clea*fclea ) / max( eps, qgcm_intrst )
   clea2gcm_ratio = max( 0.0_wp, min( 1.0_wp, clea2gcm_ratio ) )
