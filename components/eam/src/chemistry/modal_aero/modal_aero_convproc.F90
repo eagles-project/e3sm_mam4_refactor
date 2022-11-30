@@ -2138,7 +2138,7 @@ jtsub_loop_main_aa: &
    end subroutine compute_downdraft_mixing_ratio
 
 !====================================================================================
-   subroutine initialize_dcondt (                               &
+   subroutine initialize_dcondt(                                &
                 doconvproc_extd, iflux_method, ktop, kbot,      & ! in
                 dpdry_i, fa_u,      mu_i,       md_i,           & ! in
                 chat,    const,     conu,       cond,           & ! in
@@ -2153,7 +2153,7 @@ jtsub_loop_main_aa: &
 !-----------------------------------------------------------------------
 
    ! cloudborne aerosol, so the arrays are dimensioned with pcnst_extd = pcnst*2
-   integer, parameter :: pcnst_extd = pcnst*2
+   integer, parameter   :: pcnst_extd = pcnst*2
    logical, intent(in)  :: doconvproc_extd(pcnst_extd) ! flag for doing convective transport
    integer, intent(in)  :: iflux_method             ! 1=as in convtran (deep), 2=uwsh
    integer, intent(in)  :: ktop                     ! top level index
@@ -2172,7 +2172,7 @@ jtsub_loop_main_aa: &
    real(r8),intent(in)  :: dddp(pver)           ! dd(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: eudp(pver)           ! eu(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: eddp(pver)           ! ed(i,k)*dp(i,k) at current i [mb/s]
-   real(r8),intent(out)    :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
+   real(r8),intent(out) :: dcondt(pcnst_extd,pver)  ! grid-average TMR tendency for current column  [kg/kg/s]
 
 
    integer      :: kk           ! vertical index
@@ -2195,20 +2195,7 @@ jtsub_loop_main_aa: &
       fa_u_dp = fa_u(kk)*dpdry_i(kk)
       do icnst = 2, pcnst_extd
          if (doconvproc_extd(icnst)) then
-            ! First compute fluxes using environment subsidence/lifting and
-            ! entrainment/detrainment into up/downdrafts,
-            ! to provide an additional mass balance check
-            ! (this could be deleted after the code is well tested)
-            fluxin  = mu_i(kk )*min(chat(icnst,kk ),const(icnst,km1x))     &
-                    - md_i(kp1)*min(chat(icnst,kp1),const(icnst,kp1x))     &
-                    + dudp(kk)*conu(icnst,kk) + dddp(kk)*cond(icnst,kp1)
-            fluxout = mu_i(kp1)*min(chat(icnst,kp1),const(icnst,kk))       &
-                    - md_i(kk )*min(chat(icnst,kk ),const(icnst,kk))       &
-                    + (eudp(kk) + eddp(kk)) * const(icnst,kk)
-
-            netflux = fluxin - fluxout
-
-            ! Now compute fluxes as in convtran, and also source/sink terms
+            ! compute fluxes as in convtran, and also source/sink terms
             ! (version 3 limit fluxes outside convection to mass in appropriate layer
             ! (these limiters are probably only safe for positive definite quantitities
             ! (it assumes that mu and md already satify a courant number limit of 1)
@@ -2222,11 +2209,10 @@ jtsub_loop_main_aa: &
                          - ( md_i(kp1)*cond(icnst,kp1)                          &
                            + md_i(kk )*min(chat(icnst,kk ),const(icnst,kk )) )
             else
-               fluxin  =     mu_i(kp1)*conu(icnst,kp1) - ( md_i(kk )*cond(icnst,kk ) )
-               fluxout =     mu_i(kk )*conu(icnst,kk ) - ( md_i(kp1)*cond(icnst,kp1) )
-
                ! new method -- simple upstream method for the env subsidence
                ! tmpa = net env mass flux (positive up) at top of layer k
+               fluxin  =     mu_i(kp1)*conu(icnst,kp1) - ( md_i(kk )*cond(icnst,kk ) )
+               fluxout =     mu_i(kk )*conu(icnst,kk ) - ( md_i(kp1)*cond(icnst,kp1) )
                tmpa = -( mu_i(kk  ) + md_i(kk  ) )
                if (tmpa <= 0.0_r8) then
                   fluxin  = fluxin  - tmpa*const(icnst,km1x)
@@ -2242,8 +2228,8 @@ jtsub_loop_main_aa: &
                endif
             endif
             netflux = fluxin - fluxout
-            netsrce = fa_u_dp*(dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
 
+            netsrce = fa_u_dp*(dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
             dcondt(icnst,kk) = (netflux+netsrce)/dpdry_i(kk)
 
          endif   ! "doconvproc_extd"
