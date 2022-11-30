@@ -86,9 +86,7 @@ use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
 ! Subroutines for conversion from grid cell mean to subareas and back
 use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
                                       , set_subarea_gases_and_aerosols &
-                                      , form_gcm_of_gases_and_aerosols_from_subareas &
-                                      , copy_cnst
-
+                                      , form_gcm_of_gases_and_aerosols_from_subareas
 
 ! For output of diagnostics
 use modal_aero_amicphys_control, only: nqtendaa, nqqcwtendaa, &
@@ -379,18 +377,17 @@ implicit none
       !=================================================================================================
       ! Gases and aerosols
       !----------------------
+      ! Calculate new grid cell mean values
+
       call form_gcm_of_gases_and_aerosols_from_subareas( &
          nsubarea, ncldy_subarea, afracsub,              &! in
          qsub4, qqcwsub4, qqcwgcm3,                      &! in
          qgcm4, qqcwgcm4                                 )! out
 
-      ! Clip negative values and copy grid cell mean to output array
+      ! Copy grid cell mean values to output arrays
 
-      lcopy(:) = lmapcc_all(:) > 0
-      call copy_cnst( qgcm4, q(ii,kk,:), lcopy ) !from, to, flag
-
-      lcopy(:) = lmapcc_all(:) >= lmapcc_val_aer
-      call copy_cnst( qqcwgcm4, qqcw(ii,kk,:), lcopy ) !from, to, flag
+      where (lmapcc_all(:) > 0)                  q(ii,kk,:) = qgcm4(:)
+      where (lmapcc_all(:) >= lmapcc_val_aer) qqcw(ii,kk,:) = qqcwgcm4(:)
 
       !----------------------
       ! Aerosol water
