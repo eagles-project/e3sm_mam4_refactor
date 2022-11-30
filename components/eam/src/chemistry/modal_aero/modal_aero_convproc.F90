@@ -2229,6 +2229,10 @@ jtsub_loop_main_aa: &
             endif
             netflux = fluxin - fluxout
 
+            ! note for C++ refactoring:
+            ! I was trying to separate dconudt_activa and dconudt_wetdep out
+            ! into a subroutine, but for some reason it doesn't give consistent
+            ! dcondt values. have to leave them here.   Shuaiqi Tang, 2022
             netsrce = fa_u_dp*(dconudt_activa(icnst,kk) + dconudt_wetdep(icnst,kk))
             dcondt(icnst,kk) = (netflux+netsrce)/dpdry_i(kk)
 
