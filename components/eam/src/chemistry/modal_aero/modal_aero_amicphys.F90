@@ -732,8 +732,8 @@ main_jsub_loop: &
 !  - coagulation - because cloud-borne aerosol would need to be included
 !--------------------------------------------------------------------------------
       subroutine mam_amicphys_1subarea(        &
-         do_cond,                do_rename,          &
-         do_newnuc,              do_coag,            &
+         do_cond_sub,            do_rename_sub,      &
+         do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
          latndx,     lonndx,     lund,               &
          loffset,    deltat,                         &
@@ -766,7 +766,7 @@ main_jsub_loop: &
       use modal_aero_coag, only: mam_coag_1subarea
       use modal_aero_rename, only: mam_rename_1subarea
 
-      logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
+      logical,  intent(in)    :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
       logical,  intent(in)    :: iscldy_subarea        ! true if sub-area is cloudy
       integer,  intent(in)    :: lchnk                 ! chunk identifier
       integer,  intent(in)    :: nstep                 ! model time-step number
@@ -902,8 +902,7 @@ main_jsub_loop: &
       !    if it decreases,
       !       start from post-cldchem mix-ratio
       ! *** currently just do this for h2so4 and nh3
-      if ( ( do_cond                         ) .and. &
-           ( gaexch_h2so4_uptake_optaa == 2 ) ) then
+      if ( (do_cond_sub) .and. (gaexch_h2so4_uptake_optaa==2) ) then
          do igas = 1, ngas
             if ((igas == igas_h2so4) .or. (igas == igas_nh3)) then
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
@@ -946,9 +945,10 @@ main_jsub_loop: &
 
       dnclusterdt = 0.0_r8
 
-      dtsubstep = deltat
-      if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
+!     dtsubstep = deltat
+!     if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
 
+      dtsubstep = deltat/ntsubstep
       del_h2so4_gasprod = max( qgas3(igas_h2so4)-qgas1(igas_h2so4), 0.0_r8 )/ntsubstep
 
 !
@@ -960,19 +960,16 @@ jtsubstep_loop: &
       do jtsubstep = 1, ntsubstep
 
 
-!
-!
-! gas-aerosol exchange
-!
-!
+      !----------------------
+      ! gas-aerosol exchange
+      !----------------------
       uptkrate_h2so4 = 0.0_r8
 
-do_cond_if_block10: &
-      if ( do_cond ) then
+      if ( do_cond_sub ) then
 
-      qgas_sv1 = qgas_cur
-      qnum_sv1 = qnum_cur
-      qaer_sv1 = qaer_cur
+         qgas_sv1 = qgas_cur
+         qnum_sv1 = qnum_cur
+         qaer_sv1 = qaer_cur
 
          call mam_gasaerexch_1subarea(                                &
            nstep,             lchnk,                                  &
@@ -991,86 +988,82 @@ do_cond_if_block10: &
            uptkaer,           uptkrate_h2so4                          )
 
 
-      if (newnuc_h2so4_conc_optaa == 11) then
-         qgas_avg(igas_h2so4) = 0.5_r8*(qgas_sv1(igas_h2so4) + qgas_cur(igas_h2so4))
-      else if (newnuc_h2so4_conc_optaa == 12) then
-         qgas_avg(igas_h2so4) = qgas_cur(igas_h2so4)
-      end if
+         if (newnuc_h2so4_conc_optaa == 11) then
+            qgas_avg(igas_h2so4) = 0.5_r8*(qgas_sv1(igas_h2so4) + qgas_cur(igas_h2so4))
+         else if (newnuc_h2so4_conc_optaa == 12) then
+            qgas_avg(igas_h2so4) = qgas_cur(igas_h2so4)
+         end if
 
-      qgas_del_cond = qgas_del_cond + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep))
-      qnum_delsub_cond = qnum_cur - qnum_sv1
-      qaer_delsub_cond = qaer_cur - qaer_sv1
-! qaer_delsub_grow4rnam = change in qaer_del_cond during latest condensation calculations
-      qaer_delsub_grow4rnam = qaer_cur - qaer_sv1
+         qgas_del_cond = qgas_del_cond + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep))
+         qnum_delsub_cond = qnum_cur - qnum_sv1
+         qaer_delsub_cond = qaer_cur - qaer_sv1
+         qaer_delsub_grow4rnam = qaer_cur - qaer_sv1 !change in qaer_del_cond during latest condensation calculations
 
-      del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
+         del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
                        - (qgas_sv1(igas_h2so4) + qgas_netprod_otrproc(igas_h2so4)*dtsubstep)
 
-      else ! do_cond_if_block10
+      else ! do_cond_sub
 
-      qgas_avg(1:ngas) = qgas_cur(1:ngas)
-      qaer_delsub_grow4rnam(:,:) = 0.0_r8
+        qgas_avg(1:ngas) = qgas_cur(1:ngas)
+        qaer_delsub_grow4rnam(:,:) = 0.0_r8
 
-      del_h2so4_aeruptk = 0.0_r8
+        del_h2so4_aeruptk = 0.0_r8
 
-      end if do_cond_if_block10
+      end if !do_cond_sub
 
 
-!
-!
-! renaming after "continuous growth"
-!
-!
-do_rename_if_block30: &
-      if ( do_rename ) then
+      !----------------------------------
+      ! renaming after "continuous growth"
+      !----------------------------------
+      if ( do_rename_sub ) then
 
-      dest_mode_of_mode(:) = 0
-      dest_mode_of_mode(nait) = nacc
+         dest_mode_of_mode(:) = 0
+         dest_mode_of_mode(nait) = nacc
 
-      if (iscldy_subarea) then 
-! qaer_delsub_grow4rnam   = change in qaer from cloud chemistry and gas condensation
-! qaercw_delsub_grow4rnam = change in qaercw from cloud chemistry
-      qaer_delsub_grow4rnam   = (qaer3 - qaer2)/ntsubstep  + qaer_delsub_grow4rnam
-      qaercw_delsub_grow4rnam = (qaercw3 - qaercw2)/ntsubstep
-      end if
+         ! qaer_delsub_grow4rnam   = change in qaer from cloud chemistry and gas condensation
+         ! qaercw_delsub_grow4rnam = change in qaercw from cloud chemistry
+         if (iscldy_subarea) then 
+            qaer_delsub_grow4rnam   = (qaer3 - qaer2)/ntsubstep  + qaer_delsub_grow4rnam
+            qaercw_delsub_grow4rnam = (qaercw3 - qaercw2)/ntsubstep
+         end if
 
-      qnum_sv1 = qnum_cur
-      qaer_sv1 = qaer_cur
+         qnum_sv1 = qnum_cur
+         qaer_sv1 = qaer_cur
 
-      if (iscldy_subarea) then 
-      qnumcw_sv1 = qnumcw_cur
-      qaercw_sv1 = qaercw_cur
-      end if
+         if (iscldy_subarea) then 
+         qnumcw_sv1 = qnumcw_cur
+         qaercw_sv1 = qaercw_cur
+         end if
 
-      if (.not.iscldy_subarea) then 
-      call mam_rename_1subarea(                                    &
-         iscldy_subarea,                                           &
-         dest_mode_of_mode,                                        &
-         n_mode,                                                   &
-         qnum_cur,                                                 &
-         qaer_cur,          qaer_delsub_grow4rnam                  )
+         if (.not.iscldy_subarea) then 
+         call mam_rename_1subarea(                                    &
+            iscldy_subarea,                                           &
+            dest_mode_of_mode,                                        &
+            n_mode,                                                   &
+            qnum_cur,                                                 &
+            qaer_cur,          qaer_delsub_grow4rnam                  )
 
-      else
-      call mam_rename_1subarea(                                      &
-         iscldy_subarea,                                             &
-         dest_mode_of_mode,                                          &
-         n_mode,                                                     &
-         qnum_cur,                                                   &
-         qaer_cur,          qaer_delsub_grow4rnam,                   &
-         qnumcw_cur,                                                 &
-         qaercw_cur,        qaercw_delsub_grow4rnam                  )
+         else
+         call mam_rename_1subarea(                                      &
+            iscldy_subarea,                                             &
+            dest_mode_of_mode,                                          &
+            n_mode,                                                     &
+            qnum_cur,                                                   &
+            qaer_cur,          qaer_delsub_grow4rnam,                   &
+            qnumcw_cur,                                                 &
+            qaercw_cur,        qaercw_delsub_grow4rnam                  )
 
-      end if
+         end if
 
-      qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
-      qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
+         qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
+         qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
 
-      if (iscldy_subarea) then
-      qnumcw_del_rnam = qnumcw_del_rnam + (qnumcw_cur - qnumcw_sv1)
-      qaercw_del_rnam = qaercw_del_rnam + (qaercw_cur - qaercw_sv1)
-      end if
+         if (iscldy_subarea) then
+         qnumcw_del_rnam = qnumcw_del_rnam + (qnumcw_cur - qnumcw_sv1)
+         qaercw_del_rnam = qaercw_del_rnam + (qaercw_cur - qaercw_sv1)
+         end if
 
-      end if do_rename_if_block30
+      end if !do_rename_sub
 
 
 
@@ -1082,7 +1075,7 @@ do_rename_if_block30: &
 !
 !
       do_newnuc_if_block50: &
-      if ( do_newnuc ) then
+      if ( do_newnuc_sub ) then
 
       qgas_sv1 = qgas_cur
       qnum_sv1 = qnum_cur
@@ -1116,7 +1109,7 @@ do_rename_if_block30: &
 ! coagulation part
 !
 !
-      if ( do_coag ) then
+      if ( do_coag_sub ) then
 
       qnum_sv1 = qnum_cur
       qaer_sv1 = qaer_cur
@@ -1141,7 +1134,7 @@ do_rename_if_block30: &
 !
 
       do_aging_in_subarea = ( n_agepair>0 ) .and. &
-                            ( (.not.iscldy_subarea).or.(iscldy_subarea.and.do_cond) )
+                            ( (.not.iscldy_subarea).or.(iscldy_subarea.and.do_cond_sub) )
 
       if (do_aging_in_subarea) then
 
@@ -1161,12 +1154,12 @@ do_rename_if_block30: &
 
 ! accumulate sub-step q-dels
 
-      if ( do_coag .and. (.not.iscldy_subarea) ) then
+      if ( do_coag_sub .and. (.not.iscldy_subarea) ) then
          qnum_del_coag = qnum_del_coag + qnum_delsub_coag
          qaer_del_coag = qaer_del_coag + qaer_delsub_coag
       end if
 
-      if ( do_cond ) then
+      if ( do_cond_sub ) then
          qnum_del_cond = qnum_del_cond + qnum_delsub_cond
          qaer_del_cond = qaer_del_cond + qaer_delsub_cond
       end if
@@ -1219,8 +1212,8 @@ end do jtsubstep_loop
 
       misc_vars_aa_sub%ncluster_tend_nnuc_1grid = dnclusterdt
 
-      return
-      end subroutine mam_amicphys_1subarea
+end subroutine mam_amicphys_1subarea
+!--------------------------------------------------------------------------------
 
 
 !----------------------------------------------------------------------
