@@ -730,6 +730,31 @@ main_jsub_loop: &
       end subroutine mam_amicphys_1gridcell
 
 !--------------------------------------------------------------------------------
+! Call aerosol microphysics processes for a single (cloudy or clear) subarea
+! (with indices = lchnk,i,k,jsub)
+!
+! qgas3, qaer3, qaercw3, qnum3, qnumcw3 are the current incoming TMRs
+! qgas4, qaer4, qaercw4, qnum4, qnumcw4 are the updated outgoing TMRs
+!
+! In a clear subarea, calculate
+!  - gas-aerosol exchange (condensation/evaporation)
+!  - growth from smaller to larger modes (renaming) due to condensation
+!  - new particle nucleation
+!  - coagulation
+!  - transfer of particles from hydrophobic modes to hydrophilic modes (aging)
+!    due to condensation and coagulation
+!
+! In a cloudy subarea,
+!  - when do_cond = false, this routine only calculate changes involving
+!    growth from smaller to larger modes (renaming) following cloud chemistry
+!    so gas TMRs are not changed
+!  - when do_cond = true, this routine also calculates changes involving
+!    gas-aerosol exchange (condensation/evaporation)
+!  - transfer of particles from hydrophobic modes to hydrophilic modes (aging)
+!       due to condensation
+! Currently, in a cloudy subarea, this routine does not do
+!  - new particle nucleation - because h2so4 gas conc. should be very low in cloudy air
+!  - coagulation - because cloud-borne aerosol would need to be included
 !--------------------------------------------------------------------------------
       subroutine mam_amicphys_1subarea(        &
          do_cond,                do_rename,          &
@@ -753,40 +778,15 @@ main_jsub_loop: &
          qaercw_delaa,                               &
          misc_vars_aa_sub                            )
 
-  use modal_aero_amicphys_control
-!
-! CLEAR SUBAREA ----
-! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
-!    for a single clear sub-area (with indices = lchnk,i,k,jsub)
-! qgas3, qaer3, qnum3 are the current incoming TMRs
-! qgas4, qaer4, qnum4 are the updated outgoing TMRs
-!
-! this routine calculates changes involving
-!    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to condensation
-!    new particle nucleation
-!    coagulation
-!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
-!       due to condensation and coagulation
-!
-! CLOUDY SUBAREA
-!
-! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
-!    for a single cloudy sub-area (with indices = lchnk,i,k,jsub)
-! qgas3, qaer3, qaercw3, qnum3, qnumcw3 are the current incoming TMRs
-! qgas4, qaer4, qaercw4, qnum4, qnumcw4 are the updated outgoing TMRs
-!
-! when do_cond = false, this routine only calculates changes involving
-!    growth from smaller to larger modes (renaming) following cloud chemistry
-!    so gas TMRs are not changed
-! when do_cond = true, this routine also calculates changes involving
-!    gas-aerosol exchange (condensation/evaporation)
-!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
-!       due to condensation
-! currently this routine does not do
-!    new particle nucleation - because h2so4 gas conc. should be very low in cloudy air
-!    coagulation - because cloud-borne aerosol would need to be included
-!
+      use modal_aero_amicphys_control, only: r8, ntot_poaspec=>npoa, ntot_soaspec=>nsoa &
+                                           , max_mode, max_gas, max_aer &
+                                           , nqtendaa, nqqcwtendaa, misc_vars_aa_type &
+                                           , gaexch_h2so4_uptake_optaa, ngas, igas_h2so4, igas_nh3 &
+                                           , newnuc_h2so4_conc_optaa &
+                                           , nait, nacc, max_agepair, n_agepair &
+                                           , iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, iqqcwtend_rnam
+
+      use modal_aero_data,   only:  n_mode=>ntot_amode
       use physconst, only:  r_universal
       use modal_aero_coag, only: mam_coag_1subarea
       use modal_aero_rename, only: mam_rename_1subarea
@@ -801,22 +801,19 @@ main_jsub_loop: &
       integer,  intent(in)    :: loffset
       integer,  intent(in)    :: jsub, nsubarea        ! sub-area index, number of sub-areas
 
-      real(r8), intent(in)    :: afracsub              ! fractional area of sub-area (0-1)
-      real(r8), intent(in)    :: deltat                ! time step (s)
+      real(r8), intent(in)    :: afracsub              ! fractional area of subarea [unitless, 0-1]
+      real(r8), intent(in)    :: deltat                ! time step [s]
 
-      real(r8), intent(in)    :: temp                  ! temperature at model levels (K)
-      real(r8), intent(in)    :: pmid                  ! pressure at layer center (Pa)
-      real(r8), intent(in)    :: pdel                  ! pressure thickness of layer (Pa)
-      real(r8), intent(in)    :: zmid                  ! altitude (above ground) at layer center (m)
-      real(r8), intent(in)    :: pblh                  ! planetary boundary layer depth (m)
-      real(r8), intent(in)    :: relhum                ! relative humidity (0-1)
+      real(r8), intent(in)    :: temp                  ! air temperature at model levels [K]
+      real(r8), intent(in)    :: pmid                  ! air pressure at layer center [Pa]
+      real(r8), intent(in)    :: pdel                  ! pressure thickness of layer [Pa]
+      real(r8), intent(in)    :: zmid                  ! altitude (above ground) at layer center [m]
+      real(r8), intent(in)    :: pblh                  ! planetary boundary layer depth [m]
+      real(r8), intent(in)    :: relhum                ! relative humidity [unitless, 0-1]
 
-      real(r8), intent(inout) :: dgn_a(max_mode)
-      real(r8), intent(inout) :: dgn_awet(max_mode)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
-      real(r8), intent(inout) :: wetdens(max_mode)
-                                    ! interstitial aerosol wet density (kg/m3)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
+      real(r8), intent(inout) :: dgn_a   (max_mode)    ! dry geo. mean diameter [m] of number distribution
+      real(r8), intent(inout) :: dgn_awet(max_mode)    ! wet geo. mean diameter [m] of number distribution
+      real(r8), intent(inout) :: wetdens (max_mode)    ! interstitial aerosol wet density [kg/m3]
 
 ! qXXXN (X=gas,aer,wat,num; N=1:4) are sub-area mixing ratios
 !    XXX=gas - gas species
@@ -858,8 +855,6 @@ main_jsub_loop: &
       type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa_sub
 
 ! local
-      integer, parameter :: ntot_poaspec = npoa
-      integer, parameter :: ntot_soaspec = nsoa
 
       integer :: iaer, igas, ip
       integer :: jtsubstep
@@ -867,14 +862,8 @@ main_jsub_loop: &
 ! if dest_mode_of_mode(n) >  0, then mode n gets renamed into mode dest_mode_of_mode(n)
 ! if dest_mode_of_mode(n) <= 0, then mode n does not have renaming
       integer :: dest_mode_of_mode(max_mode)
-      integer :: n, ntsubstep
-      integer :: n_mode
-      integer :: ntot_soamode
-
-      logical, parameter :: flag_pcarbon_opoa_frac_zero   = .true.
-      logical, parameter :: flag_nh4_lt_2so4_each_step  = .false.
-
-      logical :: skip_soamode(max_mode)   ! true if this mode does not have soa
+      integer :: n
+      integer,parameter ::  ntsubstep = 1
 
       real(r8), dimension( 1:max_gas ) :: qgas_cur, qgas_sv1, qgas_avg
       real(r8), dimension( 1:max_gas ) :: qgas_del_cond, qgas_del_nnuc, qgas_netprod_otrproc
@@ -913,15 +902,12 @@ main_jsub_loop: &
       real(r8) :: gas_diffus(max_gas)              ! gas diffusivity at current temp and pres (m2/s)
       real(r8) :: gas_freepath(max_gas)            ! gas mean free path at current temp and pres (m)
 
-      real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf
-      real(r8) :: tmp_relhum
       real(r8) :: uptkaer(max_gas,max_mode)
       real(r8) :: uptkrate_h2so4
 
       logical :: do_aging_in_subarea
 
       aircon = pmid/(r_universal*temp) ! air molar density (kmol/m3)
-      n_mode = ntot_amode
 
       qgas_cur = qgas3
       qaer_cur = qaer3
@@ -934,17 +920,17 @@ main_jsub_loop: &
       end if
 
       qgas_netprod_otrproc(:) = 0.0_r8
+      ! if gaexch_h2so4_uptake_optaa == 2, then
+      !    if qgas increases from pre-gaschem to post-cldchem,
+      !       start from the pre-gaschem mix-ratio and add in the production
+      !       during the integration
+      !    if it decreases,
+      !       start from post-cldchem mix-ratio
+      ! *** currently just do this for h2so4 and nh3
       if ( ( do_cond                         ) .and. &
            ( gaexch_h2so4_uptake_optaa == 2 ) ) then
          do igas = 1, ngas
             if ((igas == igas_h2so4) .or. (igas == igas_nh3)) then
-! if gaexch_h2so4_uptake_optaa == 2, then
-!    if qgas increases from pre-gaschem to post-cldchem,
-!       start from the pre-gaschem mix-ratio and add in the production
-!       during the integration
-!    if it decreases,
-!       start from post-cldchem mix-ratio
-! *** currently just do this for h2so4 and nh3
                qgas_netprod_otrproc(igas) = (qgas3(igas) - qgas1(igas))/deltat
                if ( qgas_netprod_otrproc(igas) >= 0.0_r8 ) then
                   qgas_cur(igas) = qgas1(igas)
@@ -985,7 +971,6 @@ main_jsub_loop: &
 
       dnclusterdt = 0.0_r8
 
-      ntsubstep = 1
       dtsubstep = deltat
       if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
 
