@@ -1030,10 +1030,10 @@ jtsubstep_loop: &
          qnum_sv1 = qnum_cur
          qaer_sv1 = qaer_cur
 
-         if (iscldy_subarea) then 
+        !if (iscldy_subarea) then 
          qnumcw_sv1 = qnumcw_cur
          qaercw_sv1 = qaercw_cur
-         end if
+        !end if
 
          if (.not.iscldy_subarea) then 
          call mam_rename_1subarea(                                    &
@@ -1067,14 +1067,11 @@ jtsubstep_loop: &
 
 
 
-   if (.not.iscldy_subarea) then
+!  if (.not.iscldy_subarea) then
 
-!
-!
-! new particle formation (nucleation)
-!
-!
-      do_newnuc_if_block50: &
+      !-------------------------------------
+      ! new particle formation (nucleation)
+      !-------------------------------------
       if ( do_newnuc_sub ) then
 
       qgas_sv1 = qgas_cur
@@ -1101,14 +1098,11 @@ jtsubstep_loop: &
       qaer_del_nnuc = qaer_del_nnuc + (qaer_cur - qaer_sv1)
       dnclusterdt = dnclusterdt + dnclusterdt_substep*(dtsubstep/deltat)
 
-      end if do_newnuc_if_block50
+      end if
 
-
-!
-!
-! coagulation part
-!
-!
+      !-------------------
+      ! coagulation
+      !-------------------
       if ( do_coag_sub ) then
 
       qnum_sv1 = qnum_cur
@@ -1125,14 +1119,9 @@ jtsubstep_loop: &
 
       end if
 
-   end if ! .not.iscldy_subarea
-
-!
-!
-! primary carbon aging
-!
-!
-
+      !----------------------
+      ! primary carbon aging
+      !----------------------
       do_aging_in_subarea = ( n_agepair>0 ) .and. &
                             ( (.not.iscldy_subarea).or.(iscldy_subarea.and.do_cond_sub) )
 
@@ -1152,8 +1141,9 @@ jtsubstep_loop: &
 
       end if
 
-! accumulate sub-step q-dels
-
+      !----------------------------
+      ! accumulate sub-step q-dels
+      !---------------------------------
       if ( do_coag_sub .and. (.not.iscldy_subarea) ) then
          qnum_del_coag = qnum_del_coag + qnum_delsub_coag
          qaer_del_coag = qaer_del_coag + qaer_delsub_coag
@@ -1189,18 +1179,21 @@ end do jtsubstep_loop
       qgas_delaa(:,iqtend_coag) = 0.0_r8
 
      if (iscldy_subarea) then
-        qgas_delaa(:,iqtend_nnuc) = 0.0_r8
-        qnum_delaa(:,iqtend_nnuc) = 0.0_r8
-        qnum_delaa(:,iqtend_coag) = 0.0_r8
+
+          qgas_delaa(:,iqtend_nnuc) = 0.0_r8
+          qnum_delaa(:,iqtend_nnuc) = 0.0_r8
         qaer_delaa(:,:,iqtend_nnuc) = 0.0_r8
+          qnum_delaa(:,iqtend_coag) = 0.0_r8
         qaer_delaa(:,:,iqtend_coag) = 0.0_r8
-      qnumcw_delaa(:,iqqcwtend_rnam) = qnumcw_del_rnam(:)
+
+        qnumcw_delaa(:,iqqcwtend_rnam) = qnumcw_del_rnam(:)
       qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_del_rnam(:,:)
+
      else
-        qgas_delaa(:,iqtend_nnuc) = qgas_del_nnuc(:)
-        qnum_delaa(:,iqtend_nnuc) = qnum_del_nnuc(:)
-        qnum_delaa(:,iqtend_coag) = qnum_del_coag(:)
+          qgas_delaa(:,iqtend_nnuc) = qgas_del_nnuc(:)
+          qnum_delaa(:,iqtend_nnuc) = qnum_del_nnuc(:)
         qaer_delaa(:,:,iqtend_nnuc) = qaer_del_nnuc(:,:)
+          qnum_delaa(:,iqtend_coag) = qnum_del_coag(:)
         qaer_delaa(:,:,iqtend_coag) = qaer_del_coag(:,:)
      end if
 
