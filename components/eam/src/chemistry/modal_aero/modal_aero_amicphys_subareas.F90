@@ -39,7 +39,7 @@ subroutine setup_subareas( cld,                                     &! in
   real(wp), intent(out) :: fclea, fcldy               ! area fraction of clear/cloudy subarea [unitless]
 
   ! Cloud chemistry is only active when cld(i,k) >= 1.0e-5_wp
-  ! It may be that the macrophysics has a higher threshold that this
+  ! It may be that the macrophysics has a higher threshold than this
   real(wp), parameter :: fcld_locutoff = 1.0e-5_wp
 
   ! Grid cells with cloud fraction larger than this cutoff is considered to be overcast
@@ -214,14 +214,15 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
 
      lcopy(1:ncnst) = lmapcc_all(1:ncnst) > 0     ! copy all gases and aerosols
 
-     do jsub = 1,nsubarea
-        call copy_cnst( qgcm1, qsub1(:,jsub), lcopy ) !from, to, flag
-        call copy_cnst( qgcm2, qsub2(:,jsub), lcopy ) !from, to, flag
-        call copy_cnst( qgcm3, qsub3(:,jsub), lcopy ) !from, to, flag
+     jsub = 1
+     where(lcopy)
+       qsub1(:,jsub) = qgcm1(:)
+       qsub2(:,jsub) = qgcm2(:)
+       qsub3(:,jsub) = qgcm3(:)
 
-        call copy_cnst( qqcwgcm2, qqcwsub2(:,jsub), lcopy ) !from, to, flag
-        call copy_cnst( qqcwgcm3, qqcwsub3(:,jsub), lcopy ) !from, to, flag
-     end do
+       qqcwsub2(:,jsub) = qqcwgcm2(:)
+       qqcwsub3(:,jsub) = qqcwgcm3(:)
+     end where
 
   !*************************************************************************************************
   ! Category II: partly cloudy grid cell. Tracer mixing ratios are generally assumed different
@@ -241,14 +242,14 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! i.e., they all equal the grid cell mean.
      !------------------------------------------------------------------------------------------
      do jsub = 1,nsubarea
-        call copy_cnst( qgcm1, qsub1(:,jsub), cnst_is_gas ) !from, to, flag
+        where (cnst_is_gas) qsub1(:,jsub) = qgcm1(:)
      end do
 
      !------------------------------------------------------------------------------------------
      ! After gas chemistry, still assume gas mixing ratios are the same in all subareas.
      !------------------------------------------------------------------------------------------
      do jsub = 1,nsubarea
-        call copy_cnst( qgcm2, qsub2(:,jsub), cnst_is_gas ) !from, to, flag
+        where (cnst_is_gas) qsub2(:,jsub) = qgcm2(:)
      end do
 
      !----------------------------------------------------------------------------------------
@@ -258,10 +259,9 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! subarea likely have changed.
      !----------------------------------------------------------------------------------------
      ! Gases in the clear subarea remain the same as their values before cloud chemistry.
+     where (cnst_is_gas) qsub3(:,jclea) = qsub2(:,jclea)
 
-     call copy_cnst( qsub2(:,jclea), qsub3(:,jclea), cnst_is_gas ) !from, to, flag
-
-     ! Calculater the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
+     ! Calculate the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
      ! cloud fraction and the clear-sky values
 
      call compute_qsub_from_gcm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
@@ -312,20 +312,6 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   end if ! different categories
 
 end subroutine set_subarea_gases_and_aerosols
-
-subroutine copy_cnst( q_in, q_copy, lcopy )
-!------------------------------------------------------
-! Purpose: copy values from one array to another
-!------------------------------------------------------
-  logical, intent(in)    :: lcopy(ncnst)  ! whether individual constituents should be copied
-  real(wp),intent(in)    :: q_in(ncnst)   ! values to be copied
-  real(wp),intent(inout) :: q_copy(ncnst) ! copy of input values 
-
-  where( lcopy )
-    q_copy = q_in
-  end where
-
-end subroutine copy_cnst
 
 subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea( lcompute, f_a, f_b, qgcm, &! in
                                                             qsub_a, qsub_b            )! inout
