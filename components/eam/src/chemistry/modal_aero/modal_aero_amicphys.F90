@@ -709,7 +709,7 @@ main_jsub_loop: &
 ! (with indices = lchnk,i,k,jsub)
 !
 ! qgas3, qaer3, qaercw3, qnum3, qnumcw3 are the current incoming TMRs
-! qgas4, qaer4, qaercw4, qnum4, qnumcw4 are the updated outgoing TMRs
+! qgas_cur, qaer_cur, qaercw_cur, qnum_cur, qnumcw_cur are the updated outgoing TMRs
 !
 ! In a clear subarea, calculate
 !  - gas-aerosol exchange (condensation/evaporation)
@@ -742,15 +742,12 @@ main_jsub_loop: &
          temp,       pmid,       pdel,               &
          zmid,       pblh,       relhum,             &
          dgn_a,      dgn_awet,   wetdens,            &
-         qgas1,      qgas3,      qgas4,              &
-         qgas_delaa,                                 &
-                qnum3,      qnum4,   qnum_delaa,     &
-         qaer2, qaer3,      qaer4,   qaer_delaa,     &
-         qwtr3,      qwtr4,                          &
-         qnumcw3,    qnumcw4,                        &
-         qnumcw_delaa,                               &
-         qaercw2,    qaercw3,    qaercw4,            &
-         qaercw_delaa,                               &
+         qgas1,   qgas3,   qgas_cur,   qgas_delaa,   &
+                  qnum3,   qnum_cur,   qnum_delaa,   &
+         qaer2,   qaer3,   qaer_cur,   qaer_delaa,   &
+                  qwtr3,   qwtr_cur,                 &
+                  qnumcw3, qnumcw_cur, qnumcw_delaa, &
+         qaercw2, qaercw3, qaercw_cur, qaercw_delaa, &
          misc_vars_aa_sub                            )
 
       use modal_aero_amicphys_control, only: r8, ntot_poaspec=>npoa, ntot_soaspec=>nsoa &
@@ -761,9 +758,9 @@ main_jsub_loop: &
                                            , nait, nacc, max_agepair, n_agepair &
                                            , iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, iqqcwtend_rnam
 
-      use modal_aero_data,   only:  n_mode=>ntot_amode
-      use physconst, only:  r_universal
-      use modal_aero_coag, only: mam_coag_1subarea
+      use modal_aero_data,   only: n_mode=>ntot_amode
+      use physconst,         only: r_universal
+      use modal_aero_coag,   only: mam_coag_1subarea
       use modal_aero_rename, only: mam_rename_1subarea
 
       logical,  intent(in)    :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
@@ -798,33 +795,33 @@ main_jsub_loop: &
 !    N=1 - before gas-phase chemistry
 !    N=2 - before cloud chemistry
 !    N=3 - current incoming values (before gas-aerosol exchange, newnuc, coag)
-!    N=4 - updated outgoing values (after  gas-aerosol exchange, newnuc, coag)
+!    N=_cur - updated outgoing values (after  gas-aerosol exchange, newnuc, coag)
 !
 ! qXXX_delaa are TMR changes (not tendencies)
 !    for different processes, which are used to produce history output
 ! for a clear sub-area, the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
       real(r8), intent(in   ), dimension( 1:max_gas ) :: qgas1, qgas3
-      real(r8), intent(inout), dimension( 1:max_gas ) :: qgas4
+      real(r8), intent(inout), dimension( 1:max_gas ) :: qgas_cur
       real(r8), intent(inout), dimension( 1:max_gas, 1:nqtendaa ) :: qgas_delaa
 
       real(r8), intent(in   ), dimension( 1:max_mode ) ::  qnum3
-      real(r8), intent(inout), dimension( 1:max_mode ) ::  qnum4
+      real(r8), intent(inout), dimension( 1:max_mode ) ::  qnum_cur
       real(r8), intent(inout), dimension( 1:max_mode, 1:nqtendaa ) :: qnum_delaa
 
       real(r8), intent(in   ), dimension( 1:max_aer, 1:max_mode ) :: qaer2, qaer3
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) ::  qaer4
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) ::  qaer_cur
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) :: qaer_delaa
 
       real(r8), intent(in   ), dimension( 1:max_mode ) :: qwtr3
-      real(r8), intent(inout), dimension( 1:max_mode ) :: qwtr4
+      real(r8), intent(inout), dimension( 1:max_mode ) :: qwtr_cur
 
       real(r8), intent(in   ), dimension( 1:max_mode ) :: qnumcw3
-      real(r8), intent(inout), dimension( 1:max_mode ) :: qnumcw4
+      real(r8), intent(inout), dimension( 1:max_mode ) :: qnumcw_cur
       real(r8), intent(inout), dimension( 1:max_mode, 1:nqqcwtendaa ) :: qnumcw_delaa
 
       real(r8), intent(in   ), dimension( 1:max_aer, 1:max_mode ) :: qaercw2, qaercw3
-      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaercw4
+      real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaercw_cur
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa
 
       type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa_sub
@@ -840,7 +837,7 @@ main_jsub_loop: &
       integer :: n
       integer,parameter ::  ntsubstep = 1
 
-      real(r8), dimension( 1:max_gas ) :: qgas_cur, qgas_sv1, qgas_avg
+      real(r8), dimension( 1:max_gas ) :: qgas_sv1, qgas_avg
       real(r8), dimension( 1:max_gas ) :: qgas_del_cond, qgas_del_nnuc, qgas_netprod_otrproc
                 ! qgas_netprod_otrproc = gas net production rate from other processes
                 !    such as gas-phase chemistry and emissions (mol/mol/s)
@@ -851,23 +848,21 @@ main_jsub_loop: &
 
 ! qxxx_del_yyyy    are mix-ratio changes over full time step (deltat)
 ! qxxx_delsub_yyyy are mix-ratio changes over time sub-step (dtsubstep)
-      real(r8), dimension( 1:max_mode ) :: qnum_cur, qnum_sv1
+      real(r8), dimension( 1:max_mode ) :: qnum_sv1
       real(r8), dimension( 1:max_mode ) :: qnum_del_cond, qnum_del_rnam, qnum_del_nnuc, qnum_del_coag, &
          qnum_delsub_cond, qnum_delsub_coag
 
-      real(r8), dimension( 1:max_mode ) :: qnumcw_cur, qnumcw_sv1
+      real(r8), dimension( 1:max_mode ) :: qnumcw_sv1
       real(r8), dimension( 1:max_mode ) :: qnumcw_del_rnam
 
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur, qaer_sv1
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
       real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond, qaer_del_rnam, qaer_del_nnuc, qaer_del_coag, &
          qaer_delsub_grow4rnam, &
          qaer_delsub_cond, qaer_delsub_coag
 
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_cur, qaercw_sv1
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_del_rnam, qaercw_delsub_grow4rnam
-
-      real(r8), dimension( 1:max_mode ) :: qwtr_cur
 
       real(r8) :: aircon                           ! air molar density (kmol/m3)
       real(r8) :: del_h2so4_gasprod
@@ -945,17 +940,12 @@ main_jsub_loop: &
 
       dnclusterdt = 0.0_r8
 
-!     dtsubstep = deltat
-!     if (ntsubstep > 1) dtsubstep = deltat/ntsubstep
-
       dtsubstep = deltat/ntsubstep
       del_h2so4_gasprod = max( qgas3(igas_h2so4)-qgas1(igas_h2so4), 0.0_r8 )/ntsubstep
 
-!
-!
+!===================================
 ! loop over multiple time sub-steps
-!
-!
+!===================================
 jtsubstep_loop: &
       do jtsubstep = 1, ntsubstep
 
@@ -1065,10 +1055,6 @@ jtsubstep_loop: &
 
       end if !do_rename_sub
 
-
-
-!  if (.not.iscldy_subarea) then
-
       !-------------------------------------
       ! new particle formation (nucleation)
       !-------------------------------------
@@ -1155,24 +1141,11 @@ jtsubstep_loop: &
       end if
 
 end do jtsubstep_loop
+!======================
 
-
-!
-!
-! final mix ratios
-!
-!
-      qgas4 = qgas_cur
-      qaer4 = qaer_cur
-      qnum4 = qnum_cur
-      qwtr4 = qwtr_cur
-
-     if (iscldy_subarea) then
-      qnumcw4 = qnumcw_cur
-      qaercw4 = qaercw_cur
-     end if
-
-! final mix ratio changes
+      !-------------------------
+      ! final mix ratio changes
+      !-------------------------
 
       qgas_delaa(:,iqtend_cond) = qgas_del_cond(:)
       qgas_delaa(:,iqtend_rnam) = 0.0_r8
