@@ -292,6 +292,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
      ! update variables for output
      do icnst = 1, pcnst
         if ( .not. dotend(icnst) ) cycle
+
         if ((species_class(icnst) == spec_class_aerosol) .or. &
             (species_class(icnst) == spec_class_gas    )) then
            ! these used for history file wetdep diagnostics
@@ -449,10 +450,7 @@ subroutine ma_convproc_dp_intr(                &
 
    real(r8), intent(in)    :: dt                         ! delta t (model time increment) [s]
    real(r8), intent(in)    :: qnew(pcols,pver,pcnst)     ! tracer mixing ratio including water vapor [kg/kg]
-   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)     ! time tendency of q [kg/kg/s]
-   logical,  intent(out)   :: dotend(pcnst)              ! if do tendency
    integer,  intent(in)    :: nsrflx                     ! last dimension of qsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx) ! process-specific column tracer tendencies (see ma_convproc_intr for more information) [kg/m2/s]
 
    real(r8), intent(in)    :: dp_frac(pcols,pver) ! Deep conv cloud fraction [0-1]
    real(r8), intent(in)    :: icwmrdp(pcols,pver) ! Deep conv cloud condensate (in cloud) [kg/kg]
@@ -474,6 +472,11 @@ subroutine ma_convproc_dp_intr(                &
    integer,  intent(in)    :: ideep(pcols)      ! Gathering array
    integer,  intent(in)    :: lengath           ! Gathered min lon indices over which to operate
    integer,  intent(in)    :: species_class(:)  ! species index
+
+   logical,  intent(out)   :: dotend(pcnst)              ! if do tendency
+   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)     ! time tendency of q [kg/kg/s]
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx) ! process-specific column tracer tendencies (see ma_convproc_intr for more information) [kg/m2/s]
+
 
 ! Local variables
    integer :: ii
@@ -572,10 +575,7 @@ subroutine ma_convproc_sh_intr(                 &
 
    real(r8), intent(in)    :: dt                      ! delta t (model time increment) [s]
    real(r8), intent(in)    :: qnew(pcols,pver,pcnst)  ! tracer mixing ratio (TMR) including water vapor [kg/kg]
-   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)  ! time tendency of TMR [kg/kg/s]
-   logical,  intent(out)   :: dotend(pcnst)           ! flag if do tendency
    integer,  intent(in)    :: nsrflx                  ! last dimension of qsrflx
-   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)  ! process-specific column tracer tendencies  (see ma_convproc_intr for more information) [kg/m2/s]
 
    real(r8), intent(in)    :: sh_frac(pcols,pver)       ! Shallow conv cloud frac [0-1]
    real(r8), intent(in)    :: icwmrsh(pcols,pver)       ! Shallow conv cloud condensate (in cloud) [kg/kg]
@@ -585,6 +585,10 @@ subroutine ma_convproc_sh_intr(                 &
    real(r8), intent(in)    :: cmfmcsh(pcols,pverp)      ! Shallow conv mass flux [kg/m2/s]
    real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver) ! shallow conv [ent/(ent+det)] ratio
    integer,  intent(in)    :: species_class(:)          ! species index
+
+   logical,  intent(out)   :: dotend(pcnst)           ! flag if do tendency
+   real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)  ! time tendency of TMR [kg/kg/s]
+   real(r8), intent(inout) :: qsrflx(pcols,pcnst,nsrflx)  ! process-specific column tracer tendencies  (see ma_convproc_intr for more information) [kg/m2/s] 
 
 ! Local variables
    integer :: icol
@@ -814,12 +818,16 @@ subroutine extend_belowcloud_downward(             &
 
    k_cldbot = maxg(icol)          ! cloud bot level
    k_4_below_cldbot = min( k_cldbot+4, pver )  ! 4 levels below cloud bottom
+
    if (k_4_below_cldbot > k_cldbot) then  ! make sure cloud bot is not the bottom model level
+
       dp_sum = sum( dpdry(icol,k_cldbot:k_4_below_cldbot) )
+
       do kk = k_cldbot+1, k_4_below_cldbot
          ! extend mass flux below cloud to k_4_below_cldbot
          mu(icol,kk) = mu(icol,k_cldbot)*sum( dpdry(icol,kk:k_4_below_cldbot) )/dp_sum
       enddo ! kk
+
       maxg(icol) = k_4_below_cldbot
    endif
 
@@ -897,6 +905,7 @@ subroutine calculate_ent_det(                   &
             endif
          endif
       endif
+
    enddo ! kk
 
 end subroutine calculate_ent_det
@@ -1565,7 +1574,8 @@ jtsub_loop_main_aa: &
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
                 conu,           xx_wcldbase,    xx_kcldbase             ) ! inout 
 !-----------------------------------------------------------------------
-! Compute updraft mixing ratios from cloudbase to cloudtop
+! Compute updraft mixing ratios from cloudbase to cloudtop 
+! as well as tendencies of wetdeposition and activation from updraft
 ! No special treatment is needed at k=pver because arrays are dimensioned 1:pver+1
 ! A time-split approach is used.  First, entrainment is applied to produce
 !    an initial conu(m,k) from conu(m,k+1).  Next, chemistry/physics are
@@ -1719,12 +1729,13 @@ jtsub_loop_main_aa: &
    integer      :: kp1                  ! kk + 1
    real(r8)     :: zkm                  ! height above surface [km]
    real(r8), parameter  :: w_peak = 4.0_r8      ! pre-defined peak updraft [m/s]
+   real(r8), parameter  :: w_min = 0.1_r8       ! pre-defined minimum updraft [m/s]
 
 ! shallow - wup = (mup in kg/m2/s) / [rhoair * (updraft area)]
     if (iconvtype /= 1) then
        wup(kk) = (mu_i(kp1) + mu_i(kk))*0.5_r8*hund_ovr_g &
                       / (rhoair_i(kk) * (cldfrac_i(kk)*0.5_r8))
-       wup(kk) = max( 0.1_r8, wup(kk) )
+       wup(kk) = max( w_min, wup(kk) )
 
 ! deep - the above method overestimates updraft area and underestimate wup
 !    the following is based lemone and zipser (j atmos sci, 1980, p. 2455)
@@ -1738,7 +1749,7 @@ jtsub_loop_main_aa: &
        else
            wup(kk) = 2.9897_r8*(zkm**0.5_r8)
        endif
-       wup(kk) = min_max_bound(0.1_r8, w_peak, wup(kk))
+       wup(kk) = min_max_bound(w_min, w_peak, wup(kk))
    endif
 
    end subroutine compute_wup
@@ -2602,7 +2613,8 @@ jtsub_loop_main_aa: &
    do imode = 1, ntot_amode
       do ispec = 0, nspec_amode(imode)
          call assign_la_lc(imode, ispec, la, lc)
-         call tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, la, lc, ktop, kbot_prevap)
+         call tmr_tendency(pcnst_extd, la, lc, ktop, kbot_prevap, & ! in
+                           dcondt, dcondt_resusp                  ) ! inout
       enddo   ! "ll = -1, nspec_amode(n)"
    enddo      ! "n = 1, ntot_amode"
 
@@ -2611,8 +2623,9 @@ jtsub_loop_main_aa: &
    end subroutine ma_resuspend_convproc
 
 !=========================================================================================
-   subroutine tmr_tendency(pcnst_extd, dcondt, dcondt_resusp, &
-                        la, lc, ktop, kbot_prevap)
+   subroutine tmr_tendency(pcnst_extd,                  & ! in
+                        la, lc, ktop, kbot_prevap,      & ! in
+                        dcondt, dcondt_resusp           ) ! inout
 !-----------------------------------------------------------------------
 ! calculate tendency of TMR
 !-----------------------------------------------------------------------
@@ -2621,10 +2634,10 @@ jtsub_loop_main_aa: &
 
    ! arguments (note:  TMR = tracer mixing ratio)
    integer,  intent(in)    :: pcnst_extd ! cloudborne aerosol dimension [unitless]
+   integer,  intent(in)    :: la, lc            ! indices
+   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels
    real(r8), intent(inout) :: dcondt(pcnst_extd,pver) ! overall TMR tendency from convection [#/kg/s or kg/kg/s]
    real(r8), intent(inout) :: dcondt_resusp(pcnst_extd,pver) ! portion of TMR tendency due to resuspension [#/kg/s or kg/kg/s]
-   integer, intent(in)     :: la, lc            ! indices
-   integer,  intent(in)    :: ktop, kbot_prevap ! indices of top and bottom cloud levels
 
    ! local variables
    integer  :: kk   ! indices of vertical levels
@@ -2778,7 +2791,7 @@ jtsub_loop_main_aa: &
    xinv_ntsub = 1.0_r8/ntsub
    dtsub = dt*xinv_ntsub
 
-
+   ! update diagnostic variables
    do imode = 1, ntot_amode
         do ispec = 0, nspec_amode(imode)
              call assign_la_lc(imode, ispec, la, lc)
