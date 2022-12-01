@@ -382,7 +382,7 @@ subroutine update_qnew_ptend(                                         &
 
    ! Arguments
    logical,  intent(in)    :: dotend(pcnst)             ! if do tendency
-   logical,  intent(in)    :: is_update_ptend           ! if add dqdt onto ptend%q
+   logical,  intent(in)    :: is_update_ptend           ! if update ptend with dqdt
    integer,  intent(in)    :: ncol                      ! index
    integer,  intent(in)    :: species_class(:)          ! species index
    real(r8), intent(in)    :: dqdt(pcols,pver,pcnst)    ! time tendency of tracer [kg/kg/s]
@@ -404,7 +404,7 @@ subroutine update_qnew_ptend(                                         &
      qtmp(1:ncol,:,ll) = qnew(1:ncol,:,ll) + dt*dqdt(1:ncol,:,ll)
      qnew(1:ncol,:,ll) = max( 0.0_r8, qtmp(1:ncol,:,ll) )
 
-     ! add dqdt onto ptend%q and set ptend%lq
+     ! add dqdt onto ptend_q and set ptend_lq
      if ( is_update_ptend ) then
         ptend_q(1:ncol,:,ll) = ptend_q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
         ptend_lq(ll) = .true.
@@ -905,7 +905,7 @@ end subroutine calculate_ent_det
 subroutine ma_convproc_tend(                                         &
                      convtype,                                       & ! in
                      lchnk,      ncnst,      dt,                     & ! in
-                     t,          pmid,       q,                      & ! in
+                     temperature,            pmid,       qnew,       & ! in
                      mu,         md,         du,         eu,         & ! in
                      ed,         dp,         dpdry,      jt,         & ! in
                      mx,         ideep,      il1g,       il2g,       & ! in  
@@ -964,9 +964,9 @@ subroutine ma_convproc_tend(                                         &
    integer,  intent(in) :: lchnk             ! chunk identifier
    integer,  intent(in) :: ncnst             ! number of tracers to transport
    real(r8), intent(in) :: dt                ! Model timestep [s]
-   real(r8), intent(in) :: t(pcols,pver)     ! Temperature [K]
+   real(r8), intent(in) :: temperature(pcols,pver)     ! Temperature [K]
    real(r8), intent(in) :: pmid(pcols,pver)  ! Pressure at model levels [Pa]
-   real(r8), intent(in) :: q(pcols,pver,ncnst) ! Tracer array including moisture [kg/kg]
+   real(r8), intent(in) :: qnew(pcols,pver,ncnst)      ! Tracer array including moisture [kg/kg]
 
    real(r8), intent(in) :: mu(pcols,pver)    ! Updraft mass flux (positive) [mb/s]
    real(r8), intent(in) :: md(pcols,pver)    ! Downdraft mass flux (negative) [mb/s]
@@ -1078,10 +1078,7 @@ subroutine ma_convproc_tend(                                         &
 
 
 !-----------------------------------------------------------------------
-!
-
    lun = iulog
-
 
    if (convtype == 'deep') then
       iconvtype = 1
@@ -1135,11 +1132,11 @@ i_loop_main_aa: &
          dp_i(kk) = dp(ii,kk)
          dpdry_i(kk) = dpdry(ii,kk)
          cldfrac_i(kk) = cldfrac(icol,kk)
-         rhoair_i(kk) = pmid(icol,kk)/(rair*t(icol,kk))
+         rhoair_i(kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
       enddo
 !  load tracer mixing ratio array, which will be updated at the end of each
 !  jtsub interation
-      q_i(1:pver,1:pcnst) = q(icol,1:pver,1:pcnst)
+      q_i(1:pver,1:pcnst) = qnew(icol,1:pver,1:pcnst)
       ktop = jt(ii)
       kbot = mx(ii)
 
@@ -1181,7 +1178,7 @@ jtsub_loop_main_aa: &
                 doconvproc_extd, icol,  ktop,   kbot,   iconvtype,      & ! in
                 dt,     dp_i,   dpdry_i,        cldfrac,                & ! in
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
-                const,  t,      aqfrac, icwmr,          rprd,           & ! in
+                const,  temperature,    aqfrac, icwmr,  rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
                 conu,           xx_wcldbase,    xx_kcldbase             ) ! inout
 
@@ -1564,7 +1561,7 @@ jtsub_loop_main_aa: &
                 doconvproc_extd, icol,  ktop,   kbot,   iconvtype,      & ! in
                 dt,     dp_i,   dpdry_i,        cldfrac,                & ! in
                 rhoair_i,       zmagl,  dz,     mu_i,   eudp,           & ! in
-                const,  t,      aqfrac, icwmr,          rprd,           & ! in
+                const,  temperature,    aqfrac, icwmr,  rprd,           & ! in
                 fa_u,   dconudt_wetdep,         dconudt_activa,         & ! out
                 conu,           xx_wcldbase,    xx_kcldbase             ) ! inout 
 !-----------------------------------------------------------------------
@@ -1595,7 +1592,7 @@ jtsub_loop_main_aa: &
    real(r8),intent(in)  :: eudp(pver)           ! eu(i,k)*dp(i,k) at current i [mb/s]
    real(r8),intent(in)  :: const(pcnst_extd,pver)   ! gathered tracer array [kg/kg]
 
-   real(r8), intent(in) :: t(pcols,pver)        ! Temperature [K]
+   real(r8), intent(in) :: temperature(pcols,pver)  ! Temperature [K]
    real(r8), intent(in) :: aqfrac(pcnst_extd)   ! aqueous fraction of constituent in updraft [fraction]
    real(r8), intent(in) :: icwmr(pcols,pver)    ! Convective cloud water from zm scheme [kg/kg]
    real(r8), intent(in) :: rprd(pcols,pver)     ! Convective precipitation formation rate [kg/kg/s]
@@ -1678,10 +1675,9 @@ jtsub_loop_main_aa: &
 
             ! aerosol activation - method 2
             call compute_activation_tend(                       &
-                        icol,           kk,             f_ent,  & ! in
-
-                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
-                        dt_u,   wup,    icwmr,          t,      & ! in
+                        icol,           kk,        f_ent,       & ! in
+                        cldfrac_i,      rhoair_i,  mu_i,        & ! in
+                        dt_u,   wup,    icwmr,     temperature, & ! in
                         kactcnt,        kactfirst,              & ! inout
                         conu,           dconudt_activa,         & ! inout
                         xx_wcldbase,    xx_kcldbase             ) ! inout
@@ -1749,9 +1745,9 @@ jtsub_loop_main_aa: &
 
 !====================================================================================
    subroutine compute_activation_tend(                          &
-                        icol,           kk,             f_ent,  & ! in
-                        cldfrac_i,      rhoair_i,       mu_i,   & ! in
-                        dt_u,   wup,    icwmr,          t,      & ! in
+                        icol,           kk,        f_ent,       & ! in
+                        cldfrac_i,      rhoair_i,  mu_i,        & ! in
+                        dt_u,   wup,    icwmr,     temperature, & ! in
                         kactcnt,        kactfirst,              & ! inout
                         conu,           dconudt_activa,         & ! inout
                         xx_wcldbase,    xx_kcldbase             ) ! inout
@@ -1775,7 +1771,7 @@ jtsub_loop_main_aa: &
    real(r8), intent(in) :: mu_i(pverp)          ! mu at current i (note pverp dimension) [mb/s]
    real(r8), intent(in) :: dt_u(pver)           ! lagrangian transport time in the updraft at current level [s]
    real(r8), intent(in) :: wup(pver)            ! mean updraft vertical velocity at current level updraft [m/s]
-   real(r8), intent(in) :: t(pcols,pver)        ! Temperature [K]
+   real(r8), intent(in) :: temperature(pcols,pver)     ! Temperature [K]
    real(r8), intent(in) :: icwmr(pcols,pver)    ! Convective cloud water from zm scheme [kg/kg]
    integer,  intent(inout) :: kactcnt           !  Counter for no. of levels having activation
    integer,  intent(inout) :: kactfirst         ! Lowest layer with activation (= cloudbase)
@@ -1815,7 +1811,7 @@ jtsub_loop_main_aa: &
         call ma_activate_convproc(                                 &
                      conu(:,kk), dconudt_activa(:,kk),             & ! inout
                      f_ent,      dt_u(kk),            wup(kk),     & ! in
-                     t(icol,kk), rhoair_i(kk),                     & ! in
+                     temperature(icol,kk),            rhoair_i(kk),& ! in
                      pcnst_extd, kk,                  kactfirst    ) ! in
    endif
 
