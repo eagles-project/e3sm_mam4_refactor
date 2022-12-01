@@ -62,7 +62,6 @@ module modal_aero_convproc
 
 !=========================================================================================
 subroutine ma_convproc_init
-
 !----------------------------------------
 ! Purpose:  declare output fields, initialize variables needed by convection
 !----------------------------------------
@@ -113,8 +112,6 @@ subroutine ma_convproc_init
 
    return
 end subroutine ma_convproc_init
-
-
 
 !=========================================================================================
 subroutine ma_convproc_intr( state, dt,                             & ! in
@@ -189,11 +186,14 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    integer  :: imode, ispec
 
    logical  :: dotend(pcnst)    ! if do tendency
-
    real(r8) :: dlfdp(pcols,pver)                ! Deep (Total-Shallow) conv cldwtr detrainment (grid avg) [kg/kg/s] 
    real(r8) :: dqdt(pcols,pver,pcnst)           ! time tendency of q [kg/kg/s]
    real(r8) :: qnew(pcols,pver,pcnst)           ! tracer mixing ratio from state%q [kg/kg]
                                                 ! qnew is updated through the processes in this subroutine but does not update into state
+   ! variables in FORTRAN structure variables (e.g. ptend_q = ptend%q)
+   logical  :: ptend_lq(pcnst)          ! if do tendency
+   real(r8) :: ptend_q(pcols,pver,pcnst)! time tendency of q [kg/kg/s]
+
    real(r8) :: sflxic(pcols,pcnst)
    real(r8) :: sflxid(pcols,pcnst)
    real(r8) :: sflxec(pcols,pcnst)
@@ -215,8 +215,10 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
   ncol  = state%ncol
   lchnk = state%lchnk
   qnew(1:ncol,:,:) = state%q(1:ncol,:,:)
-  dotend(:) = ptend%lq(:)
-  dqdt(:,:,:) = ptend%q(:,:,:)
+
+  ptend_lq(:) = ptend%lq(:)
+  ptend_q(:,:,:) = ptend%q(:,:,:)
+
   hund_ovr_g = 100.0_r8/gravit
 !  used with zm_conv mass fluxes and delta-p. This is also used in other
 !  subroutines in this file since it is declared at the beginning.
@@ -226,12 +228,17 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 !
 ! prepare for processing
 !
+  dotend(:)   = ptend_lq(:)
+  dqdt(:,:,:) = ptend_q(:,:,:)
   qsrflx(:,:,:) = 0.0_r8
   call update_qnew_ptend(                                         &
                          dotend,                    .false.,      &  ! in
                          ncol,     species_class,   dqdt,         &  ! in
                          qsrflx,   dt,                            &  ! in
-                         ptend,    qnew                           )  ! inout
+                         ptend_lq, ptend_q,         qnew          )  ! inout
+  ! update ptend
+  ptend%lq(:) = ptend_lq(:)
+  ptend%q(:,:,:) = ptend_q(:,:,:)
 
   ! calculate variables for output
    sflxic(:,:) = 0.0_r8
@@ -239,7 +246,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    sflxec(:,:) = 0.0_r8
    sflxed(:,:) = 0.0_r8
    do icnst = 1, pcnst
-      if ( (species_class(icnst) == spec_class_aerosol) .and. ptend%lq(icnst) ) then
+      if ( (species_class(icnst) == spec_class_aerosol) .and. ptend_lq(icnst) ) then
          sflxec(1:ncol,icnst) = qsrflx_mzaer2cnvpr(1:ncol,icnst,1)
          sflxed(1:ncol,icnst) = qsrflx_mzaer2cnvpr(1:ncol,icnst,2)
       endif
@@ -266,7 +273,10 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
             dotend,                  .true.,       &  ! in
             ncol,   species_class,   dqdt,         &  ! in
             qsrflx, dt,                            &  ! in
-            ptend,  qnew                           )  ! inout
+            ptend_lq, ptend_q,       qnew          )  ! inout
+     ! update ptend
+     ptend%lq(:) = ptend_lq(:)
+     ptend%q(:,:,:) = ptend_q(:,:,:)
 
      ! update variables for output
      do icnst = 1, pcnst
@@ -305,7 +315,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
               dotend,                  .true.,       &  ! in
               ncol,   species_class,   dqdt,         &  ! in
               qsrflx, dt,                            &  ! in
-              ptend,  qnew                           )  ! inout
+              ptend_lq, ptend_q,       qnew          )  ! inout
 
      ! update variables for output
      do icnst = 1, pcnst
@@ -353,15 +363,12 @@ subroutine update_qnew_ptend(                                         &
                            dotend, is_update_ptend,                   &  ! in
                            ncol,   species_class,   dqdt,             &  ! in
                            qsrflx, dt,                                &  ! in
-                           ptend,  qnew                               )  ! inout
+                           ptend_lq, ptend_q,       qnew              )  ! inout
 ! ---------------------------------------------------------------------------------------
-! update qnew, ptend (%q and %lq)
+! update qnew, ptend_q and ptend_lq
 ! ---------------------------------------------------------------------------------------  
-use physics_types, only: physics_ptend
-use constituents,  only: pcnst
 
    ! Arguments
-   type(physics_ptend), intent(inout) :: ptend          ! indivdual parameterization tendencies. ptend%q [kg/kg/s] and ptend%lq [logical] will be updated
    logical,  intent(in)    :: dotend(pcnst)             ! if do tendency
    logical,  intent(in)    :: is_update_ptend           ! if add dqdt onto ptend%q
    integer,  intent(in)    :: ncol                      ! index
@@ -370,6 +377,8 @@ use constituents,  only: pcnst
    real(r8), intent(in)    :: qsrflx(:,:,:)             ! process-specific column tracer tendencies. see ma_convproc_tend for detail info [kg/m2/s]
    real(r8), intent(in)    :: dt                        ! model time step [s]
    real(r8), intent(inout) :: qnew(pcols,pver,pcnst)    ! Tracer array including moisture [kg/kg]
+   logical,  intent(inout) :: ptend_lq(pcnst)           ! if do tendency
+   real(r8), intent(inout) :: ptend_q(pcols,pver,pcnst) ! time tendency of q [kg/kg/s]
 
    ! Local variables
    integer  :: ll                         ! index
@@ -385,8 +394,8 @@ use constituents,  only: pcnst
 
      ! add dqdt onto ptend%q and set ptend%lq
      if ( is_update_ptend ) then
-        ptend%q(1:ncol,:,ll) = ptend%q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
-        ptend%lq(ll) = .true.
+        ptend_q(1:ncol,:,ll) = ptend_q(1:ncol,:,ll) + dqdt(1:ncol,:,ll)
+        ptend_lq(ll) = .true.
      endif
 
    enddo ! ll
@@ -648,8 +657,6 @@ subroutine assign_dotend( species_class,  & ! in
 ! assign do-tendency flag from species_class, convproc_do_aer and convproc_do_gas.
 ! convproc_do_aer and convproc_do_gas are assigned in the beginning of the  module
 !---------------------------------------------------------------------
-
-use constituents,   only: pcnst
 
    integer,  intent(in)    :: species_class(:)
    logical,  intent(out)   :: dotend(pcnst)
