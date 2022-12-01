@@ -180,8 +180,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 
 
 ! Local variables
-   integer  :: ncol             ! total column number. from state%ncol
-   integer  :: la, lc, lchnk    ! indices
+   integer  :: la, lc           ! indices
    integer  :: icnst
    integer  :: imode, ispec
 
@@ -190,9 +189,16 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
    real(r8) :: dqdt(pcols,pver,pcnst)           ! time tendency of q [kg/kg/s]
    real(r8) :: qnew(pcols,pver,pcnst)           ! tracer mixing ratio from state%q [kg/kg]
                                                 ! qnew is updated through the processes in this subroutine but does not update into state
+
    ! variables in FORTRAN structure variables (e.g. ptend_q = ptend%q)
+   integer  :: ncol                     ! total column number. from state%ncol
+   integer  :: lchnk                    ! chunk identifier. from state%lchnk
    logical  :: ptend_lq(pcnst)          ! if do tendency
    real(r8) :: ptend_q(pcols,pver,pcnst)! time tendency of q [kg/kg/s]
+   real(r8) :: state_pdeldry(pcols,pver)! layer delta-p-dry [mb]
+   real(r8) :: state_pdel(pcols,pver)   ! layer delta-p [mb]
+   real(r8) :: state_t(pcols,pver)      ! Temperature [K]
+   real(r8) :: state_pmid(pcols,pver)   ! Pressure at model levels [Pa]
 
    real(r8) :: sflxic(pcols,pcnst)
    real(r8) :: sflxid(pcols,pcnst)
@@ -214,7 +220,10 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 !
   ncol  = state%ncol
   lchnk = state%lchnk
-  qnew(1:ncol,:,:) = state%q(1:ncol,:,:)
+  state_pdeldry = state%pdeldry
+  state_pdel = state%pdel
+  state_t = state%t
+  state_pmid = state%pmid
 
   ptend_lq(:) = ptend%lq(:)
   ptend_q(:,:,:) = ptend%q(:,:,:)
@@ -230,6 +239,7 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
 !
   dotend(:)   = ptend_lq(:)
   dqdt(:,:,:) = ptend_q(:,:,:)
+  qnew(1:ncol,:,:) = state%q(1:ncol,:,:) ! qnew will update in the subroutines but not update back to state%q
   qsrflx(:,:,:) = 0.0_r8
   call update_qnew_ptend(                                         &
                          dotend,                    .false.,      &  ! in
@@ -260,7 +270,8 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
      qsrflx(:,:,:) = 0.0_r8
      dlfdp(1:ncol,:) = max( (dlf(1:ncol,:) - dlfsh(1:ncol,:)), 0.0_r8 )
      call ma_convproc_dp_intr(                    &
-        state,   dt,                              & ! in
+        lchnk,   state_t,         state_pmid,     & ! in
+        state_pdeldry,            dt,             & ! in
         dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
         mu, md, du, eu, ed, dp,                   & ! in
         jt, maxg, ideep, lengath, qnew,           & ! in
@@ -303,7 +314,8 @@ subroutine ma_convproc_intr( state, dt,                             & ! in
      dqdt(:,:,:) = 0.0_r8
      qsrflx(:,:,:) = 0.0_r8
      call ma_convproc_sh_intr(                    &
-        state,   dt,                              & ! in
+        ncol,    lchnk,   state_t, state_pmid,    & ! in
+        state_pdeldry,    state_pdel,      dt,    & ! in
         sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh, & ! in
         cmfmcsh, sh_e_ed_ratio,   qnew,           & ! in
         nsrflx,  species_class,                   & ! in
@@ -403,7 +415,8 @@ end subroutine update_qnew_ptend
 
 !=========================================================================================
 subroutine ma_convproc_dp_intr(                &
-     state,  dt,                               & ! in
+     lchnk,   state_t,         state_pmid,     & ! in
+     state_pdeldry,            dt,             & ! in
      dp_frac, icwmrdp, rprddp, evapcdp, dlfdp, & ! in
      mu, md, du, eu, ed, dp,                   & ! in
      jt, maxg, ideep, lengath,   qnew,         & ! in
@@ -429,10 +442,12 @@ subroutine ma_convproc_dp_intr(                &
 
  
 ! Arguments
-   type(physics_state), intent(in ) :: state          ! Physics state variables
+   integer,  intent(in)    :: lchnk                       ! chunk identifier.
+   real(r8), intent(in)    :: state_pdeldry(pcols,pver)   ! layer delta-p-dry [mb]
+   real(r8), intent(in)    :: state_t(pcols,pver)         ! Temperature [K]
+   real(r8), intent(in)    :: state_pmid(pcols,pver)      ! Pressure at model levels [Pa]
 
    real(r8), intent(in)    :: dt                         ! delta t (model time increment) [s]
-
    real(r8), intent(in)    :: qnew(pcols,pver,pcnst)     ! tracer mixing ratio including water vapor [kg/kg]
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)     ! time tendency of q [kg/kg/s]
    logical,  intent(out)   :: dotend(pcnst)              ! if do tendency
@@ -477,7 +492,7 @@ subroutine ma_convproc_dp_intr(                &
 ! initialize dpdry (units=mb), which is used for tracers of dry mixing ratio type
    dpdry = 0._r8
    do ii = 1, lengath
-      dpdry(ii,:) = state%pdeldry(ideep(ii),:)/100._r8
+      dpdry(ii,:) = state_pdeldry(ideep(ii),:)/100._r8
    end do
 
 ! turn on/off calculations for aerosols and trace gases
@@ -501,8 +516,8 @@ subroutine ma_convproc_dp_intr(                &
 
    call ma_convproc_tend(                                            &
                      'deep',                                         &
-                     state%lchnk,      pcnst,            dt,         &
-                     state%t,    state%pmid,             qnew,       &   
+                     lchnk,      pcnst,                  dt,         &
+                     state_t,    state_pmid,             qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -515,15 +530,16 @@ subroutine ma_convproc_dp_intr(                &
 
 
     ! output diagnostics fields
-    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
-    call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
-    call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
+    call outfld( 'DP_MFUP_MAX', xx_mfup_max, pcols, lchnk )
+    call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, lchnk )
+    call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, lchnk )
 
 end subroutine ma_convproc_dp_intr
 
 !=========================================================================================
 subroutine ma_convproc_sh_intr(                 &
-     state, dt,                                 & ! in
+     ncol,    lchnk,   state_t, state_pmid,     & ! in
+     state_pdeldry,    state_pdel,      dt,     & ! in
      sh_frac, icwmrsh, rprdsh, evapcsh, dlfsh,  & ! in
      cmfmcsh, sh_e_ed_ratio,    qnew,           & ! in
      nsrflx,  species_class,                    & ! in
@@ -547,7 +563,13 @@ subroutine ma_convproc_sh_intr(                 &
 !-----------------------------------------------------------------------
 
 ! Arguments
-   type(physics_state), intent(in ) :: state          ! Physics state variables
+   integer,  intent(in)    :: ncol
+   integer,  intent(in)    :: lchnk                   ! chunk identifier.
+   real(r8), intent(in)    :: state_pdeldry(pcols,pver)   ! layer delta-p-dry [mb]
+   real(r8), intent(in)    :: state_pdel(pcols,pver)      ! layer delta-p [mb]
+   real(r8), intent(in)    :: state_t(pcols,pver)         ! Temperature [K]
+   real(r8), intent(in)    :: state_pmid(pcols,pver)      ! Pressure at model levels [Pa]
+
    real(r8), intent(in)    :: dt                      ! delta t (model time increment) [s]
    real(r8), intent(in)    :: qnew(pcols,pver,pcnst)  ! tracer mixing ratio (TMR) including water vapor [kg/kg]
    real(r8), intent(inout) :: dqdt(pcols,pver,pcnst)  ! time tendency of TMR [kg/kg/s]
@@ -565,7 +587,7 @@ subroutine ma_convproc_sh_intr(                 &
    integer,  intent(in)    :: species_class(:)          ! species index
 
 ! Local variables
-   integer :: icol, ncol
+   integer :: icol
 
    real(r8) :: dpdry(pcols,pver)     ! layer delta-p-dry [mb]
    real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)  ! output of ma_convproc_tend, may not used
@@ -589,15 +611,13 @@ subroutine ma_convproc_sh_intr(                 &
 ! Initialize
 !
 
-   ncol  = state%ncol
-
    ! md and ed are assumed zero in shallow convection in ma_convproc_tend
    md(:,:) = 0.0_r8
    ed(:,:) = 0.0_r8
 
 ! these dp and dpdry have units of mb
-   dpdry(1:ncol,:) = state%pdeldry(1:ncol,:)/100._r8
-   dp(   1:ncol,:) = state%pdel(   1:ncol,:)/100._r8
+   dpdry(1:ncol,:) = state_pdeldry(1:ncol,:)/100._r8
+   dp(   1:ncol,:) = state_pdel(   1:ncol,:)/100._r8
 
    ideep(:) = -1
    do icol = 1, ncol
@@ -631,8 +651,8 @@ subroutine ma_convproc_sh_intr(                 &
 
    call ma_convproc_tend(                                            &
                      'uwsh',                                         &
-                     state%lchnk,      pcnst,            dt,         &
-                     state%t,    state%pmid,             qnew,       &   
+                     lchnk,      pcnst,                  dt,         &
+                     state_t,    state_pmid,             qnew,       &   
                      mu,         md,         du,         eu,         &   
                      ed,         dp,         dpdry,      jt,         &   
                      maxg,       ideep,      1,          lengath,    &       
@@ -644,9 +664,9 @@ subroutine ma_convproc_sh_intr(                 &
                      xx_mfup_max, xx_wcldbase, xx_kcldbase           ) ! out
 
     ! output diagnostics fields
-    call outfld( 'SH_MFUP_MAX', xx_mfup_max, pcols, state%lchnk )
-    call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, state%lchnk )
-    call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, state%lchnk )
+    call outfld( 'SH_MFUP_MAX', xx_mfup_max, pcols, lchnk )
+    call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, lchnk )
+    call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, lchnk )
 
 end subroutine ma_convproc_sh_intr
 
