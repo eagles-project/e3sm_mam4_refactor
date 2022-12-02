@@ -146,14 +146,12 @@
 ! qxxx_del_yyyy    are mix-ratio changes over full time step (deltat)
 ! qxxx_delsub_yyyy are mix-ratio changes over time sub-step (dtsubstep)
       real(r8), dimension( 1:max_mode ) :: qnum_sv1
-      real(r8), dimension( 1:max_mode ) :: qnum_del_coag
       real(r8), dimension( 1:max_mode ) :: qnum_delsub_cond, qnum_delsub_coag
 
       real(r8), dimension( 1:max_mode ) :: qnumcw_sv1
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
       real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_coag
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
@@ -226,11 +224,13 @@
       qgas_delaa(:,iqtend_nnuc) = 0._r8 
       qnum_delaa(:,iqtend_nnuc) = 0.0_r8 
       qaer_delaa(:,:,iqtend_nnuc) = 0.0_r8 
-   
+  
+     ! coagulation 
+      qgas_delaa  (:,iqtend_coag) = 0.0_r8
+      qnum_delaa  (:,iqtend_coag) = 0.0_r8
+      qaer_delaa(:,:,iqtend_coag) = 0.0_r8
      !--
-    !---
 
-      qaer_del_coag = 0.0_r8
       qaer_delsub_cond = 0.0_r8
 
      if (iscldy_subarea) then
@@ -239,7 +239,6 @@
       qaer_delsub_coag = 0.0_r8
      end if
 
-      qnum_del_coag = 0.0_r8
       qnum_delsub_cond = 0.0_r8
 
      if (iscldy_subarea) then
@@ -423,6 +422,9 @@ jtsubstep_loop: &
       qnum_delsub_coag = qnum_cur - qnum_sv1
       qaer_delsub_coag = qaer_cur - qaer_sv1
 
+          qnum_delaa(:,iqtend_coag) = qnum_delaa(:,iqtend_coag) + qnum_delsub_coag 
+        qaer_delaa(:,:,iqtend_coag) = qaer_delaa(:,:,iqtend_coag) + qaer_delsub_coag 
+
       end if
 
       !----------------------
@@ -450,10 +452,10 @@ jtsubstep_loop: &
       !----------------------------
       ! accumulate sub-step q-dels
       !---------------------------------
-      if ( do_coag_sub .and. (.not.iscldy_subarea) ) then
-         qnum_del_coag = qnum_del_coag + qnum_delsub_coag
-         qaer_del_coag = qaer_del_coag + qaer_delsub_coag
-      end if
+   !  if ( do_coag_sub .and. (.not.iscldy_subarea) ) then
+   !     qnum_del_coag = qnum_del_coag + qnum_delsub_coag
+   !     qaer_del_coag = qaer_del_coag + qaer_delsub_coag
+   !  end if
 
    !  if ( do_cond_sub ) then
    !     qnum_del_cond = qnum_del_cond + qnum_delsub_cond
@@ -469,15 +471,14 @@ end do jtsubstep_loop
       !-------------------------
 
  !    qgas_delaa(:,iqtend_cond) = qgas_del_cond(:)
-      qgas_delaa(:,iqtend_coag) = 0.0_r8
 
      if (iscldy_subarea) then
 
  !        qgas_delaa(:,iqtend_nnuc) = 0.0_r8
  !        qnum_delaa(:,iqtend_nnuc) = 0.0_r8
  !      qaer_delaa(:,:,iqtend_nnuc) = 0.0_r8
-          qnum_delaa(:,iqtend_coag) = 0.0_r8
-        qaer_delaa(:,:,iqtend_coag) = 0.0_r8
+ !        qnum_delaa(:,iqtend_coag) = 0.0_r8
+ !      qaer_delaa(:,:,iqtend_coag) = 0.0_r8
 
  !      qnumcw_delaa(:,iqqcwtend_rnam) = qnumcw_del_rnam(:)
  !    qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_del_rnam(:,:)
@@ -486,8 +487,8 @@ end do jtsubstep_loop
  !        qgas_delaa(:,iqtend_nnuc) = qgas_del_nnuc(:)
  !        qnum_delaa(:,iqtend_nnuc) = qnum_del_nnuc(:)
  !      qaer_delaa(:,:,iqtend_nnuc) = qaer_del_nnuc(:,:)
-          qnum_delaa(:,iqtend_coag) = qnum_del_coag(:)
-        qaer_delaa(:,:,iqtend_coag) = qaer_del_coag(:,:)
+ !        qnum_delaa(:,iqtend_coag) = qnum_del_coag(:)
+ !      qaer_delaa(:,:,iqtend_coag) = qaer_del_coag(:,:)
      end if
 
    !    qnum_delaa(:,iqtend_cond) = qnum_del_cond(:)
