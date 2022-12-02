@@ -146,19 +146,17 @@
 ! qxxx_del_yyyy    are mix-ratio changes over full time step (deltat)
 ! qxxx_delsub_yyyy are mix-ratio changes over time sub-step (dtsubstep)
       real(r8), dimension( 1:max_mode ) :: qnum_sv1
-      real(r8), dimension( 1:max_mode ) :: qnum_del_rnam, qnum_del_coag
+      real(r8), dimension( 1:max_mode ) :: qnum_del_coag
       real(r8), dimension( 1:max_mode ) :: qnum_delsub_cond, qnum_delsub_coag
 
       real(r8), dimension( 1:max_mode ) :: qnumcw_sv1
-      real(r8), dimension( 1:max_mode ) :: qnumcw_del_rnam
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
       real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_rnam, qaer_del_coag
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_coag
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_del_rnam
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) ::   qaer_delsub_grow4rnam
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_delsub_grow4rnam
@@ -214,32 +212,37 @@
       qnum_delaa  (:,iqtend_cond) = 0.0_r8
       qaer_delaa(:,:,iqtend_cond) = 0.0_r8
 
+     ! renaming
+      qgas_delaa  (:,iqtend_rnam) = 0.0_r8
+      qnum_delaa  (:,iqtend_rnam) = 0.0_r8 
+      qaer_delaa(:,:,iqtend_rnam) = 0.0_r8
+
+      if (iscldy_subarea) then
+          qnumcw_delaa(:,iqqcwtend_rnam) = 0.0_r8 
+        qaercw_delaa(:,:,iqqcwtend_rnam) = 0.0_r8
+      end if
+
      ! nucleation
       qgas_delaa(:,iqtend_nnuc) = 0._r8 
       qnum_delaa(:,iqtend_nnuc) = 0.0_r8 
       qaer_delaa(:,:,iqtend_nnuc) = 0.0_r8 
-
+   
      !--
+    !---
 
-      qaer_del_rnam = 0.0_r8
       qaer_del_coag = 0.0_r8
       qaer_delsub_cond = 0.0_r8
 
      if (iscldy_subarea) then
-      qaercw_del_rnam = 0.0_r8
      else ! clear
       qaer_delsub_coag_in = 0.0_r8
       qaer_delsub_coag = 0.0_r8
      end if
 
-      qnum_del_rnam = 0.0_r8
-
-
       qnum_del_coag = 0.0_r8
       qnum_delsub_cond = 0.0_r8
 
      if (iscldy_subarea) then
-      qnumcw_del_rnam = 0.0_r8
      else
       qnum_delsub_coag = 0.0_r8
      end if
@@ -361,12 +364,12 @@ jtsubstep_loop: &
          !------------------------
          ! Accumulate increments
          !------------------------
-         qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
-         qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
+         qnum_delaa  (:,iqtend_rnam) = qnum_delaa  (:,iqtend_rnam) + (qnum_cur - qnum_sv1) 
+         qaer_delaa(:,:,iqtend_rnam) = qaer_delaa(:,:,iqtend_rnam) + (qaer_cur - qaer_sv1) 
 
          if (iscldy_subarea) then
-         qnumcw_del_rnam = qnumcw_del_rnam + (qnumcw_cur - qnumcw_sv1)
-         qaercw_del_rnam = qaercw_del_rnam + (qaercw_cur - qaercw_sv1)
+            qnumcw_delaa  (:,iqqcwtend_rnam) = qnumcw_delaa  (:,iqqcwtend_rnam) + (qnumcw_cur - qnumcw_sv1) 
+            qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_delaa(:,:,iqqcwtend_rnam) + (qaercw_cur - qaercw_sv1)
          end if
 
       end if !do_rename_sub
@@ -466,7 +469,6 @@ end do jtsubstep_loop
       !-------------------------
 
  !    qgas_delaa(:,iqtend_cond) = qgas_del_cond(:)
-      qgas_delaa(:,iqtend_rnam) = 0.0_r8
       qgas_delaa(:,iqtend_coag) = 0.0_r8
 
      if (iscldy_subarea) then
@@ -477,8 +479,8 @@ end do jtsubstep_loop
           qnum_delaa(:,iqtend_coag) = 0.0_r8
         qaer_delaa(:,:,iqtend_coag) = 0.0_r8
 
-        qnumcw_delaa(:,iqqcwtend_rnam) = qnumcw_del_rnam(:)
-      qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_del_rnam(:,:)
+ !      qnumcw_delaa(:,iqqcwtend_rnam) = qnumcw_del_rnam(:)
+ !    qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_del_rnam(:,:)
 
      else
  !        qgas_delaa(:,iqtend_nnuc) = qgas_del_nnuc(:)
@@ -491,8 +493,8 @@ end do jtsubstep_loop
    !    qnum_delaa(:,iqtend_cond) = qnum_del_cond(:)
    !  qaer_delaa(:,:,iqtend_cond) = qaer_del_cond(:,:)
 
-      qnum_delaa(:,iqtend_rnam) = qnum_del_rnam(:)
-      qaer_delaa(:,:,iqtend_rnam) = qaer_del_rnam(:,:)
+   !  qnum_delaa(:,iqtend_rnam) = qnum_del_rnam(:)
+   !  qaer_delaa(:,:,iqtend_rnam) = qaer_del_rnam(:,:)
 
       misc_vars_aa_sub%ncluster_tend_nnuc_1grid = dnclusterdt
 
