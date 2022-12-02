@@ -1,31 +1,43 @@
 #if 0
-  integer,save  :: print_time_step
-  integer  :: kprint, unit_input, unit_output, ispec
+  type(yaml_vars) :: yaml
+
+  integer,save  :: print_time_step=0
+  logical  :: firstcall
+  integer  :: unit_input, unit_output, ispec, nstep
   real(r8) :: fldcw_wrt(pcnst)
   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
 
-  ! YAML file input generation code- DO NOT PORT to C++
-  !print all inputs one-by-one at column "i"
-  icol = icolprnt(state%lchnk) !column to write data
-  kprint = 50
-  if(icol > 0 .and. one_print_ts(print_time_step)) then ! if this column exists in lchnk
 
+  yaml%kprint = 68 !level
+  yaml%nstep_print = 379 !time step
+
+  !YAML file input generation code- DO NOT PORT to C++
+  !print all inputs one-by-one at column "yaml%iprint"
+  yaml%iprint = icolprnt(state%lchnk) !column to write data
+
+  firstcall = one_print_ts(print_time_step,.true.) !Is it the first call for this time step
+  nstep = get_nstep() !time step
+
+  yaml%print_flag = .false.
+  if(yaml%iprint > 0 .and. nstep==yaml%nstep_print .and. firstcall) then ! if this column exists in lchnk
+     yaml%lchnk_print=state%lchnk
+     yaml%print_flag = .true.
      !open I/O yaml files
-     call open_files('calcsz_sub', &  !intent-in
+     call open_files('calcsize_sub', &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
-     call write_input_output_header(unit_input, unit_output,state%lchnk,icol,'compute_tendencies',deltat)
+     call write_input_output_header(unit_input, unit_output,state%lchnk,yaml%iprint,'compute_tendencies',nstep, yaml%kprint, deltat)
 
      !start writing data
-     call write_aerosol_mmr(unit_input, unit_output,'interstitial',state%q(icol,kprint,:))
-     call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',state%q(icol,kprint,:),.true.)
+     call write_aerosol_mmr(unit_input, unit_output,'interstitial',state%q(yaml%iprint,yaml%kprint,:))
+     call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',state%q(yaml%iprint,yaml%kprint,:),.true.)
 
-     !fldcw_wrt array will carry species at icol and kprint, initialize it with huge values
+     !fldcw_wrt array will carry species at yaml%iprint and yaml%kprint, initialize it with huge values
      fldcw_wrt(:) = huge(fldcw_wrt)
      do ispec = 16, pcnst !ensure that the loop starts from 16, as aerosols starts at 16th index
         tmp_arr => qqcw_get_field(pbuf,ispec,state%lchnk)
-        fldcw_wrt(ispec) = tmp_arr(icol,kprint)
+        fldcw_wrt(ispec) = tmp_arr(yaml%iprint,yaml%kprint)
      enddo
      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne',fldcw_wrt)
      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)

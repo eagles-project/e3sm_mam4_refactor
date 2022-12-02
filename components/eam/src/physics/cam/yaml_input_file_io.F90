@@ -25,11 +25,38 @@ module yaml_input_file_io
   public :: write_input_output_header !writes input related  header for both input and output files
   public :: write_output_header       !writes output related  header for output file
   public :: one_print_ts !enables only one sample write at each time step
+  public :: yaml_vars ! data structure to carry yaml vars
+
+  public :: write_var    !write a single variable
+  public :: write_output_var  !write a single output variable
   public :: write_1d_var ! writes 1D variables of any dimension
   public :: write_1d_output_var !writes 1D variables of any dimension in the output python module
   public :: write_aerosol_mmr   !writes aerosol mmr (cloud borne and interstitial)
   public :: write_output_aerosol_mmr !writes aerosol mmr (cloud borne and interstitial) in the output python module
+
+  !Share data from other modules
   public :: icolprnt, getunit, freeunit, get_nstep
+
+  !A structure to carry all the yaml input/output variables
+  type yaml_vars
+     integer :: iprint, kprint, nstep_print
+     integer :: lchnk_print = huge(1)
+     logical :: print_flag = .false.
+  end type yaml_vars
+
+
+  !interfaces for datatypes (integers and reals)
+  interface write_var
+     module procedure write_var_int
+     module procedure write_var_real
+  end interface write_var
+
+  interface write_output_var
+     module procedure write_output_var_int
+     module procedure write_output_var_real
+  end interface write_output_var
+
+
 
 contains
 
@@ -49,8 +76,8 @@ contains
     !local
     character(len=2000) :: finp, fout
 
-    write(finp,'(2A,I1,A)')trim(adjustl(name)),'_input_ts_',get_nstep(),'.yaml'
-    write(fout,'(2A,I1,A)')trim(adjustl(name)),'_output_ts_',get_nstep(),'.py'
+    write(finp,'(2A,I0,A)')trim(adjustl(name)),'_input_ts_',get_nstep(),'.yaml'
+    write(fout,'(2A,I0,A)')trim(adjustl(name)),'_output_ts_',get_nstep(),'.py'
 
     !get a unused unit numbers to write
     unit_input = getunit()
@@ -89,7 +116,10 @@ contains
     integer, intent(inout) :: print_time_step
 
     !input
-    logical, intent(in), optional :: do_update_print_time !flag to decide if print time should be updated or not
+    !flag to decide if print time should be updated or not
+    !(print_time_step is updated by 1 if do_update_print_time is .true.
+    !so that the next printout happens on the next time step)
+    logical, intent(in), optional :: do_update_print_time
 
     !local (return value)
     logical :: one_print_ts
@@ -108,11 +138,11 @@ contains
   !-------------------------- * Write headers * -----------------------------------
   !================================================================================
 
-  subroutine write_input_output_header(unit_input, unit_output,lchunk, icol, subr_name, dt)
+  subroutine write_input_output_header(unit_input, unit_output,lchunk, icol, subr_name, nstep, lev, dt)
     !------------------------------------------------------------------
     !Purpose: Write input header for the YAML input and the output files
     !------------------------------------------------------------------
-    integer,  intent(in) :: unit_input, unit_output, lchunk, icol
+    integer,  intent(in) :: unit_input, unit_output, lchunk, icol, nstep, lev
     real(r8), intent(in), optional :: dt !time step
 
     character(len = *), intent(in) :: subr_name
@@ -131,7 +161,8 @@ contains
     call is_file_open(unit_output)
 
     !write some meta data
-    write(meta_msg,'(A,F17.14,A,F17.14)')'# Data at lat:', get_rlat_p(lchunk, icol)*RAD_TO_DEG,' and lon:',get_rlon_p(lchunk, icol)*RAD_TO_DEG
+    write(meta_msg,*)'# Data at [lat=', get_rlat_p(lchunk, icol)*RAD_TO_DEG, &
+         ', lon=',get_rlon_p(lchunk, icol)*RAD_TO_DEG,', k=',lev,', time step=', nstep,']'
 
     !write header for the input file
     write(unit_input,'(A)')adjustl(trim(meta_msg))
@@ -283,6 +314,116 @@ contains
     write(unit_output,'(A)')'],]'
 
   end subroutine write_output_aerosol_mmr
+
+  !================================================================================
+
+  subroutine write_var_int(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)  :: field        ! field values in int
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    write(unit_input,'(3A,I10,A)')'    ',trim(adjustl(fld_name)),':[', field,']'
+
+    call write_output_var_int(unit_output, fld_name, field, "input")
+
+  end subroutine write_var_int
+
+  !================================================================================
+
+  subroutine write_output_var_int(unit_output, fld_name, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)  :: field           ! field values in int
+
+    !optional input
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A,I10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+
+  end subroutine write_output_var_int
+
+  !================================================================================
+
+  !================================================================================
+
+  subroutine write_var_real(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field        ! field values in r8
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    write(unit_input,'(3A,E17.10,A)')'    ',trim(adjustl(fld_name)),':[', field,']'
+
+    call write_output_var_real(unit_output, fld_name, field, "input")
+
+  end subroutine write_var_real
+
+  !================================================================================
+
+  subroutine write_output_var_real(unit_output, fld_name, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field           ! field values in r8
+
+    !optional input
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A,E17.10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+
+  end subroutine write_output_var_real
 
   !================================================================================
 

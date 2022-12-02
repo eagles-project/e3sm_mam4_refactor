@@ -1,0 +1,14 @@
+# Data at [lat=   45.1040729547578      , lon=   145.965088007967      , k=          68 , time step=         379 ] 
+mam4xx:
+  function: XYZ
+input:
+  fixed:
+    dt:    0.00
+    top_lev:[         1]
+    ncol:[         4]
+    imode:[         4]
+    nspec:[         3]
+    list_idx_in:[         0]
+    interstitial:[ 0.6026775036E-10, 0.2692401318E-10, 0.1396645841E-15]
+    cldbrn:[ 0.1632349640E-26, 0.7326897587E-27, 0.3681943949E-32]
+    density:[ 0.1000000000E+04, 0.1700000000E+04, 0.1601000000E+04]
