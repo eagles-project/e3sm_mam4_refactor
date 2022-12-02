@@ -155,11 +155,13 @@
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
       real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_rnam, qaer_del_coag
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_grow4rnam
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_del_rnam, qaercw_delsub_grow4rnam
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_del_rnam
+
+      real(r8), dimension( 1:max_aer, 1:max_mode ) ::   qaer_delsub_grow4rnam
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_delsub_grow4rnam
 
       real(r8) :: aircon                           ! air molar density (kmol/m3)
       real(r8) :: del_h2so4_gasprod
@@ -295,16 +297,13 @@ jtsubstep_loop: &
          qnum_delaa  (:,iqtend_cond) = qnum_delaa  (:,iqtend_cond) + qnum_delsub_cond 
          qaer_delaa(:,:,iqtend_cond) = qaer_delaa(:,:,iqtend_cond) + qaer_delsub_cond 
 
-         qaer_delsub_grow4rnam = qaer_cur - qaer_sv1 !change in qaer_del_cond during latest condensation calculations
-
          del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
                        - (qgas_sv1(igas_h2so4) + qgas_netprod_otrproc(igas_h2so4)*dtsubstep)
 
       else ! do_cond_sub
 
         qgas_avg(1:ngas) = qgas_cur(1:ngas)
-        qaer_delsub_grow4rnam(:,:) = 0.0_r8
-
+        qaer_delsub_cond = 0.0_r8
         del_h2so4_aeruptk = 0.0_r8
 
       end if !do_cond_sub
@@ -318,20 +317,26 @@ jtsubstep_loop: &
          dest_mode_of_mode(:) = 0
          dest_mode_of_mode(nait) = nacc
 
-         ! qaer_delsub_grow4rnam   = change in qaer from cloud chemistry and gas condensation
-         ! qaercw_delsub_grow4rnam = change in qaercw from cloud chemistry
+         !---------------------------------------------------------
+         ! Calculate changes in aerosol mass mixing ratios due to 
+         !  - gas condensation/evaporation
+         !  - cloudy chemistry (if the subarea is cloudy)
+         !---------------------------------------------------------
+         qaer_delsub_grow4rnam  = qaer_delsub_cond
+
          if (iscldy_subarea) then 
             qaer_delsub_grow4rnam   = (qaer3 - qaer2)/ntsubstep  + qaer_delsub_grow4rnam
             qaercw_delsub_grow4rnam = (qaercw3 - qaercw2)/ntsubstep
          end if
 
+         !----------
+         ! Renaming
+         !----------
          qnum_sv1 = qnum_cur
          qaer_sv1 = qaer_cur
 
-        !if (iscldy_subarea) then 
          qnumcw_sv1 = qnumcw_cur
          qaercw_sv1 = qaercw_cur
-        !end if
 
          if (.not.iscldy_subarea) then 
          call mam_rename_1subarea(                                    &
@@ -353,6 +358,9 @@ jtsubstep_loop: &
 
          end if
 
+         !------------------------
+         ! Accumulate increments
+         !------------------------
          qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
          qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
 
@@ -387,13 +395,8 @@ jtsubstep_loop: &
          qwtr_cur,                                                  &
          dnclusterdt_substep                                        )
 
-     !qgas_del_nnuc = qgas_del_nnuc + (qgas_cur - qgas_sv1)
       qgas_delaa(:,iqtend_nnuc) = qgas_delaa(:,iqtend_nnuc) + (qgas_cur - qgas_sv1)
-
-     !qnum_del_nnuc = qnum_del_nnuc + (qnum_cur - qnum_sv1)
       qnum_delaa(:,iqtend_nnuc) = qnum_delaa(:,iqtend_nnuc) + (qnum_cur - qnum_sv1)
-
-     !qaer_del_nnuc = qaer_del_nnuc + (qaer_cur - qaer_sv1)
       qaer_delaa(:,:,iqtend_nnuc) = qaer_delaa(:,:,iqtend_nnuc) + (qaer_cur - qaer_sv1)
 
       dnclusterdt = dnclusterdt + dnclusterdt_substep*(dtsubstep/deltat)
