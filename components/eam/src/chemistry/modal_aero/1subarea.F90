@@ -134,7 +134,6 @@
       integer :: n
 
       real(r8), dimension( 1:max_gas ) :: qgas_sv1, qgas_avg
-      real(r8), dimension( 1:max_gas ) :: qgas_del_cond!, qgas_del_nnuc
 
       real(r8) :: qgas_netprod_otrproc(max_gas)
                 ! qgas_netprod_otrproc = gas net production rate from other processes
@@ -147,17 +146,17 @@
 ! qxxx_del_yyyy    are mix-ratio changes over full time step (deltat)
 ! qxxx_delsub_yyyy are mix-ratio changes over time sub-step (dtsubstep)
       real(r8), dimension( 1:max_mode ) :: qnum_sv1
-      real(r8), dimension( 1:max_mode ) :: qnum_del_cond, qnum_del_rnam, qnum_del_coag, &
-         qnum_delsub_cond, qnum_delsub_coag
+      real(r8), dimension( 1:max_mode ) :: qnum_del_rnam, qnum_del_coag
+      real(r8), dimension( 1:max_mode ) :: qnum_delsub_cond, qnum_delsub_coag
 
       real(r8), dimension( 1:max_mode ) :: qnumcw_sv1
       real(r8), dimension( 1:max_mode ) :: qnumcw_del_rnam
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
       real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_cond, qaer_del_rnam, qaer_del_coag, &
-         qaer_delsub_grow4rnam, &
-         qaer_delsub_cond, qaer_delsub_coag
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_del_rnam, qaer_del_coag
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_grow4rnam
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag
 
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_del_rnam, qaercw_delsub_grow4rnam
@@ -208,21 +207,19 @@
          end do ! igas
       end if
 
-      qgas_del_cond = 0.0_r8
+     ! condensation
+      qgas_delaa  (:,iqtend_cond) = 0.0_r8
+      qnum_delaa  (:,iqtend_cond) = 0.0_r8
+      qaer_delaa(:,:,iqtend_cond) = 0.0_r8
 
-     !--
      ! nucleation
-     !qgas_del_nnuc = 0.0_r8
-     !qnum_del_nnuc = 0.0_r8
-     !qaer_del_nnuc = 0.0_r8
       qgas_delaa(:,iqtend_nnuc) = 0._r8 
       qnum_delaa(:,iqtend_nnuc) = 0.0_r8 
       qaer_delaa(:,:,iqtend_nnuc) = 0.0_r8 
+
      !--
 
-      qaer_del_cond = 0.0_r8
       qaer_del_rnam = 0.0_r8
-
       qaer_del_coag = 0.0_r8
       qaer_delsub_cond = 0.0_r8
 
@@ -233,7 +230,6 @@
       qaer_delsub_coag = 0.0_r8
      end if
 
-      qnum_del_cond = 0.0_r8
       qnum_del_rnam = 0.0_r8
 
 
@@ -292,9 +288,13 @@ jtsubstep_loop: &
             qgas_avg(igas_h2so4) = qgas_cur(igas_h2so4)
          end if
 
-         qgas_del_cond = qgas_del_cond + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep))
+         qgas_delaa(:,iqtend_cond) = qgas_delaa(:,iqtend_cond) + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep)) 
+
          qnum_delsub_cond = qnum_cur - qnum_sv1
          qaer_delsub_cond = qaer_cur - qaer_sv1
+         qnum_delaa  (:,iqtend_cond) = qnum_delaa  (:,iqtend_cond) + qnum_delsub_cond 
+         qaer_delaa(:,:,iqtend_cond) = qaer_delaa(:,:,iqtend_cond) + qaer_delsub_cond 
+
          qaer_delsub_grow4rnam = qaer_cur - qaer_sv1 !change in qaer_del_cond during latest condensation calculations
 
          del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
@@ -449,10 +449,11 @@ jtsubstep_loop: &
          qaer_del_coag = qaer_del_coag + qaer_delsub_coag
       end if
 
-      if ( do_cond_sub ) then
-         qnum_del_cond = qnum_del_cond + qnum_delsub_cond
-         qaer_del_cond = qaer_del_cond + qaer_delsub_cond
-      end if
+   !  if ( do_cond_sub ) then
+   !     qnum_del_cond = qnum_del_cond + qnum_delsub_cond
+   !     qaer_del_cond = qaer_del_cond + qaer_delsub_cond
+   !  end if
+
 
 end do jtsubstep_loop
 !======================
@@ -461,7 +462,7 @@ end do jtsubstep_loop
       ! final mix ratio changes
       !-------------------------
 
-      qgas_delaa(:,iqtend_cond) = qgas_del_cond(:)
+ !    qgas_delaa(:,iqtend_cond) = qgas_del_cond(:)
       qgas_delaa(:,iqtend_rnam) = 0.0_r8
       qgas_delaa(:,iqtend_coag) = 0.0_r8
 
@@ -484,10 +485,10 @@ end do jtsubstep_loop
         qaer_delaa(:,:,iqtend_coag) = qaer_del_coag(:,:)
      end if
 
-      qnum_delaa(:,iqtend_cond) = qnum_del_cond(:)
-      qnum_delaa(:,iqtend_rnam) = qnum_del_rnam(:)
+   !    qnum_delaa(:,iqtend_cond) = qnum_del_cond(:)
+   !  qaer_delaa(:,:,iqtend_cond) = qaer_del_cond(:,:)
 
-      qaer_delaa(:,:,iqtend_cond) = qaer_del_cond(:,:)
+      qnum_delaa(:,iqtend_rnam) = qnum_del_rnam(:)
       qaer_delaa(:,:,iqtend_rnam) = qaer_del_rnam(:,:)
 
       misc_vars_aa_sub%ncluster_tend_nnuc_1grid = dnclusterdt
