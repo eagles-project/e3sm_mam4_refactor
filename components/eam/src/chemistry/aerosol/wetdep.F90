@@ -762,7 +762,7 @@ main_i_loop: &
             fracev_cu(i) = max(0._r8,min(1._r8,fracev_cu(i)))
 ! Sungsu
 
-            if (mam_prevap_resusp_optcc <= 0) then
+            if (mam_prevap_resusp_optcc == 0) then
                fracev(i) = 0.0_r8
                fracev_cu(i) = 0.0_r8
             endif
@@ -1157,7 +1157,7 @@ jstrcnv_loop_aa: &
             resusp_c_sv(i) = resusp_c
 
 
-            if ( mam_prevap_resusp_optcc <= 3) then
+            if ( mam_prevap_resusp_optcc == 0) then
                scavt(i,k) = -srct(i) + (fracev(i)*scavab(i)+fracev_cu(i)*scavabc(i))*gravit/pdel(i,k)
             else
                scavt(i,k) = -srct(i) + (resusp_s+resusp_c)*gravit/pdel(i,k)
@@ -1179,7 +1179,7 @@ jstrcnv_loop_aa: &
 
 !           if(present(resus_fix)) then
 !              if ( .not. resus_fix ) then
-               if (mam_prevap_resusp_optcc <= 1) then
+               if (mam_prevap_resusp_optcc == 0) then
 !                 if ( present(bcscavt) ) bcscavt(i,k) = -(srcc * (1-finc)) * omsm +  &
 !                      fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)
 !                 if ( present(bsscavt) ) bsscavt(i,k) = -(srcs * (1-fins)) * omsm +  &
@@ -1190,25 +1190,6 @@ jstrcnv_loop_aa: &
                        fracev(i)*scavab(i)*gravit/pdel(i,k)
                   rcscavt(i,k) = 0.0
                   rsscavt(i,k) = 0.0
-               else if (mam_prevap_resusp_optcc == 2 .or. mam_prevap_resusp_optcc == 3) then
-!                 if ( present(bcscavt) ) then
-!                    if ( present(rcscavt) ) then
-                        bcscavt(i,k) = -(srcc * (1-finc)) * omsm                 !RCE
-                        rcscavt(i,k) = fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)  !RCE
-!                    else
-!                       bcscavt(i,k) = -(srcc * (1-finc)) * omsm  &
-!                            + fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)
-!                    end if
-!                 end if
-!                 if ( present(bsscavt) ) then
-!                    if ( present(rsscavt) ) then
-                        bsscavt(i,k) = -(srcs * (1-fins)) * omsm               !RCE
-                        rsscavt(i,k) = + fracev(i)*scavab(i)*gravit/pdel(i,k)  !RCE
-!                    else
-!                       bsscavt(i,k) = -(srcs * (1-fins)) * omsm  &
-!                            + fracev(i)*scavab(i)*gravit/pdel(i,k)
-!                    end if
-!                 end if
                else ! here mam_prevap_resusp_optcc == 130, 210, 230
                   bcscavt(i,k) = -(srcc * (1-finc)) * omsm
                   rcscavt(i,k) = resusp_c*gravit/pdel(i,k)
@@ -1220,17 +1201,11 @@ jstrcnv_loop_aa: &
             dblchek(i) = tracer(i,k) + deltat*scavt(i,k)
 
             ! now keep track of scavenged mass and precip
-            if (mam_prevap_resusp_optcc <= 3) then
+            if (mam_prevap_resusp_optcc == 0) then
                scavab(i) = scavab(i)*(1-fracev(i)) + srcs*pdel(i,k)/gravit
                precabs(i) = precabs(i) + (precs(i,k) - evaps(i,k))*pdel(i,k)/gravit
                scavabc(i) = scavabc(i)*(1-fracev_cu(i)) + srcc*pdel(i,k)/gravit
                precabc(i) = precabc(i) + (cmfdqr(i,k) - evapc(i,k))*pdel(i,k)/gravit
-               if (mam_prevap_resusp_optcc == 3) then
-                  scavab(i)  = max( 0.0_r8, scavab(i)  )
-                  scavabc(i) = max( 0.0_r8, scavabc(i) )
-                  precabs(i) = max( 0.0_r8, precabs(i) )
-                  precabc(i) = max( 0.0_r8, precabc(i) )
-               endif
             endif
 
             tracab(i) = tracab(i) + tracer(i,k)*pdel(i,k)/gravit
