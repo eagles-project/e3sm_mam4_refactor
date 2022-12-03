@@ -299,7 +299,7 @@ subroutine mam_amicphys_1subarea(&
          !---------------------------------------------------------
          ! Calculate changes in aerosol mass mixing ratios due to 
          !  - gas condensation/evaporation
-         !  - cloudy chemistry (if the subarea is cloudy)
+         !  - cloud chemistry (if the subarea is cloudy)
          !---------------------------------------------------------
          qaer_delsub_grow4rnam  = qaer_delsub_cond
 
@@ -317,24 +317,11 @@ subroutine mam_amicphys_1subarea(&
          qnumcw_sv1 = qnumcw_cur
          qaercw_sv1 = qaercw_cur
 
-         if (.not.iscldy_subarea) then 
-            call mam_rename_1subarea(                     &
-               iscldy_subarea,                            &
-               dest_mode_of_mode,                         &
-               n_mode,                                    &
-               qnum_cur,                                  &
-               qaer_cur,          qaer_delsub_grow4rnam   )
-
-         else
-            call mam_rename_1subarea(                      &
-               iscldy_subarea,                             &
-               dest_mode_of_mode,                          &
-               n_mode,                                     &
-               qnum_cur,                                   &
-               qaer_cur,          qaer_delsub_grow4rnam,   &
-               qnumcw_cur,                                 &
-               qaercw_cur,        qaercw_delsub_grow4rnam  )
-         end if
+         call mam_rename_1subarea(                          &
+            iscldy_subarea,                                 &
+            dest_mode_of_mode, n_mode,                      &
+            qnum_cur,   qaer_cur,    qaer_delsub_grow4rnam, &
+            qnumcw_cur, qaercw_cur, qaercw_delsub_grow4rnam )
 
          !------------------------
          ! Accumulate increments
@@ -390,11 +377,11 @@ subroutine mam_amicphys_1subarea(&
          qnum_sv1 = qnum_cur
          qaer_sv1 = qaer_cur
 
-         call mam_coag_1subarea(                                       &
-            dtsubstep,                                                 &! in
-            temp,              pmid,             aircon,               &! in
-            dgn_a,             dgn_awet,         wetdens,              &! in
-            qnum_cur,          qaer_cur,         qaer_delsub_coag_in   )! inout, inout, out
+         call mam_coag_1subarea( &
+            dtsubstep,                                &! in
+            temp,      pmid,     aircon,              &! in
+            dgn_a,     dgn_awet, wetdens,             &! in
+            qnum_cur,  qaer_cur, qaer_delsub_coag_in  )! inout, inout, out
 
          qnum_delsub_coag = qnum_cur - qnum_sv1
          qaer_delsub_coag = qaer_cur - qaer_sv1
@@ -416,11 +403,11 @@ subroutine mam_amicphys_1subarea(&
 
       if (do_aging_in_subarea) then
 
-         call mam_pcarbon_aging_1subarea(                              &
-            dgn_a,             n_mode,                                 &  ! input
-            qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &  ! in-outs
-            qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &  ! in-outs
-            qaer_delsub_coag_in)                                          ! in-outs
+         call mam_pcarbon_aging_1subarea(                          &
+            dgn_a,             n_mode,                             &! input
+            qnum_cur,          qnum_delsub_cond, qnum_delsub_coag, &! in-outs
+            qaer_cur,          qaer_delsub_cond, qaer_delsub_coag, &! in-outs
+            qaer_delsub_coag_in)                                    ! in-outs
 
       end if
 
