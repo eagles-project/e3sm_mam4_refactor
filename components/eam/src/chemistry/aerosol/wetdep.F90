@@ -616,7 +616,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) cldmabc(pcols)       ! maximum cloud at or above this level
       real(r8) odds                 ! limit on removal rate (proportional to prec)
       real(r8) dblchek(pcols)
-      logical :: found
 
     ! Jan.16.2009. Sungsu for wet scavenging below clouds.
     ! real(r8) cldovr_cu(pcols)     ! Convective precipitation area at the base of each layer
@@ -1153,6 +1152,7 @@ jstrcnv_loop_aa: &
 
             end if resusp_block_aa
 
+! --------------------------------------------------------------
             resusp_s_sv(i) = resusp_s
             resusp_c_sv(i) = resusp_c
 
@@ -1249,36 +1249,6 @@ jstrcnv_loop_aa: &
        ! End by Sungsu
 
          end do main_i_loop ! End of i = 1, ncol
-
-         found = .false.
-         do i = 1,ncol
-            if ( dblchek(i) < 0._r8 ) then
-               found = .true.
-               exit
-            end if
-         end do
-
-         ! the log files from MMF runs were getting really large with these warnings due 
-         ! to tiny negative values (~ -1e-300) at the top of the model, well above the CRM,
-         ! so this block avoids this problem when running the MMF
-         if ( use_MMF ) then
-            if ( found ) then
-               if ( k < (pver-crm_nz) ) found = .false.
-            end if
-         end if
-
-         if ( found ) then
-            do i = 1,ncol
-               if (dblchek(i) .lt. 0._r8) then
-                  write(iulog,*) ' wetdepa_v2: negative value ', i, k, tracer(i,k), &
-                     dblchek(i), scavt(i,k), srct(i), rat(i), fracev(i)
-                  write(iulog,*) ' wetdepa_v2: negative value ', i, k, &
-                       mam_prevap_resusp_optcc, is_strat_cloudborne, tracer(i,k), &
-                       dblchek(i), deltat*scavt(i,k), deltat*srct(i), &
-                       deltat*resusp_s_sv(i)*gravit/pdel(i,k), deltat*resusp_c_sv(i)*gravit/pdel(i,k)
-               endif
-            end do
-         endif
 
       end do main_k_loop ! End of k = 1, pver
 
