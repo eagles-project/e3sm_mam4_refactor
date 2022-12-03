@@ -67,7 +67,6 @@ contains
 !==============================================================================
 
 !==============================================================================
-!==============================================================================
 subroutine wetdep_init()
   use physics_buffer, only: pbuf_get_index
   use constituents,   only: cnst_get_ind
@@ -94,9 +93,12 @@ subroutine wetdep_init()
 endsubroutine wetdep_init
 
 !==============================================================================
-! gathers up the inputs needed for the wetdepa routines
-!==============================================================================
 subroutine wetdep_inputs_set( state, pbuf, inputs )
+! -----------------------------------------------------------------------------
+! gathers up the inputs needed for the wetdepa routines
+! -----------------------------------------------------------------------------
+
+
   use phys_control,   only: cam_physpkg_is
   use physics_types,  only: physics_state
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
@@ -233,10 +235,9 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   totcond(:ncol,:) = q_liq(:ncol,:) + q_ice(:ncol,:)
 
   ! calculate cldv, cldvcu and cldvst
-  call clddiag( temperature,     pmid,   pdel,   cmfdqr, evapc, &
-               cldt,  cldcu,       cldst,  evapr, &
-               prain, cldv, cldvcu, cldvst, rainmr, &
-                ncol )
+  call clddiag( ncol, temperature, pmid,   pdel,   cmfdqr, evapc, & ! in
+               cldt,  cldcu,       cldst,  evapr,  prain,         & ! in
+               cldv,  cldvcu,      cldvst, rainmr                 ) ! out
   ! *********************************************** end
 
   ! **********************************************
@@ -255,9 +256,10 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
 end subroutine wetdep_inputs_set
 
 !==============================================================================
-! deallocate storage assoicated with wetdep_inputs_t type variable
-!==============================================================================
 subroutine wetdep_inputs_unset(inputs)
+! -----------------------------------------------------------------------------
+! deallocate storage assoicated with wetdep_inputs_t type variable
+! -----------------------------------------------------------------------------
 
   ! args
   type(wetdep_inputs_t), intent(inout) :: inputs          !! collection of wetdepa inputs
@@ -273,23 +275,22 @@ subroutine wetdep_inputs_unset(inputs)
 
 end subroutine wetdep_inputs_unset
 
-subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
-                   cldt, cldcu, cldst,  evapr, &
-                   prain, cldv, cldvcu, cldvst, rain, &
-                   ncol)
-
-   ! ------------------------------------------------------------------------------------ 
-   ! Estimate the cloudy volume which is occupied by rain or cloud water as
-   ! the max between the local cloud amount or the
-   ! sum above of (cloud*positive precip production)      sum total precip from above
-   !              ----------------------------------   x ------------------------
-   ! sum above of     (positive precip           )        sum positive precip from above
-   ! Author: P. Rasch
-   !         Sungsu Park. Mar.2010 
-   ! ------------------------------------------------------------------------------------
+!==============================================================================
+subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
+                   cldt, cldcu,       cldst,      evapr, prain,  & ! in
+                   cldv, cldvcu,      cldvst,     rain           ) ! out
+! ------------------------------------------------------------------------------------ 
+! Estimate the cloudy volume which is occupied by rain or cloud water as
+! the max between the local cloud amount or the
+! sum above of (cloud*positive precip production)      sum total precip from above
+!              ----------------------------------   x ------------------------
+! sum above of     (positive precip           )        sum positive precip from above
+! Author: P. Rasch
+!         Sungsu Park. Mar.2010 
+! ------------------------------------------------------------------------------------
 
    ! Input arguments:
-   real(r8), intent(in) :: t(pcols,pver)        ! temperature [K]
+   real(r8), intent(in) :: temperature(pcols,pver)        ! temperature [K]
    real(r8), intent(in) :: pmid(pcols,pver)     ! pressure at layer midpoints[Pa]
    real(r8), intent(in) :: pdel(pcols,pver)     ! pressure difference across layers [Pa]
    real(r8), intent(in) :: cmfdqr(pcols,pver)   ! dq/dt due to convective rainout [kg/kg/s]
@@ -308,7 +309,6 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain [kg/kg]
 
    ! Local variables:
-   integer  i, k
    real(r8) sumppr_all(pcols,pver)    ! precipitation rate in all vertical levels [kg/m2/s]
    real(r8) lprec(pcols,pver)         ! local production rate of precip [kg/m2/s]
    real(r8) sumppr_cu_all(pcols,pver) ! same as sumppr_all but for conv.precip. calculated but not used
@@ -329,16 +329,16 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    call calculate_cloudy_volume(ncol, cldst, lprec_st, .false., cldvst, sumppr_st_all) !stratiform
 
    ! calculate rain mixing ratio
-   call rain_mix_ratio(t, pmid, sumppr_all, ncol, rain)
+   call rain_mix_ratio(temperature, pmid, sumppr_all, ncol, rain)
 
 end subroutine clddiag
 
-
+!==============================================================================
 subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
-    !----------------------------------------------------------------------------
-    ! calculate local precipitation generation rate (kg/m2/s) from
-    ! source (condensation) and sink (evaporation) terms
-    !----------------------------------------------------------------------------
+!----------------------------------------------------------------------------
+! calculate local precipitation generation rate (kg/m2/s) from
+! source (condensation) and sink (evaporation) terms
+!----------------------------------------------------------------------------
     ! Input arguments:
     real(r8), intent(in) :: pdel(pcols,pver)        ! pressure difference across layers [Pa]
     real(r8), intent(in) :: source_term(pcols,pver) ! precipitation source term rate (condensation) [kg/kg/s]
@@ -349,29 +349,26 @@ subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
     real(r8), intent(out) :: lprec(pcols,pver)     ! local production rate of precip [kg/m2/s]
 
     ! Local variables:
-    integer  i, k
+    integer  icol, kk
 
     !calculate local precipitation rate
-    do i=1,ncol
-       do k=1,pver
-          lprec(i,k)  = (pdel(i,k)/gravit)*(source_term(i,k)-sink_term(i,k))
+    do icol=1,ncol
+       do kk=1,pver
+          lprec(icol,kk)  = (pdel(icol,kk)/gravit)*(source_term(icol,kk)-sink_term(icol,kk))
        enddo
     enddo
 
 end subroutine local_precip_production
 
-
+!==============================================================================
 subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_all)
-   ! ------------------------------------------------------------------------------------
-   ! Calculate cloudy volume which is occupied by rain or cloud water as
-   ! the max between the local cloud amount or the
-   ! sum above of (cloud*positive precip production)      sum total precip from
-   ! above
-   !              ----------------------------------   x
-   !              ------------------------
-   ! sum above of     (positive precip           )        sum positive precip
-   ! from above
-   ! ------------------------------------------------------------------------------------
+! ------------------------------------------------------------------------------------
+! Calculate cloudy volume which is occupied by rain or cloud water as
+! the max between the local cloud amount or the
+! sum above of (cloud*positive precip production)      sum total precip from above
+!              ----------------------------------   x   ------------------------
+! sum above of     (positive precip           )        sum positive precip from above
+! ------------------------------------------------------------------------------------
    ! Input arguments:
    real(r8), intent(in) :: cld(pcols,pver)   ! cloud fraction [fraction, unitless]
    real(r8), intent(in) :: lprec(pcols,pver) ! local production rate of precip [kg/m2/s]
@@ -383,7 +380,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    real(r8), intent(out) :: sumppr_all(pcols,pver) ! sum of precipitation rate above each layer, for calling rain_mix_ratio use [kg/m2/s]
 
    ! Local variables:
-   integer  i,k
+   integer  icol,kk
    real(r8) sumppr(pcols)        ! precipitation rate [kg/m2/s]
    real(r8) sumpppr(pcols)       ! sum of positive precips from above
    real(r8) cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
@@ -391,43 +388,43 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
 
 
    ! initiate variables
-   do i=1,ncol
-      sumppr(i) = 0._r8
-      cldv1(i) = 0._r8
-      sumpppr(i) = 1.e-36_r8   ! not 0 because it will be divided
+   do icol=1,ncol
+      sumppr(icol) = 0._r8
+      cldv1(icol) = 0._r8
+      sumpppr(icol) = 1.e-36_r8   ! not 0 because it will be divided
    end do
 
-   do k = 1,pver
-      do i = 1,ncol
+   do kk = 1,pver
+      do icol = 1,ncol
          if (is_tot_cld) then
-             cldv(i,k) = max(min(1._r8,cldv1(i)/sumpppr(i))*sumppr(i)/sumpppr(i),cld(i,k))
+             cldv(icol,kk) = max( min(1._r8,cldv1(icol)/sumpppr(icol)) *sumppr(icol)/sumpppr(icol), cld(icol,kk))
          else
              ! For convective and stratiform precipitation volume at the top interface of each layer. 
              ! Neglect the current layer.
-             cldv(i,k) = max(min(1._r8,cldv1(i)/sumpppr(i))*(sumppr(i)/sumpppr(i)),0._r8)
+             cldv(icol,kk) = max( min(1._r8,cldv1(icol)/sumpppr(icol)) * (sumppr(icol)/sumpppr(icol)), 0._r8)
          endif
-         lprecp = max(lprec(i,k), 1.e-30_r8)
-         cldv1(i) = cldv1(i)  + cld(i,k)*lprecp
-         sumppr(i) = sumppr(i) + lprec(i,k)
-         sumppr_all(i,k) = sumppr(i)      ! save all sumppr to callrain_mix_ratio
-         sumpppr(i) = sumpppr(i) + lprecp
+         lprecp = max(lprec(icol,kk), 1.e-30_r8)
+         cldv1(icol) = cldv1(icol)  + cld(icol,kk)*lprecp
+         sumppr(icol) = sumppr(icol) + lprec(icol,kk)
+         sumppr_all(icol,kk) = sumppr(icol)      ! save all sumppr to callrain_mix_ratio
+         sumpppr(icol) = sumpppr(icol) + lprecp
       enddo
    enddo
 
 end subroutine calculate_cloudy_volume
 
-
-subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
-      !-----------------------------------------------------------------------
-      ! Purpose:
-      ! calculate rain mixing ratio from precipitation rate above.
-      !
-      ! extracted from clddiag subroutine
-      ! modified by Shuaiqi Tang in 9/22/2022
-      !-----------------------------------------------------------------------
+!==============================================================================
+subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
+!-----------------------------------------------------------------------
+! Purpose:
+! calculate rain mixing ratio from precipitation rate above.
+!
+! extracted from clddiag subroutine
+! for C++ portint, Shuaiqi Tang in 9/22/2022
+!-----------------------------------------------------------------------
 
    ! Input arguments:
-   real(r8), intent(in) :: t(pcols,pver)      ! temperature [K]
+   real(r8), intent(in) :: temperature(pcols,pver)      ! temperature [K]
    real(r8), intent(in) :: pmid(pcols,pver)   ! pressure at layer midpoints [Pa]
    real(r8), intent(in) :: sumppr(pcols,pver) ! sum of precipitation rate above each layer [kg/m2/s]
    integer,  intent(in) :: ncol
@@ -436,7 +433,7 @@ subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
    real(r8), intent(out) :: rain(pcols,pver) ! mixing ratio of rain [kg/kg]
 
    ! Local variables:
-   integer  i,k
+   integer  icol,kk
 
    ! constants used in fallspeed calculation; taken from findmcnew
    real(r8) :: convfw
@@ -446,14 +443,14 @@ subroutine rain_mix_ratio(t, pmid, sumppr, ncol, rain)
    ! define the constant convfw. taken from findmcnew, do not find the reference
    ! of the equation  -- by Shuaiqi when refactoring
    convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
-   do k = 1,pver
-     do i = 1,ncol
-         rain(i,k) = 0._r8
-         if(t(i,k) .gt. tmelt) then
-            rho = pmid(i,k)/(rair*t(i,k))
+   do kk = 1,pver
+     do icol = 1,ncol
+         rain(icol,kk) = 0._r8
+         if(temperature(icol,kk) .gt. tmelt) then
+            rho = pmid(icol,kk)/(rair*temperature(icol,kk))
             vfall = convfw/sqrt(rho)
-          rain(i,k) = sumppr(i,k) / (rho*vfall)
-            if (rain(i,k).lt.1.e-14_r8) rain(i,k) = 0._r8
+            rain(icol,kk) = sumppr(icol,kk) / (rho*vfall)
+            if (rain(icol,kk).lt.1.e-14_r8) rain(icol,kk) = 0._r8
          endif
       end do
    end do
@@ -977,6 +974,7 @@ main_i_loop: &
 !     3 = same as 2 but with some added "xxx = max( 0, xxx)" lines
 !   130 = non-linear resuspension of aerosol mass   based on scavenged aerosol mass
 !   230 = non-linear resuspension of aerosol number based on raindrop number
+!   (only 0, 130 and 230 are used in current code)
 resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
 
@@ -1288,10 +1286,11 @@ jstrcnv_loop_aa: &
 
 
 !==============================================================================
+      function flux_precnum_vs_flux_prec_mpln( flux_prec, jstrcnv )
+! --------------------------------------------------------------------------------
 !     flux_precnum_vs_flux_prec_mp = precipitation number flux at the cloud base [drops/m^2/s]
 !     Options of assuming log-normal or marshall-palmer raindrop size distribution
-!
-      function flux_precnum_vs_flux_prec_mpln( flux_prec, jstrcnv )
+! --------------------------------------------------------------------------------
       real(r8) :: flux_precnum_vs_flux_prec_mpln  ! [drops/m^2/s]
       real(r8), intent(in) :: flux_prec     ! [drops/m^2/s]
       integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
@@ -1322,12 +1321,14 @@ jstrcnv_loop_aa: &
 
 
 !==============================================================================
+      function faer_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
+! --------------------------------------------------------------------------------
 ! corresponding fraction of precipitation-borne aerosol flux that is resuspended
 ! Options of assuming log-normal or marshall-palmer raindrop size distribution
 ! note that these fractions are relative to the cloud-base fluxes,
 ! and not to the layer immediately above fluxes
+! --------------------------------------------------------------------------------
 
-      function faer_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
       real(r8) :: faer_resusp_vs_fprec_evap_mpln ! [fraction]
       real(r8), intent(in) :: fprec_evap ! [fraction]
       integer,  intent(in) :: jstrcnv   ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
@@ -1377,11 +1378,13 @@ jstrcnv_loop_aa: &
 
 
 !==============================================================================
+      function fprecn_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
+! --------------------------------------------------------------------------------
 ! Rain number evaporation fraction
 ! Options of assuming log-normal or marshall-palmer raindrop size distribution
 ! note that these fractions are relative to the cloud-base fluxes,
 ! and not to the layer immediately above fluxes
-      function fprecn_resusp_vs_fprec_evap_mpln( fprec_evap, jstrcnv )
+! --------------------------------------------------------------------------------
       real(r8) :: fprecn_resusp_vs_fprec_evap_mpln  ! [fraction]
       real(r8), intent(in) :: fprec_evap     ! [fraction]
       integer,  intent(in) :: jstrcnv  ! current only two options: 1 for marshall-palmer distribution, 2 for log-normal distribution
