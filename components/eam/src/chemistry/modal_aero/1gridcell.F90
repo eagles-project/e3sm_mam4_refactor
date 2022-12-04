@@ -44,13 +44,10 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8), intent(in)    :: pdel                  ! pressure thickness of layer (Pa)
       real(r8), intent(in)    :: zmid                  ! altitude (above ground) at layer center (m)
       real(r8), intent(in)    :: pblh                  ! planetary boundary layer depth (m)
-      real(r8), intent(in)    :: relhumsub(maxsubarea)  ! sub-area relative humidity (0-1)
-      real(r8), intent(inout) :: dgn_a(max_mode)
-      real(r8), intent(inout) :: dgn_awet(max_mode)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
-      real(r8), intent(inout) :: wetdens(max_mode)
-                                    ! interstitial aerosol wet density (kg/m3)
-                                    ! dry & wet geo. mean dia. (m) of number distrib.
+      real(r8), intent(in)    :: relhumsub(maxsubarea) ! sub-area relative humidity (0-1)
+      real(r8), intent(inout) :: dgn_a(max_mode)       ! dry geo. mean dia. (m) of number distrib.
+      real(r8), intent(inout) :: dgn_awet(max_mode)    ! wet geo. mean dia. (m) of number distrib.
+      real(r8), intent(inout) :: wetdens(max_mode)     ! interstitial aerosol wet density (kg/m3)
 
 ! qsubN and qqcwsubN (N=1:4) are tracer mixing ratios (TMRs, mol/mol or #/kmol) in sub-areas
 !    currently there are just clear and cloudy sub-areas
@@ -59,51 +56,36 @@ subroutine mam_amicphys_1gridcell(          &
 !    N=2 - before cloud chemistry
 !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
 !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
-      real(r8), intent(in   ), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub4, qqcwsub4
-      real(r8), intent(inout), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: &
-         qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+      real(r8), intent(in   ), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
+      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub4, qqcwsub4
+      real(r8), intent(inout), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+
 ! qsub_tendaa and qqcwsub_tendaa are TMR tendencies
 !    for different processes, which are used to produce history output
 ! the processes are condensation/evaporation (and associated aging),
 !    renaming, coagulation, and nucleation
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) :: &
-         qsub_tendaa
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: &
-         qqcwsub_tendaa
+      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
+      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) ::  qqcwsub_tendaa
       type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa
 
 ! local
       integer :: iaer, igas
       integer :: jsub
       integer :: l
-      integer :: n
+      integer :: imode
       logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
       logical :: do_map_gas_sub
 
-      real(r8), dimension( 1:max_gas ) :: &
-         qgas1, qgas2, qgas3, qgas4
-      real(r8), dimension( 1:max_mode ) :: &
-         qnum2, qnum3, qnum4, &
-         qnumcw2, qnumcw3, qnumcw4
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: &
-         qaer2, qaer3, qaer4, &
-         qaercw2, qaercw3, qaercw4
-      real(r8), dimension( 1:max_mode ) :: &
-         qwtr3, qwtr4
+      real(r8), dimension( 1:max_gas ) :: qgas1, qgas2, qgas3, qgas4
+      real(r8), dimension( 1:max_mode ) :: qnum2, qnum3, qnum4, qnumcw2, qnumcw3, qnumcw4
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer2, qaer3, qaer4, qaercw2, qaercw3, qaercw4
+      real(r8), dimension( 1:max_mode ) :: qwtr3, qwtr4
 
-      real(r8), dimension( 1:max_gas, 1:nqtendaa ) :: &
-         qgas_delaa
-      real(r8), dimension( 1:max_mode, 1:nqtendaa ) :: &
-         qnum_delaa
-      real(r8), dimension( 1:max_mode, 1:nqqcwtendaa ) :: &
-         qnumcw_delaa
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) :: &
-         qaer_delaa
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: &
-         qaercw_delaa
+      real(r8), dimension( 1:max_gas, 1:nqtendaa ) ::  qgas_delaa
+      real(r8), dimension( 1:max_mode, 1:nqtendaa ) :: qnum_delaa
+      real(r8), dimension( 1:max_mode, 1:nqqcwtendaa ) :: qnumcw_delaa
+      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa
+      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa
 
       real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
 
@@ -123,7 +105,7 @@ subroutine mam_amicphys_1gridcell(          &
       end do
 
 
-main_jsub_loop: &
+main_jsubarea_loop: &
       do jsub = 1, nsubarea
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
@@ -138,17 +120,20 @@ main_jsub_loop: &
          do_newnuc_sub = do_newnuc
          do_coag_sub   = do_coag
       end if
-      do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
 
 
 ! map incoming sub-area mix-ratios to gas/aer/num arrays
 
+      !--------------------
+      ! Gases
+      !--------------------
       qgas1(:) = 0.0_r8
       qgas2(:) = 0.0_r8
       qgas3(:) = 0.0_r8
       qgas4(:) = 0.0_r8
+      ! for cldy subarea, only do gases if doing gaexch
+      do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
       if ( do_map_gas_sub .eqv. .true. ) then
-! for cldy subarea, only do gases if doing gaexch
       do igas = 1, ngas
          l = lmap_gas(igas)
          qgas1(igas) = qsub1(l,jsub)*fcvt_gas(igas)
@@ -158,55 +143,80 @@ main_jsub_loop: &
       end do
       end if
 
-      qaer2(:,:) = 0.0_r8
+      !-----------------------------------------
+      ! interstitial aerosol mass and number
+      !-----------------------------------------
       qnum2(:)   = 0.0_r8
-      qaer3(:,:) = 0.0_r8
       qnum3(:)   = 0.0_r8
-      qaer4(:,:) = 0.0_r8
       qnum4(:)   = 0.0_r8
+      do imode = 1, ntot_amode
+         l = lmap_num(imode)
+         qnum2(imode) = qsub2(l,jsub)*fcvt_num
+         qnum3(imode) = qsub3(l,jsub)*fcvt_num
+         qnum4(imode) = qnum3(imode)
+      end do ! imode
+
+      qaer2(:,:) = 0.0_r8
+      qaer3(:,:) = 0.0_r8
+      qaer4(:,:) = 0.0_r8
+      do imode = 1, ntot_amode
+         do iaer = 1, naer
+            l = lmap_aer(iaer,imode)
+            if (l > 0) then
+               qaer2(iaer,imode) = qsub2(l,jsub)*fcvt_aer(iaer)
+               qaer3(iaer,imode) = qsub3(l,jsub)*fcvt_aer(iaer)
+               qaer4(iaer,imode) = qaer3(iaer,imode)
+            end if
+         end do
+      end do ! imode
+
+      !-----------------------------------------
+      ! aerosol water
+      !-----------------------------------------
       qwtr3(:)   = 0.0_r8
       qwtr4(:)   = 0.0_r8
-      do n = 1, ntot_amode
-         l = lmap_num(n)
-         qnum2(n) = qsub2(l,jsub)*fcvt_num
-         qnum3(n) = qsub3(l,jsub)*fcvt_num
-         qnum4(n) = qnum3(n)
-         do iaer = 1, naer
-            l = lmap_aer(iaer,n)
-            if (l > 0) then
-               qaer2(iaer,n) = qsub2(l,jsub)*fcvt_aer(iaer)
-               qaer3(iaer,n) = qsub3(l,jsub)*fcvt_aer(iaer)
-               qaer4(iaer,n) = qaer3(iaer,n)
-            end if
-         end do
-         qwtr3(n) = qaerwatsub3(n,jsub)*fcvt_wtr
-         qwtr4(n) = qwtr3(n)
+      do imode = 1, ntot_amode
+         l = lmap_num(imode)
+         qwtr3(imode) = qaerwatsub3(imode,jsub)*fcvt_wtr
+         qwtr4(imode) = qwtr3(imode)
       end do ! n
+
+      !-----------------------------------------
+      ! cloud-borne aerosol mass and number
+      !-----------------------------------------
+      ! only do cloud-borne for cloudy
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
-! only do cloud-borne for cloudy
-      qaercw2(:,:) = 0.0_r8
+
       qnumcw2(:)   = 0.0_r8
-      qaercw3(:,:) = 0.0_r8
       qnumcw3(:)   = 0.0_r8
-      qaercw4(:,:) = 0.0_r8
       qnumcw4(:)   = 0.0_r8
-      do n = 1, ntot_amode
-         l = lmap_numcw(n)
-         qnumcw2(n) = qqcwsub2(l,jsub)*fcvt_num
-         qnumcw3(n) = qqcwsub3(l,jsub)*fcvt_num
-         qnumcw4(n) = qnumcw3(n)
+      do imode = 1, ntot_amode
+         l = lmap_numcw(imode)
+         qnumcw2(imode) = qqcwsub2(l,jsub)*fcvt_num
+         qnumcw3(imode) = qqcwsub3(l,jsub)*fcvt_num
+         qnumcw4(imode) = qnumcw3(imode)
+      end do ! imode
+
+      qaercw2(:,:) = 0.0_r8
+      qaercw3(:,:) = 0.0_r8
+      qaercw4(:,:) = 0.0_r8
+      do imode = 1, ntot_amode
          do iaer = 1, naer
-            l = lmap_aercw(iaer,n)
+            l = lmap_aercw(iaer,imode)
             if (l > 0) then
-               qaercw2(iaer,n) = qqcwsub2(l,jsub)*fcvt_aer(iaer)
-               qaercw3(iaer,n) = qqcwsub3(l,jsub)*fcvt_aer(iaer)
-               qaercw4(iaer,n) = qaercw3(iaer,n)
+               qaercw2(iaer,imode) = qqcwsub2(l,jsub)*fcvt_aer(iaer)
+               qaercw3(iaer,imode) = qqcwsub3(l,jsub)*fcvt_aer(iaer)
+               qaercw4(iaer,imode) = qaercw3(iaer,imode)
             end if
          end do
-      end do ! n
+      end do ! imode
+
       end if
 
+      !----------------------------------------------------
+      ! Calculate aerosol microphysics for a single subarea
+      !----------------------------------------------------
       call mam_amicphys_1subarea(                    &
          do_cond_sub,            do_rename_sub,      &
          do_newnuc_sub,          do_coag_sub,        &
@@ -231,59 +241,79 @@ main_jsub_loop: &
          qaercw_delaa,                               &
          misc_vars_aa_sub(jsub)                      )
 
+      !----------------------------------------------------
       if ((nsubarea == 1) .or. (iscldy_subarea(jsub) .eqv. .false.)) then
          misc_vars_aa%ncluster_tend_nnuc_1grid = misc_vars_aa%ncluster_tend_nnuc_1grid &
                                                + misc_vars_aa_sub(jsub)%ncluster_tend_nnuc_1grid*afracsub(jsub)
-#if ( defined ( MOSAIC_SPECIES ) )
-         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid
-         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid
-         misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = misc_vars_aa_sub(jsub)%xnerr_astem_negative_1grid(1:5,1:4)
-#endif
       end if
 
+     ! map gas/aer/num arrays (mix-ratio and del=change) back to sub-area arrays
 
-
-! map gas/aer/num arrays (mix-ratio and del=change) back to sub-area arrays
-
+      !----------------------------------------------------
+      ! Gases
+      !----------------------------------------------------
       if ( do_map_gas_sub .eqv. .true. ) then
-      do igas = 1, ngas
-         l = lmap_gas(igas)
-         qsub4(l,jsub) = qgas4(igas)/fcvt_gas(igas)
-         qsub_tendaa(l,:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
-      end do
+       do igas = 1, ngas
+         qsub4( lmap_gas(igas),jsub ) = qgas4(igas)/fcvt_gas(igas)
+         qsub_tendaa( lmap_gas(igas),:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
+       end do
       end if
 
-      do n = 1, ntot_amode
-         l = lmap_num(n)
-         qsub4(l,jsub) = qnum4(n)/fcvt_num
-         qsub_tendaa(l,:,jsub) = qnum_delaa(n,:)/(fcvt_num*deltat)
-         do iaer = 1, naer
-            l = lmap_aer(iaer,n)
-            if (l > 0) then
-               qsub4(l,jsub) = qaer4(iaer,n)/fcvt_aer(iaer)
-               qsub_tendaa(l,:,jsub) = qaer_delaa(iaer,n,:)/(fcvt_aer(iaer)*deltat)
-            end if
-         end do
-         qaerwatsub4(n,jsub) = qwtr4(n)/fcvt_wtr
+      !----------------------------------------------------
+      ! Aerosol water
+      !----------------------------------------------------
+      do imode = 1, ntot_amode
+         qaerwatsub4(imode,jsub) = qwtr4(imode)/fcvt_wtr
+      end do ! imode
 
-         if ( iscldy_subarea(jsub) ) then
-         l = lmap_numcw(n)
-         qqcwsub4(l,jsub) = qnumcw4(n)/fcvt_num
-         qqcwsub_tendaa(l,:,jsub) = qnumcw_delaa(n,:)/(fcvt_num*deltat)
-         do iaer = 1, naer
-            l = lmap_aercw(iaer,n)
-            if (l > 0) then
-               qqcwsub4(l,jsub) = qaercw4(iaer,n)/fcvt_aer(iaer)
-               qqcwsub_tendaa(l,:,jsub) = qaercw_delaa(iaer,n,:)/(fcvt_aer(iaer)*deltat)
-            end if
-         end do
-         end if
-      end do ! n
+      !----------------------------------------------------
+      ! Interstitial aerosol number
+      !----------------------------------------------------
+      do imode = 1, ntot_amode
+         l = lmap_num(imode)
+         qsub4(l,jsub) = qnum4(imode)/fcvt_num
+         qsub_tendaa(l,:,jsub) = qnum_delaa(imode,:)/(fcvt_num*deltat)
+      end do ! imode
 
+      !----------------------------------------------------
+      ! Interstitial aerosol mass
+      !----------------------------------------------------
+      do imode = 1, ntot_amode
+      do iaer = 1, naer
+          l = lmap_aer(iaer,imode)
+          if (l > 0) then
+             qsub4(l,jsub) = qaer4(iaer,imode)/fcvt_aer(iaer)
+             qsub_tendaa(l,:,jsub) = qaer_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+          end if
+      end do ! iaer
+      end do ! imode
 
-      end do main_jsub_loop
+      if ( iscldy_subarea(jsub) ) then
 
+       !----------------------------------------------------
+       ! Cloud-borne aerosol number
+       !----------------------------------------------------
+       do imode = 1, ntot_amode
+          l = lmap_numcw(imode)
+          qqcwsub4(l,jsub) = qnumcw4(imode)/fcvt_num
+          qqcwsub_tendaa(l,:,jsub) = qnumcw_delaa(imode,:)/(fcvt_num*deltat)
+       end do ! imode
 
+       !----------------------------------------------------
+       ! Cloud-borne aerosol mass
+       !----------------------------------------------------
+       do imode = 1, ntot_amode
+       do iaer = 1, naer
+          l = lmap_aercw(iaer,imode)
+          if (l > 0) then
+             qqcwsub4(l,jsub) = qaercw4(iaer,imode)/fcvt_aer(iaer)
+             qqcwsub_tendaa(l,:,jsub) = qaercw_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+          end if
+       end do ! iaer
+       end do ! imode
 
-      return
-      end subroutine mam_amicphys_1gridcell
+      end if
+
+  end do main_jsubarea_loop
+
+end subroutine mam_amicphys_1gridcell
