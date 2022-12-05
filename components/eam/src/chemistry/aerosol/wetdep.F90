@@ -535,7 +535,15 @@ subroutine wetdepa_v2( ncol, deltat, &
             ! sol_fact  is used for below cloud scavenging
             ! sol_facti is used for in cloud scavenging
 
-      integer, intent(in) :: mam_prevap_resusp_optcc
+      integer, intent(in) :: mam_prevap_resusp_optcc ! suspension options.
+!     0 = no resuspension
+!     1 = linear resuspension of aerosol mass or number following original mam
+!     coding and history_aero_prevap_resusp = .false.
+!     2 = same as 1 but history_aero_prevap_resusp = .true.
+!     3 = same as 2 but with some added "xxx = max( 0, xxx)" lines
+!   130 = non-linear resuspension of aerosol mass   based on scavenged aerosol mass
+!   230 = non-linear resuspension of aerosol number based on raindrop number
+!     (1,2,3 are not used in the current code)
 
 !     logical, intent(in) :: resus_fix
       ! rce 2010/05/01
@@ -1153,75 +1161,16 @@ jstrcnv_loop_aa: &
             end if resusp_block_aa
 
 ! --------------------------------------------------------------
-            resusp_s_sv(i) = resusp_s
-            resusp_c_sv(i) = resusp_c
 
-
-            if ( mam_prevap_resusp_optcc == 0) then
-               scavt(i,k) = -srct(i) + (fracev(i)*scavab(i)+fracev_cu(i)*scavabc(i))*gravit/pdel(i,k)
-            else
-               scavt(i,k) = -srct(i) + (resusp_s+resusp_c)*gravit/pdel(i,k)
-            endif
-
-            iscavt(i,k) = -(srcc*finc + srcs*fins)*omsm
-
-!           if ( present(icscavt) ) icscavt(i,k) = -(srcc*finc) * omsm
-!           if ( present(isscavt) ) isscavt(i,k) = -(srcs*fins) * omsm
-            icscavt(i,k) = -(srcc*finc) * omsm
-            isscavt(i,k) = -(srcs*fins) * omsm
-
-!           if(.not.present(resus_fix)) then
-!              if ( present(bcscavt) ) bcscavt(i,k) = -(srcc * (1-finc)) * omsm +  &
-!                   fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)
-!              if ( present(bsscavt) ) bsscavt(i,k) = -(srcs * (1-fins)) * omsm +  &
-!                   fracev(i)*scavab(i)*gravit/pdel(i,k)
-!           endif
-
-!           if(present(resus_fix)) then
-!              if ( .not. resus_fix ) then
-               if (mam_prevap_resusp_optcc == 0) then
-!                 if ( present(bcscavt) ) bcscavt(i,k) = -(srcc * (1-finc)) * omsm +  &
-!                      fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)
-!                 if ( present(bsscavt) ) bsscavt(i,k) = -(srcs * (1-fins)) * omsm +  &
-!                      fracev(i)*scavab(i)*gravit/pdel(i,k)
-                  bcscavt(i,k) = -(srcc * (1-finc)) * omsm +  &
-                       fracev_cu(i)*scavabc(i)*gravit/pdel(i,k)
-                  bsscavt(i,k) = -(srcs * (1-fins)) * omsm +  &
-                       fracev(i)*scavab(i)*gravit/pdel(i,k)
-                  rcscavt(i,k) = 0.0
-                  rsscavt(i,k) = 0.0
-               else ! here mam_prevap_resusp_optcc == 130, 210, 230
-                  bcscavt(i,k) = -(srcc * (1-finc)) * omsm
-                  rcscavt(i,k) = resusp_c*gravit/pdel(i,k)
-                  bsscavt(i,k) = -(srcs * (1-fins)) * omsm
-                  rsscavt(i,k) = resusp_s*gravit/pdel(i,k)
-               endif
-!           endif
-
-            dblchek(i) = tracer(i,k) + deltat*scavt(i,k)
-
-            ! now keep track of scavenged mass and precip
-            if (mam_prevap_resusp_optcc == 0) then
-               scavab(i) = scavab(i)*(1-fracev(i)) + srcs*pdel(i,k)/gravit
-               precabs(i) = precabs(i) + (precs(i,k) - evaps(i,k))*pdel(i,k)/gravit
-               scavabc(i) = scavabc(i)*(1-fracev_cu(i)) + srcc*pdel(i,k)/gravit
-               precabc(i) = precabc(i) + (cmfdqr(i,k) - evapc(i,k))*pdel(i,k)/gravit
-            endif
-
-            tracab(i) = tracab(i) + tracer(i,k)*pdel(i,k)/gravit
-
-       ! Jan.16.2010. Sungsu
-       ! Compute convective and stratiform precipitation areas at the base interface
-       ! of current layer. These are for computing 'below cloud scavenging' in the 
-       ! next layer below.
-
-       ! cldovr_cu(i) = max( cldovr_cu(i), cldc(i,k) )
-       ! cldovr_st(i) = max( cldovr_st(i), max( 0._r8, cldt(i,k) - cldc(i,k) ) )
-
-       ! cldovr_cu(i) = max( 0._r8, min ( 1._r8, cldovr_cu(i) ) )
-       ! cldovr_st(i) = max( 0._r8, min ( 1._r8, cldovr_st(i) ) )
-
-       ! End by Sungsu
+           call update_scavenging( i,            k,             & ! in
+                        mam_prevap_resusp_optcc,pdel,           & ! in
+                        omsm,   srcc,   srcs,   srct,           & ! in
+                        fins,   finc,   fracev, fracev_cu,      & ! in
+                        resusp_c,       resusp_s,               & ! in
+                        precs,  evaps,  cmfdqr, evapc,          & ! in
+                        scavt,  iscavt, icscavt,isscavt,        & ! inout
+                        bcscavt,bsscavt,rcscavt,rsscavt,        & ! inout
+                        scavab, scavabc,precabc,precabs         ) ! inout
 
          end do main_i_loop ! End of i = 1, ncol
 
@@ -1229,6 +1178,88 @@ jstrcnv_loop_aa: &
 
    end subroutine wetdepa_v2
 
+!==============================================================================
+   subroutine update_scavenging( icol,          kk,             & ! in
+                        mam_prevap_resusp_optcc,pdel,           & ! in
+                        omsm,   srcc,   srcs,   srct,           & ! in
+                        fins,   finc,   fracev, fracev_cu,      & ! in 
+                        resusp_c,       resusp_s,               & ! in
+                        precs,  evaps,  cmfdqr, evapc,          & ! in
+                        scavt,  iscavt, icscavt,isscavt,        & ! inout
+                        bcscavt,bsscavt,rcscavt,rsscavt,        & ! inout
+                        scavab, scavabc,precabc,precabs         ) ! inout
+! ------------------------------------------------------------------------------
+! update scavenging variables
+! ------------------------------------------------------------------------------
+   ! input variables
+   integer, intent(in) :: icol                ! column index
+   integer, intent(in) :: kk                  ! level index
+   integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options 
+   real(r8),intent(in) :: pdel(pcols,pver)    ! pressure thikness [Pa]
+   real(r8),intent(in) :: omsm                ! 1 - (a small number), used to prevent roundoff errors below zero
+   real(r8),intent(in) :: srcc                ! tend for convective rain [kg/kg/s]
+   real(r8),intent(in) :: srcs                ! tend for stratiform rain [kg/kg/s]
+   real(r8),intent(in) :: srct(pcols)         ! total tendency for conv+strat rain [kg/kg/s]
+   real(r8),intent(in) :: fins                ! fraction of rem. rate by strat rain [fraction]
+   real(r8),intent(in) :: finc                ! fraction of rem. rate by conv. rain [fraction]
+   real(r8),intent(in) :: fracev(pcols)       ! fraction of precip from above that is evaporating [fraction]
+   real(r8),intent(in) :: fracev_cu(pcols)    ! Fraction of convective precip from above that is evaporating [fraction]
+   real(r8),intent(in) :: resusp_c            ! aerosol mass re-suspension in a particular layer from convective rain [kg/m2/s]
+   real(r8),intent(in) :: resusp_s            ! aerosol mass re-suspension in a particular layer from stratiform rain [kg/m2/s]
+   real(r8),intent(in) :: precs(pcols,pver)   ! rate of production of stratiform precip [kg/kg/s]
+   real(r8),intent(in) :: evaps(pcols,pver)   ! rate of evaporation of precip [kg/kg/s]
+   real(r8),intent(in) :: cmfdqr(pcols,pver)  ! rate of production of convective precip [kg/kg/s]
+   real(r8),intent(in) :: evapc(pcols,pver)   ! Evaporation rate of convective precipitation [kg/kg/s]
+   ! output variables
+   real(r8), intent(inout) :: scavt(pcols,pver)    ! scavenging tend [kg/kg/s]
+   real(r8), intent(inout) :: iscavt(pcols,pver)   ! incloud scavenging tends [kg/kg/s]
+   real(r8), intent(inout) :: icscavt(pcols,pver)  ! incloud, convective [kg/kg/s]
+   real(r8), intent(inout) :: isscavt(pcols,pver)  ! incloud, stratiform [kg/kg/s]
+   real(r8), intent(inout) :: bcscavt(pcols,pver)  ! below cloud, convective [kg/kg/s]
+   real(r8), intent(inout) :: bsscavt(pcols,pver)  ! below cloud, stratiform [kg/kg/s]
+   real(r8), intent(inout) :: rcscavt(pcols,pver)  ! resuspension, convective [kg/kg/s]
+   real(r8), intent(inout) :: rsscavt(pcols,pver)  ! resuspension, stratiform [kg/kg/s]
+   real(r8), intent(inout) :: scavab(pcols)        ! scavenged tracer flux from above [kg/m2/s]
+   real(r8), intent(inout) :: scavabc(pcols)       ! scavenged tracer flux from above [kg/m2/s]
+   real(r8), intent(inout) :: precabc(pcols)       ! conv precip from above [kg/m2/s]
+   real(r8), intent(inout) :: precabs(pcols)       ! strat precip from above [kg/m2/s]
+
+   if ( mam_prevap_resusp_optcc == 0) then
+       scavt(icol,kk) = -srct(icol) + &
+            (fracev(icol)*scavab(icol)+fracev_cu(icol)*scavabc(icol))*gravit/pdel(icol,kk)
+   else
+       scavt(icol,kk) = -srct(icol) + (resusp_s+resusp_c)*gravit/pdel(icol,kk)
+   endif
+
+   iscavt(icol,kk) = -(srcc*finc + srcs*fins)*omsm
+   icscavt(icol,kk) = -(srcc*finc) * omsm
+   isscavt(icol,kk) = -(srcs*fins) * omsm
+
+   if (mam_prevap_resusp_optcc == 0) then
+          bcscavt(icol,kk) = -(srcc * (1-finc)) * omsm +  &
+              fracev_cu(icol)*scavabc(icol)*gravit/pdel(icol,kk)
+
+          bsscavt(icol,kk) = -(srcs * (1-fins)) * omsm +  &
+              fracev(icol)*scavab(icol)*gravit/pdel(icol,kk)
+
+          rcscavt(icol,kk) = 0.0
+          rsscavt(icol,kk) = 0.0
+   else ! here mam_prevap_resusp_optcc == 130, 210, 230
+          bcscavt(icol,kk) = -(srcc * (1-finc)) * omsm
+          rcscavt(icol,kk) = resusp_c*gravit/pdel(icol,kk)
+          bsscavt(icol,kk) = -(srcs * (1-fins)) * omsm
+          rsscavt(icol,kk) = resusp_s*gravit/pdel(icol,kk)
+   endif
+
+   ! now keep track of scavenged mass and precip
+   if (mam_prevap_resusp_optcc == 0) then
+       scavab(icol)  = scavab(icol) *(1-fracev   (icol)) + srcs*pdel(icol,kk)/gravit
+       scavabc(icol) = scavabc(icol)*(1-fracev_cu(icol)) + srcc*pdel(icol,kk)/gravit
+       precabs(icol) = precabs(icol) + (precs (icol,kk) - evaps(icol,kk))*pdel(icol,kk)/gravit
+       precabc(icol) = precabc(icol) + (cmfdqr(icol,kk) - evapc(icol,kk))*pdel(icol,kk)/gravit
+   endif
+
+   end subroutine update_scavenging
 
 !==============================================================================
       function flux_precnum_vs_flux_prec_mpln( flux_prec, jstrcnv )
