@@ -76,8 +76,8 @@ subroutine mam_amicphys_1gridcell(          &
       logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
       logical :: do_map_gas_sub
 
-      real(r8), dimension( 1:max_gas ) :: qgas1, qgas2, qgas3, qgas4
-      real(r8), dimension( 1:max_mode ) :: qnum2, qnum3, qnum4, qnumcw2, qnumcw3, qnumcw4
+      real(r8), dimension( 1:max_gas ) :: qgas1, qgas3, qgas4
+      real(r8), dimension( 1:max_mode ) :: qnum3, qnum4, qnumcw3, qnumcw4
       real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer2, qaer3, qaer4, qaercw2, qaercw3, qaercw4
       real(r8), dimension( 1:max_mode ) :: qwtr3, qwtr4
 
@@ -87,7 +87,7 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa
       real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa
 
-      real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
+    ! real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
 
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
@@ -121,6 +121,8 @@ main_jsubarea_loop: &
          do_coag_sub   = do_coag
       end if
 
+      ! for cldy subarea, only do gases if doing gaexch
+      do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
 
 ! map incoming sub-area mix-ratios to gas/aer/num arrays
 
@@ -128,44 +130,32 @@ main_jsubarea_loop: &
       ! Gases
       !--------------------
       qgas1(:) = 0.0_r8
-      qgas2(:) = 0.0_r8
       qgas3(:) = 0.0_r8
-      qgas4(:) = 0.0_r8
-      ! for cldy subarea, only do gases if doing gaexch
-      do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
       if ( do_map_gas_sub .eqv. .true. ) then
-      do igas = 1, ngas
-         l = lmap_gas(igas)
-         qgas1(igas) = qsub1(l,jsub)*fcvt_gas(igas)
-         qgas2(igas) = qsub2(l,jsub)*fcvt_gas(igas)
-         qgas3(igas) = qsub3(l,jsub)*fcvt_gas(igas)
-         qgas4(igas) = qgas3(igas)
-      end do
+         do igas = 1, ngas
+          l = lmap_gas(igas)
+          qgas1(igas) = qsub1(l,jsub)*fcvt_gas(igas)
+          qgas3(igas) = qsub3(l,jsub)*fcvt_gas(igas)
+         end do
       end if
 
       !-----------------------------------------
       ! interstitial aerosol mass and number
       !-----------------------------------------
-      qnum2(:)   = 0.0_r8
       qnum3(:)   = 0.0_r8
-      qnum4(:)   = 0.0_r8
       do imode = 1, ntot_amode
          l = lmap_num(imode)
-         qnum2(imode) = qsub2(l,jsub)*fcvt_num
          qnum3(imode) = qsub3(l,jsub)*fcvt_num
-         qnum4(imode) = qnum3(imode)
       end do ! imode
 
       qaer2(:,:) = 0.0_r8
       qaer3(:,:) = 0.0_r8
-      qaer4(:,:) = 0.0_r8
       do imode = 1, ntot_amode
          do iaer = 1, naer
             l = lmap_aer(iaer,imode)
             if (l > 0) then
                qaer2(iaer,imode) = qsub2(l,jsub)*fcvt_aer(iaer)
                qaer3(iaer,imode) = qsub3(l,jsub)*fcvt_aer(iaer)
-               qaer4(iaer,imode) = qaer3(iaer,imode)
             end if
          end do
       end do ! imode
@@ -174,11 +164,9 @@ main_jsubarea_loop: &
       ! aerosol water
       !-----------------------------------------
       qwtr3(:)   = 0.0_r8
-      qwtr4(:)   = 0.0_r8
       do imode = 1, ntot_amode
          l = lmap_num(imode)
          qwtr3(imode) = qaerwatsub3(imode,jsub)*fcvt_wtr
-         qwtr4(imode) = qwtr3(imode)
       end do ! n
 
       !-----------------------------------------
@@ -188,26 +176,20 @@ main_jsubarea_loop: &
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
 
-      qnumcw2(:)   = 0.0_r8
       qnumcw3(:)   = 0.0_r8
-      qnumcw4(:)   = 0.0_r8
       do imode = 1, ntot_amode
          l = lmap_numcw(imode)
-         qnumcw2(imode) = qqcwsub2(l,jsub)*fcvt_num
          qnumcw3(imode) = qqcwsub3(l,jsub)*fcvt_num
-         qnumcw4(imode) = qnumcw3(imode)
       end do ! imode
 
       qaercw2(:,:) = 0.0_r8
       qaercw3(:,:) = 0.0_r8
-      qaercw4(:,:) = 0.0_r8
       do imode = 1, ntot_amode
          do iaer = 1, naer
             l = lmap_aercw(iaer,imode)
             if (l > 0) then
                qaercw2(iaer,imode) = qqcwsub2(l,jsub)*fcvt_aer(iaer)
                qaercw3(iaer,imode) = qqcwsub3(l,jsub)*fcvt_aer(iaer)
-               qaercw4(iaer,imode) = qaercw3(iaer,imode)
             end if
          end do
       end do ! imode
