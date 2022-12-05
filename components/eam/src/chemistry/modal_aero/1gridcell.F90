@@ -71,7 +71,7 @@ subroutine mam_amicphys_1gridcell(          &
 ! local
       integer :: iaer, igas
       integer :: jsub
-      integer :: l
+      integer :: icnst
       integer :: imode
       logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
       logical :: do_map_gas_sub
@@ -92,21 +92,16 @@ subroutine mam_amicphys_1gridcell(          &
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
 
-! the q--4 values will be equal to q--3 values unless they get changed
-      qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
-      qqcwsub4(:,1:nsubarea) = qqcwsub3(:,1:nsubarea)
-      qaerwatsub4(:,1:nsubarea) = qaerwatsub3(:,1:nsubarea)
+   ! the q--4 values will be equal to q--3 values unless they get changed
+   qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
+   qqcwsub4(:,1:nsubarea) = qqcwsub3(:,1:nsubarea)
+   qaerwatsub4(:,1:nsubarea) = qaerwatsub3(:,1:nsubarea)
 
-      qsub_tendaa(:,:,1:nsubarea) = 0.0_r8
-      qqcwsub_tendaa(:,:,1:nsubarea) = 0.0_r8
-
-      do jsub = 1, nsubarea
-          misc_vars_aa_sub(jsub) = misc_vars_aa
-      end do
-
+   qsub_tendaa(:,:,1:nsubarea) = 0.0_r8
+   qqcwsub_tendaa(:,:,1:nsubarea) = 0.0_r8
 
 main_jsubarea_loop: &
-      do jsub = 1, nsubarea
+   do jsub = 1, nsubarea
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
          do_cond_sub   = do_cond
@@ -133,9 +128,9 @@ main_jsubarea_loop: &
       qgas3(:) = 0.0_r8
       if ( do_map_gas_sub .eqv. .true. ) then
          do igas = 1, ngas
-          l = lmap_gas(igas)
-          qgas1(igas) = qsub1(l,jsub)*fcvt_gas(igas)
-          qgas3(igas) = qsub3(l,jsub)*fcvt_gas(igas)
+          icnst = lmap_gas(igas)
+          qgas1(igas) = qsub1(icnst,jsub)*fcvt_gas(igas)
+          qgas3(igas) = qsub3(icnst,jsub)*fcvt_gas(igas)
          end do
       end if
 
@@ -144,18 +139,18 @@ main_jsubarea_loop: &
       !-----------------------------------------
       qnum3(:)   = 0.0_r8
       do imode = 1, ntot_amode
-         l = lmap_num(imode)
-         qnum3(imode) = qsub3(l,jsub)*fcvt_num
+         icnst = lmap_num(imode)
+         qnum3(imode) = qsub3(icnst,jsub)*fcvt_num
       end do ! imode
 
       qaer2(:,:) = 0.0_r8
       qaer3(:,:) = 0.0_r8
       do imode = 1, ntot_amode
          do iaer = 1, naer
-            l = lmap_aer(iaer,imode)
-            if (l > 0) then
-               qaer2(iaer,imode) = qsub2(l,jsub)*fcvt_aer(iaer)
-               qaer3(iaer,imode) = qsub3(l,jsub)*fcvt_aer(iaer)
+            icnst = lmap_aer(iaer,imode)
+            if (icnst > 0) then
+               qaer2(iaer,imode) = qsub2(icnst,jsub)*fcvt_aer(iaer)
+               qaer3(iaer,imode) = qsub3(icnst,jsub)*fcvt_aer(iaer)
             end if
          end do
       end do ! imode
@@ -165,7 +160,6 @@ main_jsubarea_loop: &
       !-----------------------------------------
       qwtr3(:)   = 0.0_r8
       do imode = 1, ntot_amode
-         l = lmap_num(imode)
          qwtr3(imode) = qaerwatsub3(imode,jsub)*fcvt_wtr
       end do ! n
 
@@ -178,18 +172,18 @@ main_jsubarea_loop: &
 
       qnumcw3(:)   = 0.0_r8
       do imode = 1, ntot_amode
-         l = lmap_numcw(imode)
-         qnumcw3(imode) = qqcwsub3(l,jsub)*fcvt_num
+         icnst = lmap_numcw(imode)
+         qnumcw3(imode) = qqcwsub3(icnst,jsub)*fcvt_num
       end do ! imode
 
       qaercw2(:,:) = 0.0_r8
       qaercw3(:,:) = 0.0_r8
       do imode = 1, ntot_amode
          do iaer = 1, naer
-            l = lmap_aercw(iaer,imode)
-            if (l > 0) then
-               qaercw2(iaer,imode) = qqcwsub2(l,jsub)*fcvt_aer(iaer)
-               qaercw3(iaer,imode) = qqcwsub3(l,jsub)*fcvt_aer(iaer)
+            icnst = lmap_aercw(iaer,imode)
+            if (icnst > 0) then
+               qaercw2(iaer,imode) = qqcwsub2(icnst,jsub)*fcvt_aer(iaer)
+               qaercw3(iaer,imode) = qqcwsub3(icnst,jsub)*fcvt_aer(iaer)
             end if
          end do
       end do ! imode
@@ -236,8 +230,9 @@ main_jsubarea_loop: &
       !----------------------------------------------------
       if ( do_map_gas_sub .eqv. .true. ) then
        do igas = 1, ngas
-         qsub4( lmap_gas(igas),jsub ) = qgas4(igas)/fcvt_gas(igas)
-         qsub_tendaa( lmap_gas(igas),:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
+          icnst = lmap_gas(igas)
+          qsub4(icnst,jsub ) = qgas4(igas)/fcvt_gas(igas)
+          qsub_tendaa(icnst,:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
        end do
       end if
 
@@ -252,9 +247,9 @@ main_jsubarea_loop: &
       ! Interstitial aerosol number
       !----------------------------------------------------
       do imode = 1, ntot_amode
-         l = lmap_num(imode)
-         qsub4(l,jsub) = qnum4(imode)/fcvt_num
-         qsub_tendaa(l,:,jsub) = qnum_delaa(imode,:)/(fcvt_num*deltat)
+         icnst = lmap_num(imode)
+         qsub4(icnst,jsub) = qnum4(imode)/fcvt_num
+         qsub_tendaa(icnst,:,jsub) = qnum_delaa(imode,:)/(fcvt_num*deltat)
       end do ! imode
 
       !----------------------------------------------------
@@ -262,10 +257,10 @@ main_jsubarea_loop: &
       !----------------------------------------------------
       do imode = 1, ntot_amode
       do iaer = 1, naer
-          l = lmap_aer(iaer,imode)
-          if (l > 0) then
-             qsub4(l,jsub) = qaer4(iaer,imode)/fcvt_aer(iaer)
-             qsub_tendaa(l,:,jsub) = qaer_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+          icnst = lmap_aer(iaer,imode)
+          if (icnst > 0) then
+             qsub4(icnst,jsub) = qaer4(iaer,imode)/fcvt_aer(iaer)
+             qsub_tendaa(icnst,:,jsub) = qaer_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
           end if
       end do ! iaer
       end do ! imode
@@ -276,9 +271,9 @@ main_jsubarea_loop: &
        ! Cloud-borne aerosol number
        !----------------------------------------------------
        do imode = 1, ntot_amode
-          l = lmap_numcw(imode)
-          qqcwsub4(l,jsub) = qnumcw4(imode)/fcvt_num
-          qqcwsub_tendaa(l,:,jsub) = qnumcw_delaa(imode,:)/(fcvt_num*deltat)
+          icnst = lmap_numcw(imode)
+          qqcwsub4(icnst,jsub) = qnumcw4(imode)/fcvt_num
+          qqcwsub_tendaa(icnst,:,jsub) = qnumcw_delaa(imode,:)/(fcvt_num*deltat)
        end do ! imode
 
        !----------------------------------------------------
@@ -286,16 +281,16 @@ main_jsubarea_loop: &
        !----------------------------------------------------
        do imode = 1, ntot_amode
        do iaer = 1, naer
-          l = lmap_aercw(iaer,imode)
-          if (l > 0) then
-             qqcwsub4(l,jsub) = qaercw4(iaer,imode)/fcvt_aer(iaer)
-             qqcwsub_tendaa(l,:,jsub) = qaercw_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+          icnst = lmap_aercw(iaer,imode)
+          if (icnst > 0) then
+             qqcwsub4(icnst,jsub) = qaercw4(iaer,imode)/fcvt_aer(iaer)
+             qqcwsub_tendaa(icnst,:,jsub) = qaercw_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
           end if
        end do ! iaer
        end do ! imode
 
       end if
 
-  end do main_jsubarea_loop
+   end do main_jsubarea_loop
 
 end subroutine mam_amicphys_1gridcell
