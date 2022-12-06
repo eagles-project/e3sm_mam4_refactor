@@ -1001,23 +1001,46 @@ resusp_block_aa: &
 
             ! for stratiform clouds
             arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
-            call wetdep_prevap_resusp(                          &
-                        1,          mam_prevap_resusp_optcc,    & ! in
+            ! step 1 - do evaporation and resuspension
+            call wetdep_resusp(                                 &
+                        1,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),  evaps(i,k),  precs(i,k),    & ! in
-                        srcs,       arainx,                     & ! in
-                        resusp_s,                               & ! out
-                        precabs_base(i),  precabs(i),           & ! inout
-                        scavab(i),        precnums_base(i)      ) ! inout        
+                        srcs,           arainx,                 & ! in
+                        precabs(i),     precabs_base(i),        & ! in
+                        scavab(i),      precnums_base(i),       & ! in
+                        precabx_tmp,    precabx_base_tmp,       & ! out
+                        scavabx_tmp,    precnumx_base_tmp,      & ! out
+                        resusp_s                                ) ! out
+            ! step 2 - do precip production and scavenging
+            call wetdep_prevap(                                 &
+                        1,              mam_prevap_resusp_optcc,& ! in
+                        pdel(i,k),      precs(i,k),             & ! in
+                        srcs,           arainx,                 & ! in
+                        precabx_tmp,    precabx_base_tmp,       & ! in
+                        scavabx_tmp,    precnumx_base_tmp,      & ! in
+                        precabs(i),     precabs_base(i),        & ! out
+                        scavab(i),      precnums_base(i)        ) ! out
 
             ! for convective clouds
             arainx = max( cldvcu(i,min(k+1,pver)), 0.01_r8)     ! non-zero
-            call wetdep_prevap_resusp(                          &
-                        2,          mam_prevap_resusp_optcc,    & ! in
+            call wetdep_resusp(                                 &
+                        2,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),  evapc(i,k),  cmfdqr(i,k),   & ! in
-                        srcc,       arainx,                     & ! in
-                        resusp_c,                               & ! out
-                        precabc_base(i),   precabc(i),          & ! inout
-                        scavabc(i),        precnumc_base(i)     ) ! inout
+                        srcc,           arainx,                 & ! in
+                        precabc(i),     precabc_base(i),        & ! in
+                        scavabc(i),     precnumc_base(i),       & ! in
+                        precabx_tmp,    precabx_base_tmp,       & ! out
+                        scavabx_tmp,    precnumx_base_tmp,      & ! out
+                        resusp_c                                ) ! out
+            ! step 2 - do precip production and scavenging
+            call wetdep_prevap(                                 &
+                        2,              mam_prevap_resusp_optcc,& ! in
+                        pdel(i,k),      cmfdqr(i,k),            & ! in
+                        srcc,           arainx,                 & ! in
+                        precabx_tmp,    precabx_base_tmp,       & ! in
+                        scavabx_tmp,    precnumx_base_tmp,      & ! in
+                        precabc(i),     precabc_base(i),        & ! out
+                        scavabc(i),     precnumc_base(i)        ) ! out
 
             else resusp_block_aa
 
@@ -1045,17 +1068,18 @@ resusp_block_aa: &
    end subroutine wetdepa_v2
 
 !==============================================================================
-   subroutine wetdep_prevap_resusp(                             &
+   subroutine wetdep_resusp(                         &
                         jstrcnv,        mam_prevap_resusp_optcc,& ! in
-                        pdel_ik,evapx,  pprdx,  srcx,   arainx, & ! in
-                        resusp_x,                               & ! out
-                        precabx_base,   precabx,                & ! inout
-                        scavabx,        precnumx_base           ) ! inout
+                        pdel_ik, evapx, pprdx,  srcx,   arainx, & ! in
+                        precabx_old,    precabx_base_old,       & ! in
+                        scavabx_old,    precnumx_base_old,      & ! in
+                        precabx_new,    precabx_base_new,       & ! out
+                        scavabx_new,    precnumx_base_new,      & ! out
+                        resusp_x                                ) ! out
+
 ! ------------------------------------------------------------------------------
-! do nonlinear calculation of precipitation evaporation and resuspension
-! for either stratiform or convective variables
+! do precip production and scavenging
 ! ------------------------------------------------------------------------------
-   implicit none
    integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
                                         ! raindrop size distribution is
                                         ! different for different cloud:
@@ -1067,119 +1091,104 @@ resusp_block_aa: &
    real(r8),intent(in) :: pprdx
    real(r8),intent(in) :: srcx
    real(r8),intent(in) :: arainx ! precipitation and cloudy volume,at the top interface of current layer [fraction]
+   real(r8),intent(in) :: precabx_base_old
+   real(r8),intent(in) :: precabx_old
+   real(r8),intent(in) :: scavabx_old
+   real(r8),intent(in) :: precnumx_base_old
+   real(r8),intent(out) :: precabx_base_new
+   real(r8),intent(out) :: precabx_new
+   real(r8),intent(out) :: scavabx_new
+   real(r8),intent(out) :: precnumx_base_new
    real(r8),intent(out) :: resusp_x
-   real(r8),intent(inout) :: precabx_base
-   real(r8),intent(inout) :: precabx
-   real(r8),intent(inout) :: scavabx
-   real(r8),intent(inout) :: precnumx_base
+
 
    ! local variables
    real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
    real(r8), parameter :: x_smallaa = 1.0e-30_r8     ! small value for x_old
-
-   real(r8)     :: precabx_base_tmp,precabx_base_old,precabx_base_new
-   real(r8)     :: precabx_tmp,precabx_old,precabx_new
-   real(r8)     :: scavabx_tmp,scavabx_old,scavabx_new
-   real(r8)     :: precnumx_base_tmp,precnumx_base_old,precnumx_base_new
-   real(r8)     :: tmpa
-   real(r8)     :: u_old,u_tmp  ! fraction of precabx and precabx_base
-   real(r8)     :: x_old,x_tmp  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
+   real(r8)            :: tmpa ! temporary working variable
+   real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
+   real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
    real(r8)     :: x_ratio      ! fraction of x_tmp/x_old
 
-   ! put input variables into *_old
-   precabx_base_old = precabx_base
-   precabx_old = precabx
-   scavabx_old = scavabx
-   precnumx_base_old = precnumx_base
    ! initiate *_new in case they are not calculated
-   ! precabx_base_new and precabx_new are always calculated
-   scavabx_new = scavabx
-   precnumx_base_new = precnumx_base
+   scavabx_new = scavabx_old
+   precnumx_base_new = precnumx_base_old
+   precabx_base_new = precabx_base_old
 
-! step 1 - do evaporation and resuspension
-            precabx_base_tmp = precabx_base_old
-            precnumx_base_tmp = precnumx_base_old
-            tmpa = max( 0.0_r8, evapx*pdel_ik/gravit )
-            precabx_tmp = min_max_bound(0.0_r8,precabx_base_tmp, precabx_old-tmpa)
+   tmpa = max( 0.0_r8, evapx*pdel_ik/gravit )
+   precabx_new = min_max_bound(0.0_r8,precabx_base_new, precabx_old-tmpa)
 
-      if (precabx_tmp < prec_smallaa) then
-               ! precip rate is essentially zero so do complete resuspension
-               if ( mam_prevap_resusp_optcc <= 130) then
-                  ! linear resuspension based on scavenged aerosol mass or number
-                  scavabx_tmp = 0.0_r8
-                  resusp_x = scavabx_old
-               else
-                  ! non-linear resuspension of aerosol number based on raindrop number
-                  if (precabx_base_old < prec_smallaa) then
-                     resusp_x = 0.0_r8
-                  else
-                     u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
-                     x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
-                     x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
-                     x_tmp = 0.0_r8
-                     resusp_x = max( 0.0_r8, precnumx_base_tmp*(x_old - x_tmp) )
-                  end if
-               end if
-               ! setting both these precip rates to zero causes the resuspension
-               ! calculations to start fresh if there is any more precip production
-               precabx_tmp = 0.0_r8
-               precabx_base_tmp = 0.0_r8
-
-      else if (evapx <= 0.0_r8) then
-               ! no evap so no resuspension
-               if ( mam_prevap_resusp_optcc <= 130) then
-                  scavabx_tmp = scavabx_old
-               end if
-               resusp_x = 0.0_r8
-
+   if (precabx_new < prec_smallaa) then
+      ! precip rate is essentially zero so do complete resuspension
+      if ( mam_prevap_resusp_optcc <= 130) then
+         ! linear resuspension based on scavenged aerosol mass or number
+         scavabx_new = 0.0_r8
+         resusp_x = scavabx_old
       else
-               u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
-               if ( mam_prevap_resusp_optcc <= 130) then
-                  ! non-linear resuspension of aerosol mass
-                  x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, jstrcnv )
-               else
-                  ! non-linear resuspension of aerosol number based on raindrop number
-                  x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
-               end if
-               x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
+         ! non-linear resuspension of aerosol number based on raindrop number
+         if (precabx_base_old < prec_smallaa) then
+            resusp_x = 0.0_r8
+         else
+            u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
+            x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
+            x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
+            x_new = 0.0_r8
+            resusp_x = max( 0.0_r8, precnumx_base_new*(x_old - x_new) )
+         endif
+      endif
+      ! setting both these precip rates to zero causes the resuspension
+      ! calculations to start fresh if there is any more precip production
+      precabx_new = 0.0_r8
+      precabx_base_new = 0.0_r8
 
-               if (x_old < x_smallaa) then
-                  x_tmp = 0.0_r8
-                  x_ratio = 0.0_r8
-               else
-                  u_tmp = min_max_bound(0.0_r8, 1.0_r8, precabx_tmp/precabx_base_tmp)
-                  u_tmp = min( u_tmp, u_old )
-                  if ( mam_prevap_resusp_optcc <= 130) then
-                     ! non-linear resuspension of aerosol mass
-                     x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-u_tmp, jstrcnv )
-                  else
-                     ! non-linear resuspension of aerosol number based on raindrop number
-                     x_tmp = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_tmp, jstrcnv )
-                  end if
-                  x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
-                  x_tmp = min( x_tmp, x_old )
-                  x_ratio = min_max_bound(0.0_r8, 1.0_r8, x_tmp/x_old)
-               end if
+   elseif (evapx <= 0.0_r8) then
+      ! no evap so no resuspension
+      if ( mam_prevap_resusp_optcc <= 130) then
+         scavabx_new = scavabx_old
+      endif
+         resusp_x = 0.0_r8
 
-               if ( mam_prevap_resusp_optcc <= 130) then
-                  ! aerosol mass resuspension
-                  scavabx_tmp = max( 0.0_r8, scavabx_old * x_ratio )
-                  resusp_x = max( 0.0_r8, scavabx_old - scavabx_tmp )
-               else
-                  ! number resuspension
-                  resusp_x = max( 0.0_r8, precnumx_base_tmp*(x_old - x_tmp) )
-               end if
-      end if
-! step 2 - do precip production and scavenging
-         call wetdep_prevap(                                    &
-                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
-                        pdel_ik,        pprdx,  srcx,   arainx, & ! in
-                        precabx_tmp,    precabx_base_tmp,       & ! in
-                        scavabx_tmp,    precnumx_base_tmp,      & ! in
-                        precabx,        precabx_base,           & ! out
-                        scavabx,        precnumx_base           ) ! out
+   else
+      u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
+      if ( mam_prevap_resusp_optcc <= 130) then
+         ! non-linear resuspension of aerosol mass
+         x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, jstrcnv )
+      else
+         ! non-linear resuspension of aerosol number based on raindrop number
+         x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
+      endif
+      x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
 
-   end subroutine wetdep_prevap_resusp
+      if (x_old < x_smallaa) then
+         x_new = 0.0_r8
+         x_ratio = 0.0_r8
+      else
+         u_new = min_max_bound(0.0_r8, 1.0_r8, precabx_new/precabx_base_new)
+         u_new = min( u_new, u_old )
+         if ( mam_prevap_resusp_optcc <= 130) then
+            ! non-linear resuspension of aerosol mass
+            x_new = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, jstrcnv )
+         else
+            ! non-linear resuspension of aerosol number based on raindrop number
+            x_new = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, jstrcnv )
+         endif
+         x_new = min_max_bound(0.0_r8, 1.0_r8, x_new)
+         x_new = min( x_new, x_old )
+         x_ratio = min_max_bound(0.0_r8, 1.0_r8, x_new/x_old)
+      endif
+
+      ! update aerosol resuspension
+      if ( mam_prevap_resusp_optcc <= 130) then
+         ! aerosol mass resuspension
+         scavabx_new = max( 0.0_r8, scavabx_old * x_ratio )
+         resusp_x = max( 0.0_r8, scavabx_old - scavabx_new )
+      else
+         ! number resuspension
+         resusp_x = max( 0.0_r8, precnumx_base_new*(x_old - x_new) )
+      endif
+   endif
+
+   end subroutine wetdep_resusp
 
 !==============================================================================
    subroutine wetdep_prevap(                                    &
