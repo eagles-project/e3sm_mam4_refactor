@@ -1000,19 +1000,21 @@ resusp_block_aa: &
             end if
 
             ! for stratiform clouds
+            arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
             call wetdep_prevap_resusp(                          &
                         1,          mam_prevap_resusp_optcc,    & ! in
                         pdel(i,k),  evaps(i,k),  precs(i,k),    & ! in
-                        srcs,       cldvst(i,min(k+1,pver)),    & ! in
+                        srcs,       arainx,                     & ! in
                         resusp_s,                               & ! out
                         precabs_base(i),  precabs(i),           & ! inout
                         scavab(i),        precnums_base(i)      ) ! inout        
 
             ! for convective clouds
+            arainx = max( cldvcu(i,min(k+1,pver)), 0.01_r8)     ! non-zero
             call wetdep_prevap_resusp(                          &
                         2,          mam_prevap_resusp_optcc,    & ! in
                         pdel(i,k),  evapc(i,k),  cmfdqr(i,k),   & ! in
-                        srcc,       cldvcu(i,min(k+1,pver)),    & ! in
+                        srcc,       arainx,                     & ! in
                         resusp_c,                               & ! out
                         precabc_base(i),   precabc(i),          & ! inout
                         scavabc(i),        precnumc_base(i)     ) ! inout
@@ -1064,7 +1066,7 @@ resusp_block_aa: &
    real(r8),intent(in) :: evapx
    real(r8),intent(in) :: pprdx
    real(r8),intent(in) :: srcx
-   real(r8),intent(in) :: arainx
+   real(r8),intent(in) :: arainx ! precipitation and cloudy volume,at the top interface of current layer [fraction]
    real(r8),intent(out) :: resusp_x
    real(r8),intent(inout) :: precabx_base
    real(r8),intent(inout) :: precabx
@@ -1083,7 +1085,6 @@ resusp_block_aa: &
    real(r8)     :: u_old,u_tmp  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_tmp  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
    real(r8)     :: x_ratio      ! fraction of x_tmp/x_old
-   real(r8)     :: arainxx
 
    ! put input variables into *_old
    precabx_base_old = precabx_base
@@ -1101,7 +1102,7 @@ resusp_block_aa: &
             tmpa = max( 0.0_r8, evapx*pdel_ik/gravit )
             precabx_tmp = min_max_bound(0.0_r8,precabx_base_tmp, precabx_old-tmpa)
 
-            if (precabx_tmp < prec_smallaa) then
+      if (precabx_tmp < prec_smallaa) then
                ! precip rate is essentially zero so do complete resuspension
                if ( mam_prevap_resusp_optcc <= 130) then
                   ! linear resuspension based on scavenged aerosol mass or number
@@ -1124,14 +1125,14 @@ resusp_block_aa: &
                precabx_tmp = 0.0_r8
                precabx_base_tmp = 0.0_r8
 
-            else if (evapx <= 0.0_r8) then
+      else if (evapx <= 0.0_r8) then
                ! no evap so no resuspension
                if ( mam_prevap_resusp_optcc <= 130) then
                   scavabx_tmp = scavabx_old
                end if
                resusp_x = 0.0_r8
 
-            else
+      else
                u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
                if ( mam_prevap_resusp_optcc <= 130) then
                   ! non-linear resuspension of aerosol mass
@@ -1168,30 +1169,29 @@ resusp_block_aa: &
                   ! number resuspension
                   resusp_x = max( 0.0_r8, precnumx_base_tmp*(x_old - x_tmp) )
                end if
-            end if
+      end if
 ! step 2 - do precip production and scavenging
             tmpa = max( 0.0_r8, pprdx*pdel_ik/gravit )
             precabx_base_new = max( 0.0_r8, precabx_base_tmp + tmpa )
             precabx_new = min_max_bound(0.0_r8, precabx_base_new,  precabx_tmp + tmpa)
 
-            if ( mam_prevap_resusp_optcc <= 130) then
+       if ( mam_prevap_resusp_optcc <= 130) then
                ! aerosol mass scavenging
                tmpa = max( 0.0_r8, srcx*pdel_ik/gravit )
                scavabx_new = max( 0.0_r8, scavabx_tmp + tmpa )
-            else
+       else
                ! raindrop number increase
                if (precabx_base_new < prec_smallaa) then
                   precnumx_base_new = 0.0_r8
                else if (precabx_base_new > precabx_base_tmp) then
                   ! note - calc rainshaft number flux from rainshaft water flux,
                   ! then multiply by rainshaft area to get grid-average number flux
-                  arainxx = max( arainx, 0.01_r8 )
-                  tmpa = arainxx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainxx), jstrcnv )
+                  tmpa = arainx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainx), jstrcnv )
                   precnumx_base_new = max( 0.0_r8, tmpa )
                else
                   precnumx_base_new = precnumx_base_tmp
                end if
-            end if
+       end if
 
    ! update *_new into output variables
    precabx_base = precabx_base_new
