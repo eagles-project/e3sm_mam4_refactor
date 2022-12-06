@@ -124,8 +124,6 @@ main_jsubarea_loop: &
       !--------------------
       ! Gases
       !--------------------
-      qgas1(:) = 0.0_r8
-      qgas3(:) = 0.0_r8
       if ( do_map_gas_sub .eqv. .true. ) then
          do igas = 1, ngas
           icnst = lmap_gas(igas)
@@ -137,14 +135,11 @@ main_jsubarea_loop: &
       !-----------------------------------------
       ! interstitial aerosol mass and number
       !-----------------------------------------
-      qnum3(:)   = 0.0_r8
       do imode = 1, ntot_amode
          icnst = lmap_num(imode)
          qnum3(imode) = qsub3(icnst,jsub)*fcvt_num
       end do ! imode
 
-      qaer2(:,:) = 0.0_r8
-      qaer3(:,:) = 0.0_r8
       do imode = 1, ntot_amode
          do iaer = 1, naer
             icnst = lmap_aer(iaer,imode)
@@ -158,7 +153,6 @@ main_jsubarea_loop: &
       !-----------------------------------------
       ! aerosol water
       !-----------------------------------------
-      qwtr3(:)   = 0.0_r8
       do imode = 1, ntot_amode
          qwtr3(imode) = qaerwatsub3(imode,jsub)*fcvt_wtr
       end do ! n
@@ -170,22 +164,19 @@ main_jsubarea_loop: &
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
 
-      qnumcw3(:)   = 0.0_r8
       do imode = 1, ntot_amode
          icnst = lmap_numcw(imode)
          qnumcw3(imode) = qqcwsub3(icnst,jsub)*fcvt_num
       end do ! imode
 
-      qaercw2(:,:) = 0.0_r8
-      qaercw3(:,:) = 0.0_r8
       do imode = 1, ntot_amode
-         do iaer = 1, naer
-            icnst = lmap_aercw(iaer,imode)
-            if (icnst > 0) then
-               qaercw2(iaer,imode) = qqcwsub2(icnst,jsub)*fcvt_aer(iaer)
-               qaercw3(iaer,imode) = qqcwsub3(icnst,jsub)*fcvt_aer(iaer)
-            end if
-         end do
+      do iaer = 1, naer
+         icnst = lmap_aercw(iaer,imode)
+         if (icnst > 0) then
+            qaercw2(iaer,imode) = qqcwsub2(icnst,jsub)*fcvt_aer(iaer)
+            qaercw3(iaer,imode) = qqcwsub3(icnst,jsub)*fcvt_aer(iaer)
+         end if
+      end do
       end do ! imode
 
       end if
