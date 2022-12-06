@@ -13,6 +13,7 @@ use phys_control, only: cam_physpkg_is
 use cam_logfile,  only: iulog
 use cam_abortutils, only: endrun
 use spmd_utils,     only: masterproc
+use mam_support,  only: min_max_bound
 
 implicit none
 save
@@ -987,11 +988,9 @@ resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
 ! force non-negative
             precabs_base(i) = max( 0.0_r8, precabs_base(i) )
-            precabs(i)  = max( 0.0_r8, precabs(i) )
-            precabs(i)  = min( precabs_base(i), precabs(i) )
+            precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
             precabc_base(i) = max( 0.0_r8, precabc_base(i) )
-            precabc(i)  = max( 0.0_r8, precabc(i) )
-            precabc(i)  = min( precabc_base(i), precabc(i) )
+            precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
             if ( mam_prevap_resusp_optcc <= 130) then
                scavab(i) = max( 0.0_r8, scavab(i) )
                scavabc(i) = max( 0.0_r8, scavabc(i) )
@@ -1100,33 +1099,28 @@ resusp_block_aa: &
             precabx_base_tmp = precabx_base_old
             precnumx_base_tmp = precnumx_base_old
             tmpa = max( 0.0_r8, evapx*pdel_ik/gravit )
-            precabx_tmp = max( 0.0_r8, precabx_old - tmpa )
-            precabx_tmp  = min( precabx_base_tmp, precabx_tmp )
+            precabx_tmp = min_max_bound(0.0_r8,precabx_base_tmp, precabx_old-tmpa)
 
             if (precabx_tmp < prec_smallaa) then
                ! precip rate is essentially zero so do complete resuspension
                if ( mam_prevap_resusp_optcc <= 130) then
-                  ! linear resuspension based on scavenged aerosol mass or
-                  ! number
+                  ! linear resuspension based on scavenged aerosol mass or number
                   scavabx_tmp = 0.0_r8
                   resusp_x = scavabx_old
                else
-                  ! non-linear resuspension of aerosol number based on raindrop
-                  ! number
+                  ! non-linear resuspension of aerosol number based on raindrop number
                   if (precabx_base_old < prec_smallaa) then
                      resusp_x = 0.0_r8
                   else
-                     u_old = precabx_old/precabx_base_old
-                     u_old = max( 0.0_r8, min( 1.0_r8, u_old ) )
+                     u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
                      x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
-                     x_old = max( 0.0_r8, min( 1.0_r8, x_old ) )
+                     x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
                      x_tmp = 0.0_r8
                      resusp_x = max( 0.0_r8, precnumx_base_tmp*(x_old - x_tmp) )
                   end if
                end if
                ! setting both these precip rates to zero causes the resuspension
-               ! calculations to start fresh if there is any more precip
-               ! production
+               ! calculations to start fresh if there is any more precip production
                precabx_tmp = 0.0_r8
                precabx_base_tmp = 0.0_r8
 
@@ -1138,37 +1132,32 @@ resusp_block_aa: &
                resusp_x = 0.0_r8
 
             else
-               u_old = precabx_old/precabx_base_old
-               u_old = max( 0.0_r8, min( 1.0_r8, u_old ) )
+               u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
                if ( mam_prevap_resusp_optcc <= 130) then
                   ! non-linear resuspension of aerosol mass
                   x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, jstrcnv )
                else
-                  ! non-linear resuspension of aerosol number based on raindrop
-                  ! number
+                  ! non-linear resuspension of aerosol number based on raindrop number
                   x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
                end if
-               x_old = max( 0.0_r8, min( 1.0_r8, x_old ) )
+               x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
 
                if (x_old < x_smallaa) then
                   x_tmp = 0.0_r8
                   x_ratio = 0.0_r8
                else
-                  u_tmp = precabx_tmp/precabx_base_tmp
-                  u_tmp = max( 0.0_r8, min( 1.0_r8, u_tmp ) )
+                  u_tmp = min_max_bound(0.0_r8, 1.0_r8, precabx_tmp/precabx_base_tmp)
                   u_tmp = min( u_tmp, u_old )
                   if ( mam_prevap_resusp_optcc <= 130) then
                      ! non-linear resuspension of aerosol mass
                      x_tmp = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-u_tmp, jstrcnv )
                   else
-                     ! non-linear resuspension of aerosol number based on
-                     ! raindrop number
+                     ! non-linear resuspension of aerosol number based on raindrop number
                      x_tmp = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_tmp, jstrcnv )
                   end if
-                  x_tmp = max( 0.0_r8, min( 1.0_r8, x_tmp ) )
+                  x_tmp = min_max_bound(0.0_r8, 1.0_r8, x_tmp)
                   x_tmp = min( x_tmp, x_old )
-                  x_ratio = x_tmp/x_old
-                  x_ratio = max( 0.0_r8, min( 1.0_r8, x_ratio ) )
+                  x_ratio = min_max_bound(0.0_r8, 1.0_r8, x_tmp/x_old)
                end if
 
                if ( mam_prevap_resusp_optcc <= 130) then
@@ -1183,8 +1172,7 @@ resusp_block_aa: &
 ! step 2 - do precip production and scavenging
             tmpa = max( 0.0_r8, pprdx*pdel_ik/gravit )
             precabx_base_new = max( 0.0_r8, precabx_base_tmp + tmpa )
-            precabx_new = max( 0.0_r8, precabx_tmp + tmpa )
-            precabx_new = min( precabx_base_new, precabx_new )
+            precabx_new = min_max_bound(0.0_r8, precabx_base_new,  precabx_tmp + tmpa)
 
             if ( mam_prevap_resusp_optcc <= 130) then
                ! aerosol mass scavenging
@@ -1196,8 +1184,7 @@ resusp_block_aa: &
                   precnumx_base_new = 0.0_r8
                else if (precabx_base_new > precabx_base_tmp) then
                   ! note - calc rainshaft number flux from rainshaft water flux,
-                  !    then multiply by rainshaft area to get grid-average
-                  !    number flux
+                  ! then multiply by rainshaft area to get grid-average number flux
                   arainxx = max( arainx, 0.01_r8 )
                   tmpa = arainxx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainxx), jstrcnv )
                   precnumx_base_new = max( 0.0_r8, tmpa )
