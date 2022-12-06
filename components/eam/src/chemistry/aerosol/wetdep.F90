@@ -1171,36 +1171,79 @@ resusp_block_aa: &
                end if
       end if
 ! step 2 - do precip production and scavenging
-            tmpa = max( 0.0_r8, pprdx*pdel_ik/gravit )
-            precabx_base_new = max( 0.0_r8, precabx_base_tmp + tmpa )
-            precabx_new = min_max_bound(0.0_r8, precabx_base_new,  precabx_tmp + tmpa)
-
-       if ( mam_prevap_resusp_optcc <= 130) then
-               ! aerosol mass scavenging
-               tmpa = max( 0.0_r8, srcx*pdel_ik/gravit )
-               scavabx_new = max( 0.0_r8, scavabx_tmp + tmpa )
-       else
-               ! raindrop number increase
-               if (precabx_base_new < prec_smallaa) then
-                  precnumx_base_new = 0.0_r8
-               else if (precabx_base_new > precabx_base_tmp) then
-                  ! note - calc rainshaft number flux from rainshaft water flux,
-                  ! then multiply by rainshaft area to get grid-average number flux
-                  tmpa = arainx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainx), jstrcnv )
-                  precnumx_base_new = max( 0.0_r8, tmpa )
-               else
-                  precnumx_base_new = precnumx_base_tmp
-               end if
-       end if
-
-   ! update *_new into output variables
-   precabx_base = precabx_base_new
-   precabx = precabx_new
-   scavabx = scavabx_new
-   precnumx_base = precnumx_base_new
-
+         call wetdep_prevap(                                    &
+                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        pdel_ik,        pprdx,  srcx,   arainx, & ! in
+                        precabx_tmp,    precabx_base_tmp,       & ! in
+                        scavabx_tmp,    precnumx_base_tmp,      & ! in
+                        precabx,        precabx_base,           & ! out
+                        scavabx,        precnumx_base           ) ! out
 
    end subroutine wetdep_prevap_resusp
+
+!==============================================================================
+   subroutine wetdep_prevap(                                    &
+                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        pdel_ik,        pprdx,  srcx,   arainx, & ! in
+                        precabx_old,    precabx_base_old,       & ! in
+                        scavabx_old,    precnumx_base_old,      & ! in
+                        precabx_new,    precabx_base_new,       & ! out
+                        scavabx_new,    precnumx_base_new       ) ! out
+
+! ------------------------------------------------------------------------------
+! do precip production and scavenging
+! ------------------------------------------------------------------------------
+   integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
+                                        ! raindrop size distribution is
+                                        ! different for different cloud:
+                                        ! 1: assume marshall-palmer distribution
+                                        ! 2: assume log-normal distribution
+   integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
+   real(r8),intent(in) :: pdel_ik       ! pressure thikness at current column and level [Pa]
+   real(r8),intent(in) :: pprdx
+   real(r8),intent(in) :: srcx
+   real(r8),intent(in) :: arainx ! precipitation and cloudy volume,at the top interface of current layer [fraction]
+   real(r8),intent(in) :: precabx_base_old
+   real(r8),intent(in) :: precabx_old
+   real(r8),intent(in) :: scavabx_old
+   real(r8),intent(in) :: precnumx_base_old
+   real(r8),intent(out) :: precabx_base_new
+   real(r8),intent(out) :: precabx_new
+   real(r8),intent(out) :: scavabx_new
+   real(r8),intent(out) :: precnumx_base_new
+
+   ! local variables
+   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
+   real(r8)            :: tmpa ! temporary working variable
+ 
+   ! initiate *_new in case they are not calculated
+   ! precabx_base_new and precabx_new are always calculated
+   scavabx_new = scavabx_old
+   precnumx_base_new = precnumx_base_old
+
+   tmpa = max( 0.0_r8, pprdx*pdel_ik/gravit )
+   precabx_base_new = max( 0.0_r8, precabx_base_old + tmpa )
+   precabx_new = min_max_bound(0.0_r8, precabx_base_new,  precabx_old+tmpa)
+
+   if ( mam_prevap_resusp_optcc <= 130) then
+       ! aerosol mass scavenging
+       tmpa = max( 0.0_r8, srcx*pdel_ik/gravit )
+       scavabx_new = max( 0.0_r8, scavabx_old + tmpa )
+   else
+       ! raindrop number increase
+       if (precabx_base_new < prec_smallaa) then
+          precnumx_base_new = 0.0_r8
+       elseif (precabx_base_new > precabx_base_old) then
+          ! note - calc rainshaft number flux from rainshaft water flux,
+          ! then multiply by rainshaft area to get grid-average number flux
+          tmpa = arainx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainx), jstrcnv )
+          precnumx_base_new = max( 0.0_r8, tmpa )
+       else
+          precnumx_base_new = precnumx_base_old
+       endif
+   endif
+
+   end subroutine wetdep_prevap
 
 !==============================================================================
    subroutine update_scavenging( icol,          kk,             & ! in
