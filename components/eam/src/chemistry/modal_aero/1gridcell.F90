@@ -1,97 +1,123 @@
 
-!--------------------------------------------------------------------------------
-! Calculates changes to gas and aerosol subarea TMRs (tracer mixing ratios)
-!    for all active subareas in the current grid cell (with indices = lchnk,i,k)
-! qsub3 and qqcwsub3 are the incoming current TMRs
-! qsub4 and qqcwsub4 are the outgoing updated TMRs
-!--------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
+! Purpose: Calculates changes to gas and aerosol subarea TMRs (tracer mixing ratios)
+!          for all active subareas in the current grid cell (with indices = lchnk,i,k)
+!          qsub3 and qqcwsub3 are the incoming current TMRs
+!          qsub4 and qqcwsub4 are the outgoing updated TMRs
+!--------------------------------------------------------------------------------------
 subroutine mam_amicphys_1gridcell(          &
-         do_cond,            do_rename,           &
-         do_newnuc,          do_coag,             &
-         nstep,    lchnk,    i,        k,         &
-         latndx,   lonndx,   lund,                &
-         loffset,  deltat,                        &
-         nsubarea,  ncldy_subarea,                &
-         iscldy_subarea,     afracsub,            &
-         temp,     pmid,     pdel,                &
-         zmid,     pblh,     relhumsub,           &
-         dgn_a,    dgn_awet, wetdens,             &
-         qsub1,                                   &
-         qsub2, qqcwsub2,                         &
-         qsub3, qqcwsub3, qaerwatsub3,            &
-         qsub4, qqcwsub4, qaerwatsub4,            &
-         qsub_tendaa, qqcwsub_tendaa,             &
-         misc_vars_aa                             )
+         do_cond,            do_rename,     &
+         do_newnuc,          do_coag,       &
+         nstep,    lchnk,    ii,      kk,   &
+         latndx,   lonndx,   lund,          &
+         loffset,  deltat,                  &
+         nsubarea,  ncldy_subarea,          &
+         iscldy_subarea,     afracsub,      &
+         temp,     pmid,     pdel,          &
+         zmid,     pblh,     relhumsub,     &
+         dgn_a,    dgn_awet, wetdens,       &
+         qsub1,                             &
+         qsub2, qqcwsub2,                   &
+         qsub3, qqcwsub3, qaerwatsub3,      &
+         qsub4, qqcwsub4, qaerwatsub4,      &
+         qsub_tendaa, qqcwsub_tendaa,       &
+         misc_vars_aa                       )
 
-  use modal_aero_amicphys_control
+   use modal_aero_amicphys_control, only: r8
+   use modal_aero_amicphys_control, only: gas_pcnst, maxsubarea, max_mode, max_gas, max_aer, &
+                                          ntot_amode_extd, nqtendaa, nqqcwtendaa, misc_vars_aa_type
+   use modal_aero_amicphys_control, only: mdo_gaexch_cldy_subarea 
 
-      logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
-      logical,  intent(in)    :: iscldy_subarea(maxsubarea)
+   ! Input/output variables
 
-      integer,  intent(in)    :: nstep                 ! model time-step number
-      integer,  intent(in)    :: lchnk                 ! chunk identifier
-      integer,  intent(in)    :: i, k                  ! column and level indices
-      integer,  intent(in)    :: latndx, lonndx        ! lat and lon indices
-      integer,  intent(in)    :: lund                  ! logical unit for diagnostic output
-      integer,  intent(in)    :: loffset
-      integer,  intent(in)    :: nsubarea, ncldy_subarea
+   logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag  ! whether individual processes are turned on in general
+   logical,  intent(in)    :: iscldy_subarea(maxsubarea)              ! whether the subareas are cloudy
 
-      real(r8), intent(in)    :: deltat                ! time step (s)
-      real(r8), intent(in)    :: afracsub(maxsubarea)   ! sub-area fractional area (0-1)
+   integer,  intent(in)    :: nstep                 ! model time-step number
+   integer,  intent(in)    :: lchnk                 ! chunk identifier
+   integer,  intent(in)    :: ii, kk                ! column and level indices
+   integer,  intent(in)    :: latndx, lonndx        ! lat and lon indices
+   integer,  intent(in)    :: lund                  ! logical unit for diagnostic output
+   integer,  intent(in)    :: loffset               ! # of host model's tracers that are not dealt with by MAM
+   integer,  intent(in)    :: nsubarea              ! # of active subareas
+   integer,  intent(in)    :: ncldy_subarea         ! # of cloudy subareas 
 
-      real(r8), intent(in)    :: temp                  ! temperature at model levels (K)
-      real(r8), intent(in)    :: pmid                  ! pressure at layer center (Pa)
-      real(r8), intent(in)    :: pdel                  ! pressure thickness of layer (Pa)
-      real(r8), intent(in)    :: zmid                  ! altitude (above ground) at layer center (m)
-      real(r8), intent(in)    :: pblh                  ! planetary boundary layer depth (m)
-      real(r8), intent(in)    :: relhumsub(maxsubarea) ! sub-area relative humidity (0-1)
-      real(r8), intent(inout) :: dgn_a(max_mode)       ! dry geo. mean dia. (m) of number distrib.
-      real(r8), intent(inout) :: dgn_awet(max_mode)    ! wet geo. mean dia. (m) of number distrib.
-      real(r8), intent(inout) :: wetdens(max_mode)     ! interstitial aerosol wet density (kg/m3)
+   real(r8), intent(in)    :: deltat                ! time step [s]
+   real(r8), intent(in)    :: afracsub(maxsubarea)  ! subarea fractional area [unitless]
 
-! qsubN and qqcwsubN (N=1:4) are tracer mixing ratios (TMRs, mol/mol or #/kmol) in sub-areas
-!    currently there are just clear and cloudy sub-areas
-!    the N=1:4 have same meanings as for qgcmN
-!    N=1 - before gas-phase chemistry
-!    N=2 - before cloud chemistry
-!    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
-!    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
-      real(r8), intent(in   ), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:maxsubarea ) :: qsub4, qqcwsub4
-      real(r8), intent(inout), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+   real(r8), intent(in)    :: temp                  ! air temperature at model levels [K]
+   real(r8), intent(in)    :: pmid                  ! air pressure at layer center [Pa]
+   real(r8), intent(in)    :: pdel                  ! pressure thickness of layer [Pa)
+   real(r8), intent(in)    :: zmid                  ! altitude (above ground) at layer center [m]
+   real(r8), intent(in)    :: pblh                  ! planetary boundary layer depth [m]
+   real(r8), intent(in)    :: relhumsub(maxsubarea) ! subarea relative humidity [unitless]
+   real(r8), intent(inout) :: dgn_a(max_mode)       ! dry geometric mean diameter [m] of number distrib.
+   real(r8), intent(inout) :: dgn_awet(max_mode)    ! wet geometric mean diameter [m] of number distrib.
+   real(r8), intent(inout) :: wetdens(max_mode)     ! interstitial aerosol wet density [kg/m3]
 
-! qsub_tendaa and qqcwsub_tendaa are TMR tendencies
-!    for different processes, which are used to produce history output
-! the processes are condensation/evaporation (and associated aging),
-!    renaming, coagulation, and nucleation
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
-      real(r8), intent(inout), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) ::  qqcwsub_tendaa
-      type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa
+   ! qsubN and qqcwsubN (N=1:4) are tracer mixing ratios (TMRs, [kmol/kmol or #/kmol]) in subareas.
+   ! qaerwatsubN are aerosol water mixing ratios [kmol/kmol] in subareas.
+   ! Currently there are just clear and cloudy subareas. 
+   !    N=1 - before gas-phase chemistry
+   !    N=2 - before cloud chemistry
+   !    N=3 - incoming values - before amicphys (i.e., gas-aerosol exchange, newnuc, coag)
+   !    N=4 - outgoing values - after  amicphys (i.e., gas-aerosol exchange, newnuc, coag)
+   !
+   ! For these arrays, the tracer indices are the same as in the host model except for an offset.
+   !  - Gases and interstitial aerosol number and mass mixing ratios are stored in the same array
+   !    and distinguished by different tracer indices.
+   !  - Cloud-borned aerosol number and mass mixing ratios are stored in another array.
+   !  - Aerosol water mixing ratio is yet separate.
 
-! local
-      integer :: iaer, igas
-      integer :: jsub
-      integer :: icnst
-      integer :: imode
-      logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
-      logical :: do_map_gas_sub
+   real(r8), intent(in   ), dimension(gas_pcnst,maxsubarea) :: qsub1, qsub2, qsub3, qqcwsub2, qqcwsub3
+   real(r8), intent(inout), dimension(gas_pcnst,maxsubarea) :: qsub4, qqcwsub4
+   real(r8), intent(inout), dimension(ntot_amode_extd,maxsubarea) :: qaerwatsub3, qaerwatsub4
 
-      real(r8), dimension( 1:max_gas ) :: qgas1_mam, qgas3_mam, qgas4_mam
-      real(r8), dimension( 1:max_mode ) :: qnum3_mam, qnum4_mam, qnumcw3_mam, qnumcw4_mam
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer2_mam, qaer3_mam, qaer4_mam, qaercw2_mam, qaercw3_mam, qaercw4_mam
-      real(r8), dimension( 1:max_mode ) :: qwtr3_mam, qwtr4_mam
+   ! qsub_tendaa and qqcwsub_tendaa are TMR tendencies for different processes, which are used to produce history output.
+   ! The processes are condensation/evaporation (and associated aging), renaming, coagulation, and nucleation.
+   ! For these arrays, the tracer indices are the same as in the host model except for an offset.
 
-      real(r8), dimension( 1:max_gas, 1:nqtendaa ) ::  qgas_delaa_mam
-      real(r8), dimension( 1:max_mode, 1:nqtendaa ) :: qnum_delaa_mam
-      real(r8), dimension( 1:max_mode, 1:nqqcwtendaa ) :: qnumcw_delaa_mam
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa_mam
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa_mam
+   real(r8), intent(inout), dimension(gas_pcnst,nqtendaa,   maxsubarea) ::    qsub_tendaa  ! for gases and interstitial aerosols
+   real(r8), intent(inout), dimension(gas_pcnst,nqqcwtendaa,maxsubarea) :: qqcwsub_tendaa  ! for cloud-borne aerosols
 
-      type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
+   type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa
 
+   ! Local variables
+
+   integer :: jsub        ! subarea index
+   integer :: icnst       ! host model's constituent index minus an offset
+   integer :: iaer, igas  ! MAM's internal indices for aerosol and gas species
+   integer :: imode       ! MAM's internal indices for aerosol modes
+   logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub  ! switches for processes in subareas
+   logical :: do_map_gas_sub      ! whether to map gas mixing ratio between host model and MAM's amicphys package
+   logical :: do_map_cldbrn_sub   ! whether to map cloud-borne aerosol mixing ratios between host model and MAM's amicphys package
+
+   ! The following are also subarea TMRs, but organized by way of the internal bookkeeping of MAM's amicphys package.
+   ! Gas mixing ratios, interstitial and cloud-borne aerosol mass and number mixing ratios and aerosol
+   ! water mixing ratios are all stored in separate arrays. The appended numbers 1-4 have the same meaning as above:
+   !    N=1 - before gas-phase chemistry
+   !    N=2 - before cloud chemistry
+   !    N=3 - before amicphys (i.e., gas-aerosol exchange, newnuc, coag)
+   !    N=4 - after amicphys  (i.e., gas-aerosol exchange, newnuc, coag)
+
+   real(r8), dimension(max_gas)          :: qgas1_mam, qgas3_mam, qgas4_mam
+   real(r8), dimension(max_mode)         :: qnum3_mam, qnum4_mam, qnumcw3_mam, qnumcw4_mam
+   real(r8), dimension(max_aer,max_mode) :: qaer2_mam, qaer3_mam, qaer4_mam, qaercw2_mam, qaercw3_mam, qaercw4_mam
+   real(r8), dimension(max_mode)         :: qwtr3_mam, qwtr4_mam
+
+   ! The following are subarea TMR increments (= tendencies * deltat) organized by way of the internal 
+   ! bookkeeping of MAM's amicphys package.
+
+   real(r8), dimension(max_gas, nqtendaa)              ::   qgas_delaa_mam
+   real(r8), dimension(max_mode,nqtendaa)              ::   qnum_delaa_mam
+   real(r8), dimension(max_mode,nqqcwtendaa)           :: qnumcw_delaa_mam
+   real(r8), dimension(max_aer, max_mode, nqtendaa)    ::   qaer_delaa_mam
+   real(r8), dimension(max_aer, max_mode, nqqcwtendaa) :: qaercw_delaa_mam
+
+   type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
    !--------------------------------------------------------------------------------
-   ! the q--4 values will be equal to q--3 values unless they get changed
+   ! The q--4 values will be equal to q--3 values unless they get changed
    !--------------------------------------------------------------------------------
    qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
    qqcwsub4(:,1:nsubarea) = qqcwsub3(:,1:nsubarea)
@@ -107,7 +133,7 @@ subroutine mam_amicphys_1gridcell(          &
    do jsub = 1, nsubarea
 
       !--------------------------------------------------------------------------------
-      ! Set switches. These are used in the subroutines called below
+      ! Set switches that turn on or off individual aerosol processes. 
       !--------------------------------------------------------------------------------
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
          do_cond_sub   = do_cond
@@ -122,14 +148,20 @@ subroutine mam_amicphys_1gridcell(          &
          do_coag_sub   = do_coag
       end if
 
-      ! for cldy subarea, only do gases if doing gaexch
-      do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
+      !--------------------------------------------------------------------------------
+      ! Set switches that turn on or off the mapping between host model's and MAM's
+      ! internal arrays.
+      ! - Cloud-borne aerosols only need to be mapped if subarea is cloudy.
+      ! - Gases only need to be mapped if doing gas-aerosol-exch or nucleation.
+      !--------------------------------------------------------------------------------
+      do_map_cldbrn_sub = iscldy_subarea(jsub)
+      do_map_gas_sub    = do_cond_sub .or. do_newnuc_sub
 
       !--------------------------------------------------------------------------------
       ! Map incoming (host model's) subarea mixing ratios to the aerosol
       ! microphysics package's internal gas/aer/num arrays
       !--------------------------------------------------------------------------------
-      call map_info_from_host_to_mam( do_map_gas_sub, iscldy_subarea(jsub),        &! in
+      call map_info_from_host_to_mam( do_map_gas_sub, do_map_cldbrn_sub,           &! in
                                       qsub1(:,jsub), qsub2(:,jsub), qsub3(:,jsub), &! in
                                       qgas1_mam, qgas3_mam,                        &! out
                                       qnum3_mam, qaer2_mam, qaer3_mam,             &! out
@@ -138,28 +170,27 @@ subroutine mam_amicphys_1gridcell(          &
                                       qaerwatsub3(:,jsub),                         &! in
                                       qwtr3_mam                                    )! out
 
-
       !--------------------------------------------------------------------------------
       ! Calculate aerosol microphysics for a single subarea
       !--------------------------------------------------------------------------------
       call mam_amicphys_1subarea(                    &
-         do_cond_sub,            do_rename_sub,      &
-         do_newnuc_sub,          do_coag_sub,        &
-         nstep,      lchnk,      i,        k,        &
-         latndx,     lonndx,     lund,               &
-         loffset,    deltat,                         &
-         jsub,                   nsubarea,           &
-         iscldy_subarea(jsub),   afracsub(jsub),     &
-         temp,       pmid,       pdel,               &
-         zmid,       pblh,       relhumsub(jsub),    &
-         dgn_a,      dgn_awet,   wetdens,            &
-         qgas1_mam,      qgas3_mam,    qgas4_mam,       qgas_delaa_mam,  &
-         qnum3_mam,      qnum4_mam,    qnum_delaa_mam,                   &
-         qaer2_mam,      qaer3_mam,    qaer4_mam,       qaer_delaa_mam,  &
-         qwtr3_mam,      qwtr4_mam,                                      &
-         qnumcw3_mam,    qnumcw4_mam,  qnumcw_delaa_mam,                 &
-         qaercw2_mam,    qaercw3_mam,  qaercw4_mam,     qaercw_delaa_mam,&
-         misc_vars_aa_sub(jsub)                                          )
+         do_cond_sub,            do_rename_sub,      &! in
+         do_newnuc_sub,          do_coag_sub,        &! in
+         nstep,      lchnk,      ii,      kk,        &! in
+         latndx,     lonndx,     lund,               &! in
+         loffset,    deltat,                         &! in
+         jsub,                   nsubarea,           &! in
+         iscldy_subarea(jsub),   afracsub(jsub),     &! in
+         temp,       pmid,       pdel,               &! in
+         zmid,       pblh,       relhumsub(jsub),    &! in
+         dgn_a,      dgn_awet,   wetdens,            &! in
+         qgas1_mam,      qgas3_mam,    qgas4_mam,       qgas_delaa_mam,  &! 2x in, 2x out
+         qnum3_mam,      qnum4_mam,    qnum_delaa_mam,                   &! 1x in, 2x out
+         qaer2_mam,      qaer3_mam,    qaer4_mam,       qaer_delaa_mam,  &! 2x in, 2x out
+         qwtr3_mam,      qwtr4_mam,                                      &! 1x in, 1x out
+         qnumcw3_mam,    qnumcw4_mam,  qnumcw_delaa_mam,                 &! 1x in, 2x out
+         qaercw2_mam,    qaercw3_mam,  qaercw4_mam,     qaercw_delaa_mam,&! 2x in, 2x out
+         misc_vars_aa_sub(jsub)                                          )! out
 
       !-------
       if ((nsubarea == 1) .or. (iscldy_subarea(jsub) .eqv. .false.)) then
@@ -171,7 +202,7 @@ subroutine mam_amicphys_1gridcell(          &
       ! Map the aerosol microphysics package's internal gas/aer/num arrays (mix-ratios 
       ! and increments) back to (host model's) subarea arrays
       !--------------------------------------------------------------------------------
-      call map_info_from_mam_to_host( do_map_gas_sub, iscldy_subarea(jsub), deltat, &! in
+      call map_info_from_mam_to_host( do_map_gas_sub, do_map_cldbrn_sub, deltat,    &! in
                                       qgas4_mam, qgas_delaa_mam,                    &! in
                                       qnum4_mam, qnum_delaa_mam,                    &! in
                                       qaer4_mam, qaer_delaa_mam,                    &! in
@@ -189,12 +220,12 @@ subroutine mam_amicphys_1gridcell(          &
 
 end subroutine mam_amicphys_1gridcell
 
-!--------------------------------------------------------------------------------
+!------------------------------------------------------------------------------------------------------
 ! Purpose: 
-! Map mixing ratios from arrays that use the host model's indexing to
-! MAM's amicphys internal arrays.
+! Map mixing ratios from arrays that use the host model's indexing (variables with the "_host" suffix)
+! to MAM's amicphys internal arrays (variables with the "_mam" suffix).
 ! Also reconcile possible differences in molecular weights.
-!--------------------------------------------------------------------------------
+!------------------------------------------------------------------------------------------------------
 subroutine map_info_from_host_to_mam( do_map_gas, do_map_cldbrn,               &! in
                                       q1_host,       q2_host,     q3_host,     &! in
                                       qgas1_mam,     qgas3_mam,                &! out
@@ -289,11 +320,11 @@ subroutine map_info_from_host_to_mam( do_map_gas, do_map_cldbrn,               &
 
 end subroutine map_info_from_host_to_mam
 
-!--------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------------
 ! Purpose: 
-! 1. Map mixing ratios from MAM's amicphys internal arrays to arrays
-!    that use the host model's indexing. Also reconcile possible
-!    differences in molecular weights.
+! 1. Map mixing ratios from MAM's amicphys internal arrays (variables with the "_mam" suffix)
+!    to arrays that use the host model's indexing (variables with the "_host" suffix). 
+!    Also reconcile possible differences in molecular weights.
 ! 2. Do the same for budget terms and convert increments to tendencies.
 !--------------------------------------------------------------------------------
 subroutine map_info_from_mam_to_host( do_map_gas, do_map_cldbrn, deltat, &! in
@@ -398,5 +429,3 @@ subroutine map_info_from_mam_to_host( do_map_gas, do_map_cldbrn, deltat, &! in
     end if
 
 end subroutine map_info_from_mam_to_host
-
-
