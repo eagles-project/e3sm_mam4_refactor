@@ -1,5 +1,10 @@
 
 !--------------------------------------------------------------------------------
+! Calculates changes to gas and aerosol subarea TMRs (tracer mixing ratios)
+!    for all active subareas in the current grid cell (with indices = lchnk,i,k)
+! qsub3 and qqcwsub3 are the incoming current TMRs
+! qsub4 and qqcwsub4 are the outgoing updated TMRs
+!--------------------------------------------------------------------------------
 subroutine mam_amicphys_1gridcell(          &
          do_cond,            do_rename,           &
          do_newnuc,          do_coag,             &
@@ -17,12 +22,7 @@ subroutine mam_amicphys_1gridcell(          &
          qsub4, qqcwsub4, qaerwatsub4,            &
          qsub_tendaa, qqcwsub_tendaa,             &
          misc_vars_aa                             )
-!
-! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
-!    for the current grid cell (with indices = lchnk,i,k)
-! qsub3 and qqcwsub3 are the incoming current TMRs
-! qsub4 and qqcwsub4 are the outgoing updated TMRs
-!
+
   use modal_aero_amicphys_control
 
       logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
@@ -76,16 +76,16 @@ subroutine mam_amicphys_1gridcell(          &
       logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
       logical :: do_map_gas_sub
 
-      real(r8), dimension( 1:max_gas ) :: qgas1, qgas3, qgas4
-      real(r8), dimension( 1:max_mode ) :: qnum3, qnum4, qnumcw3, qnumcw4
-      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer2, qaer3, qaer4, qaercw2, qaercw3, qaercw4
-      real(r8), dimension( 1:max_mode ) :: qwtr3, qwtr4
+      real(r8), dimension( 1:max_gas ) :: qgas1_mam, qgas3_mam, qgas4_mam
+      real(r8), dimension( 1:max_mode ) :: qnum3_mam, qnum4_mam, qnumcw3_mam, qnumcw4_mam
+      real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer2_mam, qaer3_mam, qaer4_mam, qaercw2_mam, qaercw3_mam, qaercw4_mam
+      real(r8), dimension( 1:max_mode ) :: qwtr3_mam, qwtr4_mam
 
-      real(r8), dimension( 1:max_gas, 1:nqtendaa ) ::  qgas_delaa
-      real(r8), dimension( 1:max_mode, 1:nqtendaa ) :: qnum_delaa
-      real(r8), dimension( 1:max_mode, 1:nqqcwtendaa ) :: qnumcw_delaa
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa
-      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa
+      real(r8), dimension( 1:max_gas, 1:nqtendaa ) ::  qgas_delaa_mam
+      real(r8), dimension( 1:max_mode, 1:nqtendaa ) :: qnum_delaa_mam
+      real(r8), dimension( 1:max_mode, 1:nqqcwtendaa ) :: qnumcw_delaa_mam
+      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa_mam
+      real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa_mam
 
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
@@ -131,12 +131,12 @@ subroutine mam_amicphys_1gridcell(          &
       !--------------------------------------------------------------------------------
       call map_info_from_host_to_mam( do_map_gas_sub, iscldy_subarea(jsub),        &! in
                                       qsub1(:,jsub), qsub2(:,jsub), qsub3(:,jsub), &! in
-                                      qgas1, qgas3,                                &! out
-                                      qnum3, qaer2, qaer3,                         &! out
+                                      qgas1_mam, qgas3_mam,                        &! out
+                                      qnum3_mam, qaer2_mam, qaer3_mam,             &! out
                                       qqcwsub2(:,jsub), qqcwsub3(:,jsub),          &! in
-                                      qnumcw3, qaercw2, qaercw3,                   &! out
+                                      qnumcw3_mam, qaercw2_mam, qaercw3_mam,       &! out
                                       qaerwatsub3(:,jsub),                         &! in
-                                      qwtr3                                        )! out
+                                      qwtr3_mam                                    )! out
 
 
       !--------------------------------------------------------------------------------
@@ -153,18 +153,13 @@ subroutine mam_amicphys_1gridcell(          &
          temp,       pmid,       pdel,               &
          zmid,       pblh,       relhumsub(jsub),    &
          dgn_a,      dgn_awet,   wetdens,            &
-         qgas1,      qgas3,      qgas4,              &
-         qgas_delaa,                                 &
-         qnum3,      qnum4,                          &
-         qnum_delaa,                                 &
-         qaer2,      qaer3,      qaer4,              &
-         qaer_delaa,                                 &
-         qwtr3,      qwtr4,                          &
-         qnumcw3,    qnumcw4,                        &
-         qnumcw_delaa,                               &
-         qaercw2,    qaercw3,    qaercw4,            &
-         qaercw_delaa,                               &
-         misc_vars_aa_sub(jsub)                      )
+         qgas1_mam,      qgas3_mam,    qgas4_mam,       qgas_delaa_mam,  &
+         qnum3_mam,      qnum4_mam,    qnum_delaa_mam,                   &
+         qaer2_mam,      qaer3_mam,    qaer4_mam,       qaer_delaa_mam,  &
+         qwtr3_mam,      qwtr4_mam,                                      &
+         qnumcw3_mam,    qnumcw4_mam,  qnumcw_delaa_mam,                 &
+         qaercw2_mam,    qaercw3_mam,  qaercw4_mam,     qaercw_delaa_mam,&
+         misc_vars_aa_sub(jsub)                                          )
 
       !-------
       if ((nsubarea == 1) .or. (iscldy_subarea(jsub) .eqv. .false.)) then
@@ -177,15 +172,15 @@ subroutine mam_amicphys_1gridcell(          &
       ! and increments) back to (host model's) subarea arrays
       !--------------------------------------------------------------------------------
       call map_info_from_mam_to_host( do_map_gas_sub, iscldy_subarea(jsub), deltat, &! in
-                                      qgas4, qgas_delaa, &! in
-                                      qnum4, qnum_delaa, &! in
-                                      qaer4, qaer_delaa, &! in
-                                      qsub4(:,jsub), qsub_tendaa(:,:,jsub), &!  inout
-                                      qnumcw4, qnumcw_delaa, &! in
-                                      qaercw4, qaercw_delaa, &! in
-                                      qqcwsub4(:,jsub), qqcwsub_tendaa(:,:,jsub), &! inout
-                                      qwtr4, &! in
-                                      qaerwatsub4(:,jsub) )   ! inout
+                                      qgas4_mam, qgas_delaa_mam,                    &! in
+                                      qnum4_mam, qnum_delaa_mam,                    &! in
+                                      qaer4_mam, qaer_delaa_mam,                    &! in
+                                      qsub4(:,jsub), qsub_tendaa(:,:,jsub),         &! inout
+                                      qnumcw4_mam, qnumcw_delaa_mam,                &! in
+                                      qaercw4_mam, qaercw_delaa_mam,                &! in
+                                      qqcwsub4(:,jsub), qqcwsub_tendaa(:,:,jsub),   &! inout
+                                      qwtr4_mam,                                    &! in
+                                      qaerwatsub4(:,jsub)                           )! inout
 
    !=================================
    ! Done with the subarea
