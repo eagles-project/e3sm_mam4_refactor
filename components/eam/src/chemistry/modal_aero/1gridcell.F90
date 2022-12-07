@@ -216,72 +216,122 @@ main_jsubarea_loop: &
 
      ! map gas/aer/num arrays (mix-ratio and del=change) back to sub-area arrays
 
-      !----------------------------------------------------
-      ! Gases
-      !----------------------------------------------------
-      if ( do_map_gas_sub .eqv. .true. ) then
-       do igas = 1, ngas
-          icnst = lmap_gas(igas)
-          qsub4(icnst,jsub ) = qgas4(igas)/fcvt_gas(igas)
-          qsub_tendaa(icnst,:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
-       end do
-      end if
-
-      !----------------------------------------------------
-      ! Aerosol water
-      !----------------------------------------------------
-      do imode = 1, ntot_amode
-         qaerwatsub4(imode,jsub) = qwtr4(imode)/fcvt_wtr
-      end do ! imode
-
-      !----------------------------------------------------
-      ! Interstitial aerosol number
-      !----------------------------------------------------
-      do imode = 1, ntot_amode
-         icnst = lmap_num(imode)
-         qsub4(icnst,jsub) = qnum4(imode)/fcvt_num
-         qsub_tendaa(icnst,:,jsub) = qnum_delaa(imode,:)/(fcvt_num*deltat)
-      end do ! imode
-
-      !----------------------------------------------------
-      ! Interstitial aerosol mass
-      !----------------------------------------------------
-      do imode = 1, ntot_amode
-      do iaer = 1, naer
-          icnst = lmap_aer(iaer,imode)
-          if (icnst > 0) then
-             qsub4(icnst,jsub) = qaer4(iaer,imode)/fcvt_aer(iaer)
-             qsub_tendaa(icnst,:,jsub) = qaer_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
-          end if
-      end do ! iaer
-      end do ! imode
-
-      if ( iscldy_subarea(jsub) ) then
-
-       !----------------------------------------------------
-       ! Cloud-borne aerosol number
-       !----------------------------------------------------
-       do imode = 1, ntot_amode
-          icnst = lmap_numcw(imode)
-          qqcwsub4(icnst,jsub) = qnumcw4(imode)/fcvt_num
-          qqcwsub_tendaa(icnst,:,jsub) = qnumcw_delaa(imode,:)/(fcvt_num*deltat)
-       end do ! imode
-
-       !----------------------------------------------------
-       ! Cloud-borne aerosol mass
-       !----------------------------------------------------
-       do imode = 1, ntot_amode
-       do iaer = 1, naer
-          icnst = lmap_aercw(iaer,imode)
-          if (icnst > 0) then
-             qqcwsub4(icnst,jsub) = qaercw4(iaer,imode)/fcvt_aer(iaer)
-             qqcwsub_tendaa(icnst,:,jsub) = qaercw_delaa(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
-          end if
-       end do ! iaer
-       end do ! imode
-
-      end if
+      call map_info_from_mam_to_host( do_map_gas_sub, iscldy_subarea(jsub), deltat, &
+                                      qgas4, qgas_delaa, &
+                                      qnum4, qnum_delaa, &
+                                      qaer4, qaer_delaa, &
+                                      qsub4(:,jsub), qsub_tendaa(:,:,jsub), &
+                                      qnumcw4, qnumcw_delaa, &
+                                      qaercw4, qaercw_delaa, &
+                                      qqcwsub4(:,jsub), qqcwsub_tendaa(:,:,jsub), &
+                                      qwtr4, &
+                                      qaerwatsub4(:,jsub) )
 
    end do main_jsubarea_loop
 
 end subroutine mam_amicphys_1gridcell
+
+subroutine map_info_from_mam_to_host( do_map_gas, do_map_cldbrn, deltat, &! in
+                                      qgas_mam,   qgas_delaa_mam,        &! in
+                                      qnum_mam,   qnum_delaa_mam,        &! in
+                                      qaer_mam,   qaer_delaa_mam,        &! in
+                                      q_host,     q_tendaa_host,         &! inout
+                                      qnumcw_mam, qnumcw_delaa_mam,      &! in
+                                      qaercw_mam, qaercw_delaa_mam,      &! in
+                                      qqcw_host,  qqcw_tendaa_host,      &! inout
+                                      qwtr_mam,                          &! in
+                                      qaerwat_host                       )! inout
+
+    use modal_aero_amicphys_control,only: r8
+    use modal_aero_amicphys_control,only: ngas, lmap_gas, fcvt_gas, &
+                                          ntot_amode, naer, lmap_num, lmap_aer, fcvt_num, fcvt_aer, &
+                                          lmap_numcw, lmap_aercw, &
+                                          fcvt_wtr 
+   
+    logical,intent(in) :: do_map_cldbrn
+    logical,intent(in) :: do_map_gas
+    real(r8),intent(in):: deltat
+
+    real(r8),intent(in)    :: qgas_mam(:),   qgas_delaa_mam(:,:)
+    real(r8),intent(in)    :: qnum_mam(:),   qnum_delaa_mam(:,:)
+    real(r8),intent(in)    :: qaer_mam(:,:), qaer_delaa_mam(:,:,:)
+    real(r8),intent(inout) :: q_host(:),     q_tendaa_host(:,:)
+
+    real(r8),intent(in)    :: qnumcw_mam(:),   qnumcw_delaa_mam(:,:)
+    real(r8),intent(in)    :: qaercw_mam(:,:), qaercw_delaa_mam(:,:,:)
+    real(r8),intent(inout) :: qqcw_host(:),    qqcw_tendaa_host(:,:)
+
+    real(r8),intent(in)    :: qwtr_mam(:)
+    real(r8),intent(inout) :: qaerwat_host(:)
+
+    integer :: igas, iaer, imode, icnst
+
+    !----------------------------------------------------
+    ! Gases
+    !----------------------------------------------------
+    if ( do_map_gas ) then
+     do igas = 1, ngas
+        icnst = lmap_gas(igas)
+        q_host(icnst) = qgas_mam(igas)/fcvt_gas(igas)
+        q_tendaa_host(icnst,:) = qgas_delaa_mam(igas,:)/(fcvt_gas(igas)*deltat)
+     end do
+    end if
+
+    !----------------------------------------------------
+    ! Aerosol water
+    !----------------------------------------------------
+    do imode = 1, ntot_amode
+       qaerwat_host(imode) = qwtr_mam(imode)/fcvt_wtr
+    end do ! imode
+
+    !----------------------------------------------------
+    ! Interstitial aerosol number
+    !----------------------------------------------------
+    do imode = 1, ntot_amode
+       icnst = lmap_num(imode)
+       q_host(icnst) = qnum_mam(imode)/fcvt_num
+       q_tendaa_host(icnst,:) = qnum_delaa_mam(imode,:)/(fcvt_num*deltat)
+    end do ! imode
+
+    !----------------------------------------------------
+    ! Interstitial aerosol mass
+    !----------------------------------------------------
+    do imode = 1, ntot_amode
+    do iaer = 1, naer
+        icnst = lmap_aer(iaer,imode)
+        if (icnst > 0) then
+           q_host(icnst) = qaer_mam(iaer,imode)/fcvt_aer(iaer)
+           q_tendaa_host(icnst,:) = qaer_delaa_mam(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+        end if
+    end do ! iaer
+    end do ! imode
+
+
+    if ( do_map_cldbrn ) then
+     !----------------------------------------------------
+     ! Cloud-borne aerosol number
+     !----------------------------------------------------
+     do imode = 1, ntot_amode
+        icnst = lmap_numcw(imode)
+        qqcw_host(icnst) = qnumcw_mam(imode)/fcvt_num
+        qqcw_tendaa_host(icnst,:) = qnumcw_delaa_mam(imode,:)/(fcvt_num*deltat)
+     end do ! imode
+
+     !----------------------------------------------------
+     ! Cloud-borne aerosol mass
+     !----------------------------------------------------
+     do imode = 1, ntot_amode
+     do iaer = 1, naer
+        icnst = lmap_aercw(iaer,imode)
+        if (icnst > 0) then
+           qqcw_host(icnst) = qaercw_mam(iaer,imode)/fcvt_aer(iaer)
+           qqcw_tendaa_host(icnst,:) = qaercw_delaa_mam(iaer,imode,:)/(fcvt_aer(iaer)*deltat)
+        end if
+     end do ! iaer
+     end do ! imode
+
+    end if
+
+end subroutine map_info_from_mam_to_host
+
+
