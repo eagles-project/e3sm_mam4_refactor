@@ -87,12 +87,12 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqtendaa ) ::  qaer_delaa
       real(r8), dimension( 1:max_aer, 1:max_mode, 1:nqqcwtendaa ) :: qaercw_delaa
 
-    ! real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
-
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
 
+   !--------------------------------------------------------------------------------
    ! the q--4 values will be equal to q--3 values unless they get changed
+   !--------------------------------------------------------------------------------
    qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
    qqcwsub4(:,1:nsubarea) = qqcwsub3(:,1:nsubarea)
    qaerwatsub4(:,1:nsubarea) = qaerwatsub3(:,1:nsubarea)
@@ -100,9 +100,15 @@ subroutine mam_amicphys_1gridcell(          &
    qsub_tendaa(:,:,1:nsubarea) = 0.0_r8
    qqcwsub_tendaa(:,:,1:nsubarea) = 0.0_r8
 
-main_jsubarea_loop: &
+   !=================================
+   ! Loop over cloudy/clear subareas
+   !=================================
+   main_jsubarea_loop: &
    do jsub = 1, nsubarea
 
+      !--------------------------------------------------------------------------------
+      ! Set switches. These are used in the subroutines called below
+      !--------------------------------------------------------------------------------
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
          do_cond_sub   = do_cond
          do_rename_sub = do_rename
@@ -119,71 +125,23 @@ main_jsubarea_loop: &
       ! for cldy subarea, only do gases if doing gaexch
       do_map_gas_sub = do_cond_sub .or. do_newnuc_sub
 
-! map incoming sub-area mix-ratios to gas/aer/num arrays
+      !--------------------------------------------------------------------------------
+      ! Map incoming (host model's) subarea mixing ratios to the aerosol
+      ! microphysics package's internal gas/aer/num arrays
+      !--------------------------------------------------------------------------------
+      call map_info_from_host_to_mam( do_map_gas_sub, iscldy_subarea(jsub),        &! in
+                                      qsub1(:,jsub), qsub2(:,jsub), qsub3(:,jsub), &! in
+                                      qgas1, qgas3,                                &! out
+                                      qnum3, qaer2, qaer3,                         &! out
+                                      qqcwsub2(:,jsub), qqcwsub3(:,jsub),          &! in
+                                      qnumcw3, qaercw2, qaercw3,                   &! out
+                                      qaerwatsub3(:,jsub),                         &! in
+                                      qwtr3                                        )! out
 
-      !--------------------
-      ! Gases
-      !--------------------
-      if ( do_map_gas_sub .eqv. .true. ) then
-         do igas = 1, ngas
-          icnst = lmap_gas(igas)
-          qgas1(igas) = qsub1(icnst,jsub)*fcvt_gas(igas)
-          qgas3(igas) = qsub3(icnst,jsub)*fcvt_gas(igas)
-         end do
-      end if
 
-      !-----------------------------------------
-      ! interstitial aerosol mass and number
-      !-----------------------------------------
-      do imode = 1, ntot_amode
-         icnst = lmap_num(imode)
-         qnum3(imode) = qsub3(icnst,jsub)*fcvt_num
-      end do ! imode
-
-      do imode = 1, ntot_amode
-         do iaer = 1, naer
-            icnst = lmap_aer(iaer,imode)
-            if (icnst > 0) then
-               qaer2(iaer,imode) = qsub2(icnst,jsub)*fcvt_aer(iaer)
-               qaer3(iaer,imode) = qsub3(icnst,jsub)*fcvt_aer(iaer)
-            end if
-         end do
-      end do ! imode
-
-      !-----------------------------------------
-      ! aerosol water
-      !-----------------------------------------
-      do imode = 1, ntot_amode
-         qwtr3(imode) = qaerwatsub3(imode,jsub)*fcvt_wtr
-      end do ! n
-
-      !-----------------------------------------
-      ! cloud-borne aerosol mass and number
-      !-----------------------------------------
-      ! only do cloud-borne for cloudy
-
-      if ( iscldy_subarea(jsub) .eqv. .true. ) then
-
-      do imode = 1, ntot_amode
-         icnst = lmap_numcw(imode)
-         qnumcw3(imode) = qqcwsub3(icnst,jsub)*fcvt_num
-      end do ! imode
-
-      do imode = 1, ntot_amode
-      do iaer = 1, naer
-         icnst = lmap_aercw(iaer,imode)
-         if (icnst > 0) then
-            qaercw2(iaer,imode) = qqcwsub2(icnst,jsub)*fcvt_aer(iaer)
-            qaercw3(iaer,imode) = qqcwsub3(icnst,jsub)*fcvt_aer(iaer)
-         end if
-      end do
-      end do ! imode
-
-      end if
-
-      !----------------------------------------------------
+      !--------------------------------------------------------------------------------
       ! Calculate aerosol microphysics for a single subarea
-      !----------------------------------------------------
+      !--------------------------------------------------------------------------------
       call mam_amicphys_1subarea(                    &
          do_cond_sub,            do_rename_sub,      &
          do_newnuc_sub,          do_coag_sub,        &
@@ -208,29 +166,141 @@ main_jsubarea_loop: &
          qaercw_delaa,                               &
          misc_vars_aa_sub(jsub)                      )
 
-      !----------------------------------------------------
+      !-------
       if ((nsubarea == 1) .or. (iscldy_subarea(jsub) .eqv. .false.)) then
          misc_vars_aa%ncluster_tend_nnuc_1grid = misc_vars_aa%ncluster_tend_nnuc_1grid &
                                                + misc_vars_aa_sub(jsub)%ncluster_tend_nnuc_1grid*afracsub(jsub)
       end if
 
-     ! map gas/aer/num arrays (mix-ratio and del=change) back to sub-area arrays
+      !--------------------------------------------------------------------------------
+      ! Map the aerosol microphysics package's internal gas/aer/num arrays (mix-ratios 
+      ! and increments) back to (host model's) subarea arrays
+      !--------------------------------------------------------------------------------
+      call map_info_from_mam_to_host( do_map_gas_sub, iscldy_subarea(jsub), deltat, &! in
+                                      qgas4, qgas_delaa, &! in
+                                      qnum4, qnum_delaa, &! in
+                                      qaer4, qaer_delaa, &! in
+                                      qsub4(:,jsub), qsub_tendaa(:,:,jsub), &!  inout
+                                      qnumcw4, qnumcw_delaa, &! in
+                                      qaercw4, qaercw_delaa, &! in
+                                      qqcwsub4(:,jsub), qqcwsub_tendaa(:,:,jsub), &! inout
+                                      qwtr4, &! in
+                                      qaerwatsub4(:,jsub) )   ! inout
 
-      call map_info_from_mam_to_host( do_map_gas_sub, iscldy_subarea(jsub), deltat, &
-                                      qgas4, qgas_delaa, &
-                                      qnum4, qnum_delaa, &
-                                      qaer4, qaer_delaa, &
-                                      qsub4(:,jsub), qsub_tendaa(:,:,jsub), &
-                                      qnumcw4, qnumcw_delaa, &
-                                      qaercw4, qaercw_delaa, &
-                                      qqcwsub4(:,jsub), qqcwsub_tendaa(:,:,jsub), &
-                                      qwtr4, &
-                                      qaerwatsub4(:,jsub) )
-
+   !=================================
+   ! Done with the subarea
+   !=================================
    end do main_jsubarea_loop
 
 end subroutine mam_amicphys_1gridcell
 
+!--------------------------------------------------------------------------------
+! Purpose: 
+! Map mixing ratios from arrays that use the host model's indexing to
+! MAM's amicphys internal arrays.
+! Also reconcile possible differences in molecular weights.
+!--------------------------------------------------------------------------------
+subroutine map_info_from_host_to_mam( do_map_gas, do_map_cldbrn,               &! in
+                                      q1_host,       q2_host,     q3_host,     &! in
+                                      qgas1_mam,     qgas3_mam,                &! out
+                                      qnum3_mam,     qaer2_mam,   qaer3_mam,   &! out
+                                      qqcw2_host,    qqcw3_host,               &! in
+                                      qnumcw3_mam,   qaercw2_mam, qaercw3_mam, &! out
+                                      qaerwat3_host,                           &! in
+                                      qwtr3_mam                                )! out
+
+   use modal_aero_amicphys_control,only: r8
+   use modal_aero_amicphys_control,only: ngas, lmap_gas, fcvt_gas, &
+                                         ntot_amode, naer, lmap_num, lmap_aer, fcvt_num, fcvt_aer, &
+                                         lmap_numcw, lmap_aercw, &
+                                         fcvt_wtr
+
+   logical,intent(in) :: do_map_gas
+   logical,intent(in) :: do_map_cldbrn
+
+   real(r8),intent(in)  :: q1_host(:), q2_host(:), q3_host(:)
+
+   real(r8),intent(out) :: qgas1_mam(:), qgas3_mam(:)
+   real(r8),intent(out) :: qnum3_mam(:)
+   real(r8),intent(out) :: qaer2_mam(:,:), qaer3_mam(:,:)
+
+   real(r8),intent(in)  :: qqcw2_host(:),  qqcw3_host(:)
+
+   real(r8),intent(out) :: qnumcw3_mam(:)
+   real(r8),intent(out) :: qaercw2_mam(:,:), qaercw3_mam(:,:)
+
+   real(r8),intent(in)  :: qaerwat3_host(:)
+   real(r8),intent(out) :: qwtr3_mam(:)
+
+   integer :: igas, iaer, imode, icnst
+
+   !--------------------
+   ! Gases
+   !--------------------
+   if ( do_map_gas ) then
+      do igas = 1, ngas
+       icnst = lmap_gas(igas)
+       qgas1_mam(igas) = q1_host(icnst)*fcvt_gas(igas)
+       qgas3_mam(igas) = q3_host(icnst)*fcvt_gas(igas)
+      end do
+   end if
+
+   !-----------------------------------------
+   ! Interstitial aerosol mass and number
+   !-----------------------------------------
+   do imode = 1, ntot_amode
+      icnst = lmap_num(imode)
+      qnum3_mam(imode) = q3_host(icnst)*fcvt_num
+   end do ! imode
+
+   do imode = 1, ntot_amode
+      do iaer = 1, naer
+         icnst = lmap_aer(iaer,imode)
+         if (icnst > 0) then
+            qaer2_mam(iaer,imode) = q2_host(icnst)*fcvt_aer(iaer)
+            qaer3_mam(iaer,imode) = q3_host(icnst)*fcvt_aer(iaer)
+         end if
+      end do
+   end do ! imode
+
+   !-----------------------------------------
+   ! Aerosol water
+   !-----------------------------------------
+   do imode = 1, ntot_amode
+      qwtr3_mam(imode) = qaerwat3_host(imode)*fcvt_wtr
+   end do ! imode 
+
+   !-----------------------------------------
+   ! Cloud-borne aerosol mass and number
+   !-----------------------------------------
+   if ( do_map_cldbrn ) then
+
+      do imode = 1, ntot_amode
+         icnst = lmap_numcw(imode)
+         qnumcw3_mam(imode) = qqcw3_host(icnst)*fcvt_num
+      end do ! imode
+
+      do imode = 1, ntot_amode
+      do iaer = 1, naer
+         icnst = lmap_aercw(iaer,imode)
+         if (icnst > 0) then
+            qaercw2_mam(iaer,imode) = qqcw2_host(icnst)*fcvt_aer(iaer)
+            qaercw3_mam(iaer,imode) = qqcw3_host(icnst)*fcvt_aer(iaer)
+         end if
+      end do ! iaer
+      end do ! imode
+
+   end if
+
+end subroutine map_info_from_host_to_mam
+
+!--------------------------------------------------------------------------------
+! Purpose: 
+! 1. Map mixing ratios from MAM's amicphys internal arrays to arrays
+!    that use the host model's indexing. Also reconcile possible
+!    differences in molecular weights.
+! 2. Do the same for budget terms and convert increments to tendencies.
+!--------------------------------------------------------------------------------
 subroutine map_info_from_mam_to_host( do_map_gas, do_map_cldbrn, deltat, &! in
                                       qgas_mam,   qgas_delaa_mam,        &! in
                                       qnum_mam,   qnum_delaa_mam,        &! in
