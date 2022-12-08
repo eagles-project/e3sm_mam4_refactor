@@ -803,152 +803,43 @@ main_i_loop: &
             ! Sungsu: Below new formula of 'fracp' is necessary since 'conicw' is a LWC/IWC
             !         that has already precipitated out, that is, 'conicw' does not contain
             !         precipitation at all ! 
-              fracp = cmfdqr(i,k)*deltat/max(1.e-12_r8,cldc(i,k)*conicw(i,k)+(cmfdqr(i,k)+dlf(i,k))*deltat) ! Sungsu.Mar.19.2010.
-            ! Dec.29.2009
-            ! Note cmfdrq can be negative from evap of rain, so constrain it <-- This is wrong. cmfdqr does not
-            ! contain evaporation of precipitation.
+
+
+    tracer_incu = f_act_conv(i,k)*(tracer(i,k)+&
+        min(qqcw(i,k),tracer(i,k)*((cldt(i,k)-cldc(i,k))/max(0.01_r8,(1._r8-(cldt(i,k)-cldc(i,k)))))))
+   tracer_mean = tracer(i,k)*(1._r8-cldc(i,k)*f_act_conv(i,k))-cldc(i,k)*f_act_conv(i,k)*&
+           min(qqcw(i,k),tracer(i,k)*((cldt(i,k)-cldc(i,k))/max(0.01_r8,(1._r8-(cldt(i,k)-cldc(i,k))))))
+    tracer_mean = max(0._r8,tracer_mean)
+
+              fracp = cmfdqr(i,k)*deltat/max(1.e-12_r8,cldc(i,k)*conicw(i,k)+(cmfdqr(i,k)+dlf(i,k))*deltat)
             fracp = max(min(1._r8,fracp),0._r8)
-            ! remove that amount from within the convective area
-!           srcs1 = cldc(i,k)*fracp*tracer(i,k)*(1._r8-weight)/deltat ! liquid only
-!           srcs1 = cldc(i,k)*fracp*tracer(i,k)/deltat             ! any condensation
-!           srcs1 = 0.
-!           Jan.02.2010. Sungsu : cldt --> cldc below.
-            ! rce 2010/05/01
-!           if (present(is_strat_cloudborne)) then  ! Tianyi, 2011/03/29
-               if ( is_strat_cloudborne ) then
-                  ! only strat in-cloud removal affects strat-cloudborne aerosol
-                  srcs1 = 0._r8
-               else
-                  tracer_incu = f_act_conv(i,k)*(tracer(i,k)+& 
-                       min(qqcw(i,k),tracer(i,k)*((cldt(i,k)-cldc(i,k))/max(0.01_r8,(1._r8-(cldt(i,k)-cldc(i,k)))))))              
-                  srcs1 = sol_factic(i,k)*cldc(i,k)*fracp*tracer_incu*(1._r8-weight)/deltat &  ! Liquid
-                       + sol_factiic    *cldc(i,k)*fracp*tracer_incu*(weight)/deltat          ! Ice
-               end if
-!           else
-!              srcs1 = sol_factic(i,k)*cldc(i,k)*fracp*tracer(i,k)*(1._r8-weight)/deltat &  ! liquid
-!                   +  sol_factiic*cldc(i,k)*fracp*tracer(i,k)*(weight)/deltat      ! ice
-!           end if
-
-
-            !--mcb
-
-            ! scavenge below cloud
-
-            !            cldmabc(i) = max(cldc(i,k),cldmabc(i))
-            !            cldmabc(i) = max(cldt(i,k),cldmabc(i))
-            ! cldmabc(i) = max(cldv(i,k),cldmabc(i))
-            ! cldmabc(i) = cldv(i,k)
             cldmabc(i) = cldvcu(i,k)
 
-            ! Jan. 16. 2010. Sungsu
-            ! cldmabc(i) = cldmabc(i) * cldovr_cu(i) / max( 0.01_r8, cldovr_cu(i) + cldovr_st(i) )
-            ! End by Sungsu
-
-            ! rce 2010/05/01
-!           if (present(is_strat_cloudborne)) then  ! Tianyi, 2011/03/29
-               if ( is_strat_cloudborne ) then
-                  ! only strat in-cloud removal affects strat-cloudborne aerosol
-                  srcs2 = 0._r8
-               else
-                  tracer_mean = tracer(i,k)*(1._r8-cldc(i,k)*f_act_conv(i,k))-cldc(i,k)*f_act_conv(i,k)*&
-                       min(qqcw(i,k),tracer(i,k)*((cldt(i,k)-cldc(i,k))/max(0.01_r8,(1._r8-(cldt(i,k)-cldc(i,k))))))
-                  tracer_mean = max(0._r8,tracer_mean) 
-                  odds  = max(min(1._r8,precabc(i)/max(cldmabc(i),1.e-5_r8)*scavcoef(i,k)*deltat),0._r8) ! Dana and Hales coefficient (/mm)
-                  srcs2 = sol_factb *cldmabc(i)*odds*tracer_mean*(1._r8-weight)/deltat & ! Liquid
-                       + sol_factbi*cldmabc(i)*odds*tracer_mean*(weight)/deltat         ! Ice
-               end if
-!           else
-!              odds=max( &
-!                   min(1._r8,precabc(i)/max(cldmabc(i),1.e-5_r8) &
-!                   *scavcoef(i,k)*deltat),0._r8) ! Dana and Hales coefficient (/mm)
-!              srcs2 = sol_factb*cldmabc(i)*odds*tracer(i,k)*(1._r8-weight)/deltat & ! liquid
-!                   +  sol_factbi*cldmabc(i)*odds*tracer(i,k)*(weight)/deltat    !ice
-!           end if
-
-
-            !Note that using the temperature-determined weight doesn't make much sense here
-
-
-            srcc = srcs1 + srcs2  ! convective tend by both processes
-            finc = srcs1/(srcc + 1.e-36_r8) ! fraction in-cloud
+        call wetdep_scavenging(                                &
+                        is_strat_cloudborne,    1,  &
+                        deltat,         fracp,  cldc(i,k),           &
+                        precabc(i),         cldmabc(i), scavcoef(i,k),       &
+                        sol_factb,      sol_factbi,             &
+                        sol_factic(i,k),      sol_factiic,             &
+                        tracer_incu,       tracer_mean,    weight, &
+                        srcc,            finc                     )
 
             ! ****************** Stratiform ***********************
             ! now do the stratiform scavenging
+       fracp = precs(i,k)*deltat/max(cwat(i,k)+precs(i,k)*deltat,1.e-12_r8)
+        fracp = max(0._r8,min(1._r8,fracp))
+        cldmabs(i) = cldvst(i,k) ! Stratiform precipitation area at the top interface of current layer
 
-            ! incloud scavenging
-
-            ! rce 2010/05/01
-!           if(present(is_strat_cloudborne)) then  ! Tianyi 2011/03/29
-               if ( is_strat_cloudborne ) then
-                  ! new code for stratiform incloud scav of cloudborne (modal) aerosol 
-                  ! >> use the 1st order cw to precip rate calculated in microphysics routine
-                  ! >> cloudborne aerosol resides in cloudy portion of grid cell, so do not apply "cldt" factor
-                  ! fracp = rate1ord_cw2pr_st(i,k)*deltat
-                  ! fracp = max(0._r8,min(1._r8,fracp))
-                  fracp = precs(i,k)*deltat/max(cwat(i,k)+precs(i,k)*deltat,1.e-12_r8) ! Sungsu. Mar.19.2010.
-                  fracp = max(0._r8,min(1._r8,fracp))
-                  srcs1 = sol_facti *fracp*tracer(i,k)/deltat*(1._r8-weight) &  ! Liquid
-                       + sol_factii*fracp*tracer(i,k)/deltat*(weight)          ! Ice
-               else
-                  ! strat in-cloud removal only affects strat-cloudborne aerosol
-                  srcs1 = 0._r8
-               end if
-!           else 
-!              ! fracp is the fraction of cloud water converted to precip
-!              ! Sungsu modified fracp as the convectiv case.
-!              !        Below new formula by Sungsu of 'fracp' is necessary since 'cwat' is a LWC/IWC
-!              !        that has already precipitated out, that is, 'cwat' does not contain
-!              !        precipitation at all ! 
-!              !            fracp =  precs(i,k)*deltat/max(cwat(i,k),1.e-12_r8)
-!              fracp =  precs(i,k)*deltat/max(cwat(i,k)+precs(i,k)*deltat,1.e-12_r8) ! Sungsu. Mar.19.2010.
-!              fracp = max(0._r8,min(1._r8,fracp))
-!              !            fracp = 0.     ! for debug
-!              
-!              ! assume the corresponding amnt of tracer is removed
-!              !++mcb -- remove cldc; change cldt to cldv 
-!              !            srcs1 = (cldt(i,k)-cldc(i,k))*fracp*tracer(i,k)/deltat
-!              !            srcs1 = cldv(i,k)*fracp*tracer(i,k)/deltat &
-!              !            srcs1 = cldt(i,k)*fracp*tracer(i,k)/deltat            ! all condensate
-!              !            Jan.02.2010. Sungsu : cldt --> cldt - cldc below.
-!              srcs1 = sol_facti*(cldt(i,k)-cldc(i,k))*fracp*tracer(i,k)/deltat*(1._r8-weight) &  ! liquid
-!                   + sol_factii*(cldt(i,k)-cldc(i,k))*fracp*tracer(i,k)/deltat*(weight)       ! ice
-!           end if
-            ! end rce 2010/05/01
+        call wetdep_scavenging(                                &
+                        is_strat_cloudborne,    2,  &
+                        deltat,         fracp,  cldc(i,k),           &
+                        precabs(i),         cldmabs(i), scavcoef(i,k),       &
+                        sol_factb,      sol_factbi,             &
+                        sol_facti,      sol_factii,             &
+                        tracer(i,k),       tracer_mean,    weight, &
+                        srcs,            fins                     )
 
 
-            ! below cloud scavenging
-
-!           volume undergoing below cloud scavenging
-!           cldmabs(i) = cldv(i,k)   ! precipitating volume
-!           cldmabs(i) = cldt(i,k)   ! local cloud volume
-            cldmabs(i) = cldvst(i,k) ! Stratiform precipitation area at the top interface of current layer
-
-            ! Jan. 16. 2010. Sungsu
-            ! cldmabs(i) = cldmabs(i) * cldovr_st(i) / max( 0.01_r8, cldovr_cu(i) + cldovr_st(i) )
-            ! End by Sungsu
-
-            ! rce 2010/05/01
-!           if (present(is_strat_cloudborne)) then  ! Tianyi 2011/03/29
-               if ( is_strat_cloudborne ) then
-                  ! only strat in-cloud removal affects strat-cloudborne aerosol
-                  srcs2 = 0._r8
-               else
-                  odds = precabs(i)/max(cldmabs(i),1.e-5_r8)*scavcoef(i,k)*deltat
-                  odds = max(min(1._r8,odds),0._r8)
-                  srcs2 = sol_factb *cldmabs(i)*odds*tracer_mean*(1._r8-weight)/deltat & ! Liquid
-                       + sol_factbi*cldmabs(i)*odds*tracer_mean*(weight)/deltat         ! Ice
-               end if
-!           else
-!              odds = precabs(i)/max(cldmabs(i),1.e-5_r8)*scavcoef(i,k)*deltat
-!              odds = max(min(1._r8,odds),0._r8)
-!              srcs2 =sol_factb*(cldmabs(i)*odds) *tracer(i,k)*(1._r8-weight)/deltat & ! liquid
-!                   + sol_factbi*(cldmabs(i)*odds) *tracer(i,k)*(weight)/deltat       ! ice
-!           end if
-                        
-            !Note that using the temperature-determined weight doesn't make much sense here
-
-            srcs = srcs1 + srcs2             ! total stratiform scavenging
-            fins=srcs1/(srcs + 1.e-36_r8)    ! fraction taken by incloud processes
 
             ! make sure we dont take out more than is there
             ! ratio of amount available to amount removed
@@ -1055,6 +946,78 @@ resusp_block_aa: &
       end do main_k_loop ! End of k = 1, pver
 
    end subroutine wetdepa_v2
+
+!==============================================================================
+   subroutine wetdep_scavenging(                                &
+                        is_strat_cloudborne,    is_conv_strat,  &
+                        deltat,         fracp,  cldc_ik,           &
+                        precab_i,         cldmab_i, scavcoef_ik,       &
+                        sol_factb,      sol_factbi,             &
+                        sol_facti,      sol_factii,             &
+                        tracer_1,       tracer_mean,    weight, &
+                        src,            fin                     )
+! ------------------------------------------------------------------------------
+! do the stratiform scavenging
+! ------------------------------------------------------------------------------
+
+   logical, intent(in) :: is_strat_cloudborne
+   integer, intent(in) :: is_conv_strat ! 1: convective. 2: stratiform
+
+   real(r8), intent(in) :: deltat       ! timestep
+   real(r8), intent(in) :: fracp        ! fraction of cloud water converted to precip
+   real(r8), intent(in) :: cldc_ik     ! convective cloud fraction
+   real(r8), intent(in) :: precab_i       ! precip from above of the layer
+   real(r8), intent(in) :: cldmab_i        ! precipitation area at the top interface
+   real(r8), intent(in) :: scavcoef_ik ! Dana and Hales coefficient [1/mm]
+   real(r8), intent(in) :: sol_factb   ! solubility factor (frac of aerosol scavenged below cloud)
+   real(r8), intent(in) :: sol_factbi  ! solubility factor (frac of aerosol scavenged below cloud by ice)
+   real(r8), intent(in) :: sol_facti   ! solubility factor (frac of aerosol scavenged in cloud)
+   real(r8), intent(in) :: sol_factii  ! solubility factor (frac of aerosol scavenged in cloud by ice)
+   real(r8), intent(in) :: tracer_1
+   real(r8), intent(in) :: tracer_mean
+   real(r8), intent(in) :: weight      ! fraction of condensate which is ice
+   real(r8), intent(out) :: src
+   real(r8), intent(out) :: fin
+
+   real(r8), parameter :: small_value = 1.e-12_r8
+   real(r8) :: src1      ! incloud scavenging tendency
+   real(r8) :: src2      ! below-cloud scavenging tendency
+   real(r8) :: odds       ! limit on removal rate (proportional to prec)
+
+   ! calculate limitation of removal rate using Dana and Hales coefficient
+   odds = precab_i/max(cldmab_i,1.e-5_r8)*scavcoef_ik*deltat
+   odds = max(min(1._r8,odds),0._r8)
+
+   if ( is_strat_cloudborne ) then
+      if (is_conv_strat == 1) then
+         ! convective cloud does not affect strat-cloudborne aerosol
+         src1 = 0._r8
+      else
+         ! strat in-cloud removal only affects strat-cloudborne aerosol
+         ! in-cloud scavenging:
+         src1 = sol_facti *fracp*tracer_1/deltat*(1._r8-weight) & ! Liquid
+              + sol_factii*fracp*tracer_1/deltat*(weight)          !Ice
+      endif
+      ! no below-cloud scavenging
+      src2 = 0._r8
+  
+   else
+      if (is_conv_strat == 1) then      ! convective
+         src1 = sol_facti*cldc_ik*fracp*tracer_1*(1._r8-weight)/deltat &  ! Liquid
+              + sol_factii*cldc_ik*fracp*tracer_1*(weight)/deltat              ! Ice
+      else      ! stratiform
+         ! strat in-cloud removal only affects strat-cloudborne aerosol
+         src1 = 0._r8
+      endif
+      src2 = sol_factb *cldmab_i*odds*tracer_mean*(1._r8-weight)/deltat & ! Liquid
+           + sol_factbi*cldmab_i*odds*tracer_mean*(weight)/deltat ! Ice
+
+   endif
+
+   src = src1 + src2             ! total stratiform or convective scavenging
+   fin=src1/(src + 1.e-36_r8)    ! fraction taken by incloud processes
+
+   end subroutine wetdep_scavenging
 
 !==============================================================================
    subroutine wetdep_resusp(                         &
