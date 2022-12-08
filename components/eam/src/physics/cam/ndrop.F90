@@ -306,8 +306,7 @@ subroutine dropmixnuc( &
    ! doesn't distinguish between warm, cold clouds
 
    use output_aerocom_aie , only: do_aerocom_ind3
-  !BJG add these for direct access to num, mmr in state_q array.
-   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field
+   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype
 
    ! arguments
    type(physics_state), target, intent(in)    :: state
@@ -337,7 +336,6 @@ subroutine dropmixnuc( &
    real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer (Pa)
    real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer (/Pa)
    real(r8), pointer :: zm(:,:)      ! geopotential height of level (m)
-!! BJG added line below
    real(r8), pointer :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
 
    real(r8), pointer :: kvh(:,:)     ! vertical diffusivity (m2/s)
@@ -440,13 +438,13 @@ subroutine dropmixnuc( &
    integer  :: idx1000
    logical  :: zmflag
 
-!! BJG added below
   integer :: imode       ! mode index
   integer :: kk          ! level index
-  integer :: nspec_max   ! max number of species in a mode
-  real(r8), allocatable  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+  integer :: lspec      ! species index for given mode
+  integer :: spc_idx, num_idx
+  real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
+  real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
   real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
-  integer  :: lspec, spc_idx, num_idx, maxspec
 
    !-------------------------------------------------------------------------------
 
@@ -454,6 +452,26 @@ subroutine dropmixnuc( &
 
    lchnk = state%lchnk
    ncol  = state%ncol
+
+  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+
+   ! Extract cloud borne MMRs from pbuf 
+
+   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
+   do imode=1,ntot_amode
+      do kk=top_lev,pver
+         do lspec =1, nspec_amode(imode)
+           spc_idx = lmassptrcw_amode(lspec,imode)
+           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
+           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
+         enddo
+         num_idx = numptrcw_amode(imode)
+         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
+      enddo
+   enddo
+
+  !End note for C++ port
 
    ncldwtr  => state%q(:,:,numliq_idx)
    temp     => state%t
@@ -464,7 +482,6 @@ subroutine dropmixnuc( &
    rpdel    => state%rpdel
    zm       => state%zm
     
-!! BJG added line below
    state_q  => state%q
 
    call pbuf_get_field(pbuf, kvh_idx, kvh)
@@ -1112,35 +1129,6 @@ subroutine dropmixnuc( &
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
 
-  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
-
-   ! Find max number of species in all the modes to allocate storage arrays
-   nspec_max = nspec_amode(1)
-   do imode = 2, ntot_amode
-      nspec_max = max(nspec_max, nspec_amode(imode))
-   end do
-
-   allocate( qcldbrn(pcols,nspec_max,pver,ntot_amode)   )
-   allocate( qcldbrn_num(pcols,pver,ntot_amode)   )
-
-   ! Extract cloud borne MMRs from pbuf 
-
-   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
-   do imode=1,ntot_amode
-      do kk=top_lev,pver
-         do lspec =1, nspec_amode(imode)
-           spc_idx = lmassptrcw_amode(lspec,imode)
-           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
-           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
-         enddo
-         num_idx = numptrcw_amode(imode)
-         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
-         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
-      enddo
-   enddo
-
-  !End note for C++ port
-
    call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    do l = 1, psat
       call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
@@ -1208,11 +1196,6 @@ subroutine dropmixnuc( &
       fm,         &
       fluxn,      &
       fluxm       )
-
-
-!  do not include below line with C++ port, according to note above.
-   deallocate( qcldbrn, qcldbrn_num )
-
 
 
 end subroutine dropmixnuc
