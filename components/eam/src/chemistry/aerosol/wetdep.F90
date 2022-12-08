@@ -62,7 +62,6 @@ integer :: nevapr_shcu_idx     = 0
 integer :: nevapr_dpcu_idx     = 0 
 integer :: ixcldice, ixcldliq
 
-logical :: pergro_mods         = .false.
 
 !==============================================================================
 contains
@@ -90,7 +89,6 @@ subroutine wetdep_init()
 
   call cnst_get_ind('CLDICE', ixcldice)
   call cnst_get_ind('CLDLIQ', ixcldliq)
-  call phys_getopts(pergro_mods_out = pergro_mods)
 
 endsubroutine wetdep_init
 
@@ -964,18 +962,11 @@ main_i_loop: &
             
             ! fraction that is not removed within the cloud
             ! (assumed to be interstitial, and subject to convective transport)
-            if(pergro_mods) then
-               fracp = deltat*srct(i)/(max(cldmabs(i),1.e-4_r8)*max(tracer(i,k),1.e-36_r8))  ! amount removed !BSINGH - phil suggested 2nd approach
-            else
-               fracp = deltat*srct(i)/max(cldmabs(i)*tracer(i,k),1.e-36_r8)  ! amount removed ! original code
-            endif
-            fracp = max(0._r8,min(1._r8,fracp))
-            fracis(i,k) = 1._r8 - fracp
+            fracp = deltat*srct(i)/max(cldmabs(i)*tracer(i,k),1.e-36_r8)
+            fracis(i,k) = 1._r8 - min_max_bound(0.0_r8, 1.0_r8, fracp)
 
-            ! tend is all tracer removed by scavenging, plus all re-appearing from evaporation above
-            ! Sungsu added cumulus contribution in the below 3 blocks
-         
-
+! tend is all tracer removed by scavenging, plus all re-appearing from evaporation above
+! Sungsu added cumulus contribution in the below blocks
 ! mam_prevap_resusp_optcc values:
 !     0 = no resuspension
 !     1 = linear resuspension of aerosol mass or number following original mam coding
@@ -986,23 +977,23 @@ main_i_loop: &
 !   (only 0, 130 and 230 are used in current code)
 resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
-! force non-negative
-            precabs_base(i) = max( 0.0_r8, precabs_base(i) )
-            precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
-            precabc_base(i) = max( 0.0_r8, precabc_base(i) )
-            precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
-            if ( mam_prevap_resusp_optcc <= 130) then
-               scavab(i) = max( 0.0_r8, scavab(i) )
-               scavabc(i) = max( 0.0_r8, scavabc(i) )
-            else
-               precnums_base(i) = max( 0.0_r8, precnums_base(i) )
-               precnumc_base(i) = max( 0.0_r8, precnumc_base(i) )
-            end if
+                ! force non-negative
+                precabs_base(i) = max( 0.0_r8, precabs_base(i) )
+                precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
+                precabc_base(i) = max( 0.0_r8, precabc_base(i) )
+                precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
+                if ( mam_prevap_resusp_optcc <= 130) then
+                   scavab(i) = max( 0.0_r8, scavab(i) )
+                   scavabc(i) = max( 0.0_r8, scavabc(i) )
+                else
+                   precnums_base(i) = max( 0.0_r8, precnums_base(i) )
+                   precnumc_base(i) = max( 0.0_r8, precnumc_base(i) )
+                endif
 
-            ! for stratiform clouds
-            arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
-            ! step 1 - do evaporation and resuspension
-            call wetdep_resusp(                                 &
+                ! for stratiform clouds
+                arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
+                ! step 1 - do evaporation and resuspension
+                call wetdep_resusp(                             &
                         1,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),      evaps(i,k),             & ! in
                         precabs(i),     precabs_base(i),        & ! in
@@ -1010,8 +1001,8 @@ resusp_block_aa: &
                         precabx_tmp,    precabx_base_tmp,       & ! out
                         scavabx_tmp,    precnumx_base_tmp,      & ! out
                         resusp_s                                ) ! out
-            ! step 2 - do precip production and scavenging
-            call wetdep_prevap(                                 &
+                ! step 2 - do precip production and scavenging
+                call wetdep_prevap(                             &
                         1,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),      precs(i,k),             & ! in
                         srcs,           arainx,                 & ! in
@@ -1020,9 +1011,9 @@ resusp_block_aa: &
                         precabs(i),     precabs_base(i),        & ! out
                         scavab(i),      precnums_base(i)        ) ! out
 
-            ! for convective clouds
-            arainx = max( cldvcu(i,min(k+1,pver)), 0.01_r8)     ! non-zero
-            call wetdep_resusp(                                 &
+                ! for convective clouds
+                arainx = max( cldvcu(i,min(k+1,pver)), 0.01_r8)     ! non-zero
+                call wetdep_resusp(                             &
                         2,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),      evapc(i,k),             & ! in
                         precabc(i),     precabc_base(i),        & ! in
@@ -1030,8 +1021,8 @@ resusp_block_aa: &
                         precabx_tmp,    precabx_base_tmp,       & ! out
                         scavabx_tmp,    precnumx_base_tmp,      & ! out
                         resusp_c                                ) ! out
-            ! step 2 - do precip production and scavenging
-            call wetdep_prevap(                                 &
+                ! step 2 - do precip production and scavenging
+                call wetdep_prevap(                             &
                         2,              mam_prevap_resusp_optcc,& ! in
                         pdel(i,k),      cmfdqr(i,k),            & ! in
                         srcc,           arainx,                 & ! in
@@ -1040,7 +1031,7 @@ resusp_block_aa: &
                         precabc(i),     precabc_base(i),        & ! out
                         scavabc(i),     precnumc_base(i)        ) ! out
 
-            else resusp_block_aa
+            else resusp_block_aa ! mam_prevap_resusp_optcc = 0, no resuspension
 
                resusp_c = fracev_cu(i)*scavabc(i)
                resusp_s = fracev(i)*scavab(i)
@@ -1131,7 +1122,7 @@ resusp_block_aa: &
                      jstrcnv,        mam_prevap_resusp_optcc,& ! in
                      precabx_old,    precabx_base_old,       & ! in
                      scavabx_old,    precnumx_base_old,      & ! in
-                     precabx_new,                            & ! out
+                     precabx_new,                            & ! in
                      scavabx_new,    resusp_x                ) ! out
 
    endif
@@ -1200,7 +1191,7 @@ resusp_block_aa: &
                         jstrcnv,        mam_prevap_resusp_optcc,& ! in
                         precabx_old,    precabx_base_old,       & ! in
                         scavabx_old,    precnumx_base_old,      & ! in
-                        precabx_new,                            & ! out
+                        precabx_new,                            & ! in
                         scavabx_new,    resusp_x                ) ! out
 
 ! ------------------------------------------------------------------------------
@@ -1216,7 +1207,7 @@ resusp_block_aa: &
    real(r8),intent(in) :: precabx_old
    real(r8),intent(in) :: scavabx_old
    real(r8),intent(in) :: precnumx_base_old
-   real(r8),intent(out) :: precabx_new
+   real(r8),intent(in) :: precabx_new
    real(r8),intent(out) :: scavabx_new
    real(r8),intent(out) :: resusp_x
 
