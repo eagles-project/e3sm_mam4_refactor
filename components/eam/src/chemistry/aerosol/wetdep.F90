@@ -714,7 +714,7 @@ main_k_loop: &
             fracp = cmfdqr(i,k)*deltat/max(1.e-12_r8,cldc(i,k)*conicw(i,k)+(cmfdqr(i,k)+dlf(i,k))*deltat)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp) * cldc(i,k)
             call wetdep_scavenging(                                &
-                        is_strat_cloudborne,            1,         & ! in, 1 for convective
+                        2,              is_strat_cloudborne,       & ! in, 2 for convective
                         deltat,         fracp,                     & ! in
                         precabc,        cldvcu(i,k), scavcoef(i,k),& ! in 
                         sol_factb,      sol_factic(i,k),           & ! in
@@ -727,7 +727,7 @@ main_k_loop: &
             fracp = precs(i,k)*deltat/max(cwat(i,k)+precs(i,k)*deltat,1.e-12_r8)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp)
             call wetdep_scavenging(                                & 
-                        is_strat_cloudborne,            2,         & ! in, 2 for stratiform
+                        1,              is_strat_cloudborne,       & ! in, 1 for stratiform
                         deltat,         fracp,                     & ! in
                         precabs,        cldvst(i,k), scavcoef(i,k),& ! in
                         sol_factb,      sol_facti,                 & ! in
@@ -859,9 +859,9 @@ resusp_block_aa: &
 
 !==============================================================================
    subroutine wetdep_scavenging(                                &
-                        is_strat_cloudborne,    is_conv_strat,  &
+                        is_st_cu,       is_strat_cloudborne,    &
                         deltat,         fracp,                  &
-                        precabx,       cldv_ik, scavcoef_ik,   &
+                        precabx,       cldv_ik, scavcoef_ik,    &
                         sol_factb,      sol_facti,              &
                         tracer_1,       tracer_2,               &
                         src,            fin                     )
@@ -881,7 +881,7 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
 
    logical, intent(in) :: is_strat_cloudborne   ! if tracer is stratiform-cloudborne aerosol or not
-   integer, intent(in) :: is_conv_strat ! 1: convective. 2: stratiform
+   integer, intent(in) :: is_st_cu ! options for stratiform (1) or convective (2) clouds
 
    real(r8), intent(in) :: deltat       ! timestep [s]
    real(r8), intent(in) :: fracp        ! fraction of cloud water converted to precip [fraction]
@@ -905,7 +905,7 @@ resusp_block_aa: &
    odds = min_max_bound(0.0_r8, 1.0_r8, odds)
 
    if ( is_strat_cloudborne ) then
-      if (is_conv_strat == 1) then
+      if (is_st_cu == 2) then
          ! convective cloud does not affect strat-cloudborne aerosol
          src1 = 0._r8
       else
@@ -917,7 +917,7 @@ resusp_block_aa: &
       src2 = 0._r8
   
    else
-      if (is_conv_strat == 1) then      ! convective
+      if (is_st_cu == 2) then      ! convective
          src1 = sol_facti *fracp*tracer_1/deltat
       else      ! stratiform
          ! strat in-cloud removal only affects strat-cloudborne aerosol
@@ -934,7 +934,7 @@ resusp_block_aa: &
 
 !==============================================================================
    subroutine wetdep_resusp(                         &
-                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        is_st_cu,       mam_prevap_resusp_optcc,& ! in
                         pdel_ik,        evapx,                  & ! in
                         precabx_old,    precabx_base_old,       & ! in
                         scavabx_old,    precnumx_base_old,      & ! in
@@ -945,7 +945,7 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
 ! do precip production, resuspension and scavenging
 ! ------------------------------------------------------------------------------
-   integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
+   integer, intent(in) :: is_st_cu ! options for stratiform (1) or convective (2) clouds
                                         ! raindrop size distribution is
                                         ! different for different cloud:
                                         ! 1: assume marshall-palmer distribution
@@ -979,7 +979,7 @@ resusp_block_aa: &
    if (precabx_new < prec_smallaa) then
       ! precip rate is essentially zero so do complete resuspension
       call wetdep_resusp_noprecip(                         &
-                   jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                   is_st_cu,       mam_prevap_resusp_optcc,& ! in
                    precabx_old,    precabx_base_old,       & ! in
                    scavabx_old,    precnumx_base_old,      & ! in
                    precabx_new,    precabx_base_new,       & ! out
@@ -995,7 +995,7 @@ resusp_block_aa: &
    else
       ! regular non-linear resuspension
       call wetdep_resusp_nonlinear(                          &
-                     jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                     is_st_cu,       mam_prevap_resusp_optcc,& ! in
                      precabx_old,    precabx_base_old,       & ! in
                      scavabx_old,    precnumx_base_old,      & ! in
                      precabx_new,                            & ! in
@@ -1008,7 +1008,7 @@ resusp_block_aa: &
 
 !==============================================================================
    subroutine wetdep_resusp_noprecip(                           &
-                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        is_st_cu,       mam_prevap_resusp_optcc,& ! in
                         precabx_old,    precabx_base_old,       & ! in
                         scavabx_old,    precnumx_base_old,      & ! in
                         precabx_new,    precabx_base_new,       & ! out
@@ -1017,7 +1017,7 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
 ! do complete resuspension when precipitation rate is zero
 ! ------------------------------------------------------------------------------
-   integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
+   integer, intent(in) :: is_st_cu      ! options for stratiform (1) or convective (2) clouds
                                         ! raindrop size distribution is
                                         ! different for different cloud:
                                         ! 1: assume marshall-palmer distribution
@@ -1049,7 +1049,7 @@ resusp_block_aa: &
         else
             ! non-linear resuspension of aerosol number based on raindrop number
             u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
-            x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv )
+            x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, is_st_cu)
             x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
             x_new = 0.0_r8
             resusp_x = max( 0.0_r8, precnumx_base_old*(x_old - x_new) )
@@ -1064,7 +1064,7 @@ resusp_block_aa: &
 
 !==============================================================================
    subroutine wetdep_resusp_nonlinear(                          &
-                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        is_st_cu,       mam_prevap_resusp_optcc,& ! in
                         precabx_old,    precabx_base_old,       & ! in
                         scavabx_old,    precnumx_base_old,      & ! in
                         precabx_new,                            & ! in
@@ -1073,7 +1073,7 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
 ! do nonlinear resuspension of aerosol mass or number
 ! ------------------------------------------------------------------------------
-   integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
+   integer, intent(in) :: is_st_cu      ! options for stratiform (1) or convective (2) clouds
                                         ! raindrop size distribution is
                                         ! different for different cloud:
                                         ! 1: assume marshall-palmer distribution
@@ -1098,10 +1098,10 @@ resusp_block_aa: &
    u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
    if ( mam_prevap_resusp_optcc <= 130) then
         ! non-linear resuspension of aerosol mass
-        x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, jstrcnv)
+        x_old = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln( 1.0_r8-u_old, is_st_cu)
    else
         ! non-linear resuspension of aerosol number based on raindrop number
-        x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, jstrcnv)
+        x_old = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_old, is_st_cu)
    endif
    x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
 
@@ -1113,10 +1113,10 @@ resusp_block_aa: &
         u_new = min( u_new, u_old )
         if ( mam_prevap_resusp_optcc <= 130) then
             ! non-linear resuspension of aerosol mass
-            x_new = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, jstrcnv )
+            x_new = 1.0_r8 - faer_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, is_st_cu)
         else
             ! non-linear resuspension of aerosol number based on raindrop number
-            x_new = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, jstrcnv )
+            x_new = 1.0_r8 - fprecn_resusp_vs_fprec_evap_mpln(1.0_r8-u_new, is_st_cu)
         endif
         x_new = min_max_bound(0.0_r8, 1.0_r8, x_new)
         x_new = min( x_new, x_old )
@@ -1138,7 +1138,7 @@ resusp_block_aa: &
 
 !==============================================================================
    subroutine wetdep_prevap(                                    &
-                        jstrcnv,        mam_prevap_resusp_optcc,& ! in
+                        is_st_cu,       mam_prevap_resusp_optcc,& ! in
                         pdel_ik,        pprdx,  srcx,   arainx, & ! in
                         precabx_old,    precabx_base_old,       & ! in
                         scavabx_old,    precnumx_base_old,      & ! in
@@ -1148,7 +1148,7 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
 ! do precip production and scavenging
 ! ------------------------------------------------------------------------------
-   integer, intent(in) :: jstrcnv       ! options for stratiform (1) or convective (2) clouds
+   integer, intent(in) :: is_st_cu      ! options for stratiform (1) or convective (2) clouds
                                         ! raindrop size distribution is
                                         ! different for different cloud:
                                         ! 1: assume marshall-palmer distribution
@@ -1191,7 +1191,7 @@ resusp_block_aa: &
        elseif (precabx_base_new > precabx_base_old) then
           ! note - calc rainshaft number flux from rainshaft water flux,
           ! then multiply by rainshaft area to get grid-average number flux
-          tmpa = arainx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainx), jstrcnv )
+          tmpa = arainx * flux_precnum_vs_flux_prec_mpln((precabx_base_new/arainx), is_st_cu)
           precnumx_base_new = max( 0.0_r8, tmpa )
        else
           precnumx_base_new = precnumx_base_old
