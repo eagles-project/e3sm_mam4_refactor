@@ -583,7 +583,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       integer i                 ! x index
       integer k                 ! z index
 
-      real(r8) adjfac               ! factor stolen from cmfmca
       real(r8) aqfrac               ! fraction of tracer in aqueous phase
       real(r8) cwatc                ! local convective total water amount 
       real(r8) cwats                ! local stratiform total water amount 
@@ -604,14 +603,12 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) precabc(pcols)       ! conv precip from above (work array)
       real(r8) precabs(pcols)       ! strat precip from above (work array)
       real(r8) precbl               ! precip falling out of level (work array)
-      real(r8) precmin              ! minimum convective precip causing scavenging
       real(r8) rat(pcols)           ! ratio of amount available to amount removed
       real(r8) scavab(pcols)        ! scavenged tracer flux from above (work array)
       real(r8) scavabc(pcols)       ! scavenged tracer flux from above (work array)
       real(r8) srcc                 ! tend for convective rain
       real(r8) srcs                 ! tend for stratiform rain
       real(r8) srct(pcols)          ! work variable
-      real(r8) tracab(pcols)        ! column integrated tracer amount
 !      real(r8) vfall                ! fall speed of precip
       real(r8) fins                 ! fraction of rem. rate by strat rain
       real(r8) finc                 ! fraction of rem. rate by conv. rain
@@ -659,8 +656,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) resusp_s          ! aerosol mass re-suspension in a particular layer from stratiform rain
 
       real(r8) resusp_x
-      real(r8) resusp_c_sv(pcols)
-      real(r8) resusp_s_sv(pcols)
       real(r8) scavabx_old, scavabx_tmp, scavabx_new
       real(r8) srcx
       real(r8) tmpa, tmpb, tracer_tmp
@@ -668,22 +663,9 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) x_old, x_tmp, x_ratio
 
       
-#ifdef CRM_NZ
-      ! crm_nz is used to disable warnings above the CRM with MMF
-      integer, parameter :: crm_nz = CRM_NZ   
-#else
-      ! if not MMF, CRM_NZ is not defined, so set to pver to avoid build error
-      integer, parameter :: crm_nz = pver
-#endif
-      logical use_MMF
-      call phys_getopts( use_MMF_out = use_MMF)
-
 ! ------------------------------------------------------------------------
-!      omsm = 1.-1.e-10          ! used to prevent roundoff errors below zero
       omsm = 1._r8-2*epsilon(1._r8) ! used to prevent roundoff errors below zero
-      precmin =  0.1_r8/8.64e4_r8      ! set critical value to 0.1 mm/day in kg/m2/s
 
-      adjfac = deltat/(max(deltat,cmftau)) ! adjustment factor from hack scheme
 
 
       ! this section of code is for highly soluble aerosols,
@@ -694,26 +676,20 @@ subroutine wetdepa_v2( ncol, deltat, &
       ! the fraction of cloud water converted to precip defines
       ! the amount of tracer which is pulled out.
 
-      do i = 1,pcols
-         precabs(i) = 0
-         precabc(i) = 0
-         scavab(i) = 0
-         scavabc(i) = 0
-         tracab(i) = 0
+main_i_loop: &
+      do i = 1,ncol
+         precabs(i) = 0.0_r8
+         precabc(i) = 0.0_r8
+         scavab(i) = 0.0_r8
+         scavabc(i) = 0.0_r8
 
          precabs_base(i) = 0.0_r8
          precabc_base(i) = 0.0_r8
          precnums_base(i) = 0.0_r8
          precnumc_base(i) = 0.0_r8
-         resusp_c_sv(i) = 0.0_r8
-         resusp_s_sv(i) = 0.0_r8
-
-      end do
 
 main_k_loop: &
-      do k = 1,pver
-main_i_loop: &
-         do i = 1,ncol
+         do k = 1,pver
 
             ! ****************** Evaporation **************************
             ! stratiform
@@ -727,8 +703,7 @@ main_i_loop: &
                         pdel(i,k),   evapc(i,k),  precabc(i),   & ! in
                         fracev_cu(i)                            ) ! out
 
-
-            ! ****************** Scavenging **************************
+           ! ****************** Scavenging **************************
 
             ! temporary saved tracer value 
             tracer_tmp =  min(qqcw(i,k), tracer(i,k)*((cldt(i,k)-cldc(i,k)) / &
@@ -798,17 +773,17 @@ main_i_loop: &
 resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
                 ! force non-negative
-                precabs_base(i) = max( 0.0_r8, precabs_base(i) )
-                precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
-                precabc_base(i) = max( 0.0_r8, precabc_base(i) )
-                precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
-                if ( mam_prevap_resusp_optcc <= 130) then
-                   scavab(i) = max( 0.0_r8, scavab(i) )
-                   scavabc(i) = max( 0.0_r8, scavabc(i) )
-                else
-                   precnums_base(i) = max( 0.0_r8, precnums_base(i) )
-                   precnumc_base(i) = max( 0.0_r8, precnumc_base(i) )
-                endif
+!                precabs_base(i) = max( 0.0_r8, precabs_base(i) )
+ !               precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
+  !              precabc_base(i) = max( 0.0_r8, precabc_base(i) )
+   !             precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
+    !            if ( mam_prevap_resusp_optcc <= 130) then
+     !              scavab(i) = max( 0.0_r8, scavab(i) )
+      !             scavabc(i) = max( 0.0_r8, scavabc(i) )
+       !         else
+        !           precnums_base(i) = max( 0.0_r8, precnums_base(i) )
+         !          precnumc_base(i) = max( 0.0_r8, precnumc_base(i) )
+          !      endif
 
                 ! for stratiform clouds
                 arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
@@ -856,7 +831,7 @@ resusp_block_aa: &
                resusp_c = fracev_cu(i)*scavabc(i)
                resusp_s = fracev(i)*scavab(i)
 
-            end if resusp_block_aa
+            endif resusp_block_aa
 
 ! --------------------------------------------------------------
 
@@ -870,9 +845,8 @@ resusp_block_aa: &
                         bcscavt,bsscavt,rcscavt,rsscavt,        & ! inout
                         scavab, scavabc,precabc,precabs         ) ! inout
 
-         end do main_i_loop ! End of i = 1, ncol
-
-      end do main_k_loop ! End of k = 1, pver
+         enddo main_k_loop ! End of k = 1, pver
+      enddo main_i_loop ! End of i = 1, ncol
 
    end subroutine wetdepa_v2
 
