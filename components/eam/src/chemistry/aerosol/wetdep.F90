@@ -597,7 +597,7 @@ subroutine wetdepa_v2( ncol, deltat, &
                                 ! in terms of mixing ratios
       real(r8) mpla                 ! moles / liter H2O entering the layer from above
       real(r8) mplb                 ! moles / liter H2O leaving the layer below
-      real(r8) omsm                 ! 1 - (a small number)
+!      real(r8) omsm                 ! 1 - (a small number)
       real(r8) part                 !  partial pressure of tracer in atmospheres
       real(r8) patm                 ! total pressure in atmospheres
       real(r8) precabc(pcols)       ! conv precip from above (work array)
@@ -618,24 +618,8 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) odds                 ! limit on removal rate (proportional to prec)
       real(r8) dblchek(pcols)
 
-    ! Jan.16.2009. Sungsu for wet scavenging below clouds.
-    ! real(r8) cldovr_cu(pcols)     ! Convective precipitation area at the base of each layer
-    ! real(r8) cldovr_st(pcols)     ! Stratiform precipitation area at the base of each layer
-
       real(r8) tracer_incu
       real(r8) tracer_mean
-
-    ! End by Sungsu
-
-!     real(r8) sol_facti,  sol_factb  ! in cloud and below cloud fraction of aerosol scavenged
-!     real(r8) sol_factii, sol_factbi ! in cloud and below cloud fraction of aerosol scavenged by ice
-!     real(r8) sol_factic(pcols,pver)             ! sol_facti for convective clouds
-!     real(r8) sol_factiic            ! sol_factii for convective clouds
-      ! sol_factic & solfact_iic added for MODAL_AERO.  
-      ! For stratiform cloud, cloudborne aerosol is treated explicitly,
-      !    and sol_facti is 1.0 for cloudborne, 0.0 for interstitial.
-      ! For convective cloud, cloudborne aerosol is not treated explicitly,
-      !    and sol_factic is 1.0 for both cloudborne and interstitial.
 
       integer  jstrcnv
 
@@ -664,7 +648,7 @@ subroutine wetdepa_v2( ncol, deltat, &
 
       
 ! ------------------------------------------------------------------------
-      omsm = 1._r8-2*epsilon(1._r8) ! used to prevent roundoff errors below zero
+      real(r8), parameter ::   omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero
 
 
 
@@ -761,29 +745,8 @@ main_k_loop: &
             ! ****************** Resuspension **************************
 
 ! tend is all tracer removed by scavenging, plus all re-appearing from evaporation above
-! Sungsu added cumulus contribution in the below blocks
-! mam_prevap_resusp_optcc values:
-!     0 = no resuspension
-!     1 = linear resuspension of aerosol mass or number following original mam coding
-!     2 = same as 1 but resuspension tendencies are in rc/sscavt rather than combined with bc/sscavt
-!     3 = same as 2 but with some added "xxx = max( 0, xxx)" lines
-!   130 = non-linear resuspension of aerosol mass   based on scavenged aerosol mass
-!   230 = non-linear resuspension of aerosol number based on raindrop number
-!   (only 0, 130 and 230 are used in current code)
 resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
-                ! force non-negative
-!                precabs_base(i) = max( 0.0_r8, precabs_base(i) )
- !               precabs(i)  = min_max_bound( 0.0_r8, precabs_base(i), precabs(i) )
-  !              precabc_base(i) = max( 0.0_r8, precabc_base(i) )
-   !             precabc(i)  = min_max_bound( 0.0_r8, precabc_base(i), precabc(i) )
-    !            if ( mam_prevap_resusp_optcc <= 130) then
-     !              scavab(i) = max( 0.0_r8, scavab(i) )
-      !             scavabc(i) = max( 0.0_r8, scavabc(i) )
-       !         else
-        !           precnums_base(i) = max( 0.0_r8, precnums_base(i) )
-         !          precnumc_base(i) = max( 0.0_r8, precnumc_base(i) )
-          !      endif
 
                 ! for stratiform clouds
                 arainx = max( cldvst(i,min(k+1,pver)), 0.01_r8 )    ! non-zero
@@ -833,9 +796,9 @@ resusp_block_aa: &
 
             endif resusp_block_aa
 
-! --------------------------------------------------------------
+            ! ****************** update scavengingfor output ***************
 
-           call update_scavenging( i,            k,             & ! in
+            call update_scavenging( i,            k,            & ! in
                         mam_prevap_resusp_optcc,pdel,           & ! in
                         omsm,   srcc,   srcs,   srct,           & ! in
                         fins,   finc,   fracev, fracev_cu,      & ! in
