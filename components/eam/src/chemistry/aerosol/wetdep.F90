@@ -601,7 +601,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8) omsm                 ! 1 - (a small number)
       real(r8) part                 !  partial pressure of tracer in atmospheres
       real(r8) patm                 ! total pressure in atmospheres
-      real(r8) pdog                 ! work variable (pdel/gravit)
       real(r8) precabc(pcols)       ! conv precip from above (work array)
       real(r8) precabs(pcols)       ! strat precip from above (work array)
       real(r8) precbl               ! precip falling out of level (work array)
@@ -686,28 +685,6 @@ subroutine wetdepa_v2( ncol, deltat, &
 
       adjfac = deltat/(max(deltat,cmftau)) ! adjustment factor from hack scheme
 
-      ! assume 4 m/s fall speed currently (should be improved)
-!      vfall = 4.
-	
-      ! default (if other sol_facts aren't in call, set all to required sol_fact
-!     sol_facti = sol_fact
-!     sol_factb = sol_fact
-!     sol_factii = sol_fact
-!     sol_factbi = sol_fact
-
-!     if ( present(sol_facti_in) )  sol_facti = sol_facti_in
-!     if ( present(sol_factii_in) )  sol_factii = sol_factii_in
-!     if ( present(sol_factbi_in) )  sol_factbi = sol_factbi_in
-!     sol_facti = sol_facti_in
-!     sol_factii = sol_factii_in
-!     sol_factbi = sol_factbi_in
-
-!     sol_factic  = sol_facti
-!     sol_factiic = sol_factii
-!     if ( present(sol_factic_in ) )  sol_factic  = sol_factic_in
-!     if ( present(sol_factiic_in) )  sol_factiic = sol_factiic_in
-!     sol_factic  = sol_factic_in
-!     sol_factiic = sol_factiic_in
 
       ! this section of code is for highly soluble aerosols,
       ! the assumption is that within the cloud that
@@ -731,48 +708,32 @@ subroutine wetdepa_v2( ncol, deltat, &
          resusp_c_sv(i) = 0.0_r8
          resusp_s_sv(i) = 0.0_r8
 
-       ! Jan.16. Sungsu 
-       ! I added below to compute vertically projected cumulus and stratus fractions from the top to the
-       ! current model layer by assuming a simple independent maximum overlapping assumption for 
-       ! each cloud.
-       ! cldovr_cu(i) = 0._r8
-       ! cldovr_st(i) = 0._r8
-       ! End by Sungsu
-
       end do
 
 main_k_loop: &
       do k = 1,pver
 main_i_loop: &
          do i = 1,ncol
-!            tc     = t(i,k) - tmelt
-
-            pdog = pdel(i,k)/gravit
 
             ! ****************** Evaporation **************************
-            ! calculate the fraction of strat precip from above 
-            !                 which evaporates within this layer
-            fracev(i) = evaps(i,k)*pdel(i,k)/gravit &
-                     /max(1.e-12_r8,precabs(i))
+            ! stratiform
+            call compute_evap_frac(                             &
+                        mam_prevap_resusp_optcc,                & ! in
+                        pdel(i,k),   evaps(i,k),  precabs(i),   & ! in
+                        fracev(i)                               ) ! out
+            ! convective
+            call compute_evap_frac(                             &
+                        mam_prevap_resusp_optcc,                & ! in
+                        pdel(i,k),   evapc(i,k),  precabc(i),   & ! in
+                        fracev_cu(i)                            ) ! out
 
-            ! trap to ensure reasonable ratio bounds
-            fracev(i) = max(0._r8,min(1._r8,fracev(i)))
 
-! Sungsu : Same as above but convective precipitation part
-            fracev_cu(i) = evapc(i,k)*pdel(i,k)/gravit/max(1.e-12_r8,precabc(i))
-            fracev_cu(i) = max(0._r8,min(1._r8,fracev_cu(i)))
-! Sungsu
+            ! ****************** Scavenging **************************
 
-            if (mam_prevap_resusp_optcc == 0) then
-               fracev(i) = 0.0_r8
-               fracev_cu(i) = 0.0_r8
-            endif
-
-            ! temporary tracer value to calculate in-cumulus tracer and mean tracer
-            ! for wetdep_scavenging use
+            ! temporary saved tracer value 
             tracer_tmp =  min(qqcw(i,k), tracer(i,k)*((cldt(i,k)-cldc(i,k)) / &
                 max(0.01_r8, (1._r8-(cldt(i,k)-cldc(i,k)))) )) 
-            ! in-cumulus tracer
+            ! calculate in-cumulus and mean tracer values for wetdep_scavenging use
             tracer_incu = f_act_conv(i,k) * (tracer(i,k) + tracer_tmp)
             tracer_mean = tracer(i,k)*(1._r8-cldc(i,k)*f_act_conv(i,k)) - tracer_tmp*cldc(i,k)*f_act_conv(i,k)
             tracer_mean = max(0._r8,tracer_mean)
@@ -821,6 +782,8 @@ main_i_loop: &
             ! (assumed to be interstitial, and subject to convective transport)
             fracp = deltat*srct(i)/max(cldvst(i,k)*tracer(i,k),1.e-36_r8)
             fracis(i,k) = 1._r8 - min_max_bound(0.0_r8, 1.0_r8, fracp)
+
+            ! ****************** Resuspension **************************
 
 ! tend is all tracer removed by scavenging, plus all re-appearing from evaporation above
 ! Sungsu added cumulus contribution in the below blocks
@@ -912,6 +875,31 @@ resusp_block_aa: &
       end do main_k_loop ! End of k = 1, pver
 
    end subroutine wetdepa_v2
+
+!==============================================================================
+   subroutine compute_evap_frac(                        &
+                        mam_prevap_resusp_optcc,        &
+                        pdel_ik,   evap_ik,  precab_i,  &
+                        fracev_i                        )       
+! ------------------------------------------------------------------------------
+! calculate the fraction of strat precip from above
+!                 which evaporates within this layer
+! ------------------------------------------------------------------------------
+   integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
+   real(r8),intent(in) :: pdel_ik       ! pressure thikness at current column and level [Pa]
+   real(r8),intent(in) :: evap_ik
+   real(r8),intent(in) :: precab_i
+   real(r8),intent(out) :: fracev_i
+
+   if (mam_prevap_resusp_optcc == 0) then
+        fracev_i = 0.0_r8
+   else
+        fracev_i = evap_ik*pdel_ik/gravit/max(1.e-12_r8,precab_i)
+        ! trap to ensure reasonable ratio bounds
+        fracev_i = min_max_bound(0._r8, 1._r8, fracev_i)
+   endif
+
+   end subroutine compute_evap_frac
 
 !==============================================================================
    subroutine wetdep_scavenging(                                &
