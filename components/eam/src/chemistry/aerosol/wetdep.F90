@@ -458,27 +458,6 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
 end subroutine rain_mix_ratio
 
 !==============================================================================
-
-! REASTER 08/05/2015
-! changed arguments
-!    put them in a more logical order
-!    optional arguments are now mandatory, and commented out:
-!       all "if ( present(xx) )" tests
-!       any code for ".not. present(xx)" cases
-!    eliminated the sol_fact**_in - now just use sol_fact**
-
-! old argument order
-! ubroutine wetdepa_v2( t, p, q, pdel, &
-!                       cldt, cldc, cmfdqr, evapc, conicw, precs, conds, &
-!                       evaps, cwat, tracer, deltat, &
-!                       scavt, iscavt, cldv, cldvcu, cldvst, dlf, fracis, sol_fact, ncol, &
-!                       scavcoef, is_strat_cloudborne, rate1ord_cw2pr_st, qqcw, f_act_conv, &
-!                       icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt, &  
-!                       sol_facti_in, sol_factbi_in, sol_factii_in, &
-!                       sol_factic_in, sol_factiic_in, resus_fix ) 
-! note - p, q, cldv not needed
-
-! new argument order
 subroutine wetdepa_v2( ncol, deltat, &
                        t, p, q, pdel, &
                        cmfdqr, evapc, dlf, conicw, &
@@ -497,43 +476,41 @@ subroutine wetdepa_v2( ncol, deltat, &
       ! Author: P. Rasch
       ! Modified by T. Bond 3/2003 to track different removals
       ! Sungsu Park. Mar.2010 : Impose consistencies with a few changes in physics.
-      !-----------------------------------------------------------------------
 
-      use phys_control, only: phys_getopts
+      ! this section of code is for highly soluble aerosols,
+      ! the assumption is that within the cloud that
+      ! all the tracer is in the cloud water
+      !
+      ! for both convective and stratiform clouds,
+      ! the fraction of cloud water converted to precip defines
+      ! the amount of tracer which is pulled out.
+      !-----------------------------------------------------------------------
 
       implicit none
 
       integer, intent(in) :: ncol
 
+      ! C++ refactor: t, p, q, conds,cldv seems not used and can be removed
       real(r8), intent(in) ::&
-         deltat,               &! time step
+         deltat,               &! time step [s]
          t(pcols,pver),        &! temperature
          p(pcols,pver),        &! pressure
          q(pcols,pver),        &! moisture
-         pdel(pcols,pver),     &! pressure thikness
-         cmfdqr(pcols,pver),   &! rate of production of convective precip
-! Sungsu
-         evapc(pcols,pver),    &! Evaporation rate of convective precipitation
+         pdel(pcols,pver),     &! pressure thikness [Pa]
+         cmfdqr(pcols,pver),   &! rate of production of convective precip [kg/kg/s]
+         evapc(pcols,pver),    &! Evaporation rate of convective precipitation [kg/kg/s]
          dlf(pcols,pver),      &! Detrainment of convective condensate [kg/kg/s]
-! Sungsu
-         conicw(pcols,pver),   &! convective cloud water
-         precs(pcols,pver),    &! rate of production of stratiform precip
-         conds(pcols,pver),    &! rate of production of condensate
-         evaps(pcols,pver),    &! rate of evaporation of precip
-         cwat(pcols,pver),     &! cloud water amount 
-         cldt(pcols,pver),     &! total cloud fraction
-         cldc(pcols,pver),     &! convective cloud fraction
-         cldv(pcols,pver),     &! total cloud fraction
-! Sungsu
-         cldvcu(pcols,pver),   &! Convective precipitation area at the top interface of each layer
-         cldvst(pcols,pver),   &! Stratiform precipitation area at the top interface of each layer
-! Sungsu
-         tracer(pcols,pver)     ! trace species
-      ! If subroutine is called with just sol_fact:
-            ! sol_fact is used for both in- and below-cloud scavenging
-      ! If subroutine is called with optional argument sol_facti_in:
-            ! sol_fact  is used for below cloud scavenging
-            ! sol_facti is used for in cloud scavenging
+         conicw(pcols,pver),   &! convective cloud water [kg/kg]
+         precs(pcols,pver),    &! rate of production of stratiform precip [kg/kg/s]
+         conds(pcols,pver),    &! rate of production of condensate [kg/kg/s]
+         evaps(pcols,pver),    &! rate of evaporation of precip [kg/kg/s]
+         cwat(pcols,pver),     &! cloud water amount [kg/kg] 
+         cldt(pcols,pver),     &! total cloud fraction [fraction]
+         cldc(pcols,pver),     &! convective cloud fraction [fraction]
+         cldv(pcols,pver),     &! total cloud fraction [fraction]
+         cldvcu(pcols,pver),   &! Convective precipitation area at the top interface of each layer [fraction]
+         cldvst(pcols,pver),   &! Stratiform precipitation area at the top interface of each layer [fraction]
+         tracer(pcols,pver)     ! trace species [kg/kg]
 
       integer, intent(in) :: mam_prevap_resusp_optcc ! suspension options.
 !     0 = no resuspension
@@ -545,131 +522,81 @@ subroutine wetdepa_v2( ncol, deltat, &
 !   230 = non-linear resuspension of aerosol number based on raindrop number
 !     (1,2,3 are not used in the current code)
 
-!     logical, intent(in) :: resus_fix
-      ! rce 2010/05/01
       ! is_strat_cloudborne = .true. if tracer is stratiform-cloudborne aerosol; else .false. 
-      logical, intent(in) :: is_strat_cloudborne   
-      real(r8), intent(in) :: scavcoef(pcols,pver) ! Dana and Hales coefficient (/mm) (0.1 if not MODAL_AERO)
-      ! rate1ord_cw2pr_st = 1st order rate for strat cw to precip (1/s) 
-      real(r8), intent(in) :: rate1ord_cw2pr_st(pcols,pver)
-      ! qqcw = strat-cloudborne aerosol corresponding to tracer when is_strat_cloudborne==.false.; else 0.0 
+      logical,  intent(in) :: is_strat_cloudborne   
+      real(r8), intent(in) :: scavcoef(pcols,pver) ! Dana and Hales coefficient [1/mm]
+      ! rate1ord_cw2pr_st = 1st order rate for strat cw to precip (1/s)
+      ! C++ porting: this variable seems not used 
+      real(r8), intent(in) :: rate1ord_cw2pr_st(pcols,pver)     ! [1/s]
       ! f_act_conv = conv-cloud activation fraction when is_strat_cloudborne==.false.; else 0.0 
-      real(r8), intent(in) :: f_act_conv(pcols,pver)
-
-      real(r8), intent(in) :: qqcw(pcols,pver)
-      ! end rce 2010/05/01
-
-!     real(r8), intent(in) :: sol_fact ! solubility factor (fraction of aer scavenged below & in, or just below or sol_facti is provided)
-      real(r8), intent(in) :: sol_factb   ! solubility factor (frac of aerosol scavenged below cloud)
-      real(r8), intent(in) :: sol_factbi  ! solubility factor (frac of aerosol scavenged below cloud by ice)
-      real(r8), intent(in) :: sol_facti   ! solubility factor (frac of aerosol scavenged in cloud)
-      real(r8), intent(in) :: sol_factii  ! solubility factor (frac of aerosol scavenged in cloud by ice)
-      real(r8), intent(in) :: sol_factic(pcols,pver)  ! sol_facti for convective clouds
-      real(r8), intent(in) :: sol_factiic ! sol_factii for convective clouds
+      real(r8), intent(in) :: f_act_conv(pcols,pver) ! [fraction]
+      ! qqcw = strat-cloudborne aerosol corresponding to tracer when is_strat_cloudborne==.false.; else 0.0
+      real(r8), intent(in) :: qqcw(pcols,pver)  ! [kg/kg]
+      real(r8), intent(in) :: sol_factb   ! solubility factor (frac of aerosol scavenged below cloud) [fraction]
+      real(r8), intent(in) :: sol_facti   ! solubility factor (frac of aerosol scavenged in cloud) [fraction]
+      real(r8), intent(in) :: sol_factic(pcols,pver)  ! sol_facti for convective clouds [fraction]
+      ! C++ refactor: Ice cloud is neglected with ice fraction forced with zero.
+      ! sol_fracbi, sol_fractii and sol_fractiic are not used and can be removed
+      real(r8), intent(in) :: sol_factbi  ! solubility factor (frac of aerosol scavenged below cloud by ice) [fraction]
+      real(r8), intent(in) :: sol_factii  ! solubility factor (frac of aerosol scavenged in cloud by ice) [fraction]
+      real(r8), intent(in) :: sol_factiic ! sol_factii for convective clouds [fraction]
          
-      real(r8), intent(out) :: fracis(pcols,pver)  ! fraction of species not scavenged
-      real(r8), intent(out) :: scavt(pcols,pver)   ! scavenging tend 
-      real(r8), intent(out) :: iscavt(pcols,pver)  ! incloud scavenging tends
-
-      real(r8), intent(out) :: icscavt(pcols,pver)  ! incloud, convective
-      real(r8), intent(out) :: isscavt(pcols,pver)  ! incloud, stratiform
-      real(r8), intent(out) :: bcscavt(pcols,pver)  ! below cloud, convective
-      real(r8), intent(out) :: bsscavt(pcols,pver)  ! below cloud, stratiform
-      real(r8), intent(out) :: rcscavt(pcols,pver)  ! resuspension, convective 
-      real(r8), intent(out) :: rsscavt(pcols,pver)  ! resuspension, stratiform 
+      real(r8), intent(out) :: fracis(pcols,pver)  ! fraction of species not scavenged [fraction]
+      real(r8), intent(out) :: scavt(pcols,pver)   ! scavenging tend [kg/kg/s]
+      real(r8), intent(out) :: iscavt(pcols,pver)  ! incloud scavenging tends [kg/kg/s]
+      real(r8), intent(out) :: icscavt(pcols,pver)  ! incloud, convective [kg/kg/s]
+      real(r8), intent(out) :: isscavt(pcols,pver)  ! incloud, stratiform [kg/kg/s]
+      real(r8), intent(out) :: bcscavt(pcols,pver)  ! below cloud, convective [kg/kg/s]
+      real(r8), intent(out) :: bsscavt(pcols,pver)  ! below cloud, stratiform [kg/kg/s]
+      real(r8), intent(out) :: rcscavt(pcols,pver)  ! resuspension, convective [kg/kg/s]
+      real(r8), intent(out) :: rsscavt(pcols,pver)  ! resuspension, stratiform [kg/kg/s] 
 
       ! local variables
+      integer  :: icol          ! column index
+      integer  :: kk            ! z index
+      real(r8) :: fracev_st     ! fraction of stratiform precip from above that is evaporating [fraction]
+      real(r8) :: fracev_cu     ! Fraction of convective precip from above that is evaporating [fraction]
+      real(r8) :: fracp         ! fraction of cloud water converted to precip [fraction]
+      real(r8) :: precabc       ! conv precip from above [kg/m2/s] 
+      real(r8) :: precabs       ! strat precip from above [kg/m2/s]
+      real(r8) :: precabx_tmp   ! temporary store precabc or precabs [kg/m2/s]
+      real(r8) :: precabc_base     ! conv precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
+      real(r8) :: precabs_base     ! strat precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
+      real(r8) :: precabx_base_tmp ! temporarily store precab*_base [kg/m2/s]
+      real(r8) :: precnums_base    ! stratiform precip number flux at the bottom of a particular layer [#/m2/s]
+      real(r8) :: precnumc_base    ! convective precip number flux at the bottom of a particular layer [#/m2/s]
+      real(r8) :: precnumx_base_tmp ! temporarily store precnum*_base [#/m2/s]
+      real(r8) :: scavabs       ! stratiform scavenged tracer flux from above [kg/m2/s]
+      real(r8) :: scavabc       ! convective scavenged tracer flux from above [kg/m2/s]
+      real(r8) :: scavabx_tmp   ! temporarily store scavab* [kg/m2/s]
+      real(r8) :: resusp_c      ! aerosol mass re-suspension in a particular layer from convective rain [kg/m2/s]
+      real(r8) :: resusp_s      ! aerosol mass re-suspension in a particular layer from stratiform rain [kg/m2/s]
+      real(r8) :: srcc          ! tendency for convective rain scavenging [kg/kg/s]
+      real(r8) :: srcs          ! tendency for stratiform rain scavenging [kg/kg/s]
+      real(r8) :: srct          ! total scavenging tendency [kg/kg/s]
+      real(r8) :: tracer_incu   ! in-cumulus tracer concentration [kg/kg]
+      real(r8) :: tracer_mean   ! mean tracer concenration [kg/kg]
+      real(r8) :: tracer_tmp    ! temporarily calculation of tracer [kg/kg]
+      real(r8) :: fins          ! fraction of rem. rate by strat rain [fraction]
+      real(r8) :: finc          ! fraction of rem. rate by conv. rain [fraction]
+      real(r8) :: rat           ! ratio of amount available to amount removed [fraction]
+      real(r8) :: arainx        ! precipitation and cloudy volume,at the top interface of current layer [fraction]
+      real(r8) :: scavt_ik      ! scavenging tend at current (icol,kk) [kg/kg/s]
+      real(r8) :: iscavt_ik     ! incloud scavenging tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: icscavt_ik    ! incloud, convective scavenging tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: isscavt_ik    ! incloud, stratiform scavenging tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: bcscavt_ik    ! below cloud, convective scavenging tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: bsscavt_ik    ! below cloud, stratiform scavenging tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: rcscavt_ik    ! resuspension, convective tends at current (icol,kk) [kg/kg/s]
+      real(r8) :: rsscavt_ik    ! resuspension, stratiform tends at current (icol,kk) [kg/kg/s]
 
-      integer i, icol                 ! x index
-      integer k,kk                 ! z index
+      real(r8), parameter ::   omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
 
-      real(r8) aqfrac               ! fraction of tracer in aqueous phase
-      real(r8) cwatc                ! local convective total water amount 
-      real(r8) cwats                ! local stratiform total water amount 
-      real(r8) cwatp                ! local water amount falling from above precip
-      real(r8) fracev_st        ! fraction of stratiform precip from above that is evaporating
-! Sungsu
-      real(r8) fracev_cu     ! Fraction of convective precip from above that is evaporating
-! Sungsu
-      real(r8) fracp                ! fraction of cloud water converted to precip
-      real(r8) gafrac               ! fraction of tracer in gas phasea
-      real(r8) hconst               ! henry's law solubility constant when equation is expressed
-                                ! in terms of mixing ratios
-      real(r8) mpla                 ! moles / liter H2O entering the layer from above
-      real(r8) mplb                 ! moles / liter H2O leaving the layer below
-!      real(r8) omsm                 ! 1 - (a small number)
-      real(r8) part                 !  partial pressure of tracer in atmospheres
-      real(r8) patm                 ! total pressure in atmospheres
-      real(r8) precabc       ! conv precip from above (work array)
-      real(r8) precabs       ! strat precip from above (work array)
-      real(r8) precabc_base  ! conv precip at an effective cloud base for calculations in a particular layer
-      real(r8) precabs_base  ! strat precip at an effective cloud base for calculations in a particular layer
-      real(r8) precnums_base  ! stratiform precip number flux at the bottom of a particular layer
-      real(r8) precnumc_base  ! convective precip number flux at the bottom of a particular layer
-
-      real(r8) rat           ! ratio of amount available to amount removed
-      real(r8) scavabs        ! scavenged tracer flux from above (work array)
-      real(r8) scavabc       ! scavenged tracer flux from above (work array)
-      real(r8) srcc                 ! tend for convective rain
-      real(r8) srcs                 ! tend for stratiform rain
-      real(r8) srct          ! work variable
-!      real(r8) vfall                ! fall speed of precip
-      real(r8) fins                 ! fraction of rem. rate by strat rain
-      real(r8) finc                 ! fraction of rem. rate by conv. rain
-      real(r8) srcs1                ! work variable
-      real(r8) srcs2                ! work variable
-!      real(r8) tc                   ! temp in celcius
-      real(r8) odds                 ! limit on removal rate (proportional to prec)
-      real(r8) dblchek(pcols)
-
-      real(r8) tracer_incu
-      real(r8) tracer_mean
-
-      integer  jstrcnv
-
-      real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
-      real(r8), parameter :: x_smallaa = 1.0e-30_r8
-
-      real(r8) arainx
-      real(r8) evapx
-      real(r8) pprdx
-      real(r8) precabx_old, precabx_tmp, precabx_new
-      real(r8) precabx_base_old, precabx_base_tmp, precabx_base_new
-      real(r8) precnumx_base_old, precnumx_base_tmp, precnumx_base_new
-      real(r8) resusp_c          ! aerosol mass re-suspension in a particular layer from convective rain
-      real(r8) resusp_s          ! aerosol mass re-suspension in a particular layer from stratiform rain
-
-      real(r8) resusp_x
-      real(r8) scavabx_old, scavabx_tmp, scavabx_new
-      real(r8) srcx
-      real(r8) tmpa, tmpb, tracer_tmp
-      real(r8) u_old, u_tmp
-      real(r8) x_old, x_tmp, x_ratio
-
-      real(r8) :: scavt_ik   ! scavenging tend
-      real(r8) :: iscavt_ik  ! incloud scavenging tends
-      real(r8) :: icscavt_ik  ! incloud, convective
-      real(r8) :: isscavt_ik  ! incloud, stratiform
-      real(r8) :: bcscavt_ik  ! below cloud, convective
-      real(r8) :: bsscavt_ik  ! below cloud, stratiform
-      real(r8) :: rcscavt_ik ! resuspension, convective
-      real(r8) :: rsscavt_ik  ! resuspension, stratiform
-      
-! ------------------------------------------------------------------------
-      real(r8), parameter ::   omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero
-
-
-
-      ! this section of code is for highly soluble aerosols,
-      ! the assumption is that within the cloud that
-      ! all the tracer is in the cloud water
-      !
-      ! for both convective and stratiform clouds, 
-      ! the fraction of cloud water converted to precip defines
-      ! the amount of tracer which is pulled out.
 
 main_i_loop: &
       do icol = 1,ncol
+
+         ! initiate variables
          precabs = 0.0_r8
          precabc = 0.0_r8
          scavabs = 0.0_r8
@@ -844,9 +771,9 @@ resusp_block_aa: &
 ! ------------------------------------------------------------------------------
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
    real(r8),intent(in) :: pdel_ik       ! pressure thikness at current column and level [Pa]
-   real(r8),intent(in) :: evap_ik
-   real(r8),intent(in) :: precabx
-   real(r8),intent(out) :: fracevx
+   real(r8),intent(in) :: evap_ik       ! evaporation in this layer [kg/kg/s]
+   real(r8),intent(in) :: precabx       ! precipitation from above [kg/m2/s] 
+   real(r8),intent(out) :: fracevx      ! fraction of evaporation [fraction]
 
    if (mam_prevap_resusp_optcc == 0) then
         fracevx = 0.0_r8
@@ -896,10 +823,10 @@ resusp_block_aa: &
    real(r8), intent(out) :: src         ! total scavenging (incloud + belowcloud) [kg/kg/s]
    real(r8), intent(out) :: fin         ! fraction of incloud scavenging [fraction]
 
-   real(r8), parameter :: small_fraction = 1.e-5_r8     ! small value of area fraction to avoid divided by zero
-   real(r8) :: src1      ! incloud scavenging tendency
-   real(r8) :: src2      ! below-cloud scavenging tendency
+   real(r8) :: src1      ! incloud scavenging tendency [kg/kg/s]
+   real(r8) :: src2      ! below-cloud scavenging tendency [kg/kg/s]
    real(r8) :: odds      ! limit on removal rate (proportional to prec) [fraction]
+   real(r8), parameter :: small_fraction = 1.e-5_r8     ! small value of area fraction to avoid divided by zero
 
    ! calculate limitation of removal rate using Dana and Hales coefficient
    odds = precabx/max(cldv_ik,small_fraction) * scavcoef_ik*deltat
@@ -953,21 +880,21 @@ resusp_block_aa: &
                                         ! 2: assume log-normal distribution
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
    real(r8),intent(in) :: pdel_ik       ! pressure thikness at current column and level [Pa]
-   real(r8),intent(in) :: evapx
-   real(r8),intent(in) :: precabx_base_old ! [kg/m2/s]
-   real(r8),intent(in) :: precabx_old ! [kg/m2/s]
-   real(r8),intent(in) :: scavabx_old
-   real(r8),intent(in) :: precnumx_base_old
-   real(r8),intent(out) :: precabx_base_new ! [kg/m2/s]
-   real(r8),intent(out) :: precabx_new ! [kg/m2/s]
-   real(r8),intent(out) :: scavabx_new
-   real(r8),intent(out) :: precnumx_base_new
-   real(r8),intent(out) :: resusp_x
+   real(r8),intent(in) :: evapx         ! evaporation at current layer [kg/kg/s]
+   real(r8),intent(in) :: precabx_base_old ! input of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(in) :: precabx_old ! input of precipitation above this layer [kg/m2/s]
+   real(r8),intent(in) :: scavabx_old ! input of scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(in) :: precnumx_base_old ! input of precipitation number at cloud base [#/m2/s]
+   real(r8),intent(out) :: precabx_base_new ! output of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(out) :: precabx_new ! output of precipitation above this layer [kg/m2/s]
+   real(r8),intent(out) :: scavabx_new ! output of scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(out) :: precnumx_base_new ! output of precipitation number at cloud base [#/m2/s]
+   real(r8),intent(out) :: resusp_x    ! aerosol mass re-suspension in a particular layer [kg/m2/s]
 
 
    ! local variables
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
    real(r8)            :: tmpa ! temporary working variable
+   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
 
    ! initiate *_new in case they are not calculated
    scavabx_new = scavabx_old
@@ -1024,20 +951,20 @@ resusp_block_aa: &
                                         ! 1: assume marshall-palmer distribution
                                         ! 2: assume log-normal distribution
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
-   real(r8),intent(in) :: precabx_base_old ! [kg/m2/s]
-   real(r8),intent(in) :: precabx_old ! [kg/m2/s]
-   real(r8),intent(in) :: scavabx_old
-   real(r8),intent(in) :: precnumx_base_old
-   real(r8),intent(out) :: precabx_base_new ! [kg/m2/s]
-   real(r8),intent(out) :: precabx_new ! [kg/m2/s]
-   real(r8),intent(out) :: scavabx_new
-   real(r8),intent(out) :: resusp_x
+   real(r8),intent(in) :: precabx_base_old ! input of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(in) :: precabx_old ! input of precipitation above this layer [kg/m2/s]
+   real(r8),intent(in) :: scavabx_old ! input of scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(in) :: precnumx_base_old ! precipitation number at cloud base [#/m2/s]
+   real(r8),intent(out) :: precabx_base_new ! output of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(out) :: precabx_new ! output of precipitation above this layer [kg/m2/s]
+   real(r8),intent(out) :: scavabx_new ! output of scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(out) :: resusp_x    ! aerosol mass re-suspension in a particular layer [kg/m2/s]
 
 
    ! local variables
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
+   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
 
 
    if ( mam_prevap_resusp_optcc <= 130) then
@@ -1080,20 +1007,20 @@ resusp_block_aa: &
                                         ! 1: assume marshall-palmer distribution
                                         ! 2: assume log-normal distribution
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
-   real(r8),intent(in) :: precabx_base_old ! [kg/m2/s]
-   real(r8),intent(in) :: precabx_old ! [kg/m2/s]
-   real(r8),intent(in) :: scavabx_old
-   real(r8),intent(in) :: precnumx_base_old
-   real(r8),intent(in) :: precabx_new ! [kg/m2/s]
-   real(r8),intent(out) :: scavabx_new
-   real(r8),intent(out) :: resusp_x
+   real(r8),intent(in) :: precabx_base_old ! input of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(in) :: precabx_old  ! input of precipitation above this layer [kg/m2/s]
+   real(r8),intent(in) :: scavabx_old  ! input scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(in) :: precnumx_base_old ! precipitation number at cloud base [#/m2/s]
+   real(r8),intent(in) :: precabx_new  ! output of precipitation above this layer [kg/m2/s]
+   real(r8),intent(out) :: scavabx_new ! output scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(out) :: resusp_x    ! aerosol mass re-suspension in a particular layer [kg/m2/s]
 
 
    ! local variables
-   real(r8), parameter :: x_smallaa = 1.0e-30_r8     ! small value for x_old
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
    real(r8)     :: x_ratio      ! fraction of x_tmp/x_old
+   real(r8), parameter :: x_smallaa = 1.0e-30_r8     ! small value for x_old
 
 
    u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
@@ -1156,21 +1083,21 @@ resusp_block_aa: &
                                         ! 2: assume log-normal distribution
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options
    real(r8),intent(in) :: pdel_ik       ! pressure thikness at current column and level [Pa]
-   real(r8),intent(in) :: pprdx
-   real(r8),intent(in) :: srcx
+   real(r8),intent(in) :: pprdx  ! precipitation generation rate [kg/kg/s]
+   real(r8),intent(in) :: srcx   ! scavenging tendency [kg/kg/s]
    real(r8),intent(in) :: arainx ! precipitation and cloudy volume,at the top interface of current layer [fraction]
-   real(r8),intent(in) :: precabx_base_old ! [kg/m2/s]
-   real(r8),intent(in) :: precabx_old ! [kg/m2/s]
-   real(r8),intent(in) :: scavabx_old
-   real(r8),intent(in) :: precnumx_base_old
-   real(r8),intent(out) :: precabx_base_new ! [kg/m2/s]
-   real(r8),intent(out) :: precabx_new ! [kg/m2/s]
-   real(r8),intent(out) :: scavabx_new
-   real(r8),intent(out) :: precnumx_base_new
+   real(r8),intent(in) :: precabx_base_old ! input of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(in) :: precabx_old ! input of precipitation above this layer [kg/m2/s]
+   real(r8),intent(in) :: scavabx_old ! input scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(in) :: precnumx_base_old ! input of rain number at cloud base [#/m2/s]
+   real(r8),intent(out) :: precabx_base_new ! output of precipitation at cloud base [kg/m2/s]
+   real(r8),intent(out) :: precabx_new ! output of precipitation above this layer [kg/m2/s]
+   real(r8),intent(out) :: scavabx_new ! output scavenged tracer flux from above [kg/m2/s]
+   real(r8),intent(out) :: precnumx_base_new ! output of rain number at cloud base [#/m2/s]
 
    ! local variables
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
    real(r8)            :: tmpa ! temporary working variable
+   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
  
    ! initiate *_new in case they are not calculated
    ! precabx_base_new and precabx_new are always calculated
@@ -1218,9 +1145,9 @@ resusp_block_aa: &
    integer, intent(in) :: mam_prevap_resusp_optcc       ! suspension options 
    real(r8),intent(in) :: pdel_ik       ! pressure thikness [Pa]
    real(r8),intent(in) :: omsm          ! 1 - (a small number), to prevent roundoff errors below zero
-   real(r8),intent(in) :: srcc          ! tend for convective rain [kg/kg/s]
-   real(r8),intent(in) :: srcs          ! tend for stratiform rain [kg/kg/s]
-   real(r8),intent(in) :: srct          ! total tendency for conv+strat rain [kg/kg/s]
+   real(r8),intent(in) :: srcc          ! tend for convective rain scavenging [kg/kg/s]
+   real(r8),intent(in) :: srcs          ! tend for stratiform rain scavenging [kg/kg/s]
+   real(r8),intent(in) :: srct          ! total scavenging tendency for conv+strat rain [kg/kg/s]
    real(r8),intent(in) :: fins          ! fraction of rem. rate by strat rain [fraction]
    real(r8),intent(in) :: finc          ! fraction of rem. rate by conv. rain [fraction]
    real(r8),intent(in) :: fracev_st     ! fraction of stratiform precip from above that is evaporating [fraction]
@@ -1240,8 +1167,8 @@ resusp_block_aa: &
    real(r8), intent(out) :: bsscavt_ik  ! below cloud, stratiform [kg/kg/s]
    real(r8), intent(out) :: rcscavt_ik  ! resuspension, convective [kg/kg/s]
    real(r8), intent(out) :: rsscavt_ik  ! resuspension, stratiform [kg/kg/s]
-   real(r8), intent(inout) :: scavabs   ! scavenged tracer flux from above [kg/m2/s]
-   real(r8), intent(inout) :: scavabc   ! scavenged tracer flux from above [kg/m2/s]
+   real(r8), intent(inout) :: scavabs   ! stratiform scavenged tracer flux from above [kg/m2/s]
+   real(r8), intent(inout) :: scavabc   ! convective scavenged tracer flux from above [kg/m2/s]
    real(r8), intent(inout) :: precabc   ! conv precip from above [kg/m2/s]
    real(r8), intent(inout) :: precabs   ! strat precip from above [kg/m2/s]
 
