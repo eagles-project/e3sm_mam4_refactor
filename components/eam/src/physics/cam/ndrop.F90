@@ -1729,7 +1729,7 @@ end subroutine get_aer_mmr_sum
 
 !===============================================================================
 
-subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn_num_local, &!in
+subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn1d_num, &!in
            naerosol) !out
 
   use modal_aero_data, only:numptrcw_amode
