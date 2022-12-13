@@ -443,7 +443,7 @@ subroutine dropmixnuc( &
 !! BJG added below
   integer :: imode       ! mode index
   integer :: kk          ! level index
-  integer :: nspec_max   ! max number of species in a mode
+!!  integer :: nspec_max   ! max number of species in a mode
   real(r8), allocatable  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
   real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
   integer  :: lspec, spc_idx, num_idx, maxspec
@@ -1117,10 +1117,10 @@ subroutine dropmixnuc( &
   !Extract cloud borne MMRs from pbuf 
 
    ! Find max number of species in all the modes
-   nspec_max = nspec_amode(1)
-   do imode = 2, ntot_amode
-      nspec_max = max(nspec_max, nspec_amode(imode))
-   end do
+!!   nspec_max = nspec_amode(1)
+!!   do imode = 2, ntot_amode
+!!      nspec_max = max(nspec_max, nspec_amode(imode))
+!!   end do
 
 
    allocate( qcldbrn(pcols,nspec_max,pver,ntot_amode)   )
@@ -1144,7 +1144,7 @@ subroutine dropmixnuc( &
 
 
 ! BJG   call ccncalc(state_q, temp, lchnk, ncol, pbuf, cs, ccn)
-   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, lchnk, ncol, nspec_max, pbuf, cs, ccn)
+   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    do l = 1, psat
       call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
    enddo
@@ -1470,7 +1470,7 @@ end subroutine maxsat
 
 !===============================================================================
 
-subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, lchnk, ncol, nspec_max, pbuf, cs, ccn)
+subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    ! calculates number concentration of aerosols activated as CCN at
    ! supersaturation supersat.
    ! assumes an internal mixture of a multiple externally-mixed aerosol modes
@@ -1481,13 +1481,8 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, lchnk, ncol, nspec_max, 
   ! input arguments
    real(r8), pointer, intent(in)  :: state_q(:,:,:) ! aerosol mmrs [kg/kg]     
    real(r8), pointer, intent(in)  :: tair(:,:)     ! air temperature [K]
-   integer, intent(in)   :: lchnk ! chunk index
    integer, intent(in)   :: ncol  ! number of columns
-   integer, intent(in)   :: nspec_max     ! max number of species in a mode
    real(r8), intent(in)  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
-
-
-   type(physics_buffer_desc),   pointer       :: pbuf(:)
    real(r8), intent(in)  :: cs(pcols,pver)       ! air density [kg/m3]
 
   ! output arguments
