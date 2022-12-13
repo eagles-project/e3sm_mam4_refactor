@@ -1488,14 +1488,17 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    integer phase ! phase of aerosol
 
    !     mathematical constants
-   real(r8), parameter :: percent_to_fraction = 0.01_r8
-   real(r8), parameter :: per_m3_to_per_cm3 = 1.e-6_r8 
-   real(r8), parameter :: smcoefcoef = 2._r8/sqrt(27._r8)
-   real(r8), parameter :: super(psat) = percent_to_fraction * supersat(psat)
+   real(r8) percent_to_fraction, per_m3_to_per_cm3
+   real(r8) smcoefcoef
+   real(r8) super(psat) ! supersaturation [fraction]
    !-------------------------------------------------------------------------------
 
-
    phase=3 ! interstitial+cloudborne
+
+   percent_to_fraction = 0.01_r8
+   per_m3_to_per_cm3 = 1.e-6_r8
+   super(:)=supersat(:)*percent_to_fraction
+   smcoefcoef=2._r8/sqrt(27._r8)
 
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
 
