@@ -1511,7 +1511,7 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, lchnk, ncol, nspec_max, 
    integer phase ! phase of aerosol
 
    !     mathematical constants
-   real(r8), pct_to_fraction, per_m3_to_per_cm3
+   real(r8) pct_to_fraction, per_m3_to_per_cm3
    real(r8) smcoefcoef
    real(r8) super(psat) ! supersaturation [fraction]
    !-------------------------------------------------------------------------------
