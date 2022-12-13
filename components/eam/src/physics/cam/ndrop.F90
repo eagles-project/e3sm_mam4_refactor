@@ -1651,9 +1651,8 @@ subroutine loadaer( &
      !phase == 3 is interstitial + cldborne
 !  Assumes iphase =1 or 3, so interstitial is always summed, added with cldbrn when present
 !  iphase = 2 would require alternate logic from following subroutine
-     call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,kk,:), & !in
-          vaerosolsum, hygrosum,   & !inout
-          qcldbrn_local(:,:nspec)) !in
+     call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,kk,:), qcldbrn_local(:,:nspec), & !in
+          vaerosolsum, hygrosum)   !inout
 ! BJG  endif
 
   !  Finalize computation of bulk hygrospopicity and volume conc
@@ -1676,18 +1675,16 @@ subroutine loadaer( &
 ! BJG     call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, &!in
 ! BJG          naerosol) !out
 ! BJG  else
-     call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, &!in
-          naerosol, &!out
-          qcldbrn_num_local) !in 
+     call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, qcldbrn_num_local, &!in
+          naerosol)  !out
 ! BJG  endif
 
 end subroutine loadaer
 
 !===============================================================================
 
-subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, & !in
-     vaerosolsum, hygrosum,   & !inout
-     qcldbrn1d) ! in
+subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, qcldbrn1d, & !in
+     vaerosolsum, hygrosum)    !inout
 
   !add these for direct access to mmr (in state_q array), density and hygroscopicity
   use modal_aero_data,   only: lspectype_amode, specdens_amode, spechygro, lmassptr_amode
@@ -1732,9 +1729,8 @@ end subroutine get_aer_mmr_sum
 
 !===============================================================================
 
-subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, &!in
-           naerosol, &!out
-           qcldbrn1d_num)  !in
+subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn_num_local, &!in
+           naerosol) !out
 
   use modal_aero_data, only:numptrcw_amode
 
