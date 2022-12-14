@@ -51,6 +51,7 @@ real(r8) :: surften       ! surface tension of water w/respect to air (N/m)
 real(r8) :: alog2, alog3, alogaten
 real(r8) :: third, twothird, sixth, zero
 real(r8) :: sq2, sqpi
+integer  :: nspec_max            ! max number of species in a mode
 
 ! CCN diagnostic fields
 integer,  parameter :: psat=6    ! number of supersaturations to calc ccn concentration
@@ -103,7 +104,7 @@ contains
 subroutine ndrop_init
 
    integer  :: ii, l, lptr, m, mm
-   integer  :: nspec_max            ! max number of species in a mode
+!!! BJG   integer  :: nspec_max            ! max number of species in a mode
    character(len=32)   :: tmpname
    character(len=32)   :: tmpname_cw
    character(len=128)  :: long_name
