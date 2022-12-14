@@ -308,7 +308,7 @@ subroutine dropmixnuc( &
 
    use output_aerocom_aie , only: do_aerocom_ind3
   !BJG add these for direct access to num, mmr in state_q array.
-   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field
+   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype
 
    ! arguments
    type(physics_state), target, intent(in)    :: state
@@ -1124,7 +1124,8 @@ subroutine dropmixnuc( &
 !!   end do
 
 
-   allocate( qcldbrn(pcols,nspec_max,pver,ntot_amode)   )
+!!! BJG   allocate( qcldbrn(pcols,nspec_max,pver,ntot_amode)   )
+   allocate( qcldbrn(pcols,maxd_aspectype,pver,ntot_amode)   )
    allocate( qcldbrn_num(pcols,pver,ntot_amode)   )
 
    qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
