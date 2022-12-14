@@ -453,26 +453,6 @@ subroutine dropmixnuc( &
    lchnk = state%lchnk
    ncol  = state%ncol
 
-  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
-
-   ! Extract cloud borne MMRs from pbuf 
-
-   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
-   do imode=1,ntot_amode
-      do kk=top_lev,pver
-         do lspec =1, nspec_amode(imode)
-           spc_idx = lmassptrcw_amode(lspec,imode)
-           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
-           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
-         enddo
-         num_idx = numptrcw_amode(imode)
-         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
-         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
-      enddo
-   enddo
-
-  !End note for C++ port
-
    ncldwtr  => state%q(:,:,numliq_idx)
    temp     => state%t
    omega    => state%omega
@@ -1128,6 +1108,26 @@ subroutine dropmixnuc( &
    call outfld('NDROPSRC', nsource,  pcols, lchnk)
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
+
+  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+
+   ! Extract cloud borne MMRs from pbuf 
+
+   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
+   do imode=1,ntot_amode
+      do kk=top_lev,pver
+         do lspec =1, nspec_amode(imode)
+           spc_idx = lmassptrcw_amode(lspec,imode)
+           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
+           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
+         enddo
+         num_idx = numptrcw_amode(imode)
+         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
+      enddo
+   enddo
+
+  !End note for C++ port
 
    call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    do l = 1, psat
