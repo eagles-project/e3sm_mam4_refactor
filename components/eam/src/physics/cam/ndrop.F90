@@ -445,7 +445,8 @@ subroutine dropmixnuc( &
   integer :: imode       ! mode index
   integer :: kk          ! level index
 !!  integer :: nspec_max   ! max number of species in a mode
-  real(r8), allocatable  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+!!  real(r8), allocatable  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+  real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode), qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
   real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
   integer  :: lspec, spc_idx, num_idx, maxspec
 
@@ -1125,8 +1126,8 @@ subroutine dropmixnuc( &
 
 
 !!! BJG   allocate( qcldbrn(pcols,nspec_max,pver,ntot_amode)   )
-   allocate( qcldbrn(pcols,maxd_aspectype,pver,ntot_amode)   )
-   allocate( qcldbrn_num(pcols,pver,ntot_amode)   )
+!!! BJG   allocate( qcldbrn(pcols,maxd_aspectype,pver,ntot_amode)   )
+!!! BJG   allocate( qcldbrn_num(pcols,pver,ntot_amode)   )
 
    qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
    do imode=1,ntot_amode
@@ -1215,7 +1216,7 @@ subroutine dropmixnuc( &
       fluxm       )
 
 ! BJG line below added
-   deallocate( qcldbrn, qcldbrn_num )
+!! BJG   deallocate( qcldbrn, qcldbrn_num )
 
 
 end subroutine dropmixnuc
