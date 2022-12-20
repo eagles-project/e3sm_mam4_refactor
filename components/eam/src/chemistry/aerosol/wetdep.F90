@@ -303,12 +303,12 @@ subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
    real(r8), intent(out) :: rain(pcols,pver)     ! mixing ratio of rain [kg/kg]
 
    ! Local variables:
-   real(r8) sumppr_all(pcols,pver)    ! precipitation rate in all vertical levels [kg/m2/s]
-   real(r8) lprec(pcols,pver)         ! local production rate of precip [kg/m2/s]
-   real(r8) sumppr_cu_all(pcols,pver) ! same as sumppr_all but for conv.precip. calculated but not used
-   real(r8) lprec_cu(pcols,pver)      ! Local production rate of convective precip [kg/m2/s]
-   real(r8) sumppr_st_all(pcols,pver) ! same as sumppr_all but for strat.precip. calculated but not used
-   real(r8) lprec_st(pcols,pver)      ! Local production rate of stratiform precip [kg/m2/s]
+   real(r8) :: sumppr_all(pcols,pver)    ! precipitation rate in all vertical levels [kg/m2/s]
+   real(r8) :: lprec(pcols,pver)         ! local production rate of precip [kg/m2/s]
+   real(r8) :: sumppr_cu_all(pcols,pver) ! same as sumppr_all but for conv.precip. calculated but not used
+   real(r8) :: lprec_cu(pcols,pver)      ! Local production rate of convective precip [kg/m2/s]
+   real(r8) :: sumppr_st_all(pcols,pver) ! same as sumppr_all but for strat.precip. calculated but not used
+   real(r8) :: lprec_st(pcols,pver)      ! Local production rate of stratiform precip [kg/m2/s]
    ! -----------------------------------------------------------------------
 
    !calculate local precipitation rate
@@ -343,7 +343,7 @@ subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
     real(r8), intent(out) :: lprec(pcols,pver)     ! local production rate of precip [kg/m2/s]
 
     ! Local variables:
-    integer  icol, kk
+    integer :: icol, kk
 
     !calculate local precipitation rate
     do icol=1,ncol
@@ -374,11 +374,12 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    real(r8), intent(out) :: sumppr_all(pcols,pver) ! sum of precipitation rate above each layer, for calling rain_mix_ratio use [kg/m2/s]
 
    ! Local variables:
-   integer  icol,kk
-   real(r8) sumppr(pcols)        ! precipitation rate [kg/m2/s]
-   real(r8) sumpppr(pcols)       ! sum of positive precips from above
-   real(r8) cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
-   real(r8) lprecp               ! local production rate of precip [kg/m2/s] if positive
+   integer :: icol,kk
+   real(r8) :: sumppr(pcols)        ! precipitation rate [kg/m2/s]
+   real(r8) :: sumpppr(pcols)       ! sum of positive precips from above
+   real(r8) :: cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
+   real(r8) :: lprecp               ! local production rate of precip [kg/m2/s] if positive
+   real(r8), parameter :: small_value = 1.e-30_r8    ! small value to avoid divided by zero
 
 
    ! initiate variables
@@ -397,7 +398,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
              ! Neglect the current layer.
              cldv(icol,kk) = max( min(1._r8,cldv1(icol)/sumpppr(icol)) * (sumppr(icol)/sumpppr(icol)), 0._r8)
          endif
-         lprecp = max(lprec(icol,kk), 1.e-30_r8)
+         lprecp = max(lprec(icol,kk), small_value)
          cldv1(icol) = cldv1(icol)  + cld(icol,kk)*lprecp
          sumppr(icol) = sumppr(icol) + lprec(icol,kk)
          sumppr_all(icol,kk) = sumppr(icol)      ! save all sumppr to callrain_mix_ratio
@@ -570,7 +571,9 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8) :: rcscavt_ik    ! resuspension, convective tends at current (icol,kk) [kg/kg/s]
       real(r8) :: rsscavt_ik    ! resuspension, stratiform tends at current (icol,kk) [kg/kg/s]
 
-      real(r8), parameter ::   omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
+      real(r8), parameter :: small_value_12 = 1.e-12_r8    ! small value to avoid divided by zero
+      real(r8), parameter :: small_value_36 = 1.e-36_r8    ! small value to avoid divided by zero
+      real(r8), parameter :: omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
 
 
 main_i_loop: &
@@ -620,7 +623,7 @@ main_k_loop: &
             ! is a LWC/IWC that has already precipitated out, that is, 'conicw' does
             ! not contain precipitation at all !
             fracp = cmfdqr(icol,kk)*deltat / &
-max(1.e-12_r8,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*deltat)
+                    max(small_value_12,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*deltat)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp) * cldc(icol,kk)
             call wetdep_scavenging(                                &
                         2,              is_strat_cloudborne,       & ! in, 2 for convective
@@ -633,7 +636,7 @@ max(1.e-12_r8,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*delta
             ! now do the stratiform scavenging
 
             ! fracp: fraction of convective cloud water converted to rain
-            fracp = precs(icol,kk)*deltat/max(cwat(icol,kk)+precs(icol,kk)*deltat,1.e-12_r8)
+            fracp = precs(icol,kk)*deltat/max(cwat(icol,kk)+precs(icol,kk)*deltat,small_value_12)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp)
             call wetdep_scavenging(                                & 
                         1,              is_strat_cloudborne,       & ! in, 1 for stratiform
@@ -646,7 +649,7 @@ max(1.e-12_r8,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*delta
 
             ! make sure we dont take out more than is there
             ! ratio of amount available to amount removed
-            rat = tracer(icol,kk)/max(deltat*(srcc+srcs),1.e-36_r8)
+            rat = tracer(icol,kk)/max(deltat*(srcc+srcs),small_value_36)
             if (rat.lt.1._r8) then
                srcs = srcs*rat
                srcc = srcc*rat
@@ -656,7 +659,7 @@ max(1.e-12_r8,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*delta
             
             ! fraction that is not removed within the cloud
             ! (assumed to be interstitial, and subject to convective transport)
-            fracp = deltat*srct/max(cldvst(icol,kk)*tracer(icol,kk),1.e-36_r8)
+            fracp = deltat*srct/max(cldvst(icol,kk)*tracer(icol,kk),small_value_36)
             fracis(icol,kk) = 1._r8 - min_max_bound(0.0_r8, 1.0_r8, fracp)
 
             ! ****************** Resuspension **************************
@@ -755,10 +758,13 @@ resusp_block_aa: &
    real(r8),intent(in) :: precabx       ! precipitation from above [kg/m2/s] 
    real(r8),intent(out) :: fracevx      ! fraction of evaporation [fraction]
 
+   real(r8), parameter :: small_value = 1.e-12_r8    ! small value to avoid divided by zero
+
+
    if (mam_prevap_resusp_optcc == 0) then
         fracevx = 0.0_r8
    else
-        fracevx = evap_ik*pdel_ik/gravit/max(1.e-12_r8,precabx)
+        fracevx = evap_ik*pdel_ik/gravit/max(small_value,precabx)
         ! trap to ensure reasonable ratio bounds
         fracevx = min_max_bound(0._r8, 1._r8, fracevx)
    endif
@@ -806,6 +812,7 @@ resusp_block_aa: &
    real(r8) :: src1      ! incloud scavenging tendency [kg/kg/s]
    real(r8) :: src2      ! below-cloud scavenging tendency [kg/kg/s]
    real(r8) :: odds      ! limit on removal rate (proportional to prec) [fraction]
+   real(r8), parameter :: small_value = 1.e-36_r8    ! small value to avoid divided by zero
    real(r8), parameter :: small_fraction = 1.e-5_r8     ! small value of area fraction to avoid divided by zero
 
    ! calculate limitation of removal rate using Dana and Hales coefficient
@@ -836,7 +843,7 @@ resusp_block_aa: &
    endif
 
    src = src1 + src2             ! total stratiform or convective scavenging
-   fin=src1/(src + 1.e-36_r8)    ! fraction taken by incloud processes
+   fin=src1/(src + small_value)    ! fraction taken by incloud processes
 
    end subroutine wetdep_scavenging
 
