@@ -458,13 +458,12 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
 end subroutine rain_mix_ratio
 
 !==============================================================================
-subroutine wetdepa_v2( ncol, deltat, &
-                       t, p, q, pdel, &
+subroutine wetdepa_v2( ncol, deltat,  pdel, &
                        cmfdqr, evapc, dlf, conicw, &
-                       precs, conds, evaps, cwat, &
-                       cldt, cldc, cldv, cldvcu, cldvst, &
-                       sol_factb, sol_factbi, sol_facti, sol_factii, sol_factic, sol_factiic, &
-                       mam_prevap_resusp_optcc, is_strat_cloudborne, scavcoef, rate1ord_cw2pr_st, f_act_conv, &
+                       precs, evaps, cwat, &
+                       cldt, cldc, cldvcu, cldvst, &
+                       sol_factb, sol_facti, sol_factic, &
+                       mam_prevap_resusp_optcc, is_strat_cloudborne, scavcoef, f_act_conv, &
                        tracer, qqcw, &
                        fracis, scavt, iscavt, &
                        icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt )
@@ -490,24 +489,18 @@ subroutine wetdepa_v2( ncol, deltat, &
 
       integer, intent(in) :: ncol
 
-      ! C++ refactor: t, p, q, conds,cldv seems not used and can be removed
       real(r8), intent(in) ::&
          deltat,               &! time step [s]
-         t(pcols,pver),        &! temperature
-         p(pcols,pver),        &! pressure
-         q(pcols,pver),        &! moisture
          pdel(pcols,pver),     &! pressure thikness [Pa]
          cmfdqr(pcols,pver),   &! rate of production of convective precip [kg/kg/s]
          evapc(pcols,pver),    &! Evaporation rate of convective precipitation [kg/kg/s]
          dlf(pcols,pver),      &! Detrainment of convective condensate [kg/kg/s]
          conicw(pcols,pver),   &! convective cloud water [kg/kg]
          precs(pcols,pver),    &! rate of production of stratiform precip [kg/kg/s]
-         conds(pcols,pver),    &! rate of production of condensate [kg/kg/s]
          evaps(pcols,pver),    &! rate of evaporation of precip [kg/kg/s]
          cwat(pcols,pver),     &! cloud water amount [kg/kg] 
          cldt(pcols,pver),     &! total cloud fraction [fraction]
          cldc(pcols,pver),     &! convective cloud fraction [fraction]
-         cldv(pcols,pver),     &! total cloud fraction [fraction]
          cldvcu(pcols,pver),   &! Convective precipitation area at the top interface of each layer [fraction]
          cldvst(pcols,pver),   &! Stratiform precipitation area at the top interface of each layer [fraction]
          tracer(pcols,pver)     ! trace species [kg/kg]
@@ -525,9 +518,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       ! is_strat_cloudborne = .true. if tracer is stratiform-cloudborne aerosol; else .false. 
       logical,  intent(in) :: is_strat_cloudborne   
       real(r8), intent(in) :: scavcoef(pcols,pver) ! Dana and Hales coefficient [1/mm]
-      ! rate1ord_cw2pr_st = 1st order rate for strat cw to precip (1/s)
-      ! C++ porting: this variable seems not used 
-      real(r8), intent(in) :: rate1ord_cw2pr_st(pcols,pver)     ! [1/s]
       ! f_act_conv = conv-cloud activation fraction when is_strat_cloudborne==.false.; else 0.0 
       real(r8), intent(in) :: f_act_conv(pcols,pver) ! [fraction]
       ! qqcw = strat-cloudborne aerosol corresponding to tracer when is_strat_cloudborne==.false.; else 0.0
@@ -535,11 +525,6 @@ subroutine wetdepa_v2( ncol, deltat, &
       real(r8), intent(in) :: sol_factb   ! solubility factor (frac of aerosol scavenged below cloud) [fraction]
       real(r8), intent(in) :: sol_facti   ! solubility factor (frac of aerosol scavenged in cloud) [fraction]
       real(r8), intent(in) :: sol_factic(pcols,pver)  ! sol_facti for convective clouds [fraction]
-      ! C++ refactor: Ice cloud is neglected with ice fraction forced with zero.
-      ! sol_fracbi, sol_fractii and sol_fractiic are not used and can be removed
-      real(r8), intent(in) :: sol_factbi  ! solubility factor (frac of aerosol scavenged below cloud by ice) [fraction]
-      real(r8), intent(in) :: sol_factii  ! solubility factor (frac of aerosol scavenged in cloud by ice) [fraction]
-      real(r8), intent(in) :: sol_factiic ! sol_factii for convective clouds [fraction]
          
       real(r8), intent(out) :: fracis(pcols,pver)  ! fraction of species not scavenged [fraction]
       real(r8), intent(out) :: scavt(pcols,pver)   ! scavenging tend [kg/kg/s]

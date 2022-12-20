@@ -1777,14 +1777,13 @@ lphase_jnmw_conditional: &
                 endif
 
                 call wetdepa_v2( &
-                     ncol, dt, &
-                     state%t, state%pmid, state%q(:,:,1), state%pdel, &
+                     ncol, dt, state%pdel, &
                      dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
-                     dep_inputs%prain, dep_inputs%qme, dep_inputs%evapr, dep_inputs%totcond, &
+                     dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
                      dep_inputs%cldt, dep_inputs%cldcu, &
-                     dep_inputs%cldv, dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     sol_factb, sol_factbi, sol_facti, sol_factii, sol_factic, sol_factiic, &
-                     mam_prevap_resusp_optcc, .false., scavcoefnv(:,:,jnv), rate1ord_cw2pr_st, f_act_conv, &
+                     dep_inputs%cldvcu, dep_inputs%cldvst, &
+                     sol_factb, sol_facti, sol_factic, &
+                     mam_prevap_resusp_optcc, .false., scavcoefnv(:,:,jnv), f_act_conv, &
                      q_tmp, qqcw_in(:,:), &
                      fracis(:,:,mm), dqdt_tmp, iscavt, &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt )
@@ -2020,14 +2019,13 @@ do_lphase2_conditional: &
                    endif
                    
                 call wetdepa_v2( &
-                     ncol, dt, &
-                     state%t, state%pmid, state%q(:,:,1), state%pdel, &
+                     ncol, dt, state%pdel, &
                      dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
-                     dep_inputs%prain, dep_inputs%qme, dep_inputs%evapr, dep_inputs%totcond, &
+                     dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
                      dep_inputs%cldt, dep_inputs%cldcu, &
-                     dep_inputs%cldv, dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     sol_factb, sol_factbi, sol_facti, sol_factii, sol_factic, sol_factiic, &
-                     mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), rate1ord_cw2pr_st, f_act_conv, &
+                     dep_inputs%cldvcu, dep_inputs%cldvst, &
+                     sol_factb, sol_facti, sol_factic, &
+                     mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, &
                      fldcw, qqcw_tmp,  &
                      fracis_cw, dqdt_tmp, iscavt, &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
