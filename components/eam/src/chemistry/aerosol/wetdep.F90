@@ -9,10 +9,7 @@ module wetdep
 use shr_kind_mod, only: r8 => shr_kind_r8
 use ppgrid,       only: pcols, pver
 use physconst,    only: gravit, rair, tmelt
-use phys_control, only: cam_physpkg_is
-use cam_logfile,  only: iulog
 use cam_abortutils, only: endrun
-use spmd_utils,     only: masterproc
 use mam_support,  only: min_max_bound
 
 implicit none
@@ -28,9 +25,7 @@ public :: wetdep_init
 public :: wetdep_inputs_set
 public :: wetdep_inputs_unset
 
-real(r8), parameter :: cmftau = 3600._r8
 real(r8), parameter :: rhoh2o = 1000._r8            ! density of water
-real(r8), parameter :: molwta = 28.97_r8            ! molecular weight dry air gm/mole
 
 type wetdep_inputs_t
    real(r8), pointer :: cldt(:,:) => null()  ! cloud fraction
@@ -99,7 +94,6 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
 ! -----------------------------------------------------------------------------
 
 
-  use phys_control,   only: cam_physpkg_is
   use physics_types,  only: physics_state
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
 
@@ -441,8 +435,9 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
    real(r8) :: vfall
 
    ! define the constant convfw. taken from findmcnew, do not find the reference
-   ! of the equation  -- by Shuaiqi when refactoring
+   ! of the equation  -- by Shuaiqi when refactoring for C++
    convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
+
    do kk = 1,pver
      do icol = 1,ncol
          rain(icol,kk) = 0._r8
