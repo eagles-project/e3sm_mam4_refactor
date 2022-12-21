@@ -492,10 +492,10 @@ end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
 
-subroutine modal_aero_wateruptake_sub( &
-   ncol, nmodes, rhcrystal, rhdeliques, dryrad, &
-   hygro, rh, dryvol, wetrad, wetvol,           &
-   wtrvol)
+   subroutine modal_aero_wateruptake_sub(               &
+           ncol,    nmodes, rhcrystal, rhdeliques,      & ! in
+           dryrad,  hygro,  rh,        dryvol,          & ! in
+           wetrad,  wetvol, wtrvol                      ) ! out
 
 !-----------------------------------------------------------------------
 !
@@ -511,62 +511,64 @@ subroutine modal_aero_wateruptake_sub( &
    integer, intent(in)  :: ncol                    ! number of columns
    integer, intent(in)  :: nmodes
 
-   real(r8), intent(in) :: rhcrystal(:)
-   real(r8), intent(in) :: rhdeliques(:)
-   real(r8), intent(in) :: dryrad(:,:,:)         ! dry volume mean radius of aerosol (m)
-   real(r8), intent(in) :: hygro(:,:,:)          ! volume-weighted mean hygroscopicity (--)
-   real(r8), intent(in) :: rh(:,:)               ! relative humidity (0-1)
+   real(r8), intent(in) :: rhcrystal(:)          ! crystal RH [fraction]
+   real(r8), intent(in) :: rhdeliques(:)         ! deliques RH [Fraction]
+   real(r8), intent(in) :: dryrad(:,:,:)         ! dry volume mean radius of aerosol [m]
+   real(r8), intent(in) :: hygro(:,:,:)          ! volume-weighted mean hygroscopicity [unitless]
+   real(r8), intent(in) :: rh(:,:)               ! relative humidity [fraction]
    real(r8), intent(in) :: dryvol(:,:,:)
 
-   real(r8), intent(out) :: wetrad(:,:,:)        ! wet radius of aerosol (m)
-   real(r8), intent(out) :: wetvol(:,:,:)        ! single-particle-mean wet volume (m3)
-   real(r8), intent(out) :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol (m3)
+   real(r8), intent(out) :: wetrad(:,:,:)        ! wet radius of aerosol [m]
+   real(r8), intent(out) :: wetvol(:,:,:)        ! single-particle-mean wet volume [m^3]
+   real(r8), intent(out) :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
 
    ! local variables
 
-   integer :: i, k, m
+   integer :: icol, kk, imode
 
    real(r8) :: hystfac                ! working variable for hysteresis
    !-----------------------------------------------------------------------
 
 
    ! loop over all aerosol modes
-   do m = 1, nmodes
+   do imode = 1, nmodes
 
-      hystfac = 1.0_r8 / max(1.0e-5_r8, (rhdeliques(m) - rhcrystal(m)))
+      hystfac = 1.0_r8 / max(1.0e-5_r8, (rhdeliques(imode) - rhcrystal(imode)))
 
-      do k = top_lev, pver
-         do i = 1, ncol
+      do kk = top_lev, pver
+         do icol = 1, ncol
 
             ! compute wet radius for each mode
-            call modal_aero_kohler(dryrad(i,k,m), hygro(i,k,m), rh(i,k), wetrad(i,k,m))
+            call modal_aero_kohler(dryrad(icol,kk,imode),               & ! in
+                                hygro(icol,kk,imode), rh(icol,kk),      & ! in
+                                wetrad(icol,kk,imode)                   ) ! out
 
-            wetrad(i,k,m) = max(wetrad(i,k,m), dryrad(i,k,m))
-            wetvol(i,k,m) = pi43*wetrad(i,k,m)**3
-            wetvol(i,k,m) = max(wetvol(i,k,m), dryvol(i,k,m))
-            wtrvol(i,k,m) = wetvol(i,k,m) - dryvol(i,k,m)
-            wtrvol(i,k,m) = max(wtrvol(i,k,m), 0.0_r8)
+            wetrad(icol,kk,imode) = max(wetrad(icol,kk,imode), dryrad(icol,kk,imode))
+            wetvol(icol,kk,imode) = pi43*wetrad(icol,kk,imode)**3
+            wetvol(icol,kk,imode) = max(wetvol(icol,kk,imode), dryvol(icol,kk,imode))
+            wtrvol(icol,kk,imode) = wetvol(icol,kk,imode) - dryvol(icol,kk,imode)
+            wtrvol(icol,kk,imode) = max(wtrvol(icol,kk,imode), 0.0_r8)
 
             ! apply simple treatment of deliquesence/crystallization hysteresis
             ! for rhcrystal < rh < rhdeliques, aerosol water is a fraction of
             ! the "upper curve" value, and the fraction is a linear function of rh
-            if (rh(i,k) < rhcrystal(m)) then
-               wetrad(i,k,m) = dryrad(i,k,m)
-               wetvol(i,k,m) = dryvol(i,k,m)
-               wtrvol(i,k,m) = 0.0_r8
-            else if (rh(i,k) < rhdeliques(m)) then
-               wtrvol(i,k,m) = wtrvol(i,k,m)*hystfac*(rh(i,k) - rhcrystal(m))
-               wtrvol(i,k,m) = max(wtrvol(i,k,m), 0.0_r8)
-               wetvol(i,k,m) = dryvol(i,k,m) + wtrvol(i,k,m)
-               wetrad(i,k,m) = (wetvol(i,k,m)/pi43)**third
-            end if
+            if (rh(icol,kk) < rhcrystal(imode)) then
+               wetrad(icol,kk,imode) = dryrad(icol,kk,imode)
+               wetvol(icol,kk,imode) = dryvol(icol,kk,imode)
+               wtrvol(icol,kk,imode) = 0.0_r8
+            elseif (rh(icol,kk) < rhdeliques(imode)) then
+               wtrvol(icol,kk,imode) = wtrvol(icol,kk,imode)*hystfac*(rh(icol,kk) - rhcrystal(imode))
+               wtrvol(icol,kk,imode) = max(wtrvol(icol,kk,imode), 0.0_r8)
+               wetvol(icol,kk,imode) = dryvol(icol,kk,imode) + wtrvol(icol,kk,imode)
+               wetrad(icol,kk,imode) = (wetvol(icol,kk,imode)/pi43)**third
+            endif
 
-         end do  ! columns
-      end do     ! levels
+         enddo  ! columns
+      enddo     ! levels
 
-   end do ! modes
+   enddo ! modes
 
-end subroutine modal_aero_wateruptake_sub
+   end subroutine modal_aero_wateruptake_sub
 
 !-----------------------------------------------------------------------
    subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
