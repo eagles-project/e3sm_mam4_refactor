@@ -15,7 +15,9 @@ use cam_history,      only: addfld, add_default, outfld
 use cam_logfile,      only: iulog
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 use phys_control,     only: phys_getopts
-use cam_abortutils,       only: endrun
+use cam_abortutils,   only: endrun
+use mam_support,      only: min_max_bound
+
 
 implicit none
 private
@@ -567,8 +569,8 @@ subroutine modal_aero_wateruptake_sub( &
 end subroutine modal_aero_wateruptake_sub
 
 !-----------------------------------------------------------------------
-   subroutine modal_aero_kohler(   &
-          rdry_in, hygro, rh, rwet_out )
+   subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
+                                 rwet_out               ) ! out
 
 ! calculates equlibrium radius r of haze droplets as function of
 ! dry particle mass and relative humidity s using kohler solution
@@ -606,18 +608,21 @@ end subroutine modal_aero_wateruptake_sub
    real(r8), parameter :: tair = 273._r8    
    real(r8), parameter :: third = 1._r8/3._r8
    real(r8), parameter :: ugascon = 8.3e7_r8
-
+   real(r8), parameter :: factor_um2m = 1.e-6_r8  ! convert micron to m
+   real(r8), parameter :: factor_m2um = 1.e6_r8   ! convert m to micron
+   real(r8), parameter :: small_rh = 1.e-10_r8    ! small value to avoid zero
+   real(r8), parameter :: small_vol = 1.e-12_r8   ! small value to avoid zero
+   real(r8), parameter :: rmax = 30._r8           ! upper bound of radius [microns]
 
 !  effect of organics on surface tension is neglected
    aa=2.e4_r8*mw*surften/(ugascon*tair*rhow)
  
-   rdry = rdry_in*1.0e6_r8   ! convert (m) to (microns)
+   rdry = rdry_in*factor_m2um   ! convert (m) to (microns)
    vol = rdry**3          ! vol is r**3, not volume
    bb = vol*hygro
 
 !  quartic
-   ss = min(rh,1._r8-eps)
-   ss = max(ss,1.e-10_r8)
+   ss = min_max_bound(small_rh, 1._r8-eps, rh)
    slog = log(ss)
    p43 = -aa/slog
    p42 = 0._r8
@@ -628,9 +633,9 @@ end subroutine modal_aero_wateruptake_sub
    p31 = -bb/aa
    p30 = -vol
 
-   if(vol.le.1.e-12_r8) then
+   if(vol .le. small_vol) then
          rwet=rdry
-         rwet_out = rwet*1.e-6_r8
+         rwet_out = rwet*factor_um2m
          return
    endif
 
@@ -680,8 +685,8 @@ end subroutine modal_aero_wateruptake_sub
    endif
 
 ! bound and convert from microns to m
-   rwet = min(rwet,30._r8) ! upper bound based on 1 day lifetime
-   rwet_out = rwet*1.e-6_r8
+   rwet = min(rwet, rmax) ! upper bound based on 1 day lifetime
+   rwet_out = rwet*factor_um2m
 
    return
    end subroutine modal_aero_kohler
