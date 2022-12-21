@@ -596,7 +596,6 @@ end subroutine modal_aero_wateruptake_sub
    real(r8) :: ss          ! relative humidity (1 = saturated) [fraction]
    real(r8) :: slog        ! log relative humidity
    real(r8) :: vol         ! total volume of particle [microns**3]
-   real(r8) :: xi, xr      ! temporary variables
 
    complex(r8) :: cx4(4),cx3(3) ! output of polynomials
 
@@ -642,18 +641,7 @@ end subroutine modal_aero_wateruptake_sub
    else
        call makoh_quartic(cx4,p43,p42,p41,p40)
 !      find smallest real(r8) solution
-       rwet = 1000._r8*rdry
-       nsol=0
-       do nn=1,4
-              xr = real(cx4(nn))
-              xi = aimag(cx4(nn))
-              if(abs(xi).gt.abs(xr)*eps) cycle  
-              if(xr.gt.rwet) cycle  
-              if(xr.lt.rdry*(1._r8-eps)) cycle  
-              if(xr.ne.xr) cycle  
-              rwet = xr
-              nsol = nn
-       enddo
+       call find_real_solution( rdry, cx4, rwet,nsol)
        if(nsol.eq.0)then
               write(iulog,*)   &
                'ccm kohlerc - no real(r8) solution found (quartic)'
@@ -675,18 +663,7 @@ end subroutine modal_aero_wateruptake_sub
        else
             call makoh_cubic(cx3,p32,p31,p30)
 !           find smallest real(r8) solution
-            rwet = 1000._r8*rdry
-            nsol=0
-            do nn=1,3
-                 xr=real(cx3(nn))
-                 xi=aimag(cx3(nn))
-                 if(abs(xi).gt.abs(xr)*eps) cycle  
-                 if(xr.gt.rwet) cycle  
-                 if(xr.lt.rdry*(1._r8-eps)) cycle  
-                 if(xr.ne.xr) cycle  
-                 rwet=xr
-                 nsol=nn
-            enddo  
+            call find_real_solution( rdry, cx3, rwet,nsol) 
             if(nsol.eq.0)then
                  write(iulog,*)   &
                   'ccm kohlerc - no real(r8) solution found (cubic)'
@@ -808,6 +785,41 @@ end subroutine modal_aero_wateruptake_sub
 
    return
    end subroutine makoh_quartic
+
+!----------------------------------------------------------------------
+   subroutine find_real_solution(               &
+                rdry,   cx,                     & ! in
+                rwet,   nsol                    ) ! out
+!
+!  find the smallest real solution from the polynomial solver
+!
+   real(r8),    intent(in) :: rdry      ! dry radius
+   complex(r8), intent(in) :: cx(:)     ! polynomial output
+   real(r8),    intent(out) :: rwet     ! wet radius
+   integer,     intent(out) :: nsol     ! index of the solution
+
+   ! local variables
+   integer  :: n_cx     ! length of cx
+   integer  :: nn       ! index of cx
+   real(r8) :: xr, xi   ! real and image part of cx
+   real(r8), parameter :: eps = 1.e-4_r8
+
+   n_cx = size(cx, dim=1)
+
+   rwet = 1000._r8*rdry
+   nsol = 0
+   do nn=1,n_cx
+       xr = real(cx(nn))
+       xi = aimag(cx(nn))
+       if(abs(xi).gt.abs(xr)*eps) cycle
+       if(xr.gt.rwet) cycle
+       if(xr.lt.rdry*(1._r8-eps)) cycle
+       if(xr.ne.xr) cycle
+       rwet = xr
+       nsol = nn
+   enddo
+
+   end subroutine find_real_solution
 
 !----------------------------------------------------------------------
 
