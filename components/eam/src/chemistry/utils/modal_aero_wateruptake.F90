@@ -170,7 +170,6 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 
-
 subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnumwet_m, &
                                      qaerwat_m, wetdens_m, clear_rh_in)
 
@@ -568,7 +567,7 @@ subroutine modal_aero_wateruptake_sub( &
 end subroutine modal_aero_wateruptake_sub
 
 !-----------------------------------------------------------------------
-      subroutine modal_aero_kohler(   &
+   subroutine modal_aero_kohler(   &
           rdry_in, hygro, s, rwet_out, im )
 
 ! calculates equlibrium radius r of haze droplets as function of
@@ -577,41 +576,41 @@ end subroutine modal_aero_wateruptake_sub
 
 ! for multiple aerosol types, assumes an internal mixture of aerosols
 
-      implicit none
+   implicit none
 
 ! arguments
-      integer :: im         ! number of grid points to be processed
-      real(r8) :: rdry_in(:)    ! aerosol dry radius (m)
-      real(r8) :: hygro(:)      ! aerosol volume-mean hygroscopicity (--)
-      real(r8) :: s(:)          ! relative humidity (1 = saturated)
-      real(r8) :: rwet_out(:)   ! aerosol wet radius (m)
+   integer :: im         ! number of grid points to be processed
+   real(r8) :: rdry_in(:)    ! aerosol dry radius (m)
+   real(r8) :: hygro(:)      ! aerosol volume-mean hygroscopicity (--)
+   real(r8) :: s(:)          ! relative humidity (1 = saturated)
+   real(r8) :: rwet_out(:)   ! aerosol wet radius (m)
 
 ! local variables
-      integer, parameter :: imax=200
-      integer :: i, n, nsol
+   integer, parameter :: imax=200
+   integer :: i, n, nsol
 
-      real(r8) :: a, b
-      real(r8) :: p40(imax),p41(imax),p42(imax),p43(imax) ! coefficients of polynomial
-      real(r8) :: p30(imax),p31(imax),p32(imax) ! coefficients of polynomial
-      real(r8) :: p
-      real(r8) :: r3, r4
-      real(r8) :: r(im)         ! wet radius (microns)
-      real(r8) :: rdry(imax)    ! radius of dry particle (microns)
-      real(r8) :: ss            ! relative humidity (1 = saturated)
-      real(r8) :: slog(imax)    ! log relative humidity
-      real(r8) :: vol(imax)     ! total volume of particle (microns**3)
-      real(r8) :: xi, xr
+   real(r8) :: a, b
+   real(r8) :: p40(imax),p41(imax),p42(imax),p43(imax) ! coefficients of polynomial
+   real(r8) :: p30(imax),p31(imax),p32(imax) ! coefficients of polynomial
+   real(r8) :: p
+   real(r8) :: r3, r4
+   real(r8) :: r(im)         ! wet radius (microns)
+   real(r8) :: rdry(imax)    ! radius of dry particle (microns)
+   real(r8) :: ss            ! relative humidity (1 = saturated)
+   real(r8) :: slog(imax)    ! log relative humidity
+   real(r8) :: vol(imax)     ! total volume of particle (microns**3)
+   real(r8) :: xi, xr
 
-      complex(r8) :: cx4(4,imax),cx3(3,imax)
+   complex(r8) :: cx4(4),cx3(3,imax)
 
-      real(r8), parameter :: eps = 1.e-4_r8
-      real(r8), parameter :: mw = 18._r8
-      real(r8), parameter :: pi = 3.14159_r8
-      real(r8), parameter :: rhow = 1._r8
-      real(r8), parameter :: surften = 76._r8
-      real(r8), parameter :: tair = 273._r8
-      real(r8), parameter :: third = 1._r8/3._r8
-      real(r8), parameter :: ugascon = 8.3e7_r8
+   real(r8), parameter :: eps = 1.e-4_r8
+   real(r8), parameter :: mw = 18._r8
+   real(r8), parameter :: pi = 3.14159_r8
+   real(r8), parameter :: rhow = 1._r8
+   real(r8), parameter :: surften = 76._r8
+   real(r8), parameter :: tair = 273._r8
+   real(r8), parameter :: third = 1._r8/3._r8
+   real(r8), parameter :: ugascon = 8.3e7_r8
 
 
 !     effect of organics on surface tension is neglected
@@ -650,13 +649,13 @@ end subroutine modal_aero_wateruptake_sub
 !          approximate solution for small particles
            r(i)=rdry(i)*(1._r8+p*third/(1._r8-slog(i)*rdry(i)/a))
         else
-           call makoh_quartic(cx4(1,i),p43(i),p42(i),p41(i),p40(i),1)
+           call makoh_quartic(cx4,p43(i),p42(i),p41(i),p40(i))
 !          find smallest real(r8) solution
            r(i)=1000._r8*rdry(i)
            nsol=0
            do n=1,4
-              xr=real(cx4(n,i))
-              xi=aimag(cx4(n,i))
+              xr=real(cx4(n))
+              xi=aimag(cx4(n))
               if(abs(xi).gt.abs(xr)*eps) cycle  
               if(xr.gt.r(i)) cycle  
               if(xr.lt.rdry(i)*(1._r8-eps)) cycle  
@@ -667,7 +666,7 @@ end subroutine modal_aero_wateruptake_sub
            if(nsol.eq.0)then
               write(iulog,*)   &
                'ccm kohlerc - no real(r8) solution found (quartic)'
-              write(iulog,*)'roots =', (cx4(n,i),n=1,4)
+              write(iulog,*)'roots =', (cx4(n),n=1,4)
               write(iulog,*)'p0-p3 =', p40(i), p41(i), p42(i), p43(i)
               write(iulog,*)'rh=',s(i)
               write(iulog,*)'setting radius to dry radius=',rdry(i)
@@ -722,8 +721,8 @@ end subroutine modal_aero_wateruptake_sub
          rwet_out(i) = r(i)*1.e-6_r8
       end do
 
-      return
-      end subroutine modal_aero_kohler
+   return
+   end subroutine modal_aero_kohler
 
 
 !-----------------------------------------------------------------------
@@ -778,65 +777,59 @@ end subroutine modal_aero_wateruptake_sub
 
 
 !-----------------------------------------------------------------------
-      subroutine makoh_quartic( cx, p3, p2, p1, p0, im )
+   subroutine makoh_quartic( cx, p3, p2, p1, p0)
 
 !     solves x**4 + p3 x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2, p3 are real
 !
-      integer, parameter :: imx=200
-      integer :: im
-      real(r8) :: p0(imx), p1(imx), p2(imx), p3(imx)
-      complex(r8) :: cx(4,imx)
+   real(r8), intent(in)     :: p0, p1, p2, p3 
+   complex(r8), intent(out) :: cx(4)
 
-      integer :: i
-      real(r8) :: third, q(imx), r(imx)
-      complex(r8) :: cb(imx), cb0(imx), cb1(imx),   &
-                     crad(imx), cy(imx), czero
+   real(r8) :: third, q, r
+   complex(r8) :: cb, cb0, cb1, crad, cy, czero
+
+   ! set complex zeros and 1/3 values
+   czero=cmplx(0.0_r8,0.0_r8,r8)
+   third=1._r8/3._r8
 
 
-      czero=cmplx(0.0_r8,0.0_r8,r8)
-      third=1._r8/3._r8
+   q=-p2*p2/36._r8+(p3*p1-4._r8*p0)/12._r8
+   r=-(p2/6._r8)**3+p2*(p3*p1-4._r8*p0)/48._r8 + (4._r8*p0*p2-p0*p3*p3-p1*p1)/16._r8
 
-      do 10 i=1,im
+   crad=r*r+q*q*q
+   crad=sqrt(crad)
 
-      q(i)=-p2(i)*p2(i)/36._r8+(p3(i)*p1(i)-4*p0(i))/12._r8
-      r(i)=-(p2(i)/6)**3+p2(i)*(p3(i)*p1(i)-4*p0(i))/48._r8   &
-       +(4*p0(i)*p2(i)-p0(i)*p3(i)*p3(i)-p1(i)*p1(i))/16
+   cb=r-crad
 
-      crad(i)=r(i)*r(i)+q(i)*q(i)*q(i)
-      crad(i)=sqrt(crad(i))
-
-      cb(i)=r(i)-crad(i)
-      if(cb(i).eq.czero)then
+   if(cb.eq.czero)then
 !        insoluble particle
-         cx(1,i)=(-p1(i))**third
-         cx(2,i)=cx(1,i)
-         cx(3,i)=cx(1,i)
-         cx(4,i)=cx(1,i)
-      else
-         cb(i)=cb(i)**third
+         cx(1)=(-p1)**third
+         cx(2)=cx(1)
+         cx(3)=cx(1)
+         cx(4)=cx(1)
+   else
+         cb=cb**third
 
-         cy(i)=-cb(i)+q(i)/cb(i)+p2(i)/6
+         cy=-cb+q/cb+p2/6._r8
 
-         cb0(i)=sqrt(cy(i)*cy(i)-p0(i))
-         cb1(i)=(p3(i)*cy(i)-p1(i))/(2*cb0(i))
+         cb0=sqrt(cy*cy-p0)
+         cb1=(p3*cy-p1)/(2._r8*cb0)
 
-         cb(i)=p3(i)/2+cb1(i)
-         crad(i)=cb(i)*cb(i)-4*(cy(i)+cb0(i))
-         crad(i)=sqrt(crad(i))
-         cx(1,i)=(-cb(i)+crad(i))/2._r8
-         cx(2,i)=(-cb(i)-crad(i))/2._r8
+         cb=p3/2._r8+cb1
+         crad=cb*cb-4._r8*(cy+cb0)
+         crad=sqrt(crad)
+         cx(1)=(-cb+crad)/2._r8
+         cx(2)=(-cb-crad)/2._r8
 
-         cb(i)=p3(i)/2-cb1(i)
-         crad(i)=cb(i)*cb(i)-4*(cy(i)-cb0(i))
-         crad(i)=sqrt(crad(i))
-         cx(3,i)=(-cb(i)+crad(i))/2._r8
-         cx(4,i)=(-cb(i)-crad(i))/2._r8
-      endif
-   10 continue
+         cb=p3/2._r8-cb1
+         crad=cb*cb-4._r8*(cy-cb0)
+         crad=sqrt(crad)
+         cx(3)=(-cb+crad)/2._r8
+         cx(4)=(-cb-crad)/2._r8
+   endif
 
-      return
-      end subroutine makoh_quartic
+   return
+   end subroutine makoh_quartic
 
 !----------------------------------------------------------------------
 
