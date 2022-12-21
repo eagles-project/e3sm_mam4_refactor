@@ -537,7 +537,7 @@ subroutine modal_aero_wateruptake_sub( &
          do i = 1, ncol
 
             ! compute wet radius for each mode
-            call modal_aero_kohler(dryrad(i:i,k,m), hygro(i:i,k,m), rh(i:i,k), wetrad(i:i,k,m), 1)
+            call modal_aero_kohler(dryrad(i:i,k,m), hygro(i:i,k,m), rh(i:i,k), wetrad(i:i,k,m))
 
             wetrad(i,k,m) = max(wetrad(i,k,m), dryrad(i,k,m))
             wetvol(i,k,m) = pi43*wetrad(i,k,m)**3
@@ -568,7 +568,7 @@ end subroutine modal_aero_wateruptake_sub
 
 !-----------------------------------------------------------------------
    subroutine modal_aero_kohler(   &
-          rdry_in, hygro, s, rwet_out, im )
+          rdry_in, hygro, s, rwet_out )
 
 ! calculates equlibrium radius r of haze droplets as function of
 ! dry particle mass and relative humidity s using kohler solution
@@ -579,7 +579,6 @@ end subroutine modal_aero_wateruptake_sub
    implicit none
 
 ! arguments
-   integer :: im         ! number of grid points to be processed
    real(r8) :: rdry_in(:)    ! aerosol dry radius (m)
    real(r8) :: hygro(:)      ! aerosol volume-mean hygroscopicity (--)
    real(r8) :: s(:)          ! relative humidity (1 = saturated)
@@ -594,7 +593,7 @@ end subroutine modal_aero_wateruptake_sub
    real(r8) :: p30(imax),p31(imax),p32(imax) ! coefficients of polynomial
    real(r8) :: p
    real(r8) :: r3, r4
-   real(r8) :: r(im)         ! wet radius (microns)
+   real(r8) :: r(1)         ! wet radius (microns)
    real(r8) :: rdry(imax)    ! radius of dry particle (microns)
    real(r8) :: ss            ! relative humidity (1 = saturated)
    real(r8) :: slog(imax)    ! log relative humidity
@@ -614,9 +613,9 @@ end subroutine modal_aero_wateruptake_sub
 
 
 !     effect of organics on surface tension is neglected
-      a=2.e4_r8*mw*surften/(ugascon*tair*rhow)
+   a=2.e4_r8*mw*surften/(ugascon*tair*rhow)
 
-      do i=1,im
+   i=1
            rdry(i) = rdry_in(i)*1.0e6_r8   ! convert (m) to (microns)
            vol(i) = rdry(i)**3          ! vol is r**3, not volume
            b = vol(i)*hygro(i)
@@ -633,15 +632,11 @@ end subroutine modal_aero_wateruptake_sub
            p32(i)=0._r8
            p31(i)=-b/a
            p30(i)=-vol(i)
-      end do
 
 
-       do 100 i=1,im
-
-!       if(vol(i).le.1.e-20)then
         if(vol(i).le.1.e-12_r8)then
            r(i)=rdry(i)
-           go to 100
+           continue
         endif
 
         p=abs(p31(i))/(rdry(i)*rdry(i))
@@ -713,13 +708,10 @@ end subroutine modal_aero_wateruptake_sub
            r(i)=(r4*(1._r8-s(i))+r3*(s(i)-1._r8+eps))/eps
         endif
 
-  100 continue
 
 ! bound and convert from microns to m
-      do i=1,im
          r(i) = min(r(i),30._r8) ! upper bound based on 1 day lifetime
          rwet_out(i) = r(i)*1.e-6_r8
-      end do
 
    return
    end subroutine modal_aero_kohler
