@@ -601,7 +601,7 @@ end subroutine modal_aero_wateruptake_sub
    real(r8) :: vol(imax)     ! total volume of particle (microns**3)
    real(r8) :: xi, xr
 
-   complex(r8) :: cx4(4),cx3(3,imax)
+   complex(r8) :: cx4(4),cx3(3)
 
    real(r8), parameter :: eps = 1.e-4_r8
    real(r8), parameter :: mw = 18._r8
@@ -683,13 +683,13 @@ end subroutine modal_aero_wateruptake_sub
            if(p.lt.eps)then
               r(i)=rdry(i)*(1._r8+p*third)
            else
-              call makoh_cubic(cx3,p32,p31,p30,im)
+              call makoh_cubic(cx3,p32(i),p31(i),p30(i))
 !             find smallest real(r8) solution
               r(i)=1000._r8*rdry(i)
               nsol=0
               do n=1,3
-                 xr=real(cx3(n,i))
-                 xi=aimag(cx3(n,i))
+                 xr=real(cx3(n))
+                 xi=aimag(cx3(n))
                  if(abs(xi).gt.abs(xr)*eps) cycle  
                  if(xr.gt.r(i)) cycle  
                  if(xr.lt.rdry(i)*(1._r8-eps)) cycle  
@@ -700,7 +700,7 @@ end subroutine modal_aero_wateruptake_sub
               if(nsol.eq.0)then
                  write(iulog,*)   &
                   'ccm kohlerc - no real(r8) solution found (cubic)'
-                 write(iulog,*)'roots =', (cx3(n,i),n=1,3)
+                 write(iulog,*)'roots =', (cx3(n),n=1,3)
                  write(iulog,*)'p0-p2 =', p30(i), p31(i), p32(i)
                  write(iulog,*)'rh=',s(i)
                  write(iulog,*)'setting radius to dry radius=',rdry(i)
@@ -726,54 +726,48 @@ end subroutine modal_aero_wateruptake_sub
 
 
 !-----------------------------------------------------------------------
-      subroutine makoh_cubic( cx, p2, p1, p0, im )
+   subroutine makoh_cubic( cx, p2, p1, p0)
 !
 !     solves  x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2 are real
 !
-      integer, parameter :: imx=200
-      integer :: im
-      real(r8) :: p0(imx), p1(imx), p2(imx)
-      complex(r8) :: cx(3,imx)
+   real(r8) :: p0, p1, p2   ! input parameters
+   complex(r8) :: cx(3)     ! output
 
-      integer :: i
-      real(r8) :: eps, q(imx), r(imx), sqrt3, third
-      complex(r8) :: ci, cq, crad(imx), cw, cwsq, cy(imx), cz(imx)
+   real(r8) :: qq, rr, sqrt3, third  ! temparary variables
+   complex(r8) :: ci, cq, crad, cw, cwsq, cy, cz  ! temparary variables
+   real(r8), parameter :: eps=1.e-20_r8
 
-      save eps
-      data eps/1.e-20_r8/
 
-      third=1._r8/3._r8
-      ci=cmplx(0._r8,1._r8,r8)
-      sqrt3=sqrt(3._r8)
-      cw=0.5_r8*(-1+ci*sqrt3)
-      cwsq=0.5_r8*(-1-ci*sqrt3)
+   third=1._r8/3._r8
+   ci=cmplx(0._r8,1._r8,r8)
+   sqrt3=sqrt(3._r8)
+   cw=0.5_r8*(-1._r8 + ci*sqrt3)
+   cwsq=0.5_r8*(-1._r8 - ci*sqrt3)
 
-      do i=1,im
-      if(p1(i).eq.0._r8)then
+   if(p1.eq.0._r8)then
 !        completely insoluble particle
-         cx(1,i)=(-p0(i))**third
-         cx(2,i)=cx(1,i)
-         cx(3,i)=cx(1,i)
-      else
-         q(i)=p1(i)/3._r8
-         r(i)=p0(i)/2._r8
-         crad(i)=r(i)*r(i)+q(i)*q(i)*q(i)
-         crad(i)=sqrt(crad(i))
+         cx(1) = (-p0)**third
+         cx(2) = cx(1)
+         cx(3) = cx(1)
+   else
+         qq = p1/3._r8
+         rr = p0/2._r8
+         crad = rr*rr + qq*qq*qq
+         crad = sqrt(crad)
 
-         cy(i)=r(i)-crad(i)
-         if (abs(cy(i)).gt.eps) cy(i)=cy(i)**third
-         cq=q(i)
-         cz(i)=-cq/cy(i)
+         cy = rr-crad
+         if (abs(cy).gt.eps) cy=cy**third
+         cq = qq
+         cz = -cq/cy
 
-         cx(1,i)=-cy(i)-cz(i)
-         cx(2,i)=-cw*cy(i)-cwsq*cz(i)
-         cx(3,i)=-cwsq*cy(i)-cw*cz(i)
-      endif
-      enddo
+         cx(1) = -cy-cz
+         cx(2) = -cw*cy - cwsq*cz
+         cx(3) = -cwsq*cy - cw*cz
+   endif
 
-      return
-      end subroutine makoh_cubic
+   return
+   end subroutine makoh_cubic
 
 
 !-----------------------------------------------------------------------
