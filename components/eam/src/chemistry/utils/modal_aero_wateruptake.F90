@@ -785,21 +785,21 @@ end subroutine modal_aero_wateruptake_sub
    real(r8), intent(in)     :: p0, p1, p2, p3 
    complex(r8), intent(out) :: cx(4)
 
-   real(r8) :: third, q, r
-   complex(r8) :: cb, cb0, cb1, crad, cy, czero
+   real(r8) :: third, qq, rr    ! temporary variables
+   complex(r8) :: cb, cb0, cb1, crad, cy, czero ! temporary variables
 
    ! set complex zeros and 1/3 values
    czero=cmplx(0.0_r8,0.0_r8,r8)
    third=1._r8/3._r8
 
 
-   q=-p2*p2/36._r8+(p3*p1-4._r8*p0)/12._r8
-   r=-(p2/6._r8)**3+p2*(p3*p1-4._r8*p0)/48._r8 + (4._r8*p0*p2-p0*p3*p3-p1*p1)/16._r8
+   qq=-p2*p2/36._r8+(p3*p1-4._r8*p0)/12._r8
+   rr=-(p2/6._r8)**3+p2*(p3*p1-4._r8*p0)/48._r8 + (4._r8*p0*p2-p0*p3*p3-p1*p1)/16._r8
 
-   crad=r*r+q*q*q
+   crad=rr*rr + qq*qq*qq
    crad=sqrt(crad)
 
-   cb=r-crad
+   cb=rr-crad
 
    if(cb.eq.czero)then
 !        insoluble particle
@@ -808,24 +808,23 @@ end subroutine modal_aero_wateruptake_sub
          cx(3)=cx(1)
          cx(4)=cx(1)
    else
-         cb=cb**third
+         cb = cb**third
+         cy = -cb + qq/cb + p2/6._r8
 
-         cy=-cb+q/cb+p2/6._r8
+         cb0 = sqrt(cy*cy - p0)
+         cb1 = (p3*cy - p1)/(2._r8*cb0)
 
-         cb0=sqrt(cy*cy-p0)
-         cb1=(p3*cy-p1)/(2._r8*cb0)
+         cb = p3/2._r8 + cb1
+         crad = cb*cb - 4._r8*(cy+cb0)
+         crad = sqrt(crad)
+         cx(1) = (-cb+crad)/2._r8
+         cx(2) = (-cb-crad)/2._r8
 
-         cb=p3/2._r8+cb1
-         crad=cb*cb-4._r8*(cy+cb0)
-         crad=sqrt(crad)
-         cx(1)=(-cb+crad)/2._r8
-         cx(2)=(-cb-crad)/2._r8
-
-         cb=p3/2._r8-cb1
-         crad=cb*cb-4._r8*(cy-cb0)
-         crad=sqrt(crad)
-         cx(3)=(-cb+crad)/2._r8
-         cx(4)=(-cb-crad)/2._r8
+         cb = p3/2._r8-cb1
+         crad = cb*cb - 4._r8*(cy-cb0)
+         crad = sqrt(crad)
+         cx(3) = (-cb+crad)/2._r8
+         cx(4) = (-cb-crad)/2._r8
    endif
 
    return
