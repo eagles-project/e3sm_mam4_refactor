@@ -660,31 +660,6 @@ end subroutine modal_aero_wateruptake_dr
        endif
    endif
 
-   if(rh.gt.1._r8-eps)then
-!      save quartic solution at s=1-eps
-       r4=rwet
-!      cubic for rh=1
-       pp = abs(p31)/(rdry*rdry)
-       if(pp.lt.eps)then
-            rwet = rdry*(1._r8+pp*third)
-       else
-            call makoh_cubic(cx3,p32,p31,p30)
-!           find smallest real(r8) solution
-            call find_real_solution( rdry, cx3, rwet,nsol) 
-            if(nsol.eq.0)then
-                 write(iulog,*)   &
-                  'ccm kohlerc - no real(r8) solution found (cubic)'
-                 write(iulog,*)'roots =', (cx3(nn),nn=1,3)
-                 write(iulog,*)'p0-p2 =', p30, p31, p32
-                 write(iulog,*)'rh=',rh
-                 write(iulog,*)'setting radius to dry radius=',rdry
-                 rwet=rdry
-            endif
-       endif
-       r3=rwet
-!      now interpolate between quartic, cubic solutions
-       rwet = (r4*(1._r8-rh) + r3*(rh-1._r8+eps))/eps
-   endif
 
 ! bound and convert from microns to m
    rwet = min(rwet, rmax) ! upper bound based on 1 day lifetime
@@ -692,51 +667,6 @@ end subroutine modal_aero_wateruptake_dr
 
    return
    end subroutine modal_aero_kohler
-
-
-!-----------------------------------------------------------------------
-   subroutine makoh_cubic( cx, p2, p1, p0)
-!
-!     solves  x**3 + p2 x**2 + p1 x + p0 = 0
-!     where p0, p1, p2 are real
-!
-   real(r8) :: p0, p1, p2   ! input parameters
-   complex(r8) :: cx(3)     ! output
-
-   real(r8) :: qq, rr, sqrt3, third  ! temparary variables
-   complex(r8) :: ci, cq, crad, cw, cwsq, cy, cz  ! temparary variables
-   real(r8), parameter :: eps=1.e-20_r8
-
-
-   third=1._r8/3._r8
-   ci=cmplx(0._r8,1._r8,r8)
-   sqrt3=sqrt(3._r8)
-   cw=0.5_r8*(-1._r8 + ci*sqrt3)
-   cwsq=0.5_r8*(-1._r8 - ci*sqrt3)
-
-   if(p1.eq.0._r8)then
-!        completely insoluble particle
-         cx(1) = (-p0)**third
-         cx(2) = cx(1)
-         cx(3) = cx(1)
-   else
-         qq = p1/3._r8
-         rr = p0/2._r8
-         crad = rr*rr + qq*qq*qq
-         crad = sqrt(crad)
-
-         cy = rr-crad
-         if (abs(cy).gt.eps) cy=cy**third
-         cq = qq
-         cz = -cq/cy
-
-         cx(1) = -cy-cz
-         cx(2) = -cw*cy - cwsq*cz
-         cx(3) = -cwsq*cy - cw*cz
-   endif
-
-   return
-   end subroutine makoh_cubic
 
 
 !-----------------------------------------------------------------------
