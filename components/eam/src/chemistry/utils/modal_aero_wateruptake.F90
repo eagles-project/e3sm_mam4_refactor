@@ -593,15 +593,13 @@ end subroutine modal_aero_wateruptake_dr
 
    real(r8) :: aa, bb, pp   ! parameters
    real(r8) :: p40,p41,p42,p43 ! coefficients of polynomial
-   real(r8) :: p30,p31,p32 ! coefficients of polynomial
-   real(r8) :: r3, r4      ! tempararily store wet radius from polynomials [microns]
    real(r8) :: rwet        ! wet radius [microns]
    real(r8) :: rdry        ! radius of dry particle [microns]
    real(r8) :: ss          ! relative humidity (1 = saturated) [fraction]
    real(r8) :: slog        ! log relative humidity
    real(r8) :: vol         ! total volume of particle [microns**3]
 
-   complex(r8) :: cx4(4),cx3(3) ! output of polynomials
+   complex(r8) :: cx4(4) ! output of polynomials
 
    real(r8), parameter :: eps = 1.e-4_r8
    real(r8), parameter :: mw = 18._r8
@@ -613,7 +611,6 @@ end subroutine modal_aero_wateruptake_dr
    real(r8), parameter :: factor_um2m = 1.e-6_r8  ! convert micron to m
    real(r8), parameter :: factor_m2um = 1.e6_r8   ! convert m to micron
    real(r8), parameter :: small_rh = 1.e-10_r8    ! small value to avoid zero
-   real(r8), parameter :: small_vol = 1.e-12_r8   ! small value to avoid zero
    real(r8), parameter :: rmax = 30._r8           ! upper bound of radius [microns]
 
 !  effect of organics on surface tension is neglected
@@ -630,18 +627,8 @@ end subroutine modal_aero_wateruptake_dr
    p42 = 0._r8
    p41 = bb/slog-vol
    p40 = aa*vol/slog
-!  cubic for rh=1
-   p32 = 0._r8
-   p31 = -bb/aa
-   p30 = -vol
 
-   if(vol .le. small_vol) then
-         rwet=rdry
-         rwet_out = rwet*factor_um2m
-         return
-   endif
-
-   pp = abs(p31)/(rdry*rdry)
+   pp = abs(-bb/aa)/(rdry*rdry)
    if(pp.lt.eps)then
 !      approximate solution for small particles
        rwet = rdry * (1._r8 + pp*third/(1._r8-slog*rdry/aa))
@@ -649,15 +636,6 @@ end subroutine modal_aero_wateruptake_dr
        call makoh_quartic(cx4,p43,p42,p41,p40)
 !      find smallest real(r8) solution
        call find_real_solution( rdry, cx4, rwet,nsol)
-       if(nsol.eq.0)then
-              write(iulog,*)   &
-               'ccm kohlerc - no real(r8) solution found (quartic)'
-              write(iulog,*)'roots =', (cx4(nn),nn=1,4)
-              write(iulog,*)'p0-p3 =', p40, p41, p42, p43
-              write(iulog,*)'rh=',rh
-              write(iulog,*)'setting radius to dry radius=',rdry
-              rwet = rdry
-       endif
    endif
 
 
