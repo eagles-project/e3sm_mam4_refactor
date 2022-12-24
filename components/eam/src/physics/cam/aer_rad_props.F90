@@ -122,7 +122,7 @@ end subroutine aer_rad_props_init
 !==============================================================================
 
 subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6_volc, &
-                            tau, tau_w, tau_w_g, tau_w_f, clear_rh)
+                            tau, tau_w, tau_w_g, tau_w_f)
 
    ! Return bulk layer tau, omega, g, f for all spectral intervals.
 
@@ -135,8 +135,6 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
    integer,             intent(in) :: idxnite(:)           ! local column indices of night columns
    logical,             intent(in) :: is_cmip6_volc        ! true if cmip6 style volcanic file is read otherwise false
    real(r8),            intent(in) :: dt                   ! time step (s)
-   real(r8), optional,  intent(in) :: clear_rh(pcols,pver) ! optional clear air relative humidity
-                                                              ! that gets passed to modal_aero_wateruptake_dr
 
    real(r8), intent(out) :: tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
    real(r8), intent(out) :: tau_w  (pcols,0:pver,nswbands) ! aerosol single scattering albedo * tau
@@ -263,7 +261,7 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
    ! Contributions from modal aerosols.
    if (nmodes > 0) then
       call modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
-           trop_level, tau, tau_w, tau_w_g, tau_w_f, clear_rh=clear_rh)
+           trop_level, tau, tau_w, tau_w_g, tau_w_f)
    else
       tau    (1:ncol,:,:) = 0._r8
       tau_w  (1:ncol,:,:) = 0._r8
@@ -346,7 +344,7 @@ end subroutine aer_rad_props_sw
 
 !==============================================================================
 
-subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer, clear_rh)
+subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer)
 
    use radconstants,  only: ot_length
 
@@ -365,8 +363,6 @@ subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer,
 
    type(physics_buffer_desc), pointer :: pbuf(:)
    real(r8),            intent(out) :: odap_aer(pcols,pver,nlwbands) ! [fraction] absorption optical depth, per layer
-   real(r8), optional,  intent(in)  :: clear_rh(pcols,pver) ! optional clear air relative humidity
-                                                           ! that gets passed to modal_aero_wateruptake_dr
 
    ! Local variables
 
@@ -422,7 +418,7 @@ subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer,
 
    ! Contributions from modal aerosols.
    if (nmodes > 0) then
-      call modal_aero_lw(list_idx, dt, state, pbuf, odap_aer,clear_rh)
+      call modal_aero_lw(list_idx, dt, state, pbuf, odap_aer)
    else
       odap_aer = 0._r8
    end if

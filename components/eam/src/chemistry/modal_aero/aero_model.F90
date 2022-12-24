@@ -1302,8 +1302,7 @@ contains
        species_class,                                                           &
        cam_out,                                                                 & !Intent-inout
        pbuf,                                                                    & !Pointer
-       ptend,                                                                   & !Intent-out
-       clear_rh                                                                 ) !optional 
+       ptend                                                                    ) !Intent-out
 
     use modal_aero_deposition, only: set_srf_wetdep
     use wetdep,                only: wetdepa_v2, wetdep_inputs_set, &
@@ -1345,8 +1344,6 @@ contains
 
     type(physics_ptend), intent(out)   :: ptend       ! indivdual parameterization tendencies
 
-    real(r8), optional,  intent(in)    :: clear_rh(pcols,pver) ! optional clear air relative humidity 
-                                                               ! that gets passed to modal_aero_wateruptake_dr
 
 
     ! local vars
@@ -1464,12 +1461,7 @@ contains
     
     ! Aerosol water uptake
     call t_startf('wateruptake')
-    if (present(clear_rh)) then
-      ! clear_rh allows us to provide alternate calculation of clear air RH
-      call modal_aero_wateruptake_dr(state, pbuf, clear_rh_in=clear_rh)
-    else
-      call modal_aero_wateruptake_dr(state, pbuf)
-    endif
+    call modal_aero_wateruptake_dr(state, pbuf)
     call t_stopf('wateruptake')
 
     if (nwetdep<1) return

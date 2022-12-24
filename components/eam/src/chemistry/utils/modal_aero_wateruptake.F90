@@ -173,7 +173,7 @@ end subroutine modal_aero_wateruptake_init
 !===============================================================================
 
 subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnumwet_m, &
-                                     qaerwat_m, wetdens_m, clear_rh_in)
+                                     qaerwat_m, wetdens_m)
 
   use shr_log_mod ,   only: errmsg => shr_log_errmsg
    !----------------------------------------------------------------------------
@@ -195,8 +195,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), optional, allocatable, target, intent(inout)   :: dgnumwet_m(:,:,:)
    real(r8), optional, allocatable, target, intent(inout)   :: qaerwat_m(:,:,:)
    real(r8), optional, allocatable, target, intent(inout)   :: wetdens_m(:,:,:)
-   ! optional input relative humidty (overrides clearsky RH estimate below)
-   real(r8), optional,          intent(in)    :: clear_rh_in(pcols,pver)
 
    !----------------------------------------------------------------------------
    ! local variables
@@ -300,10 +298,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       dgncur_awet => dgnumwet_m
       qaerwat     => qaerwat_m
       if(present(wetdens_m)) then
-         if (.not. allocated(wetdens_m)) then
-            call endrun('modal_aero_wateruptake_dr called '// &
-                 'with list_idx_in but wetdens_m is not allocated '//errmsg(__FILE__,__LINE__))
-         endif
          wetdens     => wetdens_m
       else
          !set compute_wetdens to flase if wetdens is not present
@@ -387,24 +381,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    !----------------------------------------------------------------------------
    ! specify clear air relative humidity
 
-   if (present(clear_rh_in)) then
-
-      ! use input relative humidity
-      rh(1:ncol,1:pver) = clear_rh_in(1:ncol,1:pver)
-
-      ! check that values are reasonable and apply upper limit
-      do k = top_lev, pver
-         do i = 1, ncol
-            if ( rh(i,k)<0 ) then
-               write(iulog,*) 'modal_aero_wateruptake_dr: clear_rh_in is negative - rh:',rh(i,k),' k=',k
-               call endrun('modal_aero_wateruptake_dr: clear_rh_in cannot be negative')
-            end if
-            ! limit RH to 98% to be consistent with behavior when clear_rh_in is not provided
-            rh(i,k) = min(rh(i,k), 0.98_r8)
-         end do ! i
-      end do ! k
-
-   else
 
       ! estimate clear air relative humidity using cloud fraction
       h2ommr => state%q(:,:,1)
@@ -424,11 +400,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
             endif
             rh(i,k) = max(rh(i,k), 0.0_r8)
             rh(i,k) = min(rh(i,k), 0.98_r8)
-            if(pergro_mods) then
-               cldn_thresh = 0.9998_r8
-            else
-               cldn_thresh = 1.0_r8 !original code
-            endif
+            cldn_thresh = 1.0_r8 !original code
             if (cldn(i,k) .lt. cldn_thresh) then
                rh(i,k) = (rh(i,k) - cldn(i,k)) / (1.0_r8 - cldn(i,k))  ! RH of clear portion
             end if
@@ -436,7 +408,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
          end do ! i = 1, ncol
       end do ! k = top_lev, pver
 
-   end if ! if present(clear_rh_in)
 
    !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
