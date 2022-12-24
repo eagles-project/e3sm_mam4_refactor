@@ -249,23 +249,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                      history_verbose_out = history_verbose)
 
    list_idx = 0
-   if (present(list_idx_in)) then
-      list_idx = list_idx_in
-
-      ! check that all optional args for diagnostic mode are present
-      if (.not. present(dgnumdry_m) .or. .not. present(dgnumwet_m) .or. &
-          .not. present(qaerwat_m)) then
-         call endrun('modal_aero_wateruptake_dr called '// &
-              'with list_idx_in but required args not present '//errmsg(__FILE__,__LINE__))
-      end if
-
-      ! arrays for diagnostic calculations must be allocated
-      if (.not. allocated(dgnumdry_m) .or. .not. allocated(dgnumwet_m) .or. &
-          .not. allocated(qaerwat_m)) then
-         call endrun('modal_aero_wateruptake_dr called '// &
-              'with list_idx_in but required args not allocated '//errmsg(__FILE__,__LINE__))
-      end if
-   end if ! if present(list_idx_in)
+   if (present(list_idx_in))     list_idx = list_idx_in
 
    ! loop over all aerosol modes
    call rad_cnst_get_info(list_idx, nmodes=nmodes)
@@ -303,7 +287,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
          !set compute_wetdens to flase if wetdens is not present
          compute_wetdens = .false.
       endif
-   end if
+   endif
 
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
@@ -329,7 +313,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
             ! save off these values to be used as defaults
             specdens_1(m)  = specdens
             spechygro_1    = spechygro
-         end if
+         endif
 
          do k = top_lev, pver
             do i = 1, ncol
@@ -338,9 +322,9 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                dumb          = duma/specdens
                dryvolmr(i,k) = dryvolmr(i,k) + dumb
                hygro(i,k,m)  = hygro(i,k,m) + dumb*spechygro
-            end do ! i = 1, ncol
-         end do ! k = top_lev, pver
-      end do ! l = 1, nspec
+            enddo ! i = 1, ncol
+         enddo ! k = top_lev, pver
+      enddo ! l = 1, nspec
 
       alnsg = log(sigmag)
 
@@ -351,10 +335,9 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                hygro(i,k,m) = hygro(i,k,m)/dryvolmr(i,k)
             else
                hygro(i,k,m) = spechygro_1
-            end if
+            endif
 
             ! dry aerosol properties
-
             v2ncur_a = 1._r8 / ( (pi/6._r8)*(dgncur_a(i,k,m)**3._r8)*exp(4.5_r8*alnsg**2._r8) )
             ! naer = aerosol number (#/kg)
             naer(i,k,m) = dryvolmr(i,k)*v2ncur_a
@@ -368,15 +351,15 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                drydens = maer(i,k,m)/dryvolmr(i,k)
             else
                drydens = 1.0_r8
-            end if
+            endif
             dryvol(i,k,m)   = 1.0_r8/v2ncur_a
             drymass(i,k,m)  = drydens*dryvol(i,k,m)
             dryrad(i,k,m)   = (dryvol(i,k,m)/pi43)**third
 
-         end do ! i = 1, ncol
-      end do ! k = top_lev, pver
+         enddo ! i = 1, ncol
+      enddo ! k = top_lev, pver
 
-   end do    ! modes
+   enddo    ! modes
 
    !----------------------------------------------------------------------------
    ! specify clear air relative humidity
@@ -403,10 +386,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
             cldn_thresh = 1.0_r8 !original code
             if (cldn(i,k) .lt. cldn_thresh) then
                rh(i,k) = (rh(i,k) - cldn(i,k)) / (1.0_r8 - cldn(i,k))  ! RH of clear portion
-            end if
+            endif
             rh(i,k) = max(rh(i,k), 0.0_r8)
-         end do ! i = 1, ncol
-      end do ! k = top_lev, pver
+         enddo ! i = 1, ncol
+      enddo ! k = top_lev, pver
 
 
    !----------------------------------------------------------------------------
@@ -431,12 +414,12 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                   wetdens(i,k,m) = (drymass(i,k,m) + rhoh2o*wtrvol(i,k,m))/wetvol(i,k,m)
                else
                   wetdens(i,k,m) = specdens_1(m)
-               end if
+               endif
             endif
-         end do ! i = 1, ncol
-      end do ! k = top_lev, pver
+         enddo ! i = 1, ncol
+      enddo ! k = top_lev, pver
 
-   end do ! m = 1, nmodes
+   enddo ! m = 1, nmodes
 
    !----------------------------------------------------------------------------
    ! write history output if not in diagnostic mode
@@ -452,12 +435,12 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
          call outfld( 'dgnw_a'//trnum(2:3), dgncur_awet(:,:,m), pcols, lchnk)
          if (history_aerosol .and. .not. history_verbose) &
          aerosol_water(:ncol,:) = aerosol_water(:ncol,:) + qaerwat(:ncol,:,m)
-      end do ! m = 1, nmodes
+      enddo ! m = 1, nmodes
 
       if (history_aerosol .and. .not. history_verbose) &
          call outfld( 'aero_water',  aerosol_water(:ncol,:),    ncol, lchnk)
 
-   end if
+   endif
 
 end subroutine modal_aero_wateruptake_dr
 
