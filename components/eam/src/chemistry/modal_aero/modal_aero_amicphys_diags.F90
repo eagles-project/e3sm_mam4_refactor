@@ -2,7 +2,12 @@ module modal_aero_amicphys_diags
 
   implicit none
 
-  public
+  private
+
+  public :: amicphys_diags_init
+  public :: get_gcm_tend_diags_from_subareas
+  public :: accumulate_column_tend_integrals
+  public :: outfld_1proc_all_cnst
 
 contains
 
