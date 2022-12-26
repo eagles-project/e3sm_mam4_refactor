@@ -15,7 +15,11 @@ module modal_aero_amicphys_subareas
 
   implicit none
 
-  public
+  private
+
+  public :: setup_subareas, set_subarea_rh
+  public :: set_subarea_gases_and_aerosols
+  public :: form_gcm_of_gases_and_aerosols_from_subareas
 
 contains
 
