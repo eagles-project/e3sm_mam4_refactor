@@ -89,7 +89,7 @@ use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
                                       , form_gcm_of_gases_and_aerosols_from_subareas
 
 ! For output of diagnostics
-use modal_aero_amicphys_control, only: nqtendaa, nqqcwtendaa, &
+use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa, &
                                        do_q_coltendaa, do_qqcw_coltendaa, &
                                        iqtend_cond, iqtend_rnam, &
                                        iqtend_nnuc, iqtend_coag, &
@@ -465,6 +465,7 @@ subroutine mam_amicphys_1gridcell(          &
 ! qsub4 and qqcwsub4 are the outgoing updated TMRs
 !
   use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa
 
       logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
       logical,  intent(in)    :: iscldy_subarea(maxsubarea)
@@ -798,6 +799,10 @@ main_jsub_loop: &
 !    coagulation - because cloud-borne aerosol would need to be included
 !
   use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags, only: nqtendaa, nqqcwtendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam
 
       use physconst, only:  r_universal
       use modal_aero_rename, only: mam_rename_1subarea
@@ -1232,6 +1237,10 @@ do_rename_if_block30: &
          misc_vars_aa_sub                            )
 
   use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags, only: nqtendaa, nqqcwtendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam
 !
 ! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
 !    for a single clear sub-area (with indices = lchnk,i,k,jsub)
@@ -4311,6 +4320,10 @@ use modal_aero_data, only : &
 
 use modal_aero_coag, only: n_coagpair, src_mode_coagpair, dest_mode_coagpair, end_mode_coagpair
 use modal_aero_amicphys_control
+use modal_aero_amicphys_diags, only: do_q_coltendaa, do_qqcw_coltendaa, & 
+                                     iqtend_cond, iqtend_rnam, &
+                                     iqtend_nnuc, iqtend_coag, &
+                                     iqqcwtend_rnam
 
 implicit none
 

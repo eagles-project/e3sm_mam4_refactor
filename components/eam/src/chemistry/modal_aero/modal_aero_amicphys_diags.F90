@@ -1,13 +1,36 @@
 module modal_aero_amicphys_diags
 
+  use modal_aero_amicphys_control, only: ncnst=>gas_pcnst
+
   implicit none
 
   private
+
+  ! Public interfaces
 
   public :: amicphys_diags_init
   public :: get_gcm_tend_diags_from_subareas
   public :: accumulate_column_tend_integrals
   public :: outfld_1proc_all_cnst
+
+  ! Public parameters
+
+  integer,parameter,public :: nqtendaa = 4
+  integer,parameter,public :: iqtend_cond = 1
+  integer,parameter,public :: iqtend_rnam = 2
+  integer,parameter,public :: iqtend_nnuc = 3
+  integer,parameter,public :: iqtend_coag = 4
+
+  integer,parameter,public :: nqqcwtendaa = 1
+  integer,parameter,public :: iqqcwtend_rnam = 1
+
+  character(len=8),parameter,public :: suffix_q_coltendaa(nqtendaa) = (/'_sfgaex1','_sfgaex2','_sfnnuc1','_sfcoag1'/)
+  character(len=8),parameter,public :: suffix_qqcw_coltendaa(nqqcwtendaa) = '_sfgaex2'
+
+  ! Public variables
+
+  logical,public :: do_q_coltendaa(ncnst,nqtendaa) = .false.
+  logical,public :: do_qqcw_coltendaa(ncnst,nqqcwtendaa) = .false.
 
 contains
 
@@ -15,10 +38,6 @@ contains
 ! Purpose: set switches that turn on or off column-integrated tendency diagnostics.
 !-----------------------------------------------------------------------------------
 subroutine amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
-
-  use modal_aero_amicphys_control, only: do_q_coltendaa, do_qqcw_coltendaa, &
-                                         iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, &
-                                         iqqcwtend_rnam
 
   logical,intent(in) :: do_cond, do_rename, do_newnuc, do_coag
 
@@ -40,7 +59,7 @@ subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, 
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
                                              qgcm_tendaa, qqcwgcm_tendaa        )! out
 
-  use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst, maxsubarea, nqtendaa, nqqcwtendaa
+  use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst, maxsubarea
 
   integer,  intent(in) :: nsubarea                   ! # of active subareas
   integer,  intent(in) :: ncldy_subarea              ! # of cloudy subareas
@@ -84,8 +103,6 @@ subroutine accumulate_column_tend_integrals( pdel, gravit,                &! in
                                              q_coltendaa, qqcw_coltendaa  )! inout
 
   use modal_aero_amicphys_control, only: wp=>r8, ncnst=>gas_pcnst
-  use modal_aero_amicphys_control, only: do_q_coltendaa, do_qqcw_coltendaa, &
-                                         nqtendaa, nqqcwtendaa
 
   real(wp),intent(in) :: pdel       ! layer thickness in pressure coordinate [Pa]
   real(wp),intent(in) :: gravit     ! gravitational acceleration [m/s^2]
