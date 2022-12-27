@@ -110,11 +110,6 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 
      relhumsub(:) = relhumgcm
 
-#if ( defined( MAM_STANDALONE ) )
-  else if (cldy_rh_sameas_clear > 0) then
-     relhumsub(:) = relhumgcm
-#endif
-
   else
      ! Grid cell has a cloudy subarea. Set RH in that part to 1.0.
      relhumsub(jcldy) = 1.0_wp

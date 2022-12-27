@@ -37,10 +37,6 @@ subroutine modal_aero_amicphys_intr(                             &
                         qq,                 qqcw,                &
                         q_pregaschem,                            &
                         q_precldchem,       qqcw_precldchem,     &
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-                        nqtendbb,           nqqcwtendbb,         &
-                        q_tendbb,           qqcw_tendbb,         &
-#endif
                         dgncur_a,           dgncur_awet,         &
                         wetdens_host,                            &
                         qaerwat                                  )
@@ -112,11 +108,6 @@ implicit none
    integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
    integer,  intent(in)    :: latndx(pcols), lonndx(pcols)
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-   integer,  intent(in)    :: nqtendbb             ! dimension for q_tendbb
-   integer,  intent(in)    :: nqqcwtendbb          ! dimension for qqcw_tendbb
-#endif
-
    real(r8), intent(in)    :: deltat               ! time step [s]
 
    !---------------------------------------------------------------------------------------
@@ -136,11 +127,6 @@ implicit none
    real(r8), intent(in)    :: q_precldchem(ncol,pver,gas_pcnst)    ! q TMRs    before cloud chemistry
    real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,gas_pcnst) ! qqcw TMRs before cloud chemistry
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-   real(r8), intent(inout) :: q_tendbb(ncol,pver,gas_pcnst,nqtendbb)    ! TMR tendencies for box-model diagnostic output
-   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,gas_pcnst,nqqcwtendbb)
-#endif
-
    !---------------------------------------------------------------------------------------
    ! Ambient environment
    !---------------------------------------------------------------------------------------
@@ -151,7 +137,6 @@ implicit none
    real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth [m]
    real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity [kg/kg]
    real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction [unitless] *** NOTE ncol dimension
-
 
    !---------------------------------------------------------------------------------------
    ! Particle sizes
@@ -259,11 +244,6 @@ implicit none
    ! Column integrals need to be initialized with zeros
       q_coltendaa = 0.0_r8 
    qqcw_coltendaa = 0.0_r8
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-! these variables otherwise undefined
-   q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
-#endif
 
    call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
@@ -406,14 +386,6 @@ implicit none
       call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
                                              qgcm_tendaa, qqcwgcm_tendaa        )! out 
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if (iqtend_cond <= nqtendbb) q_tendbb(ii,kk,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
-      if (iqtend_rnam <= nqtendbb) q_tendbb(ii,kk,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
-      if (iqtend_nnuc <= nqtendbb) q_tendbb(ii,kk,:,iqtend_nnuc) = qgcm_tendaa(:,iqtend_nnuc)
-      if (iqtend_coag <= nqtendbb) q_tendbb(ii,kk,:,iqtend_coag) = qgcm_tendaa(:,iqtend_coag)
-      if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(ii,kk,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
-#endif
 
       call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
                                              qgcm_tendaa,         qqcwgcm_tendaa,         &! in
