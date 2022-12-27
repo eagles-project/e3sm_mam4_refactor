@@ -47,10 +47,11 @@ subroutine mam_amicphys_1subarea(&
 
    use modal_aero_amicphys_control, only: r8, ntot_poaspec=>npoa, ntot_soaspec=>nsoa &
                                         , max_mode, max_gas, max_aer &
-                                        , nqtendaa, nqqcwtendaa, misc_vars_aa_type &
+                                        , misc_vars_aa_type &
                                         , gaexch_h2so4_uptake_optaa, ngas, igas_h2so4, igas_nh3 &
                                         , newnuc_h2so4_conc_optaa &
-                                        , nait, nacc, max_agepair, n_agepair &
+                                        , nait, nacc, max_agepair, n_agepair
+   use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa &
                                         , iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, iqqcwtend_rnam
 
    use modal_aero_data,   only: n_mode=>ntot_amode
