@@ -395,28 +395,15 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
 
-   call modal_aero_wateruptake_radius(                          &
-                ncol,   nmodes, rhcrystal,      rhdeliques,     & ! in
-                dryrad, hygro,  rh,             dryvol,         & ! in
-                wetrad,         wetvol,         wtrvol          ) ! out
-
-   do m = 1, nmodes
-
-      do k = top_lev, pver
-         do i = 1, ncol
-
-            dgncur_awet(i,k,m) = dgncur_a(i,k,m) * (wetrad(i,k,m)/dryrad(i,k,m))
-            qaerwat(i,k,m)     = rhoh2o*naer(i,k,m)*wtrvol(i,k,m)
-
-         enddo ! i = 1, ncol
-      enddo ! k = top_lev, pver
-
-   enddo ! m = 1, nmodes
+   call modal_aero_wateruptake_radius( ncol,    nmodes,         & ! in
+                rhcrystal,      rhdeliques,     dgncur_a,       & ! in
+                dryrad, hygro,  rh,     naer,   dryvol,         & ! in
+                wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat   ) ! out
 
    if (compute_wetdens) then
-        call modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
-                wetvol, wtrvol, drymass,      specdens_1,       & ! in
-                wetdens                                         ) ! out
+        call modal_aero_wateruptake_wetdens( ncol,   nmodes, & ! in
+             wetvol, wtrvol, drymass,      specdens_1,       & ! in
+             wetdens                                         ) ! out
    endif
 
    !----------------------------------------------------------------------------
@@ -444,10 +431,10 @@ end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
 
-   subroutine modal_aero_wateruptake_radius(            &
-           ncol,    nmodes, rhcrystal, rhdeliques,      & ! in
-           dryrad,  hygro,  rh,        dryvol,          & ! in
-           wetrad,  wetvol, wtrvol                      ) ! out
+   subroutine modal_aero_wateruptake_radius( ncol,  nmodes,  & ! in
+                rhcrystal,      rhdeliques,    dgncur_a,     & ! in
+                dryrad, hygro,  rh,     naer,  dryvol,       & ! in
+                wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
 
 !-----------------------------------------------------------------------
 !
@@ -465,22 +452,22 @@ end subroutine modal_aero_wateruptake_dr
 
    real(r8), intent(in) :: rhcrystal(:)          ! crystal RH [fraction]
    real(r8), intent(in) :: rhdeliques(:)         ! deliques RH [Fraction]
+   real(r8), intent(in) :: dgncur_a(:,:,:)       ! dry aerosol diameter [m]
    real(r8), intent(in) :: dryrad(:,:,:)         ! dry volume mean radius of aerosol [m]
    real(r8), intent(in) :: hygro(:,:,:)          ! volume-weighted mean hygroscopicity [unitless]
    real(r8), intent(in) :: rh(:,:)               ! relative humidity [fraction]
-   real(r8), intent(in) :: dryvol(:,:,:)
+   real(r8), intent(in) :: naer(:,:,:)           ! number of aerosols [#/kg-air]
+   real(r8), intent(in) :: dryvol(:,:,:)         ! dry aerosol volume [m^3]
 
    real(r8), intent(out) :: wetrad(:,:,:)        ! wet radius of aerosol [m]
    real(r8), intent(out) :: wetvol(:,:,:)        ! single-particle-mean wet volume [m^3]
    real(r8), intent(out) :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
-
+   real(r8), intent(out) :: dgncur_awet(:,:,:)   ! wet aerosol diameter [m]
+   real(r8), intent(out) :: qaerwat(:,:,:)       ! aerosol water [kg/kg]
    ! local variables
-
    integer :: icol, kk, imode
-
    real(r8) :: hystfac                ! working variable for hysteresis
    !-----------------------------------------------------------------------
-
 
    ! loop over all aerosol modes
    do imode = 1, nmodes
@@ -514,6 +501,11 @@ end subroutine modal_aero_wateruptake_dr
                wetvol(icol,kk,imode) = dryvol(icol,kk,imode) + wtrvol(icol,kk,imode)
                wetrad(icol,kk,imode) = (wetvol(icol,kk,imode)/pi43)**third
             endif
+
+            ! calculate wet aerosol diameter and aerosol water
+            dgncur_awet(icol,kk,imode) = dgncur_a(icol,kk,imode) * &
+                                        (wetrad(icol,kk,imode)/dryrad(icol,kk,imode))
+            qaerwat(icol,kk,imode) = rhoh2o*naer(icol,kk,imode)*wtrvol(icol,kk,imode)
 
          enddo  ! columns
       enddo     ! levels
