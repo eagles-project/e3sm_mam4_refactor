@@ -96,6 +96,8 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 ! Purpose: Set relative humidity in subareas.
 !----------------------------------------------------------------------------
 
+  use mam_support, only: min_max_bound
+
   integer,  intent(in) :: ncldy_subarea         ! # of cloudy subareas
   integer,  intent(in) :: jclea, jcldy          ! indices of clear and cloudy subareas
   real(wp), intent(in) :: afracsub(maxsubarea)  ! area fraction in subareas [unitless]
@@ -119,7 +121,7 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 
      if (jclea > 0) then
         relhum_tmp = (relhumgcm - afracsub(jcldy))/afracsub(jclea)
-        relhumsub(jclea) = max( 0.0_wp, min( 1.0_wp, relhum_tmp ) )
+        relhumsub(jclea) = min_max_bound( 0.0_wp, 1.0_wp, relhum_tmp )
      end if
   end if
 
