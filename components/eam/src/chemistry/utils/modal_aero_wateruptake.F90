@@ -408,18 +408,16 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
             dgncur_awet(i,k,m) = dgncur_a(i,k,m) * (wetrad(i,k,m)/dryrad(i,k,m))
             qaerwat(i,k,m)     = rhoh2o*naer(i,k,m)*wtrvol(i,k,m)
 
-            ! compute aerosol wet density (kg/m3)
-            if(compute_wetdens) then
-               if (wetvol(i,k,m) > 1.0e-30_r8) then
-                  wetdens(i,k,m) = (drymass(i,k,m) + rhoh2o*wtrvol(i,k,m))/wetvol(i,k,m)
-               else
-                  wetdens(i,k,m) = specdens_1(m)
-               endif
-            endif
          enddo ! i = 1, ncol
       enddo ! k = top_lev, pver
 
    enddo ! m = 1, nmodes
+
+   if (compute_wetdens) then
+        call modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
+                wetvol, wtrvol, drymass,      specdens_1,       & ! in
+                wetdens                                         ) ! out
+   endif
 
    !----------------------------------------------------------------------------
    ! write history output if not in diagnostic mode
@@ -689,6 +687,44 @@ end subroutine modal_aero_wateruptake_dr
    enddo
 
    end subroutine find_real_solution
+
+!===============================================================================
+   subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
+                wetvol, wtrvol, drymass,      specdens_1,       & ! in
+                wetdens                                         ) ! out
+!-----------------------------------------------------------------------
+! compute aerosol wet diameter, aerosol water and density
+!-----------------------------------------------------------------------
+   integer, intent(in)  :: ncol                    ! number of columns
+   integer, intent(in)  :: nmodes
+   real(r8),intent(in)  :: wetvol(:,:,:)        ! single-particle-mean wet aerosol volume [m^3]
+   real(r8),intent(in)  :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
+   real(r8),intent(in)  :: drymass(:,:,:)       ! single-particle-mean dry mass [kg]
+   real(r8),intent(in)  :: specdens_1(:)        ! specified dry aerosol density [kg/m3]
+   real(r8),intent(out) :: wetdens(ncol,pver,nmodes)       ! wet aerosol density [kg/m3]
+   ! local variables
+   integer :: icol, kk, imode
+   real(r8), parameter  :: small_value = 1.0e-30_r8
+
+   ! compute aerosol wet density (kg/m3)
+   do imode = 1, nmodes
+      do kk = top_lev, pver
+         do icol = 1, ncol
+            if (wetvol(icol,kk,imode) > small_value) then
+               ! wet density
+               wetdens(icol,kk,imode) = (drymass(icol,kk,imode) + rhoh2o*wtrvol(icol,kk,imode)) &
+                                        / wetvol(icol,kk,imode)
+            else
+               ! dry density
+               wetdens(icol,kk,imode) = specdens_1(imode)
+            endif
+
+         enddo ! i = 1, ncol
+      enddo ! k = top_lev, pver
+   enddo ! m = 1, nmodes
+
+   end subroutine modal_aero_wateruptake_wetdens
+
 
 !----------------------------------------------------------------------
 
