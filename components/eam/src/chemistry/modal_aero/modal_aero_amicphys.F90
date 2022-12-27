@@ -65,6 +65,7 @@ use constituents,      only:  cnst_name
 use physconst,         only:  gravit, mwdry, r_universal
 use wv_saturation,     only:  qsat
 use phys_control,      only:  phys_getopts
+use mam_support,       only:  min_max_bound
 
 ! Parameters, bookkeeping info, switches, runtime options
 use modal_aero_data,   only:  &
@@ -264,7 +265,7 @@ implicit none
                            nsubarea, ncldy_subarea, jclea, jcldy, &! out
                            iscldy_subarea, afracsub, fclea, fcldy )! out
 
-      relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(ii,kk)/qv_sat(ii,kk) ) )
+      relhumgcm = min_max_bound( 0.0_r8, 1.0_r8, qv(ii,kk)/qv_sat(ii,kk) )
 
       call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
 
