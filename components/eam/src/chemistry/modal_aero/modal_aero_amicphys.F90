@@ -31,10 +31,10 @@ subroutine modal_aero_amicphys_intr(                             &
                         lchnk,    ncol,     nstep,               &
                         loffset,  deltat,                        &
                         latndx,   lonndx,                        &
-                        t,        pmid,     pdel,                &
+                        temp,     pmid,     pdel,                &
                         zm,       pblh,                          &
                         qv,       cld,                           &
-                        q,                  qqcw,                &
+                        qq,                 qqcw,                &
                         q_pregaschem,                            &
                         q_precldchem,       qqcw_precldchem,     &
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
@@ -123,12 +123,12 @@ implicit none
    ! Tracer mixing ratios: current values as well as some "old" values used
    ! for the numerical coupling of physical processes
    !---------------------------------------------------------------------------------------
-   real(r8), intent(inout) :: q(ncol,pver,gas_pcnst) ! current tracer mixing ratios (TMRs)
-                                                     ! of gases and interstitial aerosol tracers
-                                                     ! these values are updated (so out /= in)
-                                                     ! *** MUST BE  #/kmol-air for number
-                                                     ! *** MUST BE kmol/kmol-air for mass
-                                                     ! *** NOTE ncol dimension
+   real(r8), intent(inout) :: qq(ncol,pver,gas_pcnst) ! current tracer mixing ratios (TMRs)
+                                                      ! of gases and interstitial aerosol tracers
+                                                      ! these values are updated (so out /= in)
+                                                      ! *** MUST BE  #/kmol-air for number
+                                                      ! *** MUST BE kmol/kmol-air for mass
+                                                      ! *** NOTE ncol dimension
    real(r8), intent(inout) :: qqcw(ncol,pver,gas_pcnst) ! like q but for cloud-borner tracers
                                                         ! these values are updated
 
@@ -144,7 +144,7 @@ implicit none
    !---------------------------------------------------------------------------------------
    ! Ambient environment
    !---------------------------------------------------------------------------------------
-   real(r8), intent(in)    :: t(pcols,pver)        ! air temperature [K]
+   real(r8), intent(in)    :: temp(pcols,pver)     ! air temperature [K]
    real(r8), intent(in)    :: pmid(pcols,pver)     ! air pressure [Pa]
    real(r8), intent(in)    :: pdel(pcols,pver)     ! pressure layer thickness [Pa]
    real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers [m]
@@ -270,7 +270,7 @@ implicit none
    !====================================================
    ! Get saturation mixing ratio
    !====================================================
-   call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
+   call qsat( temp(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
 
    do kk = top_lev, pver
    do ii = 1, ncol
@@ -317,7 +317,7 @@ implicit none
          ! Gases and interstitial aerosols
          qgcm1(icnst) = max( 0.0_r8, q_pregaschem(ii,kk,icnst) )
          qgcm2(icnst) = max( 0.0_r8, q_precldchem(ii,kk,icnst) )
-         qgcm3(icnst) = max( 0.0_r8, q(ii,kk,icnst) )
+         qgcm3(icnst) = max( 0.0_r8, qq(ii,kk,icnst) )
 
          ! Cloud-borne aerosols
          qqcwgcm2(icnst:) = max( 0.0_r8, qqcw_precldchem(ii,kk,icnst) )
@@ -362,7 +362,7 @@ implicit none
          loffset,  deltat,                        &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,      afracsub,           &
-         t(ii,kk),   pmid(ii,kk), pdel(ii,kk),    &
+         temp(ii,kk), pmid(ii,kk), pdel(ii,kk),   &
          zm(ii,kk),  pblh(ii),   relhumsub,       &
          dgn_a,    dgn_awet,  wetdens,            &
          qsub1,                                   &
@@ -386,7 +386,7 @@ implicit none
 
       ! Copy grid cell mean values to output arrays
 
-      where (lmapcc_all(:) > 0)                  q(ii,kk,:) = qgcm4(:)
+      where (lmapcc_all(:) > 0)                 qq(ii,kk,:) = qgcm4(:)
       where (lmapcc_all(:) >= lmapcc_val_aer) qqcw(ii,kk,:) = qqcwgcm4(:)
 
       !----------------------
