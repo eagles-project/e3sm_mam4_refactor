@@ -395,10 +395,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
 
-   call modal_aero_wateruptake_sub( &
-      ncol, nmodes, rhcrystal, rhdeliques, dryrad, &
-      hygro, rh, dryvol, wetrad, wetvol,           &
-      wtrvol)
+   call modal_aero_wateruptake_radius(                          &
+                ncol,   nmodes, rhcrystal,      rhdeliques,     & ! in
+                dryrad, hygro,  rh,             dryvol,         & ! in
+                wetrad,         wetvol,         wtrvol          ) ! out
 
    do m = 1, nmodes
 
@@ -446,7 +446,7 @@ end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
 
-   subroutine modal_aero_wateruptake_sub(               &
+   subroutine modal_aero_wateruptake_radius(            &
            ncol,    nmodes, rhcrystal, rhdeliques,      & ! in
            dryrad,  hygro,  rh,        dryvol,          & ! in
            wetrad,  wetvol, wtrvol                      ) ! out
@@ -522,7 +522,7 @@ end subroutine modal_aero_wateruptake_dr
 
    enddo ! modes
 
-   end subroutine modal_aero_wateruptake_sub
+   end subroutine modal_aero_wateruptake_radius
 
 !-----------------------------------------------------------------------
    subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
