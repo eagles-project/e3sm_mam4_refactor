@@ -210,7 +210,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    integer :: nspec
 
    real(r8), pointer :: h2ommr(:,:) ! specific humidity
-   real(r8), pointer :: t(:,:)      ! temperatures (K)
+   real(r8), pointer :: temperature(:,:)      ! temperatures (K)
    real(r8), pointer :: pmid(:,:)   ! layer pressure (Pa)
    real(r8), pointer :: raer(:,:)   ! aerosol species MRs (kg/kg and #/kg)
 
@@ -362,35 +362,18 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    enddo    ! modes
 
    !----------------------------------------------------------------------------
-   ! specify clear air relative humidity
+   ! estimate clear air relative humidity using cloud fraction
+   h2ommr       => state%q(:,:,1)
+   temperature  => state%t
+   pmid         => state%pmid
 
+   ! get cloud fraction
+   itim_old    =  pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
-      ! estimate clear air relative humidity using cloud fraction
-      h2ommr => state%q(:,:,1)
-      t      => state%t
-      pmid   => state%pmid
-
-      itim_old    =  pbuf_old_tim_idx()
-      call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
-      do k = top_lev, pver
-         call qsat_water(t(:ncol,k), pmid(:ncol,k), es(:ncol), qs(:ncol))
-         do i = 1, ncol
-            if (qs(i) > h2ommr(i,k)) then
-               rh(i,k) = h2ommr(i,k)/qs(i)
-            else
-               rh(i,k) = 0.98_r8
-            endif
-            rh(i,k) = max(rh(i,k), 0.0_r8)
-            rh(i,k) = min(rh(i,k), 0.98_r8)
-            cldn_thresh = 1.0_r8 !original code
-            if (cldn(i,k) .lt. cldn_thresh) then
-               rh(i,k) = (rh(i,k) - cldn(i,k)) / (1.0_r8 - cldn(i,k))  ! RH of clear portion
-            endif
-            rh(i,k) = max(rh(i,k), 0.0_r8)
-         enddo ! i = 1, ncol
-      enddo ! k = top_lev, pver
-
+   call modal_aero_wateruptake_rh_clearair( ncol,         & ! in
+                        temperature, pmid,  h2ommr, cldn, & ! in
+                        rh                                ) ! inout
 
    !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
@@ -428,6 +411,47 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    endif
 
 end subroutine modal_aero_wateruptake_dr
+
+!===============================================================================
+   subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
+                        temperature,    pmid,   h2ommr,  cldn,  & ! in
+                        rh                                      ) ! inout
+!-----------------------------------------------------------------------
+! estimate clear air relative humidity using cloud fraction
+!-----------------------------------------------------------------------
+   integer,  intent(in) :: ncol                 ! number of columns
+   real(r8), intent(in) :: temperature(:,:)     ! temperature [K]
+   real(r8), intent(in) :: pmid(:,:)            ! layer pressure [Pa]
+   real(r8), intent(in) :: h2ommr(:,:)          ! water mass mixing ratio [kg/kg]
+   real(r8), intent(in) :: cldn(:,:)            ! layer cloud fraction [fraction]
+   real(r8), intent(inout) :: rh(:,:)           ! relative humidity [Fraction]
+
+   ! local variables
+   integer   :: icol, kk
+   real(r8)  :: rh_max = 0.98_r8        ! maximum relative humidity
+   real(r8)  :: es(pcols)               ! saturation vapor pressure [Pa]
+   real(r8)  :: qs(pcols)               ! saturation specific humidity [kg/kg]
+   real(r8), parameter  :: cldn_thresh = 1.0_r8      ! threshold cloud fraction
+
+   do kk = top_lev, pver
+      call qsat_water(temperature(:ncol,kk), pmid(:ncol,kk), es(:ncol), qs(:ncol))
+      do icol = 1, ncol
+         if (qs(icol) > h2ommr(icol,kk)) then
+            rh(icol,kk) = h2ommr(icol,kk)/qs(icol)
+         else
+            rh(icol,kk) = rh_max
+         endif
+         rh(icol,kk) = min_max_bound(0.0_r8, rh_max, rh(icol,kk))
+
+         if (cldn(icol,kk) .lt. cldn_thresh) then
+            rh(icol,kk) = (rh(icol,kk) - cldn(icol,kk)) / &
+                          (1.0_r8 - cldn(icol,kk))  ! RH of clear portion
+         endif
+         rh(icol,kk) = max(rh(icol,kk), 0.0_r8)
+      enddo ! i = 1, ncol
+   enddo ! k = top_lev, pver
+
+   end subroutine modal_aero_wateruptake_rh_clearair
 
 !===============================================================================
 
@@ -693,7 +717,7 @@ end subroutine modal_aero_wateruptake_dr
    real(r8),intent(in)  :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
    real(r8),intent(in)  :: drymass(:,:,:)       ! single-particle-mean dry mass [kg]
    real(r8),intent(in)  :: specdens_1(:)        ! specified dry aerosol density [kg/m3]
-   real(r8),intent(out) :: wetdens(ncol,pver,nmodes)       ! wet aerosol density [kg/m3]
+   real(r8),intent(out) :: wetdens(pcols,pver,nmodes)       ! wet aerosol density [kg/m3]
    ! local variables
    integer :: icol, kk, imode
    real(r8), parameter  :: small_value = 1.0e-30_r8
