@@ -289,79 +289,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       endif
    endif
 
-   !----------------------------------------------------------------------------
    ! retreive aerosol properties
+   call modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
+                                      state, pbuf,   dgncur_a     ) ! in
 
-   do m = 1, nmodes
-
-      dryvolmr(:,:) = 0._r8
-
-      ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigmag,  &
-         rhcrystal=rhcrystal(m), rhdeliques=rhdeliques(m))
-
-      ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
-
-      do l = 1, nspec
-
-         ! get species interstitial mixing ratio ('a')
-         call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, raer)
-         call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, hygro_aer=spechygro)
-
-         if (l == 1) then
-            ! save off these values to be used as defaults
-            specdens_1(m)  = specdens
-            spechygro_1    = spechygro
-         endif
-
-         do k = top_lev, pver
-            do i = 1, ncol
-               duma          = raer(i,k)
-               maer(i,k,m)   = maer(i,k,m) + duma
-               dumb          = duma/specdens
-               dryvolmr(i,k) = dryvolmr(i,k) + dumb
-               hygro(i,k,m)  = hygro(i,k,m) + dumb*spechygro
-            enddo ! i = 1, ncol
-         enddo ! k = top_lev, pver
-      enddo ! l = 1, nspec
-
-      alnsg = log(sigmag)
-
-      do k = top_lev, pver
-         do i = 1, ncol
-
-            if (dryvolmr(i,k) > 1.0e-30_r8) then
-               hygro(i,k,m) = hygro(i,k,m)/dryvolmr(i,k)
-            else
-               hygro(i,k,m) = spechygro_1
-            endif
-
-            ! dry aerosol properties
-            v2ncur_a = 1._r8 / ( (pi/6._r8)*(dgncur_a(i,k,m)**3._r8)*exp(4.5_r8*alnsg**2._r8) )
-            ! naer = aerosol number (#/kg)
-            naer(i,k,m) = dryvolmr(i,k)*v2ncur_a
-
-            ! compute mean (1 particle) dry volume and mass for each mode
-            ! old coding is replaced because the new (1/v2ncur_a) is equal to
-            ! the mean particle volume
-            ! also moletomass forces maer >= 1.0e-30, so (maer/dryvolmr)
-            ! should never cause problems (but check for maer < 1.0e-31 anyway)
-            if (maer(i,k,m) .gt. 1.0e-31_r8) then
-               drydens = maer(i,k,m)/dryvolmr(i,k)
-            else
-               drydens = 1.0_r8
-            endif
-            dryvol(i,k,m)   = 1.0_r8/v2ncur_a
-            drymass(i,k,m)  = drydens*dryvol(i,k,m)
-            dryrad(i,k,m)   = (dryvol(i,k,m)/pi43)**third
-
-         enddo ! i = 1, ncol
-      enddo ! k = top_lev, pver
-
-   enddo    ! modes
-
-   !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
    h2ommr       => state%q(:,:,1)
    temperature  => state%t
@@ -375,9 +306,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                         temperature, pmid,  h2ommr, cldn, & ! in
                         rh                                ) ! inout
 
-   !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
-
    call modal_aero_wateruptake_radius( ncol,    nmodes,         & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
                 dryrad, hygro,  rh,     naer,   dryvol,         & ! in
@@ -411,6 +340,112 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    endif
 
 end subroutine modal_aero_wateruptake_dr
+
+!===============================================================================
+   subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
+                                        state,     pbuf,   dgncur_a     ) ! in
+!-----------------------------------------------------------------------
+! retreive dry aerosol properties
+! output variables are declared in the module so no output variables in this subroutine
+!-----------------------------------------------------------------------
+
+   integer,  intent(in)  :: ncol                ! number of columns
+   integer,  intent(in)  :: nmodes              ! number of modes
+   integer,  intent(in)  :: list_idx            ! radiative constituents list index
+   real(r8), intent(in)  :: dgncur_a(:,:,:)     ! dry aerosol diameter [m]
+   type(physics_state), target, intent(in)  :: state          ! Physics state variables
+   type(physics_buffer_desc), pointer       :: pbuf(:)        ! physics buffer
+
+   ! local variables
+   integer      :: imode, ispec, kk, icol
+   integer      :: nspec
+   real(r8)     :: sigmag
+   real(r8)     :: alnsg                        ! log(sigmag)
+   real(r8)     :: specdens                     ! aerosol density [kg/m3]
+   real(r8)     :: spechygro, spechygro_1       ! aerosol hygroscopicity [unitless]
+   real(r8)     :: v2ncur_a                     ! 1 / mean particle volume [1/m3]
+   real(r8)     :: drydens                      ! dry particle density [kg/m3]
+   real(r8)     :: dryvolmr(pcols,pver)         ! volume MR for aerosol mode [m3/kg]
+   real(r8)     :: vol_tmp                      ! temporary aerosol volume [m3/kg]
+   real(r8), pointer :: raer(:,:)   ! aerosol species MRs [kg/kg and #/kg]
+   real(r8), parameter  :: small_value = 1.0e-30_r8
+   real(r8), parameter  :: small_value_31 = 1.0e-31_r8
+
+
+   do imode = 1, nmodes
+      ! initiate variable
+      dryvolmr(:,:) = 0._r8
+
+      ! get mode properties
+      call rad_cnst_get_mode_props(list_idx, imode,        & ! in
+                sigmag=sigmag, rhcrystal=rhcrystal(imode), & ! out
+                rhdeliques=rhdeliques(imode)               ) ! out
+      alnsg = log(sigmag)
+      ! get mode info
+      call rad_cnst_get_info(list_idx, imode, & ! in
+                                   nspec=nspec) ! out
+
+      ! save off defaults values
+      call rad_cnst_get_aer_props(list_idx, imode, 1, & ! in
+                     density_aer=specdens_1(imode),hygro_aer=spechygro_1) ! out
+
+      do ispec = 1, nspec
+         ! get species interstitial mixing ratio ('a')
+         call rad_cnst_get_aer_mmr(list_idx, imode, ispec, 'a', state, pbuf, & ! in
+                                   raer) ! out
+         call rad_cnst_get_aer_props(list_idx, imode, ispec, & ! in
+                     density_aer=specdens,hygro_aer=spechygro) ! out
+
+         do kk = top_lev, pver
+            do icol = 1, ncol
+               vol_tmp             = raer(icol,kk)/specdens
+               maer(icol,kk,imode) = maer(icol,kk,imode) + raer(icol,kk)
+               dryvolmr(icol,kk)   = dryvolmr(icol,kk) + vol_tmp
+               ! hygro currently is sum(hygro * volume) of each species,
+               ! need to divided by sum(volume) later to get mean hygro for all species.
+               hygro(icol,kk,imode)  = hygro(icol,kk,imode) + vol_tmp*spechygro
+            enddo ! ncol
+         enddo ! kk
+      enddo ! nspec
+
+
+      do kk = top_lev, pver
+         do icol = 1, ncol
+
+            if (dryvolmr(icol,kk) > small_value) then
+               ! divided by sum(volume) to get mean hygro
+               hygro(icol,kk,imode) = hygro(icol,kk,imode)/dryvolmr(icol,kk)
+            else
+               hygro(icol,kk,imode) = spechygro_1
+            endif
+
+            v2ncur_a = 1._r8 / ((pi/6._r8)*(dgncur_a(icol,kk,imode)**3._r8)*exp(4.5_r8*alnsg**2._r8) )
+            ! naer = aerosol number (#/kg)
+            naer(icol,kk,imode) = dryvolmr(icol,kk)*v2ncur_a
+
+            ! compute mean (1 particle) dry volume and mass for each mode
+            ! old coding is replaced because the new (1/v2ncur_a) is equal to
+            ! the mean particle volume
+            ! also moletomass forces maer >= 1.0e-30, so (maer/dryvolmr)
+            ! should never cause problems (but check for maer < 1.0e-31 anyway)
+            if (maer(icol,kk,imode) .gt. small_value_31) then
+               drydens = maer(icol,kk,imode)/dryvolmr(icol,kk)
+            else
+               drydens = 1.0_r8
+            endif
+
+            ! C++ porting note: these are output but defined in the module
+            ! thus not in the subroutine output
+            dryvol(icol,kk,imode)   = 1.0_r8/v2ncur_a
+            drymass(icol,kk,imode)  = drydens*dryvol(icol,kk,imode)
+            dryrad(icol,kk,imode)   = (dryvol(icol,kk,imode)/pi43)**third
+
+         enddo !  ncol
+      enddo ! kk
+
+   enddo    ! modes
+
+   end subroutine modal_aero_wateruptake_dryaer
 
 !===============================================================================
    subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
