@@ -172,10 +172,9 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 
-subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnumwet_m, &
-                                     qaerwat_m, wetdens_m)
+   subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, &
+                       dgnumdry_m, dgnumwet_m, qaerwat_m, wetdens_m)
 
-  use shr_log_mod ,   only: errmsg => shr_log_errmsg
    !----------------------------------------------------------------------------
    !
    ! CAM specific driver for modal aerosol water uptake code.
@@ -196,49 +195,31 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), optional, allocatable, target, intent(inout)   :: qaerwat_m(:,:,:)
    real(r8), optional, allocatable, target, intent(inout)   :: wetdens_m(:,:,:)
 
-   !----------------------------------------------------------------------------
    ! local variables
-
-   integer  :: lchnk              ! chunk index
-   integer  :: ncol               ! number of columns
-   integer  :: list_idx           ! radiative constituents list index
-   integer  :: stat
-
-   integer :: imode
+   integer :: lchnk              ! chunk index
+   integer :: ncol               ! number of columns
+   integer :: list_idx           ! radiative constituents list index
+   integer :: imode              ! mode index
    integer :: itim_old
-   integer :: nmodes
-   integer :: nspec
+   integer :: nmodes             ! total mode number
 
-   real(r8), pointer :: h2ommr(:,:) ! specific humidity
-   real(r8), pointer :: temperature(:,:)      ! temperatures (K)
-   real(r8), pointer :: pmid(:,:)   ! layer pressure (Pa)
-   real(r8), pointer :: raer(:,:)   ! aerosol species MRs (kg/kg and #/kg)
+   real(r8), pointer :: h2ommr(:,:)      ! specific humidity [kg/kg]
+   real(r8), pointer :: temperature(:,:) ! temperatures [K]
+   real(r8), pointer :: pmid(:,:)        ! layer pressure [Pa]
+   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
+   real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
+   real(r8), pointer :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
+   real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
+   real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
 
-   real(r8), pointer :: cldn(:,:)      ! layer cloud fraction (0-1)
-   real(r8), pointer :: dgncur_a(:,:,:)
-   real(r8), pointer :: dgncur_awet(:,:,:)
-   real(r8), pointer :: wetdens(:,:,:)
-   real(r8), pointer :: qaerwat(:,:,:)
+   real(r8) :: rh(pcols,pver)        ! relative humidity [fraction]
+   logical  :: compute_wetdens
 
-   real(r8) :: dryvolmr(pcols,pver)          ! volume MR for aerosol mode (m3/kg)
-   real(r8) :: specdens
-   real(r8) :: spechygro, spechygro_1
-   real(r8) :: duma, dumb
-   real(r8) :: sigmag
-   real(r8) :: alnsg
-   real(r8) :: v2ncur_a
-   real(r8) :: drydens               ! dry particle density  (kg/m^3)
-   real(r8) :: rh(pcols,pver)        ! relative humidity (0-1)
-
-   real(r8) :: es(pcols)             ! saturation vapor pressure
-   real(r8) :: qs(pcols)             ! saturation specific humidity
-   real(r8) :: cldn_thresh
-   real(r8) :: aerosol_water(pcols,pver) !sum of aerosol water (wat_a1 + wat_a2 + wat_a3 + wat_a4)
-   logical :: history_aerosol      ! Output the MAM aerosol variables and tendencies
-   logical :: history_verbose      ! produce verbose history output
-   logical :: compute_wetdens
-
-   character(len=3) :: trnum       ! used to hold mode number (as characters)
+   ! variables for writing history output
+   real(r8) :: aerosol_water(pcols,pver) !sum of aerosol water (wat_a1 + wat_a2 + wat_a3 + wat_a4) [kg/kg]
+   logical  :: history_aerosol      ! Output the MAM aerosol variables and tendencies
+   logical  :: history_verbose      ! produce verbose history output
+   character(len=3)  :: trnum       ! used to hold mode number (as characters)
    !----------------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -306,7 +287,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
 
    call modal_aero_wateruptake_rh_clearair( ncol,         & ! in
                         temperature, pmid,  h2ommr, cldn, & ! in
-                        rh                                ) ! inout
+                        rh                                ) ! out
 
    !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
@@ -453,7 +434,7 @@ end subroutine modal_aero_wateruptake_dr
 !===============================================================================
    subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
                         temperature,    pmid,   h2ommr,  cldn,  & ! in
-                        rh                                      ) ! inout
+                        rh                                      ) ! out
 !-----------------------------------------------------------------------
 ! estimate clear air relative humidity using cloud fraction
 !-----------------------------------------------------------------------
@@ -462,7 +443,7 @@ end subroutine modal_aero_wateruptake_dr
    real(r8), intent(in) :: pmid(:,:)            ! layer pressure [Pa]
    real(r8), intent(in) :: h2ommr(:,:)          ! water mass mixing ratio [kg/kg]
    real(r8), intent(in) :: cldn(:,:)            ! layer cloud fraction [fraction]
-   real(r8), intent(inout) :: rh(:,:)           ! relative humidity [Fraction]
+   real(r8), intent(out) :: rh(:,:)           ! relative humidity [Fraction]
 
    ! local variables
    integer   :: icol, kk
