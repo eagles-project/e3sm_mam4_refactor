@@ -204,7 +204,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    integer  :: list_idx           ! radiative constituents list index
    integer  :: stat
 
-   integer :: i, k, l, m
+   integer :: imode
    integer :: itim_old
    integer :: nmodes
    integer :: nspec
@@ -289,10 +289,12 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       endif
    endif
 
+   !----------------------------------------------------------------------------
    ! retreive aerosol properties
    call modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
                                       state, pbuf,   dgncur_a     ) ! in
 
+   !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
    h2ommr       => state%q(:,:,1)
    temperature  => state%t
@@ -306,6 +308,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                         temperature, pmid,  h2ommr, cldn, & ! in
                         rh                                ) ! inout
 
+   !----------------------------------------------------------------------------
    ! compute aerosol wet radius and aerosol water
    call modal_aero_wateruptake_radius( ncol,    nmodes,         & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
@@ -324,15 +327,15 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    if (.not.present(list_idx_in)) then
 
       aerosol_water(:ncol,:) = 0._r8
-      do m = 1, nmodes
+      do imode = 1, nmodes
          ! output to history
-         write( trnum, '(i3.3)' ) m
-         call outfld( 'wat_a'//trnum(3:3),  qaerwat(:,:,m),     pcols, lchnk)
-         call outfld( 'dgnd_a'//trnum(2:3), dgncur_a(:,:,m),    pcols, lchnk)
-         call outfld( 'dgnw_a'//trnum(2:3), dgncur_awet(:,:,m), pcols, lchnk)
+         write( trnum, '(i3.3)' ) imode
+         call outfld( 'wat_a'//trnum(3:3),  qaerwat(:,:,imode),     pcols, lchnk)
+         call outfld( 'dgnd_a'//trnum(2:3), dgncur_a(:,:,imode),    pcols, lchnk)
+         call outfld( 'dgnw_a'//trnum(2:3), dgncur_awet(:,:,imode), pcols, lchnk)
          if (history_aerosol .and. .not. history_verbose) &
-         aerosol_water(:ncol,:) = aerosol_water(:ncol,:) + qaerwat(:ncol,:,m)
-      enddo ! m = 1, nmodes
+         aerosol_water(:ncol,:) = aerosol_water(:ncol,:) + qaerwat(:ncol,:,imode)
+      enddo ! nmodes
 
       if (history_aerosol .and. .not. history_verbose) &
          call outfld( 'aero_water',  aerosol_water(:ncol,:),    ncol, lchnk)
