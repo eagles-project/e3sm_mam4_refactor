@@ -172,8 +172,8 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 
-   subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, &
-                       dgnumdry_m, dgnumwet_m, qaerwat_m, wetdens_m)
+   subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! in
+                                        dgnumwet_m, qaerwat_m, wetdens_m      ) ! inout
 
    !----------------------------------------------------------------------------
    !
@@ -200,7 +200,7 @@ end subroutine modal_aero_wateruptake_init
    integer :: ncol               ! number of columns
    integer :: list_idx           ! radiative constituents list index
    integer :: imode              ! mode index
-   integer :: itim_old
+   integer :: itim_old           ! index
    integer :: nmodes             ! total mode number
 
    real(r8), pointer :: h2ommr(:,:)      ! specific humidity [kg/kg]
@@ -225,15 +225,8 @@ end subroutine modal_aero_wateruptake_init
    lchnk = state%lchnk
    ncol = state%ncol
 
-   ! determine default variables
-   call phys_getopts(history_aerosol_out = history_aerosol, &
-                     history_verbose_out = history_verbose)
-
    list_idx = 0
    if (present(list_idx_in))     list_idx = list_idx_in
-
-   ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
    !initialize to an invalid value
    naer(:,:,:)    = huge(1.0_r8)
@@ -243,13 +236,17 @@ end subroutine modal_aero_wateruptake_init
    wetrad(:,:,:)  = huge(1.0_r8)
    wetvol(:,:,:)  = huge(1.0_r8)
    wtrvol(:,:,:)  = huge(1.0_r8)
-
    rhcrystal(:)   = huge(1.0_r8)
    rhdeliques(:)  = huge(1.0_r8)
    specdens_1(:)  = huge(1.0_r8)
+   maer(:,:,:)    = 0._r8
+   hygro(:,:,:)   = 0._r8
 
-   maer(:,:,:)     = 0._r8
-   hygro(:,:,:)    = 0._r8
+   ! determine default variables
+   call phys_getopts(history_aerosol_out = history_aerosol, &
+                     history_verbose_out = history_verbose)
+   ! loop over all aerosol modes
+   call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
    !by default set compute_wetdens to be true
    compute_wetdens = .true.
