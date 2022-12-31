@@ -281,7 +281,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    ! compute wet aerosol properties
 
    ! compute aerosol wet radius, volume, diameter and aerosol water
-   call modal_aero_wateruptake_radius( ncol,    nmodes,         & ! in
+   call modal_aero_wateruptake_wetaer( ncol,    nmodes,         & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
                 dryrad, hygro,  rh,     naer,   dryvol,         & ! in
                 wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat   ) ! out
@@ -466,13 +466,13 @@ use wv_saturation,    only: qsat_water
 end subroutine modal_aero_wateruptake_rh_clearair
 
 !===============================================================================
-subroutine modal_aero_wateruptake_radius( ncol,  nmodes,  & ! in
+subroutine modal_aero_wateruptake_wetaer( ncol,  nmodes,  & ! in
              rhcrystal,      rhdeliques,    dgncur_a,     & ! in
              dryrad, hygro,  rh,     naer,  dryvol,       & ! in
              wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
 !-----------------------------------------------------------------------
 !
-! Purpose: Compute aerosol wet radius
+! Purpose: Compute aerosol wet radius and other properties
 !
 ! Method:  Kohler theory
 !
@@ -546,7 +546,7 @@ subroutine modal_aero_wateruptake_radius( ncol,  nmodes,  & ! in
 
    enddo ! modes
 
-end subroutine modal_aero_wateruptake_radius
+end subroutine modal_aero_wateruptake_wetaer
 
 !===============================================================================
 subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
@@ -719,7 +719,7 @@ subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
              wetdens                                         ) ! inout
 !-----------------------------------------------------------------------
-! compute aerosol wet diameter, aerosol water and density
+! compute aerosol wet density
 !-----------------------------------------------------------------------
    integer, intent(in)  :: ncol                    ! number of columns
    integer, intent(in)  :: nmodes
