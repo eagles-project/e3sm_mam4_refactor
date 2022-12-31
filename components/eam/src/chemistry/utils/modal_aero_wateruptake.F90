@@ -7,12 +7,9 @@ use physconst,        only: pi, rhoh2o
 use ppgrid,           only: pcols, pver
 use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
-
-use wv_saturation,    only: qsat_water
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
                             rad_cnst_get_mode_props, rad_cnst_get_mode_num
 use cam_history,      only: addfld, add_default, outfld
-use cam_logfile,      only: iulog
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 use phys_control,     only: phys_getopts
 use cam_abortutils,   only: endrun
@@ -26,13 +23,8 @@ save
 public :: &
    modal_aero_wateruptake_init, &
    modal_aero_wateruptake_dr, &
-   modal_aero_kohler
-
-
-public :: modal_aero_wateruptake_reg
-
-real(r8), parameter :: third = 1._r8/3._r8
-real(r8), parameter :: pi43  = pi*4.0_r8/3.0_r8
+   modal_aero_kohler, &
+   modal_aero_wateruptake_reg
 
 
 ! Physics buffer indices
@@ -43,6 +35,9 @@ integer :: wetdens_ap_idx = 0
 integer :: qaerwat_idx    = 0
 
 logical :: pergro_mods         = .false.
+
+real(r8), parameter   :: third = 1._r8/3._r8
+real(r8), parameter   :: pi43  = pi*4.0_r8/3.0_r8
 
 real(r8), allocatable :: maer(:,:,:)      ! aerosol wet mass MR (including water) (kg/kg-air)
 real(r8), allocatable :: hygro(:,:,:)     ! volume-weighted mean hygroscopicity (--)
@@ -58,7 +53,6 @@ real(r8), allocatable :: wtrvol(:,:,:)    ! single-particle-mean water volume in
 real(r8), allocatable :: rhcrystal(:)
 real(r8), allocatable :: rhdeliques(:)
 real(r8), allocatable :: specdens_1(:)
-!$OMP THREADPRIVATE(maer, hygro, naer, dryvol, drymass, dryrad, wetrad, wetvol, wtrvol, rhcrystal, rhdeliques, specdens_1)
 
 !===============================================================================
 contains
@@ -67,7 +61,6 @@ contains
 subroutine modal_aero_wateruptake_reg()
 
   use physics_buffer,   only: pbuf_add_field, dtype_r8
-  use rad_constituents, only: rad_cnst_get_info
 
    integer :: nmodes
    
@@ -90,7 +83,7 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
-   integer :: m, nmodes, istat
+   integer :: imode, nmodes, istat
    logical :: history_aerosol      ! Output the MAM aerosol variables and tendencies
    logical :: history_verbose      ! produce verbose history output
 
@@ -137,8 +130,8 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
                      history_verbose_out = history_verbose, &
                      pergro_mods_out = pergro_mods)
 
-   do m = 1, nmodes
-      write(trnum, '(i3.3)') m
+   do imode = 1, nmodes
+      write(trnum, '(i3.3)') imode
       call addfld('dgnd_a'//trnum(2:3), (/ 'lev' /), 'A', 'm', &
          'dry dgnum, interstitial, mode '//trnum(2:3))
       call addfld('dgnw_a'//trnum(2:3), (/ 'lev' /), 'A', 'm', &
@@ -154,7 +147,7 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
          endif
       endif
 
-   end do
+   enddo
 
    ! Add total aerosol water
    if (history_aerosol .and. .not. history_verbose) then
@@ -171,10 +164,8 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
-
-   subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! in
-                                        dgnumwet_m, qaerwat_m, wetdens_m      ) ! inout
-
+subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! in
+                                        dgnumwet_m, qaerwat_m, wetdens_m   ) ! inout
    !----------------------------------------------------------------------------
    !
    ! CAM specific driver for modal aerosol water uptake code.
@@ -220,8 +211,8 @@ end subroutine modal_aero_wateruptake_init
    logical  :: history_aerosol      ! Output the MAM aerosol variables and tendencies
    logical  :: history_verbose      ! produce verbose history output
    character(len=3)  :: trnum       ! used to hold mode number (as characters)
-   !----------------------------------------------------------------------------
 
+   !----------------------------------------------------------------------------
    lchnk = state%lchnk
    ncol = state%ncol
 
@@ -287,16 +278,19 @@ end subroutine modal_aero_wateruptake_init
                         rh                                ) ! out
 
    !----------------------------------------------------------------------------
-   ! compute aerosol wet radius and aerosol water
+   ! compute wet aerosol properties
+
+   ! compute aerosol wet radius, volume, diameter and aerosol water
    call modal_aero_wateruptake_radius( ncol,    nmodes,         & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
                 dryrad, hygro,  rh,     naer,   dryvol,         & ! in
                 wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat   ) ! out
 
+   ! compute wet aerosol density
    if (compute_wetdens) then
         call modal_aero_wateruptake_wetdens( ncol,   nmodes, & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
-             wetdens                                         ) ! out
+             wetdens                                         ) ! inout
    endif
 
    !----------------------------------------------------------------------------
@@ -323,8 +317,8 @@ end subroutine modal_aero_wateruptake_init
 end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
-   subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
-                                        state,     pbuf,   dgncur_a     ) ! in
+subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
+                                     state,     pbuf,   dgncur_a     ) ! in
 !-----------------------------------------------------------------------
 ! retreive dry aerosol properties
 ! output variables are declared in the module so no output variables in this subroutine
@@ -426,15 +420,17 @@ end subroutine modal_aero_wateruptake_dr
 
    enddo    ! modes
 
-   end subroutine modal_aero_wateruptake_dryaer
+end subroutine modal_aero_wateruptake_dryaer
 
 !===============================================================================
-   subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
-                        temperature,    pmid,   h2ommr,  cldn,  & ! in
-                        rh                                      ) ! out
+subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
+                     temperature,    pmid,   h2ommr,  cldn,  & ! in
+                     rh                                      ) ! out
 !-----------------------------------------------------------------------
 ! estimate clear air relative humidity using cloud fraction
 !-----------------------------------------------------------------------
+use wv_saturation,    only: qsat_water
+
    integer,  intent(in) :: ncol                 ! number of columns
    real(r8), intent(in) :: temperature(:,:)     ! temperature [K]
    real(r8), intent(in) :: pmid(:,:)            ! layer pressure [Pa]
@@ -467,15 +463,13 @@ end subroutine modal_aero_wateruptake_dr
       enddo ! i = 1, ncol
    enddo ! k = top_lev, pver
 
-   end subroutine modal_aero_wateruptake_rh_clearair
+end subroutine modal_aero_wateruptake_rh_clearair
 
 !===============================================================================
-
-   subroutine modal_aero_wateruptake_radius( ncol,  nmodes,  & ! in
-                rhcrystal,      rhdeliques,    dgncur_a,     & ! in
-                dryrad, hygro,  rh,     naer,  dryvol,       & ! in
-                wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
-
+subroutine modal_aero_wateruptake_radius( ncol,  nmodes,  & ! in
+             rhcrystal,      rhdeliques,    dgncur_a,     & ! in
+             dryrad, hygro,  rh,     naer,  dryvol,       & ! in
+             wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
 !-----------------------------------------------------------------------
 !
 ! Purpose: Compute aerosol wet radius
@@ -507,8 +501,8 @@ end subroutine modal_aero_wateruptake_dr
    ! local variables
    integer :: icol, kk, imode
    real(r8) :: hystfac                ! working variable for hysteresis
-   !-----------------------------------------------------------------------
 
+   !-----------------------------------------------------------------------
    ! loop over all aerosol modes
    do imode = 1, nmodes
 
@@ -552,18 +546,18 @@ end subroutine modal_aero_wateruptake_dr
 
    enddo ! modes
 
-   end subroutine modal_aero_wateruptake_radius
+end subroutine modal_aero_wateruptake_radius
 
+!===============================================================================
+subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
+                              rwet_out               ) ! out
 !-----------------------------------------------------------------------
-   subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
-                                 rwet_out               ) ! out
-
 ! calculates equlibrium radius r of haze droplets as function of
 ! dry particle mass and relative humidity s using kohler solution
 ! given in pruppacher and klett (eqn 6-35)
 
 ! for multiple aerosol types, assumes an internal mixture of aerosols
-
+!-----------------------------------------------------------------------
    implicit none
 
 ! arguments
@@ -628,15 +622,14 @@ end subroutine modal_aero_wateruptake_dr
    rwet_out = rwet*factor_um2m
 
    return
-   end subroutine modal_aero_kohler
+end subroutine modal_aero_kohler
 
-
+!===============================================================================
+subroutine makoh_quartic( cx, p3, p2, p1, p0)
 !-----------------------------------------------------------------------
-   subroutine makoh_quartic( cx, p3, p2, p1, p0)
-
 !     solves x**4 + p3 x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2, p3 are real
-!
+!-----------------------------------------------------------------------
    real(r8), intent(in)     :: p0, p1, p2, p3 
    complex(r8), intent(out) :: cx(4)
 
@@ -683,14 +676,15 @@ end subroutine modal_aero_wateruptake_dr
    endif
 
    return
-   end subroutine makoh_quartic
+end subroutine makoh_quartic
 
+!===============================================================================
+subroutine find_real_solution(               &
+             rdry,   cx,                     & ! in
+             rwet,   nsol                    ) ! out
 !----------------------------------------------------------------------
-   subroutine find_real_solution(               &
-                rdry,   cx,                     & ! in
-                rwet,   nsol                    ) ! out
-!
 !  find the smallest real solution from the polynomial solver
+!----------------------------------------------------------------------
 !
    real(r8),    intent(in) :: rdry      ! dry radius
    complex(r8), intent(in) :: cx(:)     ! polynomial output
@@ -718,12 +712,12 @@ end subroutine modal_aero_wateruptake_dr
        nsol = nn
    enddo
 
-   end subroutine find_real_solution
+end subroutine find_real_solution
 
 !===============================================================================
-   subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
-                wetvol, wtrvol, drymass,      specdens_1,       & ! in
-                wetdens                                         ) ! out
+subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
+             wetvol, wtrvol, drymass,      specdens_1,       & ! in
+             wetdens                                         ) ! inout
 !-----------------------------------------------------------------------
 ! compute aerosol wet diameter, aerosol water and density
 !-----------------------------------------------------------------------
@@ -733,7 +727,7 @@ end subroutine modal_aero_wateruptake_dr
    real(r8),intent(in)  :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
    real(r8),intent(in)  :: drymass(:,:,:)       ! single-particle-mean dry mass [kg]
    real(r8),intent(in)  :: specdens_1(:)        ! specified dry aerosol density [kg/m3]
-   real(r8),intent(out) :: wetdens(pcols,pver,nmodes)       ! wet aerosol density [kg/m3]
+   real(r8),intent(inout) :: wetdens(:,:,:)     ! wet aerosol density [kg/m3]
    ! local variables
    integer :: icol, kk, imode
    real(r8), parameter  :: small_value = 1.0e-30_r8
@@ -755,11 +749,9 @@ end subroutine modal_aero_wateruptake_dr
       enddo ! k = top_lev, pver
    enddo ! m = 1, nmodes
 
-   end subroutine modal_aero_wateruptake_wetdens
+end subroutine modal_aero_wateruptake_wetdens
 
-
-!----------------------------------------------------------------------
-
-   end module modal_aero_wateruptake
+!===============================================================================
+end module modal_aero_wateruptake
 
 
