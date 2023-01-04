@@ -621,14 +621,14 @@ subroutine hetfrz_classnuc_cam_calc( &
    do kk = top_lev, pver
       do icol = 1, ncol
          rho(icol,kk) = pmid(icol,kk)/(rair*t(icol,kk))
-      end do
-   end do
+      enddo
+   enddo
 
    do kk = top_lev, pver
       do icol = 1, ncol
          lcldm(icol,kk) = max(ast(icol,kk), mincld)
-      end do
-   end do
+      enddo
+   enddo
 
    ! Convert interstitial and cloud borne aerosols from a mass to a volume basis before
    ! being used in get_aer_num
@@ -640,9 +640,9 @@ subroutine hetfrz_classnuc_cam_calc( &
          call rad_cnst_get_mode_num(0, mode_idx(ispec), 'a', state, pbuf, ptr2d)
       else
          call rad_cnst_get_aer_mmr(0, mode_idx(ispec), spec_idx(ispec), 'a', state, pbuf, ptr2d)
-      end if
+      endif
       aer(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:) * rho(:ncol,:)
-   end do
+   enddo
 
    ! Init top levels of outputs of get_aer_num
    total_aer_num              = 0._r8
@@ -702,8 +702,8 @@ subroutine hetfrz_classnuc_cam_calc( &
          fn_cloudborne_aer_num(icol,kk,1) = total_aer_num(icol,kk,1)*factnum(icol,kk,mode_accum_idx)  ! bc
          fn_cloudborne_aer_num(icol,kk,2) = total_aer_num(icol,kk,2)*factnum(icol,kk,mode_accum_idx)  ! dst_a1
          fn_cloudborne_aer_num(icol,kk,3) = total_aer_num(icol,kk,3)*factnum(icol,kk,mode_coarse_idx) ! dst_a3
-      end do
-   end do
+      enddo
+   enddo
 
    call outfld('bc_num',        total_aer_num(:,:,1),    pcols, lchnk)
    call outfld('dst1_num',      total_aer_num(:,:,2),    pcols, lchnk)
@@ -796,7 +796,7 @@ subroutine hetfrz_classnuc_cam_calc( &
             frzimm(icol,kk) = 0._r8
             frzcnt(icol,kk) = 0._r8
             frzdep(icol,kk) = 0._r8
-         end if
+         endif
 
          nnuccc_bc(icol,kk) = frzbcimm(icol,kk)*1.0e6_r8*ast(icol,kk)
          nnucct_bc(icol,kk) = frzbccnt(icol,kk)*1.0e6_r8*ast(icol,kk)
@@ -817,8 +817,8 @@ subroutine hetfrz_classnuc_cam_calc( &
          numice10s(icol,kk) = (frzimm(icol,kk)+frzcnt(icol,kk)+frzdep(icol,kk))*1.0e6_r8*deltatin*(10._r8/deltatin)
          numice10s_imm_dst(icol,kk) = frzduimm(icol,kk)*1.0e6_r8*deltatin*(10._r8/deltatin)
          numice10s_imm_bc(icol,kk) = frzbcimm(icol,kk)*1.0e6_r8*deltatin*(10._r8/deltatin)
-      end do
-   end do
+      enddo
+   enddo
 
    call outfld('FREQIMM', freqimm, pcols, lchnk)
    call outfld('FREQCNT', freqcnt, pcols, lchnk)
@@ -930,7 +930,7 @@ subroutine calculate_interstitial_aer_num(ii, kk, ncnst, aer, &
 
    if (dmc > 0._r8 ) then
       total_interstitial_aer_num(3) = dmc/aermc_coarse_total * aer(ii,kk,num_coarse) * num_m3_to_cm3 ! #/cm^3
-   end if
+   endif
 
 end subroutine calculate_interstitial_aer_num                                                                                                                        
 
@@ -972,11 +972,11 @@ subroutine calculate_cloudborne_aer_num(ii, kk, ncnst, aer_cb, &
   
    if (as_bc > 0._r8) then
       total_cloudborne_aer_num(1) = as_bc/aermc_accum_total * aer_cb(ii,kk,num_accum) * num_m3_to_cm3 ! #/cm^3
-   end if
+   endif
 
    if (as_du > 0._r8) then
       total_cloudborne_aer_num(2) = as_du/aermc_accum_total * aer_cb(ii,kk,num_accum) * num_m3_to_cm3 ! #/cm^3
-   end if
+   endif
 
 
    dmc_imm = aer_cb(ii,kk,dst_coarse)
@@ -986,7 +986,7 @@ subroutine calculate_cloudborne_aer_num(ii, kk, ncnst, aer_cb, &
 
    if (dmc_imm > 0._r8) then
       total_cloudborne_aer_num(3) = dmc_imm/aermc_coarse_total * aer_cb(ii,kk,num_coarse) * num_m3_to_cm3 ! #/cm^3
-   end if
+   endif
 
 end subroutine calculate_cloudborne_aer_num                                                                                                                                    
 
@@ -1009,6 +1009,7 @@ subroutine calculate_mass_mean_radius(ii, kk, ncnst, aer, &
 
    ! local variables
    real(r8) :: bc_num, dst1_num, dst3_num                ! number concentration [#/cm^3]
+   real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
    real(r8), parameter :: aermc_min_threshold  = 1.0e-30_r8
    real(r8), parameter :: aernum_min_threshold = 1.0e-3_r8
    real(r8), parameter :: r_bc_prescribed = 0.067e-6_r8
@@ -1026,20 +1027,20 @@ subroutine calculate_mass_mean_radius(ii, kk, ncnst, aer, &
    ! BC
    if ((aer(ii,kk,bc_accum)+aer(ii,kk,bc_pcarbon))*1.0e-3_r8 > aermc_min_threshold .and. bc_num > aernum_min_threshold) then
       hetraer(1) = (3._r8/(4*pi*specdens_bc)*(aer(ii,kk,bc_accum)+aer(ii,kk,bc_pcarbon))/ &
-                   (bc_num*1.0e6_r8))**(1._r8/3._r8)
-   end if
+                   (bc_num*num_cm3_to_m3))**(1._r8/3._r8)
+   endif
 
    ! fine dust a1
    if (aer(ii,kk,dst_accum)*1.0e-3_r8 > aermc_min_threshold .and. dst1_num > aernum_min_threshold) then
       hetraer(2) = (3._r8/(4*pi*specdens_dust)*aer(ii,kk,dst_accum)/&
-                   (dst1_num*1.0e6_r8))**(1._r8/3._r8)
-   end if
+                   (dst1_num*num_cm3_to_m3))**(1._r8/3._r8)
+   endif
 
    ! coarse dust a3
    if (aer(ii,kk,dst_coarse)*1.0e-3_r8 > aermc_min_threshold .and. dst3_num > aernum_min_threshold) then
       hetraer(3) = (3._r8/(4*pi*specdens_dust)*aer(ii,kk,dst_coarse)/&
-                   (dst3_num*1.0e6_r8))**(1._r8/3._r8)
-   end if
+                   (dst3_num*num_cm3_to_m3))**(1._r8/3._r8)
+   endif
 
 end subroutine calculate_mass_mean_radius
 
@@ -1180,7 +1181,7 @@ subroutine calculate_coated_fraction(ii, kk, ncnst, aer,  rhoair, &
       total_aer_num(ispec)    = total_interstitial_aer_num(ispec) + total_cloudborne_aer_num(ispec)
       coated_aer_num(ispec)   = total_interstitial_aer_num(ispec)*dstcoat(ispec)
       uncoated_aer_num(ispec) = total_interstitial_aer_num(ispec)*(1._r8-dstcoat(ispec))
-   end do
+   enddo
 
    coated_aer_num(1)   = aer(ii,kk,bc_pcarbon)*bc_kg_to_num*num_m3_to_cm3*dstcoat(1)+ &
                          aer(ii,kk,bc_accum)*bc_kg_to_num*num_m3_to_cm3
@@ -1234,12 +1235,12 @@ subroutine calculate_water_activity(ii, kk, ncnst, aer, &
       awcam(2) = (dst1_num*num_cm3_to_m3)/aer(ii,kk,num_accum)* &
                  (aer(ii,kk,so4_accum) + aer(ii,kk,soa_accum) + &
                   aer(ii,kk,pom_accum) + aer(ii,kk,bc_accum) + aer(ii,kk,mom_accum))*mass_kg_to_mug ! [mug m-3]
-   end if
+   endif
 
    if (awcam(2) > 0._r8) then
       awfacm(2) = ( aer(ii,kk,bc_accum) + aer(ii,kk,soa_accum) + aer(ii,kk,pom_accum) + aer(ii,kk,mom_accum) )/ &
                   ( aer(ii,kk,soa_accum) + aer(ii,kk,pom_accum) + aer(ii,kk,so4_accum) + aer(ii,kk,bc_accum) + aer(ii,kk,mom_accum) )
-   end if
+   endif
 
 
    ! accumulation mode for bc (if MAM4, primary carbon mode is insoluble)
@@ -1247,7 +1248,7 @@ subroutine calculate_water_activity(ii, kk, ncnst, aer, &
       awcam(1) = (bc_num*num_cm3_to_m3)/aer(ii,kk,num_accum)* &
                  (aer(ii,kk,so4_accum) + aer(ii,kk,soa_accum) + &
                   aer(ii,kk,pom_accum) + aer(ii,kk,bc_accum) + aer(ii,kk,mom_accum))  * mass_kg_to_mug ! [mug m-3]
-   end if
+   endif
 
    awfacm(1) = awfacm(2)
 
@@ -1257,14 +1258,14 @@ subroutine calculate_water_activity(ii, kk, ncnst, aer, &
       awcam(3) = (dst3_num*num_cm3_to_m3)/aer(ii,kk,num_coarse)* &
                  (aer(ii,kk,so4_coarse) + aer(ii,kk,mom_coarse) + &
                   aer(ii,kk,bc_coarse) + aer(ii,kk,pom_coarse) + aer(ii,kk,soa_coarse)) * mass_kg_to_mug
-   end if
+   endif
 
    if (awcam(3) > 0._r8) then
       awfacm(3) = ( aer(ii,kk,bc_coarse) + aer(ii,kk,soa_coarse) + &
                     aer(ii,kk,pom_coarse) + aer(ii,kk,mom_coarse) ) / &
                   ( aer(ii,kk,soa_coarse) + aer(ii,kk,pom_coarse) + &
                     aer(ii,kk,so4_coarse) + aer(ii,kk,bc_coarse) + aer(ii,kk,mom_coarse) )
-   end if
+   endif
                                                                                                 
 end subroutine calculate_water_activity
 
