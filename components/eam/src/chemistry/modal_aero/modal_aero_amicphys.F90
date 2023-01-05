@@ -209,7 +209,6 @@ implicit none
    ! misc
 
    logical :: do_cond, do_rename, do_newnuc, do_coag
-   logical :: lcopy(gas_pcnst)
 
    type ( misc_vars_aa_type ) :: misc_vars_aa
    real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
@@ -251,7 +250,9 @@ implicit none
    !====================================================
    ! Get saturation mixing ratio
    !====================================================
-   call qsat( temp(1:ncol,1:pver), pmid(1:ncol,1:pver), ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
+   call qsat( temp(1:ncol,1:pver), pmid(1:ncol,1:pver), &! in
+              ev_sat(1:ncol,1:pver),                    &! out (but not used)
+              qv_sat(1:ncol,1:pver)                     )! out
 
    do kk = top_lev, pver
    do ii = 1, ncol
