@@ -53,6 +53,10 @@ module modal_aero_convproc
 ! module data
    real(r8) :: hund_ovr_g  ! = 100.0_r8/gravit, calculated once and used frequently
    real(r8), parameter :: mbsth = 1.e-15 ! threshold below which we treat the mass fluxes as zero [mb/s]
+   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
+                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
+                ! eliminate occasional very small icwmr values from the ZM
+                ! module
    logical  :: convproc_do_gas, convproc_do_aer
 
 !=========================================================================================
@@ -1794,9 +1798,6 @@ jtsub_loop_main_aa: &
 
    logical      :: do_act_this_lev      ! flag for doing activation at current level
    integer      :: kp1                  ! kk + 1
-   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
-                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
-                ! eliminate occasional very small icwmr values from the ZM module
 
    ! initiate variables
    do_act_this_lev = .false.
@@ -2110,9 +2111,6 @@ jtsub_loop_main_aa: &
    real(r8)     :: expcdtm1     ! exp(cdt) - 1 [unitless]
    real(r8)     :: half_cld     ! 0.5 * cldfrac [fraction]
 
-   real(r8), parameter :: clw_cut = 1.0e-6      ! cutoff value of cloud water for doing updraft [kg/kg]
-                ! Skip levels where icwmr(icol,k) <= clw_cut (=1.0e-6) to
-                ! eliminate occasional very small icwmr values from the ZM module
 
    cdt = 0.0_r8
    if ((icwmr(icol,kk) > clw_cut) .and. (rprd(icol,kk) > 0.0)) then
