@@ -1,85 +1,103 @@
 #define CAM_VERSION_IS_ACME
 
-
+module modal_aero_amicphys
 !----------------------------------------------------------------------
+! Purpose: does modal aerosol gas-aerosol exchange
+!          and additional aerosol microphysics processes:
+!          - intermodal transfer of particle mass and number (renaming),
+!          - nucleation,
+!          - coagulation,
+!          - aging of hydrophobic particles.
+!
+! History:
+!   RCE 07.04.13:  Adapted from MIRAGE2 code
 !----------------------------------------------------------------------
-!BOP
-!
-! !MODULE: modal_aero_amicphys --- does modal aerosol gas-aerosol exchange
-!
-! !INTERFACE:
-   module modal_aero_amicphys
 
-! !USES:
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
 
-  use modal_aero_amicphys_control
-
   implicit none
   private
-
-! !PUBLIC MEMBER FUNCTIONS:
   public modal_aero_amicphys_intr, modal_aero_amicphys_init
 
-! !DESCRIPTION: This module implements ...
-!
-! !REVISION HISTORY:
-!
-!   RCE 07.04.13:  Adapted from MIRAGE2 code
-!
-!EOP
-!----------------------------------------------------------------------
-!BOC
-
-! list private module data here
-
-!EOC
 !----------------------------------------------------------------------
 
+contains
 
-  contains
-
-
-!--------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------
 subroutine modal_aero_amicphys_intr(                             &
                         mdo_gasaerexch,     mdo_rename,          &
                         mdo_newnuc,         mdo_coag,            &
                         lchnk,    ncol,     nstep,               &
                         loffset,  deltat,                        &
                         latndx,   lonndx,                        &
-                        t,        pmid,     pdel,                &
+                        temp,     pmid,     pdel,                &
                         zm,       pblh,                          &
                         qv,       cld,                           &
-                        q,                  qqcw,                &
+                        qq,                 qqcw,                &
                         q_pregaschem,                            &
                         q_precldchem,       qqcw_precldchem,     &
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-                        nqtendbb,           nqqcwtendbb,         &
-                        q_tendbb,           qqcw_tendbb,         &
-#endif
                         dgncur_a,           dgncur_awet,         &
                         wetdens_host,                            &
                         qaerwat                                  )
+!----------------------------------------------------------------------
+! !DESCRIPTION:
+! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
+!  - gas-aerosol exchange (condensation/evaporation)
+!  - growth from smaller to larger modes (renaming) due to both condensation and cloud chemistry
+!  - new particle nucleation
+!  - coagulation
+!  - transfer of particles from hydrophobic modes to hydrophilic modes (aging)
+!       due to condensation and coagulation
+!
+! The incoming mixing ratios (q and qqcw) are updated before output.
+!
+! !REVISION HISTORY:
+!   RCE 07.04.13:  Adapted from earlier version of CAM5 modal aerosol routines
+!                  for these processes
+!   Hui Wan 2022:  Restructured loops and created subroutines.
+!----------------------------------------------------------------------
 
-
-! !USES:
+use modal_aero_amicphys_control, only: r8
 use cam_history,       only:  outfld, fieldname_len
 use chem_mods,         only:  adv_mass
 use constituents,      only:  cnst_name
 use physconst,         only:  gravit, mwdry, r_universal
 use wv_saturation,     only:  qsat
 use phys_control,      only:  phys_getopts
+use mam_support,       only:  min_max_bound
 
+! Parameters, bookkeeping info, switches, runtime options
 use modal_aero_data,   only:  &
     cnst_name_cw, &
     lmassptr_amode, lmassptrcw_amode, lptr2_soa_g_amode, &
     nspec_amode, &
-    numptr_amode, numptrcw_amode
-use modal_aero_newnuc, only:  adjust_factor_pbl_ratenucl
+    numptr_amode, numptrcw_amode, ntot_amode
 
+use modal_aero_amicphys_control, only: gas_pcnst, lmapcc_all, lmapcc_val_aer, &
+                                       maxsubarea, top_lev, &
+                                       update_qaerwat, &
+                                       ntot_amode_extd, max_mode, nait, nsoa, &
+                                       misc_vars_aa_type
+
+! Subroutines for conversion from grid cell mean to subareas and back
+use modal_aero_amicphys_subareas, only: setup_subareas, set_subarea_rh &
+                                      , set_subarea_gases_and_aerosols &
+                                      , form_gcm_of_gases_and_aerosols_from_subareas
+
+! For output of diagnostics
+use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa, &
+                                       do_q_coltendaa, do_qqcw_coltendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam,  &
+                                       suffix_q_coltendaa, suffix_qqcw_coltendaa
+
+! For diagnostics
+use modal_aero_amicphys_diags, only: amicphys_diags_init &
+                                   , get_gcm_tend_diags_from_subareas &
+                                   , accumulate_column_tend_integrals &
+                                   , outfld_1proc_all_cnst
 
 implicit none
 
@@ -90,615 +108,244 @@ implicit none
    integer,  intent(in)    :: nstep                ! model time-step number
    integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
    integer,  intent(in)    :: latndx(pcols), lonndx(pcols)
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-   integer,  intent(in)    :: nqtendbb             ! dimension for q_tendbb
-   integer,  intent(in)    :: nqqcwtendbb          ! dimension for qqcw_tendbb
-#endif
 
-   real(r8), intent(in)    :: deltat               ! time step (s)
+   real(r8), intent(in)    :: deltat               ! time step [s]
 
-   real(r8), intent(inout) :: q(ncol,pver,pcnstxx) ! current tracer mixing ratios (TMRs)
-                                                   ! these values are updated (so out /= in)
-                                                   ! *** MUST BE  #/kmol-air for number
-                                                   ! *** MUST BE mol/mol-air for mass
-                                                   ! *** NOTE ncol dimension
-   real(r8), intent(inout) :: qqcw(ncol,pver,pcnstxx)
-                                                   ! like q but for cloud-borner tracers
-                                                   ! these values are updated
-   real(r8), intent(in)    :: q_pregaschem(ncol,pver,pcnstxx)    ! q TMRs    before gas-phase chemistry
-   real(r8), intent(in)    :: q_precldchem(ncol,pver,pcnstxx)    ! q TMRs    before cloud chemistry
-   real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,pcnstxx) ! qqcw TMRs before cloud chemistry
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-   real(r8), intent(inout) :: q_tendbb(ncol,pver,pcnstxx,nqtendbb)    ! TMR tendencies for box-model diagnostic output
-   real(r8), intent(inout) :: qqcw_tendbb(ncol,pver,pcnstxx,nqqcwtendbb)
-#endif
+   !---------------------------------------------------------------------------------------
+   ! Tracer mixing ratios: current values as well as some "old" values used
+   ! for the numerical coupling of physical processes
+   !---------------------------------------------------------------------------------------
+   real(r8), intent(inout) :: qq(ncol,pver,gas_pcnst) ! current tracer mixing ratios (TMRs)
+                                                      ! of gases and interstitial aerosol tracers
+                                                      ! these values are updated (so out /= in)
+                                                      ! *** MUST BE  #/kmol-air for number
+                                                      ! *** MUST BE kmol/kmol-air for mass
+                                                      ! *** NOTE ncol dimension
+   real(r8), intent(inout) :: qqcw(ncol,pver,gas_pcnst) ! like q but for cloud-borner tracers
+                                                        ! these values are updated
 
-   real(r8), intent(in)    :: t(pcols,pver)        ! temperature at model levels (K)
-   real(r8), intent(in)    :: pmid(pcols,pver)     ! pressure at model level centers (Pa)
-   real(r8), intent(in)    :: pdel(pcols,pver)     ! pressure thickness of levels (Pa)
-   real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers (m)
-   real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth (m)
-   real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity (kg/kg)
-   real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction (-) *** NOTE ncol dimension
-   real(r8), intent(inout) :: dgncur_a(pcols,pver,ntot_amode)
-   real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode)
-                                 ! dry & wet geo. mean dia. (m) of number distrib.
-   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode)
-                                 ! interstitial aerosol wet density (kg/m3)
-   real(r8), intent(inout), optional :: &
-                              qaerwat(pcols,pver,ntot_amode)
-                                 ! aerosol water mixing ratio (kg/kg, NOT mol/mol)
+   real(r8), intent(in)    :: q_pregaschem(ncol,pver,gas_pcnst)    ! q TMRs    before gas-phase chemistry
+   real(r8), intent(in)    :: q_precldchem(ncol,pver,gas_pcnst)    ! q TMRs    before cloud chemistry
+   real(r8), intent(in)    :: qqcw_precldchem(ncol,pver,gas_pcnst) ! qqcw TMRs before cloud chemistry
 
-! !DESCRIPTION:
-! calculates changes to gas and aerosol TMRs (tracer mixing ratios) from
-!    gas-aerosol exchange (condensation/evaporation)
-!    growth from smaller to larger modes (renaming) due to both
-!       condensation and cloud chemistry
-!    new particle nucleation
-!    coagulation
-!    transfer of particles from hydrophobic modes to hydrophilic modes (aging)
-!       due to condensation and coagulation
-!
-! the incoming mixing ratios (q and qqcw) are updated before output
-!
-! !REVISION HISTORY:
-!   RCE 07.04.13:  Adapted from earlier version of CAM5 modal aerosol routines
-!                  for these processes
-!
-!EOP
-!----------------------------------------------------------------------
-!BOC
+   !---------------------------------------------------------------------------------------
+   ! Ambient environment
+   !---------------------------------------------------------------------------------------
+   real(r8), intent(in)    :: temp(pcols,pver)     ! air temperature [K]
+   real(r8), intent(in)    :: pmid(pcols,pver)     ! air pressure [Pa]
+   real(r8), intent(in)    :: pdel(pcols,pver)     ! pressure layer thickness [Pa]
+   real(r8), intent(in)    :: zm(pcols,pver)       ! altitude (above ground) at level centers [m]
+   real(r8), intent(in)    :: pblh(pcols)          ! planetary boundary layer depth [m]
+   real(r8), intent(in)    :: qv(pcols,pver)       ! specific humidity [kg/kg]
+   real(r8), intent(in)    :: cld(ncol,pver)       ! cloud fraction [unitless] *** NOTE ncol dimension
 
-! local variables
-   integer, parameter :: ldiag1=-1, ldiag2=-1, ldiag3=-1, ldiag4=-1
-   integer, parameter :: method_soa = 2
-!     method_soa=0 is no uptake
-!     method_soa=1 is irreversible uptake done like h2so4 uptake
-!     method_soa=2 is reversible uptake using subr modal_aero_soaexch
+   !---------------------------------------------------------------------------------------
+   ! Particle sizes
+   !---------------------------------------------------------------------------------------
+   real(r8), intent(inout) :: dgncur_a   (pcols,pver,ntot_amode) ! dry geo. mean diameter [m] of number distrib.
+   real(r8), intent(inout) :: dgncur_awet(pcols,pver,ntot_amode) ! wet geo. mean diameter [m] of number distrib.
 
-   integer :: i, icol_diag, ipass, iq
-   integer :: itmpa, itmpb, itmpc, itmpd
-   integer :: iqtend, iqqcwtend
-   integer :: iaer, igas
-   integer :: j, jac, jsoa, jsub
-   integer :: jclea, jcldy
-   integer :: k
-   integer :: l, l2, l3, la, lb, lc, lmz, lsfrm, lstoo
-   integer :: lun, lund
-   integer :: m
-   integer :: n, niter, niter_max, ntot_soamode
-   integer :: nsubarea, ncldy_subarea
+   ! misc.
+   real(r8), intent(inout) :: wetdens_host(pcols,pver,ntot_amode)      ! interstitial aerosol wet density [kg/m3]
+   real(r8), intent(inout), optional :: qaerwat(pcols,pver,ntot_amode) ! aerosol water mixing ratio
+
+   !---------------------
+   ! local variables
+   !---------------------
+   ! Variables used for saving grid cell mean values
+
+   real(r8) :: relhumgcm                           ! relative humidity [unitless] 
+   real(r8) :: dgn_a(max_mode), dgn_awet(max_mode) ! dry and wet geo. mean diameter [m]
+   real(r8) :: ev_sat(pcols,pver)                  ! (water) saturation vapor pressure [Pa]
+   real(r8) :: qv_sat(pcols,pver)                  ! (water) saturation mixing ratio [kg/kg]
+   real(r8) :: wetdens(max_mode)                   ! interstitial aerosol wet density [kg/m3]
+
+   ! Constituent (tracer) mixing ratios. These are local, 1D copies
+   ! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs) [kmol/kmol or #/kmol]
+   !    N=1 - before gas-phase chemistry
+   !    N=2 - before cloud chemistry
+   !    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
+   !    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
+
+   real(r8) :: qgcm1   (gas_pcnst)
+
+   real(r8) :: qgcm2   (gas_pcnst)
+   real(r8) :: qqcwgcm2(gas_pcnst)
+
+   real(r8) :: qgcm3   (gas_pcnst)
+   real(r8) :: qqcwgcm3(gas_pcnst)
+   real(r8) :: qaerwatgcm3(ntot_amode_extd)   ! aerosol water mixing ratios [kmol/kmol]
+
+   real(r8) :: qgcm4   (gas_pcnst)
+   real(r8) :: qqcwgcm4(gas_pcnst)
+   real(r8) :: qaerwatgcm4(ntot_amode_extd)   ! aerosol water mixing ratios [kmol/kmol]
+
+   ! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
+   !    currently there are just clear and cloudy sub-areas
+   !    the N=1:4 have same meanings as for qgcmN
+
+   real(r8), dimension(gas_pcnst,maxsubarea) :: qsub1, qsub2,    qsub3,       qsub4
+   real(r8), dimension(gas_pcnst,maxsubarea) ::        qqcwsub2, qqcwsub3,    qqcwsub4
+   real(r8), dimension(ntot_amode_extd,maxsubarea) ::            qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios [kmol/kmol]
+
+   ! Loop indices
+
+   integer :: ii, kk ! grid column and vertical level
+   integer :: icnst  ! constituent (tracer) 
+   integer :: imode  ! lognormal mode
+   integer :: jsoa   ! soa species
+
+   ! Variables related to subareas
+
+   integer  :: jsub                 ! loop index for subarea
+   integer  :: jclea, jcldy         ! index of clear and cloudy subareas
+   real(r8) :: fclea, fcldy         ! area fraction [unitless] of clear and cloudy subareas
+   real(r8) :: afracsub(maxsubarea) ! area fraction [unitless] of each subarea
+   integer  :: nsubarea             ! # of active subareas in this grid cell
+   integer  :: ncldy_subarea        ! # of cloudy subareas in this grid cell
+   logical  :: iscldy_subarea(maxsubarea)  ! whether a subarea is cloudy
+   real(r8) :: relhumsub(maxsubarea)       ! relative humidity in subareas [unitless]
+
+   ! misc
 
    logical :: do_cond, do_rename, do_newnuc, do_coag
-   logical :: iscldy_subarea(maxsubarea)
 
-   character(len=fieldname_len+3) :: fieldname
-   character(len=6)   :: tmpch6a, tmpch6c
-   character(len=200) :: tmp_str
+   type ( misc_vars_aa_type ) :: misc_vars_aa
+   real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
 
-   real (r8) :: pdel_fac
+   !----------------------------
+   ! For diagnostics
+   !----------------------------
+   real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: qgcm_tendaa
+   real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: qqcwgcm_tendaa
 
-!----------------------------------------------------------------------
-   logical   :: history_aerocom    ! Output the aerocom history
-!-----------------------------------------------------------------------
+   real(r8), dimension(gas_pcnst, 1:nqtendaa, 1:maxsubarea ) ::  qsub_tendaa
+   real(r8), dimension(gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: qqcwsub_tendaa
 
+   ! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
+   !    for different processes, which are output to history
+   ! the processes are condensation/evaporation (and associated aging),
+   !    renaming, coagulation, and nucleation
 
-      real(8), parameter :: fcld_locutoff = 1.0e-5_r8
-! cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
-! it may be that the macrophysics has a higher threshold that this
-      real(8), parameter :: fcld_hicutoff = 0.999_r8
+   real(r8), dimension(pcols,gas_pcnst,   nqtendaa) ::     q_coltendaa
+   real(r8), dimension(pcols,gas_pcnst,nqqcwtendaa) ::  qqcw_coltendaa
+   !------------------------------------------------------------------
 
-      real(r8) :: afracsub(maxsubarea)
-      real(r8) :: dgn_a(max_mode), dgn_awet(max_mode)
-      real(r8) :: ev_sat(pcols,pver)
-      real(r8) :: fclea, fcldy, fcldybb
-      real(r8) :: nufine_3dtend_nnuc(pcols,pver)
-      real(r8) :: ncluster_3dtend_nnuc(pcols,pver)
-      real(r8) :: qv_sat(pcols,pver)
-      real(r8) :: relhumgcm, relhumsub(maxsubarea)
-      real(r8) :: soag_3dtend_cond(pcols,pver,nsoa)
-      real(r8) :: tmpa, tmpb, tmpc
-      real(r8) :: tmp_qa_clea, tmp_qa_cldy, tmp_qa_gcav
-      real(r8) :: tmp_qc_cldy, tmp_qc_gcav
-      real(r8) :: tmp_aa, tmp_aa_clea, tmp_aa_cldy
-      real(r8) :: tmp_kxt, tmp_kxt2, tmp_pxt, tmp_pok
-      real(r8) :: tmp_q1, tmp_q2, tmp_q3, tmp_q4, tmp_q5, tmp_qdot4
-      real(r8) :: wetdens(max_mode)
+   do_cond   = ( mdo_gasaerexch > 0 )
+   do_rename = ( mdo_rename > 0 )
+   do_newnuc = ( mdo_newnuc > 0 )
+   do_coag   = ( mdo_coag > 0 )
 
+   !====================================================
+   ! Initialization for budget diagnostics
+   !====================================================
+   ncluster_3dtend_nnuc = 0.0_r8
 
-! qgcmN and qqcwgcmN (N=1:4) are grid-cell mean tracer mixing ratios (TMRs, mol/mol or #/kmol)
-!    N=1 - before gas-phase chemistry
-!    N=2 - before cloud chemistry
-!    N=3 - incoming values (before gas-aerosol exchange, newnuc, coag)
-!    N=4 - outgoing values (after  gas-aerosol exchange, newnuc, coag)
-      real(r8), dimension( 1:gas_pcnst ) :: &
-         qgcm1, qgcm2, qgcm3, qgcm4, &
-         qqcwgcm1, qqcwgcm2, qqcwgcm3, qqcwgcm4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa ) :: &
-         qgcm_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa ) :: &
-         qqcwgcm_tendaa
-      real(r8), dimension( 1:ntot_amode_extd ) :: &
-         qaerwatgcm3, qaerwatgcm4   ! aerosol water mixing ratios (mol/mol)
+   ! Column integrals need to be initialized with zeros
+      q_coltendaa = 0.0_r8 
+   qqcw_coltendaa = 0.0_r8
 
-! qsubN and qqcwsubN (N=1:4) are TMRs in sub-areas
-!    currently there are just clear and cloudy sub-areas
-!    the N=1:4 have same meanings as for qgcmN
-      real(r8), dimension( 1:gas_pcnst, 1:maxsubarea ) :: &
-         qsub1, qsub2, qsub3, qsub4, &
-         qqcwsub1, qqcwsub2, qqcwsub3, qqcwsub4
-      real(r8), dimension( 1:gas_pcnst, 1:nqtendaa, 1:maxsubarea ) :: &
-         qsub_tendaa
-      real(r8), dimension( 1:gas_pcnst, 1:nqqcwtendaa, 1:maxsubarea ) :: &
-         qqcwsub_tendaa
-      real(r8), dimension( 1:ntot_amode_extd, 1:maxsubarea ) :: &
-         qaerwatsub3, qaerwatsub4   ! aerosol water mixing ratios (mol/mol)
+   call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
 
-! q_coltendaa and qqcw_coltendaa are column-integrated tendencies
-!    for different processes, which are output to history
-! the processes are condensation/evaporation (and associated aging),
-!    renaming, coagulation, and nucleation
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqtendaa ) :: &
-         q_coltendaa
-      real(r8), dimension( 1:pcols, 1:gas_pcnst, 1:nqqcwtendaa ) :: &
-         qqcw_coltendaa
+   !====================================================
+   ! Get saturation mixing ratio
+   !====================================================
+   call qsat( temp(1:ncol,1:pver), pmid(1:ncol,1:pver), &! in
+              ev_sat(1:ncol,1:pver),                    &! out (but not used)
+              qv_sat(1:ncol,1:pver)                     )! out
 
-#if ( defined( MOSAIC_SPECIES ) )
-      real(r8) :: cnvrg_fail(pcols,pver) !BSINGH -  For tracking MOSAIC convergence failures
-      real(r8) :: max_kelvin_iter(pcols,pver)  !BSINGH -  For tracking when max is hit for kelvin iterations
-      real(r8) :: xnerr_astem_negative(pcols,pver,5,4)
-#endif
+   do kk = top_lev, pver
+   do ii = 1, ncol
 
-      type ( misc_vars_aa_type ) :: misc_vars_aa
+      !=========================================================================
+      ! Construct cloudy and clear (cloud-free) subareas within each grid cell
+      !=========================================================================
+      ! Define subareas; set RH
+      !--------------------------
+      call setup_subareas( cld(ii,kk),                              &! in
+                           nsubarea, ncldy_subarea, jclea, jcldy, &! out
+                           iscldy_subarea, afracsub, fclea, fcldy )! out
 
+      relhumgcm = min_max_bound( 0.0_r8, 1.0_r8, qv(ii,kk)/qv_sat(ii,kk) )
 
+      call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
 
+      !-------------------------------
+      ! Set aerosol water in subareas
+      !-------------------------------
+      ! Notes from Dick Easter/Steve Ghan: how to treat aerosol water in subareas needs more work/thinking
+      ! Currently modal_aero_water_uptake calculates qaerwat using
+      ! the grid-cell mean interstital-aerosol mix-rats and the clear-area RH.
 
-      adjust_factor_pbl_ratenucl = newnuc_adjust_factor_pbl
+      qaerwatsub3(:,:) = 0.0_r8
 
-#if ( defined CAM_VERSION_IS_ACME )
-      history_aerocom = .false.
-#else
-      call phys_getopts( history_aerocom_out        = history_aerocom )
-#endif
-
-
-      icol_diag = -1
-      if (ldiag1 > 0) then
-      if (nstep < 3) then
-         do i = 1, ncol
-!           if ((latndx(i) == 23) .and. (lonndx(i) == 37)) icol_diag = i
-            if ((latndx(i) == 47) .and. (lonndx(i) ==121)) icol_diag = i  ! amazon
-         end do
-      end if
-      end if
-
-      do_cond   = ( mdo_gasaerexch > 0 )
-      do_rename = ( mdo_rename > 0 )
-      do_newnuc = ( mdo_newnuc > 0 )
-      do_coag   = ( mdo_coag > 0 )
-
-      q_coltendaa = 0.0_r8 ; qqcw_coltendaa = 0.0_r8
-      nufine_3dtend_nnuc = 0.0_r8
-      ncluster_3dtend_nnuc = 0.0_r8
-      soag_3dtend_cond = 0.0_r8
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-! these variables otherwise undefined
-      q_tendbb = 0.0_r8 ; qqcw_tendbb = 0.0_r8
-#endif
-
-#if ( defined( MOSAIC_SPECIES ) )
-      cnvrg_fail(1:pcols,1:pver) = 0.0_r8
-      max_kelvin_iter(1:pcols,1:pver)  = 0.0_r8
-      xnerr_astem_negative(1:pcols,1:pver,1:5,1:4) = 0.0_r8
-#endif
-
-! turn off history selectively for comparison with dd06f
-      if ( (.not. do_cond) .and. (.not. do_rename) ) then
-         do_q_coltendaa(:,iqtend_cond) = .false.
-         do_q_coltendaa(:,iqtend_rnam) = .false.
-         do_qqcw_coltendaa(:,iqqcwtend_rnam) = .false.
-      end if
-      if ( .not. do_newnuc ) then
-         do_q_coltendaa(:,iqtend_nnuc) = .false.
-      end if
-      if ( .not. do_coag ) then
-         do_q_coltendaa(:,iqtend_coag) = .false.
-      end if
-
-! get saturation mixing ratio
-      call qsat( t(1:ncol,1:pver), pmid(1:ncol,1:pver), &
-                 ev_sat(1:ncol,1:pver), qv_sat(1:ncol,1:pver) )
-
-main_k_loop: &
-      do k = top_lev, pver
-main_i_loop: &
-      do i = 1, ncol
-
-      if ( ldiag13n ) lun13n = 129 + i
-
-
-!
-! determine the number of sub-areas, their fractional areas, and relative humidities
-!
-! if cloud fraction ~= 0, the grid-cell has a single clear  sub-area      (nsubarea = 1)
-! if cloud fraction ~= 1, the grid-cell has a single cloudy sub-area      (nsubarea = 1)
-! otherwise,              the grid-cell has a clear and a cloudy sub-area (nsubarea = 2)
-!
-      if (cld(i,k) < fcld_locutoff) then
-! note that cloud chemistry is only on when cld(i,k) >= 1.0e-5_r8
-! it may be that the macrophysics has a higher threshold that this
-         fcldy = 0.0_r8
-         nsubarea = 1 ; ncldy_subarea = 0
-         jclea = 1 ; jcldy = 0
-      else if (cld(i,k) > fcld_hicutoff) then
-         fcldy = 1.0_r8
-         nsubarea = 1 ; ncldy_subarea = 1
-         jclea = 0 ; jcldy = 1
-      else
-         fcldy = cld(i,k)
-         nsubarea = 2 ; ncldy_subarea = 1
-         jclea = 1 ; jcldy = 2
-      end if
-      fclea = 1.0_r8 - fcldy
-      fcldybb = max( cld(i,k), 1.0e-6_r8 )
-
-      iscldy_subarea(:) = .false.
-      if (jcldy > 0) iscldy_subarea(jcldy) = .true.
-
-      afracsub(:) = 0.0_r8
-      if (jclea > 0) afracsub(jclea) = fclea
-      if (jcldy > 0) afracsub(jcldy) = fcldy
-
-      relhumgcm = max( 0.0_r8, min( 1.0_r8, qv(i,k)/qv_sat(i,k) ) )
-      if (ncldy_subarea <= 0) then
-         relhumsub(:) = relhumgcm
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      else if (cldy_rh_sameas_clear > 0) then
-         relhumsub(:) = relhumgcm
-#endif
-      else
-         relhumsub(jcldy) = 1.0_r8
-         if (jclea > 0) then
-            tmpa = (relhumgcm - afracsub(jcldy))/afracsub(jclea)
-            relhumsub(jclea) = max( 0.0_r8, min( 1.0_r8, tmpa ) )
-         end if
-      end if
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag13n ) then
-      write(lun13n,'(/a,3i5)') 'modal_aero_amicphys_intr mapping at nstep, i, k', nstep, i, k
-      write(lun13n,'(a,1p,5i12  )') 'jclea, jcldy, ncldy, nsubc', &
-         jclea, jcldy, ncldy_subarea, nsubarea
-      write(lun13n,'(a,1p,5e12.4)') 'cld, fcldy, fcldybb, fclea', &
-         cld(i,k), fcldy, fcldybb, fclea
-      write(lun13n,'(a,1p,5e12.4)') 'relhumav, relhumsub(1:2)  ', &
-         relhumgcm, relhumsub(1:2)
-      end if
-#endif
-
-
-      do lmz = 1, gas_pcnst
-         qgcm1(lmz)    = max( 0.0_r8, q_pregaschem(i,k,lmz) )
-         qgcm2(lmz)    = max( 0.0_r8, q_precldchem(i,k,lmz) )
-         qqcwgcm2(lmz) = max( 0.0_r8, qqcw_precldchem(i,k,lmz) )
-         qgcm3(lmz)    = max( 0.0_r8, q(i,k,lmz) )
-         qqcwgcm3(lmz) = max( 0.0_r8, qqcw(i,k,lmz) )
-      end do
-      qaerwatgcm3(:) = 0.0_r8
       if ( present( qaerwat ) ) then
-         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(i,k,1:ntot_amode) )
+      ! If provided, the grid cell mean values of aerosol water mixing ratios are clipped
+      ! and then assigned to all subareas.
+
+         qaerwatgcm3(1:ntot_amode) = max( 0.0_r8, qaerwat(ii,kk,1:ntot_amode) )
+         do jsub = 1, nsubarea
+            qaerwatsub3(:,jsub) = qaerwatgcm3(:)
+         end do
       end if
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      n = min( maxsubarea, nsubarea+1 )
-#else
-      n = nsubarea
-#endif
-      qsub1(:,1:n) = 0.0_r8
-      qsub2(:,1:n) = 0.0_r8
-      qsub3(:,1:n) = 0.0_r8
-      qsub4(:,1:n) = 0.0_r8
-      qqcwsub1(:,1:n) = 0.0_r8
-      qqcwsub2(:,1:n) = 0.0_r8
-      qqcwsub3(:,1:n) = 0.0_r8
-      qqcwsub4(:,1:n) = 0.0_r8
-      qaerwatsub3(:,1:n) = 0.0_r8
-      qaerwatsub4(:,1:n) = 0.0_r8
+      !-------------------------------------------------------------------------
+      ! Set gases, interstitial aerosols, and cloud-borne aerosols in subareas
+      !-------------------------------------------------------------------------
+      ! Copy grid cell mean mixing ratios; clip negative values if any.
 
-!
-! calculate initial (i.e., before cond/rnam/nnuc/coag) tracer mixing ratios within the sub-areas
-!    for all-clear or all-cloudy cases, the sub-area TMRs are equal to the grid-cell means
-!    for partly cloudy case, they are different.  This is primarily because the
-!       interstitial aerosol mixing ratios are assumed lower in the cloudy sub-area than in
-!       the clear sub-area, because much of the aerosol is activated in the cloudy sub-area.
-!
-      if ( (jclea > 0) .and. (jcldy > 0) .and. &
-           (jclea+jcldy == 3) .and. (nsubarea == 2) ) then
-! partly cloudy case
+      do icnst = 1,gas_pcnst
 
-! set gas mixing ratios in sub-areas (for the condensing gases only!!)
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) /= lmapcc_val_gas) cycle
+         ! Gases and interstitial aerosols
+         qgcm1(icnst) = max( 0.0_r8, q_pregaschem(ii,kk,icnst) )
+         qgcm2(icnst) = max( 0.0_r8, q_precldchem(ii,kk,icnst) )
+         qgcm3(icnst) = max( 0.0_r8, qq(ii,kk,icnst) )
 
-            ! assume gas in both sub-areas before gas-chem and cloud-chem equal grid-cell mean
-            qsub1(lmz,1:nsubarea) = qgcm1(lmz)
-            qsub2(lmz,1:nsubarea) = qgcm2(lmz)
+         ! Cloud-borne aerosols
+         qqcwgcm2(icnst:) = max( 0.0_r8, qqcw_precldchem(ii,kk,icnst) )
+         qqcwgcm3(icnst:) = max( 0.0_r8, qqcw(ii,kk,icnst) )
 
-            ! assume gas in clear sub-area after cloud-chem equals before cloud-chem value
-            qsub3(lmz,jclea) = qsub2(lmz,jclea)
-            ! gas in cloud sub-area then determined by grid-cell mean and clear values
-            qsub3(lmz,jcldy) = (qgcm3(lmz) - fclea*qsub3(lmz,jclea))/fcldy
-            ! check that this does not produce a negative value
-            if (qsub3(lmz,jcldy) < 0.0_r8) then
-               qsub3(lmz,jcldy) = 0.0_r8
-               qsub3(lmz,jclea) = qgcm3(lmz)/fclea
-            end if
-         end do
-
-! set aerosol mixing ratios in sub-areas
-         do n = 1, ntot_amode
-
-         do l2 = 0, nspec_amode(n)
-
-            if (l2 <= 1) then
-            ! calculcate partitioning factors
-               if (l2 == 0) then
-                  la = numptr_amode(n) - loffset
-                  lc = numptrcw_amode(n) - loffset
-                  tmp_qa_gcav = qgcm2(la)
-                  tmp_qc_gcav = qqcwgcm2(lc)
-               else
-                  tmp_qa_gcav = 0.0_r8
-                  tmp_qc_gcav = 0.0_r8
-                  do l3 = 1, nspec_amode(n)
-                     la = lmassptr_amode(l3,n) - loffset
-                     tmp_qa_gcav = tmp_qa_gcav + qgcm2(la)
-                     lc = lmassptrcw_amode(l3,n) - loffset
-                     tmp_qc_gcav = tmp_qc_gcav + qqcwgcm2(lc)
-                  end do
-               end if
-
-               tmp_qc_cldy = tmp_qc_gcav/fcldy
-               tmp_qa_cldy = max( 0.0_r8, ((tmp_qa_gcav+tmp_qc_gcav) - tmp_qc_cldy) )
-               tmp_qa_clea = (tmp_qa_gcav - fcldy*tmp_qa_cldy)/fclea
-
-               ! *** question ***
-               !    use same tmp_aa_clea/cldy for everything ?
-               !    use one for number and one for all masses (based on total mass) ?
-               !    use separate ones for everything ?
-               ! maybe one for number and one for all masses is best,
-               !    because number and mass have different activation fractions
-               ! *** question ***
-               tmp_aa = max( 1.e-35_r8, tmp_qa_clea*fclea ) / max( 1.e-35_r8, tmp_qa_gcav )
-               tmp_aa = max( 0.0_r8, min( 1.0_r8, tmp_aa ) )
-               tmp_aa_clea = tmp_aa/fclea
-               tmp_aa_cldy = (1.0_r8-tmp_aa)/fcldy
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-               if ( n <= 2 .and. ldiag13n ) then
-                  if (n==1 .and. l2==0) write(lun13n,'(a)')
-                  write(lun13n,'(a,2i3, 1p,6e12.4)') 'n, l2, tmp_aa, tmp_aa_clea, tmp_aa_cldy', &
-                     n, l2, tmp_aa, tmp_aa_clea, tmp_aa_cldy
-                  tmpa = 1.0e-6_r8*mwhost_num/mwdry
-                  if (l2 > 0) tmpa = 1.0e9_r8
-                  write(lun13n,'(a, 6x, 1p,6e12.4)') 'qct, qcy, qat, qay, qax, qtt           ', &
-                     tmpa*tmp_qc_gcav, tmpa*tmp_qc_cldy, tmpa*tmp_qa_gcav, &
-                     tmpa*tmp_qa_cldy, tmpa*tmp_qa_clea, tmpa*(tmp_qc_gcav+tmp_qa_gcav)
-               end if
-#endif
-            end if ! (l2 <= 1)
-
-            if (l2 == 0) then
-               la = numptr_amode(n) - loffset
-               lc = numptrcw_amode(n) - loffset
-            else
-               la = lmassptr_amode(l2,n) - loffset
-               lc = lmassptrcw_amode(l2,n) - loffset
-            end if
-
-            qsub2(la,jclea) = qgcm2(la)*tmp_aa_clea
-            qsub2(la,jcldy) = qgcm2(la)*tmp_aa_cldy
-            qqcwsub2(lc,jclea) = 0.0_r8
-            qqcwsub2(lc,jcldy) = qqcwgcm2(lc)/fcldy
-
-            qsub3(la,jclea) = qgcm3(la)*tmp_aa_clea
-            qsub3(la,jcldy) = qgcm3(la)*tmp_aa_cldy
-            qqcwsub3(lc,jclea) = 0.0_r8
-            qqcwsub3(lc,jcldy) = qqcwgcm3(lc)/fcldy
-
-            end do ! l2
-         end do ! n
-
-      else if ((jclea == 1) .and. (jcldy == 0) .and. (nsubarea == 1)) then
-! all clear, or cld < 1e-5
-! in this case, fclea=1 and fcldy=0
-!
-! put all the gases and interstitial aerosols in the clear sub-area
-!    and set mix-ratios = 0 in cloudy sub-area
-! for cloud-borne aerosol, do nothing
-!    because the grid-cell-mean cloud-borne aerosol will be left unchanged
-!    (i.e., this routine only changes qqcw when cld >= 1e-5)
-!
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) <= 0) cycle
-            qsub1(lmz,jclea) = qgcm1(lmz)
-            qsub2(lmz,jclea) = qgcm2(lmz)
-            qsub3(lmz,jclea) = qgcm3(lmz)
-            qqcwsub2(lmz,jclea) = qqcwgcm2(lmz)
-            qqcwsub3(lmz,jclea) = qqcwgcm3(lmz)
-         end do
-
-      else if ((jclea == 0) .and. (jcldy == 1) .and. (nsubarea == 1)) then
-! all cloudy, or cld > 0.999
-! in this case, fcldy= and fclea=0
-!
-! put all the gases and interstitial aerosols in the cloudy sub-area
-!    and set mix-ratios = 0 in clear sub-area
-!
-         do lmz = 1, gas_pcnst
-            if (lmapcc_all(lmz) <= 0) cycle
-            qsub1(lmz,jcldy) = qgcm1(lmz)
-            qsub2(lmz,jcldy) = qgcm2(lmz)
-            qsub3(lmz,jcldy) = qgcm3(lmz)
-            qqcwsub2(lmz,jcldy) = qqcwgcm2(lmz)
-            qqcwsub3(lmz,jcldy) = qqcwgcm3(lmz)
-         end do
-
-      else
-! this should not happen
-         write(tmp_str,'(a,3(1x,i10))') &
-            '*** modal_aero_amicphys - bad jclea, jcldy, nsubarea', &
-            jclea, jcldy, nsubarea
-         call endrun( tmp_str )
-      end if
-
-! aerosol water -- how to treat this in sub-areas needs more work/thinking
-! currently modal_aero_water_uptake calculates qaerwat using
-!    the grid-cell mean interstital-aerosol mix-rats and the clear-area rh
-      do jsub = 1, nsubarea
-         qaerwatsub3(:,jsub) = qaerwatgcm3(:)
       end do
 
-      if (nsubarea == 1) then
-! the j=2 subarea is used for some diagnostics
-! but is not used in actual calculations
-         j = 2
-         qsub1(:,j) = 0.0_r8
-         qsub2(:,j) = 0.0_r8
-         qsub3(:,j) = 0.0_r8
-         qqcwsub2(:,j) = 0.0_r8
-         qqcwsub3(:,j) = 0.0_r8
-      end if
+      ! Partition grid cell mean to subareas
 
+      call  set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
+                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
+                                            qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
 
-! diagnostics after forming sub-areas
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag13n ) then
-      do l2 = 1, 4
-         if (l2 == 1) then
-            igas = igas_h2so4
-         else if (l2 == 3) then
-            igas = igas_nh3
-            if (igas <= 0) cycle
-         else if (l2 == 4) then
-            igas = -3
-         else
-            igas = 1
-         end if
-         if (igas > 0) then
-            l = lmap_gas(igas)
-            tmpch6a = name_gas(igas)
-         else
-            l = -igas
-            tmpch6a = cnst_name(l+loffset)
-         end if
-         tmpa = 1.0e9
-         write(lun13n,'(a)')
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' host  1-3', &
-            q_pregaschem(i,k,l)*tmpa, q_precldchem(i,k,l)*tmpa, q(i,k,l)*tmpa
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' gm    1-3', &
-            qgcm1(l)*tmpa, qgcm2(l)*tmpa, qgcm3(l)*tmpa
-         j = jclea ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' clear 1-3', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa
-         j = jcldy ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' cloud 1-3', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa
-      end do ! l2
+      !================================================================================
+      ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
+      !================================================================================
+      ! Initialize mixing ratios in all subareas
 
-      n = 1
-      do l2 = 1, 3
-         if (l2 == 1) then
-            tmpa = 1.0e-6_r8/28.966_r8
-            la = lmap_num(n)
-            lc = lmap_numcw(n)
-            tmpch6a = name_num(n)
-            tmpch6c = name_numcw(n)
-         else
-            if (l2 == 2) then
-               iaer = iaer_so4
-            else
-               iaer = iaer_soa
-            end if
-            tmpa = 1.0e9_r8
-            la = lmap_aer(iaer,n)
-            lc = lmap_aercw(iaer,n)
-            tmpch6a = name_aer(iaer,n)
-            tmpch6c = name_aercw(iaer,n)
-         end if
-         write(lun13n,'(a)')
-         write(lun13n,'(4a,1p,2(2x,2e12.4))') tmpch6a, ' host  2-3; ', tmpch6c, ' ...', &
-            q_precldchem(i,k,la)*tmpa, q(i,k,la)*tmpa, &
-            qqcw_precldchem(i,k,lc)*tmpa, qqcw(i,k,lc)*tmpa
-         write(lun13n,'(4a,1p,2(2x,2e12.4))') tmpch6a, ' gm    2-3; ', tmpch6c, ' ...', &
-            qgcm2(la)*tmpa, qgcm3(la)*tmpa, &
-            qqcwgcm2(lc)*tmpa, qqcwgcm3(lc)*tmpa
-         j = jclea ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(4a,1p,2(2x,2e12.4))') tmpch6a, ' clear 2-3; ', tmpch6c, ' ...', &
-            qsub2(la,j)*tmpa, qsub3(la,j)*tmpa, &
-            qqcwsub2(lc,j)*tmpa, qqcwsub3(lc,j)*tmpa
-         j = jcldy ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(4a,1p,2(2x,2e12.4))') tmpch6a, ' cloud 2-3; ', tmpch6c, ' ...', &
-            qsub2(la,j)*tmpa, qsub3(la,j)*tmpa, &
-            qqcwsub2(lc,j)*tmpa, qqcwsub3(lc,j)*tmpa
-      end do ! l2
-      end if ! ( ldiag13n )
-#endif
+            qsub4(:,:) = 0.0_r8
+         qqcwsub4(:,:) = 0.0_r8
+      qaerwatsub4(:,:) = 0.0_r8
 
-!
-! start integration
-!
-      do n = 1, max_mode
-         if (n <= ntot_amode) then
-            dgn_a(n)           = dgncur_a(i,k,n)
-            dgn_awet(n)        = dgncur_awet(i,k,n)
-            wetdens(n)         = max( 1000.0_r8, wetdens_host(i,k,n) )
-         else
-            dgn_a(n) = 0.0_r8
-            dgn_awet(n) = 0.0_r8
-            wetdens(n) = 1000.0_r8
-         end if
-      end do
+      ! Copy aerosol size and density info
 
-      misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(i,k)
-#if ( defined ( MOSAIC_SPECIES ) )
-      misc_vars_aa%cnvrg_fail_1grid = cnvrg_fail(i,k)
-      misc_vars_aa%max_kelvin_iter_1grid = max_kelvin_iter(i,k)
-      misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = xnerr_astem_negative(pcols,pver,1:5,1:4)
-#endif
+      dgn_a   (:) = 0.0_r8
+      dgn_awet(:) = 0.0_r8
+      wetdens (:) = 1000.0_r8
 
+      dgn_a   (1:ntot_amode) = dgncur_a(ii,kk,1:ntot_amode)
+      dgn_awet(1:ntot_amode) = dgncur_awet(ii,kk,1:ntot_amode)
+      wetdens (1:ntot_amode) = max( 1000.0_r8, wetdens_host(ii,kk,1:ntot_amode) )
 
-      lund = iulog  ! for cambox, iulog=93 at this point
+      misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(ii,kk)
 
-!      ubroutine mam_amicphys_1gridcell(          &
-!        do_cond,            do_rename,           &
-!        do_newnuc,          do_coag,             &
-!        nstep,    lchnk,    i,         k,        &
-!        latndx,   lonndx,   lund,                &
-!        loffset,  deltat,                        &
-!        nsubarea,  ncldy_subarea,                &
-!        iscldy_subarea,     afracsub,            &
-!        temp,     pmid,     pdel,                &
-!        zmid,     pblh,     relhumsub,           &
-!        dgn_a,    dgn_awet, wetdens,             &
-!        qsub1,                                   &
-!        qsub2, qqcwsub2,                         &
-!        qsub3, qqcwsub3,                         &
-!        qsub4, qqcwsub4,                         &
-!        qsub_tendaa, qqcwsub_tendaa              )
+      ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
 
       call mam_amicphys_1gridcell(                &
          do_cond,             do_rename,          &
          do_newnuc,           do_coag,            &
-         nstep,    lchnk,     i,         k,       &
-         latndx(i),           lonndx(i), lund,    &
+         nstep,    lchnk,     ii,        kk,      &
+         latndx(ii),          lonndx(ii), iulog,  &
          loffset,  deltat,                        &
          nsubarea,  ncldy_subarea,                &
          iscldy_subarea,      afracsub,           &
-         t(i,k),   pmid(i,k), pdel(i,k),          &
-         zm(i,k),  pblh(i),   relhumsub,          &
+         temp(ii,kk), pmid(ii,kk), pdel(ii,kk),   &
+         zm(ii,kk),  pblh(ii),   relhumsub,       &
          dgn_a,    dgn_awet,  wetdens,            &
          qsub1,                                   &
          qsub2, qqcwsub2,                         &
@@ -707,215 +354,68 @@ main_i_loop: &
          qsub_tendaa, qqcwsub_tendaa,             &
          misc_vars_aa                             )
 
+      !=================================================================================================
+      ! Aerosol microphysics calculations done for all subareas. Form new grid cell mean mixing ratios.
+      !=================================================================================================
+      ! Gases and aerosols
+      !----------------------
+      ! Calculate new grid cell mean values
 
-!
-! form new grid-mean mix-ratios
-!
-      if (nsubarea == 1) then
-         qgcm4(:) = qsub4(:,1)
-         qgcm_tendaa(:,:) = qsub_tendaa(:,:,1)
-         qaerwatgcm4(1:ntot_amode) = qaerwatsub4(1:ntot_amode,1)
-      else
-         qgcm4(:) = 0.0_r8
-         qgcm_tendaa(:,:) = 0.0_r8
-         do j = 1, nsubarea
-            qgcm4(:) = qgcm4(:) + qsub4(:,j)*afracsub(j)
-            qgcm_tendaa(:,:) = qgcm_tendaa(:,:) + qsub_tendaa(:,:,j)*afracsub(j)
-         end do
-         ! for aerosol water use the clear sub-area value
-         qaerwatgcm4(1:ntot_amode) = qaerwatsub4(1:ntot_amode,jclea)
-      end if
+      call form_gcm_of_gases_and_aerosols_from_subareas( &
+         nsubarea, ncldy_subarea, afracsub,              &! in
+         qsub4, qqcwsub4, qqcwgcm3,                      &! in
+         qgcm4, qqcwgcm4                                 )! out
 
-      if (ncldy_subarea <= 0) then
-         qqcwgcm4(:) = qqcwgcm3(:)
-         qqcwgcm_tendaa(:,:) = 0.0_r8
-      else if (nsubarea == 1) then
-         qqcwgcm4(:) = qqcwsub4(:,1)
-         qqcwgcm_tendaa(:,:) = qqcwsub_tendaa(:,:,1)
-      else
-         qqcwgcm4(:) = 0.0_r8
-         qqcwgcm_tendaa(:,:) = 0.0_r8
-         do j = 1, nsubarea
-            if ( .not. iscldy_subarea(j) ) cycle
-            qqcwgcm4(:) = qqcwgcm4(:) + qqcwsub4(:,j)*afracsub(j)
-            qqcwgcm_tendaa(:,:) = qqcwgcm_tendaa(:,:) + qqcwsub_tendaa(:,:,j)*afracsub(j)
-         end do
-      end if
+      ! Copy grid cell mean values to output arrays
 
-      do lmz = 1, gas_pcnst
-         if (lmapcc_all(lmz) > 0) then
-            q(i,k,lmz) = max(qgcm4(lmz),0.0_r8)  ! HW, to ensure non-negative
-            if (lmapcc_all(lmz) >= lmapcc_val_aer) then
-               qqcw(i,k,lmz) = max(qqcwgcm4(lmz),0.0_r8)  !HW, to ensure non-negative
-            end if
-         end if
-      end do
+      where (lmapcc_all(:) > 0)                 qq(ii,kk,:) = qgcm4(:)
+      where (lmapcc_all(:) >= lmapcc_val_aer) qqcw(ii,kk,:) = qqcwgcm4(:)
 
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if (iqtend_cond <= nqtendbb) q_tendbb(i,k,:,iqtend_cond) = qgcm_tendaa(:,iqtend_cond)
-      if (iqtend_rnam <= nqtendbb) q_tendbb(i,k,:,iqtend_rnam) = qgcm_tendaa(:,iqtend_rnam)
-      if (iqtend_nnuc <= nqtendbb) q_tendbb(i,k,:,iqtend_nnuc) = qgcm_tendaa(:,iqtend_nnuc)
-      if (iqtend_coag <= nqtendbb) q_tendbb(i,k,:,iqtend_coag) = qgcm_tendaa(:,iqtend_coag)
-      if (iqqcwtend_rnam <= nqqcwtendbb) qqcw_tendbb(i,k,:,iqqcwtend_rnam) = qqcwgcm_tendaa(:,iqqcwtend_rnam)
-#endif
+      !----------------------
+      ! Aerosol water
+      !----------------------
+      ! Take values from either the single subarea or the clear subarea to grid cell mean,
+      ! depending on what subarea(s) exist in the grid cell.
+
       if ( update_qaerwat > 0 .and. present( qaerwat ) ) then
-         qaerwat(i,k,1:ntot_amode) = qaerwatgcm4(1:ntot_amode)
+         jsub = 1;  if (nsubarea>1) jsub = jclea
+         qaerwat(ii,kk,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
       end if
 
+      !================================================================
+      ! Process diagnostics of the current grid cell
+      !================================================================
+      call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
+                                             qsub_tendaa, qqcwsub_tendaa,       &! in
+                                             qgcm_tendaa, qqcwgcm_tendaa        )! out 
 
-! diagnostics after forming sub-areas
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      if ( ldiag13n ) then
-      do l2 = 1, 4
-         if (l2 == 1) then
-            igas = igas_h2so4
-         else if (l2 == 3) then
-            igas = igas_nh3
-            if (igas <= 0) cycle
-         else if (l2 == 4) then
-            igas = -3
-         else
-            igas = 1
-         end if
-         if (igas > 0) then
-            l = lmap_gas(igas)
-            tmpch6a = name_gas(igas)
-         else
-            l = -igas
-            tmpch6a = cnst_name(l+loffset)
-         end if
-         tmpa = 1.0e9
-         write(lun13n,'(a)')
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' host  1-4', &
-            q_pregaschem(i,k,l)*tmpa, q_precldchem(i,k,l)*tmpa, 0.0, q(i,k,l)*tmpa
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' gm    1-4', &
-            qgcm1(l)*tmpa, qgcm2(l)*tmpa, qgcm3(l)*tmpa, qgcm4(l)*tmpa
-         j = jclea ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' clear 1-4', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa, qsub4(l,j)*tmpa
-         j = jcldy ; if (j <= 0) j = nsubarea+1
-         write(lun13n,'(2a,1p,4e12.4)') tmpch6a, ' cloud 1-4', &
-            qsub1(l,j)*tmpa, qsub2(l,j)*tmpa, qsub3(l,j)*tmpa, qsub4(l,j)*tmpa
-      end do ! l2
-      end if ! ( ldiag13n )
-#endif
+      call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
+                                             qgcm_tendaa,         qqcwgcm_tendaa,         &! in
+                                             q_coltendaa(ii,:,:), qqcw_coltendaa(ii,:,:)  )! inout
 
+      ncluster_3dtend_nnuc(ii,kk) = misc_vars_aa%ncluster_tend_nnuc_1grid
 
-! increment column tendencies
-      pdel_fac = pdel(i,k)/gravit
-      do iqtend = 1, nqtendaa
-      do l = 1, gas_pcnst
-         if ( do_q_coltendaa(l,iqtend) ) then
-            q_coltendaa(i,l,iqtend) = q_coltendaa(i,l,iqtend) + qgcm_tendaa(l,iqtend)*pdel_fac
-         end if
-         if (iqtend <= nqqcwtendaa) then
-         if ( do_qqcw_coltendaa(l,iqtend) ) then
-            qqcw_coltendaa(i,l,iqtend) = qqcw_coltendaa(i,l,iqtend) + qqcwgcm_tendaa(l,iqtend)*pdel_fac
-         end if
-         end if
-      end do ! l
-      end do ! iqtend
+   end do ! main_ii_loop
+   end do ! main_kk_loop
 
-      if ( history_aerocom ) then
-         ! 3d soa tendency for aerocom
-         ! note that flux units (kg/m2/s) are used here instead of tendency units (kg/kg/s or kg/m3/s)
-         do jsoa = 1, nsoa
-            l = lptr2_soa_g_amode(jsoa) - loffset
-            soag_3dtend_cond(i,k,jsoa) = qgcm_tendaa(l,iqtend_cond)*(adv_mass(l)/mwdry)*(pdel(i,k)/gravit)
-         end do
-         ! 3d number nucleation tendency for aerocom - units are (#/m3/s)
-         ! so multiply qgcm_tendaa (#/kmol/s) by air molar density (kmol/m3)
-         l = numptr_amode(nait) - loffset
-         nufine_3dtend_nnuc(i,k) = qgcm_tendaa(l,iqtend_nnuc) * (pmid(i,k)/(r_universal*t(i,k)))
-      end if
+   !==========================================================
+   ! Output column tendencies to history
+   !==========================================================
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_cond, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_rnam, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_nnuc, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
+   call outfld_1proc_all_cnst( q_coltendaa,pcols,nqtendaa, iqtend_coag, do_q_coltendaa,cnst_name,suffix_q_coltendaa,mwdry,loffset,ncol,lchnk )
 
+   call outfld_1proc_all_cnst( qqcw_coltendaa,pcols,nqqcwtendaa, iqqcwtend_rnam,       &
+                               do_qqcw_coltendaa, cnst_name_cw, suffix_qqcw_coltendaa, &
+                               mwdry, loffset, ncol, lchnk                             )
 
-      ncluster_3dtend_nnuc(i,k) = misc_vars_aa%ncluster_tend_nnuc_1grid
-#if ( defined ( MOSAIC_SPECIES ) )
-      cnvrg_fail(i,k) = misc_vars_aa%cnvrg_fail_1grid
-      max_kelvin_iter(i,k) = misc_vars_aa%max_kelvin_iter_1grid
-      xnerr_astem_negative(pcols,pver,1:5,1:4) = misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4)
-#endif
-
-      end do main_i_loop
-
-      end do main_k_loop
-
-
-! output column tendencies to history
-! the ordering here is to allow comparison of fort.90 files from box model testing
-!    but is not important for regular cam simulations
-      do ipass = 1, 3
-
-         if (ipass == 1) then
-            itmpa = iqtend_cond ; itmpb = iqtend_rnam
-            itmpc = iqqcwtend_rnam ; itmpd = iqqcwtend_rnam
-         else if (ipass == 2) then
-            itmpa = iqtend_nnuc ; itmpb = iqtend_nnuc
-            itmpc = 0 ; itmpd = 0
-         else
-            itmpa = iqtend_coag ; itmpb = iqtend_coag
-            itmpc = 0 ; itmpd = 0
-         end if
-
-         do l = 1, gas_pcnst
-            do iqtend = itmpa, itmpb
-               if (iqtend <= 0) cycle
-               if ( do_q_coltendaa(l,iqtend) ) then
-                  q_coltendaa(1:ncol,l,iqtend) = q_coltendaa(1:ncol,l,iqtend)*(adv_mass(l)/mwdry)
-                  fieldname = trim(cnst_name(l+loffset)) // suffix_q_coltendaa(iqtend)
-                  call outfld( fieldname, q_coltendaa(1:ncol,l,iqtend), ncol, lchnk )
-               end if
-            end do ! iqtend
-            do iqqcwtend = itmpc, itmpd
-               if (iqqcwtend <= 0) cycle
-               if ( do_qqcw_coltendaa(l,iqqcwtend) ) then
-                  qqcw_coltendaa(1:ncol,l,iqqcwtend) = qqcw_coltendaa(1:ncol,l,iqqcwtend)* (adv_mass(l)/mwdry)
-                  fieldname = trim(cnst_name_cw(l+loffset)) // suffix_qqcw_coltendaa(iqqcwtend)
-                  call outfld( fieldname, qqcw_coltendaa(1:ncol,l,iqqcwtend), ncol, lchnk )
-               end if
-            end do ! iqqcwtend
-         end do ! l
-
-         if ( ipass==1 .and. history_aerocom ) then
-            do jsoa = 1, nsoa
-               l = lptr2_soa_g_amode(jsoa)
-               fieldname = trim(cnst_name(l)) // '_sfgaex3d'
-               call outfld( fieldname, soag_3dtend_cond(1:ncol,:,jsoa), ncol, lchnk )
-            end do
-            l = numptr_amode(nait)
-            fieldname = trim(cnst_name(l)) // '_nuc1'
-            call outfld( fieldname, nufine_3dtend_nnuc(1:ncol,:), ncol, lchnk )
-            fieldname = trim(cnst_name(l)) // '_nuc2'
-            call outfld( fieldname, ncluster_3dtend_nnuc(1:ncol,:), ncol, lchnk )
-         end if
-
-      end do ! ipass
-
-#if ( defined( MOSAIC_SPECIES ) )
-      if ( mosaic ) then
-         !BSINGH - output MOSAIC convergence fail tracking:
-         call outfld( 'convergence_fail', cnvrg_fail(1:ncol,:), ncol, lchnk )
-         call outfld( 'max_kelvin_iter' , max_kelvin_iter(1:ncol,:),  ncol, lchnk )
-
-         do n = 1, 4
-         do m = 1, 5
-            fieldname = ' '
-            write( fieldname(1:16), '(a,i1,a,i1)') 'astem_negval_', m, '_', n
-            call outfld( fieldname, xnerr_astem_negative(1:ncol,1:pver,m,n), ncol, lchnk )
-         end do
-         end do
-      end if
-#endif
-
-      return
-!EOC
-      end subroutine modal_aero_amicphys_intr
+end subroutine modal_aero_amicphys_intr
 
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-      subroutine mam_amicphys_1gridcell(          &
+subroutine mam_amicphys_1gridcell(          &
          do_cond,            do_rename,           &
          do_newnuc,          do_coag,             &
          nstep,    lchnk,    i,        k,         &
@@ -938,6 +438,9 @@ main_i_loop: &
 ! qsub3 and qqcwsub3 are the incoming current TMRs
 ! qsub4 and qqcwsub4 are the outgoing updated TMRs
 !
+  use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa
+
       logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
       logical,  intent(in)    :: iscldy_subarea(maxsubarea)
 
@@ -1269,6 +772,11 @@ main_jsub_loop: &
 !    new particle nucleation - because h2so4 gas conc. should be very low in cloudy air
 !    coagulation - because cloud-borne aerosol would need to be included
 !
+  use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags, only: nqtendaa, nqqcwtendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam
 
       use physconst, only:  r_universal
       use modal_aero_rename, only: mam_rename_1subarea
@@ -1701,6 +1209,12 @@ do_rename_if_block30: &
          qaer3,      qaer4,      qaer_delaa,         &
          qwtr3,      qwtr4,                          &
          misc_vars_aa_sub                            )
+
+  use modal_aero_amicphys_control
+  use modal_aero_amicphys_diags, only: nqtendaa, nqqcwtendaa, &
+                                       iqtend_cond, iqtend_rnam, &
+                                       iqtend_nnuc, iqtend_coag, &
+                                       iqqcwtend_rnam
 !
 ! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
 !    for a single clear sub-area (with indices = lchnk,i,k,jsub)
@@ -2803,6 +2317,7 @@ do_newnuc_if_block50: &
          uptkaer,           uptkrate_h2so4                          )
 
 ! uses
+  use modal_aero_amicphys_control
 
       implicit none
 
@@ -3053,6 +2568,9 @@ do_newnuc_if_block50: &
 
 ! uses
       use modal_aero_data, only: lptr2_soa_a_amode
+      use modal_aero_amicphys_control, only: r8, max_gas, max_aer, max_mode, &
+                                            npca,npoa, nsoa, nufi, ntot_amode, &
+                                            iaer_pom, mode_aging_optaa
 
 
       implicit none
@@ -3372,7 +2890,17 @@ time_loop: &
          qwtr_cur,                                                  &
          dnclusterdt                                                )
 
-! uses
+
+      use modal_aero_amicphys_control, only: &
+          r8, max_gas, max_aer, max_mode, &
+          iaer_so4, iaer_nh4, igas_h2so4, igas_nh3, nait, &
+          dgnum_aer, dgnumlo_aer, dgnumhi_aer, &
+          gaexch_h2so4_uptake_optaa, &
+          newnuc_h2so4_conc_optaa , &
+          dens_so4a_host, mw_so4a_host, pi, &
+          newnuc_adjust_factor_dnaitdt, &
+          mw_nh4a_host
+
       use chem_mods,     only: adv_mass
 
       use modal_aero_newnuc, only: &
@@ -3783,6 +3311,10 @@ time_loop: &
          qaer_del_coag_in)
 
 ! uses
+      use modal_aero_amicphys_control, only: &
+          r8, max_mode, max_aer, max_agepair, n_agepair, &
+          naer, lmap_aer, &
+          modefrm_agepair, modetoo_agepair
 
       implicit none
 
@@ -3853,6 +3385,12 @@ agepair_loop1: &
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
 ! change due to condenstion and coagulation
+
+      use modal_aero_amicphys_control, only: r8, &
+          max_mode, max_aer, max_agepair, naer, lmap_aer, &
+          iaer_so4, iaer_soa,&
+          mass_2_vol, fac_m2v_eqvhyg_aer, alnsg_aer, &
+          dr_so4_monolayers_pcage
 
       implicit none
 
@@ -3932,6 +3470,8 @@ agepair_loop1: &
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon anc accum mode
 
+      use modal_aero_amicphys_control, only: r8, max_mode
+
       implicit none
 
 ! arguments
@@ -3969,6 +3509,8 @@ agepair_loop1: &
 ! from pcarbon to accum mode
 ! adjust the change of aerosol mass/number due to condenations/coagulation
 ! in pcarbon and accum mode
+
+      use modal_aero_amicphys_control, only: r8, max_mode
 
       implicit none
 
@@ -4174,6 +3716,10 @@ use modal_aero_data, only : &
 
 use modal_aero_coag, only: set_coagulation_pairs
 
+use modal_aero_amicphys_control
+
+use modal_aero_amicphys_diags,only: m_a_amicphys_init_history 
+
 implicit none
 
 !-----------------------------------------------------------------------
@@ -4205,23 +3751,6 @@ implicit none
 !namelist variables
 n_so4_monolayers_pcage  = n_so4_monolayers_pcage_in
 dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
-
-
-#if ( defined( CAMBOX_ACTIVATE_THIS ) )
-      ldiag82  = .true.  ; lun82  = 82
-      ldiag97  = .true.  ; lun97  = 97
-      ldiag98  = .true.  ; lun98  = 98
-      ldiag13n = .true.  ; lun13n = 130
-      ldiag15n = .true.  ; lun15n = 150
-      ldiagd1  = .true.
-#else
-      ldiag82  = .false. ; lun82  = iulog
-      ldiag97  = .false. ; lun97  = iulog
-      ldiag98  = .false. ; lun98  = iulog
-      ldiag13n = .false. ; lun13n = iulog
-      ldiag15n = .false. ; lun15n = iulog
-      ldiagd1  = .false.
-#endif
 
 
       call mam_set_lptr2_and_specxxx2
@@ -4702,6 +4231,9 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
           nspec_amode, ntot_amode, &
           specdens_amode, spechygro, specmw_amode
 
+      use modal_aero_amicphys_control, only: nsoa, &
+          specmw2_amode, specdens2_amode, spechygro2
+
       implicit none
 
       integer :: jsoa
@@ -4734,313 +4266,6 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 
       return
       end subroutine mam_set_lptr2_and_specxxx2
-
-
-!--------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------
-      subroutine m_a_amicphys_init_history( loffset )
-
-!-----------------------------------------------------------------------
-!
-! Purpose:
-!    set do_adjust and do_aitken flags
-!    create history fields for column tendencies associated with
-!       modal_aero_calcsize
-!
-! Author: R. Easter
-!
-!-----------------------------------------------------------------------
-
-use cam_history, only  :  addfld, horiz_only, add_default, fieldname_len
-use cam_logfile, only  :  iulog
-use constituents, only :  pcnst, cnst_get_ind, cnst_name
-use spmd_utils, only   :  masterproc
-use phys_control,only  :  phys_getopts
-
-use modal_aero_data, only : &
-    cnst_name_cw, &
-    modeptr_accum, modeptr_aitken, modeptr_pcarbon, modeptr_ufine
-!use modal_aero_rename
-
-use modal_aero_coag, only: n_coagpair, src_mode_coagpair, dest_mode_coagpair, end_mode_coagpair
-
-implicit none
-
-!-----------------------------------------------------------------------
-! arguments
-   integer, intent(in)  :: loffset
-
-!-----------------------------------------------------------------------
-! local
-   integer  :: iaer, igas, ipair, iok
-   integer  :: lmz, lmza, lmzb, lmzc
-   integer  :: m
-   integer  :: n, na, nb, nc
-
-   real(r8) :: tmp1, tmp2
-
-   character(len=fieldname_len)   :: tmpnamea, tmpnameb
-   character(len=fieldname_len+3) :: fieldname
-   character(128)                 :: long_name
-   character(128)                 :: msg
-   character(8)                   :: unit
-   character(2)                   :: tmpch2
-
-   logical                        :: history_aerosol      ! Output the MAM aerosol tendencies
-   logical                        :: history_verbose      ! produce verbose history output
-   logical                        :: history_aerocom    ! Output the aerocom history
-   !-----------------------------------------------------------------------
-
-
-      call phys_getopts( history_aerosol_out = history_aerosol, &
-                         history_verbose_out = history_verbose   )
-#if ( defined CAM_VERSION_IS_ACME )
-      history_aerocom = .false.
-#else
-      call phys_getopts( history_aerocom_out        = history_aerocom )
-#endif
-
-
-!
-! set the do_q_coltendaa
-!
-      do_q_coltendaa(:,:) = .false.
-
-
-! gas-->aer condensation and resulting aging
-      do igas = 1, ngas
-         lmz = lmap_gas(igas)
-         if (lmz <= 0) cycle
-         do_q_coltendaa(lmz,iqtend_cond) = .true.
-         iaer = igas
-         do n = 1, ntot_amode
-            lmz = lmap_aer(iaer,n)
-            if (lmz <= 0) cycle
-            do_q_coltendaa(lmz,iqtend_cond) = .true.
-         end do ! n
-      end do ! igas
-
-      do ipair = 1, n_agepair
-         na = modefrm_agepair(ipair)
-         nb = modetoo_agepair(ipair)
-         if (na < 1 .or. nb < 1) cycle
-
-         lmza = lmap_num(na)
-         lmzb = lmap_num(nb)
-         do_q_coltendaa(lmza,iqtend_cond) = .true.
-         do_q_coltendaa(lmzb,iqtend_cond) = .true.
-         do iaer = 1, naer
-            lmza = lmap_aer(iaer,na)
-            lmzb = lmap_aer(iaer,nb)
-            if (lmza > 0) then
-               do_q_coltendaa(lmza,iqtend_cond) = .true.
-               if (lmzb > 0) do_q_coltendaa(lmzb,iqtend_cond) = .true.
-            end if
-         end do ! iaer
-      end do ! ipair
-
-!  define history fields for gas-->aer condensation and resulting aging
-      do lmz = 1, gas_pcnst
-         if ( do_q_coltendaa(lmz,iqtend_cond)) then
-            tmpnamea = cnst_name(lmz+loffset)
-            fieldname = trim(tmpnamea) // '_sfgaex1'
-            long_name = trim(tmpnamea) // ' gas-aerosol-exchange primary column tendency'
-            unit = 'kg/m2/s'
-            call addfld( fieldname, horiz_only, 'A', unit, long_name )
-            if ( history_aerosol ) call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,3x))') 'gasaerexch addfld', fieldname, unit
-         end if
-      end do ! lmz
-
-!  define history fields for 3d soa production for aerocom
-      do igas = 1, nsoa
-         lmz = lmap_gas(igas)
-         if (lmz <= 0) cycle
-         if ( .not. do_q_coltendaa(lmz,iqtend_cond)) cycle
-         if ( .not. history_aerocom ) cycle
-
-         tmpnamea = cnst_name(lmz+loffset)
-         fieldname = trim(tmpnamea) // '_sfgaex3d'
-         long_name = trim(tmpnamea) // ' gas-aerosol-exchange primary 3d tendency'
-         unit = 'kg/m2/s'
-         call addfld( fieldname, (/ 'lev' /), 'A', unit, long_name )
-         call add_default( fieldname, 1, ' ' )
-         if ( masterproc ) write(iulog,'(3(a,3x),2i5)') &
-            'gasaerexch addfld', fieldname, unit, igas, lmz+loffset
-      end do
-
-
-! renaming during gas-->aer condensation or cloud chemistry
-      na = modeptr_aitken
-      nb = modeptr_accum
-      if (na > 0 .and. nb > 0) then
-         lmza = lmap_num(na)
-         lmzb = lmap_num(nb)
-         do_q_coltendaa(lmza,iqtend_rnam) = .true.
-         do_q_coltendaa(lmzb,iqtend_rnam) = .true.
-         lmza = lmap_numcw(na)
-         lmzb = lmap_numcw(nb)
-         do_qqcw_coltendaa(lmza,iqqcwtend_rnam) = .true.
-         do_qqcw_coltendaa(lmzb,iqqcwtend_rnam) = .true.
-         do iaer = 1, naer
-            lmza = lmap_aer(iaer,na)
-            lmzb = lmap_aer(iaer,nb)
-            if (lmza > 0) then
-               do_q_coltendaa(lmza,iqtend_rnam) = .true.
-               if (lmzb > 0) do_q_coltendaa(lmzb,iqtend_rnam) = .true.
-            end if
-            lmza = lmap_aercw(iaer,na)
-            lmzb = lmap_aercw(iaer,nb)
-            if (lmza > 0) then
-               do_qqcw_coltendaa(lmza,iqqcwtend_rnam) = .true.
-               if (lmzb > 0) do_qqcw_coltendaa(lmzb,iqqcwtend_rnam) = .true.
-            end if
-         end do ! iaer
-      end if ! (na > 0 .and. nb > 0)
-
-!  define history fields for renaming during gas-->aer condensation or cloud chemistry
-      do lmz = 1, gas_pcnst
-         if ( do_q_coltendaa(lmz,iqtend_rnam)) then
-            tmpnamea = cnst_name(lmz+loffset)
-            fieldname = trim(tmpnamea) // '_sfgaex2'
-            long_name = trim(tmpnamea) // ' gas-aerosol-exchange renaming column tendency'
-            unit = 'kg/m2/s'
-            if (tmpnamea(1:4) == 'num_' .or. tmpnamea(1:4) == 'NUM_') unit = '#/m2/s'
-            call addfld( fieldname, horiz_only, 'A', unit, long_name )
-            if ( history_aerosol .and. history_verbose ) call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,3x))') 'gasaerexch addfld', fieldname, unit
-         end if
-         if ( do_qqcw_coltendaa(lmz,iqqcwtend_rnam)) then
-            tmpnamea = cnst_name_cw(lmz+loffset)
-            fieldname = trim(tmpnamea) // '_sfgaex2'
-            long_name = trim(tmpnamea) // ' gas-aerosol-exchange renaming column tendency'
-            unit = 'kg/m2/s'
-            if (tmpnamea(1:4) == 'num_' .or. tmpnamea(1:4) == 'NUM_') unit = '#/m2/s'
-            call addfld( fieldname, horiz_only, 'A', unit, long_name )
-            if ( history_aerosol .and. history_verbose ) call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,3x))') 'gasaerexch addfld', fieldname, unit
-         end if
-      end do ! lmz
-
-
-
-! coagulation
-      do ipair = 1, n_coagpair
-         na =  src_mode_coagpair(ipair)
-         nb = dest_mode_coagpair(ipair)
-         nc =  end_mode_coagpair(ipair)
-         if (na < 1 .or. nb < 1 .or. nc < 1) cycle
-
-         lmza = lmap_num(na)
-         lmzb = lmap_num(nb)
-         lmzc = lmap_num(nc)
-         do_q_coltendaa(lmza,iqtend_coag) = .true.
-         do_q_coltendaa(lmzb,iqtend_coag) = .true.
-         do_q_coltendaa(lmzc,iqtend_coag) = .true.
-         do iaer = 1, naer
-            lmza = lmap_aer(iaer,na)
-            lmzb = lmap_aer(iaer,nb)
-            lmzc = lmap_aer(iaer,nc)
-            if (lmza > 0) then
-               do_q_coltendaa(lmza,iqtend_coag) = .true.
-               if (lmzc > 0) do_q_coltendaa(lmzc,iqtend_coag) = .true.
-            end if
-            if (nb == nc) cycle
-            if (lmzb > 0) then
-               do_q_coltendaa(lmzb,iqtend_coag) = .true.
-               if (lmzc > 0) do_q_coltendaa(lmzc,iqtend_coag) = .true.
-            end if
-         end do ! iaer
-      end do ! ipair
-
-!  define history fields for coagulation
-      do lmz = 1, gas_pcnst
-         if ( do_q_coltendaa(lmz,iqtend_coag)) then
-            tmpnamea = cnst_name(lmz+loffset)
-            fieldname = trim(tmpnamea) // '_sfcoag1'
-            long_name = trim(tmpnamea) // ' modal_aero coagulation column tendency'
-            unit = 'kg/m2/s'
-            if (tmpnamea(1:4) == 'num_' .or. tmpnamea(1:4) == 'NUM_') unit = '#/m2/s'
-            call addfld( fieldname, horiz_only, 'A', unit, long_name )
-            if ( history_aerosol .and. history_verbose ) call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,3x))') 'modal_aero_coag_init addfld', fieldname, unit
-         end if
-      end do ! lmz
-
-
-! nucleation
-      n = modeptr_aitken
-      do igas = 1, ngas
-         iok = 0
-         if (igas == igas_h2so4) iok = 1
-         if (igas == igas_nh3  ) iok = 1
-         if (iok <= 0) cycle
-         lmz = lmap_gas(igas)
-         if (lmz > 0) then
-            do_q_coltendaa(lmz,iqtend_nnuc) = .true.
-            iaer = igas
-            lmz = lmap_aer(iaer,n)
-            if (lmz > 0) do_q_coltendaa(lmz,iqtend_nnuc) = .true.
-          end if
-      end do ! igas
-      lmzc = lmap_num(n)
-      do_q_coltendaa(lmzc,iqtend_nnuc) = .true.
-
-!  define history fields for nucleation
-      do lmz = 1, gas_pcnst
-         if ( do_q_coltendaa(lmz,iqtend_nnuc)) then
-            tmpnamea = cnst_name(lmz+loffset)
-            fieldname = trim(tmpnamea) // '_sfnnuc1'
-            long_name = trim(tmpnamea) // ' modal_aero new particle nucleation column tendency'
-            unit = 'kg/m2/s'
-            if (tmpnamea(1:4) == 'num_' .or. tmpnamea(1:4) == 'NUM_') unit = '#/m2/s'
-            call addfld( fieldname, horiz_only, 'A', unit, long_name )
-            if ( history_aerosol .and. history_verbose ) call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,3x))') 'modal_aero_newnuc_init addfld', fieldname, unit
-         end if
-      end do ! lmz
-
-      if ( history_aerocom ) then
-            tmpnamea = cnst_name(lmzc+loffset)
-            fieldname = trim(tmpnamea) // '_nuc1'
-            long_name = trim(tmpnamea) // ' modal_aero new particle nucleation tendency'
-            unit = '#/m3/s'
-            call addfld( fieldname, (/ 'lev' /), 'A', unit, long_name )
-            call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,2x))') &
-                'modal_aero_newnuc_init addfld', fieldname, unit
-
-            fieldname = trim(tmpnamea) // '_nuc2'
-            long_name = trim(tmpnamea) // ' modal_aero cluster nucleation rate'
-            unit = '#/m3/s'
-            call addfld( fieldname, (/ 'lev' /), 'A', unit, long_name )
-            call add_default( fieldname, 1, ' ' )
-            if ( masterproc ) write(iulog,'(3(a,2x))') &
-                'modal_aero_newnuc_init addfld', fieldname, unit
-      endif
-
-
-#if ( defined( MOSAIC_SPECIES ) )
-      if ( mosaic ) then
-         !BSINGH - Adding addfld and add_default call for tracking convergence failures
-         call addfld('convergence_fail', (/ 'lev' /), 'A', 'no units', 'For tracking MOSAIC convergence failure' )
-         call addfld('max_kelvin_iter', (/ 'lev' /), 'A', 'no units', 'For tracking when MOSAIC kelvin iterations hit max ' )
-         call add_default( 'convergence_fail', 1, ' ' )
-         call add_default( 'max_kelvin_iter', 1, ' ' )
-
-         do n = 1, 4
-         do m = 1, 5
-            fieldname = ' '
-            write( fieldname(1:16), '(a,i1,a,i1)') 'astem_negval_', m, '_', n
-            call addfld( fieldname, (/ 'lev' /), 'A', 'no units', 'For tracking ASTEM negative values' )
-            call add_default( fieldname, 1, ' ' )
-         end do
-         end do
-      end if
-#endif
-
-      return
-      end subroutine m_a_amicphys_init_history
 
 
 !----------------------------------------------------------------------

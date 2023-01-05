@@ -134,15 +134,7 @@
 
   integer, parameter :: maxsubarea = 2
 
-  integer, parameter :: nqtendaa = 4
-  integer, parameter :: iqtend_cond = 1
-  integer, parameter :: iqtend_rnam = 2
-  integer, parameter :: iqtend_nnuc = 3
-  integer, parameter :: iqtend_coag = 4
-  integer, parameter :: nqqcwtendaa = 1
-  integer, parameter :: iqqcwtend_rnam = 1
-
-  integer, parameter :: iqqcwtend_match_iqtend(nqtendaa) = (/ 0, iqqcwtend_rnam, 0, 0 /)
+! integer, parameter :: iqqcwtend_match_iqtend(nqtendaa) = (/ 0, iqqcwtend_rnam, 0, 0 /)
 
   logical, parameter :: aging_include_seasalt = .false.
                       ! when .true., aging (by coagulation) includes contribution of seasalt
@@ -205,14 +197,6 @@
   character(len=16) :: name_gas(max_gas), name_aerpfx(max_aer), &
      name_aer(max_aer,max_mode), name_aercw(max_aer,max_mode), &
      name_num(max_mode), name_numcw(max_mode)
-
-  character(len=8) :: suffix_q_coltendaa(nqtendaa) = &
-     (/ '_sfgaex1', '_sfgaex2', '_sfnnuc1', '_sfcoag1' /)
-  character(len=8) :: suffix_qqcw_coltendaa(nqqcwtendaa) = &
-                    '_sfgaex2'
-
-  logical :: do_q_coltendaa(gas_pcnst,nqtendaa) = .false.
-  logical :: do_qqcw_coltendaa(gas_pcnst,nqqcwtendaa) = .false.
 
 ! *** following 3 variables should eventually be in modal_aero_data
   real(r8) :: specmw2_amode(ntot_aspectype,ntot_amode)
