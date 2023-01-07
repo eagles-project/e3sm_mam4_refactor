@@ -57,6 +57,11 @@ integer :: nevapr_shcu_idx     = 0
 integer :: nevapr_dpcu_idx     = 0 
 integer :: ixcldice, ixcldliq
 
+! declare several small values that to avoid divided by zero used in the module
+real(r8), parameter :: small_value_30 = 1.e-30_r8   
+real(r8), parameter :: small_value_12 = 1.e-12_r8 
+real(r8), parameter :: small_value_36 = 1.e-36_r8  
+real(r8), parameter :: small_value_5  = 1.e-5_r8        ! for cloud fraction
 
 !==============================================================================
 contains
@@ -379,7 +384,6 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    real(r8) :: sumpppr(pcols)       ! sum of positive precips from above
    real(r8) :: cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
    real(r8) :: lprecp               ! local production rate of precip [kg/m2/s] if positive
-   real(r8), parameter :: small_value = 1.e-30_r8    ! small value to avoid divided by zero
 
 
    ! initiate variables
@@ -398,7 +402,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
              ! Neglect the current layer.
              cldv(icol,kk) = max( min(1._r8,cldv1(icol)/sumpppr(icol)) * (sumppr(icol)/sumpppr(icol)), 0._r8)
          endif
-         lprecp = max(lprec(icol,kk), small_value)
+         lprecp = max(lprec(icol,kk), small_value_30)
          cldv1(icol) = cldv1(icol)  + cld(icol,kk)*lprecp
          sumppr(icol) = sumppr(icol) + lprec(icol,kk)
          sumppr_all(icol,kk) = sumppr(icol)      ! save all sumppr to callrain_mix_ratio
@@ -571,8 +575,6 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8) :: rcscavt_ik    ! resuspension, convective tends at current (icol,kk) [kg/kg/s]
       real(r8) :: rsscavt_ik    ! resuspension, stratiform tends at current (icol,kk) [kg/kg/s]
 
-      real(r8), parameter :: small_value_12 = 1.e-12_r8    ! small value to avoid divided by zero
-      real(r8), parameter :: small_value_36 = 1.e-36_r8    ! small value to avoid divided by zero
       real(r8), parameter :: omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
 
       ! initiate variables
@@ -756,13 +758,10 @@ resusp_block_aa: &
    real(r8),intent(in) :: precabx       ! precipitation from above [kg/m2/s] 
    real(r8),intent(out) :: fracevx      ! fraction of evaporation [fraction]
 
-   real(r8), parameter :: small_value = 1.e-12_r8    ! small value to avoid divided by zero
-
-
    if (mam_prevap_resusp_optcc == 0) then
         fracevx = 0.0_r8
    else
-        fracevx = evap_ik*pdel_ik/gravit/max(small_value,precabx)
+        fracevx = evap_ik*pdel_ik/gravit/max(small_value_12,precabx)
         ! trap to ensure reasonable ratio bounds
         fracevx = min_max_bound(0._r8, 1._r8, fracevx)
    endif
@@ -810,11 +809,9 @@ resusp_block_aa: &
    real(r8) :: src1      ! incloud scavenging tendency [kg/kg/s]
    real(r8) :: src2      ! below-cloud scavenging tendency [kg/kg/s]
    real(r8) :: odds      ! limit on removal rate (proportional to prec) [fraction]
-   real(r8), parameter :: small_value = 1.e-36_r8    ! small value to avoid divided by zero
-   real(r8), parameter :: small_fraction = 1.e-5_r8     ! small value of area fraction to avoid divided by zero
 
    ! calculate limitation of removal rate using Dana and Hales coefficient
-   odds = precabx/max(cldv_ik,small_fraction) * scavcoef_ik*deltat
+   odds = precabx/max(cldv_ik,small_value_5) * scavcoef_ik*deltat
    odds = min_max_bound(0.0_r8, 1.0_r8, odds)
 
    if ( is_strat_cloudborne ) then
@@ -841,7 +838,7 @@ resusp_block_aa: &
    endif
 
    src = src1 + src2             ! total stratiform or convective scavenging
-   fin=src1/(src + small_value)    ! fraction taken by incloud processes
+   fin=src1/(src + small_value_36)    ! fraction taken by incloud processes
 
    end subroutine wetdep_scavenging
 
@@ -879,7 +876,6 @@ resusp_block_aa: &
 
    ! local variables
    real(r8)            :: tmpa ! temporary working variable
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
 
    ! initiate *_new in case they are not calculated
    scavabx_new = scavabx_old
@@ -889,7 +885,7 @@ resusp_block_aa: &
    tmpa = max( 0.0_r8, evapx*pdel_ik/gravit )
    precabx_new = min_max_bound(0.0_r8,precabx_base_new, precabx_old-tmpa)
 
-   if (precabx_new < prec_smallaa) then
+   if (precabx_new < small_value_30) then
       ! precip rate is essentially zero so do complete resuspension
       call wetdep_resusp_noprecip(                         &
                    is_st_cu,       mam_prevap_resusp_optcc,& ! in
@@ -949,15 +945,13 @@ resusp_block_aa: &
    ! local variables
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
-
 
    if ( mam_prevap_resusp_optcc <= 130) then
         ! linear resuspension based on scavenged aerosol mass or number
         scavabx_new = 0.0_r8
         resusp_x = scavabx_old
    else
-        if (precabx_base_old < prec_smallaa) then
+        if (precabx_base_old < small_value_30) then
             resusp_x = 0.0_r8
         else
             ! non-linear resuspension of aerosol number based on raindrop number
@@ -1005,8 +999,6 @@ resusp_block_aa: &
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
    real(r8)     :: x_ratio      ! fraction of x_tmp/x_old
-   real(r8), parameter :: x_smallaa = 1.0e-30_r8     ! small value for x_old
-
 
    u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
    if ( mam_prevap_resusp_optcc <= 130) then
@@ -1018,7 +1010,7 @@ resusp_block_aa: &
    endif
    x_old = min_max_bound(0.0_r8, 1.0_r8, x_old)
 
-   if (x_old < x_smallaa) then
+   if (x_old < small_value_30) then
         x_new = 0.0_r8
         x_ratio = 0.0_r8
    else
@@ -1082,7 +1074,6 @@ resusp_block_aa: &
 
    ! local variables
    real(r8)            :: tmpa ! temporary working variable
-   real(r8), parameter :: prec_smallaa = 1.0e-30_r8  ! 1e-30 kg/m2/s (or mm/s) = 3.2e-23 mm/yr
  
    ! initiate *_new in case they are not calculated
    ! precabx_base_new and precabx_new are always calculated
@@ -1099,7 +1090,7 @@ resusp_block_aa: &
        scavabx_new = max( 0.0_r8, scavabx_old + tmpa )
    else
        ! raindrop number increase
-       if (precabx_base_new < prec_smallaa) then
+       if (precabx_base_new < small_value_30) then
           precnumx_base_new = 0.0_r8
        elseif (precabx_base_new > precabx_base_old) then
           ! note - calc rainshaft number flux from rainshaft water flux,
