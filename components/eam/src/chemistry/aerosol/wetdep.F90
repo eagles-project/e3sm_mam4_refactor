@@ -25,8 +25,6 @@ public :: wetdep_init
 public :: wetdep_inputs_set
 public :: wetdep_inputs_unset
 
-real(r8), parameter :: rhoh2o = 1000._r8            ! density of water
-
 type wetdep_inputs_t
    real(r8), pointer :: cldt(:,:) => null()  ! cloud fraction
    real(r8), pointer :: qme(:,:) => null()
@@ -46,7 +44,6 @@ integer :: cld_idx             = 0
 integer :: qme_idx             = 0 
 integer :: prain_idx           = 0 
 integer :: nevapr_idx          = 0 
-
 integer :: icwmrdp_idx         = 0 
 integer :: icwmrsh_idx         = 0 
 integer :: rprddp_idx          = 0 
@@ -56,6 +53,8 @@ integer :: dp_frac_idx         = 0
 integer :: nevapr_shcu_idx     = 0 
 integer :: nevapr_dpcu_idx     = 0 
 integer :: ixcldice, ixcldliq
+
+real(r8), parameter :: rhoh2o = 1000._r8            ! density of water
 
 ! declare several small values that to avoid divided by zero used in the module
 real(r8), parameter :: small_value_30 = 1.e-30_r8   
@@ -566,6 +565,7 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8) :: finc          ! fraction of rem. rate by conv. rain [fraction]
       real(r8) :: rat           ! ratio of amount available to amount removed [fraction]
       real(r8) :: arainx        ! precipitation and cloudy volume,at the top interface of current layer [fraction]
+      real(r8) :: clddiff       ! cldt - cldc
       real(r8) :: scavt_ik      ! scavenging tend at current (icol,kk) [kg/kg/s]
       real(r8) :: iscavt_ik     ! incloud scavenging tends at current (icol,kk) [kg/kg/s]
       real(r8) :: icscavt_ik    ! incloud, convective scavenging tends at current (icol,kk) [kg/kg/s]
@@ -607,8 +607,8 @@ main_i_loop: &
            ! ****************** Scavenging **************************
 
             ! temporary saved tracer value 
-            tracer_tmp = min(qqcw(icol,kk), tracer(icol,kk)*((cldt(icol,kk)-cldc(icol,kk)) / &
-                         max(0.01_r8, (1._r8-(cldt(icol,kk)-cldc(icol,kk)))) )) 
+            clddiff = cldt(icol,kk)-cldc(icol,kk)
+            tracer_tmp = min(qqcw(icol,kk), tracer(icol,kk) * ( clddiff/max(0.01_r8,(1._r8-clddiff)) ) )
             ! calculate in-cumulus and mean tracer values for wetdep_scavenging use
             tracer_incu = f_act_conv(icol,kk) * (tracer(icol,kk) + tracer_tmp)
             tracer_mean = tracer(icol,kk)*(1._r8-cldc(icol,kk)*f_act_conv(icol,kk)) - &
@@ -899,7 +899,7 @@ resusp_block_aa: &
       if ( mam_prevap_resusp_optcc <= 130) then
          scavabx_new = scavabx_old
       endif
-         resusp_x = 0.0_r8
+      resusp_x = 0.0_r8
 
    else
       ! regular non-linear resuspension
@@ -1259,7 +1259,7 @@ resusp_block_aa: &
         y_lox_lin =  6.2227889828044350E-04_r8
       endif
 
-      x_var = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      x_var = min_max_bound(0.0_r8, 1.0_r8, fprec_evap)
       if (x_var < x_lox_lin) then
          y_var = y_lox_lin * (x_var/x_lox_lin)
       else
@@ -1315,7 +1315,7 @@ resusp_block_aa: &
         y_lox_lin =  2.7247994766566485E-02_r8
       endif
 
-      x_var = max( 0.0_r8, min( 1.0_r8, fprec_evap ) )
+      x_var = min_max_bound(0.0_r8, 1.0_r8, fprec_evap)
       if (x_var < x_lox_lin) then
          y_var = y_lox_lin * (x_var/x_lox_lin)
       else
