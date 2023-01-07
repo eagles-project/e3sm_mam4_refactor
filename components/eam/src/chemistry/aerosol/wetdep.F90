@@ -538,17 +538,17 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8) :: fracev_st     ! fraction of stratiform precip from above that is evaporating [fraction]
       real(r8) :: fracev_cu     ! Fraction of convective precip from above that is evaporating [fraction]
       real(r8) :: fracp         ! fraction of cloud water converted to precip [fraction]
-      real(r8) :: precabc       ! conv precip from above [kg/m2/s] 
-      real(r8) :: precabs       ! strat precip from above [kg/m2/s]
-      real(r8) :: precabx_tmp   ! temporary store precabc or precabs [kg/m2/s]
-      real(r8) :: precabc_base     ! conv precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
-      real(r8) :: precabs_base     ! strat precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
-      real(r8) :: precabx_base_tmp ! temporarily store precab*_base [kg/m2/s]
-      real(r8) :: precnums_base    ! stratiform precip number flux at the bottom of a particular layer [#/m2/s]
-      real(r8) :: precnumc_base    ! convective precip number flux at the bottom of a particular layer [#/m2/s]
-      real(r8) :: precnumx_base_tmp ! temporarily store precnum*_base [#/m2/s]
-      real(r8) :: scavabs       ! stratiform scavenged tracer flux from above [kg/m2/s]
-      real(r8) :: scavabc       ! convective scavenged tracer flux from above [kg/m2/s]
+      real(r8) :: precabc(pcols)        ! conv precip from above [kg/m2/s] 
+      real(r8) :: precabs(pcols)        ! strat precip from above [kg/m2/s]
+      real(r8) :: precabc_base(pcols)   ! conv precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
+      real(r8) :: precabs_base(pcols)   ! strat precip at an effective cloud base for calculations in a particular layer [kg/m2/s]
+      real(r8) :: precnums_base(pcols)  ! stratiform precip number flux at the bottom of a particular layer [#/m2/s]
+      real(r8) :: precnumc_base(pcols)  ! convective precip number flux at the bottom of a particular layer [#/m2/s]
+      real(r8) :: scavabs(pcols)        ! stratiform scavenged tracer flux from above [kg/m2/s]
+      real(r8) :: scavabc(pcols)        ! convective scavenged tracer flux from above [kg/m2/s]
+      real(r8) :: precabx_tmp           ! temporary store precabc or precabs [kg/m2/s]
+      real(r8) :: precabx_base_tmp      ! temporarily store precab*_base [kg/m2/s]
+      real(r8) :: precnumx_base_tmp     ! temporarily store precnum*_base [#/m2/s]
       real(r8) :: scavabx_tmp   ! temporarily store scavab* [kg/m2/s]
       real(r8) :: resusp_c      ! aerosol mass re-suspension in a particular layer from convective rain [kg/m2/s]
       real(r8) :: resusp_s      ! aerosol mass re-suspension in a particular layer from stratiform rain [kg/m2/s]
@@ -575,35 +575,32 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8), parameter :: small_value_36 = 1.e-36_r8    ! small value to avoid divided by zero
       real(r8), parameter :: omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
 
+      ! initiate variables
+      precabs(:) = 0.0_r8
+      precabc(:) = 0.0_r8
+      scavabs(:) = 0.0_r8
+      scavabc(:) = 0.0_r8
 
-main_i_loop: &
-      do icol = 1,ncol
-
-         ! initiate variables
-         precabs = 0.0_r8
-         precabc = 0.0_r8
-         scavabs = 0.0_r8
-         scavabc = 0.0_r8
-
-         precabs_base = 0.0_r8
-         precabc_base = 0.0_r8
-         precnums_base = 0.0_r8
-         precnumc_base = 0.0_r8
+      precabs_base(:) = 0.0_r8
+      precabc_base(:) = 0.0_r8
+      precnums_base(:) = 0.0_r8
+      precnumc_base(:) = 0.0_r8
 
 main_k_loop: &
-         do kk = 1,pver
-
+      do kk = 1,pver
+main_i_loop: &
+         do icol = 1,ncol
             ! ****************** Evaporation **************************
             ! stratiform
-            call compute_evap_frac(                             &
-                        mam_prevap_resusp_optcc,                & ! in
-                        pdel(icol,kk), evaps(icol,kk), precabs, & ! in
-                        fracev_st                               ) ! out
+            call compute_evap_frac(                                     &
+                        mam_prevap_resusp_optcc,                        & ! in
+                        pdel(icol,kk), evaps(icol,kk), precabs(icol),   & ! in
+                        fracev_st                                       ) ! out
             ! convective
-            call compute_evap_frac(                             &
-                        mam_prevap_resusp_optcc,                & ! in
-                        pdel(icol,kk), evapc(icol,kk), precabc, & ! in
-                        fracev_cu                               ) ! out
+            call compute_evap_frac(                                     &
+                        mam_prevap_resusp_optcc,                        & ! in
+                        pdel(icol,kk), evapc(icol,kk), precabc(icol),   & ! in
+                        fracev_cu                                       ) ! out
 
            ! ****************** Scavenging **************************
 
@@ -626,8 +623,8 @@ main_k_loop: &
                     max(small_value_12,cldc(icol,kk)*conicw(icol,kk)+(cmfdqr(icol,kk)+dlf(icol,kk))*deltat)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp) * cldc(icol,kk)
             call wetdep_scavenging(                                &
-                        2,              is_strat_cloudborne,       & ! in, 2 for convective
-                        deltat,         fracp,       precabc,      & ! in
+                        2,         is_strat_cloudborne,            & ! in, 2 for convective
+                        deltat,    fracp,      precabc(icol),      & ! in
                         cldvcu(icol,kk),      scavcoef(icol,kk),   & ! in 
                         sol_factb,            sol_factic(icol,kk), & ! in
                         tracer_incu,          tracer_mean,         & ! in
@@ -639,8 +636,8 @@ main_k_loop: &
             fracp = precs(icol,kk)*deltat/max(cwat(icol,kk)+precs(icol,kk)*deltat,small_value_12)
             fracp = min_max_bound(0.0_r8, 1.0_r8, fracp)
             call wetdep_scavenging(                                & 
-                        1,              is_strat_cloudborne,       & ! in, 1 for stratiform
-                        deltat,         fracp,       precabs,      & ! in
+                        1,         is_strat_cloudborne,            & ! in, 1 for stratiform
+                        deltat,    fracp,     precabs(icol),       & ! in
                         cldvst(icol,kk),      scavcoef(icol,kk),   & ! in
                         sol_factb,            sol_facti,           & ! in
                         tracer(icol,kk),      tracer_mean,         & ! in
@@ -674,8 +671,8 @@ resusp_block_aa: &
                 call wetdep_resusp(                             &
                         1,              mam_prevap_resusp_optcc,& ! in
                         pdel(icol,kk),  evaps(icol,kk),         & ! in
-                        precabs,        precabs_base,           & ! in
-                        scavabs,        precnums_base,          & ! in
+                        precabs(icol),  precabs_base(icol),     & ! in
+                        scavabs(icol),  precnums_base(icol),    & ! in
                         precabx_tmp,    precabx_base_tmp,       & ! out
                         scavabx_tmp,    precnumx_base_tmp,      & ! out
                         resusp_s                                ) ! out
@@ -686,16 +683,16 @@ resusp_block_aa: &
                         srcs,           arainx,                 & ! in
                         precabx_tmp,    precabx_base_tmp,       & ! in
                         scavabx_tmp,    precnumx_base_tmp,      & ! in
-                        precabs,        precabs_base,           & ! out
-                        scavabs,        precnums_base           ) ! out
+                        precabs(icol),  precabs_base(icol),     & ! out
+                        scavabs(icol),  precnums_base(icol)     ) ! out
 
                 ! for convective clouds
                 arainx = max( cldvcu(icol,min(kk+1,pver)), 0.01_r8)     ! non-zero
                 call wetdep_resusp(                             &
                         2,              mam_prevap_resusp_optcc,& ! in
                         pdel(icol,kk),  evapc(icol,kk),         & ! in
-                        precabc,        precabc_base,           & ! in
-                        scavabc,        precnumc_base,          & ! in
+                        precabc(icol),  precabc_base(icol),     & ! in
+                        scavabc(icol),  precnumc_base(icol),    & ! in
                         precabx_tmp,    precabx_base_tmp,       & ! out
                         scavabx_tmp,    precnumx_base_tmp,      & ! out
                         resusp_c                                ) ! out
@@ -706,13 +703,13 @@ resusp_block_aa: &
                         srcc,           arainx,                 & ! in
                         precabx_tmp,    precabx_base_tmp,       & ! in
                         scavabx_tmp,    precnumx_base_tmp,      & ! in
-                        precabc,        precabc_base,           & ! out
-                        scavabc,        precnumc_base           ) ! out
+                        precabc(icol),  precabc_base(icol),     & ! out
+                        scavabc(icol),  precnumc_base(icol)     ) ! out
 
             else resusp_block_aa ! mam_prevap_resusp_optcc = 0, no resuspension
 
-               resusp_c = fracev_cu*scavabc
-               resusp_s = fracev_st*scavabs
+               resusp_c = fracev_cu*scavabc(icol)
+               resusp_s = fracev_st*scavabs(icol)
 
             endif resusp_block_aa
 
@@ -726,7 +723,8 @@ resusp_block_aa: &
                    cmfdqr(icol,kk),        evapc(icol,kk),              & ! in
                    scavt_ik,   iscavt_ik,  icscavt_ik,  isscavt_ik,     & ! out
                    bcscavt_ik, bsscavt_ik, rcscavt_ik,  rsscavt_ik,     & ! out
-                   scavabs,    scavabc,    precabc,     precabs         ) ! inout
+                   scavabs(icol),          scavabc(icol),               & ! inout
+                   precabc(icol),          precabs(icol)                ) ! inout
 
             scavt(icol,kk)   = scavt_ik
             iscavt(icol,kk)  = iscavt_ik
@@ -737,9 +735,9 @@ resusp_block_aa: &
             rcscavt(icol,kk) = rcscavt_ik
             rsscavt(icol,kk) = rsscavt_ik
 
+        enddo main_i_loop ! End of i = 1, ncol
+    enddo main_k_loop ! End of k = 1, pver
 
-         enddo main_k_loop ! End of k = 1, pver
-      enddo main_i_loop ! End of i = 1, ncol
 
    end subroutine wetdepa_v2
 
