@@ -59,8 +59,10 @@ real(r8), parameter :: rhoh2o = 1000._r8            ! density of water
 ! declare several small values that to avoid divided by zero used in the module
 real(r8), parameter :: small_value_30 = 1.e-30_r8   
 real(r8), parameter :: small_value_12 = 1.e-12_r8 
+real(r8), parameter :: small_value_14 = 1.e-14_r8
 real(r8), parameter :: small_value_36 = 1.e-36_r8  
 real(r8), parameter :: small_value_5  = 1.e-5_r8        ! for cloud fraction
+real(r8), parameter :: small_value_2  = 1.e-2_r8        ! for cloud fraction
 
 !==============================================================================
 contains
@@ -229,7 +231,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
 
   ! sum deep and shallow convection contributions
   conicw(:ncol,:) = (icwmrdp(:ncol,:)*dp_frac(:ncol,:) + icwmrsh(:ncol,:)*sh_frac(:ncol,:))/ &
-                              max(0.01_r8, sh_frac(:ncol,:) + dp_frac(:ncol,:))
+                              max(small_value_2, sh_frac(:ncol,:) + dp_frac(:ncol,:))
   totcond(:ncol,:) = q_liq(:ncol,:) + q_ice(:ncol,:)
 
   ! calculate cldv, cldvcu and cldvst
@@ -389,7 +391,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    do icol=1,ncol
       sumppr(icol) = 0._r8
       cldv1(icol) = 0._r8
-      sumpppr(icol) = 1.e-36_r8   ! not 0 because it will be divided
+      sumpppr(icol) = small_value_36   ! not 0 because it will be divided
    end do
 
    do kk = 1,pver
@@ -449,7 +451,7 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
             rho = pmid(icol,kk)/(rair*temperature(icol,kk))
             vfall = convfw/sqrt(rho)
             rain(icol,kk) = sumppr(icol,kk) / (rho*vfall)
-            if (rain(icol,kk).lt.1.e-14_r8) rain(icol,kk) = 0._r8
+            if (rain(icol,kk) .lt. small_value_14) rain(icol,kk) = 0._r8
          endif
       end do
    end do
@@ -608,7 +610,7 @@ main_i_loop: &
 
             ! temporary saved tracer value 
             clddiff = cldt(icol,kk)-cldc(icol,kk)
-            tracer_tmp = min(qqcw(icol,kk), tracer(icol,kk) * ( clddiff/max(0.01_r8,(1._r8-clddiff)) ) )
+            tracer_tmp = min(qqcw(icol,kk), tracer(icol,kk) * ( clddiff/max(small_value_2,(1._r8-clddiff)) ) )
             ! calculate in-cumulus and mean tracer values for wetdep_scavenging use
             tracer_incu = f_act_conv(icol,kk) * (tracer(icol,kk) + tracer_tmp)
             tracer_mean = tracer(icol,kk)*(1._r8-cldc(icol,kk)*f_act_conv(icol,kk)) - &
@@ -668,7 +670,7 @@ resusp_block_aa: &
             if ( mam_prevap_resusp_optcc >= 100) then
 
                 ! for stratiform clouds
-                arainx = max( cldvst(icol,min(kk+1,pver)), 0.01_r8 )    ! non-zero
+                arainx = max( cldvst(icol,min(kk+1,pver)), small_value_2 )    ! non-zero
                 ! step 1 - do evaporation and resuspension
                 call wetdep_resusp(                             &
                         1,              mam_prevap_resusp_optcc,& ! in
@@ -689,7 +691,7 @@ resusp_block_aa: &
                         scavabs(icol),  precnums_base(icol)     ) ! out
 
                 ! for convective clouds
-                arainx = max( cldvcu(icol,min(kk+1,pver)), 0.01_r8)     ! non-zero
+                arainx = max( cldvcu(icol,min(kk+1,pver)), small_value_2 )     ! non-zero
                 call wetdep_resusp(                             &
                         2,              mam_prevap_resusp_optcc,& ! in
                         pdel(icol,kk),  evapc(icol,kk),         & ! in
@@ -1203,7 +1205,7 @@ resusp_block_aa: &
         a1 =  4.2690709912134056E-01_r8
       endif
 
-      if (flux_prec >= 1.0e-36_r8) then
+      if (flux_prec >= small_value_36) then
          x_var = log( flux_prec )
          y_var = exp( a0 + a1*x_var )
       else
