@@ -614,7 +614,7 @@ main_i_loop: &
             ! calculate in-cumulus and mean tracer values for wetdep_scavenging use
             tracer_incu = f_act_conv(icol,kk) * (tracer(icol,kk) + tracer_tmp)
             tracer_mean = tracer(icol,kk)*(1._r8-cldc(icol,kk)*f_act_conv(icol,kk)) - &
-                          tracer_tmp*cldc(icol,kk)*f_act_conv(icol,kk)
+                          cldc(icol,kk)*f_act_conv(icol,kk)*tracer_tmp
             tracer_mean = max(0._r8,tracer_mean)
 
             ! now do the convective scavenging
