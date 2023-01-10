@@ -189,6 +189,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    integer :: imode              ! mode index
    integer :: itim_old           ! index
 
+   real(r8), pointer :: state_q(:,:,:)   ! state%q [#/kg or kg/kg]
    real(r8), pointer :: h2ommr(:,:)      ! specific humidity [kg/kg]
    real(r8), pointer :: temperature(:,:) ! temperatures [K]
    real(r8), pointer :: pmid(:,:)        ! layer pressure [Pa]
@@ -213,6 +214,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    h2ommr       => state%q(:,:,1)
    temperature  => state%t
    pmid         => state%pmid
+   state_q      => state%q
 
    list_idx = 0
    if (present(list_idx_in))     list_idx = list_idx_in
@@ -255,8 +257,8 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
-   call modal_aero_wateruptake_dryaer( ncol, list_idx,            & ! in
-                                      state, pbuf,   dgncur_a     ) ! in
+   call modal_aero_wateruptake_dryaer( ncol,                & ! in
+                                      state_q, dgncur_a     ) ! in
 
    !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
@@ -305,18 +307,16 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
-subroutine modal_aero_wateruptake_dryaer( ncol, list_idx,            & ! in
-                                     state,     pbuf,   dgncur_a     ) ! in
+subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
+                                          state_q,  dgncur_a     ) ! in
 !-----------------------------------------------------------------------
 ! retreive dry aerosol properties
 ! output variables are declared in the module so no output variables in this subroutine
 !-----------------------------------------------------------------------
 
    integer,  intent(in)  :: ncol                ! number of columns
-   integer,  intent(in)  :: list_idx            ! radiative constituents list index
    real(r8), intent(in)  :: dgncur_a(:,:,:)     ! dry aerosol diameter [m]
-   type(physics_state), target, intent(in)  :: state          ! Physics state variables
-   type(physics_buffer_desc), pointer       :: pbuf(:)        ! physics buffer
+   real(r8), intent(in)  :: state_q(:,:,:)      ! vapor and aerosol number/mass mixing ratio from state%q [#/kg or kg/kg]
 
    ! local variables
    integer      :: imode, ispec, kk, icol,la,lc
@@ -355,7 +355,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol, list_idx,            & ! in
          specdens = specdens_amode(lspectype_amode(ispec,imode))
          call assign_la_lc( imode,      ispec,          & ! in
                             la,         lc              ) ! out
-         raer = state%q(:,:,la)
+         raer = state_q(:,:,la)
 
          do kk = top_lev, pver
             do icol = 1, ncol
