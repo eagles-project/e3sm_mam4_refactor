@@ -435,13 +435,12 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
    ! Local variables:
    integer  icol,kk
 
-   ! constants used in fallspeed calculation; taken from findmcnew
-   real(r8) :: convfw
-   real(r8) :: rho     !air density
-   real(r8) :: vfall
+   real(r8) :: convfw  ! falling velocity at air density = 1 kg/m3 [m/s * sqrt(rho)]
+   real(r8) :: rho     !air density [kg/m3]
+   real(r8) :: vfall   ! calculated raindrop falling velocity [m/s]
 
-   ! define the constant convfw. taken from findmcnew, do not find the reference
-   ! of the equation  -- by Shuaiqi when refactoring for C++
+   ! define the constant convfw. taken from cldwat.F90
+   ! reference: Tripoli and Cotton (1980)
    convfw = 1.94_r8*2.13_r8*sqrt(rhoh2o*gravit*2.7e-4_r8)
 
    do kk = 1,pver
