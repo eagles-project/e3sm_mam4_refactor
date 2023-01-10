@@ -215,7 +215,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    !----------------------------------------------------------------------------
    lchnk = state%lchnk
-   ncol = state%ncol
+   ncol  = state%ncol
+   h2ommr       => state%q(:,:,1)
+   temperature  => state%t
+   pmid         => state%pmid
 
    list_idx = 0
    if (present(list_idx_in))     list_idx = list_idx_in
@@ -259,6 +262,9 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
       endif
    endif
 
+   itim_old    =  pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
    call modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
@@ -266,13 +272,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
-   h2ommr       => state%q(:,:,1)
-   temperature  => state%t
-   pmid         => state%pmid
-
-   ! get cloud fraction
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
    call modal_aero_wateruptake_rh_clearair( ncol,         & ! in
                         temperature, pmid,  h2ommr, cldn, & ! in
