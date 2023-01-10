@@ -7,13 +7,15 @@ use physconst,        only: pi, rhoh2o
 use ppgrid,           only: pcols, pver
 use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
-                            rad_cnst_get_mode_props, rad_cnst_get_mode_num
+use modal_aero_data,  only: nmodes => ntot_amode
+use modal_aero_data,  only: nspec_amode, specdens_amode, spechygro, sigmag_amode,  &
+                            rhcrystal_amode, rhdeliques_amode, lspectype_amode
 use cam_history,      only: addfld, add_default, outfld
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 use phys_control,     only: phys_getopts
 use cam_abortutils,   only: endrun
 use mam_support,      only: min_max_bound
+use spmd_utils,   only : masterproc
 
 
 implicit none
@@ -63,9 +65,7 @@ subroutine modal_aero_wateruptake_reg()
 
   use physics_buffer,   only: pbuf_add_field, dtype_r8
 
-   integer :: nmodes
    
-   call rad_cnst_get_info(0, nmodes=nmodes)
    call pbuf_add_field('DGNUMWET',   'global',  dtype_r8, (/pcols, pver, nmodes/), dgnumwet_idx)
    call pbuf_add_field('WETDENS_AP', 'physpkg', dtype_r8, (/pcols, pver, nmodes/), wetdens_ap_idx)
 
@@ -84,7 +84,7 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
-   integer :: imode, nmodes, istat
+   integer :: imode, istat
    logical :: history_aerosol      ! Output the MAM aerosol variables and tendencies
    logical :: history_verbose      ! produce verbose history output
 
@@ -94,9 +94,6 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
    cld_idx        = pbuf_get_index('CLD')    
    dgnum_idx      = pbuf_get_index('DGNUM')    
 
-   ! assume for now that will compute wateruptake for climate list modes only
-
-   call rad_cnst_get_info(0, nmodes=nmodes)
 
    !$OMP PARALLEL
    allocate(maer(pcols,pver,nmodes),stat=istat)
@@ -192,7 +189,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    integer :: list_idx           ! radiative constituents list index
    integer :: imode              ! mode index
    integer :: itim_old           ! index
-   integer :: nmodes             ! total mode number
 
    real(r8), pointer :: h2ommr(:,:)      ! specific humidity [kg/kg]
    real(r8), pointer :: temperature(:,:) ! temperatures [K]
@@ -239,8 +235,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    ! determine default variables
    call phys_getopts(history_aerosol_out = history_aerosol, &
                      history_verbose_out = history_verbose)
-   ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
    !by default set compute_wetdens to be true
    compute_wetdens = .true.
@@ -262,7 +256,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
-   call modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
+   call modal_aero_wateruptake_dryaer( ncol, list_idx,            & ! in
                                       state, pbuf,   dgncur_a     ) ! in
 
    !----------------------------------------------------------------------------
@@ -276,14 +270,14 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    ! compute wet aerosol properties
 
    ! compute aerosol wet radius, volume, diameter and aerosol water
-   call modal_aero_wateruptake_wetaer( ncol,    nmodes,         & ! in
+   call modal_aero_wateruptake_wetaer( ncol,                    & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
                 dryrad, hygro,  rh,     naer,   dryvol,         & ! in
                 wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat   ) ! out
 
    ! compute wet aerosol density
    if (compute_wetdens) then
-        call modal_aero_wateruptake_wetdens( ncol,   nmodes, & ! in
+        call modal_aero_wateruptake_wetdens( ncol,           & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
              wetdens                                         ) ! inout
    endif
@@ -312,7 +306,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
-subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
+subroutine modal_aero_wateruptake_dryaer( ncol, list_idx,            & ! in
                                      state,     pbuf,   dgncur_a     ) ! in
 !-----------------------------------------------------------------------
 ! retreive dry aerosol properties
@@ -320,24 +314,23 @@ subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
 !-----------------------------------------------------------------------
 
    integer,  intent(in)  :: ncol                ! number of columns
-   integer,  intent(in)  :: nmodes              ! number of modes
    integer,  intent(in)  :: list_idx            ! radiative constituents list index
    real(r8), intent(in)  :: dgncur_a(:,:,:)     ! dry aerosol diameter [m]
    type(physics_state), target, intent(in)  :: state          ! Physics state variables
    type(physics_buffer_desc), pointer       :: pbuf(:)        ! physics buffer
 
    ! local variables
-   integer      :: imode, ispec, kk, icol
+   integer      :: imode, ispec, kk, icol,la,lc
    integer      :: nspec
    real(r8)     :: sigmag
    real(r8)     :: alnsg                        ! log(sigmag)
    real(r8)     :: specdens                     ! aerosol density [kg/m3]
-   real(r8)     :: spechygro, spechygro_1       ! aerosol hygroscopicity [unitless]
+   real(r8)     :: spechygro_1, spechygro_i     ! aerosol hygroscopicity [unitless]
    real(r8)     :: v2ncur_a                     ! 1 / mean particle volume [1/m3]
    real(r8)     :: drydens                      ! dry particle density [kg/m3]
    real(r8)     :: dryvolmr(pcols,pver)         ! volume MR for aerosol mode [m3/kg]
    real(r8)     :: vol_tmp                      ! temporary aerosol volume [m3/kg]
-   real(r8), pointer :: raer(:,:)   ! aerosol species MRs [kg/kg and #/kg]
+   real(r8)     :: raer(pcols,pver)             ! aerosol species mixing ratio [kg/kg]
    real(r8), parameter  :: small_value = 1.0e-30_r8
    real(r8), parameter  :: small_value_31 = 1.0e-31_r8
 
@@ -347,24 +340,23 @@ subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
       dryvolmr(:,:) = 0._r8
 
       ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, imode,        & ! in
-                sigmag=sigmag, rhcrystal=rhcrystal(imode), & ! out
-                rhdeliques=rhdeliques(imode)               ) ! out
-      alnsg = log(sigmag)
-      ! get mode info
-      call rad_cnst_get_info(list_idx, imode, & ! in
-                                   nspec=nspec) ! out
+      sigmag = sigmag_amode(imode)
+      rhcrystal = rhcrystal_amode(imode)
+      rhdeliques = rhdeliques_amode(imode)
+      nspec = nspec_amode(imode)
+      ! specdens_1 is defined in module and will be used in later subroutine
+      specdens_1 = specdens_amode(lspectype_amode(1,imode)) 
+      spechygro_1 = spechygro(lspectype_amode(1,imode))
 
-      ! save off defaults values
-      call rad_cnst_get_aer_props(list_idx, imode, 1, & ! in
-                     density_aer=specdens_1(imode),hygro_aer=spechygro_1) ! out
+      alnsg = log(sigmag)
 
       do ispec = 1, nspec
          ! get species interstitial mixing ratio ('a')
-         call rad_cnst_get_aer_mmr(list_idx, imode, ispec, 'a', state, pbuf, & ! in
-                                   raer) ! out
-         call rad_cnst_get_aer_props(list_idx, imode, ispec, & ! in
-                     density_aer=specdens,hygro_aer=spechygro) ! out
+         spechygro_i = spechygro(lspectype_amode(ispec,imode))
+         specdens = specdens_amode(lspectype_amode(ispec,imode))
+         call assign_la_lc( imode,      ispec,          & ! in
+                            la,         lc              ) ! out
+         raer = state%q(:,:,la)
 
          do kk = top_lev, pver
             do icol = 1, ncol
@@ -373,7 +365,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol, nmodes, list_idx,    & ! in
                dryvolmr(icol,kk)   = dryvolmr(icol,kk) + vol_tmp
                ! hygro currently is sum(hygro * volume) of each species,
                ! need to divided by sum(volume) later to get mean hygro for all species.
-               hygro(icol,kk,imode)  = hygro(icol,kk,imode) + vol_tmp*spechygro
+               hygro(icol,kk,imode)  = hygro(icol,kk,imode) + vol_tmp*spechygro_i
             enddo ! ncol
          enddo ! kk
       enddo ! nspec
@@ -461,7 +453,7 @@ use wv_saturation,    only: qsat_water
 end subroutine modal_aero_wateruptake_rh_clearair
 
 !===============================================================================
-subroutine modal_aero_wateruptake_wetaer( ncol,  nmodes,  & ! in
+subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
              rhcrystal,      rhdeliques,    dgncur_a,     & ! in
              dryrad, hygro,  rh,     naer,  dryvol,       & ! in
              wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
@@ -477,7 +469,6 @@ subroutine modal_aero_wateruptake_wetaer( ncol,  nmodes,  & ! in
 
    ! Arguments
    integer, intent(in)  :: ncol                    ! number of columns
-   integer, intent(in)  :: nmodes
 
    real(r8), intent(in) :: rhcrystal(:)          ! crystal RH [fraction]
    real(r8), intent(in) :: rhdeliques(:)         ! deliques RH [Fraction]
@@ -710,14 +701,13 @@ subroutine find_real_solution(               &
 end subroutine find_real_solution
 
 !===============================================================================
-subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
+subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
              wetdens                                         ) ! inout
 !-----------------------------------------------------------------------
 ! compute aerosol wet density
 !-----------------------------------------------------------------------
-   integer, intent(in)  :: ncol                    ! number of columns
-   integer, intent(in)  :: nmodes
+   integer, intent(in)  :: ncol                 ! number of columns
    real(r8),intent(in)  :: wetvol(:,:,:)        ! single-particle-mean wet aerosol volume [m^3]
    real(r8),intent(in)  :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
    real(r8),intent(in)  :: drymass(:,:,:)       ! single-particle-mean dry mass [kg]
@@ -745,6 +735,35 @@ subroutine modal_aero_wateruptake_wetdens( ncol,     nmodes, & ! in
    enddo ! m = 1, nmodes
 
 end subroutine modal_aero_wateruptake_wetdens
+
+!===============================================================================
+   subroutine assign_la_lc( imode,      ispec,          & ! in
+                            la,         lc              ) ! out
+!-----------------------------------------------------------------------
+! get the index of interstital (la) and cloudborne (lc) aerosols
+! from mode index and species index
+!-----------------------------------------------------------------------
+   use constituents, only: pcnst
+   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
+                               numptr_amode, numptrcw_amode
+
+   integer, intent(in)     :: imode            ! index of MAM4 modes
+   integer, intent(in)     :: ispec            ! index of species, in which:
+                                               ! 0 = number concentration
+                                               ! other = mass concentration
+   integer, intent(out)    :: la               ! index of interstitial aerosol
+   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la+ pcnst)
+
+   if (ispec == 0) then
+      la = numptr_amode(imode)
+      lc = numptrcw_amode(imode) + pcnst
+   else
+      la = lmassptr_amode(ispec,imode)
+      lc = lmassptrcw_amode(ispec,imode) + pcnst
+   endif
+
+   end subroutine assign_la_lc
+
 
 !===============================================================================
 end module modal_aero_wateruptake
