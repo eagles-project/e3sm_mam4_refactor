@@ -166,7 +166,7 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! in
-                                        dgnumwet_m, qaerwat_m, wetdens_m   ) ! inout
+                                        dgnumwet_m, qaerwat_m  ) ! inout
    !----------------------------------------------------------------------------
    !
    ! CAM specific driver for modal aerosol water uptake code.
@@ -185,7 +185,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    real(r8), optional, allocatable, target, intent(in)    :: dgnumdry_m(:,:,:)
    real(r8), optional, allocatable, target, intent(inout)   :: dgnumwet_m(:,:,:)
    real(r8), optional, allocatable, target, intent(inout)   :: qaerwat_m(:,:,:)
-   real(r8), optional, allocatable, target, intent(inout)   :: wetdens_m(:,:,:)
 
    ! local variables
    integer :: lchnk              ! chunk index
@@ -254,12 +253,8 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
       dgncur_a    => dgnumdry_m
       dgncur_awet => dgnumwet_m
       qaerwat     => qaerwat_m
-      if(present(wetdens_m)) then
-         wetdens     => wetdens_m
-      else
-         !set compute_wetdens to flase if wetdens is not present
-         compute_wetdens = .false.
-      endif
+      !set compute_wetdens to flase if wetdens is not present
+      compute_wetdens = .false.
    endif
 
    itim_old    =  pbuf_old_tim_idx()
