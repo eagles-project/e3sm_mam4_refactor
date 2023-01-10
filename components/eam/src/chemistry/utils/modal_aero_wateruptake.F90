@@ -53,6 +53,7 @@ real(r8), allocatable :: wtrvol(:,:,:)    ! single-particle-mean water volume in
 real(r8), allocatable :: rhcrystal(:)
 real(r8), allocatable :: rhdeliques(:)
 real(r8), allocatable :: specdens_1(:)
+!$OMP THREADPRIVATE(maer, hygro, naer, dryvol, drymass, dryrad, wetrad, wetvol, wtrvol, rhcrystal, rhdeliques, specdens_1)
 
 !===============================================================================
 contains
