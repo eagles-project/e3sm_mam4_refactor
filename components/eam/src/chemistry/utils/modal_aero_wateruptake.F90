@@ -14,8 +14,7 @@ use cam_history,      only: addfld, add_default, outfld
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 use phys_control,     only: phys_getopts
 use cam_abortutils,   only: endrun
-use mam_support,      only: min_max_bound
-use spmd_utils,   only : masterproc
+use mam_support,      only: min_max_bound, assign_la_lc
 
 
 implicit none
@@ -735,34 +734,6 @@ subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
    enddo ! m = 1, nmodes
 
 end subroutine modal_aero_wateruptake_wetdens
-
-!===============================================================================
-   subroutine assign_la_lc( imode,      ispec,          & ! in
-                            la,         lc              ) ! out
-!-----------------------------------------------------------------------
-! get the index of interstital (la) and cloudborne (lc) aerosols
-! from mode index and species index
-!-----------------------------------------------------------------------
-   use constituents, only: pcnst
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-                               numptr_amode, numptrcw_amode
-
-   integer, intent(in)     :: imode            ! index of MAM4 modes
-   integer, intent(in)     :: ispec            ! index of species, in which:
-                                               ! 0 = number concentration
-                                               ! other = mass concentration
-   integer, intent(out)    :: la               ! index of interstitial aerosol
-   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la+ pcnst)
-
-   if (ispec == 0) then
-      la = numptr_amode(imode)
-      lc = numptrcw_amode(imode) + pcnst
-   else
-      la = lmassptr_amode(ispec,imode)
-      lc = lmassptrcw_amode(ispec,imode) + pcnst
-   endif
-
-   end subroutine assign_la_lc
 
 
 !===============================================================================

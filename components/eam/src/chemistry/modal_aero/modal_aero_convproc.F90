@@ -22,6 +22,8 @@ module modal_aero_convproc
    use cam_logfile,  only: iulog
    use cam_abortutils, only: endrun
    use physconst,    only: spec_class_aerosol, spec_class_gas
+   use mam_support,  only: assign_la_lc
+
 
    implicit none
 
@@ -2874,36 +2876,7 @@ jtsub_loop_main_aa: &
    return
    end subroutine tmr_tendency
 
-!=========================================================================================
-   subroutine assign_la_lc( imode,      ispec,          & ! in
-                            la,         lc              ) ! out
-!-----------------------------------------------------------------------
-! get the index of interstital (la) and cloudborne (lc) aerosols
-! from mode index and species index
-!-----------------------------------------------------------------------
-   use constituents, only: pcnst
-   use modal_aero_data, only:  lmassptr_amode, lmassptrcw_amode, &
-                               numptr_amode, numptrcw_amode
-
-   integer, intent(in)     :: imode            ! index of MAM4 modes
-   integer, intent(in)     :: ispec            ! index of species, in which:
-                                               ! 0 = number concentration
-                                               ! other = mass concentration
-   integer, intent(out)    :: la               ! index of interstitial aerosol
-   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la + pcnst)
-
-   if (ispec == 0) then
-      la = numptr_amode(imode)
-      lc = numptrcw_amode(imode) + pcnst
-   else
-      la = lmassptr_amode(ispec,imode)
-      lc = lmassptrcw_amode(ispec,imode) + pcnst
-   endif
-
-   end subroutine assign_la_lc
 
 !=========================================================================================
-
-
 
 end module modal_aero_convproc
