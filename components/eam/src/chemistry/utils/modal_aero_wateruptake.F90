@@ -39,6 +39,12 @@ logical :: pergro_mods         = .false.
 
 real(r8), parameter   :: third = 1._r8/3._r8
 real(r8), parameter   :: pi43  = pi*4.0_r8/3.0_r8
+! some small values to avoid zeros
+real(r8), parameter  :: small_value_30 = 1.0e-30_r8
+real(r8), parameter  :: small_value_31 = 1.0e-31_r8
+real(r8), parameter  :: small_value_10 = 1.e-10_r8   
+real(r8), parameter  :: eps = 1.e-4_r8
+
 
 real(r8), allocatable :: maer(:,:,:)      ! aerosol wet mass MR (including water) (kg/kg-air)
 real(r8), allocatable :: hygro(:,:,:)     ! volume-weighted mean hygroscopicity (--)
@@ -330,8 +336,6 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
    real(r8)     :: dryvolmr(pcols,pver)         ! volume MR for aerosol mode [m3/kg]
    real(r8)     :: vol_tmp                      ! temporary aerosol volume [m3/kg]
    real(r8)     :: raer(pcols,pver)             ! aerosol species mixing ratio [kg/kg]
-   real(r8), parameter  :: small_value = 1.0e-30_r8
-   real(r8), parameter  :: small_value_31 = 1.0e-31_r8
 
 
    do imode = 1, nmodes
@@ -373,7 +377,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
       do kk = top_lev, pver
          do icol = 1, ncol
 
-            if (dryvolmr(icol,kk) > small_value) then
+            if (dryvolmr(icol,kk) > small_value_30) then
                ! divided by sum(volume) to get mean hygro
                hygro(icol,kk,imode) = hygro(icol,kk,imode)/dryvolmr(icol,kk)
             else
@@ -564,7 +568,6 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
 
    complex(r8) :: cx4(4) ! output of polynomials
 
-   real(r8), parameter :: eps = 1.e-4_r8
    real(r8), parameter :: mw = 18._r8
    real(r8), parameter :: rhow = 1._r8
    real(r8), parameter :: surften = 76._r8
@@ -573,7 +576,6 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
    real(r8), parameter :: ugascon = 8.3e7_r8
    real(r8), parameter :: factor_um2m = 1.e-6_r8  ! convert micron to m
    real(r8), parameter :: factor_m2um = 1.e6_r8   ! convert m to micron
-   real(r8), parameter :: small_rh = 1.e-10_r8    ! small value to avoid zero
    real(r8), parameter :: rmax = 30._r8           ! upper bound of radius [microns]
 
 !  effect of organics on surface tension is neglected
@@ -584,7 +586,7 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
    bb = vol*hygro
 
 !  quartic
-   ss = min_max_bound(small_rh, 1._r8-eps, rh)
+   ss = min_max_bound(small_value_10, 1._r8-eps, rh)
    slog = log(ss)
    p43 = -aa/slog
    p42 = 0._r8
@@ -680,7 +682,6 @@ subroutine find_real_solution(               &
    integer  :: n_cx     ! length of cx
    integer  :: nn       ! index of cx
    real(r8) :: xr, xi   ! real and image part of cx
-   real(r8), parameter :: eps = 1.e-4_r8
 
    n_cx = size(cx, dim=1)
 
@@ -714,13 +715,12 @@ subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
    real(r8),intent(inout) :: wetdens(:,:,:)     ! wet aerosol density [kg/m3]
    ! local variables
    integer :: icol, kk, imode
-   real(r8), parameter  :: small_value = 1.0e-30_r8
 
    ! compute aerosol wet density (kg/m3)
    do imode = 1, nmodes
       do kk = top_lev, pver
          do icol = 1, ncol
-            if (wetvol(icol,kk,imode) > small_value) then
+            if (wetvol(icol,kk,imode) > small_value_30) then
                ! wet density
                wetdens(icol,kk,imode) = (drymass(icol,kk,imode) + rhoh2o*wtrvol(icol,kk,imode)) &
                                         / wetvol(icol,kk,imode)
