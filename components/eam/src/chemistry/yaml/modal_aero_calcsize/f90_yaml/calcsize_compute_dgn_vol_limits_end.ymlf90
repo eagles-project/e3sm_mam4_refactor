@@ -1,0 +1,19 @@
+#ifdef YAML
+ if(yaml%print_flag .and. .not. printed(imode)) then
+     printed(imode) = .true.
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     call write_output_var(unit_output,'v2nmin',v2nmin)
+     call write_output_var(unit_output,'v2nmax',v2nmax)
+     call write_output_var(unit_output,'v2nminrl',v2nminrl)
+     call write_output_var(unit_output,'v2nmaxrl',v2nmaxrl)
+     call write_output_var(unit_output,'dgnxx',dgnxx)
+     call write_output_var(unit_output,'dgnyy',dgnyy)
+
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+  endif
+#endif

@@ -49,14 +49,24 @@ module yaml_input_file_io
   interface write_var
      module procedure write_var_int
      module procedure write_var_real
+     module procedure write_var_logical
   end interface write_var
 
   interface write_output_var
      module procedure write_output_var_int
      module procedure write_output_var_real
+     module procedure write_output_var_logical
   end interface write_output_var
 
+  interface write_aerosol_mmr
+     module procedure write_aerosol_mmr_real
+     module procedure write_aerosol_mmr_logical
+  end interface write_aerosol_mmr
 
+  interface write_output_aerosol_mmr
+     module procedure write_output_aerosol_mmr_real
+     module procedure write_output_aerosol_mmr_logical
+  end interface write_output_aerosol_mmr
 
 contains
 
@@ -212,7 +222,7 @@ contains
   !-------------------------- * write data * --------------------------------------
   !================================================================================
 
-  subroutine write_aerosol_mmr(unit_input, unit_output, fld_name,field,aer_num_only)
+  subroutine write_aerosol_mmr_real(unit_input, unit_output, fld_name,field,aer_num_only)
     !------------------------------------------------------------------
     !Purpose: write interstitial aerosols mmr
     !------------------------------------------------------------------
@@ -255,13 +265,13 @@ contains
     enddo
     write(unit_input,'(A)')']'
 
-    call write_output_aerosol_mmr(unit_output, fld_name, field, aer_num_only, "input")
+    call write_output_aerosol_mmr_real(unit_output, fld_name, field, aer_num_only, "input")
 
-  end subroutine write_aerosol_mmr
+  end subroutine write_aerosol_mmr_real
 
   !================================================================================
 
-  subroutine write_output_aerosol_mmr(unit_output, fld_name, field, aer_num_only, inp_out_str)
+  subroutine write_output_aerosol_mmr_real(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes aerosol mmr for the input and the output yaml file
     !------------------------------------------------------------------
@@ -313,7 +323,112 @@ contains
 
     write(unit_output,'(A)')'],]'
 
-  end subroutine write_output_aerosol_mmr
+  end subroutine write_output_aerosol_mmr_real
+
+  !================================================================================
+
+  subroutine write_aerosol_mmr_logical(unit_input, unit_output, fld_name,field,aer_num_only)
+    !------------------------------------------------------------------
+    !Purpose: write interstitial aerosols mmr
+    !------------------------------------------------------------------
+    implicit none
+
+    integer,  intent(in)   :: unit_input      ! input stream unit number
+    integer,  intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    logical, intent(in)  :: field(:)        ! field values in boolean
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only!to print only aerosol numbers
+
+    integer :: ispec, aer_spec
+    logical :: mass_or_num
+
+
+    !format statement to write in double precision
+10  format(E17.10)
+11  format(A,L10)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+    !In MAM4,first 15 species are non-aerosols, so we start with 16th species
+    !We store first specie mmr seprately to adjust comma(",") we need
+    !in the output array
+    aer_spec = 16
+    if(present(aer_num_only) .and. aer_num_only)aer_spec = 23 !23rd index is the first num aerosol
+    write(unit_input,10,advance="no")field(aer_spec)
+    aer_spec = aer_spec + 1
+
+    do ispec = aer_spec, pcnst
+       !ignore species based on "aer_num_only" optional input
+       mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num')==0)
+       if(present(aer_num_only) .and. aer_num_only) mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
+
+       if(mass_or_num) then !ignore the aerosol number
+          write(unit_input,11,advance="no")',',field(ispec)
+       endif
+
+    enddo
+    write(unit_input,'(A)')']'
+
+    call write_output_aerosol_mmr_logical(unit_output, fld_name, field, aer_num_only, "input")
+
+  end subroutine write_aerosol_mmr_logical
+
+  !================================================================================
+
+  subroutine write_output_aerosol_mmr_logical(unit_output, fld_name, field, aer_num_only, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes aerosol mmr for the input and the output yaml file
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    logical, intent(in)  :: field(:)        ! field values in boolean
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only!to print only aerosol numbers
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: ispec, aer_spec
+    logical :: mass_or_num
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(L10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    !In MAM4,first 15 species are non-aerosols, so we start with 16th species
+    aer_spec = 16
+
+    !if we need to print only aerosol number mixing ratios, we should start from 23rd species
+    if(present(aer_num_only) .and. aer_num_only)aer_spec = 23 !23rd index is the first num aerosol
+
+    do ispec = aer_spec, pcnst
+       !ignore species based on "aer_num_only" optional input
+       mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num')==0)
+       if(present(aer_num_only) .and. aer_num_only) &
+            mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
+
+       if(mass_or_num) then !ignore the aerosol number
+          write(unit_output,12,advance="no")field(ispec),','
+       endif
+
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_output_aerosol_mmr_logical
 
   !================================================================================
 
@@ -332,7 +447,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    write(unit_input,'(3A,I10,A)')'    ',trim(adjustl(fld_name)),':[', field,']'
+    write(unit_input,'(3A,I10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
 
     call write_output_var_int(unit_output, fld_name, field, "input")
 
@@ -371,6 +486,58 @@ contains
 
   !================================================================================
 
+  subroutine write_var_logical(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    logical, intent(in)  :: field        ! field values in logical
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    write(unit_input,'(3A,L10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
+
+    call write_output_var_logical(unit_output, fld_name, field, "input")
+
+  end subroutine write_var_logical
+
+  !================================================================================
+
+  subroutine write_output_var_logical(unit_output, fld_name, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    logical, intent(in)  :: field           ! field values in int
+
+    !optional input
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A,L10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+
+  end subroutine write_output_var_logical
+
   !================================================================================
 
   subroutine write_var_real(unit_input, unit_output, fld_name,field)
@@ -388,7 +555,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    write(unit_input,'(3A,E17.10,A)')'    ',trim(adjustl(fld_name)),':[', field,']'
+    write(unit_input,'(3A,E17.10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
 
     call write_output_var_real(unit_output, fld_name, field, "input")
 
@@ -449,7 +616,7 @@ contains
 10  format(E17.10)
 11  format(A,E17.10)
 
-    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),':['
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     write(unit_input,10,advance="no")field(1)
 

@@ -1,0 +1,18 @@
+#ifdef YAML
+  if(yaml%print_flag) then
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     call write_output_var(unit_output,'num_a',num_a)
+     call write_output_var(unit_output,'num_a', num_c)
+
+     call write_output_aerosol_mmr(unit_output,'dqdt',dqdt(yaml%iprint,yaml%kprint,:))
+     call write_output_aerosol_mmr(unit_output,'dqqcwdt',dqqcwdt(yaml%iprint,yaml%kprint,:))
+
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+  endif
+
+#endif

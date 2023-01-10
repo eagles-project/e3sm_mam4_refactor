@@ -1,0 +1,39 @@
+#ifdef YAML
+  type(yaml_vars), intent(in) :: yaml
+  integer  :: unit_input, unit_output
+  character(len=2000):: fname
+  logical:: printed(4) = .false.
+  real(r8) :: qprint(nspec), qcprint(nspec),dprint(nspec)
+
+
+  if(yaml%print_flag .and. .not.printed(imode)) then
+
+     write(fname,'(A,i1)')'calcsize_compute_dry_volume_mode',imode
+     call open_files(trim(adjustl(fname)), &  !intent-in
+          unit_input, unit_output) !intent-out
+
+     !start by adding an input string
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%iprint,'XYZ',get_nstep(), yaml%kprint)
+
+     !start writing data
+     call write_var(unit_input, unit_output, 'top_lev',top_lev)
+     call write_var(unit_input, unit_output, 'ncol',ncol)
+     call write_var(unit_input, unit_output, 'imode',imode)
+     call write_var(unit_input, unit_output, 'nspec',nspec)
+     call write_var(unit_input, unit_output,'list_idx_in',list_idx_in)
+     do ispec = 1, nspec
+        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'a', state, pbuf, specmmr)
+        qprint(ispec) = specmmr(yaml%iprint,yaml%kprint)
+        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'c', state, pbuf, specmmr_cld)
+        qcprint(ispec) = specmmr_cld(yaml%iprint,yaml%kprint)
+        call rad_cnst_get_aer_props(list_idx_in, imode, ispec, density_aer=specdens)
+        dprint(ispec) = specdens
+     end do ! nspec loop
+     call write_1d_var(unit_input, unit_output, 'interstitial',nspec,qprint)
+     call write_1d_var(unit_input, unit_output, 'cldbrn',nspec,qcprint)
+     call write_1d_var(unit_input, unit_output, 'density',nspec,dprint)
+     close(unit_input)
+     call freeunit(unit_input)
+  endif
+
+#endif

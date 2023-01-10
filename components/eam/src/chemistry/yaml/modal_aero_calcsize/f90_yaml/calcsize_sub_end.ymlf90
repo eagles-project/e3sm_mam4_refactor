@@ -1,4 +1,4 @@
-#if 0
+#ifdef YAML
   ! YAML file output generation code- DO NOT PORT to C++
   if(yaml%print_flag) then ! if this column exists in lchnk
 
