@@ -1,0 +1,4 @@
+!uncomment "#define YAML" line below to invoke test generation
+!#define YAML
+use yaml_input_file_io
+

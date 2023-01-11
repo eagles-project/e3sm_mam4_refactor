@@ -1,0 +1,20 @@
+#ifdef YAML
+  ! YAML file output generation code- DO NOT PORT to C++
+  if(yaml%print_flag) then ! if this column exists in lchnk
+
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     call write_output_aerosol_mmr(unit_output,'interstitial_ptend',dqdt(yaml%iprint,yaml%kprint,:))
+     call write_output_aerosol_mmr(unit_output,'interstitial_ptend_num',dqdt(yaml%iprint,yaml%kprint,:),.true.)
+
+     call write_output_aerosol_mmr(unit_output,'cloud_borne_ptend',dqqcwdt(yaml%iprint,yaml%kprint,:))
+     call write_output_aerosol_mmr(unit_output,'cloud_borne_ptend_num',dqqcwdt(yaml%iprint,yaml%kprint,:),.true.)
+
+     call write_1d_output_var(unit_output, 'diameter', 4, dgncur_a(yaml%iprint,yaml%kprint,:))
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+  endif
+#endif
