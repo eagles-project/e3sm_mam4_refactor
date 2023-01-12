@@ -66,7 +66,7 @@
 !    1 = sequential   calc. of gas-chem prod then condensation loss
 !    2 = simultaneous calc. of gas-chem prod and  condensation loss
 
-  integer, public :: newnuc_h2so4_conc_optaa = 2
+  integer,parameter, public :: newnuc_h2so4_conc_optaa = 2
 ! controls treatment of h2so4 concentrationin mam_newnuc_1subarea
 !    1 = use average value calculated in standard cam5.2.10 and earlier
 !    2 = use average value calculated in mam_gasaerexch_1subarea
