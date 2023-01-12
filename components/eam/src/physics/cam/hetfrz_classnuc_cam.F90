@@ -1020,6 +1020,7 @@ subroutine calculate_mass_mean_radius(ncnst, aer, &
    dst1_num = total_interstitial_aer_num(2)
    dst3_num = total_interstitial_aer_num(3)
 
+   ! Initialize hetraer with prescribed radius
    hetraer(1) = r_bc_prescribed
    hetraer(2) = r_dust_a1_prescribed
    hetraer(3) = r_dust_a3_prescribed
@@ -1109,7 +1110,8 @@ subroutine calculate_coated_fraction(ncnst, aer,  rhoair, &
    real(r8) :: bc_num, dst1_num, dst3_num         ! BC and dust number concentration [#/cm^3]
 
    real(r8), parameter :: bc_kg_to_num = 4.669152e+17_r8      ! #/kg from emission
-   real(r8), parameter :: dst1_scale = 0.488_r8    ! scaled for D>0.5-1 um from 0.1-1 um
+   real(r8), parameter :: dst1_0p5um_scale = 0.488_r8    ! scaled for D>0.5-1 um from 0.1-1 um
+   real(r8), parameter :: bc_0p5um_scale = 0.0256_r8
 
    real(r8) :: r_bc                         ! model radii of BC modes [m]   
    real(r8) :: r_dust_a1, r_dust_a3         ! model radii of dust modes [m]   
@@ -1202,12 +1204,12 @@ subroutine calculate_coated_fraction(ncnst, aer,  rhoair, &
    uncoated_aer_num(1) = aer(bc_pcarbon)*bc_kg_to_num*num_m3_to_cm3*(1._r8-dstcoat(1))
    
 
-   tot_na500 = total_aer_num(1)*0.0256_r8 + &   ! scaled for D>0.5 um using Clarke et al., 1997; 2004; 2007: rg=0.1um, sig=1.6
-               total_aer_num(2)*dst1_scale + &
+   tot_na500 = total_aer_num(1)*bc_0p5um_scale + &   ! scaled for D>0.5 um using Clarke et al., 1997; 2004; 2007: rg=0.1um, sig=1.6
+               total_aer_num(2)*dst1_0p5um_scale + &
                total_aer_num(3)
 
-   na500 = total_interstitial_aer_num(1)*0.0256_r8 + &   ! scaled for D>0.5 um using Clarke et al., 1997; 2004; 2007: rg=0.1um, sig=1.6
-           total_interstitial_aer_num(2)*dst1_scale + &
+   na500 = total_interstitial_aer_num(1)*bc_0p5um_scale + &   ! scaled for D>0.5 um using Clarke et al., 1997; 2004; 2007: rg=0.1um, sig=1.6
+           total_interstitial_aer_num(2)*dst1_0p5um_scale + &
            total_interstitial_aer_num(3)
                 
 end subroutine calculate_coated_fraction
