@@ -86,42 +86,42 @@ subroutine mam_amicphys_1subarea(&
 
    ! Subare mixing ratios qXXXN (X=gas,aer,wat,num; N=1:4):
    !
-   !    XXX=gas - gas species
-   !    XXX=aer - aerosol mass  species (excluding water)
-   !    XXX=wat - aerosol water
-   !    XXX=num - aerosol number
+   !    XXX=gas - gas species [kmol/kmol]
+   !    XXX=aer - aerosol mass species (excluding water) [kmol/kmol]
+   !    XXX=wat - aerosol water [kmol/kmol]
+   !    XXX=num - aerosol number [#/kmol]
    !
    !    N=1 - before gas-phase chemistry
    !    N=2 - before cloud chemistry
    !    N=3 - current incoming values (before gas-aerosol exchange, newnuc, coag)
    !    N=_cur - updated outgoing values (after  gas-aerosol exchange, newnuc, coag)
    !
-   real(r8), intent(in   ), dimension(max_gas) :: qgas1, qgas3
-   real(r8), intent(inout), dimension(max_gas) :: qgas_cur
+   real(r8), intent(in   ), dimension(max_gas) :: qgas1, qgas3  ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_gas) :: qgas_cur      ! [kmol/kmol]
 
-   real(r8), intent(in   ), dimension(max_mode) ::  qnum3
-   real(r8), intent(inout), dimension(max_mode) ::  qnum_cur
+   real(r8), intent(in   ), dimension(max_mode) :: qnum3        ! [#/kmol]
+   real(r8), intent(inout), dimension(max_mode) :: qnum_cur     ! [#/kmol]
 
-   real(r8), intent(in   ), dimension(max_aer,max_mode) :: qaer2, qaer3
-   real(r8), intent(inout), dimension(max_aer,max_mode) :: qaer_cur
+   real(r8), intent(in   ), dimension(max_aer,max_mode) :: qaer2, qaer3  ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_aer,max_mode) :: qaer_cur      ! [kmol/kmol]
 
-   real(r8), intent(in   ), dimension(max_mode) :: qnumcw3
-   real(r8), intent(inout), dimension(max_mode) :: qnumcw_cur
+   real(r8), intent(in   ), dimension(max_mode) :: qnumcw3      ! [#/kmol]
+   real(r8), intent(inout), dimension(max_mode) :: qnumcw_cur   ! [#/kmol]
 
-   real(r8), intent(in   ), dimension(max_aer,max_mode) :: qaercw2, qaercw3
-   real(r8), intent(inout), dimension(max_aer,max_mode) :: qaercw_cur
+   real(r8), intent(in   ), dimension(max_aer,max_mode) :: qaercw2, qaercw3  ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_aer,max_mode) :: qaercw_cur        ! [kmol/kmol]
 
-   real(r8), intent(in   ), dimension(max_mode) :: qwtr3
-   real(r8), intent(inout), dimension(max_mode) :: qwtr_cur
+   real(r8), intent(in   ), dimension(max_mode) :: qwtr3       ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_mode) :: qwtr_cur    ! [kmol/kmol]
 
    ! qXXX_delaa are TMR changes (increments, not tendencies) of different microphysics processes.
    ! These are diagnostics sent to history output; they do not directly affect time integration.
 
-   real(r8), intent(inout), dimension(max_gas, nqtendaa) :: qgas_delaa
-   real(r8), intent(inout), dimension(max_mode,nqtendaa) :: qnum_delaa
-   real(r8), intent(inout), dimension(max_aer,max_mode,nqtendaa) :: qaer_delaa
-   real(r8), intent(inout), dimension(max_mode,nqqcwtendaa) :: qnumcw_delaa
-   real(r8), intent(inout), dimension(max_aer,max_mode,nqqcwtendaa ) :: qaercw_delaa
+   real(r8), intent(inout), dimension(max_gas, nqtendaa)             :: qgas_delaa    ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_mode,nqtendaa)             :: qnum_delaa    ! [   #/kmol]
+   real(r8), intent(inout), dimension(max_aer,max_mode,nqtendaa)     :: qaer_delaa    ! [kmol/kmol]
+   real(r8), intent(inout), dimension(max_mode,nqqcwtendaa)          :: qnumcw_delaa  ! [   #/kmol]
+   real(r8), intent(inout), dimension(max_aer,max_mode,nqqcwtendaa ) :: qaercw_delaa  ! [kmol/kmol]
 
    type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa_sub
 
@@ -137,40 +137,42 @@ subroutine mam_amicphys_1subarea(&
 
    ! Tmp variables of mixing ratios used for diagnosing increments or for process coupling
 
-   real(r8), dimension( 1:max_gas ) :: qgas_sv1, qgas_avg
+   real(r8), dimension( 1:max_gas ) :: qgas_sv1, qgas_avg  ! [kmol/kmol]
 
-   real(r8), dimension( 1:max_mode ) :: qnum_sv1
-   real(r8), dimension( 1:max_mode ) :: qnumcw_sv1
+   real(r8), dimension( 1:max_mode ) :: qnum_sv1    ! [#/kmol]
+   real(r8), dimension( 1:max_mode ) :: qnumcw_sv1  ! [#/kmol]
 
-   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1
-   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1
+   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_sv1     ! [kmol/kmol]
+   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_sv1   ! [kmol/kmol]
 
    ! Mixing ratio increments of sub-timesteps used for process coupling
 
-   real(r8), dimension( 1:max_mode )            :: qnum_delsub_cond, qnum_delsub_coag
-   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag
-   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_grow4rnam
-   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_delsub_grow4rnam
-   real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in
+   real(r8), dimension( 1:max_mode )            :: qnum_delsub_cond, qnum_delsub_coag   ! [   #/kmol]
+   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_cond, qaer_delsub_coag   ! [kmol/kmol]
+   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaer_delsub_grow4rnam                ! [kmol/kmol]
+   real(r8), dimension( 1:max_aer, 1:max_mode ) :: qaercw_delsub_grow4rnam              ! [kmol/kmol]
+   real(r8), dimension( 1:max_aer, 1:max_agepair ) :: qaer_delsub_coag_in               ! [kmol/kmol]
+
+   real(r8) :: del_h2so4_gasprod   ! [kmol/kmol]
+   real(r8) :: del_h2so4_aeruptk   ! [kmol/kmol]
 
    ! Tendencies and coefficients usef for process coupling
 
    real(r8) :: qgas_netprod_otrproc(max_gas)
              ! qgas_netprod_otrproc = gas net production rate from other processes
-             !    such as gas-phase chemistry and emissions (mol/mol/s)
+             !    such as gas-phase chemistry and emissions [kmol/kmol/s]
              ! this allows the condensation (gasaerexch) routine to apply production and condensation loss
              !    together, which is more accurate numerically
              ! NOTE - must be >= zero, as numerical method can fail when it is negative
              ! NOTE - currently only the values for h2so4 and nh3 should be non-zero
-   real(r8) :: del_h2so4_gasprod
-   real(r8) :: del_h2so4_aeruptk
-   real(r8) :: uptkaer(max_gas,max_mode)
-   real(r8) :: uptkrate_h2so4
-   real(r8) :: dnclusterdt_substep
+
+   real(r8) :: uptkaer(max_gas,max_mode) ! uptake rates of individual gas species and aerosol modes [1/s]
+   real(r8) :: uptkrate_h2so4            ! total uptake rate of H2SO4 (summed over all modes) [1/s]
+   real(r8) :: dnclusterdt_substep       ! cluster nucleation rate [#/m3/s]
 
    ! Miscellaneous
 
-   real(r8):: aircon                ! air molar density (kmol/m3)
+   real(r8):: aircon                ! air molar density [kmol/m3]
    integer :: igas                  ! gas index
    logical :: do_aging_in_subarea
 
