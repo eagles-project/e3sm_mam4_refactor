@@ -1,7 +1,7 @@
 
 !--------------------------------------------------------------------------------
 ! Call aerosol microphysics processes for a single (cloudy or clear) subarea
-! (with indices = lchnk,i,k,jsubarea)
+! (with indices = lchnk,ii,kk,jsubarea)
 !
 ! qgas3, qaer3, qaercw3, qnum3, qnumcw3 are the current incoming TMRs
 ! qgas_cur, qaer_cur, qaercw_cur, qnum_cur, qnumcw_cur are the updated outgoing TMRs
@@ -29,7 +29,7 @@
 subroutine mam_amicphys_1subarea(&
                                  do_cond_sub,            do_rename_sub,      &
                                  do_newnuc_sub,          do_coag_sub,        &
-                                 nstep,      lchnk,      i,        k,        &
+                                 nstep,      lchnk,      ii,      kk,        &
                                  latndx,     lonndx,     lund,               &
                                  loffset,    deltat,                         &
                                  jsubarea,               nsubarea,           &
@@ -64,7 +64,7 @@ subroutine mam_amicphys_1subarea(&
    logical,  intent(in)    :: iscldy_subarea        ! true if sub-area is cloudy
    integer,  intent(in)    :: lchnk                 ! chunk identifier
    integer,  intent(in)    :: nstep                 ! model time-step number
-   integer,  intent(in)    :: i, k                  ! column and level indices
+   integer,  intent(in)    :: ii, kk                ! column and level indices
    integer,  intent(in)    :: latndx, lonndx        ! lat and lon indices
    integer,  intent(in)    :: lund                  ! logical unit for diagnostic output
    integer,  intent(in)    :: loffset
@@ -252,7 +252,7 @@ subroutine mam_amicphys_1subarea(&
 
          call mam_gasaerexch_1subarea(                    &
            nstep,             lchnk,                      &
-           i,                 k,                jsubarea, &
+           ii,                kk,               jsubarea, &
            jtsubstep,         ntsubstep,                  &
            latndx,            lonndx,           lund,     &
            dtsubstep,                                     &
@@ -350,7 +350,7 @@ subroutine mam_amicphys_1subarea(&
 
          call mam_newnuc_1subarea(                                     &
             nstep,             lchnk,                                  &
-            i,                 k,                jsubarea,             &
+            ii,                kk,               jsubarea,             &
             latndx,            lonndx,           lund,                 &
             dtsubstep,                                                 &
             temp,              pmid,             aircon,               &
