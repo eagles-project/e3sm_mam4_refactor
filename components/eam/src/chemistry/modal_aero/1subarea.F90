@@ -49,7 +49,6 @@ subroutine mam_amicphys_1subarea(&
                                         , max_mode, max_gas, max_aer &
                                         , misc_vars_aa_type &
                                         , gaexch_h2so4_uptake_optaa, ngas, igas_h2so4, igas_nh3 &
-                                        , newnuc_h2so4_conc_optaa &
                                         , nait, nacc, max_agepair, n_agepair
    use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa &
                                         , iqtend_cond, iqtend_rnam, iqtend_nnuc, iqtend_coag, iqqcwtend_rnam
@@ -265,12 +264,6 @@ subroutine mam_amicphys_1subarea(&
            qwtr_cur,                                      &
            dgn_a,             dgn_awet,         wetdens,  &
            uptkaer,           uptkrate_h2so4              )
-
-         if (newnuc_h2so4_conc_optaa == 11) then
-            qgas_avg(igas_h2so4) = 0.5_r8*(qgas_sv1(igas_h2so4) + qgas_cur(igas_h2so4))
-         else if (newnuc_h2so4_conc_optaa == 12) then
-            qgas_avg(igas_h2so4) = qgas_cur(igas_h2so4)
-         end if
 
          qgas_delaa(:,iqtend_cond) = qgas_delaa(:,iqtend_cond) + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep)) 
 
