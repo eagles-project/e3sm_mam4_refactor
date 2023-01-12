@@ -70,6 +70,7 @@ integer, parameter :: MAM3_nmodes = 3
 integer, parameter :: MAM7_nmodes = 7
 integer, parameter :: MAM4_nmodes = 4
 integer :: nmodes = -1             ! number of aerosol modes
+integer, parameter :: hetfrz_aer_nspec = 3
 
 ! mode indices
 integer :: mode_accum_idx  = -1    ! accumulation mode
@@ -138,6 +139,9 @@ real(r8), allocatable :: aer_cb(:,:,:,:)
 
 ! Copy of interstitial aerosols with basis converted from mass to volume.
 real(r8), allocatable :: aer(:,:,:,:)
+
+real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
+real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
 
 !===============================================================================
 contains
@@ -563,18 +567,18 @@ subroutine hetfrz_classnuc_cam_calc( &
 
    real(r8), pointer :: ptr2d(:,:)
 
-   real(r8) :: fn(3)
-   real(r8) :: awcam(pcols,pver,3)
-   real(r8) :: awfacm(pcols,pver,3)
-   real(r8) :: hetraer(pcols,pver,3)
-   real(r8) :: dstcoat(pcols,pver,3)
-   real(r8) :: total_interstitial_aer_num(pcols,pver,3)
-   real(r8) :: total_cloudborne_aer_num(pcols,pver,3)
-   real(r8) :: total_aer_num(pcols,pver,3)
-   real(r8) :: coated_aer_num(pcols,pver,3)
-   real(r8) :: uncoated_aer_num(pcols,pver,3)
+   real(r8) :: fn(hetfrz_aer_nspec)
+   real(r8) :: awcam(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: awfacm(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: hetraer(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: dstcoat(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: total_interstitial_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: total_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: total_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: coated_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: uncoated_aer_num(pcols,pver,hetfrz_aer_nspec)
 
-   real(r8) :: fn_cloudborne_aer_num(pcols,pver,3)
+   real(r8) :: fn_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)
 
 
    real(r8) :: con1, r3lx, supersatice
@@ -903,13 +907,12 @@ subroutine calculate_interstitial_aer_num(ncnst, aer, &
    real(r8), intent(in) :: aer(ncnst)  ! interstitial aerosol concentrations [kg/m^3]
 
    ! output
-   real(r8), intent(out) :: total_interstitial_aer_num(3) ! interstitial concentrations of BC and dust [#/cm^3]
+   real(r8), intent(out) :: total_interstitial_aer_num(hetfrz_aer_nspec) ! interstitial concentrations of BC and dust [#/cm^3]
 
 
    ! local variables
    real(r8), parameter :: bc_kg_to_num   = 4.669152e+17_r8    ! fixed ratio converting BC mass to number (based on BC emission) [#/kg]
    real(r8), parameter :: dst1_kg_to_num = 3.484e+15_r8       ! fixed ratio converting accum mode dust mass to number [#/kg]
-   real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
 
    real(r8) :: dmc                  ! dust mass concentration [kg/m^3]
    real(r8) :: aermc_coarse_total   ! total aerosol mass concentration in the  coarse mode [kg/m^3] 
@@ -949,12 +952,10 @@ subroutine calculate_cloudborne_aer_num(ncnst, aer_cb, &
    real(r8), intent(in) :: aer_cb(ncnst) ! cloud borne aerosol concentrations [kg/m^3]
 
    ! output
-   real(r8), intent(out) :: total_cloudborne_aer_num(3) ! cloudborne concentrations of BC and dust [#/cm^3]
+   real(r8), intent(out) :: total_cloudborne_aer_num(hetfrz_aer_nspec) ! cloudborne concentrations of BC and dust [#/cm^3]
 
 
    ! local variables
-   real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
-
    real(r8) :: as_du                 ! dust mass concentration in the fine mode [kg/m^3]   
    real(r8) :: as_bc                 ! BC mass concentration in the fine mode [kg/m^3]
    real(r8) :: dmc_imm               ! dust mass concentration in the coarse mode [kg/m^3]           
@@ -1002,14 +1003,13 @@ subroutine calculate_mass_mean_radius(ncnst, aer, &
    ! input
    integer,  intent(in) :: ncnst
    real(r8), intent(in) :: aer(ncnst) ! interstitial aerosol concentrations [kg/m^3]
-   real(r8), intent(in) :: total_interstitial_aer_num(3) ! interstitial concentrations of BC and dust [#/cm^3]
+   real(r8), intent(in) :: total_interstitial_aer_num(hetfrz_aer_nspec) ! interstitial concentrations of BC and dust [#/cm^3]
 
    ! output
-   real(r8), intent(out) :: hetraer(3)                   ! BC and Dust mass mean radius [m]
+   real(r8), intent(out) :: hetraer(hetfrz_aer_nspec)                   ! BC and Dust mass mean radius [m]
 
    ! local variables
    real(r8) :: bc_num, dst1_num, dst3_num                ! number concentration [#/cm^3]
-   real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
    real(r8), parameter :: aermc_min_threshold  = 1.0e-30_r8
    real(r8), parameter :: aernum_min_threshold = 1.0e-3_r8
    real(r8), parameter :: r_bc_prescribed = 0.067e-6_r8
@@ -1026,23 +1026,37 @@ subroutine calculate_mass_mean_radius(ncnst, aer, &
 
    ! BC
    if ((aer(bc_accum)+aer(bc_pcarbon))*1.0e-3_r8 > aermc_min_threshold .and. bc_num > aernum_min_threshold) then
-      hetraer(1) = (3._r8/(4*pi*specdens_bc)*(aer(bc_accum)+aer(bc_pcarbon))/ &
-                   (bc_num*num_cm3_to_m3))**(1._r8/3._r8)
+      hetraer(1) = get_aer_radius(specdens_bc, aer(bc_accum)+aer(bc_pcarbon), bc_num*num_cm3_to_m3)
    endif
 
    ! fine dust a1
    if (aer(dst_accum)*1.0e-3_r8 > aermc_min_threshold .and. dst1_num > aernum_min_threshold) then
-      hetraer(2) = (3._r8/(4*pi*specdens_dust)*aer(dst_accum)/&
-                   (dst1_num*num_cm3_to_m3))**(1._r8/3._r8)
+      hetraer(2) = get_aer_radius(specdens_dust, aer(dst_accum), dst1_num*num_cm3_to_m3)
    endif
 
    ! coarse dust a3
    if (aer(dst_coarse)*1.0e-3_r8 > aermc_min_threshold .and. dst3_num > aernum_min_threshold) then
-      hetraer(3) = (3._r8/(4*pi*specdens_dust)*aer(dst_coarse)/&
-                   (dst3_num*num_cm3_to_m3))**(1._r8/3._r8)
+      hetraer(3) = get_aer_radius(specdens_dust, aer(dst_coarse), dst3_num*num_cm3_to_m3)
    endif
 
 end subroutine calculate_mass_mean_radius
+
+!====================================================================================================
+
+pure function get_aer_radius(specdens, aermc, aernum) result(radius)
+   
+   ! Compute radius for an aerosol species given mass and number concentrations
+
+   implicit none
+   real(r8), intent(in) :: specdens    ! density [kg/m^3]
+   real(r8), intent(in) :: aermc       ! aerosol mass concentration [kg/m^3]
+   real(r8), intent(in) :: aernum      ! aerosol number concentration [kg/m^3]
+
+   real(r8) :: radius                  ! return value radius [m]
+
+   radius = (3._r8/(4*pi*specdens)*aermc/aernum)**(1._r8/3._r8)
+
+end function get_aer_radius
 
 !====================================================================================================
 
@@ -1064,15 +1078,15 @@ subroutine calculate_coated_fraction(ncnst, aer,  rhoair, &
    integer,  intent(in) :: ncnst
    real(r8), intent(in) :: aer(ncnst)                     ! interstitial aerosol concentrations [kg/m^3]
    real(r8), intent(in) :: rhoair                         ! air density [kg/m3]
-   real(r8), intent(in) :: total_interstitial_aer_num(3)  ! interstitial concentrations of BC and dust [#/cm^3]
-   real(r8), intent(in) :: total_cloudborne_aer_num(3)    ! cloudborne concentrations of BC and dust [#/cm^3]
-   real(r8), intent(in) :: hetraer(3)                     ! BC and Dust mass mean radius [m]
+   real(r8), intent(in) :: total_interstitial_aer_num(hetfrz_aer_nspec)  ! interstitial concentrations of BC and dust [#/cm^3]
+   real(r8), intent(in) :: total_cloudborne_aer_num(hetfrz_aer_nspec)    ! cloudborne concentrations of BC and dust [#/cm^3]
+   real(r8), intent(in) :: hetraer(hetfrz_aer_nspec)                     ! BC and Dust mass mean radius [m]
 
    ! output
-   real(r8), intent(out) :: total_aer_num(3)              ! total bc and dust number concentration(interstitial+cloudborne) [#/cm^3]
-   real(r8), intent(out) :: coated_aer_num(3)             ! coated bc and dust number concentration(interstitial) [#/cm^3] 
-   real(r8), intent(out) :: uncoated_aer_num(3)           ! uncoated bc and dust number concentration(interstitial) [#/cm^3]
-   real(r8), intent(out) :: dstcoat(3)                    ! coated fraction
+   real(r8), intent(out) :: total_aer_num(hetfrz_aer_nspec)              ! total bc and dust number concentration(interstitial+cloudborne) [#/cm^3]
+   real(r8), intent(out) :: coated_aer_num(hetfrz_aer_nspec)             ! coated bc and dust number concentration(interstitial) [#/cm^3] 
+   real(r8), intent(out) :: uncoated_aer_num(hetfrz_aer_nspec)           ! uncoated bc and dust number concentration(interstitial) [#/cm^3]
+   real(r8), intent(out) :: dstcoat(hetfrz_aer_nspec)                    ! coated fraction
    real(r8), intent(out) :: na500                         ! interstitial aerosol number with D>500 nm [#/cm^3]
    real(r8), intent(out) :: tot_na500                     ! total aerosol number with D>500 nm [#/cm^3]
 
@@ -1095,7 +1109,6 @@ subroutine calculate_coated_fraction(ncnst, aer,  rhoair, &
    real(r8) :: bc_num, dst1_num, dst3_num         ! BC and dust number concentration [#/cm^3]
 
    real(r8), parameter :: bc_kg_to_num = 4.669152e+17_r8      ! #/kg from emission
-   real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
    real(r8), parameter :: dst1_scale = 0.488_r8    ! scaled for D>0.5-1 um from 0.1-1 um
 
    real(r8) :: r_bc                         ! model radii of BC modes [m]   
@@ -1212,16 +1225,16 @@ subroutine calculate_water_activity(ncnst, aer, &
    ! input
    integer,  intent(in) :: ncnst
    real(r8), intent(in) :: aer(ncnst)                    ! interstitial aerosol concentrations [kg/m^3]
-   real(r8), intent(in) :: total_interstitial_aer_num(3) ! interstitial concentrations of BC and dust [#/cm^3]
+   real(r8), intent(in) :: total_interstitial_aer_num(hetfrz_aer_nspec) ! interstitial concentrations of BC and dust [#/cm^3]
 
    ! output
-   real(r8), intent(out) :: awcam(3)                    ! modal added mass [mug/m^3]
-   real(r8), intent(out) :: awfacm(3)                   ! (OC+BC)/(OC+BC+SO4)
+   real(r8), intent(out) :: awcam(hetfrz_aer_nspec)      ! modal added mass [mug/m^3]
+   real(r8), intent(out) :: awfacm(hetfrz_aer_nspec)     ! (OC+BC)/(OC+BC+SO4)
 
    ! local variables
    real(r8) :: bc_num, dst1_num, dst3_num
-   real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
    real(r8), parameter :: mass_kg_to_mug = 1.0e9_r8          ! mass unit conversion, kg to mug
+   real(r8) :: aermc_tmp
 
    bc_num   = total_interstitial_aer_num(1)
    dst1_num = total_interstitial_aer_num(2)
@@ -1229,42 +1242,36 @@ subroutine calculate_water_activity(ncnst, aer, &
                                                                                                                                    
    awcam  = 0.0_r8
    awfacm = 0.0_r8
+
+   aermc_tmp = aer(so4_accum) + aer(soa_accum) + aer(pom_accum) + aer(bc_accum) + aer(mom_accum)
    
    ! accumulation mode for dust_a1 
    if (aer(num_accum) > 0._r8) then
-      awcam(2) = (dst1_num*num_cm3_to_m3)/aer(num_accum)* &
-                 (aer(so4_accum) + aer(soa_accum) + &
-                  aer(pom_accum) + aer(bc_accum) + aer(mom_accum))*mass_kg_to_mug ! [mug m-3]
+      awcam(2) = (dst1_num*num_cm3_to_m3)/aer(num_accum)*aermc_tmp*mass_kg_to_mug
    endif
 
    if (awcam(2) > 0._r8) then
-      awfacm(2) = ( aer(bc_accum) + aer(soa_accum) + aer(pom_accum) + aer(mom_accum) )/ &
-                  ( aer(soa_accum) + aer(pom_accum) + aer(so4_accum) + aer(bc_accum) + aer(mom_accum) )
+      awfacm(2) = ( aer(bc_accum) + aer(soa_accum) + aer(pom_accum) + aer(mom_accum) )/aermc_tmp
    endif
 
 
    ! accumulation mode for bc (if MAM4, primary carbon mode is insoluble)
    if (aer(num_accum) > 0._r8) then
-      awcam(1) = (bc_num*num_cm3_to_m3)/aer(num_accum)* &
-                 (aer(so4_accum) + aer(soa_accum) + &
-                  aer(pom_accum) + aer(bc_accum) + aer(mom_accum))  * mass_kg_to_mug ! [mug m-3]
+      awcam(1) = (bc_num*num_cm3_to_m3)/aer(num_accum)*aermc_tmp*mass_kg_to_mug ! [mug m-3]
    endif
 
    awfacm(1) = awfacm(2)
 
+   
+   aermc_tmp = aer(so4_coarse) + aer(mom_coarse) + aer(bc_coarse) + aer(pom_coarse) + aer(soa_coarse)
 
    ! coarse mode for dust_a3
    if (aer(num_coarse) > 0._r8) then
-      awcam(3) = (dst3_num*num_cm3_to_m3)/aer(num_coarse)* &
-                 (aer(so4_coarse) + aer(mom_coarse) + &
-                  aer(bc_coarse) + aer(pom_coarse) + aer(soa_coarse)) * mass_kg_to_mug
+      awcam(3) = (dst3_num*num_cm3_to_m3)/aer(num_coarse)*aermc_tmp*mass_kg_to_mug
    endif
 
    if (awcam(3) > 0._r8) then
-      awfacm(3) = ( aer(bc_coarse) + aer(soa_coarse) + &
-                    aer(pom_coarse) + aer(mom_coarse) ) / &
-                  ( aer(soa_coarse) + aer(pom_coarse) + &
-                    aer(so4_coarse) + aer(bc_coarse) + aer(mom_coarse) )
+      awfacm(3) = ( aer(bc_coarse) + aer(soa_coarse) + aer(pom_coarse) + aer(mom_coarse) )/aermc_tmp
    endif
                                                                                                 
 end subroutine calculate_water_activity
