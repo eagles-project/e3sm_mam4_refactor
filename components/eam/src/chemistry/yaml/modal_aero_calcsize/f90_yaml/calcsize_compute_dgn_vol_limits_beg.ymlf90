@@ -1,0 +1,26 @@
+#ifdef YAML
+  type(yaml_vars) :: yaml
+  integer  :: unit_input, unit_output
+
+  character(len=2000):: fname
+  logical:: printed(4) = .false.
+
+
+  if(yaml%print_flag .and. .not.printed(imode)) then
+     write(fname,'(A,i1)')'calcsize_compute_dgn_vol_limits_mode',imode
+     call open_files(trim(adjustl(fname)), &  !intent-in
+          unit_input, unit_output) !intent-out
+
+     !start by adding an input string
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%iprint,'XYZ',get_nstep(), yaml%kprint)
+
+     !start writing data
+     call write_var(unit_input, unit_output, 'list_idx',list_idx)
+     call write_var(unit_input, unit_output, 'imode', imode)
+     call write_var(unit_input, unit_output, 'nait',nait)
+     call write_var(unit_input, unit_output, 'nacc', nacc)
+     call write_var(unit_input, unit_output, 'do_aitacc_transfer', do_aitacc_transfer)
+     close(unit_input)
+     call freeunit(unit_input)
+  endif
+#endif

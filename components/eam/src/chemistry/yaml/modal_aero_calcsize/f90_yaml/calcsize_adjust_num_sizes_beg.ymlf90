@@ -1,0 +1,37 @@
+#ifdef YAML
+  type(yaml_vars) :: yaml
+  integer  :: unit_input, unit_output
+
+  character(len=2000):: fname
+
+  if(yaml%print_flag) then
+     write(fname,'(A)')'calcsize_adjust_num_sizes_mode'
+     call open_files(trim(adjustl(fname)), &  !intent-in
+          unit_input, unit_output) !intent-out
+
+     !start by adding an input string
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%iprint,'XYZ',get_nstep(), yaml%kprint)
+
+     !start writing data
+     call write_var(unit_input, unit_output, 'icol',icol)
+     call write_var(unit_input, unit_output, 'klev',klev)
+     call write_var(unit_input, unit_output, 'update_mmr',update_mmr)
+     call write_var(unit_input, unit_output, 'drv_a',drv_a)
+     call write_var(unit_input, unit_output, 'num_a0',num_a0)
+     call write_var(unit_input, unit_output, 'drv_c',drv_c)
+     call write_var(unit_input, unit_output, 'num_c0',num_c0)
+     call write_var(unit_input, unit_output, 'deltatinv',deltatinv)
+     call write_var(unit_input, unit_output, 'v2nmin',v2nmin)
+
+     call write_var(unit_input, unit_output, 'v2nminrl',v2nminrl )
+     call write_var(unit_input, unit_output, 'v2nmax',v2nmax)
+     call write_var(unit_input, unit_output, 'v2nmaxrl',v2nmaxrl )
+     call write_var(unit_input, unit_output, 'fracadj',fracadj)
+     call write_var(unit_input, unit_output, 'num_mode_idx',num_mode_idx )
+     call write_var(unit_input, unit_output, 'num_cldbrn_mode_idx',num_cldbrn_mode_idx )
+
+     close(unit_input)
+     call freeunit(unit_input)
+  endif
+
+#endif

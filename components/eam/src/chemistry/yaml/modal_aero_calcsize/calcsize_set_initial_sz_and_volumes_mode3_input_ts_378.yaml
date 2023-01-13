@@ -1,0 +1,9 @@
+# Data at [lat=   45.1040729547578      , lon=   145.965088007967      , k=          69 , time step=         378 ] 
+mam4xx:
+  function: XYZ
+input:
+  fixed:
+    dt:    0.00
+    top_lev:[         1]
+    ncol:[         4]
+    imode:[         3]

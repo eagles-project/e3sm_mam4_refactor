@@ -1,0 +1,16 @@
+#ifdef YAML
+  if(yaml%print_flag .and. .not. printed(imode)) then
+     printed(imode) = .true.
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     call write_output_var(unit_output,'dryvol_a',dryvol_a(yaml%iprint,yaml%kprint))
+     call write_output_var(unit_output,'dryvol_c',dryvol_c(yaml%iprint,yaml%kprint))
+
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+
+  endif
+#endif

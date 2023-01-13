@@ -1,5 +1,5 @@
 module modal_aero_calcsize
-#include "../yaml/f90_yaml/common_uses.ymlf90"
+#include "../yaml/modal_aero_calcsize/f90_yaml/common_uses.ymlf90"
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
 use shr_kind_mod,     only: r8 => shr_kind_r8, cs => shr_kind_cs
@@ -597,7 +597,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    !-----------------------------------------------------------------------
    integer, parameter :: nsrflx = 4   ! last dimension of qsrflx
    real(r8) :: qsrflx(pcols,pcnst,nsrflx,2)
-#include "../yaml/f90_yaml/calcsize_sub_beg.ymlf90"
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_sub_beg.ymlf90"
    !-----------------------------------------------------------------------------------
    !Extract info about optional variables and initialize local variables accordingly
    !------------------------------------------------------------------------------------
@@ -838,7 +838,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    endif!if(update_mmr)
 #endif
 
-#include "../yaml/f90_yaml/calcsize_sub_end.ymlf90"
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_sub_end.ymlf90"
 
 return
 end subroutine modal_aero_calcsize_sub
@@ -872,6 +872,8 @@ subroutine set_initial_sz_and_volumes(list_idx, top_lev, ncol, imode, & !input
   integer  :: icol, klev
   real(r8) :: dgnum, sigmag, voltonumb
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_set_initial_sz_and_volumes_beg.ymlf90"
+
   call rad_cnst_get_mode_props(list_idx, imode, dgnum=dgnum, sigmag=sigmag)
   voltonumb   = 1._r8 / ( (pi/6._r8)*(dgnum**3.0_r8)*exp(4.5_r8*log(sigmag)**2.0_r8) )
 
@@ -882,6 +884,8 @@ subroutine set_initial_sz_and_volumes(list_idx, top_lev, ncol, imode, & !input
         dryvol(icol,klev)       = 0.0_r8    !initialize dry vol
      end do
   end do
+
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_set_initial_sz_and_volumes_end.ymlf90"
 
   return
 
@@ -926,6 +930,8 @@ subroutine compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, &
 
   character(len=32) :: spec_name
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_compute_dry_volume_beg.ymlf90"
+
   lchnk = state%lchnk !get chunk info for retrieving cloud borne aerosols mmr
 
   do ispec = 1, nspec
@@ -950,6 +956,7 @@ subroutine compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, &
 
   end do ! nspec loop
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_compute_dry_volume_end.ymlf90"
   return
 end subroutine compute_dry_volume
 
@@ -1015,6 +1022,7 @@ subroutine size_adjustment(list_idx, top_lev, ncol, lchnk, imode, dryvol_a, stat
   real(r8) :: sigmag, cmn_factor, dgnumlo, dgnumhi
   real(r8), pointer :: fldcw(:,:)           !specie mmr (cloud borne)
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_size_adjustment_beg.ymlf90"
   !find state q array number mode indices for interstitial and cloud borne aerosols
   !Both num_mode_idx and num_cldbrn_mode_idx should be exactly same and should be same
   !for both prognostic and diagnostic radiation lists
@@ -1110,7 +1118,7 @@ subroutine size_adjustment(list_idx, top_lev, ncol, lchnk, imode, dryvol_a, stat
 
      end do
   end do
-
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_size_adjustment_end.ymlf90"
   return
 
 end subroutine size_adjustment
@@ -1151,6 +1159,7 @@ real(r8), parameter :: relax_factor = 27.0_r8 !relax_factor=3**3=27,
 real(r8), parameter :: szadj_block_fac = 1.0e6_r8
 real(r8) :: dgnumlo, dgnumhi, sigmag, cmn_factor
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_compute_dgn_vol_limits_beg.ymlf90"
 
 call rad_cnst_get_mode_props(list_idx, imode, dgnumlo=dgnumlo, dgnumhi=dgnumhi, sigmag=sigmag)
 cmn_factor = exp(4.5_r8*log(sigmag)**2.0_r8)*pi/6.0_r8
@@ -1186,7 +1195,7 @@ if ( do_aitacc_transfer ) then
    v2nminrl = v2nmin/relax_factor
    v2nmaxrl = v2nmax*relax_factor
 end if
-
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_compute_dgn_vol_limits_end.ymlf90"
 return
 end subroutine compute_dgn_vol_limits
 
@@ -1224,6 +1233,7 @@ subroutine adjust_num_sizes(icol, klev, update_mmr, num_mode_idx, num_cldbrn_mod
   real(r8) :: delnum_a3, delnum_c3
   real(r8) :: num_t2, drv_t, delnum_t3
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_adjust_num_sizes_beg.ymlf90"
 
   if ((drv_a <= 0.0_r8) .and. (drv_c <= 0.0_r8)) then
      ! both interstitial and activated volumes are zero
@@ -1318,7 +1328,7 @@ subroutine adjust_num_sizes(icol, klev, update_mmr, num_mode_idx, num_cldbrn_mod
         dqqcwdt(icol,klev,num_cldbrn_mode_idx) = (num_c - num_c0)*deltatinv
      endif
   end if
-
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_adjust_num_sizes_end.ymlf90"
   return
 end subroutine adjust_num_sizes
 
@@ -1354,6 +1364,8 @@ subroutine update_dgn_voltonum(icol, klev, imode, update_mmr, num_idx, aer_type,
   !local
   real(r8) :: pdel_fac
 
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_update_dgn_voltonum_beg.ymlf90"
+
   if (drv > 0.0_r8) then
      if (num <= drv*v2nmin) then
         dgncur(icol,klev,imode) = dgnxx
@@ -1371,7 +1383,7 @@ subroutine update_dgn_voltonum(icol, klev, imode, update_mmr, num_idx, aer_type,
      qsrflx(icol,num_idx,1,aer_type) = qsrflx(icol,num_idx,1,aer_type) + max(0.0_r8,dqdt(icol,klev,num_idx))*pdel_fac
      qsrflx(icol,num_idx,2,aer_type) = qsrflx(icol,num_idx,2,aer_type) + min(0.0_r8,dqdt(icol,klev,num_idx))*pdel_fac
   endif
-
+#include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_update_dgn_voltonum_end.ymlf90"
   return
 end subroutine update_dgn_voltonum
 
