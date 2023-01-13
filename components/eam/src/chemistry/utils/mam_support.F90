@@ -12,10 +12,39 @@ module mam_support
   private ! make everything private
 
   !explicitly declare public functions/variables
-  public:: min_max_bound
+  public :: min_max_bound
+  public :: assign_la_lc
 
 contains
+!===============================================================================
+   subroutine assign_la_lc( imode,      ispec,          & ! in
+                            la,         lc              ) ! out
+!-----------------------------------------------------------------------
+! get the index of interstital (la) and cloudborne (lc) aerosols
+! from mode index and species index
+!-----------------------------------------------------------------------
+   use constituents,    only: pcnst
+   use modal_aero_data, only: lmassptr_amode, lmassptrcw_amode, &
+                              numptr_amode, numptrcw_amode
 
+   integer, intent(in)     :: imode            ! index of MAM4 modes
+   integer, intent(in)     :: ispec            ! index of species, in which:
+                                               ! 0 = number concentration
+                                               ! other = mass concentration
+   integer, intent(out)    :: la               ! index of interstitial aerosol
+   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la+ pcnst)
+
+   if (ispec == 0) then
+      la = numptr_amode(imode)
+      lc = numptrcw_amode(imode) + pcnst
+   else
+      la = lmassptr_amode(ispec,imode)
+      lc = lmassptrcw_amode(ispec,imode) + pcnst
+   endif
+
+   end subroutine assign_la_lc
+
+!===============================================================================
   pure function min_max_bound(minlim, maxlim, input) result(bounded)
     !Bound a quantity between a min limit and a max limit
     real(r8), intent(in) :: minlim, maxlim
@@ -27,5 +56,5 @@ contains
     bounded = max(min(maxlim, input), minlim)
 
   end function min_max_bound
-
+!===============================================================================
 end module mam_support

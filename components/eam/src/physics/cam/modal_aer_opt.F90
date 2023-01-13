@@ -406,7 +406,7 @@ end subroutine modal_aer_opt_init
 !===============================================================================
 
 subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  &
-                         tauxar, wa, ga, fa, clear_rh)
+                         tauxar, wa, ga, fa)
 
    ! calculates aerosol sw radiative properties
 
@@ -420,8 +420,6 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    integer,             intent(in) :: trop_level(pcols)!tropopause level for each column
    real(r8),            intent(in) :: ext_cmip6_sw(pcols,pver)
    logical,             intent(in) :: is_cmip6_volc
-   real(r8), optional,  intent(in) :: clear_rh(pcols,pver) ! optional clear air relative humidity
-                                                           ! that gets passed to modal_aero_wateruptake_dr
 
    real(r8), intent(out) :: tauxar(pcols,0:pver,nswbands) ! layer extinction optical depth
    real(r8), intent(out) :: wa(pcols,0:pver,nswbands)     ! layer single-scatter albedo
@@ -627,9 +625,8 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
            dgnumdry_m=dgnumdry_m)
    endif
 
-   ! clear_rh provides alternate estimate non-cloudy relative humidity
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m, clear_rh_in=clear_rh)
+        qaerwat_m)
    
 
    ! loop over all aerosol modes
@@ -1218,7 +1215,7 @@ end subroutine modal_aero_sw
 
 !===============================================================================
 
-subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar, clear_rh)
+subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
 
@@ -1231,8 +1228,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar, clear_rh)
    type(physics_buffer_desc), pointer :: pbuf(:)
 
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
-   real(r8), optional,  intent(in) :: clear_rh(pcols,pver) ! optional clear air relative humidity
-                                                           ! that gets passed to modal_aero_wateruptake_dr
 
    ! Local variables
    integer :: i, ifld, ilw, k, l, m, nc, ns
@@ -1304,9 +1299,8 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar, clear_rh)
            dgnumdry_m=dgnumdry_m)
    endif
 
-   ! clear_rh provides alternate estimate non-cloudy relative humidity
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m, clear_rh_in=clear_rh)
+        qaerwat_m)
    
 
    ! loop over all aerosol modes
