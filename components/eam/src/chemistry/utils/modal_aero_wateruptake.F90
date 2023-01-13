@@ -46,22 +46,6 @@ real(r8), parameter  :: small_value_10 = 1.e-10_r8
 real(r8), parameter  :: eps = 1.e-4_r8
 
 
-real(r8), allocatable :: maer(:,:,:)      ! aerosol wet mass MR (including water) (kg/kg-air)
-real(r8), allocatable :: hygro(:,:,:)     ! volume-weighted mean hygroscopicity (--)
-real(r8), allocatable :: naer(:,:,:)      ! aerosol number MR (bounded!) (#/kg-air)
-real(r8), allocatable :: dryvol(:,:,:)    ! single-particle-mean dry volume (m3)
-real(r8), allocatable :: drymass(:,:,:)   ! single-particle-mean dry mass  (kg)
-real(r8), allocatable :: dryrad(:,:,:)    ! dry volume mean radius of aerosol (m)
-
-real(r8), allocatable :: wetrad(:,:,:)    ! wet radius of aerosol (m)
-real(r8), allocatable :: wetvol(:,:,:)    ! single-particle-mean wet volume (m3)
-real(r8), allocatable :: wtrvol(:,:,:)    ! single-particle-mean water volume in wet aerosol (m3)
-
-real(r8), allocatable :: rhcrystal(:)
-real(r8), allocatable :: rhdeliques(:)
-real(r8), allocatable :: specdens_1(:)
-!$OMP THREADPRIVATE(maer, hygro, naer, dryvol, drymass, dryrad, wetrad, wetvol, wtrvol, rhcrystal, rhdeliques, specdens_1)
-
 !===============================================================================
 contains
 !===============================================================================
@@ -98,34 +82,6 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 
    cld_idx        = pbuf_get_index('CLD')    
    dgnum_idx      = pbuf_get_index('DGNUM')    
-
-
-   !$OMP PARALLEL
-   allocate(maer(pcols,pver,nmodes),stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate maer:       "//errmsg(__FILE__,__LINE__) )
-   allocate(hygro(pcols,pver,nmodes),   stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate hygro:      "//errmsg(__FILE__,__LINE__) )
-   allocate(naer(pcols,pver,nmodes),    stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate naer:       "//errmsg(__FILE__,__LINE__) )
-   allocate(dryvol(pcols,pver,nmodes),  stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate dryvol:     "//errmsg(__FILE__,__LINE__) )
-   allocate(drymass(pcols,pver,nmodes), stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate drymass:    "//errmsg(__FILE__,__LINE__) )
-   allocate(dryrad(pcols,pver,nmodes),  stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate dryradr:    "//errmsg(__FILE__,__LINE__) )
-   allocate(wetrad(pcols,pver,nmodes),  stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate wetrad:     "//errmsg(__FILE__,__LINE__) )
-   allocate(wetvol(pcols,pver,nmodes),  stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate wetvol:     "//errmsg(__FILE__,__LINE__) )
-   allocate(wtrvol(pcols,pver,nmodes),  stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate wtrvol:     "//errmsg(__FILE__,__LINE__) )
-   allocate(rhcrystal(nmodes),          stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate rhcrystal:  "//errmsg(__FILE__,__LINE__) )
-   allocate(rhdeliques(nmodes),         stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate rhdeliques: "//errmsg(__FILE__,__LINE__) )
-   allocate(specdens_1(nmodes),         stat=istat)
-   if (istat .ne. 0) call endrun("Unable to allocate specdens_1: "//errmsg(__FILE__,__LINE__) )
-   !$OMP END PARALLEL
 
 
    ! determine default variables
@@ -205,7 +161,19 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
    real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
 
-   real(r8) :: rh(pcols,pver)        ! relative humidity [fraction]
+   real(r8) :: rh(pcols,pver)                   ! relative humidity [fraction]
+   real(r8) :: hygro(pcols,pver,nmodes)         ! volume-weighted mean hygroscopicity [unitless]
+   real(r8) :: naer(pcols,pver,nmodes)          ! number of aerosols [#/kg-air]
+   real(r8) :: dryrad(pcols,pver,nmodes)        ! dry volume mean radius of aerosol [m]
+   real(r8) :: dryvol(pcols,pver,nmodes)        ! dry aerosol volume [m^3]
+   real(r8) :: drymass(pcols,pver,nmodes)       ! single-particle-mean dry aerosol mass [kg]
+   real(r8) :: wetrad(pcols,pver,nmodes)        ! single-particle-mean wet radius of aerosol [m]
+   real(r8) :: wetvol(pcols,pver,nmodes)        ! single-particle-mean wet volume [m^3]
+   real(r8) :: wtrvol(pcols,pver,nmodes)        ! single-particle-mean water volume in wet aerosol [m^3]
+   real(r8) :: rhcrystal(nmodes)                ! crystal RH [fraction]
+   real(r8) :: rhdeliques(nmodes)               ! deliques RH [fraction]
+   ! specdens_1 is saved and used as default value in wetdens when wet size is too small
+   real(r8) :: specdens_1(nmodes)               ! dry aerosol density of the first species [kg/m3]
    logical  :: compute_wetdens
 
    ! variables for writing history output
@@ -224,20 +192,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    list_idx = 0
    if (present(list_idx_in))     list_idx = list_idx_in
-
-   !initialize to an invalid value
-   naer(:,:,:)    = huge(1.0_r8)
-   dryvol(:,:,:)  = huge(1.0_r8)
-   drymass(:,:,:) = huge(1.0_r8)
-   dryrad(:,:,:)  = huge(1.0_r8)
-   wetrad(:,:,:)  = huge(1.0_r8)
-   wetvol(:,:,:)  = huge(1.0_r8)
-   wtrvol(:,:,:)  = huge(1.0_r8)
-   rhcrystal(:)   = huge(1.0_r8)
-   rhdeliques(:)  = huge(1.0_r8)
-   specdens_1(:)  = huge(1.0_r8)
-   maer(:,:,:)    = 0._r8
-   hygro(:,:,:)   = 0._r8
 
    ! determine default variables
    call phys_getopts(history_aerosol_out = history_aerosol, &
@@ -263,8 +217,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
 
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
-   call modal_aero_wateruptake_dryaer( ncol,                & ! in
-                                      state_q, dgncur_a     ) ! in
+   call modal_aero_wateruptake_dryaer( ncol,                         & ! in
+                                state_q,                dgncur_a,    & ! in
+                                hygro, naer, dryrad, dryvol, drymass,& ! out
+                                rhcrystal, rhdeliques,  specdens_1   ) ! out
 
    !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
@@ -314,7 +270,10 @@ end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================
 subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
-                                          state_q,  dgncur_a     ) ! in
+                                          state_q,  dgncur_a,    & ! in
+                                          hygro,        naer,    & ! out
+                                dryrad,   dryvol,     drymass,   & ! out
+                                rhcrystal,rhdeliques, specdens_1 ) ! out
 !-----------------------------------------------------------------------
 ! retreive dry aerosol properties
 ! output variables are declared in the module so no output variables in this subroutine
@@ -323,6 +282,15 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
    integer,  intent(in)  :: ncol                ! number of columns
    real(r8), intent(in)  :: dgncur_a(:,:,:)     ! dry aerosol diameter [m]
    real(r8), intent(in)  :: state_q(:,:,:)      ! vapor and aerosol number/mass mixing ratio from state%q [#/kg or kg/kg]
+   real(r8), intent(out) :: hygro(pcols,pver,nmodes)    ! volume-weighted mean hygroscopicity [unitless]
+   real(r8), intent(out) :: naer(pcols,pver,nmodes)     ! number of aerosols [#/kg-air]
+   real(r8), intent(out) :: dryrad(pcols,pver,nmodes)   ! dry volume mean radius of aerosol [m]
+   real(r8), intent(out) :: dryvol(pcols,pver,nmodes)   ! dry aerosol volume [m^3]
+   real(r8), intent(out) :: drymass(pcols,pver,nmodes)  ! single-particle-mean dry aerosol mass [kg]
+   real(r8), intent(out) :: rhcrystal(nmodes)           ! crystal RH [fraction]
+   real(r8), intent(out) :: rhdeliques(nmodes)          ! deliques RH [fraction]
+   ! specdens_1 is saved and used as default value in wetdens when wet size is too small
+   real(r8), intent(out) :: specdens_1(nmodes)          ! dry aerosol density of the first species [kg/m3] 
 
    ! local variables
    integer      :: imode, ispec, kk, icol,la,lc
@@ -334,21 +302,24 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
    real(r8)     :: v2ncur_a                     ! 1 / mean particle volume [1/m3]
    real(r8)     :: drydens                      ! dry particle density [kg/m3]
    real(r8)     :: dryvolmr(pcols,pver)         ! volume MR for aerosol mode [m3/kg]
+   real(r8)     :: maer(pcols,pver)             ! total mass mixing ratio of aerosol species [kg/kg]
    real(r8)     :: vol_tmp                      ! temporary aerosol volume [m3/kg]
    real(r8)     :: raer(pcols,pver)             ! aerosol species mixing ratio [kg/kg]
 
+   ! initiate variable
+   hygro(:,:,:)   = 0._r8 
 
    do imode = 1, nmodes
       ! initiate variable
       dryvolmr(:,:) = 0._r8
+      maer(:,:)     = 0._r8
 
       ! get mode properties
       sigmag = sigmag_amode(imode)
-      rhcrystal = rhcrystal_amode(imode)
-      rhdeliques = rhdeliques_amode(imode)
+      rhcrystal(imode) = rhcrystal_amode(imode)
+      rhdeliques(imode) = rhdeliques_amode(imode)
       nspec = nspec_amode(imode)
-      ! specdens_1 is defined in module and will be used in later subroutine
-      specdens_1 = specdens_amode(lspectype_amode(1,imode)) 
+      specdens_1(imode) = specdens_amode(lspectype_amode(1,imode)) 
       spechygro_1 = spechygro(lspectype_amode(1,imode))
 
       alnsg = log(sigmag)
@@ -364,7 +335,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
          do kk = top_lev, pver
             do icol = 1, ncol
                vol_tmp             = raer(icol,kk)/specdens
-               maer(icol,kk,imode) = maer(icol,kk,imode) + raer(icol,kk)
+               maer(icol,kk)       = maer(icol,kk) + raer(icol,kk)
                dryvolmr(icol,kk)   = dryvolmr(icol,kk) + vol_tmp
                ! hygro currently is sum(hygro * volume) of each species,
                ! need to divided by sum(volume) later to get mean hygro for all species.
@@ -393,8 +364,8 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
             ! the mean particle volume
             ! also moletomass forces maer >= 1.0e-30, so (maer/dryvolmr)
             ! should never cause problems (but check for maer < 1.0e-31 anyway)
-            if (maer(icol,kk,imode) .gt. small_value_31) then
-               drydens = maer(icol,kk,imode)/dryvolmr(icol,kk)
+            if (maer(icol,kk) .gt. small_value_31) then
+               drydens = maer(icol,kk)/dryvolmr(icol,kk)
             else
                drydens = 1.0_r8
             endif
@@ -482,11 +453,11 @@ subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
    real(r8), intent(in) :: naer(:,:,:)           ! number of aerosols [#/kg-air]
    real(r8), intent(in) :: dryvol(:,:,:)         ! dry aerosol volume [m^3]
 
-   real(r8), intent(out) :: wetrad(:,:,:)        ! wet radius of aerosol [m]
-   real(r8), intent(out) :: wetvol(:,:,:)        ! single-particle-mean wet volume [m^3]
-   real(r8), intent(out) :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
-   real(r8), intent(out) :: dgncur_awet(:,:,:)   ! wet aerosol diameter [m]
-   real(r8), intent(out) :: qaerwat(:,:,:)       ! aerosol water [kg/kg]
+   real(r8), intent(out) :: wetrad(pcols,pver,nmodes)        ! single-particle-mean wet radius of aerosol [m]
+   real(r8), intent(out) :: wetvol(pcols,pver,nmodes)        ! single-particle-mean wet volume [m^3]
+   real(r8), intent(out) :: wtrvol(pcols,pver,nmodes)        ! single-particle-mean water volume in wet aerosol [m^3]
+   real(r8), intent(out) :: dgncur_awet(pcols,pver,nmodes)   ! wet aerosol diameter [m]
+   real(r8), intent(out) :: qaerwat(pcols,pver,nmodes)       ! aerosol water [kg/kg]
    ! local variables
    integer :: icol, kk, imode
    real(r8) :: hystfac                ! working variable for hysteresis
@@ -711,7 +682,7 @@ subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
    real(r8),intent(in)  :: wetvol(:,:,:)        ! single-particle-mean wet aerosol volume [m^3]
    real(r8),intent(in)  :: wtrvol(:,:,:)        ! single-particle-mean water volume in wet aerosol [m^3]
    real(r8),intent(in)  :: drymass(:,:,:)       ! single-particle-mean dry mass [kg]
-   real(r8),intent(in)  :: specdens_1(:)        ! specified dry aerosol density [kg/m3]
+   real(r8),intent(in)  :: specdens_1(:)        ! dry aerosol density of the first species [kg/m3]
    real(r8),intent(inout) :: wetdens(:,:,:)     ! wet aerosol density [kg/m3]
    ! local variables
    integer :: icol, kk, imode
