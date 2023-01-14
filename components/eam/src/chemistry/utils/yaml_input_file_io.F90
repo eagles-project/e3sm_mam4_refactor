@@ -39,9 +39,9 @@ module yaml_input_file_io
 
   !A structure to carry all the yaml input/output variables
   type yaml_vars
-     integer :: iprint, kprint, nstep_print
+     integer :: col_print, lev_print, nstep_print
      integer :: lchnk_print = huge(1)
-     logical :: print_flag = .false.
+     logical :: flag_print = .false.
   end type yaml_vars
 
 

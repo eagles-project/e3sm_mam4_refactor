@@ -1,2 +1,2 @@
-#ifdef YAML
+#ifdef YAML_CALC
 #endif

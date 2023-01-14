@@ -1,4 +1,4 @@
-#ifdef YAML
+#ifdef YAML_CALC
   type(yaml_vars) :: yaml
   integer,save  :: print_time_step=0
   logical  :: firstcall
@@ -7,37 +7,37 @@
   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
 
 
-  yaml%kprint = 68 !level
+  yaml%lev_print = 68 !level
   yaml%nstep_print = 379 !time step
 
   !YAML file input generation code- DO NOT PORT to C++
-  !print all inputs one-by-one at column "yaml%iprint"
-  yaml%iprint = icolprnt(state%lchnk) !column to write data
+  !print all inputs one-by-one at column "yaml%col_print"
+  yaml%col_print = icolprnt(state%lchnk) !column to write data
 
   firstcall = one_print_ts(print_time_step,.true.) !Is it the first call for this time step
   nstep = get_nstep() !time step
 
-  yaml%print_flag = .false.
-  if(yaml%iprint > 0 .and. nstep==yaml%nstep_print .and. firstcall) then ! if this column exists in lchnk
+  yaml%flag_print = .false.
+  if(yaml%col_print > 0 .and. nstep==yaml%nstep_print .and. firstcall) then ! if this column exists in lchnk
      yaml%lchnk_print=state%lchnk
-     yaml%print_flag = .true.
+     yaml%flag_print = .true.
      !open I/O yaml files
      call open_files('calcsize_sub', &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
-     call write_input_output_header(unit_input, unit_output,state%lchnk,yaml%iprint,'compute_tendencies',nstep, yaml%kprint, deltat)
+     call write_input_output_header(unit_input, unit_output,state%lchnk,yaml%col_print,'compute_tendencies',nstep, yaml%lev_print, deltat)
 
      !start writing data
-     call write_aerosol_mmr(unit_input, unit_output,'interstitial',state%q(yaml%iprint,yaml%kprint,:))
+     call write_aerosol_mmr(unit_input, unit_output,'interstitial',state%q(yaml%col_print,yaml%lev_print,:))
      call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',&
-          state%q(yaml%iprint,yaml%kprint,:),.true.)! last arg .ture. for printing aerosol numbers only  
+          state%q(yaml%col_print,yaml%lev_print,:),.true.)! last arg .ture. for printing aerosol numbers only  
 
-     !fldcw_wrt array will carry species at yaml%iprint and yaml%kprint, initialize it with huge values
+     !fldcw_wrt array will carry species at yaml%col_print and yaml%lev_print, initialize it with huge values
      fldcw_wrt(:) = huge(fldcw_wrt)
      do ispec = 16, 40 !ensure that the loop starts from 16, as aerosols starts at 16th index
         tmp_arr => qqcw_get_field(pbuf,ispec,state%lchnk)
-        fldcw_wrt(ispec) = tmp_arr(yaml%iprint,yaml%kprint)
+        fldcw_wrt(ispec) = tmp_arr(yaml%col_print,yaml%lev_print)
      enddo
      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne',fldcw_wrt)
      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only

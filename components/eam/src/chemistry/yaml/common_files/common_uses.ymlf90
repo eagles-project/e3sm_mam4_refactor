@@ -1,0 +1,9 @@
+!uncomment "#define YAML_*" line below to invoke test generation for a module
+!module_aer_calcsize
+!#define YAML_CALC
+
+!module_aero_amicphys.F90
+#define YAML_AMIC
+
+use yaml_input_file_io
+

@@ -12,7 +12,8 @@ module modal_aero_amicphys
 ! History:
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 !----------------------------------------------------------------------
-
+#include "../yaml/common_files/common_uses.ymlf90"
+  use yaml_input_file_io
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
@@ -1137,7 +1138,7 @@ do_rename_if_block30: &
          dgn_a,             n_mode,                                 &  ! input
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &  ! in-outs
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &  ! in-outs
-         qaer_delsub_coag_in)                                          ! in-outs
+         qaer_delsub_coag_in, i,k,lchnk)                                          ! in-outs
 
       end if
 
@@ -1598,7 +1599,7 @@ do_newnuc_if_block50: &
          dgn_a,             n_mode,                                 & ! input
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     & ! in-outs
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     & ! in-outs
-         qaer_delsub_coag_in)                                         ! in-outs
+         qaer_delsub_coag_in, i,k,lchnk)                                         ! in-outs
 
       end if
 
@@ -3308,7 +3309,7 @@ time_loop: &
          dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
-         qaer_del_coag_in)
+         qaer_del_coag_in, ii, kk, lchnk)
 
 ! uses
       use modal_aero_amicphys_control, only: &
@@ -3337,7 +3338,7 @@ time_loop: &
       integer :: nsrc, ndest
 
       real(r8) :: xferfrac_pcage, frac_cond, frac_coag
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/amicphys_mam_pcarbon_aging_1subarea_beg.ymlf90"
 
 !
 agepair_loop1: &

@@ -1,31 +1,31 @@
-#ifdef YAML
-  if(yaml%print_flag .and. .not. printed(imode)) then
+#ifdef YAML_CALC
+  if(yaml%flag_print .and. .not. printed(imode)) then
      printed(imode) = .true.
      !write output header
      call write_output_header(unit_output)
 
      !start writing data
-     call write_output_var(unit_output,'dgncur_a',dgncur_a(yaml%iprint,yaml%kprint,imode))
-     call write_output_var(unit_output,'dgncur_c',dgncur_c(yaml%iprint,yaml%kprint,imode))
-     call write_output_var(unit_output,'v2ncur_a',v2ncur_a(yaml%iprint,yaml%kprint, imode))
-     call write_output_var(unit_output,'v2ncur_c',v2ncur_c(yaml%iprint,yaml%kprint, imode))
-     call write_output_var(unit_output,'drv_a_accsv',drv_a_accsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'drv_c_accsv',drv_c_accsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'drv_a_aitsv',drv_a_aitsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'drv_c_aitsv',drv_c_aitsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'drv_a_sv',drv_a_sv(yaml%iprint,yaml%kprint,imode))
-     call write_output_var(unit_output,'drv_c_sv',drv_c_sv(yaml%iprint,yaml%kprint,imode))
-     call write_output_var(unit_output,'num_a_accsv',num_a_accsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'num_c_accsv',num_c_accsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'num_a_aitsv',num_a_aitsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'num_c_aitsv',num_c_aitsv(yaml%iprint,yaml%kprint))
-     call write_output_var(unit_output,'num_a_sv',num_a_sv(yaml%iprint,yaml%kprint,imode))
-     call write_output_var(unit_output,'num_c_sv',num_c_sv(yaml%iprint,yaml%kprint,imode))
+     call write_output_var(unit_output,'dgncur_a',dgncur_a(yaml%col_print,yaml%lev_print,imode))
+     call write_output_var(unit_output,'dgncur_c',dgncur_c(yaml%col_print,yaml%lev_print,imode))
+     call write_output_var(unit_output,'v2ncur_a',v2ncur_a(yaml%col_print,yaml%lev_print, imode))
+     call write_output_var(unit_output,'v2ncur_c',v2ncur_c(yaml%col_print,yaml%lev_print, imode))
+     call write_output_var(unit_output,'drv_a_accsv',drv_a_accsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'drv_c_accsv',drv_c_accsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'drv_a_aitsv',drv_a_aitsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'drv_c_aitsv',drv_c_aitsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'drv_a_sv',drv_a_sv(yaml%col_print,yaml%lev_print,imode))
+     call write_output_var(unit_output,'drv_c_sv',drv_c_sv(yaml%col_print,yaml%lev_print,imode))
+     call write_output_var(unit_output,'num_a_accsv',num_a_accsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'num_c_accsv',num_c_accsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'num_a_aitsv',num_a_aitsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'num_c_aitsv',num_c_aitsv(yaml%col_print,yaml%lev_print))
+     call write_output_var(unit_output,'num_a_sv',num_a_sv(yaml%col_print,yaml%lev_print,imode))
+     call write_output_var(unit_output,'num_c_sv',num_c_sv(yaml%col_print,yaml%lev_print,imode))
 
      call write_output_aerosol_mmr(unit_output,'dotend',dotend(:))
      call write_output_aerosol_mmr(unit_output,'dotendqqcw',dotendqqcw(:))
-     call write_output_aerosol_mmr(unit_output,'dqdt',dqdt(yaml%iprint,yaml%kprint,:))
-     call write_output_aerosol_mmr(unit_output,'dqqcwdt',dqqcwdt(yaml%iprint,yaml%kprint,:))
+     call write_output_aerosol_mmr(unit_output,'dqdt',dqdt(yaml%col_print,yaml%lev_print,:))
+     call write_output_aerosol_mmr(unit_output,'dqqcwdt',dqqcwdt(yaml%col_print,yaml%lev_print,:))
 
      !close the output file
      close(unit_output)

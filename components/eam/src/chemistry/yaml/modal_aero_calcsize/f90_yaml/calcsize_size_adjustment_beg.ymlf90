@@ -1,4 +1,4 @@
-#ifdef YAML
+#ifdef YAML_CALC
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, ispec
 
@@ -7,13 +7,13 @@
   real(r8) :: fldcw_wrt(pcnst)
   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
 
-  if(yaml%print_flag .and. .not.printed(imode)) then
+  if(yaml%flag_print .and. .not.printed(imode)) then
      write(fname,'(A,i1)')'calcsize_size_adjustment_mode',imode
      call open_files(trim(adjustl(fname)), &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
-     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%iprint,'XYZ',get_nstep(), yaml%kprint)
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'XYZ',get_nstep(), yaml%lev_print)
 
      !start writing data
      call write_var(unit_input, unit_output, 'list_idx',list_idx)
@@ -23,22 +23,22 @@
      call write_var(unit_input, unit_output, 'imode',imode)
      call write_var(unit_input, unit_output, 'deltatinv',deltatinv)
      call write_var(unit_input, unit_output, 'fracadj',fracadj)
-     call write_var(unit_input, unit_output, 'pdel',pdel(yaml%iprint, yaml%kprint))
-     call write_var(unit_input, unit_output, 'dryvol_a',dryvol_a(yaml%iprint, yaml%kprint))
-     call write_var(unit_input, unit_output, 'dryvol_c',dryvol_c(yaml%iprint, yaml%kprint))
+     call write_var(unit_input, unit_output, 'pdel',pdel(yaml%col_print, yaml%lev_print))
+     call write_var(unit_input, unit_output, 'dryvol_a',dryvol_a(yaml%col_print, yaml%lev_print))
+     call write_var(unit_input, unit_output, 'dryvol_c',dryvol_c(yaml%col_print, yaml%lev_print))
 
      call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',&
-          state_q(yaml%iprint,yaml%kprint,:),.true.)! last arg .ture. for printing aerosol numbers only
+          state_q(yaml%col_print,yaml%lev_print,:),.true.)! last arg .ture. for printing aerosol numbers only
 
      call write_var(unit_input, unit_output, 'do_adjust',do_adjust)
      call write_var(unit_input, unit_output, 'update_mmr',update_mmr)
      call write_var(unit_input, unit_output, 'do_aitacc_transfer',do_aitacc_transfer)
 
-     !fldcw_wrt array will carry species at yaml%iprint and yaml%kprint, initialize it with huge values
+     !fldcw_wrt array will carry species at yaml%col_print and yaml%lev_print, initialize it with huge values
      fldcw_wrt(:) = huge(fldcw_wrt)
      do ispec = 16, 40 ! ensure that the loop starts from 16, as aerosols starts at 16th index
         tmp_arr => qqcw_get_field(pbuf,ispec,yaml%lchnk_print)
-        fldcw_wrt(ispec) = tmp_arr(yaml%iprint,yaml%kprint)
+        fldcw_wrt(ispec) = tmp_arr(yaml%col_print,yaml%lev_print)
      enddo
      call write_aerosol_mmr(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only
      close(unit_input)
