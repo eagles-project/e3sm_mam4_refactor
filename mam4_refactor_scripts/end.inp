@@ -1,0 +1,16 @@
+#ifdef <<YAML>>
+  ! YAML file output generation code- DO NOT PORT to C++
+  if(yaml%flag_print) then ! if this column exists in lchnk
+
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     !<....add code for writing data here...>
+
+
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+  endif
+#endif
