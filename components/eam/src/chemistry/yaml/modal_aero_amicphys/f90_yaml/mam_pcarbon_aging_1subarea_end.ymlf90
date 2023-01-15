@@ -1,4 +1,4 @@
-!#ifdef YAML_CPP
+#ifdef YAML_AMIC
   ! YAML file output generation code- DO NOT PORT to C++
   if(yaml%flag_print) then ! if this column exists in lchnk
 

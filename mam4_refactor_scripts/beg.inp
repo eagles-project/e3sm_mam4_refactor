@@ -1,0 +1,33 @@
+!#ifdef YAML_CPP
+
+  !<... we need lchnk and possibly column(icol or ii) and level (kk) info as an input>
+
+  type(yaml_vars) :: yaml
+  integer  :: unit_input, unit_output, y_nstep
+
+  !populate YAML structure
+  yaml%lev_print = <Add level here> !level
+  yaml%nstep_print = <add time step here> !time step
+
+  !YAML file input generation code- DO NOT PORT to C++
+  !print all inputs one-by-one at column "yaml%col_print"
+  yaml%col_print = icolprnt(lchnk) !column to write data
+  y_nstep = get_nstep() !time step
+
+  yaml%flag_print = .false.
+  if(yaml%col_print == ii .and. nstep==yaml%nstep_print .and. kk == yaml%lev_print) then ! if this column exists in lchnk
+     yaml%lchnk_print = lchnk
+     yaml%flag_print  = .true.
+
+     !open I/O yaml files
+     call open_files(SUB_NAME, &  !intent-in
+          unit_input, unit_output) !intent-out
+
+     !<....add code for writing data here...>
+
+     !close only the input file, not the output file
+     close(unit_input)
+     call freeunit(unit_input)
+
+  endif
+#endif

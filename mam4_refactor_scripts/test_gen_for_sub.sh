@@ -106,8 +106,11 @@ create_file () {
         echo "$f_path already exists."
     else
         echo 'Creating NEW file...'
-        
-        cat ${sub_str}.inp>>$f_path
+        f_tmp=tmp.inp
+        sed s/"!#ifdef YAML_CPP"/"#ifdef $cpp_directive"/g $stub_dir/${sub_str}.inp > $f_tmp
+        sed -i s/"SUB_NAME"/"\'$2\'"/g $f_tmp
+        cat $f_tmp>>$f_path
+        /bin/rm $f_tmp
     fi
 }
 
