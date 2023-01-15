@@ -14,7 +14,7 @@
   nstep = get_nstep() !time step
 
   yaml%flag_print = .false.
-  if(yaml%col_print == ii .and. nstep==yaml%nstep_print) then ! if this column exists in lchnk
+  if(yaml%col_print == ii .and. nstep==yaml%nstep_print .and. kk == yaml%lev_print) then ! if this column exists in lchnk
      yaml%lchnk_print = lchnk
      yaml%flag_print  = .true.
 

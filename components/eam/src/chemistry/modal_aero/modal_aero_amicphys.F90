@@ -13,7 +13,6 @@ module modal_aero_amicphys
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 !----------------------------------------------------------------------
 #include "../yaml/common_files/common_uses.ymlf90"
-  use yaml_input_file_io
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
