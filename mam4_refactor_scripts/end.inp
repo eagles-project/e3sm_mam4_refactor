@@ -6,7 +6,7 @@
      call write_output_header(unit_output)
 
      !start writing data
-     !<....add code for writing data here...>
+     !<add code for writing data here>
 
 
      !close the output file

@@ -22,10 +22,10 @@
      call write_output_var(unit_output,'num_a_sv',num_a_sv(yaml%col_print,yaml%lev_print,imode))
      call write_output_var(unit_output,'num_c_sv',num_c_sv(yaml%col_print,yaml%lev_print,imode))
 
-     call write_output_aerosol_mmr(unit_output,'dotend',dotend(:))
-     call write_output_aerosol_mmr(unit_output,'dotendqqcw',dotendqqcw(:))
-     call write_output_aerosol_mmr(unit_output,'dqdt',dqdt(yaml%col_print,yaml%lev_print,:))
-     call write_output_aerosol_mmr(unit_output,'dqqcwdt',dqqcwdt(yaml%col_print,yaml%lev_print,:))
+     call write_output_aerosol_mmr_from_stateq(unit_output,'dotend',dotend(:))
+     call write_output_aerosol_mmr_from_stateq(unit_output,'dotendqqcw',dotendqqcw(:))
+     call write_output_aerosol_mmr_from_stateq(unit_output,'dqdt',dqdt(yaml%col_print,yaml%lev_print,:))
+     call write_output_aerosol_mmr_from_stateq(unit_output,'dqqcwdt',dqqcwdt(yaml%col_print,yaml%lev_print,:))
 
      !close the output file
      close(unit_output)

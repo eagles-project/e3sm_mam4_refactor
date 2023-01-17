@@ -3337,7 +3337,7 @@ time_loop: &
       integer :: nsrc, ndest
 
       real(r8) :: xferfrac_pcage, frac_cond, frac_coag
-#include "../yaml/modal_aero_amicphys/f90_yaml/amicphys_mam_pcarbon_aging_1subarea_beg.ymlf90"
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_beg.ymlf90"
 
 !
 agepair_loop1: &
@@ -3348,7 +3348,7 @@ agepair_loop1: &
 
       call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
             qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
-            xferfrac_pcage, frac_cond, frac_coag)         ! output
+            xferfrac_pcage, frac_cond, frac_coag, yaml)         ! output
 
             do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
@@ -3374,14 +3374,14 @@ agepair_loop1: &
                                           qnum_cur, qnum_del_cond, qnum_del_coag)  ! in-outs
 
       enddo agepair_loop1
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_end.ymlf90"
       return
       end subroutine mam_pcarbon_aging_1subarea
 
 
       subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
           dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
-          xferfrac_pcage, frac_cond, frac_coag)
+          xferfrac_pcage, frac_cond, frac_coag, yaml)
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
 ! change due to condenstion and coagulation
@@ -3414,7 +3414,7 @@ agepair_loop1: &
       real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_frac_beg.ymlf90"
 ! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
 ! is set to 1 for default MAM4
       vol_shell = qaer_cur(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
@@ -3457,7 +3457,7 @@ agepair_loop1: &
       else
          xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
       end if
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_frac_end.ymlf90"
       return
       end subroutine mam_pcarbon_aging_frac
 

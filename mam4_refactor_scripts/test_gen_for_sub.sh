@@ -10,12 +10,12 @@ main() {
     module_name=modal_aero_amicphys
 
     #subroutine name
-    sub_name=mam_pcarbon_aging_1subarea
+    sub_name=mam_pcarbon_aging_frac
 
     #file path
     dir_path=components/eam/src/chemistry/modal_aero/
 
-    #CPP directive to tunr on file writing
+    #CPP directive to turn on file writing
     cpp_directive=YAML_AMIC
 
     #-------------------------
@@ -54,7 +54,7 @@ main() {
     echo 'Code to add:'
     echo '-------------'
 
-    echo '(If not already aded, add the following line at module level at the top)'
+    echo '(If not already added, add the following line at module level at the top)'
     echo "#include \"$relative_path/common_files/common_uses.ymlf90\""
 
     #Subroutine beginning file
@@ -98,10 +98,10 @@ create_file () {
     f_path=$3/$1/f90_yaml/$f_name
     if test -f "$f_path"; then
         newline
-        echo "[INFO ONLY]:$f_path already exists."
+        echo "[INFO ONLY]: $f_path already exists."
     else
         newline
-        echo '[INFO ONLY]:Creating NEW file...'
+        echo '[INFO ONLY]:Creating NEW file: '$f_path
         f_tmp=tmp.inp
         sed s/"!#ifdef YAML_CPP"/"#ifdef $cpp_directive"/g $stub_dir/${sub_str}.inp > $f_tmp
         sed -i s/"SUB_NAME"/"\'$2\'"/g $f_tmp

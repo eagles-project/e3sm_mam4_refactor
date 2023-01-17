@@ -31,8 +31,10 @@ module yaml_input_file_io
   public :: write_output_var  !write a single output variable
   public :: write_1d_var ! writes 1D variables of any dimension
   public :: write_1d_output_var !writes 1D variables of any dimension in the output python module
-  public :: write_aerosol_mmr   !writes aerosol mmr (cloud borne and interstitial)
-  public :: write_output_aerosol_mmr !writes aerosol mmr (cloud borne and interstitial) in the output python module
+  public :: write_2d_var ! writes 2D variables of any dimension
+  public :: write_2d_output_var !writes 2D variables of any dimension in the output python module
+  public :: write_aerosol_mmr_from_stateq   !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
+  public :: write_output_aerosol_mmr_from_stateq !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
 
   !Share data from other modules
   public :: icolprnt, getunit, freeunit, get_nstep
@@ -58,15 +60,15 @@ module yaml_input_file_io
      module procedure write_output_var_logical
   end interface write_output_var
 
-  interface write_aerosol_mmr
-     module procedure write_aerosol_mmr_real
-     module procedure write_aerosol_mmr_logical
-  end interface write_aerosol_mmr
+  interface write_aerosol_mmr_from_stateq
+     module procedure write_aerosol_mmr_from_stateq_real
+     module procedure write_aerosol_mmr_from_stateq_logical
+  end interface write_aerosol_mmr_from_stateq
 
-  interface write_output_aerosol_mmr
-     module procedure write_output_aerosol_mmr_real
-     module procedure write_output_aerosol_mmr_logical
-  end interface write_output_aerosol_mmr
+  interface write_output_aerosol_mmr_from_stateq
+     module procedure write_output_aerosol_mmr_from_stateq_real
+     module procedure write_output_aerosol_mmr_from_stateq_logical
+  end interface write_output_aerosol_mmr_from_stateq
 
 contains
 
@@ -222,9 +224,9 @@ contains
   !-------------------------- * write data * --------------------------------------
   !================================================================================
 
-  subroutine write_aerosol_mmr_real(unit_input, unit_output, fld_name,field,aer_num_only)
+  subroutine write_aerosol_mmr_from_stateq_real(unit_input, unit_output, fld_name,field,aer_num_only)
     !------------------------------------------------------------------
-    !Purpose: write interstitial aerosols mmr
+    !Purpose: write interstitial aerosols mmr from state%q vector
     !------------------------------------------------------------------
     implicit none
 
@@ -265,15 +267,15 @@ contains
     enddo
     write(unit_input,'(A)')']'
 
-    call write_output_aerosol_mmr_real(unit_output, fld_name, field, aer_num_only, "input")
+    call write_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, field, aer_num_only, "input")
 
-  end subroutine write_aerosol_mmr_real
+  end subroutine write_aerosol_mmr_from_stateq_real
 
   !================================================================================
 
-  subroutine write_output_aerosol_mmr_real(unit_output, fld_name, field, aer_num_only, inp_out_str)
+  subroutine write_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
-    !Purpose: Writes aerosol mmr for the input and the output yaml file
+    !Purpose: Writes aerosol mmr from state%q or q vector for the input and the output yaml file
     !------------------------------------------------------------------
     implicit none
 
@@ -323,13 +325,13 @@ contains
 
     write(unit_output,'(A)')'],]'
 
-  end subroutine write_output_aerosol_mmr_real
+  end subroutine write_output_aerosol_mmr_from_stateq_real
 
   !================================================================================
 
-  subroutine write_aerosol_mmr_logical(unit_input, unit_output, fld_name,field,aer_num_only)
+  subroutine write_aerosol_mmr_from_stateq_logical(unit_input, unit_output, fld_name,field,aer_num_only)
     !------------------------------------------------------------------
-    !Purpose: write interstitial aerosols mmr
+    !Purpose: write interstitial aerosols mmr from state%q or q vector
     !------------------------------------------------------------------
     implicit none
 
@@ -370,13 +372,13 @@ contains
     enddo
     write(unit_input,'(A)')']'
 
-    call write_output_aerosol_mmr_logical(unit_output, fld_name, field, aer_num_only, "input")
+    call write_output_aerosol_mmr_from_stateq_logical(unit_output, fld_name, field, aer_num_only, "input")
 
-  end subroutine write_aerosol_mmr_logical
+  end subroutine write_aerosol_mmr_from_stateq_logical
 
   !================================================================================
 
-  subroutine write_output_aerosol_mmr_logical(unit_output, fld_name, field, aer_num_only, inp_out_str)
+  subroutine write_output_aerosol_mmr_from_stateq_logical(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes aerosol mmr for the input and the output yaml file
     !------------------------------------------------------------------
@@ -428,7 +430,7 @@ contains
 
     write(unit_output,'(A)')'],]'
 
-  end subroutine write_output_aerosol_mmr_logical
+  end subroutine write_output_aerosol_mmr_from_stateq_logical
 
   !================================================================================
 
@@ -645,6 +647,10 @@ contains
     real(r8), intent(in)  :: field(:)        ! field values in r8
 
     !optional input
+    !Since we capture for input and output of a subroutine in python format, this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
     character(len=*), intent(in), optional :: inp_out_str ! input or output
 
     !local
@@ -671,5 +677,93 @@ contains
     write(unit_output,'(A)')'],]'
 
   end subroutine write_1d_output_var
+
+  !================================================================================
+
+  subroutine write_2d_var(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:)        ! field values in r8
+
+    !local
+    integer :: k
+
+    write(102,*)'Shape:', shape(field)
+#if 0
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+10  format(E17.10)
+11  format(A,E17.10)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    write(unit_input,10,advance="no")field(1)
+
+    do k = 2, dim
+       write(unit_input,11,advance="no")',',field(k)
+    enddo
+
+    write(unit_input,'(A)')']'
+
+    call write_1d_output_var(unit_output, fld_name, dim, field, "input")
+#endif
+  end subroutine write_2d_var
+
+  !================================================================================
+
+  subroutine write_2d_output_var(unit_output, fld_name, dim1, dim2, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim1, dim2      ! dimensions of the field
+    real(r8), intent(in)  :: field(:,:)        ! field values in r8
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format, this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: d1, d2
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(E17.10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do d2 = 1, dim2
+       do d1 = 1, dim1
+          write(unit_output,12,advance="no"),field(d1,d2),','
+       enddo
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_2d_output_var
 
 end module yaml_input_file_io

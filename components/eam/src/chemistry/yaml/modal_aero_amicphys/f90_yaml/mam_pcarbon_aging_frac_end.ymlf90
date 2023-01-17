@@ -6,15 +6,15 @@
      call write_output_header(unit_output)
 
      !start writing data
-     !<....add code for writing data here...>
-     !write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str)
-     call write_1d_output_var(unit_output, 'qnum_cur', max_mode, qnum_cur)
-     call write_1d_output_var(unit_output, 'qnum_del_cond', max_mode, qnum_del_cond)
-     call write_1d_output_var(unit_output, 'qnum_del_coag', max_mode, qnum_del_coag)
+     !<add code for writing data here>
+
      call write_2d_output_var(unit_output, 'qaer_cur', max_aer, max_mode, qaer_cur)
      call write_2d_output_var(unit_output, 'qaer_del_cond', max_aer, max_mode, qaer_del_cond)
-     call write_2d_output_var(unit_output, 'qaer_del_coag', max_aer, max_mode, qaer_del_coag)
      call write_2d_output_var(unit_output, 'qaer_del_coag_in', max_aer, max_agepair, qaer_del_coag_in)
+
+     call write_output_var(unit_output, 'xferfrac_pcage', xferfrac_pcage)
+     call write_output_var(unit_output, 'frac_cond', frac_cond )
+     call write_output_var(unit_output, 'frac_coag', frac_coag)
 
      !close the output file
      close(unit_output)

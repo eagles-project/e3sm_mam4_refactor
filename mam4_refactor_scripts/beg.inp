@@ -1,29 +1,41 @@
 !#ifdef YAML_CPP
-
-  !<... we need lchnk and possibly column(icol or ii) and level (kk) info as an input>
+  !<"lchnk" is needed for the following code to work,
+  ! temporarily pass it along from upper level subroutines
+  ! We also might need column index (y_i or icol) and level
+  ! index (y_k or klev):
+  ! integer, intent(in) :: y_i, y_k, lchunk
+  !>
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
 
   !populate YAML structure
-  yaml%lev_print = <Add level here> !level
-  yaml%nstep_print = <add time step here> !time step
+  yaml%lev_print = <Add hardwired level here> !level
+  yaml%nstep_print = <add hardwired time step here> !time step
 
   !YAML file input generation code- DO NOT PORT to C++
   !print all inputs one-by-one at column "yaml%col_print"
-  yaml%col_print = icolprnt(lchnk) !column to write data
+  yaml%col_print = icolprnt(y_lchnk) !column to write data
   y_nstep = get_nstep() !time step
 
-  yaml%flag_print = .false.
-  if(yaml%col_print == ii .and. nstep==yaml%nstep_print .and. kk == yaml%lev_print) then ! if this column exists in lchnk
-     yaml%lchnk_print = lchnk
+  yaml%flag_print = .false. ! to write or not to write data
+  if(yaml%col_print == y_i .and. nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  !if y_i or y_k is not available:
+  !use "if(yaml%col_print >0 .and. nstep==yaml%nstep_print)"
+  !if generating data for a dependent subroutines where "yaml" derived type is already initialized:
+  !if(yaml%flag_print) then
+
+     yaml%lchnk_print = y_lchnk
      yaml%flag_print  = .true.
 
      !open I/O yaml files
      call open_files(SUB_NAME, &  !intent-in
           unit_input, unit_output) !intent-out
 
-     !<....add code for writing data here...>
+     !start by adding an input string
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',y_nstep, yaml%lev_print)
+
+     !< add code for writing data here>
 
      !close only the input file, not the output file
      close(unit_input)
