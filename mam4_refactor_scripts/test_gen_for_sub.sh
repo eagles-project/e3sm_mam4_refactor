@@ -10,7 +10,7 @@ main() {
     module_name=modal_aero_amicphys
 
     #subroutine name
-    sub_name=mam_pcarbon_aging_frac
+    sub_name=mam_pcarbon_aging_1subarea
 
     #file path
     dir_path=components/eam/src/chemistry/modal_aero/

@@ -680,23 +680,22 @@ contains
 
   !================================================================================
 
-  subroutine write_2d_var(unit_input, unit_output, fld_name,field)
+  subroutine write_2d_var(unit_input, unit_output, fld_name, dim1, dim2, field)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D input and output field in a YAML file format
+    !Purpose: Writes a 2D input and output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
 
     integer, intent(in)   :: unit_input      ! input stream unit number
     integer, intent(in)   :: unit_output     ! output stream unit number
+    integer, intent(in)   :: dim1, dim2      ! dimensions of the field
     character(len=*), intent(in) :: fld_name ! name of the field
     real(r8), intent(in)  :: field(:,:)        ! field values in r8
 
     !local
-    integer :: k
+    integer :: d1, d2
 
-    write(102,*)'Shape:', shape(field)
-#if 0
     !check if file is open to write or not
     call is_file_open(unit_input)
 
@@ -706,23 +705,32 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    ! For maintaining format in the YAML inout file we have to  print first element of the array first
+    write(unit_input,10,advance="no")field(1,1)
 
-    do k = 2, dim
-       write(unit_input,11,advance="no")',',field(k)
+    !print rest of the column for d2=1
+    d2 = 1
+    do d1 = 2, dim1 !first element is already printed, start from the 2nd
+       write(unit_input,11,advance="no")',',field(d1,d2)
+    enddo
+
+    do d2 = 2, dim2 !First column is already printed, start from the 2nd
+       do d1 = 1, dim1
+          write(unit_input,11,advance="no")',',field(d1,d2)
+       enddo
     enddo
 
     write(unit_input,'(A)')']'
 
-    call write_1d_output_var(unit_output, fld_name, dim, field, "input")
-#endif
+    call write_2d_output_var(unit_output, fld_name, dim1, dim2, field, "input")
+
   end subroutine write_2d_var
 
   !================================================================================
 
   subroutine write_2d_output_var(unit_output, fld_name, dim1, dim2, field, inp_out_str)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D output field in a YAML file format
+    !Purpose: Writes a 2D output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
