@@ -3,6 +3,7 @@ module modal_aero_wateruptake
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
+use shr_log_mod ,     only: errmsg => shr_log_errmsg
 use physconst,        only: pi, rhoh2o
 use ppgrid,           only: pcols, pver
 use physics_types,    only: physics_state
@@ -69,7 +70,6 @@ end subroutine modal_aero_wateruptake_reg
 subroutine modal_aero_wateruptake_init(pbuf2d)
    use time_manager,   only: is_first_step
    use physics_buffer, only: pbuf_set_field
-   use shr_log_mod ,   only: errmsg => shr_log_errmsg
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -191,7 +191,21 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    state_q      => state%q
 
    list_idx = 0
-   if (present(list_idx_in))     list_idx = list_idx_in
+   if (present(list_idx_in)) then
+      list_idx = list_idx_in
+      ! check that all optional args for diagnostic mode are present
+      if (.not. present(dgnumdry_m) .or. .not. present(dgnumwet_m) .or. &
+          .not. present(qaerwat_m)) then
+         call endrun('modal_aero_wateruptake_dr called '// &
+              'with list_idx_in but required args not present '//errmsg(__FILE__,__LINE__))
+      endif
+      ! arrays for diagnostic calculations must be allocated
+      if (.not. allocated(dgnumdry_m) .or. .not. allocated(dgnumwet_m) .or. &
+          .not. allocated(qaerwat_m)) then
+         call endrun('modal_aero_wateruptake_dr called '// &
+              'with list_idx_in but required args not allocated '//errmsg(__FILE__,__LINE__))
+      endif
+   endif ! if present(list_idx_in
 
    ! determine default variables
    call phys_getopts(history_aerosol_out = history_aerosol, &
