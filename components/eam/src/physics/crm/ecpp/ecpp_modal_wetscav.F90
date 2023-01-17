@@ -1494,16 +1494,7 @@ icc_loop: &
 		tmp_rdry = dry_diam*0.5_r8*fact_leng   ! cm OR m --> m
 		tmp_rwet = tmp_rdry
  
-                rdry_in_mak(1) = tmp_rdry
-                hygro_mak(1) = tmp_hygro
-                s_mak(1) = tmp_rh
-                rwet_out_mak(1) = tmp_rwet
-!             call modal_aero_kohler( tmp_rdry, tmp_hygro, tmp_rh, tmp_rwet, 1, 1 )
-!                call modal_aero_kohler( rdry_in_mak, hygro_mak, s_mak, rwet_out_mak, 1, 1)
-!==Guangxing Lin            
-                call modal_aero_kohler( rdry_in_mak, hygro_mak, s_mak, rwet_out_mak, 1)
-!==Guangxing Lin            
-                tmp_rwet = rwet_out_mak(1)
+                call modal_aero_kohler( tmp_rdry, tmp_hydro, tmp_rh, tmp_rwet)
 
 		wet_diam = tmp_rwet*2.0_r8/fact_leng   ! m --> cm OR m
 		wet_diam = min( wet_diam, dry_diam*100.0_r8, 50.0e-6_r8/fact_leng )
