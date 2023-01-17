@@ -9,8 +9,6 @@ module ndrop
 !            affect the climate calculation.  This is implemented by using list
 !            index 0 in all the calls to rad_constituent interfaces.
 !---------------------------------------------------------------------------------
-!  BJG add below
-use constituents,     only: pcnst
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
 use spmd_utils,       only: masterproc
@@ -1119,11 +1117,11 @@ subroutine dropmixnuc( &
    do imode=1,ntot_amode
       do kk=top_lev,pver
          do lspec =1, nspec_amode(imode)
-           spc_idx = lmassptrcw_amode(lspec,imode) + pcnst
+           spc_idx = lmassptrcw_amode(lspec,imode)
            fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
            qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
          enddo
-         num_idx = numptrcw_amode(imode) + pcnst
+         num_idx = numptrcw_amode(imode)
          fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
          qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
       enddo
@@ -1694,7 +1692,7 @@ subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn1d_nu
   !convert number mixing ratios to number concentrations
   !Use bulk volume conc found previously to bound value
 
-  num_idx = numptrcw_amode(imode) + pcnst
+  num_idx = numptrcw_amode(imode)
   do icol = istart, istop
      naerosol(icol) = (state_q(icol,num_idx) + qcldbrn1d_num(icol))*cs(icol)
      !adjust number so that dgnumlo < dgnum < dgnumhi
