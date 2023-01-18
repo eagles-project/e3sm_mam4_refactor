@@ -1305,7 +1305,7 @@ jtsub_loop_main_aa: &
    aqfrac(:) = 0.0_r8
    do imode = 1, ntot_amode
       do ispec = 0, nspec_amode(imode)
-         call assign_la_lc(imode, ispec, la, lc)
+         call assign_la_lc(imode, ispec, la, lc, .true.)  ! append cloudborne aerosols after intersitial
          if ( doconvproc(la) ) then
             doconvproc_extd(lc) = .true.
             aqfrac(lc) = 1.0_r8
@@ -1951,13 +1951,13 @@ jtsub_loop_main_aa: &
 
    do imode = 1, ntot_amode
         ! for aerosol number
-        call assign_la_lc(imode, 0, la, lc)
+        call assign_la_lc(imode, 0, la, lc, .true.)  ! cloudborne aerosols are appended after intersitial
         act_frac = fn(imode)
         call update_conu_from_act_frac ( conu,       dconudt,          & ! inout
                    pcnst_extd,  la,    lc,  act_frac,    dt_u_inv      ) ! in
         ! for aerosol mass
         do ispec = 1, nspec_amode(imode)
-            call assign_la_lc(imode, ispec, la, lc)
+            call assign_la_lc(imode, ispec, la, lc, .true.)  ! cloudborne aerosols are appended after intersitial
             act_frac = fm(imode)
             call update_conu_from_act_frac ( conu,      dconudt,          & ! inout
                    pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
@@ -2610,7 +2610,7 @@ jtsub_loop_main_aa: &
 
    do imode = 1, ntot_amode
       do ispec = 0, nspec_amode(imode)
-         call assign_la_lc(imode, ispec, la, lc)
+         call assign_la_lc(imode, ispec, la, lc, .true.)  ! cloudborne aerosols are appended after intersitial
          call tmr_tendency(pcnst_extd, la, lc, ktop, kbot_prevap, & ! in
                            dcondt, dcondt_resusp                  ) ! inout
       enddo   ! "ll = -1, nspec_amode(n)"
@@ -2791,7 +2791,7 @@ jtsub_loop_main_aa: &
    ! update diagnostic variables
    do imode = 1, ntot_amode
         do ispec = 0, nspec_amode(imode)
-             call assign_la_lc(imode, ispec, la, lc)
+             call assign_la_lc(imode, ispec, la, lc, .true.)  ! cloudborne aerosols are appended after intersitial 
              if (doconvproc(la)) then
                    sumactiva(la) = sumactiva(la) + sumactiva(lc)
                    sumresusp(la) = sumresusp(la) + sumresusp(lc)
