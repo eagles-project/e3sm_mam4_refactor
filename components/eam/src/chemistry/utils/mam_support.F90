@@ -18,10 +18,13 @@ module mam_support
 contains
 !===============================================================================
    subroutine assign_la_lc( imode,      ispec,          & ! in
-                            la,         lc              ) ! out
+                            la,         lc,             & ! out
+                            is_lc_append_in             ) ! optional in
 !-----------------------------------------------------------------------
 ! get the index of interstital (la) and cloudborne (lc) aerosols
 ! from mode index and species index
+! is_lc_append_in is true when cloudborne aerosols are appended after 
+! interstitial aerosol array (default is false)
 !-----------------------------------------------------------------------
    use constituents,    only: pcnst
    use modal_aero_data, only: lmassptr_amode, lmassptrcw_amode, &
@@ -32,14 +35,26 @@ contains
                                                ! 0 = number concentration
                                                ! other = mass concentration
    integer, intent(out)    :: la               ! index of interstitial aerosol
-   integer, intent(out)    :: lc               ! index of cloudborne aerosol (la+ pcnst)
+   integer, intent(out)    :: lc               ! index of cloudborne aerosol
+   logical, optional, intent(in) :: is_lc_append_in  ! if cloudborne aerosol is appended after interstitial aerosols
+
+   logical :: is_lc_append   
+
+   ! the default option is treat cloudborne aerosols in separated array
+   is_lc_append = .false.
+   if (present(is_lc_append_in)) is_lc_append=is_lc_append_in
 
    if (ispec == 0) then
       la = numptr_amode(imode)
-      lc = numptrcw_amode(imode) + pcnst
+      lc = numptrcw_amode(imode)
    else
       la = lmassptr_amode(ispec,imode)
-      lc = lmassptrcw_amode(ispec,imode) + pcnst
+      lc = lmassptrcw_amode(ispec,imode)
+   endif
+
+   ! if true: cloudborne aerosol is append after interstitial aerosol
+   if (is_lc_append) then
+        lc = lc + pcnst  
    endif
 
    end subroutine assign_la_lc
