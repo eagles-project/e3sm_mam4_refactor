@@ -37,8 +37,10 @@ contains
    integer, intent(out)    :: la               ! index of interstitial aerosol
    integer, intent(out)    :: lc               ! index of cloudborne aerosol
    logical, optional, intent(in) :: is_lc_append_in  ! if cloudborne aerosol is appended after interstitial aerosols
+
    logical :: is_lc_append   
 
+   ! the default option is treat cloudborne aerosols in separated array
    is_lc_append = .false.
    if (present(is_lc_append_in)) is_lc_append=is_lc_append_in
 
@@ -50,8 +52,9 @@ contains
       lc = lmassptrcw_amode(ispec,imode)
    endif
 
+   ! if true: cloudborne aerosol is append after interstitial aerosol
    if (is_lc_append) then
-        lc = lc + pcnst
+        lc = lc + pcnst  
    endif
 
    end subroutine assign_la_lc
