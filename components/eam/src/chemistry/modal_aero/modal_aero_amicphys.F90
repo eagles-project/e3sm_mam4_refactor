@@ -1137,7 +1137,7 @@ do_rename_if_block30: &
          dgn_a,             n_mode,                                 &  ! input
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     &  ! in-outs
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     &  ! in-outs
-         qaer_delsub_coag_in, i,k,lchnk)                                          ! in-outs
+         qaer_delsub_coag_in)                                          ! in-outs
 
       end if
 
@@ -1598,7 +1598,7 @@ do_newnuc_if_block50: &
          dgn_a,             n_mode,                                 & ! input
          qnum_cur,          qnum_delsub_cond, qnum_delsub_coag,     & ! in-outs
          qaer_cur,          qaer_delsub_cond, qaer_delsub_coag,     & ! in-outs
-         qaer_delsub_coag_in, i,k,lchnk)                                         ! in-outs
+         qaer_delsub_coag_in)                                         ! in-outs
 
       end if
 
@@ -3308,7 +3308,7 @@ time_loop: &
          dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
-         qaer_del_coag_in, ii, kk, lchnk)
+         qaer_del_coag_in)
 
 ! uses
       use modal_aero_amicphys_control, only: &
@@ -3348,7 +3348,7 @@ time_loop: &
 
       call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
            qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
-            xferfrac_pcage, frac_cond, frac_coag, yaml)         ! output
+            xferfrac_pcage, frac_cond, frac_coag)         ! output
 
       do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
@@ -3381,7 +3381,7 @@ time_loop: &
 
       subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
           dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
-          xferfrac_pcage, frac_cond, frac_coag, yaml)
+          xferfrac_pcage, frac_cond, frac_coag)
 
 ! calculate fractions of aged pom/bc to be transferred to accum mode, aerosol
 ! change due to condenstion and coagulation
