@@ -683,15 +683,15 @@ subroutine hetfrz_classnuc_cam_calc( &
    ! output aerosols as reference information for heterogeneous freezing
    do kk = top_lev, pver
       do icol = 1, ncol
-         call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:,lchnk_zb), & ! in 
+         call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:,lchnk_zb), &      ! in 
                                              total_interstitial_aer_num(icol,kk,:)) ! out
 
          call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:,lchnk_zb), & ! in
                                            total_cloudborne_aer_num(icol,kk,:)) ! out 
 
-         call calculate_mass_mean_radius(ncnst, aer(icol,kk,:,lchnk_zb), &   ! in
+         call calculate_mass_mean_radius(ncnst, aer(icol,kk,:,lchnk_zb), &         ! in
                                          total_interstitial_aer_num(icol,kk,:), &  ! in
-                                         hetraer(icol,kk,:)) ! out
+                                         hetraer(icol,kk,:))                       ! out
 
 
          call calculate_coated_fraction(ncnst, aer(icol,kk,:,lchnk_zb), rho(icol,kk), &                                      ! in
@@ -700,9 +700,9 @@ subroutine hetfrz_classnuc_cam_calc( &
                                         total_aer_num(icol,kk,:), coated_aer_num(icol,kk,:), uncoated_aer_num(icol,kk,:), &  ! out
                                         dstcoat(icol,kk,:), na500(icol,kk), tot_na500(icol,kk))                              ! out
 
-         call calculate_water_activity(ncnst, aer(icol,kk,:,lchnk_zb), &   ! in        
-                                       total_interstitial_aer_num(icol,kk,:), & ! in        
-                                       awcam(icol,kk,:), awfacm(icol,kk,:)) ! out
+         call calculate_vars_for_water_activity(ncnst, aer(icol,kk,:,lchnk_zb), &        ! in        
+                                                total_interstitial_aer_num(icol,kk,:), & ! in        
+                                                awcam(icol,kk,:), awfacm(icol,kk,:))     ! out
 
          fn_cloudborne_aer_num(icol,kk,1) = total_aer_num(icol,kk,1)*factnum(icol,kk,mode_accum_idx)  ! bc
          fn_cloudborne_aer_num(icol,kk,2) = total_aer_num(icol,kk,2)*factnum(icol,kk,mode_accum_idx)  ! dst_a1
@@ -1228,7 +1228,7 @@ end subroutine calculate_coated_fraction
 
 !====================================================================================================
 
-subroutine calculate_water_activity(ncnst, aer, &
+subroutine calculate_vars_for_water_activity(ncnst, aer, &
                                     total_interstitial_aer_num, &
                                     awcam, awfacm)
 
@@ -1290,6 +1290,6 @@ subroutine calculate_water_activity(ncnst, aer, &
                        aer(so4_coarse) + aer(bc_coarse) + aer(mom_coarse) )
    endif
 
-end subroutine calculate_water_activity
+end subroutine calculate_vars_for_water_activity
 
 end module hetfrz_classnuc_cam
