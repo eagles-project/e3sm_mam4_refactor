@@ -6,17 +6,17 @@ main() {
     #User input Starts
     #-------------------------
 
-    #module name
-    module_name=modal_aero_amicphys
-
     #subroutine name
-    sub_name=mam_pcarbon_aging_1subarea
+    sub_name=mam_rename_1subarea
+
+    #module name
+    module_name=modal_aero_rename
 
     #file path
     dir_path=components/eam/src/chemistry/modal_aero/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_AMIC
+    cpp_directive=YAML_RENAME
 
     #-------------------------
     #USER INPUT ENDS

@@ -26,6 +26,7 @@ module yaml_input_file_io
   public :: write_output_header       !writes output related  header for output file
   public :: one_print_ts !enables only one sample write at each time step
   public :: yaml_vars ! data structure to carry yaml vars
+  public :: get_lat, get_lon ! current lat and lon
 
   public :: write_var    !write a single variable
   public :: write_output_var  !write a single output variable
@@ -46,6 +47,7 @@ module yaml_input_file_io
      logical :: flag_print = .false.
   end type yaml_vars
 
+  integer, parameter :: RAD_TO_DEG = 57.296_r8 !180/pi
 
   !interfaces for datatypes (integers and reals)
   interface write_var
@@ -59,6 +61,18 @@ module yaml_input_file_io
      module procedure write_output_var_real
      module procedure write_output_var_logical
   end interface write_output_var
+
+  interface write_1d_var
+     module procedure write_1d_var_real
+     module procedure write_1d_var_int
+     module procedure write_1d_var_logical
+  end interface write_1d_var
+
+  interface write_1d_output_var
+     module procedure write_1d_output_var_real
+     module procedure write_1d_output_var_int
+     module procedure write_1d_output_var_logical
+  end interface write_1d_output_var
 
   interface write_aerosol_mmr_from_stateq
      module procedure write_aerosol_mmr_from_stateq_real
@@ -77,19 +91,24 @@ contains
   !================================================================================
 
   subroutine open_files(name, & ! input
-       unit_input, unit_output) ! output
+       unit_input, unit_output, extra_string) ! output
 
     !intent-ins
     character(len=*), intent(in) :: name
+    character(len=*), intent(in), optional :: extra_string!This string is present will be appended to the file names
+
 
     !intent outs
     integer, intent(out) ::unit_input, unit_output
 
     !local
-    character(len=2000) :: finp, fout
+    character(len=2000) :: finp, fout, fextra
 
-    write(finp,'(2A,I0,A)')trim(adjustl(name)),'_input_ts_',get_nstep(),'.yaml'
-    write(fout,'(2A,I0,A)')trim(adjustl(name)),'_output_ts_',get_nstep(),'.py'
+    fextra=''
+    if(present(extra_string))fextra = extra_string
+
+    write(finp,'(2A,I0,3A)')trim(adjustl(name)),'_input_ts_',get_nstep(),'_',trim(fextra),'.yaml'
+    write(fout,'(2A,I0,3A)')trim(adjustl(name)),'_output_ts_',get_nstep(),'_',trim(fextra),'.py'
 
     !get a unused unit numbers to write
     unit_input = getunit()
@@ -147,6 +166,34 @@ contains
   end function one_print_ts
 
   !================================================================================
+  function get_lat(chunk,col)
+    !Get lattitude in degrees
+    !input
+    integer, intent(in) :: chunk, col ! chunk and column #
+
+    !output (return value)
+    real(r8) :: get_lat
+
+    get_lat = get_rlat_p(chunk,col)*RAD_TO_DEG
+
+    return
+  end function get_lat
+
+  !================================================================================
+  function get_lon(chunk,col)
+    !Get lattitude in degrees
+    !input
+    integer, intent(in) :: chunk, col ! chunk and column #
+
+    !output (return value)
+    real(r8) :: get_lon
+
+    get_lon = get_rlon_p(chunk,col)*RAD_TO_DEG
+
+    return
+  end function get_lon
+
+  !================================================================================
   !-------------------------- * Write headers * -----------------------------------
   !================================================================================
 
@@ -161,7 +208,6 @@ contains
 
     !local
     character(len = 2000) :: meta_msg
-    integer, parameter :: RAD_TO_DEG = 57.296_r8 !180/pi
     real(r8) :: time_step
 
     time_step = 0.0_r8 !defaut time step
@@ -173,8 +219,8 @@ contains
     call is_file_open(unit_output)
 
     !write some meta data
-    write(meta_msg,*)'# Data at [lat=', get_rlat_p(lchunk, icol)*RAD_TO_DEG, &
-         ', lon=',get_rlon_p(lchunk, icol)*RAD_TO_DEG,', k=',lev,', time step=', nstep,']'
+    write(meta_msg,*)'# Data at [lat=', get_lat(lchunk, icol), &
+         ', lon=',get_lon(lchunk, icol),', k=',lev,', time step=', nstep,']'
 
     !write header for the input file
     write(unit_input,'(A)')adjustl(trim(meta_msg))
@@ -436,7 +482,7 @@ contains
 
   subroutine write_var_int(unit_input, unit_output, fld_name,field)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D input and output field in a YAML file format
+    !Purpose: Writes a input and output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -459,7 +505,7 @@ contains
 
   subroutine write_output_var_int(unit_output, fld_name, field, inp_out_str)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D output field in a YAML file format
+    !Purpose: Writes a output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -490,7 +536,7 @@ contains
 
   subroutine write_var_logical(unit_input, unit_output, fld_name,field)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D input and output field in a YAML file format
+    !Purpose: Writes a input and output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -513,7 +559,7 @@ contains
 
   subroutine write_output_var_logical(unit_output, fld_name, field, inp_out_str)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D output field in a YAML file format
+    !Purpose: Writes a output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -544,7 +590,7 @@ contains
 
   subroutine write_var_real(unit_input, unit_output, fld_name,field)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D input and output field in a YAML file format
+    !Purpose: Writes a input and output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -567,7 +613,7 @@ contains
 
   subroutine write_output_var_real(unit_output, fld_name, field, inp_out_str)
     !------------------------------------------------------------------
-    !Purpose: Writes a 1D output field in a YAML file format
+    !Purpose: Writes a output field in a YAML file format
     !for a given column
     !------------------------------------------------------------------
     implicit none
@@ -596,7 +642,7 @@ contains
 
   !================================================================================
 
-  subroutine write_1d_var(unit_input, unit_output, fld_name,dim,field)
+  subroutine write_1d_var_real(unit_input, unit_output, fld_name,dim,field)
     !------------------------------------------------------------------
     !Purpose: Writes a 1D input and output field in a YAML file format
     !for a given column
@@ -628,13 +674,13 @@ contains
 
     write(unit_input,'(A)')']'
 
-    call write_1d_output_var(unit_output, fld_name, dim, field, "input")
+    call write_1d_output_var_real(unit_output, fld_name, dim, field, "input")
 
-  end subroutine write_1d_var
+  end subroutine write_1d_var_real
 
   !================================================================================
 
-  subroutine write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str)
+  subroutine write_1d_output_var_real(unit_output, fld_name, dim, field, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes a 1D output field in a YAML file format
     !for a given column
@@ -676,7 +722,175 @@ contains
 
     write(unit_output,'(A)')'],]'
 
-  end subroutine write_1d_output_var
+  end subroutine write_1d_output_var_real
+
+  !================================================================================
+
+  subroutine write_1d_var_int(unit_input, unit_output, fld_name,dim,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    integer, intent(in)   :: field(:)        ! field values in int
+
+    integer :: k
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+10  format(I10)
+11  format(A,I10)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    write(unit_input,10,advance="no")field(1)
+
+    do k = 2, dim
+       write(unit_input,11,advance="no")',',field(k)
+    enddo
+
+    write(unit_input,'(A)')']'
+
+    call write_1d_output_var_int(unit_output, fld_name, dim, field, "input")
+
+  end subroutine write_1d_var_int
+
+  !================================================================================
+
+  subroutine write_1d_output_var_int(unit_output, fld_name, dim, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    integer, intent(in)   :: field(:)        ! field values in int
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format, this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: k
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(I10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do k = 1, dim
+       write(unit_output,12,advance="no"),field(k),','
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_1d_output_var_int
+
+  !================================================================================
+
+  subroutine write_1d_var_logical(unit_input, unit_output, fld_name,dim,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    logical, intent(in)   :: field(:)        ! field values in bool
+
+    integer :: k
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+10  format(E17.10)
+11  format(A,L10)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    write(unit_input,10,advance="no")field(1)
+
+    do k = 2, dim
+       write(unit_input,11,advance="no")',',field(k)
+    enddo
+
+    write(unit_input,'(A)')']'
+
+    call write_1d_output_var_logical(unit_output, fld_name, dim, field, "input")
+
+  end subroutine write_1d_var_logical
+
+  !================================================================================
+
+  subroutine write_1d_output_var_logical(unit_output, fld_name, dim, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    logical, intent(in)  :: field(:)        ! field values in bool
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format, this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: k
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(L10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do k = 1, dim
+       write(unit_output,12,advance="no"),field(k),','
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_1d_output_var_logical
 
   !================================================================================
 

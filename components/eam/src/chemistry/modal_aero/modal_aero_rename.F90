@@ -1,5 +1,5 @@
 module modal_aero_rename
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod,    only:  r8 => shr_kind_r8
   use modal_aero_amicphys_control, only: naer, max_mode, max_aer, mass_2_vol
   use modal_aero_data, only: alnsg_amode, dgnumlo_amode, dgnumhi_amode, &
@@ -24,7 +24,7 @@ contains
   !--------------------------------------------------------------------------------
   subroutine mam_rename_1subarea(iscldy, dest_mode_of_mode, nmode, &
        qnum_cur, qaer_cur, qaer_del_grow4rnam, qnumcw_cur,         &
-       qaercw_cur,        qaercw_del_grow4rnam                    )
+       qaercw_cur,        qaercw_del_grow4rnam)
 
     use modal_aero_data, only: ntot_amode
 
@@ -68,7 +68,7 @@ contains
     real(r8) :: lndiameter_cutoff(max_mode) !log of diamter cutoff [m]
     real(r8) :: ln_diameter(max_mode)     !log of diameter [m]
     real(r8) :: v2nhirlx(ntot_amode), v2nlorlx(ntot_amode) !high and low volume to num ratios[m^-3]
-
+#include "../yaml/modal_aero_rename/f90_yaml/mam_rename_1subarea_beg.ymlf90"
 
     !------------------------------------------------------------------------
     !Find mapping between different modes, so that we can move aerosol
@@ -108,7 +108,7 @@ contains
          iscldy, v2nlorlx, v2nhirlx, dryvol_a, dryvol_c, deldryvol_a, deldryvol_c, &           !input
          sz_factor, fmode_dist_tail_fac, ln_diameter, lndiameter_cutoff, diameter_threshold, & !input
          qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur ) !output
-
+#include "../yaml/modal_aero_rename/f90_yaml/mam_rename_1subarea_end.ymlf90"
   end subroutine mam_rename_1subarea
 
   !--------------------------------------------------------------------------------

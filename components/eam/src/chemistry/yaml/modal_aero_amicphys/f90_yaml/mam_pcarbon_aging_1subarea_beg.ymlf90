@@ -1,21 +1,30 @@
 #ifdef YAML_AMIC
-  integer, intent(in) :: ii, kk, lchnk !additional input neede for test generation
+  !<"lchnk" is needed for the following code to work,
+  ! temporarily pass it along from upper level subroutines
+  ! We also might need column index (y_i or icol) and level
+  ! index (y_k or klev):
+  integer, intent(in) :: y_i, y_k, y_lchnk
+  !>
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
-
   !populate YAML structure
   yaml%lev_print = 68 !level
   yaml%nstep_print = 379 !time step
 
   !YAML file input generation code- DO NOT PORT to C++
-  !print all inputs one-by-one at column "yaml%iprint"
-  yaml%col_print = icolprnt(lchnk) !column to write data
+  !print all inputs one-by-one at column "yaml%col_print"
+  yaml%col_print = icolprnt(y_lchnk) !column to write data
   y_nstep = get_nstep() !time step
 
-  yaml%flag_print = .false.
-  if(yaml%col_print == ii .and. y_nstep==yaml%nstep_print .and. kk == yaml%lev_print) then ! if this column exists in lchnk
-     yaml%lchnk_print = lchnk
+  yaml%flag_print = .false. ! to write or not to write data
+  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  !if y_i or y_k is not available:
+  !use "if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print)"
+  !if generating data for a dependent subroutines where "yaml" derived type is already initialized:
+  !if(yaml%flag_print) then
+
+     yaml%lchnk_print = y_lchnk
      yaml%flag_print  = .true.
 
      !open I/O yaml files
@@ -23,10 +32,20 @@
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
-     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',y_nstep, yaml%lev_print)
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',yaml%nstep_print, yaml%lev_print)
 
-     call write_var(unit_input, unit_output, 'n_mode',n_mode)
+     !< add code for writing data here>
+     call write_var(unit_input, unit_output,'n_mode',n_mode)
      call write_1d_var(unit_input, unit_output, 'dgn_a', max_mode, dgn_a)
+
+     call write_1d_var(unit_input, unit_output, 'qnum_cur', max_mode, qnum_cur)
+     call write_1d_var(unit_input, unit_output, 'qnum_del_cond', max_mode, qnum_del_cond)
+     call write_1d_var(unit_input, unit_output, 'qnum_del_coag', max_mode, qnum_del_coag)
+
+     call write_2d_var(unit_input, unit_output, 'qaer_cur', max_aer, max_mode, qaer_cur)
+     call write_2d_var(unit_input, unit_output, 'qaer_del_cond', max_aer, max_mode, qaer_del_cond)
+     call write_2d_var(unit_input, unit_output, 'qaer_del_coag', max_aer, max_mode, qaer_del_coag)
+     call write_2d_var(unit_input, unit_output, 'qaer_del_coag_in', max_aer, max_agepair, qaer_del_coag_in)
 
      !close only the input file, not the output file
      close(unit_input)

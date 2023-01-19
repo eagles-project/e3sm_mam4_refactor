@@ -1,0 +1,71 @@
+#ifdef YAML_RENAME
+  !<"lchnk" is needed for the following code to work,
+  ! temporarily pass it along from upper level subroutines
+  ! We also might need column index (y_i or icol) and level
+  ! index (y_k or klev):
+  character(len=200) :: ext_str
+  integer, intent(in) :: y_i, y_k, y_lchnk
+  !>
+
+  type(yaml_vars) :: yaml
+  integer  :: unit_input, unit_output, y_nstep
+
+  !populate YAML structure
+  yaml%lev_print = 54
+  yaml%nstep_print = 1111
+
+  !YAML file input generation code- DO NOT PORT to C++
+  !print all inputs one-by-one at column "yaml%col_print"
+  yaml%col_print = icolprnt(y_lchnk) !column to write data
+  y_nstep = get_nstep() !time step
+
+  yaml%flag_print = .false. ! to write or not to write data
+
+  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  !if y_i or y_k is not available:
+  !use "if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print)"
+  !if generating data for a dependent subroutines where "yaml" derived type is already initialized:
+  !if(yaml%flag_print) then
+
+     yaml%lchnk_print = y_lchnk
+     yaml%flag_print  = .true.
+     if(iscldy) then
+        ext_str = 'iscldy_true'
+     else
+        ext_str = 'iscldy_false'
+     endif
+
+     !open I/O yaml files
+     call open_files('mam_rename_1subarea', &  !intent-in
+          unit_input, unit_output, trim(ext_str) ) !intent-out
+
+     !start by adding an input string
+     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',yaml%nstep_print, yaml%lev_print)
+
+     !< add code for writing data here>
+     call write_var(unit_input, unit_output, 'iscldy',iscldy)
+     call write_var(unit_input, unit_output, 'nmode',nmode)
+     call write_1d_var(unit_input, unit_output, 'dest_mode_of_mode',max_mode,dest_mode_of_mode)
+     call write_1d_var(unit_input, unit_output, 'qnum_cur',max_mode,qnum_cur)
+     if(present(qnumcw_cur))call write_1d_var(unit_input, unit_output, 'qnumcw_cur',max_mode,qnumcw_cur) !optional
+     call write_2d_var(unit_input, unit_output, 'qaer_del_grow4rnam',max_aer,max_mode,qaer_del_grow4rnam)
+     if(present(qaercw_del_grow4rnam))call write_2d_var(unit_input, unit_output, 'qaercw_del_grow4rnam',max_aer,max_mode,qaercw_del_grow4rnam) !optional
+     call write_2d_var(unit_input, unit_output, 'qaer_cur',max_aer,max_mode,qaer_cur)
+     if(present(qaercw_cur))call write_2d_var(unit_input, unit_output, 'qaercw_cur',max_aer,max_mode,qaercw_cur)!optional
+
+     !close only the input file, not the output file
+     close(unit_input)
+     call freeunit(unit_input)
+
+  endif
+#endif
+
+
+#if 0
+!code used to find ou lat-lons
+  if(present(qnumcw_cur) .and. present(qaercw_cur)) then
+     if (any(qaercw_cur(1:4,:) > 0.) .and. any(qnumcw_cur(1:4) > 0.) ) then
+        write(102,*)'phys_debug_lat = ',get_lat(y_lchnk, y_i),' phys_debug_lon = ', get_lon(y_lchnk, y_i), y_k, get_nstep(), iscldy, qaercw_cur(1:4,:),qnumcw_cur(1:4)
+     endif
+  endif
+#endif

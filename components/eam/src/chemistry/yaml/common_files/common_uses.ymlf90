@@ -3,7 +3,10 @@
 !#define YAML_CALC
 
 !module_aero_amicphys.F90
-#define YAML_AMIC
+!#define YAML_AMIC
+
+!module_aero_rename.F90
+!#define YAML_RENAME
 
 use yaml_input_file_io
 

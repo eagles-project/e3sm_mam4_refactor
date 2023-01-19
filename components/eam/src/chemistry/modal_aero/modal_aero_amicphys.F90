@@ -154,7 +154,7 @@ implicit none
    !---------------------
    ! Variables used for saving grid cell mean values
 
-   real(r8) :: relhumgcm                           ! relative humidity [unitless] 
+   real(r8) :: relhumgcm                           ! relative humidity [unitless]
    real(r8) :: dgn_a(max_mode), dgn_awet(max_mode) ! dry and wet geo. mean diameter [m]
    real(r8) :: ev_sat(pcols,pver)                  ! (water) saturation vapor pressure [Pa]
    real(r8) :: qv_sat(pcols,pver)                  ! (water) saturation mixing ratio [kg/kg]
@@ -191,7 +191,7 @@ implicit none
    ! Loop indices
 
    integer :: ii, kk ! grid column and vertical level
-   integer :: icnst  ! constituent (tracer) 
+   integer :: icnst  ! constituent (tracer)
    integer :: imode  ! lognormal mode
    integer :: jsoa   ! soa species
 
@@ -242,7 +242,7 @@ implicit none
    ncluster_3dtend_nnuc = 0.0_r8
 
    ! Column integrals need to be initialized with zeros
-      q_coltendaa = 0.0_r8 
+      q_coltendaa = 0.0_r8
    qqcw_coltendaa = 0.0_r8
 
    call amicphys_diags_init( do_cond, do_rename, do_newnuc, do_coag )
@@ -387,7 +387,7 @@ implicit none
       !================================================================
       call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
-                                             qgcm_tendaa, qqcwgcm_tendaa        )! out 
+                                             qgcm_tendaa, qqcwgcm_tendaa        )! out
 
       call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
                                              qgcm_tendaa,         qqcwgcm_tendaa,         &! in
@@ -1522,7 +1522,7 @@ do_rename_if_block30: &
          dest_mode_of_mode,                                            &
          n_mode,                                                   &
          qnum_cur,                                                 &
-         qaer_cur,          qaer_delsub_grow4rnam                  )
+         qaer_cur,          qaer_delsub_grow4rnam)
 
       qnum_del_rnam = qnum_del_rnam + (qnum_cur - qnum_sv1)
       qaer_del_rnam = qaer_del_rnam + (qaer_cur - qaer_sv1)
@@ -3339,44 +3339,44 @@ time_loop: &
       real(r8) :: xferfrac_pcage, frac_cond, frac_coag
 #include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_beg.ymlf90"
 
-!
-agepair_loop1: &
-      do ipair = 1, n_agepair         ! only execute for ipair = 1, ipair>=2 is for MAM9
+      !
+      agepair_loop1: &
+           do ipair = 1, n_agepair         ! only execute for ipair = 1, ipair>=2 is for MAM9
 
       nsrc  = modefrm_agepair(ipair)
       ndest = modetoo_agepair(ipair)
 
       call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
-            qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
+           qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
             xferfrac_pcage, frac_cond, frac_coag, yaml)         ! output
 
-            do iaer = 1, naer
+      do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
             ! species is pom or bc
             ! transfer the aged fraction to accum mode
             ! include this transfer change in the cond and/or coag change (for mass budget)
             call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                                                  ! input
-                                                xferfrac_pcage, frac_cond, frac_coag, &                         ! input
+                 xferfrac_pcage, frac_cond, frac_coag, &                         ! input
                                                 qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
-      else
+         else
             ! species is soa, so4, or nh4 produced by condensation or coagulation
             ! transfer all of it to accum mode
             ! also transfer the condensation and coagulation changes
             !    to accum mode (for mass budget)
             call transfer_cond_coag_mass_to_accum(nsrc, ndest, &                                                  ! input
-                                                  qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
-      end if
-            end do
+                 qaer_cur(iaer,:), qaer_del_cond(iaer,:), qaer_del_coag(iaer,:)) ! in-outs
+         end if
+      end do
       ! number - transfer the aged fraction to accum mode
       ! include this transfer change in the cond and/or coag change (for mass budget)
       call transfer_aged_pcarbon_to_accum(nsrc, ndest, &                           ! input
-                                          xferfrac_pcage, frac_cond, frac_coag, &  ! input
+           xferfrac_pcage, frac_cond, frac_coag, &  ! input
                                           qnum_cur, qnum_del_cond, qnum_del_coag)  ! in-outs
 
       enddo agepair_loop1
 #include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_end.ymlf90"
-      return
-      end subroutine mam_pcarbon_aging_1subarea
+   return
+ end subroutine mam_pcarbon_aging_1subarea
 
 
       subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
@@ -3486,7 +3486,7 @@ agepair_loop1: &
 
 ! local variables
       real(r8) q_tmp
-
+!#include "../yaml/modal_aero_amicphys/f90_yaml/transfer_aged_pcarbon_to_accum_beg.ymlf90"
       q_tmp = q_cur(nsrc)*xferfrac_pcage
 
       q_cur(nsrc)       = q_cur(nsrc)  - q_tmp
@@ -3497,6 +3497,7 @@ agepair_loop1: &
 
       q_del_coag(nsrc)  = q_del_coag(nsrc)  - q_tmp*frac_coag
       q_del_coag(ndest) = q_del_coag(ndest) + q_tmp*frac_coag
+!#include "../yaml/modal_aero_amicphys/f90_yaml/transfer_aged_pcarbon_to_accum_end.ymlf90"
 
       return
       end subroutine transfer_aged_pcarbon_to_accum
@@ -3718,7 +3719,7 @@ use modal_aero_coag, only: set_coagulation_pairs
 
 use modal_aero_amicphys_control
 
-use modal_aero_amicphys_diags,only: m_a_amicphys_init_history 
+use modal_aero_amicphys_diags,only: m_a_amicphys_init_history
 
 implicit none
 
