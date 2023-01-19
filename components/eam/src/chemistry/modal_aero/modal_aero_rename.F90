@@ -24,7 +24,7 @@ contains
   !--------------------------------------------------------------------------------
   subroutine mam_rename_1subarea(iscldy, dest_mode_of_mode, nmode, &
        qnum_cur, qaer_cur, qaer_del_grow4rnam, qnumcw_cur,         &
-       qaercw_cur,        qaercw_del_grow4rnam)
+       qaercw_cur,        qaercw_del_grow4rnam                    )
 
     use modal_aero_data, only: ntot_amode
 
