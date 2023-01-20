@@ -1552,9 +1552,6 @@ subroutine loadaer( &
 
   ! return aerosol number, volume concentrations, and bulk hygroscopicity
 
-  !add these for direct access to num, mmr in state_q array.
-  use modal_aero_data,   only: lspectype_amode, specdens_amode, spechygro, lmassptr_amode, lmassptrcw_amode
-
   ! input arguments
   real(r8), intent(in) :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
 
@@ -1672,7 +1669,7 @@ end subroutine get_aer_mmr_sum
 subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn1d_num, &!in
            naerosol) !out
 
-  use modal_aero_data, only:numptrcw_amode
+  use modal_aero_data, only:numptr_amode
 
   ! input arguments
   integer,  intent(in) :: imode        ! mode index
@@ -1692,7 +1689,7 @@ subroutine get_aer_num(imode, istart, istop, state_q, cs, vaerosol, qcldbrn1d_nu
   !convert number mixing ratios to number concentrations
   !Use bulk volume conc found previously to bound value
 
-  num_idx = numptrcw_amode(imode)
+  num_idx = numptr_amode(imode)
   do icol = istart, istop
      naerosol(icol) = (state_q(icol,num_idx) + qcldbrn1d_num(icol))*cs(icol)
      !adjust number so that dgnumlo < dgnum < dgnumhi
