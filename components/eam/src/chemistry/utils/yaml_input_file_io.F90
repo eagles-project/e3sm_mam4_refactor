@@ -105,10 +105,10 @@ contains
     character(len=2000) :: finp, fout, fextra
 
     fextra=''
-    if(present(extra_string))fextra = extra_string
+    if(present(extra_string))write(fextra,'(2A)')'_',trim(extra_string)
 
-    write(finp,'(2A,I0,3A)')trim(adjustl(name)),'_input_ts_',get_nstep(),'_',trim(fextra),'.yaml'
-    write(fout,'(2A,I0,3A)')trim(adjustl(name)),'_output_ts_',get_nstep(),'_',trim(fextra),'.py'
+    write(finp,'(2A,I0,3A)')trim(adjustl(name)),'_input_ts_',get_nstep(),trim(fextra),'.yaml'
+    write(fout,'(2A,I0,3A)')trim(adjustl(name)),'_output_ts_',get_nstep(),trim(fextra),'.py'
 
     !get a unused unit numbers to write
     unit_input = getunit()

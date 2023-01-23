@@ -146,7 +146,7 @@ contains
     !some parameters
     real(r8), parameter :: sqrt_half = sqrt(0.5)
     real(r8), parameter :: frelax = 27.0_r8 !(3^3): relaxing 3*diameter, which makes it 3^3 for volume
-
+#include "../yaml/modal_aero_rename/f90_yaml/find_renaming_pairs_beg.ymlf90"
     ! Let us assume there are none to start with
     num_pairs = 0
 
@@ -200,7 +200,7 @@ contains
        diameter_threshold(src_mode) = 0.99*diameter_cutoff(src_mode) !99% of the cutoff
 
     end do
-
+#include "../yaml/modal_aero_rename/f90_yaml/find_renaming_pairs_end.ymlf90"
   end subroutine find_renaming_pairs
   !----------------------------------------------------------------------
   !----------------------------------------------------------------------
@@ -267,6 +267,7 @@ contains
     !local
     integer :: imode
     integer :: dest_mode
+#include "../yaml/modal_aero_rename/f90_yaml/ompute_dryvol_change_in_src_mode_beg_yml.f90"
 
     !For each mode, compute the initial (before growth) dryvolume and the growth in dryvolume
     do imode = 1, nmode
@@ -278,7 +279,7 @@ contains
        call compute_dryvolume_change(imode, nspec, q_mmr, q_del_growth, & !input
             dryvol(imode), deldryvol(imode)) !output
     end do
-
+#include "../yaml/modal_aero_rename/f90_yaml/ompute_dryvol_change_in_src_mode_end_yml.f90"
   end subroutine compute_dryvol_change_in_src_mode
 
   !----------------------------------------------------------------------

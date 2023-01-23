@@ -1,4 +1,4 @@
-!#ifdef YAML_CPP
+#ifdef YAML_RENAME
   !<"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
@@ -38,7 +38,7 @@
      yaml%flag_print  = .true.!(**remove these if generating data for a dependent subroutines**)
 
      !open I/O yaml files (it can have an extra optional argument to pass a unique string to differentiate file names)
-     call open_files(SUB_NAME, &  !intent-in
+     call open_files('compute_dryvol_change_in_src_mode', &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string

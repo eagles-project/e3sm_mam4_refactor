@@ -7,7 +7,7 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=mam_rename_1subarea
+    sub_name=compute_dryvol_change_in_src_mode
 
     #module name
     module_name=modal_aero_rename
@@ -89,7 +89,7 @@ create_file () {
     fi
 
     #full file name
-    f_name=${sub_name}_${sub_str}.ymlf90
+    f_name=${sub_name}_${sub_str}_yml.f90
 
     #code to include
     echo "#include \"$4/$1/f90_yaml/$f_name\""
