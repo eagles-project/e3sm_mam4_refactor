@@ -269,8 +269,6 @@ subroutine mam_amicphys_1subarea(&
 
          qnum_delsub_cond = qnum_cur - qnum_sv1
          qaer_delsub_cond = qaer_cur - qaer_sv1
-         qnum_delaa  (:,iqtend_cond) = qnum_delaa  (:,iqtend_cond) + qnum_delsub_cond 
-         qaer_delaa(:,:,iqtend_cond) = qaer_delaa(:,:,iqtend_cond) + qaer_delsub_cond 
 
          del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
                            - (qgas_sv1(igas_h2so4) + qgas_netprod_otrproc(igas_h2so4)*dtsubstep)
@@ -405,6 +403,14 @@ subroutine mam_amicphys_1subarea(&
             qaer_cur,          qaer_delsub_cond, qaer_delsub_coag, &! in-outs
             qaer_delsub_coag_in)                                    ! in-outs
 
+      end if
+
+      ! The following block has to be placed here (after both condensation and aging)
+      ! as both can change the values of qnum_delsub_cond and qaer_delsub_cond.
+
+      if ( do_cond_sub ) then
+         qnum_delaa  (:,iqtend_cond) = qnum_delaa  (:,iqtend_cond) + qnum_delsub_cond 
+         qaer_delaa(:,:,iqtend_cond) = qaer_delaa(:,:,iqtend_cond) + qaer_delsub_cond 
       end if
 
    end do jtsubstep_loop
