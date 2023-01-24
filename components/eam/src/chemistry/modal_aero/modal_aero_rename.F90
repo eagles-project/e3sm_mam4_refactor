@@ -267,7 +267,7 @@ contains
     !local
     integer :: imode
     integer :: dest_mode
-#include "../yaml/modal_aero_rename/f90_yaml/ompute_dryvol_change_in_src_mode_beg_yml.f90"
+#include "../yaml/modal_aero_rename/f90_yaml/compute_dryvol_change_in_src_mode_beg_yml.f90"
 
     !For each mode, compute the initial (before growth) dryvolume and the growth in dryvolume
     do imode = 1, nmode
@@ -279,7 +279,7 @@ contains
        call compute_dryvolume_change(imode, nspec, q_mmr, q_del_growth, & !input
             dryvol(imode), deldryvol(imode)) !output
     end do
-#include "../yaml/modal_aero_rename/f90_yaml/ompute_dryvol_change_in_src_mode_end_yml.f90"
+#include "../yaml/modal_aero_rename/f90_yaml/compute_dryvol_change_in_src_mode_end_yml.f90"
   end subroutine compute_dryvol_change_in_src_mode
 
   !----------------------------------------------------------------------
