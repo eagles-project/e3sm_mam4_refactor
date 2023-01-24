@@ -1,5 +1,5 @@
 module modal_aero_calcsize
-#include "../yaml/modal_aero_calcsize/f90_yaml/common_uses.ymlf90"
+#include "../yaml/common_files/common_uses.ymlf90"
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
 use shr_kind_mod,     only: r8 => shr_kind_r8, cs => shr_kind_cs

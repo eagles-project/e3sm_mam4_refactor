@@ -1,0 +1,20 @@
+#ifdef YAML_RENAME
+  ! YAML file output generation code- DO NOT PORT to C++
+  if(yaml%flag_print) then ! if this column exists in lchnk
+
+     !write output header
+     call write_output_header(unit_output)
+
+     !start writing data
+     !<add code for writing data here>
+
+     call write_1d_output_var(unit_output, 'qnum_cur',max_mode,qnum_cur)
+     if(present(qnumcw_cur))call write_1d_output_var(unit_output, 'qnumcw_cur',max_mode,qnumcw_cur) !optional
+     call write_2d_output_var(unit_output, 'qaer_cur',max_aer,max_mode,qaer_cur)
+     if(present(qaercw_cur))call write_2d_output_var(unit_output, 'qaercw_cur',max_aer,max_mode,qaercw_cur)!optional
+
+     !close the output file
+     close(unit_output)
+     call freeunit(unit_output)
+  endif
+#endif

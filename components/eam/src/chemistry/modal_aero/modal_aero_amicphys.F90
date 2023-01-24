@@ -12,7 +12,7 @@ module modal_aero_amicphys
 ! History:
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 !----------------------------------------------------------------------
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use cam_abortutils,  only:  endrun
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
@@ -3337,6 +3337,7 @@ time_loop: &
       integer :: nsrc, ndest
 
       real(r8) :: xferfrac_pcage, frac_cond, frac_coag
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_beg.ymlf90"
 
 
 !
@@ -3374,7 +3375,7 @@ agepair_loop1: &
                                           qnum_cur, qnum_del_cond, qnum_del_coag)  ! in-outs
 
       enddo agepair_loop1
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_1subarea_end.ymlf90"
       return
       end subroutine mam_pcarbon_aging_1subarea
 
@@ -3414,7 +3415,7 @@ agepair_loop1: &
       real(r8) :: qaer_del_cond_tmp, qaer_del_coag_tmp
       real(r8) :: vol_core, vol_shell
       real(r8) :: xferfrac_max
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_frac_beg.ymlf90"
 ! for default MAM4 only so4 and soa contribute to aging, nsoa is for tagging and
 ! is set to 1 for default MAM4
       vol_shell = qaer_cur(iaer_so4,nsrc)*mass_2_vol(iaer_so4) + &
@@ -3457,7 +3458,7 @@ agepair_loop1: &
       else
          xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
       end if
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_frac_end.ymlf90"
       return
       end subroutine mam_pcarbon_aging_frac
 
@@ -3486,7 +3487,7 @@ agepair_loop1: &
 
 ! local variables
       real(r8) q_tmp
-
+!#include "../yaml/modal_aero_amicphys/f90_yaml/transfer_aged_pcarbon_to_accum_beg.ymlf90"
       q_tmp = q_cur(nsrc)*xferfrac_pcage
 
       q_cur(nsrc)       = q_cur(nsrc)  - q_tmp
@@ -3497,6 +3498,7 @@ agepair_loop1: &
 
       q_del_coag(nsrc)  = q_del_coag(nsrc)  - q_tmp*frac_coag
       q_del_coag(ndest) = q_del_coag(ndest) + q_tmp*frac_coag
+!#include "../yaml/modal_aero_amicphys/f90_yaml/transfer_aged_pcarbon_to_accum_end.ymlf90"
 
       return
       end subroutine transfer_aged_pcarbon_to_accum

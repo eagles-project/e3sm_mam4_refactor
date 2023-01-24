@@ -1,5 +1,5 @@
-#ifdef YAML
- if(yaml%print_flag .and. .not. printed(imode)) then
+#ifdef YAML_CALC
+ if(yaml%flag_print .and. .not. printed(imode)) then
      printed(imode) = .true.
      !write output header
      call write_output_header(unit_output)
