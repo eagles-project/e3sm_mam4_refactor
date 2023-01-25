@@ -1,0 +1,17 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          51 , time step=         355 ] 
+mam4xx:
+  function: compute_tendencies
+input:
+  fixed:
+    dt:    0.00
+    ncol: [         4]
+    temperature: [ 0.2804261386E+03]
+    pmid: [ 0.6753476429E+05]
+    pdel: [ 0.3395589227E+04]
+    cmfdqr: [ 0.4201774770E-07]
+    evapc: [ 0.8237076572E-08]
+    cldt: [ 0.4131862680E-01]
+    cldcu: [ 0.4131862680E-01]
+    cldst: [ 0.0000000000E+00]
+    evapr: [ 0.7626064109E-09]
+    prain: [ 0.0000000000E+00]

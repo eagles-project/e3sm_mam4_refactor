@@ -8,5 +8,8 @@
 !module_aero_rename.F90
 !#define YAML_RENAME
 
+! module_wetdep.F90
+!#define YAML_WETDEP
+
 use yaml_input_file_io
 

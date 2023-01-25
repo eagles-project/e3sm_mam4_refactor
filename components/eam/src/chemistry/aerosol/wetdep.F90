@@ -5,12 +5,14 @@ module wetdep
 ! Wet deposition routines for both aerosols and gas phase constituents.
 ! 
 !-----------------------------------------------------------------------
+#include "../yaml/common_files/common_uses.ymlf90"
 
 use shr_kind_mod, only: r8 => shr_kind_r8
 use ppgrid,       only: pcols, pver
 use physconst,    only: gravit, rair, tmelt
 use cam_abortutils, only: endrun
 use mam_support,  only: min_max_bound
+use spmd_utils,   only : masterproc
 
 implicit none
 save
@@ -315,7 +317,9 @@ subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
    real(r8) :: lprec_cu(pcols,pver)      ! Local production rate of convective precip [kg/m2/s]
    real(r8) :: sumppr_st_all(pcols,pver) ! same as sumppr_all but for strat.precip. calculated but not used
    real(r8) :: lprec_st(pcols,pver)      ! Local production rate of stratiform precip [kg/m2/s]
+
    ! -----------------------------------------------------------------------
+#include "../yaml/wetdep/f90_yaml/clddiag_beg_yml.f90"
 
    !calculate local precipitation rate
    !FIXME: Possible bug: why there is no evapc in lprec calculation?
@@ -331,6 +335,7 @@ subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
    ! calculate rain mixing ratio
    call rain_mix_ratio(temperature, pmid, sumppr_all, ncol, rain)
 
+#include "../yaml/wetdep/f90_yaml/clddiag_end_yml.f90"
 end subroutine clddiag
 
 !==============================================================================

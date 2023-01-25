@@ -1,4 +1,4 @@
-!#ifdef YAML_CPP
+#ifdef YAML_WETDEP
   !<"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
@@ -16,8 +16,8 @@
   integer  :: unit_input, unit_output, y_nstep
 
   !populate YAML structure
-  yaml%lev_print = <Add hardwired level here> !level (**remove these if generating data for a dependent subroutines**)
-  yaml%nstep_print = <add hardwired time step here> !time step(**remove these if generating data for a dependent subroutines**)
+  yaml%lev_print = 51 !level (**remove these if generating data for a dependent subroutines**)
+  yaml%nstep_print = 355 !time step(**remove these if generating data for a dependent subroutines**)
 
   !YAML file input generation code- DO NOT PORT to C++
   !print all inputs one-by-one at column "yaml%col_print"
@@ -25,10 +25,10 @@
   y_nstep = get_nstep() !time step (**remove these if generating data for a dependent subroutines**)
 
   yaml%flag_print = .false. ! to write or not to write data (**remove these if generating data for a dependent subroutines**)
-  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+!  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
      !<
      !In the case of y_i or y_k are not passed as arguments:
-     !if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
+     if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
 
      !For generating data for a dependent subroutines where "yaml" derived type is already initialized:
      !if(yaml%flag_print) then
@@ -38,7 +38,7 @@
      yaml%flag_print  = .true.!(**remove these if generating data for a dependent subroutines**)
 
      !open I/O yaml files (it can have an extra optional argument to pass a unique string to differentiate file names)
-     call open_files(SUB_NAME, &  !intent-in
+     call open_files('clddiag', &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
@@ -46,6 +46,19 @@
           'compute_tendencies',yaml%nstep_print, yaml%lev_print)
 
      !< add code for writing data here>
+call write_var(unit_input, unit_output, 'ncol', ncol)
+call write_var(unit_input, unit_output, 'temperature', temperature(yaml%col_print, yaml%lev_print))
+call write_var(unit_input, unit_output, 'pmid', pmid(yaml%col_print, yaml%lev_print))
+call write_var(unit_input, unit_output, 'pdel', pdel(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'cmfdqr', cmfdqr(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'evapc', evapc(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'cldt', cldt(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'cldcu', cldcu(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'cldst', cldst(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'evapr', evapr(yaml%col_print,yaml%lev_print))
+call write_var(unit_input, unit_output, 'prain', prain(yaml%col_print,yaml%lev_print))
+
+
      !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
      !call write_1d_var(unit_input, unit_output, fld_name,dim,field) ! writes 1D variables of any dimension
      !call write_2d_var(unit_input, unit_output, fld_name, dim1, dim2, field) ! writes 2D variables of any dimension: field(dim1,dim2)
