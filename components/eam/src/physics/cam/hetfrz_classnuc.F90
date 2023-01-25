@@ -56,10 +56,8 @@ real(r8), parameter :: limfacbc = 0.01_r8      ! max. ice nucleating fraction so
 
 real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
 
-!********************************************************
-! Wang et al., 2014 fitting parameters
-!********************************************************
 
+! Wang et al., 2014 fitting parameters
 ! freezing parameters for immersion freezing
 real(r8),parameter :: theta_imm_bc = 48.0_r8            ! contact angle [deg], converted to rad later !DeMott et al (1990)
 real(r8),parameter :: dga_imm_bc = 14.15E-20_r8         ! activation energy [J]
@@ -72,6 +70,12 @@ real(r8),parameter :: dga_dep_dust = -8.1E-21_r8        ! activation energy [J]
 real(r8),parameter :: theta_dep_bc = 28._r8             ! contact angle [deg], converted to rad later !Moehler et al (2005), soot
 real(r8),parameter :: dga_dep_bc = -2.E-19_r8           ! activation energy [J]
 
+
+! parameters for PDF theta model 
+integer, parameter :: pdf_n_theta = 301
+integer, parameter :: i1 = 53
+integer, parameter :: i2 = 113
+real(r8),parameter :: pdf_d_theta = (179._r8-1._r8)/180._r8*pi/(pdf_n_theta-1) 
 
 
 !===================================================================================================
@@ -187,41 +191,16 @@ subroutine hetfrz_classnuc_calc( &
    ! dim_theta index values of 53 through 113.  These loop bounds are
    ! hardcoded in the variables i1 and i2.
    !
-   real(r8),parameter :: theta_min = 1._r8/180._r8*pi
-   real(r8),parameter :: theta_max = 179._r8/180._r8*pi
-   real(r8) :: x1_imm
-   real(r8) :: x2_imm
-   real(r8) :: norm_theta_imm
-   real(r8),parameter :: imm_dust_mean_theta = 46.0_r8/180.0_r8*pi 
-   real(r8),parameter :: imm_dust_var_theta = 0.01_r8
-   real(r8) :: pdf_d_theta
-   integer,parameter :: pdf_n_theta = 301
-   integer,parameter :: i1 = 53
-   integer,parameter :: i2 = 113
    real(r8) :: dim_theta(pdf_n_theta)
-   real(r8) :: dim_f_imm_dust_a1(pdf_n_theta), dim_f_imm_dust_a3(pdf_n_theta)
-   real(r8) :: dim_Jimm_dust_a1(pdf_n_theta), dim_Jimm_dust_a3(pdf_n_theta)
    real(r8) :: pdf_imm_theta(pdf_n_theta)
-   real(r8) :: sum_imm_dust_a1, sum_imm_dust_a3
+
 
    !------------------------------------------------------------------------------------------------
 
    errstring = ' '
-
    
-      pdf_d_theta = (179._r8-1._r8)/180._r8*pi/(pdf_n_theta-1)
-      ! calculate the integral in the denominator
-      x1_imm = (LOG(theta_min)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-      x2_imm = (LOG(theta_max)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-      norm_theta_imm = (ERF(x2_imm)-ERF(x1_imm))*0.5_r8
-      dim_theta = 0.0_r8
-      pdf_imm_theta = 0.0_r8
-      do i = i1,i2
-         dim_theta(i) = 1._r8/180._r8*pi+(i-1)*pdf_d_theta
-         pdf_imm_theta(i) = exp(-((LOG(dim_theta(i))-LOG(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
-                                (dim_theta(i)*imm_dust_var_theta*SQRT(2*pi))/norm_theta_imm
-      end do
 
+   call calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
 
    ! get saturation vapor pressures
    eswtr = svp_water(t)  ! 0 for liquid
@@ -291,7 +270,7 @@ subroutine hetfrz_classnuc_calc( &
 
    call calculate_hetfrz_immersion_nucleation(deltat, T, uncoated_aer_num,  &
                                               total_interstitial_aer_num, total_cloudborne_aer_num, &
-                                               sigma_iw, eswtr, vwice, pdf_n_theta, dim_theta, pdf_imm_theta, &
+                                               sigma_iw, eswtr, vwice, dim_theta, pdf_imm_theta, &
                                                rgimm_bc, rgimm_dust_a1, rgimm_dust_a3, &
                                                r_bc, r_dust_a1, r_dust_a3, &
                                                do_bc, do_dst1, do_dst3, &
@@ -327,6 +306,41 @@ subroutine hetfrz_classnuc_calc( &
                                                frzbccnt, frzducnt, errstring)
 
 end subroutine  hetfrz_classnuc_calc
+
+
+subroutine calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
+
+   ! output
+   real(r8), intent(out) :: dim_theta(pdf_n_theta)
+   real(r8), intent(out) :: pdf_imm_theta(pdf_n_theta)
+
+   ! local variables
+   real(r8),parameter :: theta_min = 1._r8/180._r8*pi
+   real(r8),parameter :: theta_max = 179._r8/180._r8*pi
+   real(r8) :: x1_imm
+   real(r8) :: x2_imm
+   real(r8) :: norm_theta_imm
+   real(r8),parameter :: imm_dust_mean_theta = 46.0_r8/180.0_r8*pi
+   real(r8),parameter :: imm_dust_var_theta = 0.01_r8
+   integer :: i
+
+   ! calculate the integral in the denominator
+   x1_imm = (LOG(theta_min)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+   x2_imm = (LOG(theta_max)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+      
+   norm_theta_imm = (ERF(x2_imm)-ERF(x1_imm))*0.5_r8
+   
+   dim_theta = 0.0_r8
+   pdf_imm_theta = 0.0_r8
+      
+   do i = i1,i2
+      dim_theta(i) = 1._r8/180._r8*pi+(i-1)*pdf_d_theta
+      pdf_imm_theta(i) = exp(-((LOG(dim_theta(i))-LOG(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
+                                (dim_theta(i)*imm_dust_var_theta*SQRT(2*pi))/norm_theta_imm
+   enddo
+
+end subroutine calculate_vars_for_pdf_imm
+
 
 subroutine calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r3lx, aw)
 
@@ -383,7 +397,7 @@ end subroutine calculate_rgimm_and_determine_spec_flag
 
 subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_aer_num,  &
                                                  total_interstitial_aer_num, total_cloudborne_aer_num, &
-                                               sigma_iw, eswtr, vwice, pdf_n_theta, dim_theta, pdf_imm_theta, & 
+                                               sigma_iw, eswtr, vwice, dim_theta, pdf_imm_theta, & 
                                                rgimm_bc, rgimm_dust_a1, rgimm_dust_a3, &
                                                r_bc, r_dust_a1, r_dust_a3, &
                                                do_bc, do_dst1, do_dst3, &
@@ -399,7 +413,6 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8), intent(in) :: sigma_iw                        ! [J/m2]      
    real(r8), intent(in) :: eswtr                           ! [Pa]   
    real(r8), intent(in) :: vwice
-   integer, intent(in) :: pdf_n_theta
    real(r8), intent(in) :: dim_theta(pdf_n_theta)
    real(r8), intent(in) :: pdf_imm_theta(pdf_n_theta)
 
@@ -442,17 +455,14 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
 
    ! form factor
    ! only consider flat surfaces due to uncertainty of curved surfaces
-   m = COS(theta_imm_bc*pi/180._r8)
-   f_imm_bc = (2+m)*(1-m)**2/4._r8
-  
+   f_imm_bc = get_compatibility_parameter(theta_imm_bc*pi/180._r8)
+
    dim_f_imm_dust_a1 = 0.0_r8
    dim_f_imm_dust_a3 = 0.0_r8
    do i = i1,i2
-      m = cos(dim_theta(i))
-      dim_f_imm_dust_a1(i) = (2+m)*(1-m)**2/4._r8
+      dim_f_imm_dust_a1(i) = get_compatibility_parameter(dim_theta(i))
 
-      m = cos(dim_theta(i))
-      dim_f_imm_dust_a3(i) = (2+m)*(1-m)**2/4._r8
+      dim_f_imm_dust_a3(i) = get_compatibility_parameter(dim_theta(i))
    end do
 
 
@@ -551,17 +561,13 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    real(r8) :: f_dep_dust_a1, f_dep_dust_a3
    real(r8) :: Jdep_bc
    real(r8) :: Jdep_dust_a1, Jdep_dust_a3            
-   real(r8) :: m, dg0dep, Adep
+   real(r8) :: dg0dep, Adep
    
+
    ! form factor
-   m = COS(theta_dep_bc*pi/180._r8)
-   f_dep_bc = (2+m)*(1-m)**2/4._r8
-
-   m = COS(theta_dep_dust*pi/180._r8)
-   f_dep_dust_a1 = (2+m)*(1-m)**2/4._r8
-
-   m = COS(theta_dep_dust*pi/180._r8)
-   f_dep_dust_a3 = (2+m)*(1-m)**2/4._r8
+   f_dep_bc      = get_compatibility_parameter(theta_dep_bc*pi/180._r8)   
+   f_dep_dust_a1 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)
+   f_dep_dust_a3 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)
 
    ! homogeneous energy of germ formation
    dg0dep = 4*pi/3._r8*sigma_iv*rgdep**2
@@ -631,19 +637,12 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    real(r8) :: f_cnt_dust_a1,f_cnt_dust_a3
    real(r8) :: Jcnt_bc
    real(r8) :: Jcnt_dust_a1,Jcnt_dust_a3
-   real(r8) :: m, dg0cnt, Acnt
+   real(r8) :: dg0cnt, Acnt
 
    ! form factor
-   !m = COS(theta_dep_bc*pi/180._r8)
-   !f_cnt_bc = (2+m)*(1-m)**2/4._r8
-
-   f_cnt_bc = get_compatibility_parameter(theta_dep_bc*pi/180._r8)
-
-   m = COS(theta_dep_dust*pi/180._r8)
-   f_cnt_dust_a1 = (2+m)*(1-m)**2/4._r8
-
-   m = COS(theta_dep_dust*pi/180._r8)
-   f_cnt_dust_a3 = (2+m)*(1-m)**2/4._r8
+   f_cnt_bc      = get_compatibility_parameter(theta_dep_bc*pi/180._r8)
+   f_cnt_dust_a1 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)   
+   f_cnt_dust_a3 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)   
 
    ! homogeneous energy of germ formation
    dg0cnt = 4*pi/3._r8*sigma_iv*rgimm**2
