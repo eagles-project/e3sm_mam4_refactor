@@ -38,7 +38,7 @@ real(r8) :: rh2o
 real(r8) :: rhoh2o
 real(r8) :: mwh2o
 real(r8) :: tmelt
-!real(r8) :: pi
+!real(r8) :: pi     ! commented out to avoid double declaring pi
 
 integer  :: iulog
 
@@ -101,7 +101,7 @@ subroutine hetfrz_classnuc_init( &
    rhoh2o = rhoh2o_in
    mwh2o  = mwh2o_in
    tmelt  = tmelt_in
-   ! pi     = pi_in
+   ! pi     = pi_in              ! commented out to avoid double declaring pi
    iulog  = iulog_in
 
 end subroutine hetfrz_classnuc_init
@@ -109,7 +109,7 @@ end subroutine hetfrz_classnuc_init
 !===================================================================================================
 
 subroutine hetfrz_classnuc_calc( &
-   deltat, t, p, supersatice,                 &
+   deltat, temperature, pressure, supersatice,                 &
    fn,                                        &
    r3lx, icnlx,                               &
    frzbcimm, frzduimm,                        &
@@ -120,16 +120,16 @@ subroutine hetfrz_classnuc_calc( &
    total_interstitial_aer_num, total_cloudborne_aer_num, errstring)
 
    real(r8), intent(in) :: deltat            ! timestep [s]
-   real(r8), intent(in) :: t                 ! temperature [K]
-   real(r8), intent(in) :: p                 ! pressure [Pa]
-   real(r8), intent(in) :: supersatice       ! supersaturation ratio wrt ice at 100%rh over water [ ]
+   real(r8), intent(in) :: temperature       ! temperature [K]
+   real(r8), intent(in) :: pressure          ! pressure [Pa]
+   real(r8), intent(in) :: supersatice       ! supersaturation ratio wrt ice at 100%rh over water [unitless]
    real(r8), intent(in) :: r3lx              ! volume mean drop radius [m]
-   real(r8), intent(in) :: icnlx             ! in-cloud droplet concentration [cm-3]
+   real(r8), intent(in) :: icnlx             ! in-cloud droplet concentration [#/cm^3]
 
-   real(r8), intent(in) :: fn(hetfrz_aer_nspec)               ! fraction activated [ ] for cloud borne aerosol number
-                                               ! index values are 1:bc, 2:dust_a1, 3:dust_a3
+   real(r8), intent(in) :: fn(hetfrz_aer_nspec)               ! fraction activated for cloud borne aerosol number [unitless]
+                                                              ! index values are 1:bc, 2:dust_a1, 3:dust_a3
    real(r8), intent(in) :: hetraer(hetfrz_aer_nspec)          ! bc and dust mass mean radius [m]
-   real(r8), intent(in) :: awcam(hetfrz_aer_nspec)            ! modal added mass [mug m-3]
+   real(r8), intent(in) :: awcam(hetfrz_aer_nspec)            ! modal added mass [mug/m^3]
    real(r8), intent(in) :: awfacm(hetfrz_aer_nspec)           ! (OC+BC)/(OC+BC+SO4)
    real(r8), intent(in) :: dstcoat(hetfrz_aer_nspec)          ! coated fraction
    real(r8), intent(in) :: total_aer_num(hetfrz_aer_nspec)    ! total bc and dust number concentration(interstitial+cloudborne) [#/cm^3]
@@ -148,33 +148,27 @@ subroutine hetfrz_classnuc_calc( &
    character(len=*), intent(out) :: errstring
 
    ! local variables
-
-   real(r8) :: aw(hetfrz_aer_nspec)                           ! water activity [ ]
-
    logical :: do_bc, do_dst1, do_dst3
 
-   !real(r8), parameter :: pi = 4._r8*atan(1.0_r8)   
-   real(r8) :: tc   
-   real(r8) :: vwice   
-   real(r8) :: rhoice   
-   real(r8) :: sigma_iw                        ! [J/m2]   
-   real(r8) :: sigma_iv                        ! [J/m2]   
-   real(r8) :: esice                           ! [Pa]   
-   real(r8) :: eswtr                           ! [Pa]   
-   real(r8) :: rgimm   
-   real(r8) :: rgdep  
-   real(r8) :: rgimm_bc   
-   real(r8) :: rgimm_dust_a1, rgimm_dust_a3    
-
-   real(r8) :: q, m, phi   
+   real(r8) :: aw(hetfrz_aer_nspec)            ! water activity [ ] 
+   real(r8) :: tc                              ! temperature [C]
+   real(r8) :: vwice                           !
+   real(r8) :: rhoice                          ! 
+   real(r8) :: sigma_iw                        ! surface tension between ice and water [J/m^2]   
+   real(r8) :: sigma_iv                        ! surface tension between ice and vapor [J/m^2]   
+   real(r8) :: esice                           ! saturation vapor pressure over ice [Pa]   
+   real(r8) :: eswtr                           ! saturation vapor pressure over water [Pa]   
+   real(r8) :: rgimm                           ! critical germ radius for immersion freezing [m]
+   real(r8) :: rgdep                           ! critical germ radius for deposition nucleation [m]
+   real(r8) :: rgimm_bc                        !
+   real(r8) :: rgimm_dust_a1, rgimm_dust_a3    !
+  
    real(r8) :: r_bc                            ! model radii of BC modes [m]   
    real(r8) :: r_dust_a1, r_dust_a3            ! model radii of dust modes [m]   
-  
-   integer :: i
 
-   real(r8) :: Kcoll_bc                                    ! collision kernel [cm3 s-1]
-   real(r8) :: Kcoll_dust_a1                               ! collision kernel [cm3 s-1]
-   real(r8) :: Kcoll_dust_a3                               ! collision kernel [cm3 s-1]
+   real(r8) :: Kcoll_bc                        ! collision kernel [cm^3/s]
+   real(r8) :: Kcoll_dust_a1                   ! collision kernel [cm^3/s]
+   real(r8) :: Kcoll_dust_a3                   ! collision kernel [cm^3/s]
 
 
    !*****************************************************************************
@@ -193,8 +187,6 @@ subroutine hetfrz_classnuc_calc( &
    !
    real(r8) :: dim_theta(pdf_n_theta)
    real(r8) :: pdf_imm_theta(pdf_n_theta)
-
-
    !------------------------------------------------------------------------------------------------
 
    errstring = ' '
@@ -203,10 +195,10 @@ subroutine hetfrz_classnuc_calc( &
    call calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
 
    ! get saturation vapor pressures
-   eswtr = svp_water(t)  ! 0 for liquid
-   esice = svp_ice(t)  ! 1 for ice
+   eswtr = svp_water(temperature)  ! 0 for liquid
+   esice = svp_ice(temperature)  ! 1 for ice
 
-   tc = t - tmelt
+   tc = temperature - tmelt
    rhoice = 916.7_r8-0.175_r8*tc-5.e-4_r8*tc**2
    vwice = mwh2o*amu/rhoice
    sigma_iw = (28.5_r8+0.25_r8*tc)*1E-3_r8
@@ -218,7 +210,7 @@ subroutine hetfrz_classnuc_calc( &
    r_dust_a3 = hetraer(3)    
 
    ! calculate collision kernels as a function of environmental parameters and aerosol/droplet sizes
-   call collkernel(t, p, eswtr, r3lx,         &
+   call collkernel(temperature, pressure, eswtr, r3lx,         &
                    r_bc,                                  &  ! BC modes
                    r_dust_a1, r_dust_a3,                  &  ! dust modes
                    Kcoll_bc,                              &  ! collision kernel [cm3 s-1]
@@ -254,21 +246,21 @@ subroutine hetfrz_classnuc_calc( &
    frzdudep = 0._r8
 
    ! critical germ size
-   rgimm = 2*vwice*sigma_iw/(kboltz*t*LOG(supersatice))
+   rgimm = 2*vwice*sigma_iw/(kboltz*temperature*log(supersatice))
    
    ! take solute effect into account
    rgimm_bc = rgimm
    rgimm_dust_a1 = rgimm
    rgimm_dust_a3 = rgimm
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, t, aw(id_bc), supersatice, rgimm_bc, do_bc)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_bc), supersatice, rgimm_bc, do_bc)
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, t, aw(id_dst1), supersatice, rgimm_dust_a1, do_dst1)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst1), supersatice, rgimm_dust_a1, do_dst1)
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, t, aw(id_dst3), supersatice, rgimm_dust_a3, do_dst3)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst3), supersatice, rgimm_dust_a3, do_dst3)
 
 
-   call calculate_hetfrz_immersion_nucleation(deltat, T, uncoated_aer_num,  &
+   call calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_aer_num,  &
                                               total_interstitial_aer_num, total_cloudborne_aer_num, &
                                                sigma_iw, eswtr, vwice, dim_theta, pdf_imm_theta, &
                                                rgimm_bc, rgimm_dust_a1, rgimm_dust_a3, &
@@ -284,9 +276,9 @@ subroutine hetfrz_classnuc_calc( &
 
    ! critical germ size
    ! assume 98% RH in mixed-phase clouds (Korolev & Isaac, JAS 2006)
-   rgdep=2*vwice*sigma_iv/(kboltz*t*LOG(rhwincloud*supersatice)) 
+   rgdep=2*vwice*sigma_iv/(kboltz*temperature*log(rhwincloud*supersatice)) 
 
-   call calculate_hetfrz_deposition_nucleation(deltat, T, uncoated_aer_num, &
+   call calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_aer_num, &
                                                sigma_iv, eswtr, vwice, rgdep, &
                                                r_bc, r_dust_a1, r_dust_a3, &
                                                do_bc, do_dst1, do_dst3, &
@@ -298,7 +290,7 @@ subroutine hetfrz_classnuc_calc( &
    ! contact nucleation
    !!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   call calculate_hetfrz_contact_nucleation(deltat, T, uncoated_aer_num, icnlx, &
+   call calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer_num, icnlx, &
                                                sigma_iv, eswtr, rgimm, &
                                                r_bc, r_dust_a1, r_dust_a3, &
                                                Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3, &
@@ -325,24 +317,31 @@ subroutine calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
    integer :: i
 
    ! calculate the integral in the denominator
-   x1_imm = (LOG(theta_min)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-   x2_imm = (LOG(theta_max)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+   x1_imm = (log(theta_min)-log(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+   x2_imm = (log(theta_max)-log(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
       
-   norm_theta_imm = (ERF(x2_imm)-ERF(x1_imm))*0.5_r8
+   norm_theta_imm = (erf(x2_imm)-erf(x1_imm))*0.5_r8
    
    dim_theta = 0.0_r8
    pdf_imm_theta = 0.0_r8
       
    do i = i1,i2
       dim_theta(i) = 1._r8/180._r8*pi+(i-1)*pdf_d_theta
-      pdf_imm_theta(i) = exp(-((LOG(dim_theta(i))-LOG(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
-                                (dim_theta(i)*imm_dust_var_theta*SQRT(2*pi))/norm_theta_imm
+      pdf_imm_theta(i) = exp(-((log(dim_theta(i))-log(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
+                                (dim_theta(i)*imm_dust_var_theta*sqrt(2*pi))/norm_theta_imm
    enddo
 
 end subroutine calculate_vars_for_pdf_imm
 
 
 subroutine calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r3lx, aw)
+
+   !***************************************************
+   ! calculate water activity based on table A3 
+   ! in Chen, J.-P. (1994), J. Atmos. Sci.
+   ! aw = 1/(1 + sum of CnMn)
+   !***************************************************
+
 
    ! input
    real(r8), intent(in) :: total_interstitial_aer_num(hetfrz_aer_nspec) ! total bc and dust concentration(interstitial)
@@ -355,15 +354,20 @@ subroutine calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r
 
    ! local variables
    real(r8) :: molal(3)                        ! molality [moles/kg]
-   real(r8), parameter :: Mso4 = 96.06_r8
+   real(r8), parameter :: mw_so4 = 96.06_r8    ! sulfate molecular weight
+   real(r8), parameter :: coeff_c1 = 2.9244948e-2_r8
+   real(r8), parameter :: coeff_c2 = 2.3141243e-3_r8
+   real(r8), parameter :: coeff_c3 = 7.8184854e-7_r8
    integer :: ispec
 
    do ispec = 1, hetfrz_aer_nspec
       !calculate molality
       if ( total_interstitial_aer_num(ispec) > 0._r8 ) then
-         molal(ispec) = (1.e-6_r8*awcam(ispec)*(1._r8-awfacm(ispec))/(Mso4*total_interstitial_aer_num(ispec)*1.e6_r8))/&
-                    (4*pi/3*rhoh2o*(max(r3lx,4.e-6_r8))**3)
-         aw(ispec) = 1._r8/(1._r8+2.9244948e-2_r8*molal(ispec)+2.3141243e-3_r8*molal(ispec)**2+7.8184854e-7_r8*molal(ispec)**3)
+         molal(ispec) = (1.e-6_r8*awcam(ispec)*(1._r8-awfacm(ispec))/(mw_so4*total_interstitial_aer_num(ispec)*1.e6_r8))/&
+                        (4*pi/3*rhoh2o*(max(r3lx,4.e-6_r8))**3)
+
+         !aw(ispec) = 1._r8/(1._r8+2.9244948e-2_r8*molal(ispec)+2.3141243e-3_r8*molal(ispec)**2+7.8184854e-7_r8*molal(ispec)**3)
+         aw(ispec) = 1._r8/(1._r8 + coeff_c1*molal(ispec) + coeff_c2*molal(ispec)**2 + coeff_c3*molal(ispec)**3)
       endif
    enddo
  
@@ -431,9 +435,6 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8), parameter :: n1 = 1.e19_r8           ! number of water molecules in contact with unit area of substrate [m-2]
    real(r8), parameter :: hplanck = 6.63e-34_r8
    real(r8), parameter :: rhplanck = 1._r8/hplanck
-   !real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
-   integer, parameter :: i1 = 53
-   integer, parameter :: i2 = 113
 
    real(r8) :: rgimm_bc
    real(r8) :: rgimm_dust_a1, rgimm_dust_a3
@@ -533,19 +534,16 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
                                                do_bc, do_dst1, do_dst3, &
                                                frzbcdep, frzdudep)
    
-   real(r8), intent(in) :: temperature
    real(r8), intent(in) :: deltat               ! timestep [s]
+   real(r8), intent(in) :: temperature          ! temperature [K]
    real(r8), intent(in) :: uncoated_aer_num(3)  ! uncoated bc and dust number concentration(interstitial)
-
-   real(r8), intent(in) :: r_bc                 ! model radii of BC modes [m]   
-   real(r8), intent(in) :: r_dust_a1
-   real(r8), intent(in) :: r_dust_a3            ! model radii of dust modes [m] 
-
    real(r8), intent(in) :: sigma_iv                        ! [J/m2]      
    real(r8), intent(in) :: eswtr                           ! [Pa]   
    real(r8), intent(in) :: rgdep
    real(r8), intent(in) :: vwice
-
+   real(r8), intent(in) :: r_bc                 ! model radii of BC modes [m]   
+   real(r8), intent(in) :: r_dust_a1
+   real(r8), intent(in) :: r_dust_a3            ! model radii of dust modes [m] 
    logical, intent(in) :: do_bc
    logical, intent(in) :: do_dst1
    logical, intent(in) :: do_dst3
@@ -555,8 +553,6 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm-3 s-1]
 
    ! local variables
-   !real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
-   
    real(r8) :: f_dep_bc
    real(r8) :: f_dep_dust_a1, f_dep_dust_a3
    real(r8) :: Jdep_bc
@@ -614,7 +610,7 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    real(r8), intent(in) :: icnlx                ! in-cloud droplet concentration [#/cm^3]
    real(r8), intent(in) :: sigma_iv             ! [J/m2]      
    real(r8), intent(in) :: eswtr                ! [Pa]   
-   real(r8), intent(in) :: rgimm
+   real(r8), intent(in) :: rgimm                ! 
    real(r8), intent(in) :: r_bc                 ! radius of BC [m]   
    real(r8), intent(in) :: r_dust_a1            ! radius of dust in the accum mode [m]
    real(r8), intent(in) :: r_dust_a3            ! radius of dust in the coarse mode [m] 
@@ -631,8 +627,6 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    character(len=*), intent(out) :: errstring
 
    ! local variables
-   !real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
-
    real(r8) :: f_cnt_bc
    real(r8) :: f_cnt_dust_a1,f_cnt_dust_a3
    real(r8) :: Jcnt_bc
