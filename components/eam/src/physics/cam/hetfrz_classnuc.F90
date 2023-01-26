@@ -119,6 +119,7 @@ subroutine hetfrz_classnuc_calc( &
    total_aer_num, coated_aer_num, uncoated_aer_num,  &
    total_interstitial_aer_num, total_cloudborne_aer_num, errstring)
 
+   ! input
    real(r8), intent(in) :: deltat            ! timestep [s]
    real(r8), intent(in) :: temperature       ! temperature [K]
    real(r8), intent(in) :: pressure          ! pressure [Pa]
@@ -138,14 +139,16 @@ subroutine hetfrz_classnuc_calc( &
    real(r8), intent(in) :: total_interstitial_aer_num(hetfrz_aer_nspec) ! total bc and dust concentration(interstitial) [#/cm^3]
    real(r8), intent(in) :: total_cloudborne_aer_num(hetfrz_aer_nspec)   ! total bc and dust concentration(cloudborne) [#/cm^3]
 
-   real(r8), intent(out) :: frzbcimm           ! het. frz by BC immersion nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzbccnt           ! het. frz by BC contact nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzducnt           ! het. frz by dust contact nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzbcdep           ! het. frz by BC deposition nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm-3 s-1]
+   ! output
+   real(r8), intent(out) :: frzbcimm           ! het. frz by BC immersion nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzbccnt           ! het. frz by BC contact nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzducnt           ! het. frz by dust contact nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzbcdep           ! het. frz by BC deposition nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm^-3 s^-1]
 
    character(len=*), intent(out) :: errstring
+
 
    ! local variables
    logical :: do_bc, do_dst1, do_dst3
@@ -192,7 +195,7 @@ subroutine hetfrz_classnuc_calc( &
    errstring = ' '
    
 
-   call calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
+   call calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta) ! out
 
    ! get saturation vapor pressures
    eswtr = svp_water(temperature)  ! 0 for liquid
@@ -231,7 +234,8 @@ subroutine hetfrz_classnuc_calc( &
    ! water activity. 
    ! If the index of IN is 0, it means three freezing modes of this aerosol are depressed.
 
-   call calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r3lx, aw)
+   call calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r3lx, &   ! in
+                                 aw)                                                  ! out
 
 
    !*****************************************************************************
@@ -253,20 +257,23 @@ subroutine hetfrz_classnuc_calc( &
    rgimm_dust_a1 = rgimm
    rgimm_dust_a3 = rgimm
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_bc), supersatice, rgimm_bc, do_bc)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_bc), supersatice, & ! in
+                                                rgimm_bc, do_bc)                                        ! out
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst1), supersatice, rgimm_dust_a1, do_dst1)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst1), supersatice, & ! in
+                                                rgimm_dust_a1, do_dst1)                                   ! out
 
-   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst3), supersatice, rgimm_dust_a3, do_dst3)
+   call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst3), supersatice, & ! in
+                                                rgimm_dust_a3, do_dst3)                                   ! out
 
 
-   call calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_aer_num,  &
-                                              total_interstitial_aer_num, total_cloudborne_aer_num, &
-                                               sigma_iw, eswtr, vwice, dim_theta, pdf_imm_theta, &
-                                               rgimm_bc, rgimm_dust_a1, rgimm_dust_a3, &
-                                               r_bc, r_dust_a1, r_dust_a3, &
-                                               do_bc, do_dst1, do_dst3, &
-                                               frzbcimm, frzduimm)
+   call calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_aer_num,  &               ! in
+                                              total_interstitial_aer_num, total_cloudborne_aer_num, & ! in
+                                              sigma_iw, eswtr, vwice, dim_theta, pdf_imm_theta, &     ! in
+                                              rgimm_bc, rgimm_dust_a1, rgimm_dust_a3, &               ! in
+                                              r_bc, r_dust_a1, r_dust_a3, &                           ! in
+                                              do_bc, do_dst1, do_dst3, &                              ! in
+                                              frzbcimm, frzduimm)                                     ! out
 
 
    !!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -278,11 +285,11 @@ subroutine hetfrz_classnuc_calc( &
    ! assume 98% RH in mixed-phase clouds (Korolev & Isaac, JAS 2006)
    rgdep=2*vwice*sigma_iv/(kboltz*temperature*log(rhwincloud*supersatice)) 
 
-   call calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_aer_num, &
-                                               sigma_iv, eswtr, vwice, rgdep, &
-                                               r_bc, r_dust_a1, r_dust_a3, &
-                                               do_bc, do_dst1, do_dst3, &
-                                               frzbcdep, frzdudep)
+   call calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_aer_num, & ! in
+                                               sigma_iv, eswtr, vwice, rgdep, &         ! in
+                                               r_bc, r_dust_a1, r_dust_a3, &            ! in
+                                               do_bc, do_dst1, do_dst3, &               ! in
+                                               frzbcdep, frzdudep)                      ! out
    
     
 
@@ -290,12 +297,12 @@ subroutine hetfrz_classnuc_calc( &
    ! contact nucleation
    !!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   call calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer_num, icnlx, &
-                                               sigma_iv, eswtr, rgimm, &
-                                               r_bc, r_dust_a1, r_dust_a3, &
-                                               Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3, &
-                                               do_bc, do_dst1, do_dst3, &
-                                               frzbccnt, frzducnt, errstring)
+   call calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer_num, icnlx, & ! in
+                                            sigma_iv, eswtr, rgimm, &                       ! in
+                                            r_bc, r_dust_a1, r_dust_a3, &                   ! in
+                                            Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3, &       ! in
+                                            do_bc, do_dst1, do_dst3, &                      ! in
+                                            frzbccnt, frzducnt, errstring)                  ! out
 
 end subroutine  hetfrz_classnuc_calc
 
@@ -414,6 +421,9 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
                                                do_bc, do_dst1, do_dst3, &
                                                frzbcimm, frzduimm)
 
+   !****************************************************************************
+   ! calculate immersion nucleation rate
+   !****************************************************************************
 
    real(r8), intent(in) :: deltat                        ! timestep [s]
    real(r8), intent(in) :: temperature                   ! temperature [K]
@@ -433,8 +443,8 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    logical, intent(in) :: do_dst3                        ! flag for calculating coarse dust ice nucleation
 
    ! output
-   real(r8), intent(out) :: frzbcimm           ! het. frz by BC immersion nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm-3 s-1]
+   real(r8), intent(out) :: frzbcimm           ! het. frz by BC immersion nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm^-3 s^-1]
 
    ! local variables
    real(r8), parameter :: n1 = 1.e19_r8           ! number of water molecules in contact with unit area of substrate [m-2]
@@ -540,6 +550,10 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
                                                do_bc, do_dst1, do_dst3, &
                                                frzbcdep, frzdudep)
    
+   !****************************************************************************
+   ! calculate deposition nucleation rate
+   !****************************************************************************
+
    real(r8), intent(in) :: deltat               ! timestep [s]
    real(r8), intent(in) :: temperature          ! temperature [K]
    real(r8), intent(in) :: uncoated_aer_num(hetfrz_aer_nspec)  ! uncoated bc and dust number concentration(interstitial) [#/cm^3]
@@ -555,8 +569,8 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    logical, intent(in) :: do_dst3               ! flag for calculating coarse dust ice nucleation
 
    ! output
-   real(r8), intent(out) :: frzbcdep           ! het. frz by BC deposition nucleation [cm-3 s-1]
-   real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm-3 s-1]
+   real(r8), intent(out) :: frzbcdep           ! het. frz by BC deposition nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm^-3 s^-1]
 
    ! local variables
    real(r8) :: f_dep_bc
@@ -599,6 +613,7 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    if (do_dst3) frzdudep = frzdudep+MIN(uncoated_aer_num(id_dst3)/deltat, &
                                         uncoated_aer_num(id_dst3)/deltat &
                                         *(1._r8-exp(-Jdep_dust_a3*deltat)))
+
 end subroutine calculate_hetfrz_deposition_nucleation
 
 
@@ -608,6 +623,10 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
                                                Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3, &
                                                do_bc, do_dst1, do_dst3, &
                                                frzbccnt, frzducnt, errstring)
+
+   !****************************************************************************
+   ! calculate contact nucleation rate
+   !****************************************************************************
 
    ! input
    real(r8), intent(in) :: deltat               ! timestep [s]
@@ -673,6 +692,7 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
       errstring = 'ERROR in hetfrz_classnuc_calc::frzducnt'
       return
    endif
+
 end subroutine calculate_hetfrz_contact_nucleation
 
 
