@@ -471,14 +471,14 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
 
    ! form factor
    ! only consider flat surfaces due to uncertainty of curved surfaces
-   f_imm_bc = get_compatibility_parameter(theta_imm_bc*pi/180._r8)
+   f_imm_bc = get_form_factor(theta_imm_bc*pi/180._r8)
 
    dim_f_imm_dust_a1 = 0.0_r8
    dim_f_imm_dust_a3 = 0.0_r8
    do ibin = itheta_bin_beg, itheta_bin_end
-      dim_f_imm_dust_a1(ibin) = get_compatibility_parameter(dim_theta(ibin))
+      dim_f_imm_dust_a1(ibin) = get_form_factor(dim_theta(ibin))
 
-      dim_f_imm_dust_a3(ibin) = get_compatibility_parameter(dim_theta(ibin))
+      dim_f_imm_dust_a3(ibin) = get_form_factor(dim_theta(ibin))
    enddo
 
 
@@ -573,11 +573,12 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    real(r8), intent(out) :: frzdudep           ! het. frz by dust deposition nucleation [cm^-3 s^-1]
 
    ! local variables
-   real(r8) :: f_dep_bc
-   real(r8) :: f_dep_dust_a1, f_dep_dust_a3
-   real(r8) :: Jdep_bc
-   real(r8) :: Jdep_dust_a1, Jdep_dust_a3            
-   real(r8) :: dg0dep, Adep
+   real(r8) :: f_dep_bc                      ! form factor for bc
+   real(r8) :: f_dep_dust_a1, f_dep_dust_a3  ! form factor for dust
+   real(r8) :: Jdep_bc                       ! deposition nucleation rate for bc [/s]
+   real(r8) :: Jdep_dust_a1, Jdep_dust_a3    ! deposition nucleation rate for dust [/s]
+   real(r8) :: dg0dep                        ! homogeneous energy of germ formation [J]
+   real(r8) :: Adep                          ! prefactor [m^-2 s^-1]
 
 
    Jdep_bc      = 0._r8
@@ -585,9 +586,9 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    Jdep_dust_a3 = 0._r8
    
    ! form factor
-   f_dep_bc      = get_compatibility_parameter(theta_dep_bc*pi/180._r8)   
-   f_dep_dust_a1 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)
-   f_dep_dust_a3 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)
+   f_dep_bc      = get_form_factor(theta_dep_bc*pi/180._r8)   
+   f_dep_dust_a1 = get_form_factor(theta_dep_dust*pi/180._r8)
+   f_dep_dust_a3 = get_form_factor(theta_dep_dust*pi/180._r8)
 
    ! homogeneous energy of germ formation
    dg0dep = 4*pi/3._r8*sigma_iv*rgdep**2
@@ -652,16 +653,17 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    character(len=*), intent(out) :: errstring
 
    ! local variables
-   real(r8) :: f_cnt_bc                      
-   real(r8) :: f_cnt_dust_a1,f_cnt_dust_a3
-   real(r8) :: Jcnt_bc
-   real(r8) :: Jcnt_dust_a1,Jcnt_dust_a3
-   real(r8) :: dg0cnt, Acnt
+   real(r8) :: f_cnt_bc                       ! form factor for bc             
+   real(r8) :: f_cnt_dust_a1,f_cnt_dust_a3    ! form factor for dust
+   real(r8) :: Jcnt_bc                        ! contact nucleation rate for bc [/s]
+   real(r8) :: Jcnt_dust_a1,Jcnt_dust_a3      ! contact nucleation rate for dust [/s]
+   real(r8) :: dg0cnt                         ! homogeneous energy of germ formation [J]
+   real(r8) :: Acnt                           ! prefactor [m^-2 s^-1]
 
    ! form factor
-   f_cnt_bc      = get_compatibility_parameter(theta_dep_bc*pi/180._r8)
-   f_cnt_dust_a1 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)   
-   f_cnt_dust_a3 = get_compatibility_parameter(theta_dep_dust*pi/180._r8)   
+   f_cnt_bc      = get_form_factor(theta_dep_bc*pi/180._r8)
+   f_cnt_dust_a1 = get_form_factor(theta_dep_dust*pi/180._r8)   
+   f_cnt_dust_a3 = get_form_factor(theta_dep_dust*pi/180._r8)   
 
    ! homogeneous energy of germ formation
    dg0cnt = 4*pi/3._r8*sigma_iv*rgimm**2
@@ -671,18 +673,18 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    Acnt = rhwincloud*eswtr*4*pi/(nus*SQRT(2*pi*mwh2o*amu*kboltz*temperature))
 
    ! nucleation rate per particle
-   Jcnt_bc = Acnt*r_bc**2*EXP((-dga_dep_bc-f_cnt_bc*dg0cnt)/(kboltz*temperature))*Kcoll_bc*icnlx
-   Jcnt_dust_a1 = Acnt*r_dust_a1**2*EXP((-dga_dep_dust-f_cnt_dust_a1*dg0cnt)/(kboltz*temperature))*Kcoll_dust_a1*icnlx
-   Jcnt_dust_a3 = Acnt*r_dust_a3**2*EXP((-dga_dep_dust-f_cnt_dust_a3*dg0cnt)/(kboltz*temperature))*Kcoll_dust_a3*icnlx
+   Jcnt_bc      = Acnt*r_bc**2*exp((-dga_dep_bc-f_cnt_bc*dg0cnt)/(kboltz*temperature))*Kcoll_bc*icnlx
+   Jcnt_dust_a1 = Acnt*r_dust_a1**2*exp((-dga_dep_dust-f_cnt_dust_a1*dg0cnt)/(kboltz*temperature))*Kcoll_dust_a1*icnlx
+   Jcnt_dust_a3 = Acnt*r_dust_a3**2*exp((-dga_dep_dust-f_cnt_dust_a3*dg0cnt)/(kboltz*temperature))*Kcoll_dust_a3*icnlx
 
    ! Limit to 1% of available potential IN (for BC), no limit for dust 
-   if (do_bc) frzbccnt = frzbccnt+MIN(limfacbc*uncoated_aer_num(id_bc)/deltat, &
+   if (do_bc) frzbccnt = frzbccnt+min(limfacbc*uncoated_aer_num(id_bc)/deltat, &
                                       uncoated_aer_num(id_bc)/deltat &
                                       *(1._r8-exp(-Jcnt_bc*deltat)))
-   if (do_dst1) frzducnt = frzducnt+MIN(uncoated_aer_num(id_dst1)/deltat, &
+   if (do_dst1) frzducnt = frzducnt+min(uncoated_aer_num(id_dst1)/deltat, &
                                         uncoated_aer_num(id_dst1)/deltat &
                                         *(1._r8-exp(-Jcnt_dust_a1*deltat)))
-   if (do_dst3) frzducnt = frzducnt+MIN(uncoated_aer_num(id_dst3)/deltat, &
+   if (do_dst3) frzducnt = frzducnt+min(uncoated_aer_num(id_dst3)/deltat, &
                                         uncoated_aer_num(id_dst3)/deltat &
                                          *(1._r8-exp(-Jcnt_dust_a3*deltat)))
 
@@ -696,16 +698,16 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
 end subroutine calculate_hetfrz_contact_nucleation
 
 
-pure function get_compatibility_parameter(alpha) result(f_comp)
+pure function get_form_factor(alpha) result(f_form)
 
    implicit none
-   real(r8), intent(in) :: alpha
+   real(r8), intent(in) :: alpha  ! angle [rad]
 
-   real(r8) :: m
-   real(r8) :: f_comp
+   real(r8) :: v_cos      ! cos value of alpha
+   real(r8) :: f_form     ! form factor [unitless]
 
-   m      = cos(alpha)
-   f_comp = (2+m)*(1-m)**2/4._r8
+   v_cos  = cos(alpha)
+   f_form = (2+v_cos)*(1-v_cos)**2/4._r8
 
 end function
 
