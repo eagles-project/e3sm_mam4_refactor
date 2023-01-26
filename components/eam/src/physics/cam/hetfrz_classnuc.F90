@@ -448,19 +448,19 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
 
    ! local variables
    real(r8), parameter :: n1 = 1.e19_r8           ! number of water molecules in contact with unit area of substrate [m-2]
-   real(r8), parameter :: hplanck = 6.63e-34_r8
+   real(r8), parameter :: hplanck = 6.63e-34_r8   ! planck constant
    real(r8), parameter :: rhplanck = 1._r8/hplanck
 
-   real(r8) :: rgimm_bc
-   real(r8) :: rgimm_dust_a1, rgimm_dust_a3
-   real(r8) :: dg0imm_bc
-   real(r8) :: dg0imm_dust_a1, dg0imm_dust_a3
-   real(r8) :: Aimm_bc
-   real(r8) :: Aimm_dust_a1, Aimm_dust_a3
-   real(r8) :: f_imm_bc
-   real(r8) :: f_imm_dust_a1, f_imm_dust_a3
-   real(r8) :: Jimm_bc
-   real(r8) :: Jimm_dust_a1, Jimm_dust_a3
+   real(r8) :: rgimm_bc                           ! critical germ radius for bc immersion freezing [m]
+   real(r8) :: rgimm_dust_a1, rgimm_dust_a3       ! critical germ radius for dust immersion freezing [m]
+   real(r8) :: dg0imm_bc                          ! homogeneous energy for germ formation [J]
+   real(r8) :: dg0imm_dust_a1, dg0imm_dust_a3     ! homogeneous energy for germ formation [J]
+   real(r8) :: Aimm_bc                            ! prefactor for bc [m^-2 s^-1]
+   real(r8) :: Aimm_dust_a1, Aimm_dust_a3         ! prefactor for dust [m^-2 s^-1]
+   real(r8) :: f_imm_bc                           ! form factor for bc 
+   real(r8) :: f_imm_dust_a1, f_imm_dust_a3       ! form factor for dust
+   real(r8) :: Jimm_bc                            ! immersion nucleation rate for bc [/s]
+   real(r8) :: Jimm_dust_a1, Jimm_dust_a3         ! immersion nucleation rate for dust [/s]
    real(r8) :: ibin
 
    real(r8) :: dim_f_imm_dust_a1(pdf_n_theta), dim_f_imm_dust_a3(pdf_n_theta)
