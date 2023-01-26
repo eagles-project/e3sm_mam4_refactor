@@ -239,7 +239,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   ! calculate cldv, cldvcu and cldvst
   call clddiag( ncol, temperature, pmid,   pdel,   cmfdqr, evapc, & ! in
                cldt,  cldcu,       cldst,  evapr,  prain,         & ! in
-               cldv,  cldvcu,      cldvst, rainmr                 ) ! out
+               cldv,  cldvcu,      cldvst, rainmr, state%lchnk                 ) ! out
   ! *********************************************** end
 
   ! **********************************************
@@ -280,7 +280,7 @@ end subroutine wetdep_inputs_unset
 !==============================================================================
 subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
                    cldt, cldcu,       cldst,      evapr, prain,  & ! in
-                   cldv, cldvcu,      cldvst,     rain           ) ! out
+                   cldv, cldvcu,      cldvst,     rain, y_lchnk           ) ! out
 ! ------------------------------------------------------------------------------------ 
 ! Estimate the cloudy volume which is occupied by rain or cloud water as
 ! the max between the local cloud amount or the
@@ -303,6 +303,7 @@ subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
    real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation [kg/kg/s]
    real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation [kg/kg/s]
    integer, intent(in) :: ncol
+   integer, intent(in) :: y_lchnk
 
    ! Output arguments:
    real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water [fraction, unitless]

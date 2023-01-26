@@ -47,16 +47,16 @@
 
      !< add code for writing data here>
 call write_var(unit_input, unit_output, 'ncol', ncol)
-call write_var(unit_input, unit_output, 'temperature', temperature(yaml%col_print, yaml%lev_print))
-call write_var(unit_input, unit_output, 'pmid', pmid(yaml%col_print, yaml%lev_print))
-call write_var(unit_input, unit_output, 'pdel', pdel(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'cmfdqr', cmfdqr(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'evapc', evapc(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'cldt', cldt(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'cldcu', cldcu(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'cldst', cldst(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'evapr', evapr(yaml%col_print,yaml%lev_print))
-call write_var(unit_input, unit_output, 'prain', prain(yaml%col_print,yaml%lev_print))
+call write_1d_var(unit_input, unit_output, 'temperature',pver, temperature(yaml%col_print, :))
+call write_1d_var(unit_input, unit_output, 'pmid',pver, pmid(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'pdel',pver, pdel(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'cmfdqr',pver, cmfdqr(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'evapc',pver, evapc(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'cldt',pver, cldt(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'cldcu',pver, cldcu(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'cldst',pver, cldst(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'evapr',pver, evapr(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'prain',pver, prain(yaml%col_print,:))
 
 
      !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
