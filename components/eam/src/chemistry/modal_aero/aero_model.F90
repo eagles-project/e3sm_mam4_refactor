@@ -957,7 +957,6 @@ contains
     integer :: lchnk                   ! chunk identifier
     integer :: ncol                    ! number of atmospheric columns
     integer :: jvlc                    ! index for last dimension of vlc_xxx arrays
-    integer :: lphase                  ! index for interstitial / cloudborne aerosol
     integer :: lspec                   ! index for aerosol number / chem-mass / water-mass
     integer :: m                       ! aerosol mode index
     integer :: mm                      ! tracer index
@@ -1034,6 +1033,10 @@ contains
     tvs(:ncol,:) = state%t(:ncol,:)!*(1+state%q(:ncol,k)
     rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
+    !======================
+    ! cloud-borne aerosols
+    !======================
+
     !----------------------------------------------------------------------------------
     ! Calc settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
     !----------------------------------------------------------------------------------
@@ -1055,66 +1058,97 @@ contains
     !----------------------------------------------------------------------------------
     !----------------------------------------------------------------------------------
     do m = 1, ntot_amode   ! main loop over aerosol modes
-
-       do lphase = 1, 2   ! loop over interstitial / cloud-borne forms
-
-          if (lphase == 1) then   ! interstial aerosol - calc settling/dep velocities of mode
-
-             ! rad_aer = volume mean wet radius (m)
-             ! dgncur_awet = geometric mean wet diameter for number distribution (m)
-             rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,m)   &
-                                 *exp(1.5_r8*(alnsg_amode(m)**2))
-             ! dens_aer(1:ncol,:) = wet density (kg/m3)
-             dens_aer(1:ncol,:) = wetdens(1:ncol,:,m)
-             sg_aer(1:ncol,:) = sigmag_amode(m)
-
-             jvlc = 1  ; imnt = 0  ! interstitial aerosol number
-             call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
-                                          rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
-                                          vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
-
-             jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
-             call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
-                                          rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
-                                          vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
-          end if
-
-          do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
+      do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
 
              if (lspec == 0) then   ! number
-                if (lphase == 1) then
-                   mm = numptr_amode(m)
-                   jvlc = 1
-                else
                    mm = numptrcw_amode(m)
                    jvlc = 3
-                endif
              else if (lspec <= nspec_amode(m)) then   ! non-water mass
-                if (lphase == 1) then
-                   mm = lmassptr_amode(lspec,m)
-                   jvlc = 2
-                else
                    mm = lmassptrcw_amode(lspec,m)
                    jvlc = 4
-                endif
-             else   ! water mass
-!   bypass dry deposition of aerosol water
-                cycle
-                if (lphase == 1) then
+             else   ! water mass: bypass dry deposition of aerosol water
                    mm = 0
-!                  mm = lwaterptr_amode(m)
-                   jvlc = 2
-                else
-                   mm = 0
-                   jvlc = 4
-                endif
              endif
 
+             if (mm <= 0) cycle
 
-          if (mm <= 0) cycle
+             ! use pvprogseasalts instead (means making the top level 0)
+             pvmzaer(:ncol,1)=0._r8
+             pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
+             fldcw => qqcw_get_field(pbuf, mm,lchnk)
 
-!         if (lphase == 1) then
-          if ((lphase == 1) .and. (lspec <= nspec_amode(m))) then
+             ! use phil's method
+             !      convert from meters/sec to pascals/sec
+             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
+                pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
+
+             !      calculate the tendencies and sfc fluxes from the above velocities
+                call dust_sediment_tend( &
+                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
+                     fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx  )
+
+             ! apportion dry deposition into turb and gravitational settling for tapes
+             do i=1,ncol
+                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
+                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
+                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
+                endif
+             enddo
+
+             fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+
+             call outfld( trim(cnst_name_cw(mm))//'DDF', sflx, pcols, lchnk)
+             call outfld( trim(cnst_name_cw(mm))//'TBF', dep_trb, pcols, lchnk )
+             call outfld( trim(cnst_name_cw(mm))//'GVF', dep_grv, pcols, lchnk )
+             aerdepdrycw(:ncol,mm) = sflx(:ncol)
+
+      end do ! loop over number + constituents + water
+    enddo   ! m = 1, ntot_amode
+
+    !====================
+    ! interstial aerosol
+    !====================
+    do m = 1, ntot_amode   ! main loop over aerosol modes
+
+       !-----------------------------------------------------------
+       ! Calc settling/dep velocities of mode
+       !-----------------------------------------------------------
+       ! rad_aer = volume mean wet radius (m)
+       ! dgncur_awet = geometric mean wet diameter for number distribution (m)
+       rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,m)   &
+                           *exp(1.5_r8*(alnsg_amode(m)**2))
+       ! dens_aer(1:ncol,:) = wet density (kg/m3)
+       dens_aer(1:ncol,:) = wetdens(1:ncol,:,m)
+       sg_aer(1:ncol,:) = sigmag_amode(m)
+
+       jvlc = 1  ; imnt = 0  ! interstitial aerosol number
+       call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
+                                    rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
+                                    vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
+
+       jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
+       call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
+                                    rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
+                                    vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
+
+       !-----------------------------------------------------------
+       !-----------------------------------------------------------
+       do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
+
+             if (lspec == 0) then   ! number
+                   mm = numptr_amode(m)
+                   jvlc = 1
+             else if (lspec <= nspec_amode(m)) then   ! non-water mass
+                   mm = lmassptr_amode(lspec,m)
+                   jvlc = 2
+             else   ! water mass
+                mm = 0
+             endif
+
+             if (mm <= 0) cycle
+
+          if (lspec <= nspec_amode(m)) then
+
              ptend%lq(mm) = .TRUE.
 
              ! use pvprogseasalts instead (means making the top level 0)
@@ -1123,7 +1157,7 @@ contains
 
              call outfld( trim(cnst_name(mm))//'DDV', pvmzaer(:,2:pverp), pcols, lchnk )
 
-             if(.true.) then ! use phil's method
+             ! use phil's method
              !      convert from meters/sec to pascals/sec
              !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
                 pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
@@ -1132,10 +1166,6 @@ contains
                 call dust_sediment_tend( &
                      ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
                      state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), state%q(:,:,mm), state%pmid, &
-                               state%pdel, tvs, sflx, ptend%q(:,:,mm), dt )
-             endif
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              do i=1,ncol
@@ -1151,7 +1181,7 @@ contains
              call outfld( trim(cnst_name(mm))//'DTQ', ptend%q(:,:,mm), pcols, lchnk)
              aerdepdryis(:ncol,mm) = sflx(:ncol)
 
-          else if ((lphase == 1) .and. (lspec == nspec_amode(m)+1)) then  ! aerosol water
+          else if (lspec == nspec_amode(m)+1) then  ! aerosol water
              ! use pvprogseasalts instead (means making the top level 0)
              pvmzaer(:ncol,1)=0._r8
              pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
@@ -1180,45 +1210,9 @@ contains
 
              qaerwat(1:ncol,:,mm) = qaerwat(1:ncol,:,mm) + dqdt_tmp(1:ncol,:) * dt
 
-          else  ! lphase == 2
-             ! use pvprogseasalts instead (means making the top level 0)
-             pvmzaer(:ncol,1)=0._r8
-             pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
-             fldcw => qqcw_get_field(pbuf, mm,lchnk)
-
-             if(.true.) then ! use phil's method
-             !      convert from meters/sec to pascals/sec
-             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-                pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
-
-             !      calculate the tendencies and sfc fluxes from the above velocities
-                call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-                     fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), fldcw(:,:), state%pmid, &
-                               state%pdel, tvs, sflx, dqdt_tmp(:,:), dt )
-             endif
-
-             ! apportion dry deposition into turb and gravitational settling for tapes
-             do i=1,ncol
-                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
-                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
-                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
-                endif
-             enddo
-
-             fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
-
-             call outfld( trim(cnst_name_cw(mm))//'DDF', sflx, pcols, lchnk)
-             call outfld( trim(cnst_name_cw(mm))//'TBF', dep_trb, pcols, lchnk )
-             call outfld( trim(cnst_name_cw(mm))//'GVF', dep_grv, pcols, lchnk )
-             aerdepdrycw(:ncol,mm) = sflx(:ncol)
-
           endif
 
-          enddo   ! lspec = 0, nspec_amode(m)+1
-       enddo   ! lphase = 1, 2
+      enddo   ! lspec = 0, nspec_amode(m)+1
     enddo   ! m = 1, ntot_amode
 
     ! if the user has specified prescribed aerosol dep fluxes then 
