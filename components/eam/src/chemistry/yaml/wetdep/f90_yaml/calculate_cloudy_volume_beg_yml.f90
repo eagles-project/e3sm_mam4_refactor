@@ -14,6 +14,7 @@
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
+  integer,save :: n_calls = 0
 
   !populate YAML structure
   yaml%lev_print = 0 !level (**remove these if generating data for a dependent subroutines**)
@@ -28,17 +29,19 @@
 !  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
      !<
      !In the case of y_i or y_k are not passed as arguments:
-     if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
-
+  if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
      !For generating data for a dependent subroutines where "yaml" derived type is already initialized:
      !if(yaml%flag_print) then
      !>
+     n_calls = n_calls+1
+     if (n_calls==1) then  ! output the first call
+!     if (n_calls>=0) then  ! output all the calls
 
      yaml%lchnk_print = y_lchnk !(**remove these if generating data for a dependent subroutines**)
      yaml%flag_print  = .true.!(**remove these if generating data for a dependent subroutines**)
 
      !open I/O yaml files (it can have an extra optional argument to pass a unique string to differentiate file names)
-     call open_files('clddiag', &  !intent-in
+     call open_files('calculate_cloudy_volume', &  !intent-in
           unit_input, unit_output) !intent-out
 
      !start by adding an input string
@@ -47,16 +50,9 @@
 
      !< add code for writing data here>
 call write_var(unit_input, unit_output, 'ncol', ncol)
-call write_1d_var(unit_input, unit_output, 'temperature',pver, temperature(yaml%col_print, :))
-call write_1d_var(unit_input, unit_output, 'pmid',pver, pmid(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'pdel',pver, pdel(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'cmfdqr',pver, cmfdqr(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'evapc',pver, evapc(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'cldt',pver, cldt(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'cldcu',pver, cldcu(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'cldst',pver, cldst(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'evapr',pver, evapr(yaml%col_print,:))
-call write_1d_var(unit_input, unit_output, 'prain',pver, prain(yaml%col_print,:))
+call write_var(unit_input, unit_output, 'is_tot_cld', is_tot_cld)
+call write_1d_var(unit_input, unit_output, 'cld',pver, cld(yaml%col_print,:))
+call write_1d_var(unit_input, unit_output, 'lprec', pver, lprec(yaml%col_print,:))
 
 
      !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
@@ -70,6 +66,6 @@ call write_1d_var(unit_input, unit_output, 'prain',pver, prain(yaml%col_print,:)
      !close only the input file, not the output file
      close(unit_input)
      call freeunit(unit_input)
-
+   endif
   endif
 #endif

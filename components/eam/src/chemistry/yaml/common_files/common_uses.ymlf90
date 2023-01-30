@@ -9,7 +9,7 @@
 !#define YAML_RENAME
 
 ! module_wetdep.F90
-#define YAML_WETDEP
+!#define YAML_WETDEP
 
 use yaml_input_file_io
 

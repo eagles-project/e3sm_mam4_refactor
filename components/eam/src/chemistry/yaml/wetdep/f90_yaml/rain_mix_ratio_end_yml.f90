@@ -7,10 +7,7 @@
 
      !start writing data
      !<add code for writing data here>
-     call write_1d_output_var(unit_output, 'cldv',  pver,cldv(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'cldvcu', pver,cldvcu(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'cldvst', pver,cldvst(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'rain', pver,rain(yaml%col_print,:))
+     call write_output_var(unit_output, 'rain', rain(yaml%col_print,yaml%lev_print))
 
      !call write_output_var(unit_output, fld_name, field, inp_out_str)  !write a single output variable
      !call write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str) !writes 1D variables of any dimension in the output python module

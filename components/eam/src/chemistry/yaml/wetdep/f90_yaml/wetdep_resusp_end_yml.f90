@@ -1,16 +1,17 @@
 #ifdef YAML_WETDEP
   ! YAML file output generation code- DO NOT PORT to C++
   if(yaml%flag_print) then ! if this column exists in lchnk
-
+     
      !write output header
      call write_output_header(unit_output)
 
      !start writing data
      !<add code for writing data here>
-     call write_1d_output_var(unit_output, 'cldv',  pver,cldv(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'cldvcu', pver,cldvcu(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'cldvst', pver,cldvst(yaml%col_print,:))
-     call write_1d_output_var(unit_output, 'rain', pver,rain(yaml%col_print,:))
+     call write_output_var(unit_output, 'precabx_base_new', precabx_base_new)
+     call write_output_var(unit_output, 'precabx_new', precabx_new)
+     call write_output_var(unit_output, 'scavabx_new', scavabx_new)
+     call write_output_var(unit_output, 'precnumx_base_new',precnumx_base_new )
+     call write_output_var(unit_output, 'resusp_x', resusp_x)
 
      !call write_output_var(unit_output, fld_name, field, inp_out_str)  !write a single output variable
      !call write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str) !writes 1D variables of any dimension in the output python module

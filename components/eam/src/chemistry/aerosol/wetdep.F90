@@ -19,7 +19,7 @@ save
 private
 
 public :: wetdepa_v2  ! scavenging codes for very soluble aerosols -- CAM5 version
-public :: clddiag     ! calc of cloudy volume and rain mixing ratio
+!public :: clddiag     ! calc of cloudy volume and rain mixing ratio
 public :: faer_resusp_vs_fprec_evap_mpln
 
 public :: wetdep_inputs_t
@@ -239,7 +239,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   ! calculate cldv, cldvcu and cldvst
   call clddiag( ncol, temperature, pmid,   pdel,   cmfdqr, evapc, & ! in
                cldt,  cldcu,       cldst,  evapr,  prain,         & ! in
-               cldv,  cldvcu,      cldvst, rainmr, state%lchnk                 ) ! out
+               cldv,  cldvcu,      cldvst, rainmr                 ) ! out
   ! *********************************************** end
 
   ! **********************************************
@@ -280,7 +280,7 @@ end subroutine wetdep_inputs_unset
 !==============================================================================
 subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
                    cldt, cldcu,       cldst,      evapr, prain,  & ! in
-                   cldv, cldvcu,      cldvst,     rain, y_lchnk           ) ! out
+                   cldv, cldvcu,      cldvst,     rain           ) ! out
 ! ------------------------------------------------------------------------------------ 
 ! Estimate the cloudy volume which is occupied by rain or cloud water as
 ! the max between the local cloud amount or the
@@ -303,7 +303,6 @@ subroutine clddiag(ncol, temperature, pmid, pdel, cmfdqr, evapc, & ! in
    real(r8), intent(in) :: evapr(pcols,pver)    ! rate of evaporation of falling precipitation [kg/kg/s]
    real(r8), intent(in) :: prain(pcols,pver)    ! rate of conversion of condensate to precipitation [kg/kg/s]
    integer, intent(in) :: ncol
-   integer, intent(in) :: y_lchnk
 
    ! Output arguments:
    real(r8), intent(out) :: cldv(pcols,pver)     ! fraction occupied by rain or cloud water [fraction, unitless]
@@ -357,6 +356,7 @@ subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
     ! Local variables:
     integer :: icol, kk
 
+#include "../yaml/wetdep/f90_yaml/local_precip_production_beg_yml.f90"
     !calculate local precipitation rate
     do icol=1,ncol
        do kk=1,pver
@@ -364,6 +364,7 @@ subroutine local_precip_production(ncol, pdel, source_term, sink_term, lprec)
        enddo
     enddo
 
+#include "../yaml/wetdep/f90_yaml/local_precip_production_end_yml.f90"
 end subroutine local_precip_production
 
 !==============================================================================
@@ -391,7 +392,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
    real(r8) :: sumpppr(pcols)       ! sum of positive precips from above
    real(r8) :: cldv1(pcols)         ! precip weighted cloud fraction from above [kg/m2/s]
    real(r8) :: lprecp               ! local production rate of precip [kg/m2/s] if positive
-
+#include "../yaml/wetdep/f90_yaml/calculate_cloudy_volume_beg_yml.f90"
 
    ! initiate variables
    do icol=1,ncol
@@ -416,6 +417,7 @@ subroutine calculate_cloudy_volume(ncol, cld, lprec, is_tot_cld, cldv, sumppr_al
          sumpppr(icol) = sumpppr(icol) + lprecp
       enddo
    enddo
+#include "../yaml/wetdep/f90_yaml/calculate_cloudy_volume_end_yml.f90"
 
 end subroutine calculate_cloudy_volume
 
@@ -444,6 +446,7 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
    real(r8) :: convfw  ! falling velocity at air density = 1 kg/m3 [m/s * sqrt(rho)]
    real(r8) :: rho     !air density [kg/m3]
    real(r8) :: vfall   ! calculated raindrop falling velocity [m/s]
+#include "../yaml/wetdep/f90_yaml/rain_mix_ratio_beg_yml.f90"
 
    ! define the constant convfw. taken from cldwat.F90
    ! reference: Tripoli and Cotton (1980)
@@ -460,6 +463,7 @@ subroutine rain_mix_ratio(temperature, pmid, sumppr, ncol, rain)
          endif
       end do
    end do
+#include "../yaml/wetdep/f90_yaml/rain_mix_ratio_end_yml.f90"
 
 end subroutine rain_mix_ratio
 
@@ -583,6 +587,7 @@ subroutine wetdepa_v2( ncol, deltat,  pdel, &
       real(r8) :: rsscavt_ik    ! resuspension, stratiform tends at current (icol,kk) [kg/kg/s]
 
       real(r8), parameter :: omsm = 1._r8-2*epsilon(1._r8) ! (1 - small number) used to prevent roundoff errors below zero      
+#include "../yaml/wetdep/f90_yaml/wetdepa_v2_beg_yml.f90"
 
       ! initiate variables
       precabs(:) = 0.0_r8
@@ -747,6 +752,7 @@ resusp_block_aa: &
         enddo main_i_loop ! End of i = 1, ncol
     enddo main_k_loop ! End of k = 1, pver
 
+#include "../yaml/wetdep/f90_yaml/wetdepa_v2_end_yml.f90"
 
    end subroutine wetdepa_v2
 
@@ -754,7 +760,7 @@ resusp_block_aa: &
    subroutine compute_evap_frac(                        &
                         mam_prevap_resusp_optcc,        &
                         pdel_ik,   evap_ik,  precabx,  &
-                        fracevx                        )       
+                        fracevx                         )       
 ! ------------------------------------------------------------------------------
 ! calculate the fraction of strat precip from above
 !                 which evaporates within this layer
@@ -764,6 +770,7 @@ resusp_block_aa: &
    real(r8),intent(in) :: evap_ik       ! evaporation in this layer [kg/kg/s]
    real(r8),intent(in) :: precabx       ! precipitation from above [kg/m2/s] 
    real(r8),intent(out) :: fracevx      ! fraction of evaporation [fraction]
+#include "../yaml/wetdep/f90_yaml/compute_evap_frac_beg_yml.f90"
 
    if (mam_prevap_resusp_optcc == 0) then
         fracevx = 0.0_r8
@@ -772,6 +779,7 @@ resusp_block_aa: &
         ! trap to ensure reasonable ratio bounds
         fracevx = min_max_bound(0._r8, 1._r8, fracevx)
    endif
+#include "../yaml/wetdep/f90_yaml/compute_evap_frac_end_yml.f90"
 
    end subroutine compute_evap_frac
 
@@ -816,6 +824,7 @@ resusp_block_aa: &
    real(r8) :: src1      ! incloud scavenging tendency [kg/kg/s]
    real(r8) :: src2      ! below-cloud scavenging tendency [kg/kg/s]
    real(r8) :: odds      ! limit on removal rate (proportional to prec) [fraction]
+#include "../yaml/wetdep/f90_yaml/wetdep_scavenging_beg_yml.f90"
 
    ! calculate limitation of removal rate using Dana and Hales coefficient
    odds = precabx/max(cldv_ik,small_value_5) * scavcoef_ik*deltat
@@ -846,6 +855,7 @@ resusp_block_aa: &
 
    src = src1 + src2             ! total stratiform or convective scavenging
    fin=src1/(src + small_value_36)    ! fraction taken by incloud processes
+#include "../yaml/wetdep/f90_yaml/wetdep_scavenging_end_yml.f90"
 
    end subroutine wetdep_scavenging
 
@@ -883,6 +893,7 @@ resusp_block_aa: &
 
    ! local variables
    real(r8)            :: tmpa ! temporary working variable
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_beg_yml.f90"
 
    ! initiate *_new in case they are not calculated
    scavabx_new = scavabx_old
@@ -918,6 +929,7 @@ resusp_block_aa: &
                      scavabx_new,    resusp_x                ) ! out
 
    endif
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_end_yml.f90"
 
    end subroutine wetdep_resusp
 
@@ -952,6 +964,7 @@ resusp_block_aa: &
    ! local variables
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_noprecip_beg_yml.f90"
 
    if ( mam_prevap_resusp_optcc <= 130) then
         ! linear resuspension based on scavenged aerosol mass or number
@@ -973,6 +986,7 @@ resusp_block_aa: &
    ! calculations to start fresh if there is any more precip production
    precabx_new = 0.0_r8
    precabx_base_new = 0.0_r8
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_noprecip_end_yml.f90"
 
    end subroutine wetdep_resusp_noprecip
 
@@ -1006,6 +1020,7 @@ resusp_block_aa: &
    real(r8)     :: u_old,u_new  ! fraction of precabx and precabx_base
    real(r8)     :: x_old,x_new  ! fraction after calling function *_resusp_vs_fprec_evap_mpln
    real(r8)     :: x_ratio      ! fraction of x_tmp/x_old
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_nonlinear_beg_yml.f90"
 
    u_old = min_max_bound(0.0_r8, 1.0_r8, precabx_old/precabx_base_old)
    if ( mam_prevap_resusp_optcc <= 130) then
@@ -1044,6 +1059,7 @@ resusp_block_aa: &
         ! number resuspension
         resusp_x = max( 0.0_r8, precnumx_base_old*(x_old - x_new) )
    endif
+#include "../yaml/wetdep/f90_yaml/wetdep_resusp_nonlinear_end_yml.f90"
 
 
    end subroutine wetdep_resusp_nonlinear
@@ -1081,7 +1097,8 @@ resusp_block_aa: &
 
    ! local variables
    real(r8)            :: tmpa ! temporary working variable
- 
+#include "../yaml/wetdep/f90_yaml/wetdep_prevap_beg_yml.f90"
+
    ! initiate *_new in case they are not calculated
    ! precabx_base_new and precabx_new are always calculated
    scavabx_new = scavabx_old
@@ -1108,6 +1125,7 @@ resusp_block_aa: &
           precnumx_base_new = precnumx_base_old
        endif
    endif
+#include "../yaml/wetdep/f90_yaml/wetdep_prevap_end_yml.f90"
 
    end subroutine wetdep_prevap
 
@@ -1155,6 +1173,8 @@ resusp_block_aa: &
    real(r8), intent(inout) :: precabc   ! conv precip from above [kg/m2/s]
    real(r8), intent(inout) :: precabs   ! strat precip from above [kg/m2/s]
 
+#include "../yaml/wetdep/f90_yaml/update_scavenging_beg_yml.f90"
+
    if ( mam_prevap_resusp_optcc == 0) then
        scavt_ik = -srct + (fracev_st*scavabs + fracev_cu*scavabc)*gravit/pdel_ik
    else
@@ -1184,6 +1204,7 @@ resusp_block_aa: &
        precabs = precabs + (precs_ik  - evaps_ik)*pdel_ik/gravit
        precabc = precabc + (cmfdqr_ik - evapc_ik)*pdel_ik/gravit
    endif
+#include "../yaml/wetdep/f90_yaml/update_scavenging_end_yml.f90"
 
    end subroutine update_scavenging
 
