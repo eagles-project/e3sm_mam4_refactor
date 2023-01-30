@@ -176,9 +176,9 @@ contains
 ! !INTERFACE:
 !
 
-      subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
-           ustar,ram1in,ram1,t,pmid,&
-           pdel,fvin,fv)
+subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
+                   ustar,ram1_in,ram1_out,t,pmid,&
+                   pdel,fv_in,fv_out)
         !
         ! !DESCRIPTION: 
         !  
@@ -189,10 +189,10 @@ contains
         !
         implicit none
         integer, intent(in) :: ncol
-        real(r8),intent(in) :: ram1in(pcols)         !aerodynamical resistance (s/m)
-        real(r8),intent(in) :: fvin(pcols)                 ! sfc frc vel from land
-        real(r8),intent(out) :: ram1(pcols)         !aerodynamical resistance (s/m)
-        real(r8),intent(out) :: fv(pcols)                 ! sfc frc vel from land
+        real(r8),intent(in) :: ram1_in(pcols)         !aerodynamical resistance (s/m)
+        real(r8),intent(in) :: fv_in(pcols)                 ! sfc frc vel from land
+        real(r8),intent(out) :: ram1_out(pcols)         !aerodynamical resistance (s/m)
+        real(r8),intent(out) :: fv_out(pcols)                 ! sfc frc vel from land
         real(r8), intent(in) :: obklen(pcols)                 ! obklen
         real(r8), intent(in) :: ustar(pcols)                  ! sfc fric vel
         real(r8), intent(in) :: landfrac(pcols)               ! land fraction
@@ -206,12 +206,48 @@ contains
         real(r8), parameter :: xkar   = 0.4_r8      ! Von Karman constant
 
         ! local variables
-        real(r8) :: z,psi,psi0,nu,nu0,temp,ram
+        real(r8) :: z,psi,psi0,nu,nu0,temp
         integer :: i
-        !    write(iulog,*) rair,zzsice,zzocen,gravit,xkar
+
+        real(r8), parameter :: lndfrc_threshold = 0.000000001_r8
+
+     !---------------------------------------------------------------------------
+     ! Friction velocity:
+     !  - If the grid cell has a land fraction larger than a threshold (~zero),
+     !    then use cam_in%fv.
+     !  - Otherwise, use the ustar calculated in the atmosphere.
+     !---------------------------------------------------------------------------
+     where( landfrac(:ncol) > lndfrc_threshold )
+       fv_out(:ncol) = fv_in(:ncol)
+     elsewhere
+       fv_out(:ncol) = ustar(:ncol)
+     endwhere
+
+     ! fvitt -- fv == 0 causes a floating point exception in
+     ! dry dep of sea salts and dust
+
+     where ( fv_out(:ncol) == 0._r8 )
+        fv_out(:ncol) = 1.e-12_r8
+     endwhere
+
+     !-------------------------------------------------------------------
+     ! Aerodynamic resistence
+     !-------------------------------------------------------------------
+     do i=1,ncol
+
+        ! If the grid cell has a land fraction larger than a threshold (~zero),
+        ! simply use cam_in%ram1
+
+        if (landfrac(i) > lndfrc_threshold) then
+           ram1_out(i)=ram1_in(i)
+
+        else
+        ! If the grid cell has a land fraction smaller than the threshold,
+        ! calculate aerodynamic resistence
 
 
-        do i=1,ncol
+           ! calculate psi, psi0, temp
+
            z=pdel(i)*rair*t(i)/pmid(i)/gravit/2.0_r8   !use half the layer height like Ganzefeld and Lelieveld, 1995
            if(obklen(i).eq.0) then
               psi=0._r8
@@ -220,7 +256,11 @@ contains
               psi=min(max(z/obklen(i),-1.0_r8),1.0_r8)
               psi0=min(max(zzocen/obklen(i),-1.0_r8),1.0_r8)
            endif
+
            temp=z/zzocen
+
+           ! special treatment for ice-dominant cells
+
            if(icefrac(i) > 0.5_r8) then 
               if(obklen(i).gt.0) then 
                  psi0=min(max(zzsice/obklen(i),-1.0_r8),1.0_r8)
@@ -228,40 +268,29 @@ contains
                  psi0=0.0_r8
               endif
               temp=z/zzsice
-	   endif
+           endif
+
+           ! calculate aerodynamic resistence
+
            if(psi> 0._r8) then
-              ram=1/xkar/ustar(i)*(log(temp)+4.7_r8*(psi-psi0))
+              ram1_out(i) =1/xkar/ustar(i)*(log(temp)+4.7_r8*(psi-psi0))
            else
               nu=(1.00_r8-15.000_r8*psi)**(.25_r8)
               nu0=(1.000_r8-15.000_r8*psi0)**(.25_r8)
               if(ustar(i).ne.0._r8) then
-                 ram=1/xkar/ustar(i)*(log(temp) &
+                 ram1_out(i) =1/xkar/ustar(i)*(log(temp) &
                       +log(((nu0**2+1.00_r8)*(nu0+1.0_r8)**2)/((nu**2+1.0_r8)*(nu+1.00_r8)**2)) &
                       +2.0_r8*(atan(nu)-atan(nu0)))
               else
-	         ram=0._r8
+                 ram1_out(i) =0._r8
               endif
            endif
-           if(landfrac(i) < 0.000000001_r8) then
-              fv(i)=ustar(i)
-              ram1(i)=ram
-           else
-              fv(i)=fvin(i)
-              ram1(i)=ram1in(i)
-           endif
-           !          write(iulog,*) i,pdel(i),t(i),pmid(i),gravit,obklen(i),psi,psi0,icefrac(i),nu,nu0,ram,ustar(i),&
-           !             log(((nu0**2+1.00)*(nu0+1.0)**2)/((nu**2+1.0)*(nu+1.00)**2)),2.0*(atan(nu)-atan(nu0))
 
-        enddo
+        endif  ! if grid cell has land fraction > threshold or not
 
-        ! fvitt -- fv == 0 causes a floating point exception in 
-        ! dry dep of sea salts and dust
-        where ( fv(:ncol) == 0._r8 ) 
-           fv(:ncol) = 1.e-12_r8
-        endwhere
+     enddo ! loop over grid columns
 
-        return
-      end subroutine calcram
+  end subroutine calcram
 
 
 !##############################################################################
