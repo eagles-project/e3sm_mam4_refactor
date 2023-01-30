@@ -962,6 +962,7 @@ contains
     integer :: m                       ! aerosol mode index
     integer :: mm                      ! tracer index
     integer :: i
+    integer :: imnt  ! moment of the aerosol size distribution. 0 = number; 3 = volume
 
     real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
@@ -1000,7 +1001,7 @@ contains
     !---------------------------------------------------------------------------
     ! For turbulent dry deposition: calculate ram and fv over ocean and sea ice; 
     ! copy values over land
-
+    !---------------------------------------------------------------------------
     call calcram( ncol,               &! in: state%ncol
                   landfrac,           &! in: cam_in%landfrac
                   icefrac,            &! in: cam_in%icefrac
@@ -1033,46 +1034,49 @@ contains
     tvs(:ncol,:) = state%t(:ncol,:)!*(1+state%q(:ncol,k)
     rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
-!
-! calc settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
-!
-! *** mean drop radius should eventually be computed from ndrop and qcldwtr
+    !----------------------------------------------------------------------------------
+    ! Calc settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
+    !----------------------------------------------------------------------------------
+    ! *** mean drop radius should eventually be computed from ndrop and qcldwtr
     rad_drop(:,:) = 5.0e-6_r8
     dens_drop(:,:) = rhoh2o
     sg_drop(:,:) = 1.46_r8
-    jvlc = 3
-    call modal_aero_depvel_part( ncol,state%t(:,:), state%pmid(:,:), ram1, fv,  &
-                     vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 0, lchnk)
-    jvlc = 4
-    call modal_aero_depvel_part( ncol,state%t(:,:), state%pmid(:,:), ram1, fv,  &
-                     vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 3, lchnk)
 
+    jvlc = 3 ; imnt = 0  ! cloud-borne aerosol number
+    call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv,  &! in
+                                 rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), imnt,     &! in
+                                 vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) ) ! out
 
+    jvlc = 4 ; imnt = 3  ! cloud-borne aerosol volume/mass
+    call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv,  &! in
+                                 rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), imnt,     &! in
+                                 vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc)  )! out
 
+    !----------------------------------------------------------------------------------
+    !----------------------------------------------------------------------------------
     do m = 1, ntot_amode   ! main loop over aerosol modes
 
        do lphase = 1, 2   ! loop over interstitial / cloud-borne forms
 
           if (lphase == 1) then   ! interstial aerosol - calc settling/dep velocities of mode
 
-! rad_aer = volume mean wet radius (m)
-! dgncur_awet = geometric mean wet diameter for number distribution (m)
+             ! rad_aer = volume mean wet radius (m)
+             ! dgncur_awet = geometric mean wet diameter for number distribution (m)
              rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,m)   &
                                  *exp(1.5_r8*(alnsg_amode(m)**2))
-! dens_aer(1:ncol,:) = wet density (kg/m3)
+             ! dens_aer(1:ncol,:) = wet density (kg/m3)
              dens_aer(1:ncol,:) = wetdens(1:ncol,:,m)
              sg_aer(1:ncol,:) = sigmag_amode(m)
 
-             jvlc = 1
-             call modal_aero_depvel_part( ncol, state%t(:,:), state%pmid(:,:), ram1, fv,  & 
-                        vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 0, lchnk)
-             jvlc = 2
-             call modal_aero_depvel_part( ncol, state%t(:,:), state%pmid(:,:), ram1, fv,  & 
-                        vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 3, lchnk)
+             jvlc = 1  ; imnt = 0  ! interstitial aerosol number
+             call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
+                                          rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
+                                          vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
+
+             jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
+             call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
+                                          rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
+                                          vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
           end if
 
           do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
@@ -2629,8 +2633,9 @@ do_lphase2_conditional: &
 
   !===============================================================================
   !===============================================================================
-  subroutine modal_aero_depvel_part( ncol, t, pmid, ram1, fv, vlc_dry, vlc_trb, vlc_grv,  &
-                                     radius_part, density_part, sig_part, moment, lchnk )
+  subroutine modal_aero_depvel_part( ncol, lchnk, t, pmid, ram1, fv,               &! in
+                                     radius_part, density_part, sig_part, moment,  &! in
+                                     vlc_dry, vlc_trb, vlc_grv                     )! out
 
 !    calculates surface deposition velocity of particles
 !    L. Zhang, S. Gong, J. Padro, and L. Barrie
@@ -2651,16 +2656,18 @@ do_lphase2_conditional: &
     !
     implicit none
     !
+    integer,  intent(in) :: ncol
+    integer,  intent(in) :: lchnk
+
     real(r8), intent(in) :: t(pcols,pver)       !atm temperature (K)
     real(r8), intent(in) :: pmid(pcols,pver)    !atm pressure (Pa)
     real(r8), intent(in) :: fv(pcols)           !friction velocity (m/s)
     real(r8), intent(in) :: ram1(pcols)         !aerodynamical resistance (s/m)
+
     real(r8), intent(in) :: radius_part(pcols,pver)    ! mean (volume/number) particle radius (m)
     real(r8), intent(in) :: density_part(pcols,pver)   ! density of particle material (kg/m3)
     real(r8), intent(in) :: sig_part(pcols,pver)       ! geometric standard deviation of particles
     integer,  intent(in) :: moment ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
-    integer,  intent(in) :: ncol
-    integer,  intent(in) :: lchnk
 
     real(r8), intent(out) :: vlc_trb(pcols)       !Turbulent deposn velocity (m/s)
     real(r8), intent(out) :: vlc_grv(pcols,pver)       !grav deposn velocity (m/s)
