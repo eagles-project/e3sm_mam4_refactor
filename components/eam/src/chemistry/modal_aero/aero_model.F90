@@ -1058,21 +1058,16 @@ contains
     !----------------------------------------------------------------------------------
     !----------------------------------------------------------------------------------
     do m = 1, ntot_amode   ! main loop over aerosol modes
-      do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
+      do lspec = 0, nspec_amode(m) ! loop over number + constituents
 
              if (lspec == 0) then   ! number
-                   mm = numptrcw_amode(m)
-                   jvlc = 3
-             else if (lspec <= nspec_amode(m)) then   ! non-water mass
-                   mm = lmassptrcw_amode(lspec,m)
-                   jvlc = 4
-             else   ! water mass: bypass dry deposition of aerosol water
-                   mm = 0
+                 mm = numptrcw_amode(m) ; jvlc = 3
+             else ! aerosol mass
+                 mm = lmassptrcw_amode(lspec,m) ; jvlc = 4
              endif
 
-             if (mm <= 0) cycle
-
              ! use pvprogseasalts instead (means making the top level 0)
+
              pvmzaer(:ncol,1)=0._r8
              pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
              fldcw => qqcw_get_field(pbuf, mm,lchnk)
@@ -1080,7 +1075,7 @@ contains
              ! use phil's method
              !      convert from meters/sec to pascals/sec
              !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-                pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
+             pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
@@ -1102,7 +1097,7 @@ contains
              call outfld( trim(cnst_name_cw(mm))//'GVF', dep_grv, pcols, lchnk )
              aerdepdrycw(:ncol,mm) = sflx(:ncol)
 
-      end do ! loop over number + constituents + water
+      end do ! loop over number + constituents
     enddo   ! m = 1, ntot_amode
 
     !====================
@@ -1133,21 +1128,14 @@ contains
 
        !-----------------------------------------------------------
        !-----------------------------------------------------------
-       do lspec = 0, nspec_amode(m)+1   ! loop over number + constituents + water
+       do lspec = 0, nspec_amode(m) ! loop over number + constituents
 
              if (lspec == 0) then   ! number
-                   mm = numptr_amode(m)
-                   jvlc = 1
-             else if (lspec <= nspec_amode(m)) then   ! non-water mass
-                   mm = lmassptr_amode(lspec,m)
-                   jvlc = 2
-             else   ! water mass
-                mm = 0
+                   mm = numptr_amode(m) ; jvlc = 1
+             else ! aerosol mass
+                   mm = lmassptr_amode(lspec,m) ; jvlc = 2
              endif
 
-             if (mm <= 0) cycle
-
-          if (lspec <= nspec_amode(m)) then
 
              ptend%lq(mm) = .TRUE.
 
@@ -1181,42 +1169,13 @@ contains
              call outfld( trim(cnst_name(mm))//'DTQ', ptend%q(:,:,mm), pcols, lchnk)
              aerdepdryis(:ncol,mm) = sflx(:ncol)
 
-          else if (lspec == nspec_amode(m)+1) then  ! aerosol water
-             ! use pvprogseasalts instead (means making the top level 0)
-             pvmzaer(:ncol,1)=0._r8
-             pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
-
-             if(.true.) then ! use phil's method
-             !      convert from meters/sec to pascals/sec
-             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-                pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
-
-             !      calculate the tendencies and sfc fluxes from the above velocities
-                call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-                     qaerwat(:,:,mm),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), qaerwat(:,:,mm), state%pmid, &
-                               state%pdel, tvs, sflx, dqdt_tmp(:,:), dt )
-             endif
-
-             ! apportion dry deposition into turb and gravitational settling for tapes
-             do i=1,ncol
-                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
-                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
-                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
-                endif
-             enddo
-
-             qaerwat(1:ncol,:,mm) = qaerwat(1:ncol,:,mm) + dqdt_tmp(1:ncol,:) * dt
-
-          endif
-
-      enddo   ! lspec = 0, nspec_amode(m)+1
+      enddo   ! lspec = 0, nspec_amode(m)
     enddo   ! m = 1, ntot_amode
 
+    !=====================================================================
     ! if the user has specified prescribed aerosol dep fluxes then 
     ! do not set cam_out dep fluxes according to the prognostic aerosols
+    !=====================================================================
     if (.not.aerodep_flx_prescribed()) then
        call set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
     endif
