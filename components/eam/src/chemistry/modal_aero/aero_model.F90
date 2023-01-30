@@ -997,16 +997,32 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
 
-    ! calc ram and fv over ocean and sea ice ...
-    call calcram( ncol,landfrac,icefrac,ocnfrac,obklen,&
-                  ustar,ram1in,ram1,state%t(:,pver),state%pmid(:,pver),&
-                  state%pdel(:,pver),fvin,fv)
+    !---------------------------------------------------------------------------
+    ! For turbulent dry deposition: calculate ram and fv over ocean and sea ice; 
+    ! copy values over land
+
+    call calcram( ncol,               &! in: state%ncol
+                  landfrac,           &! in: cam_in%landfrac
+                  icefrac,            &! in: cam_in%icefrac
+                  ocnfrac,            &! in: cam_in%ocnfrac
+                  obklen,             &! in: calculated in tphysac (clubb_surface)
+                  ustar,              &! in: calculated in tphysac (clubb_surface)
+                  state%t   (:,pver), &! in. note: bottom level only
+                  state%pmid(:,pver), &! in. note: bottom level only
+                  state%pdel(:,pver), &! in. note: bottom level only
+                  ram1in,             &! in: cam_in%ram1
+                  fvin,               &! in: cam_in%fv
+                  ram1,               &! out: aerodynamical resistance (s/m)
+                  fv                  &! out: friction velocity
+                  )
 
     call outfld( 'airFV', fv(:), pcols, lchnk )
     call outfld( 'RAM1', ram1(:), pcols, lchnk )
  
+    !---------------------------------------------------------------------------
     ! note that tendencies are not only in sfc layer (because of sedimentation)
     ! and that ptend is updated within each subroutine for different species
+    !---------------------------------------------------------------------------
     
     call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 

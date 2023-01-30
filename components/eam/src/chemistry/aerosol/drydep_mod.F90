@@ -176,9 +176,11 @@ contains
 ! !INTERFACE:
 !
 
-subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
-                   ustar,ram1_in,ram1_out,t,pmid,&
-                   pdel,fv_in,fv_out)
+subroutine  calcram( ncol,landfrac,icefrac,ocnfrac, &
+                     obklen,ustar,   &
+                     tair, pmid, pdel,  &
+                     ram1_in, fv_in, &
+                     ram1_out,fv_out )
         !
         ! !DESCRIPTION: 
         !  
@@ -189,25 +191,31 @@ subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
         !
         implicit none
         integer, intent(in) :: ncol
-        real(r8),intent(in) :: ram1_in(pcols)         !aerodynamical resistance (s/m)
-        real(r8),intent(in) :: fv_in(pcols)                 ! sfc frc vel from land
-        real(r8),intent(out) :: ram1_out(pcols)         !aerodynamical resistance (s/m)
-        real(r8),intent(out) :: fv_out(pcols)                 ! sfc frc vel from land
-        real(r8), intent(in) :: obklen(pcols)                 ! obklen
-        real(r8), intent(in) :: ustar(pcols)                  ! sfc fric vel
+
         real(r8), intent(in) :: landfrac(pcols)               ! land fraction
         real(r8), intent(in) :: icefrac(pcols)                ! ice fraction
         real(r8), intent(in) :: ocnfrac(pcols)                ! ocean fraction
-        real(r8), intent(in) :: t(pcols)       !atm temperature (K)
+
+        real(r8), intent(in) :: obklen(pcols)                 ! obklen
+        real(r8), intent(in) :: ustar(pcols)                  ! sfc fric vel
+
+        real(r8), intent(in) :: tair(pcols)    !atm temperature (K)
         real(r8), intent(in) :: pmid(pcols)    !atm pressure (Pa)
-        real(r8), intent(in) :: pdel(pcols)    !atm pressure (Pa)
+        real(r8), intent(in) :: pdel(pcols)    !layer pressure thickness (Pa)
+
+        real(r8),intent(in) :: ram1_in(pcols)     ! aerodynamical resistance (s/m)
+        real(r8),intent(in) :: fv_in(pcols)       ! sfc frc vel from land
+
+        real(r8),intent(out) :: ram1_out(pcols)   ! aerodynamical resistance (s/m)
+        real(r8),intent(out) :: fv_out(pcols)     ! sfc frc vel of the current grid cell 
+
         real(r8), parameter :: zzocen = 0.0001_r8   ! Ocean aerodynamic roughness length
         real(r8), parameter :: zzsice = 0.0400_r8   ! Sea ice aerodynamic roughness length
         real(r8), parameter :: xkar   = 0.4_r8      ! Von Karman constant
 
         ! local variables
         real(r8) :: z,psi,psi0,nu,nu0,temp
-        integer :: i
+        integer :: ii
 
         real(r8), parameter :: lndfrc_threshold = 0.000000001_r8
 
@@ -233,13 +241,13 @@ subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
      !-------------------------------------------------------------------
      ! Aerodynamic resistence
      !-------------------------------------------------------------------
-     do i=1,ncol
+     do ii=1,ncol
 
         ! If the grid cell has a land fraction larger than a threshold (~zero),
         ! simply use cam_in%ram1
 
-        if (landfrac(i) > lndfrc_threshold) then
-           ram1_out(i)=ram1_in(i)
+        if (landfrac(ii) > lndfrc_threshold) then
+           ram1_out(ii)=ram1_in(ii)
 
         else
         ! If the grid cell has a land fraction smaller than the threshold,
@@ -248,22 +256,22 @@ subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
 
            ! calculate psi, psi0, temp
 
-           z=pdel(i)*rair*t(i)/pmid(i)/gravit/2.0_r8   !use half the layer height like Ganzefeld and Lelieveld, 1995
-           if(obklen(i).eq.0) then
+           z=pdel(ii)*rair*tair(ii)/pmid(ii)/gravit/2.0_r8   !use half the layer height like Ganzefeld and Lelieveld, 1995
+           if(obklen(ii).eq.0) then
               psi=0._r8
               psi0=0._r8
            else
-              psi=min(max(z/obklen(i),-1.0_r8),1.0_r8)
-              psi0=min(max(zzocen/obklen(i),-1.0_r8),1.0_r8)
+              psi=min(max(z/obklen(ii),-1.0_r8),1.0_r8)
+              psi0=min(max(zzocen/obklen(ii),-1.0_r8),1.0_r8)
            endif
 
            temp=z/zzocen
 
            ! special treatment for ice-dominant cells
 
-           if(icefrac(i) > 0.5_r8) then 
-              if(obklen(i).gt.0) then 
-                 psi0=min(max(zzsice/obklen(i),-1.0_r8),1.0_r8)
+           if(icefrac(ii) > 0.5_r8) then 
+              if(obklen(ii).gt.0) then 
+                 psi0=min(max(zzsice/obklen(ii),-1.0_r8),1.0_r8)
               else
                  psi0=0.0_r8
               endif
@@ -273,16 +281,16 @@ subroutine  calcram(ncol,landfrac,icefrac,ocnfrac,obklen,&
            ! calculate aerodynamic resistence
 
            if(psi> 0._r8) then
-              ram1_out(i) =1/xkar/ustar(i)*(log(temp)+4.7_r8*(psi-psi0))
+              ram1_out(ii) =1/xkar/ustar(ii)*(log(temp)+4.7_r8*(psi-psi0))
            else
               nu=(1.00_r8-15.000_r8*psi)**(.25_r8)
               nu0=(1.000_r8-15.000_r8*psi0)**(.25_r8)
-              if(ustar(i).ne.0._r8) then
-                 ram1_out(i) =1/xkar/ustar(i)*(log(temp) &
+              if(ustar(ii).ne.0._r8) then
+                 ram1_out(ii) =1/xkar/ustar(ii)*(log(temp) &
                       +log(((nu0**2+1.00_r8)*(nu0+1.0_r8)**2)/((nu**2+1.0_r8)*(nu+1.00_r8)**2)) &
                       +2.0_r8*(atan(nu)-atan(nu0)))
               else
-                 ram1_out(i) =0._r8
+                 ram1_out(ii) =0._r8
               endif
            endif
 
