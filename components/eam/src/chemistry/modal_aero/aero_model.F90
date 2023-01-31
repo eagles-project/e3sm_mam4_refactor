@@ -954,18 +954,16 @@ contains
     real(r8) :: fv(pcols)            ! for dry dep velocities, from land modified over ocean & ice
     real(r8) :: ram1(pcols)          ! for dry dep velocities, from land modified over ocean & ice
 
-    integer :: lchnk                   ! chunk identifier
-    integer :: ncol                    ! number of atmospheric columns
-    integer :: jvlc                    ! index for last dimension of vlc_xxx arrays
-    integer :: lspec                   ! index for aerosol number / chem-mass / water-mass
-    integer :: m                       ! aerosol mode index
-    integer :: mm                      ! tracer index
-    integer :: i
-    integer :: imnt  ! moment of the aerosol size distribution. 0 = number; 3 = volume
+    integer :: lchnk   ! chunk identifier
+    integer :: ncol    ! number of active atmospheric columns
+    integer :: lspec   ! index for aerosol number / chem-mass / water-mass
+    integer :: imode   ! aerosol mode index
+    integer :: icnst   ! tracer index
+    integer :: imnt    ! moment of the aerosol size distribution. 0 = number; 3 = volume
+    integer :: jvlc    ! index for last dimension of vlc_xxx arrays
 
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
     real(r8) :: sflx(pcols)          ! deposition flux
-    real(r8) :: pvmzaer(pcols,pverp) ! sedimentation velocity in Pa
     real(r8) :: dqdt_tmp(pcols,pver) ! temporary array to hold tendency for 1 species
 
     real(r8) :: rad_drop(pcols,pver)
@@ -978,8 +976,10 @@ contains
     real(r8) :: vlc_dry(pcols,pver,4)     ! dep velocity
     real(r8) :: vlc_grv(pcols,pver,4)     ! dep velocity
     real(r8)::  vlc_trb(pcols,4)          ! dep velocity
+
     real(r8) :: aerdepdryis(pcols,pcnst)  ! aerosol dry deposition (interstitial)
     real(r8) :: aerdepdrycw(pcols,pcnst)  ! aerosol dry deposition (cloud water)
+
     real(r8), pointer :: fldcw(:,:)
     real(r8), pointer :: dgncur_awet(:,:,:)
     real(r8), pointer :: wetdens(:,:,:)
@@ -1017,10 +1017,10 @@ contains
     call outfld( 'RAM1', ram1(:), pcols, lchnk )
  
     !---------------------------------------------------------------------------
-    ! note that tendencies are not only in sfc layer (because of sedimentation)
+    ! Intitialize ptend.
+    ! Note that tendencies are not only in sfc layer (because of sedimentation)
     ! and that ptend is updated within each subroutine for different species
     !---------------------------------------------------------------------------
-    
     call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
@@ -1031,12 +1031,13 @@ contains
 
     !======================
     ! cloud-borne aerosols
-    !======================
-
-    !----------------------------------------------------------------------------------
-    ! Calc settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
-    !----------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------------
+    ! Calculate settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
+    ! There is one set of velocities for number mixing ratios of all aerosol modes
+    ! and one set of velocities for all mass mixing ratios of all modes.
+    !---------------------------------------------------------------------------------------
     ! *** mean drop radius should eventually be computed from ndrop and qcldwtr
+
     rad_drop(:,:) = 5.0e-6_r8
     dens_drop(:,:) = rhoh2o
     sg_drop(:,:) = 1.46_r8
@@ -1052,51 +1053,60 @@ contains
                                  vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc)  )! out
 
     !----------------------------------------------------------------------------------
+    ! Loop over all modes and all tracers (number + mass species).
+    ! Calculate the drydep-induced tendencies, then update the mixing ratios.
     !----------------------------------------------------------------------------------
-    do m = 1, ntot_amode   ! main loop over aerosol modes
-      do lspec = 0, nspec_amode(m) ! loop over number + constituents
+    do imode = 1, ntot_amode         ! main loop over aerosol modes
+    do lspec = 0, nspec_amode(imode) ! loop over number + constituents
 
-             if (lspec == 0) then   ! number
-                 mm = numptrcw_amode(m) ; jvlc = 3
-             else ! aerosol mass
-                 mm = lmassptrcw_amode(lspec,m) ; jvlc = 4
-             endif
+       if (lspec == 0) then   ! number
+           icnst = numptrcw_amode(imode) ; jvlc = 3
+       else ! aerosol mass
+           icnst = lmassptrcw_amode(lspec,imode) ; jvlc = 4
+       endif
 
-             ! use pvprogseasalts instead (means making the top level 0)
+       fldcw => qqcw_get_field(pbuf,icnst,lchnk)
+       call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &
+                                               state%t, state%pint(:,:), state%pmid, state%pdel,&
+                                               dqdt_tmp, sflx )
 
-             fldcw => qqcw_get_field(pbuf, mm,lchnk)
+       aerdepdrycw(:ncol,icnst) = sflx(:ncol)
 
-             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &
-                                                     state%t, state%pint(:,:), state%pmid, state%pdel,&
-                                                     dqdt_tmp, sflx )
+       ! Update mixing ratios here. Recall that mixing ratios of cloud-borne aerosols
+       ! are stored in pbuf, not as part of the state variable
 
-             aerdepdrycw(:ncol,mm) = sflx(:ncol)
-             fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+       fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-             call drydep_diags_for_1_tracer( lchnk, ncol, mm,     &! in
-                                             vlc_dry(:,:,jvlc),   &! in
-                                             vlc_trb(:,  jvlc),   &! in
-                                             vlc_grv(:,:,jvlc),   &! in
-                                             sflx                 )! in
+       ! Get and save diagnostics
 
-      end do ! loop over number + constituents
-    enddo   ! m = 1, ntot_amode
+       call drydep_diags_for_1_tracer( lchnk, ncol, icnst,  &! in
+                                       vlc_dry(:,:,jvlc),   &! in
+                                       vlc_trb(:,  jvlc),   &! in
+                                       vlc_grv(:,:,jvlc),   &! in
+                                       sflx                 )! in
+
+    enddo ! loop over number + constituents
+    enddo ! imode = 1, ntot_amode
 
     !====================
     ! interstial aerosol
     !====================
-    do m = 1, ntot_amode   ! main loop over aerosol modes
+    do imode = 1, ntot_amode   ! main loop over aerosol modes
 
-       !-----------------------------------------------------------
-       ! Calc settling/dep velocities of mode
-       !-----------------------------------------------------------
+       !-----------------------------------------------------------------
+       ! Calcalculate settling/deposition velocities of mode.
+       ! (One set of velocities for number mixing ratio of the mode;
+       !  One set of velocities for all mass mixing ratios of the mode.)
+       !-----------------------------------------------------------------
        ! rad_aer = volume mean wet radius (m)
        ! dgncur_awet = geometric mean wet diameter for number distribution (m)
-       rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,m)   &
-                           *exp(1.5_r8*(alnsg_amode(m)**2))
+
+       rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,imode)   &
+                           *exp(1.5_r8*(alnsg_amode(imode)**2))
+
        ! dens_aer(1:ncol,:) = wet density (kg/m3)
-       dens_aer(1:ncol,:) = wetdens(1:ncol,:,m)
-       sg_aer(1:ncol,:) = sigmag_amode(m)
+       dens_aer(1:ncol,:) = wetdens(1:ncol,:,imode)
+       sg_aer(1:ncol,:) = sigmag_amode(imode)
 
        jvlc = 1  ; imnt = 0  ! interstitial aerosol number
        call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
@@ -1109,34 +1119,37 @@ contains
                                     vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
 
        !-----------------------------------------------------------
+       ! Loop over number + mass species of the mode. 
+       ! Calculate drydep-induced tendencies.
        !-----------------------------------------------------------
-       do lspec = 0, nspec_amode(m) ! loop over number + constituents
+       do lspec = 0, nspec_amode(imode)
 
-             if (lspec == 0) then   ! number
-                   mm = numptr_amode(m) ; jvlc = 1
-             else ! aerosol mass
-                   mm = lmassptr_amode(lspec,m) ; jvlc = 2
-             endif
+          if (lspec == 0) then   ! number
+             icnst = numptr_amode(imode) ; jvlc = 1
+          else ! aerosol mass
+             icnst = lmassptr_amode(lspec,imode) ; jvlc = 2
+          endif
 
-             call outfld( trim(cnst_name(mm))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
+          call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,icnst), &
+                                                  gravit, rho, &
+                                                  state%t, state%pint(:,:), state%pmid, state%pdel,&
+                                                  ptend%q(:,:,icnst), sflx )
 
+          aerdepdryis(:ncol,icnst) = sflx(:ncol)
+          ptend%lq(icnst) = .TRUE.
 
-             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,mm), &
-                                                     gravit, rho, &
-                                                     state%t, state%pint(:,:), state%pmid, state%pdel,&
-                                                     ptend%q(:,:,mm), sflx )
+          ! Get and save diagnostics
 
-             aerdepdryis(:ncol,mm) = sflx(:ncol)
-             ptend%lq(mm) = .TRUE.
+          call drydep_diags_for_1_tracer( lchnk, ncol, icnst,  &! in
+                                          vlc_dry(:,:,jvlc),   &! in
+                                          vlc_trb(:,  jvlc),   &! in
+                                          vlc_grv(:,:,jvlc),   &! in
+                                          sflx, ptend%q(:,:,icnst) )! in
 
-             call drydep_diags_for_1_tracer( lchnk, ncol, mm,     &! in
-                                             vlc_dry(:,:,jvlc),   &! in
-                                             vlc_trb(:,  jvlc),   &! in
-                                             vlc_grv(:,:,jvlc),   &! in
-                                             sflx, ptend%q(:,:,mm) )! in
+          call outfld( trim(cnst_name(icnst))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
 
-      enddo   ! lspec = 0, nspec_amode(m)
-    enddo   ! m = 1, ntot_amode
+      enddo ! lspec = 1, nspec_amode(m)
+    enddo   ! imode = 1, ntot_amode
 
     !=====================================================================
     ! if the user has specified prescribed aerosol dep fluxes then 
@@ -1199,11 +1212,11 @@ contains
   end subroutine sedimentation_solver_for_1_tracer
 
 
-  subroutine drydep_diags_for_1_tracer( lchnk, ncol, mm, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
+  subroutine drydep_diags_for_1_tracer( lchnk, ncol, icnst, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
 
     integer, intent(in) :: lchnk  ! chunk index
     integer, intent(in) :: ncol   ! # of active columns 
-    integer, intent(in) :: mm     ! tracer index
+    integer, intent(in) :: icnst  ! tracer index
     real(r8),intent(in) :: vlc_dry(pcols,pver)
     real(r8),intent(in) :: vlc_trb(pcols)
     real(r8),intent(in) :: vlc_grv(pcols,pver)
@@ -1227,12 +1240,12 @@ contains
 
     ! send diagnostics to output
 
-    call outfld( trim(cnst_name(mm))//'DDF', sflx,     pcols, lchnk)
-    call outfld( trim(cnst_name(mm))//'TBF', dep_trb,  pcols, lchnk)
-    call outfld( trim(cnst_name(mm))//'GVF', dep_grv,  pcols, lchnk)
+    call outfld( trim(cnst_name(icnst))//'DDF', sflx,     pcols, lchnk)
+    call outfld( trim(cnst_name(icnst))//'TBF', dep_trb,  pcols, lchnk)
+    call outfld( trim(cnst_name(icnst))//'GVF', dep_grv,  pcols, lchnk)
 
     if (present(dqdt_sed)) &
-    call outfld( trim(cnst_name(mm))//'DTQ', dqdt_sed, pcols, lchnk)
+    call outfld( trim(cnst_name(icnst))//'DTQ', dqdt_sed, pcols, lchnk)
 
   end subroutine drydep_diags_for_1_tracer
 
