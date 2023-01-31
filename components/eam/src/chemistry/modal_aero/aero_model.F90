@@ -1066,9 +1066,9 @@ contains
        endif
 
        fldcw => qqcw_get_field(pbuf,icnst,lchnk)
-       call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &
-                                               state%t, state%pint(:,:), state%pmid, state%pdel,&
-                                               dqdt_tmp, sflx )
+       call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &! in
+                                               state%t, state%pint(:,:), state%pmid, state%pdel,&! in
+                                               dqdt_tmp, sflx                                   )! out
 
        aerdepdrycw(:ncol,icnst) = sflx(:ncol)
 
@@ -1079,11 +1079,9 @@ contains
 
        ! Get and save diagnostics
 
-       call drydep_diags_for_1_tracer( lchnk, ncol, icnst,  &! in
-                                       vlc_dry(:,:,jvlc),   &! in
-                                       vlc_trb(:,  jvlc),   &! in
-                                       vlc_grv(:,:,jvlc),   &! in
-                                       sflx                 )! in
+       call drydep_diags_for_1_tracer( lchnk, ncol, trim(cnst_name_cw(icnst)), &! in
+                                       vlc_dry(:,:,jvlc), vlc_trb(:,jvlc),     &! in
+                                       vlc_grv(:,:,jvlc), sflx                 )! in
 
     enddo ! loop over number + constituents
     enddo ! imode = 1, ntot_amode
@@ -1130,21 +1128,19 @@ contains
              icnst = lmassptr_amode(lspec,imode) ; jvlc = 2
           endif
 
-          call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,icnst), &
-                                                  gravit, rho, &
-                                                  state%t, state%pint(:,:), state%pmid, state%pdel,&
-                                                  ptend%q(:,:,icnst), sflx )
+          call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,icnst), gravit, rho, &! in
+                                                  state%t, state%pint(:,:), state%pmid, state%pdel,             &! in
+                                                  ptend%q(:,:,icnst), sflx                                      )! out
 
           aerdepdryis(:ncol,icnst) = sflx(:ncol)
           ptend%lq(icnst) = .TRUE.
 
           ! Get and save diagnostics
 
-          call drydep_diags_for_1_tracer( lchnk, ncol, icnst,  &! in
-                                          vlc_dry(:,:,jvlc),   &! in
-                                          vlc_trb(:,  jvlc),   &! in
-                                          vlc_grv(:,:,jvlc),   &! in
-                                          sflx, ptend%q(:,:,icnst) )! in
+          call drydep_diags_for_1_tracer( lchnk, ncol, trim(cnst_name(icnst)), &! in
+                                          vlc_dry(:,:,jvlc), vlc_trb(:,jvlc),  &! in
+                                          vlc_grv(:,:,jvlc), sflx,             &! in
+                                          ptend%q(:,:,icnst)                   )! in
 
           call outfld( trim(cnst_name(icnst))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
 
@@ -1181,12 +1177,12 @@ contains
     real(r8), intent(in) :: qq_in(pcols,pver)
 
     real(r8), intent(out) :: dqdt_sed(pcols,pver) ! tendency
-    real(r8), intent(out) :: sflx(pcols)          ! deposition flux
+    real(r8), intent(out) :: sflx(pcols)          ! deposition flux at the Earth's surface
 
     real(r8) :: pvmzaer(pcols,pverp) ! sedimentation velocity in Pa
 
     ! Set sedimentation velocity to zero at the top interface of the model domain.
-    ! (This was referred to as the "pvprogseasalts method" in the old code)
+    ! (This was referred to as the "pvprogseasalts method" in the code before refactoring.)
 
     pvmzaer(:ncol,1)=0._r8
 
@@ -1197,7 +1193,7 @@ contains
 
     ! Convert from velocity to (gravitiy * mass fluxes of the air);
     ! units: convert from meters/sec to pascals/sec.
-    ! (This was referred to as "Phil's method" in the old code
+    ! (This was referred to as "Phil's method" in the code before refactoring.)
  
     pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
@@ -1212,11 +1208,13 @@ contains
   end subroutine sedimentation_solver_for_1_tracer
 
 
-  subroutine drydep_diags_for_1_tracer( lchnk, ncol, icnst, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
+  subroutine drydep_diags_for_1_tracer( lchnk, ncol, cnst_name_in, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
 
     integer, intent(in) :: lchnk  ! chunk index
     integer, intent(in) :: ncol   ! # of active columns 
-    integer, intent(in) :: icnst  ! tracer index
+
+    character(len=*), intent(in) :: cnst_name_in  ! tracer name
+
     real(r8),intent(in) :: vlc_dry(pcols,pver)
     real(r8),intent(in) :: vlc_trb(pcols)
     real(r8),intent(in) :: vlc_grv(pcols,pver)
@@ -1240,12 +1238,12 @@ contains
 
     ! send diagnostics to output
 
-    call outfld( trim(cnst_name(icnst))//'DDF', sflx,     pcols, lchnk)
-    call outfld( trim(cnst_name(icnst))//'TBF', dep_trb,  pcols, lchnk)
-    call outfld( trim(cnst_name(icnst))//'GVF', dep_grv,  pcols, lchnk)
+    call outfld( cnst_name_in//'DDF', sflx,     pcols, lchnk)
+    call outfld( cnst_name_in//'TBF', dep_trb,  pcols, lchnk)
+    call outfld( cnst_name_in//'GVF', dep_grv,  pcols, lchnk)
 
     if (present(dqdt_sed)) &
-    call outfld( trim(cnst_name(icnst))//'DTQ', dqdt_sed, pcols, lchnk)
+    call outfld( cnst_name_in//'DTQ', dqdt_sed, pcols, lchnk)
 
   end subroutine drydep_diags_for_1_tracer
 
