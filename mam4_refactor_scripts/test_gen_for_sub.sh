@@ -7,16 +7,16 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=compute_dryvol_change_in_src_mode
+    sub_name=clddiag
 
     #module name
-    module_name=modal_aero_rename
+    module_name=wetdep
 
     #file path
-    dir_path=components/eam/src/chemistry/modal_aero/
+    dir_path=components/eam/src/chemistry/aerosol/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_RENAME
+    cpp_directive=YAML_WETDEP
 
     #-------------------------
     #USER INPUT ENDS
