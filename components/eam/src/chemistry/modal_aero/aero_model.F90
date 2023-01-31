@@ -1128,25 +1128,32 @@ contains
                    mm = lmassptr_amode(lspec,m) ; jvlc = 2
              endif
 
+             call outfld( trim(cnst_name(mm))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
 
              ptend%lq(mm) = .TRUE.
 
-             ! use pvprogseasalts instead (means making the top level 0)
-             pvmzaer(:ncol,1)=0._r8
-             pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
+           ! ! use pvprogseasalts instead (means making the top level 0)
+           ! pvmzaer(:ncol,1)=0._r8
+           ! pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
 
-             call outfld( trim(cnst_name(mm))//'DDV', pvmzaer(:,2:pverp), pcols, lchnk )
+           ! call outfld( trim(cnst_name(mm))//'DDV', pvmzaer(:,2:pverp), pcols, lchnk )
 
-             ! use phil's method
-             !      convert from meters/sec to pascals/sec
-             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-                pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
+           ! ! use phil's method
+           ! !      convert from meters/sec to pascals/sec
+           ! !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
+           !    pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
-             !      calculate the tendencies and sfc fluxes from the above velocities
-                call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-                     state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
+           ! !      calculate the tendencies and sfc fluxes from the above velocities
+           !    call dust_sediment_tend( &
+           !         ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
+           !         state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
 
+             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:ncol,:,jvlc), state%q(:,:,mm), &
+                                                     gravit, rho, &
+                                                     state%t, state%pint(:,:), state%pmid, state%pdel,&
+                                                     ptend%q(:,:,mm), sflx )
+
+             !^^^^^^^^^=======
              ! apportion dry deposition into turb and gravitational settling for tapes
              do i=1,ncol
                 if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
@@ -1160,6 +1167,7 @@ contains
              call outfld( trim(cnst_name(mm))//'GVF', dep_grv, pcols, lchnk )
              call outfld( trim(cnst_name(mm))//'DTQ', ptend%q(:,:,mm), pcols, lchnk)
              aerdepdryis(:ncol,mm) = sflx(:ncol)
+             !^^^^^^^^^=======
 
       enddo   ! lspec = 0, nspec_amode(m)
     enddo   ! m = 1, ntot_amode
