@@ -19,7 +19,6 @@ save
 private
 
 public :: wetdepa_v2  ! scavenging codes for very soluble aerosols -- CAM5 version
-!public :: clddiag     ! calc of cloudy volume and rain mixing ratio
 public :: faer_resusp_vs_fprec_evap_mpln
 
 public :: wetdep_inputs_t
