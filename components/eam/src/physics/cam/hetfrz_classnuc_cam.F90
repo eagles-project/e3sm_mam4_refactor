@@ -609,7 +609,7 @@ subroutine hetfrz_classnuc_cam_calc( &
    associate( &
       lchnk => state%lchnk,             &
       ncol  => state%ncol,              &
-      t     => state%t,                 &
+      temperature     => state%t,                 &
       qc    => state%q(:pcols,:pver,cldliq_idx), &
       nc    => state%q(:pcols,:pver,numliq_idx), &
       pmid  => state%pmid               )
@@ -624,7 +624,7 @@ subroutine hetfrz_classnuc_cam_calc( &
 
    do kk = top_lev, pver
       do icol = 1, ncol
-         rho(icol,kk) = pmid(icol,kk)/(rair*t(icol,kk))
+         rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
       enddo
    enddo
 
@@ -765,14 +765,14 @@ subroutine hetfrz_classnuc_cam_calc( &
    do kk = top_lev, pver
       do icol = 1, ncol
 
-         if (t(icol,kk) > 235.15_r8 .and. t(icol,kk) < 269.15_r8) then
+         if (temperature(icol,kk) > 235.15_r8 .and. temperature(icol,kk) < 269.15_r8) then
             qcic = min(qc(icol,kk)/lcldm(icol,kk), 5.e-3_r8)
             ncic = max(nc(icol,kk)/lcldm(icol,kk), 0._r8)
 
             con1 = 1._r8/(1.333_r8*pi)**0.333_r8
             r3lx = con1*(rho(icol,kk)*qcic/(rhoh2o*max(ncic*rho(icol,kk), 1.0e6_r8)))**0.333_r8 ! in m
             r3lx = max(4.e-6_r8, r3lx)
-            supersatice = svp_water(t(icol,kk))/svp_ice(t(icol,kk))
+            supersatice = svp_water(temperature(icol,kk))/svp_ice(temperature(icol,kk))
 
             fn(1) = factnum(icol,kk,mode_accum_idx)  ! bc accumulation mode
             fn(2) = factnum(icol,kk,mode_accum_idx)  ! dust_a1 accumulation mode
@@ -780,7 +780,7 @@ subroutine hetfrz_classnuc_cam_calc( &
             
 
             call hetfrz_classnuc_calc( &
-               deltatin,  t(icol,kk),  pmid(icol,kk),  supersatice,   &
+               deltatin,  temperature(icol,kk),  pmid(icol,kk),  supersatice,   &
                fn,  r3lx,  ncic*rho(icol,kk)*1.0e-6_r8,  frzbcimm(icol,kk),  frzduimm(icol,kk),   &
                frzbccnt(icol,kk),  frzducnt(icol,kk),  frzbcdep(icol,kk),  frzdudep(icol,kk),  hetraer(icol,kk,:), &
                awcam(icol,kk,:), awfacm(icol,kk,:), dstcoat(icol,kk,:), total_aer_num(icol,kk,:),  &
@@ -1060,7 +1060,7 @@ pure function get_aer_radius(specdens, aermc, aernum) result(radius)
    implicit none
    real(r8), intent(in) :: specdens    ! density [kg/m^3]
    real(r8), intent(in) :: aermc       ! aerosol mass concentration [kg/m^3]
-   real(r8), intent(in) :: aernum      ! aerosol number concentration [kg/m^3]
+   real(r8), intent(in) :: aernum      ! aerosol number concentration [#/m^3]
 
    real(r8) :: radius                  ! return value radius [m]
 
