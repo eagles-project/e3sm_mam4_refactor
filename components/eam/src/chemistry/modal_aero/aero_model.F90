@@ -965,8 +965,6 @@ contains
 
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
     real(r8) :: sflx(pcols)          ! deposition flux
-    real(r8) :: dep_trb(pcols)       !kg/m2/s
-    real(r8) :: dep_grv(pcols)       !kg/m2/s (total of grav and trb)
     real(r8) :: pvmzaer(pcols,pverp) ! sedimentation velocity in Pa
     real(r8) :: dqdt_tmp(pcols,pver) ! temporary array to hold tendency for 1 species
 
@@ -1068,26 +1066,18 @@ contains
 
              fldcw => qqcw_get_field(pbuf, mm,lchnk)
 
-             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:ncol,:,jvlc), fldcw, gravit, rho, &
+             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &
                                                      state%t, state%pint(:,:), state%pmid, state%pdel,&
                                                      dqdt_tmp, sflx )
 
-          !^^^^^^^^====== wrap this block into something like a "dep_diags"?
-             ! apportion dry deposition into turb and gravitational settling for tapes
-             do i=1,ncol
-                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
-                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
-                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
-                endif
-             enddo
-
+             aerdepdrycw(:ncol,mm) = sflx(:ncol)
              fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-             call outfld( trim(cnst_name_cw(mm))//'DDF', sflx, pcols, lchnk)
-             call outfld( trim(cnst_name_cw(mm))//'TBF', dep_trb, pcols, lchnk )
-             call outfld( trim(cnst_name_cw(mm))//'GVF', dep_grv, pcols, lchnk )
-             aerdepdrycw(:ncol,mm) = sflx(:ncol)
-          !^^^^^^^^======
+             call drydep_diags_for_1_tracer( lchnk, ncol, mm,     &! in
+                                             vlc_dry(:,:,jvlc),   &! in
+                                             vlc_trb(:,  jvlc),   &! in
+                                             vlc_grv(:,:,jvlc),   &! in
+                                             sflx                 )! in
 
       end do ! loop over number + constituents
     enddo   ! m = 1, ntot_amode
@@ -1130,44 +1120,20 @@ contains
 
              call outfld( trim(cnst_name(mm))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
 
-             ptend%lq(mm) = .TRUE.
 
-           ! ! use pvprogseasalts instead (means making the top level 0)
-           ! pvmzaer(:ncol,1)=0._r8
-           ! pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
-
-           ! call outfld( trim(cnst_name(mm))//'DDV', pvmzaer(:,2:pverp), pcols, lchnk )
-
-           ! ! use phil's method
-           ! !      convert from meters/sec to pascals/sec
-           ! !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-           !    pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
-
-           ! !      calculate the tendencies and sfc fluxes from the above velocities
-           !    call dust_sediment_tend( &
-           !         ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-           !         state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
-
-             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:ncol,:,jvlc), state%q(:,:,mm), &
+             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,mm), &
                                                      gravit, rho, &
                                                      state%t, state%pint(:,:), state%pmid, state%pdel,&
                                                      ptend%q(:,:,mm), sflx )
 
-             !^^^^^^^^^=======
-             ! apportion dry deposition into turb and gravitational settling for tapes
-             do i=1,ncol
-                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
-                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
-                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
-                endif
-             enddo
-
-             call outfld( trim(cnst_name(mm))//'DDF', sflx, pcols, lchnk)
-             call outfld( trim(cnst_name(mm))//'TBF', dep_trb, pcols, lchnk )
-             call outfld( trim(cnst_name(mm))//'GVF', dep_grv, pcols, lchnk )
-             call outfld( trim(cnst_name(mm))//'DTQ', ptend%q(:,:,mm), pcols, lchnk)
              aerdepdryis(:ncol,mm) = sflx(:ncol)
-             !^^^^^^^^^=======
+             ptend%lq(mm) = .TRUE.
+
+             call drydep_diags_for_1_tracer( lchnk, ncol, mm,     &! in
+                                             vlc_dry(:,:,jvlc),   &! in
+                                             vlc_trb(:,  jvlc),   &! in
+                                             vlc_grv(:,:,jvlc),   &! in
+                                             sflx, ptend%q(:,:,mm) )! in
 
       enddo   ! lspec = 0, nspec_amode(m)
     enddo   ! m = 1, ntot_amode
@@ -1233,6 +1199,42 @@ contains
   end subroutine sedimentation_solver_for_1_tracer
 
 
+  subroutine drydep_diags_for_1_tracer( lchnk, ncol, mm, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
+
+    integer, intent(in) :: lchnk  ! chunk index
+    integer, intent(in) :: ncol   ! # of active columns 
+    integer, intent(in) :: mm     ! tracer index
+    real(r8),intent(in) :: vlc_dry(pcols,pver)
+    real(r8),intent(in) :: vlc_trb(pcols)
+    real(r8),intent(in) :: vlc_grv(pcols,pver)
+    real(r8),intent(in) ::    sflx(pcols)
+
+    real(r8),intent(in),optional :: dqdt_sed(pcols,pver)
+
+    real(r8) :: dep_trb(pcols)       !kg/m2/s
+    real(r8) :: dep_grv(pcols)       !kg/m2/s (total of grav and trb)
+
+    integer :: ii
+
+    ! apportion dry deposition into turb and gravitational settling for tapes
+
+    do ii=1,ncol
+       if (vlc_dry(ii,pver) .ne. 0._r8) then
+          dep_trb(ii)=sflx(ii)*vlc_trb(ii)/vlc_dry(ii,pver)
+          dep_grv(ii)=sflx(ii)*vlc_grv(ii,pver)/vlc_dry(ii,pver)
+       endif
+    enddo
+
+    ! send diagnostics to output
+
+    call outfld( trim(cnst_name(mm))//'DDF', sflx,     pcols, lchnk)
+    call outfld( trim(cnst_name(mm))//'TBF', dep_trb,  pcols, lchnk)
+    call outfld( trim(cnst_name(mm))//'GVF', dep_grv,  pcols, lchnk)
+
+    if (present(dqdt_sed)) &
+    call outfld( trim(cnst_name(mm))//'DTQ', dqdt_sed, pcols, lchnk)
+
+  end subroutine drydep_diags_for_1_tracer
 
 ! REASTER 08/04/2015 BEGIN
   !=============================================================================
