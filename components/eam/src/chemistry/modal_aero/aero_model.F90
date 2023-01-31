@@ -922,7 +922,7 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use drydep_mod,        only: d3ddflux, calcram
+    use drydep_mod,        only: calcram
     use modal_aero_data,   only: qqcw_get_field
     use modal_aero_data,   only: cnst_name_cw
     use modal_aero_data,   only: alnsg_amode
@@ -963,7 +963,6 @@ contains
     integer :: i
     integer :: imnt  ! moment of the aerosol size distribution. 0 = number; 3 = volume
 
-    real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
     real(r8) :: sflx(pcols)          ! deposition flux
     real(r8) :: dep_trb(pcols)       !kg/m2/s
@@ -1030,7 +1029,6 @@ contains
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
     call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
 
-    tvs(:ncol,:) = state%t(:ncol,:)!*(1+state%q(:ncol,k)
     rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
     !======================
@@ -1068,20 +1066,13 @@ contains
 
              ! use pvprogseasalts instead (means making the top level 0)
 
-             pvmzaer(:ncol,1)=0._r8
-             pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
              fldcw => qqcw_get_field(pbuf, mm,lchnk)
 
-             ! use phil's method
-             !      convert from meters/sec to pascals/sec
-             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-             pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
+             call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:ncol,:,jvlc), fldcw, gravit, rho, &
+                                                     state%t, state%pint(:,:), state%pmid, state%pdel,&
+                                                     dqdt_tmp, sflx )
 
-             !      calculate the tendencies and sfc fluxes from the above velocities
-                call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-                     fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-
+          !^^^^^^^^====== wrap this block into something like a "dep_diags"?
              ! apportion dry deposition into turb and gravitational settling for tapes
              do i=1,ncol
                 if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
@@ -1096,6 +1087,7 @@ contains
              call outfld( trim(cnst_name_cw(mm))//'TBF', dep_trb, pcols, lchnk )
              call outfld( trim(cnst_name_cw(mm))//'GVF', dep_grv, pcols, lchnk )
              aerdepdrycw(:ncol,mm) = sflx(:ncol)
+          !^^^^^^^^======
 
       end do ! loop over number + constituents
     enddo   ! m = 1, ntot_amode
@@ -1180,7 +1172,58 @@ contains
        call set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
     endif
 
-  endsubroutine aero_model_drydep
+  end subroutine aero_model_drydep
+
+  subroutine sedimentation_solver_for_1_tracer( ncol, dt, sed_vel, qq_in, gravit, rho, &! in
+                                                tair, pint, pmid, pdel, &! in
+                                                dqdt_sed, sflx          )! out
+
+    use shr_kind_mod,      only: r8 => shr_kind_r8
+    use ppgrid,            only: pcols, pver, pverp
+    use dust_sediment_mod, only: dust_sediment_tend
+
+    integer , intent(in) :: ncol
+    real(r8), intent(in) :: dt
+    real(r8), intent(in) :: gravit
+    real(r8), intent(in) :: rho(pcols,pver)           ! air density in kg/m3
+    real(r8), intent(in) :: tair(pcols,pver)          ! air temperature
+    real(r8), intent(in) :: pint(pcols,pverp)         ! air pressure at layer interfaces 
+    real(r8), intent(in) :: pmid(pcols,pver)          ! air pressure at layer midpoints
+    real(r8), intent(in) :: pdel(pcols,pver)          ! pressure layer thickness
+    real(r8), intent(in) :: sed_vel(pcols,pver)       ! dep velocity
+    real(r8), intent(in) :: qq_in(pcols,pver)
+
+    real(r8), intent(out) :: dqdt_sed(pcols,pver) ! tendency
+    real(r8), intent(out) :: sflx(pcols)          ! deposition flux
+
+    real(r8) :: pvmzaer(pcols,pverp) ! sedimentation velocity in Pa
+
+    ! Set sedimentation velocity to zero at the top interface of the model domain.
+    ! (This was referred to as the "pvprogseasalts method" in the old code)
+
+    pvmzaer(:ncol,1)=0._r8
+
+    ! Assume the sedimentation velocities passed in are velocities
+    ! at the bottom interface of each model layer.
+
+    pvmzaer(:ncol,2:pverp) = sed_vel(:ncol,:)
+
+    ! Convert from velocity to (gravitiy * mass fluxes of the air);
+    ! units: convert from meters/sec to pascals/sec.
+    ! (This was referred to as "Phil's method" in the old code
+ 
+    pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
+
+    ! Calculate the tendencies and sfc fluxes using the above-calculated 
+    ! air-mass fluxes and the mixing ratio of the sedimenting tracer
+
+    call dust_sediment_tend( ncol, dt,               &! in
+                             pint, pmid, pdel, tair, &! in
+                             qq_in,  pvmzaer,        &! in
+                             dqdt_sed, sflx          )! out
+
+  end subroutine sedimentation_solver_for_1_tracer
+
 
 
 ! REASTER 08/04/2015 BEGIN
