@@ -1,11 +1,23 @@
 #ifdef YAML_RENAME
   ! YAML file output generation code- DO NOT PORT to C++
-  if(yaml%flag_print) then ! if this column exists in lchnk
+  if(yaml%flag_print .and. n_calls==1) then ! if this column exists in lchnk
 
      !write output header
      call write_output_header(unit_output)
 
      !start writing data
+
+call write_output_var(unit_output, 'num_pairs', num_pairs)
+call write_1d_output_var(unit_output, 'sz_factor', nmodes, sz_factor)
+call write_1d_output_var(unit_output, 'fmode_dist_tail_fac', nmodes, fmode_dist_tail_fac)
+call write_1d_output_var(unit_output, 'v2n_lo_rlx', nmodes, v2n_lo_rlx)
+call write_1d_output_var(unit_output, 'v2n_hi_rlx', nmodes, v2n_hi_rlx)
+call write_1d_output_var(unit_output, 'ln_diameter_tail_fac', nmodes, ln_diameter_tail_fac)
+call write_1d_output_var(unit_output, 'diameter_cutoff', nmodes, diameter_cutoff)
+call write_1d_output_var(unit_output, 'ln_dia_cutoff', nmodes, ln_dia_cutoff)
+call write_1d_output_var(unit_output, 'diameter_threshold', nmodes, diameter_threshold)
+
+
      !<add code for writing data here>
      !call write_output_var(unit_output, fld_name, field, inp_out_str)  !write a single output variable
      !call write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str) !writes 1D variables of any dimension in the output python module
