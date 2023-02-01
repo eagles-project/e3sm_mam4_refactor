@@ -45,7 +45,7 @@ module aero_model
 
   ! The following variables are made public to be used by modal_aero_drydep
 
-  public :: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx, qaerwat_idx
+  public :: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx
 
  ! Misc private data 
 

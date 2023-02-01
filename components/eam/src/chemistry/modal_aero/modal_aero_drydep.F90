@@ -25,7 +25,7 @@ contains
   !=============================================================================
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
-    use aero_model,        only: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx, qaerwat_idx
+    use aero_model,        only: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx
     use drydep_mod,        only: calcram
     use modal_aero_data,   only: qqcw_get_field
     use modal_aero_data,   only: cnst_name_cw
@@ -40,10 +40,10 @@ contains
 
   ! args 
     type(physics_state),target,intent(in) :: state     ! Physics state variables
-    real(r8),               intent(in)    :: obklen(:)          
-    real(r8),               intent(in)    :: ustar(:)  ! sfc fric vel
+    real(r8),               intent(in)    :: obklen(:) ! Obukhov length [m]
+    real(r8),               intent(in)    :: ustar(:)  ! sfc friction velocity [m/s]
     type(cam_in_t), target, intent(in)    :: cam_in    ! import state
-    real(r8),               intent(in)    :: dt             ! time step
+    real(r8),               intent(in)    :: dt        ! time step [s]
     type(cam_out_t),        intent(inout) :: cam_out   ! export state
     type(physics_ptend),    intent(out)   :: ptend     ! indivdual parameterization tendencies
     type(physics_buffer_desc),    pointer :: pbuf(:)
@@ -55,10 +55,10 @@ contains
     real(r8), pointer :: fvin(:)     !
     real(r8), pointer :: ram1in(:)   ! for dry dep velocities from land model for progseasalts
 
-    real(r8), pointer :: tair(:,:)
-    real(r8), pointer :: pmid(:,:)
-    real(r8), pointer :: pint(:,:)
-    real(r8), pointer :: pdel(:,:)
+    real(r8), pointer :: tair(:,:)   ! air temperture [k]
+    real(r8), pointer :: pmid(:,:)   ! air pressure at layer midpoint [Pa]
+    real(r8), pointer :: pint(:,:)   ! air pressure at layer interface [Pa]
+    real(r8), pointer :: pdel(:,:)   ! layer thickness [Pa]
 
     real(r8) :: fv(pcols)            ! for dry dep velocities, from land modified over ocean & ice
     real(r8) :: ram1(pcols)          ! for dry dep velocities, from land modified over ocean & ice
@@ -92,8 +92,10 @@ contains
     real(r8), pointer :: qq(:,:)            ! mixing ratio of a single tracer [kg/kg] or [1/kg]
     real(r8), pointer :: dgncur_awet(:,:,:)
     real(r8), pointer :: wetdens(:,:,:)
-    real(r8), pointer :: qaerwat(:,:,:)
 
+    !---------------------------------------------------------------------------
+    ! Retrieve input variables; initialize output (i.e., ptend).
+    !---------------------------------------------------------------------------
     landfrac => cam_in%landfrac(:)
     icefrac  => cam_in%icefrac(:)
     ocnfrac  => cam_in%ocnfrac(:)
@@ -107,6 +109,13 @@ contains
     pmid => state%pmid(:,:)
     pint => state%pint(:,:)
     pdel => state%pdel(:,:)
+
+    rho(:ncol,:)=  pmid(:ncol,:)/(rair*tair(:ncol,:))
+
+    call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
+    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
+
+    call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 
     !---------------------------------------------------------------------------
     ! For turbulent dry deposition: calculate ram and fv over ocean and sea ice; 
@@ -130,23 +139,11 @@ contains
     call outfld( 'airFV', fv(:), pcols, lchnk )
     call outfld( 'RAM1', ram1(:), pcols, lchnk )
  
-    !---------------------------------------------------------------------------
-    ! Intitialize ptend.
-    ! Note that tendencies are not only in sfc layer (because of sedimentation)
-    ! and that ptend is updated within each subroutine for different species
-    !---------------------------------------------------------------------------
-    call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
-
-    call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-    call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-
-    rho(:ncol,:)=  pmid(:ncol,:)/(rair*tair(:ncol,:))
-
     !======================
     ! cloud-borne aerosols
     !---------------------------------------------------------------------------------------
-    ! Calculate settling/deposition velocities for cloud droplets (and cloud-borne aerosols)
+    ! Calculate gravitational settling and dry deposition velocities for cloud droplets 
+    ! (and hence the cloud-borne aerosols therein).
     ! There is one set of velocities for number mixing ratios of all aerosol modes
     ! and one set of velocities for all mass mixing ratios of all modes.
     !---------------------------------------------------------------------------------------
@@ -171,7 +168,7 @@ contains
                                  vlc_grv(:,:,jvlc)                   )! out
 
     !----------------------------------------------------------------------------------
-    ! Loop over all modes and all tracers (number + mass species).
+    ! Loop over all modes and all aerosol tracers (number + mass species).
     ! Calculate the drydep-induced tendencies, then update the mixing ratios.
     !----------------------------------------------------------------------------------
     do imode = 1, ntot_amode         ! main loop over aerosol modes
@@ -210,9 +207,10 @@ contains
     do imode = 1, ntot_amode   ! main loop over aerosol modes
 
        !-----------------------------------------------------------------
-       ! Calcalculate settling/deposition velocities of mode.
-       ! (One set of velocities for number mixing ratio of the mode;
-       !  One set of velocities for all mass mixing ratios of the mode.)
+       ! Calculate gravitational settling and dry deposition velocities for 
+       ! interstitial aerosol particles in a single lognormal mode. Note:
+       !  One set of velocities for number mixing ratio of the mode;
+       !  One set of velocities for all mass mixing ratios of the mode.
        !-----------------------------------------------------------------
        ! rad_aer = volume mean wet radius (m)
        ! dgncur_awet = geometric mean wet diameter for number distribution (m)
@@ -240,7 +238,7 @@ contains
 
        !-----------------------------------------------------------
        ! Loop over number + mass species of the mode. 
-       ! Calculate drydep-induced tendencies.
+       ! Calculate drydep-induced tendencies; save to ptend.
        !-----------------------------------------------------------
        do lspec = 0, nspec_amode(imode)
 
