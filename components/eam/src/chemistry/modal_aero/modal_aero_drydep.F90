@@ -26,7 +26,6 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use aero_model,        only: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx, qaerwat_idx
-    use dust_sediment_mod, only: dust_sediment_tend
     use drydep_mod,        only: calcram
     use modal_aero_data,   only: qqcw_get_field
     use modal_aero_data,   only: cnst_name_cw
@@ -40,7 +39,7 @@ contains
     use modal_aero_deposition, only: set_srf_drydep
 
   ! args 
-    type(physics_state),    intent(in)    :: state     ! Physics state variables
+    type(physics_state),target,intent(in) :: state     ! Physics state variables
     real(r8),               intent(in)    :: obklen(:)          
     real(r8),               intent(in)    :: ustar(:)  ! sfc fric vel
     type(cam_in_t), target, intent(in)    :: cam_in    ! import state
@@ -55,6 +54,11 @@ contains
     real(r8), pointer :: ocnfrac(:)  ! ocean fraction
     real(r8), pointer :: fvin(:)     !
     real(r8), pointer :: ram1in(:)   ! for dry dep velocities from land model for progseasalts
+
+    real(r8), pointer :: tair(:,:)
+    real(r8), pointer :: pmid(:,:)
+    real(r8), pointer :: pint(:,:)
+    real(r8), pointer :: pdel(:,:)
 
     real(r8) :: fv(pcols)            ! for dry dep velocities, from land modified over ocean & ice
     real(r8) :: ram1(pcols)          ! for dry dep velocities, from land modified over ocean & ice
@@ -85,7 +89,7 @@ contains
     real(r8) :: aerdepdryis(pcols,pcnst)  ! aerosol dry deposition (interstitial)
     real(r8) :: aerdepdrycw(pcols,pcnst)  ! aerosol dry deposition (cloud water)
 
-    real(r8), pointer :: fldcw(:,:)
+    real(r8), pointer :: qq(:,:)            ! mixing ratio of a single tracer [kg/kg] or [1/kg]
     real(r8), pointer :: dgncur_awet(:,:,:)
     real(r8), pointer :: wetdens(:,:,:)
     real(r8), pointer :: qaerwat(:,:,:)
@@ -99,23 +103,28 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
 
+    tair => state%t(:,:)
+    pmid => state%pmid(:,:)
+    pint => state%pint(:,:)
+    pdel => state%pdel(:,:)
+
     !---------------------------------------------------------------------------
     ! For turbulent dry deposition: calculate ram and fv over ocean and sea ice; 
     ! copy values over land
     !---------------------------------------------------------------------------
-    call calcram( ncol,               &! in: state%ncol
-                  landfrac,           &! in: cam_in%landfrac
-                  icefrac,            &! in: cam_in%icefrac
-                  ocnfrac,            &! in: cam_in%ocnfrac
-                  obklen,             &! in: calculated in tphysac (clubb_surface)
-                  ustar,              &! in: calculated in tphysac (clubb_surface)
-                  state%t   (:,pver), &! in. note: bottom level only
-                  state%pmid(:,pver), &! in. note: bottom level only
-                  state%pdel(:,pver), &! in. note: bottom level only
-                  ram1in,             &! in: cam_in%ram1
-                  fvin,               &! in: cam_in%fv
-                  ram1,               &! out: aerodynamical resistance (s/m)
-                  fv                  &! out: friction velocity
+    call calcram( ncol,         &! in: state%ncol
+                  landfrac,     &! in: cam_in%landfrac
+                  icefrac,      &! in: cam_in%icefrac
+                  ocnfrac,      &! in: cam_in%ocnfrac
+                  obklen,       &! in: calculated in tphysac
+                  ustar,        &! in: calculated in tphysac
+                  tair(:,pver), &! in. note: bottom level only
+                  pmid(:,pver), &! in. note: bottom level only
+                  pdel(:,pver), &! in. note: bottom level only
+                  ram1in,       &! in: cam_in%ram1
+                  fvin,         &! in: cam_in%fv
+                  ram1,         &! out: aerodynamical resistance (s/m)
+                  fv            &! out: friction velocity
                   )
 
     call outfld( 'airFV', fv(:), pcols, lchnk )
@@ -132,7 +141,7 @@ contains
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
     call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
 
-    rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
+    rho(:ncol,:)=  pmid(:ncol,:)/(rair*tair(:ncol,:))
 
     !======================
     ! cloud-borne aerosols
@@ -148,14 +157,18 @@ contains
     sg_drop(:,:) = 1.46_r8
 
     jvlc = 3 ; imnt = 0  ! cloud-borne aerosol number
-    call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv,  &! in
-                                 rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), imnt,     &! in
-                                 vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) ) ! out
+    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv,  &! in
+                                 rad_drop, dens_drop, sg_drop, imnt, &! in
+                                 vlc_dry(:,:,jvlc),                  &! out
+                                 vlc_trb(:,  jvlc),                  &! out
+                                 vlc_grv(:,:,jvlc)                   )! out
 
     jvlc = 4 ; imnt = 3  ! cloud-borne aerosol volume/mass
-    call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv,  &! in
-                                 rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), imnt,     &! in
-                                 vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc)  )! out
+    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv,  &! in
+                                 rad_drop, dens_drop, sg_drop, imnt, &! in
+                                 vlc_dry(:,:,jvlc),                  &! out
+                                 vlc_trb(:,  jvlc),                  &! out
+                                 vlc_grv(:,:,jvlc)                   )! out
 
     !----------------------------------------------------------------------------------
     ! Loop over all modes and all tracers (number + mass species).
@@ -170,17 +183,17 @@ contains
            icnst = lmassptrcw_amode(lspec,imode) ; jvlc = 4
        endif
 
-       fldcw => qqcw_get_field(pbuf,icnst,lchnk)
-       call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), fldcw, gravit, rho, &! in
-                                               state%t, state%pint(:,:), state%pmid, state%pdel,&! in
-                                               dqdt_tmp, sflx                                   )! out
+       qq => qqcw_get_field(pbuf,icnst,lchnk)
+       call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
+                                               gravit, rho, tair, pint, pmid, pdel,&! in
+                                               dqdt_tmp, sflx                      )! out
 
        aerdepdrycw(:ncol,icnst) = sflx(:ncol)
 
        ! Update mixing ratios here. Recall that mixing ratios of cloud-borne aerosols
        ! are stored in pbuf, not as part of the state variable
 
-       fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+       qq(1:ncol,:) = qq(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
        ! Get and save diagnostics
 
@@ -212,14 +225,18 @@ contains
        sg_aer(1:ncol,:) = sigmag_amode(imode)
 
        jvlc = 1  ; imnt = 0  ! interstitial aerosol number
-       call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
-                                    rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
-                                    vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
+       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv, &! in
+                                    rad_aer, dens_aer, sg_aer, imnt,   &! in
+                                    vlc_dry(:,:,jvlc),                 &! out
+                                    vlc_trb(:,  jvlc),                 &! out
+                                    vlc_grv(:,:,jvlc)                  )! out
 
        jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
-       call modal_aero_depvel_part( ncol, lchnk, state%t(:,:), state%pmid(:,:), ram1, fv, &! in
-                                    rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), imnt,       &! in
-                                    vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc) )! out
+       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv, &! in
+                                    rad_aer, dens_aer, sg_aer, imnt,   &! in
+                                    vlc_dry(:,:,jvlc),                 &! out
+                                    vlc_trb(:,  jvlc),                 &! out
+                                    vlc_grv(:,:,jvlc)                  )! out
 
        !-----------------------------------------------------------
        ! Loop over number + mass species of the mode. 
@@ -233,12 +250,14 @@ contains
              icnst = lmassptr_amode(lspec,imode) ; jvlc = 2
           endif
 
-          call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), state%q(:,:,icnst), gravit, rho, &! in
-                                                  state%t, state%pint(:,:), state%pmid, state%pdel,             &! in
-                                                  ptend%q(:,:,icnst), sflx                                      )! out
+          qq => state%q(:,:,icnst)
+          call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
+                                                  gravit, rho, tair, pint, pmid, pdel,&! in
+                                                  dqdt_tmp, sflx                      )! out
 
           aerdepdryis(:ncol,icnst) = sflx(:ncol)
           ptend%lq(icnst) = .TRUE.
+          ptend%q(:ncol,:,icnst) = dqdt_tmp(:ncol,:)
 
           ! Get and save diagnostics
 
@@ -262,9 +281,12 @@ contains
 
   end subroutine aero_model_drydep
 
-  subroutine sedimentation_solver_for_1_tracer( ncol, dt, sed_vel, qq_in, gravit, rho, &! in
-                                                tair, pint, pmid, pdel, &! in
-                                                dqdt_sed, sflx          )! out
+  !-----------------------------------------------------------------------
+  ! Numerically solve the sedimentation equation for 1 tracer
+  !-----------------------------------------------------------------------
+  subroutine sedimentation_solver_for_1_tracer( ncol, dt, sed_vel, qq_in,            &! in
+                                                gravit, rho, tair, pint, pmid, pdel, &! in
+                                                dqdt_sed, sflx                       )! out
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
     use ppgrid,            only: pcols, pver, pverp
