@@ -288,7 +288,8 @@ contains
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
     use ppgrid,            only: pcols, pver, pverp
-    use dust_sediment_mod, only: dust_sediment_tend
+   !use dust_sediment_mod, only: dust_sediment_tend
+    use dust_sediment_mod, only: getflx 
 
     integer , intent(in) :: ncol
     real(r8), intent(in) :: dt
@@ -304,8 +305,14 @@ contains
     real(r8), intent(out) :: dqdt_sed(pcols,pver) ! tendency
     real(r8), intent(out) :: sflx(pcols)          ! deposition flux at the Earth's surface
 
-    real(r8) :: pvmzaer(pcols,pverp) ! sedimentation velocity in Pa
+    real (r8), parameter :: mxsedfac = 0.99_r8    ! maximum sedimentation flux factor
 
+    real(r8) :: pvmzaer(pcols,pverp)     ! sedimentation velocity in Pa (positive = down)
+    real(r8) :: dtmassflux(pcols,pverp)  ! dt * mass fluxes at layer interfaces (positive = down)
+
+    integer  :: ii,kk
+
+    !---------------------------------------------------------------------------------------
     ! Set sedimentation velocity to zero at the top interface of the model domain.
     ! (This was referred to as the "pvprogseasalts method" in the code before refactoring.)
 
@@ -322,13 +329,47 @@ contains
  
     pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
-    ! Calculate the tendencies and sfc fluxes using the above-calculated 
-    ! air-mass fluxes and the mixing ratio of the sedimenting tracer
+    !------------------------------------------------------
+    ! Calculate mass flux * dt at each layer interface
+    !------------------------------------------------------
+    call getflx(ncol, pint, qq_in, pvmzaer, dt, dtmassflux)
 
-    call dust_sediment_tend( ncol, dt,               &! in
-                             pint, pmid, pdel, tair, &! in
-                             qq_in,  pvmzaer,        &! in
-                             dqdt_sed, sflx          )! out
+    ! Filter out any negative fluxes from the getflx routine
+
+    do kk = 2,pver
+       dtmassflux(:ncol,kk) = max(0._r8, dtmassflux(:ncol,kk))
+    end do
+
+    ! Upper and lower boundaries
+
+    do ii = 1,ncol
+       dtmassflux(ii,1)     = 0                                         ! no flux at model top 
+       dtmassflux(ii,pverp) = qq_in(ii,pver) * pvmzaer(ii,pverp) * dt   ! surface flux by upstream scheme
+    end do
+
+    ! Limit the flux out of the bottom of each column:
+    ! apply mxsedfac to prevent generating very small negative mixing ratio.
+    ! *** Should we include the flux through the top interface, to accommodate thin surface layers?
+
+    do kk = 1,pver
+       do ii = 1,ncol
+          dtmassflux(ii,kk+1) = min( dtmassflux(ii,kk+1), mxsedfac * qq_in(ii,kk) * pdel(ii,kk))
+       end do
+    end do
+
+    !-----------------------------------------------------------------------
+    ! Calculate the mixing ratio tendencies resulting from flux divergence
+    !-----------------------------------------------------------------------
+    do kk = 1,pver
+       do ii = 1,ncol
+          dqdt_sed(ii,kk)  = (dtmassflux(ii,kk) - dtmassflux(ii,kk+1)) / (dt * pdel(ii,kk))
+       end do
+    end do
+
+    !-----------------------------------------------------------------------
+    ! Convert flux out the bottom to mass units Pa -> kg/m2/s
+    !-----------------------------------------------------------------------
+    sflx(:ncol) = dtmassflux(:ncol,pverp) / (dt*gravit)
 
   end subroutine sedimentation_solver_for_1_tracer
 
