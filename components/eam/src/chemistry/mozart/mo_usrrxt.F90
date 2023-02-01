@@ -311,7 +311,6 @@ contains
     use mo_chem_utls,  only : get_rxt_ndx, get_spc_ndx
     use mo_setinv,     only : inv_o2_ndx=>o2_ndx, inv_h2o_ndx=>h2o_ndx
     use physics_buffer,only : physics_buffer_desc
-    use aero_model,      only : aero_model_surfarea
     use rad_constituents,only : rad_cnst_get_info
 
     implicit none
@@ -434,13 +433,6 @@ contains
     dm_array(:,:,:) = 0._r8
     sad_total(:,:) = 0._r8
 
-    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 ) then
-
-       call aero_model_surfarea( &
-            mmr, rm1, relhum, pmid, temp, strato_sad, &
-            sulfate, m, ltrop, het1_ndx, pbuf, ncol, sfc_array, dm_array, sad_total )
-       
-    endif
 
     level_loop : do k = 1,pver
        tinv(:)           = 1._r8 / temp(:ncol,k)
