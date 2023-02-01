@@ -1056,6 +1056,8 @@ end subroutine calculate_mass_mean_radius
 pure function get_aer_radius(specdens, aermc, aernum) result(radius)
 
    ! Compute radius for an aerosol species given mass and number concentrations
+   ! Note for C++ port: This function may already be present in the C++ utility
+   ! functions
 
    implicit none
    real(r8), intent(in) :: specdens    ! density [kg/m^3]
