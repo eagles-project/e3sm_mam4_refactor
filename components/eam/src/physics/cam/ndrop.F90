@@ -350,8 +350,8 @@ subroutine dropmixnuc( &
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity (m/s)
    real(r8) :: sq2pi
 
-! BJG m replaced by imode which is defined below  integer  :: i, k, l, m, mm, n
-   integer  :: i, k, l, mm, n
+! BJG l,m replaced by lspec/lsat,imode which are defined below  integer  :: i, k, l, m, mm, n
+   integer  :: i, k, mm, n
    integer  :: km1, kp1
    integer  :: nnew, nsav, ntemp
    integer  :: lptr
@@ -442,6 +442,7 @@ subroutine dropmixnuc( &
   integer :: imode       ! mode index
   integer :: kk          ! level index
   integer :: lspec      ! species index for given mode
+  integer :: lsat       !  level of supersaturation
   integer :: spc_idx, num_idx
   real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
   real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
@@ -511,10 +512,10 @@ subroutine dropmixnuc( &
       mm = mam_idx(imode, 0)
       call rad_cnst_get_mode_num(0, imode, 'a', state, pbuf, raer(mm)%fld)
       call rad_cnst_get_mode_num(0, imode, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
-      do l = 1, nspec_amode(imode)
-         mm = mam_idx(imode, l)
-         call rad_cnst_get_aer_mmr(0, imode, l, 'a', state, pbuf, raer(mm)%fld)
-         call rad_cnst_get_aer_mmr(0, imode, l, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
+      do lspec = 1, nspec_amode(imode)
+         mm = mam_idx(imode, lspec)
+         call rad_cnst_get_aer_mmr(0, imode, lspec, 'a', state, pbuf, raer(mm)%fld)
+         call rad_cnst_get_aer_mmr(0, imode, lspec, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
       end do
    end do
 
@@ -592,8 +593,8 @@ subroutine dropmixnuc( &
          raercol(:,mm,nsav)    = 0.0_r8
          raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(i,top_lev:pver)
          raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
-         do l = 1, nspec_amode(imode)
-            mm = mam_idx(imode,l)
+         do lspec = 1, nspec_amode(imode)
+            mm = mam_idx(imode,lspec)
             raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(i,top_lev:pver)
             raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
          end do
@@ -637,8 +638,8 @@ subroutine dropmixnuc( &
                dact   = raercol_cw(k,mm,nsav)*dumc
                raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
                raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               do l = 1, nspec_amode(imode)
-                  mm = mam_idx(imode,l)
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
                   dact    = raercol_cw(k,mm,nsav)*dumc
                   raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
                   raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
@@ -698,8 +699,8 @@ subroutine dropmixnuc( &
                raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
                raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
                dum = dumc*fm(imode)
-               do l = 1, nspec_amode(imode)
-                  mm = mam_idx(imode,l)
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
                   dact    = dum*raer(mm)%fld(i,k) ! interstitial only
                   raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
                   raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
@@ -871,8 +872,8 @@ subroutine dropmixnuc( &
                raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
                raercol_cw(k,mm,nsav) = 0._r8
 
-               do l = 1, nspec_amode(imode)
-                  mm = mam_idx(imode,l)
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
                   raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
                   raercol_cw(k,mm,nsav) = 0._r8
                end do
@@ -1021,8 +1022,8 @@ subroutine dropmixnuc( &
                overlapm, raercol(:,mm,nsav), pver, &
                dtmix, .true., raercol_cw(:,mm,nsav))
 
-            do l = 1, nspec_amode(imode)
-               mm = mam_idx(imode,l)
+            do lspec = 1, nspec_amode(imode)
+               mm = mam_idx(imode,lspec)
                ! rce-comment -   activation source in layer k involves particles from k+1
                !	          source(:)= mact(:,m)*(raercol(:,mm,nsav))
                source(top_lev:pver-1) = mact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
@@ -1061,8 +1062,8 @@ subroutine dropmixnuc( &
                raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
                raercol_cw(k,mm,nnew) = 0._r8
 
-               do l = 1, nspec_amode(imode)
-                  mm = mam_idx(imode,l)
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
                   raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
                   raercol_cw(k,mm,nnew) = 0._r8
                end do
@@ -1087,10 +1088,10 @@ subroutine dropmixnuc( &
          qqcwtend = 0._r8
 
          do imode = 1, ntot_amode
-            do l = 0, nspec_amode(imode)
+            do lspec = 0, nspec_amode(imode)
 
-               mm   = mam_idx(imode,l)
-               lptr = mam_cnst_idx(imode,l)
+               mm   = mam_idx(imode,lspec)
+               lptr = mam_cnst_idx(imode,lspec)
 
                raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(i,top_lev:pver))*dtinv
                qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(i,top_lev:pver))*dtinv
@@ -1136,8 +1137,8 @@ subroutine dropmixnuc( &
   !End note for C++ port
 
    call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
-   do l = 1, psat
-      call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
+   do lsat = 1, psat
+      call outfld(ccn_name(lsat), ccn(1,1,lsat), pcols, lchnk)
    enddo
 
 
@@ -1180,8 +1181,8 @@ subroutine dropmixnuc( &
    ! do column tendencies
    if (prog_modal_aero) then
       do imode = 1, ntot_amode
-         do l = 0, nspec_amode(imode)
-            mm = mam_idx(imode,l)
+         do lspec = 0, nspec_amode(imode)
+            mm = mam_idx(imode,lspec)
             call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
             call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
          end do
