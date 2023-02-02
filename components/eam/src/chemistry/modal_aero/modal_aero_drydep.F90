@@ -288,8 +288,7 @@ contains
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
     use ppgrid,            only: pcols, pver, pverp
-   !use dust_sediment_mod, only: dust_sediment_tend
-    use dust_sediment_mod, only: getflx 
+    use mo_spitfire_transport, only: getflx 
 
     integer , intent(in) :: ncol
     real(r8), intent(in) :: dt
