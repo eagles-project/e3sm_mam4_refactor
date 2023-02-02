@@ -350,8 +350,8 @@ subroutine dropmixnuc( &
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity (m/s)
    real(r8) :: sq2pi
 
-! BJG l,m replaced by lspec/lsat,imode which are defined below  integer  :: i, k, l, m, mm, n
-   integer  :: i, k, mm, n
+! BJG k,l,m replaced by kk, lspec/lsat,imode which are defined below  integer  :: i, k, l, m, mm, n
+   integer  :: i, mm, n
    integer  :: km1, kp1
    integer  :: nnew, nsav, ntemp
    integer  :: lptr
@@ -538,50 +538,50 @@ subroutine dropmixnuc( &
    ! overall_main_i_loop
    do i = 1, ncol
 
-      do k = top_lev, pver-1
-         zs(k) = 1._r8/(zm(i,k) - zm(i,k+1))
+      do kk = top_lev, pver-1
+         zs(kk) = 1._r8/(zm(i,kk) - zm(i,kk+1))
       end do
       zs(pver) = zs(pver-1)
 
       ! load number nucleated into qcld on cloud boundaries
 
-      do k = top_lev, pver
+      do kk = top_lev, pver
 
-         qcld(k)  = ncldwtr(i,k)
-         qncld(k) = 0._r8
-         srcn(k)  = 0._r8
-         cs(i,k)  = pmid(i,k)/(rair*temp(i,k))        ! air density (kg/m3)
-         dz(i,k)  = 1._r8/(cs(i,k)*gravit*rpdel(i,k)) ! layer thickness in m
+         qcld(kk)  = ncldwtr(i,kk)
+         qncld(kk) = 0._r8
+         srcn(kk)  = 0._r8
+         cs(i,kk)  = pmid(i,kk)/(rair*temp(i,kk))        ! air density (kg/m3)
+         dz(i,kk)  = 1._r8/(cs(i,kk)*gravit*rpdel(i,kk)) ! layer thickness in m
 
          do imode = 1, ntot_amode
-            nact(k,imode) = 0._r8
-            mact(k,imode) = 0._r8
+            nact(kk,imode) = 0._r8
+            mact(kk,imode) = 0._r8
          end do
 
-         zn(k) = gravit*rpdel(i,k)
+         zn(kk) = gravit*rpdel(i,kk)
 
-         if (k < pver) then
-            ekd(k)   = kvh(i,k+1)
-            ekd(k)   = max(ekd(k), zkmin)
-            ekd(k)   = min(ekd(k), zkmax)
-            csbot(k) = 2.0_r8*pint(i,k+1)/(rair*(temp(i,k) + temp(i,k+1)))
-            csbot_cscen(k) = csbot(k)/cs(i,k)
+         if (kk < pver) then
+            ekd(kk)   = kvh(i,kk+1)
+            ekd(kk)   = max(ekd(kk), zkmin)
+            ekd(kk)   = min(ekd(kk), zkmax)
+            csbot(kk) = 2.0_r8*pint(i,kk+1)/(rair*(temp(i,kk) + temp(i,kk+1)))
+            csbot_cscen(kk) = csbot(kk)/cs(i,kk)
          else
-            ekd(k)   = 0._r8
-            csbot(k) = cs(i,k)
-            csbot_cscen(k) = 1.0_r8
+            ekd(kk)   = 0._r8
+            csbot(kk) = cs(i,kk)
+            csbot_cscen(kk) = 1.0_r8
          end if
 
          ! rce-comment - define wtke at layer centers for new-cloud activation
          !    and at layer boundaries for old-cloud activation
          !++ag
-         wtke_cen(i,k) = wsub(i,k)
-         wtke(i,k)     = wsub(i,k)
+         wtke_cen(i,kk) = wsub(i,kk)
+         wtke(i,kk)     = wsub(i,kk)
          !--ag
-         wtke_cen(i,k) = max(wtke_cen(i,k), wmixmin)
-         wtke(i,k)     = max(wtke(i,k), wmixmin)
+         wtke_cen(i,kk) = max(wtke_cen(i,kk), wmixmin)
+         wtke(i,kk)     = max(wtke(i,kk), wmixmin)
 
-         nsource(i,k) = 0._r8
+         nsource(i,kk) = 0._r8
 
       end do
 
@@ -608,15 +608,15 @@ subroutine dropmixnuc( &
 
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
-      do k = top_lev, pver
+      do kk = top_lev, pver
 
          ! shrinking cloud ......................................................
          !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
          !    and also dissipate the portion of the cloud that will be regenerated
-         cldo_tmp = cldo(i,k)
+         cldo_tmp = cldo(i,kk)
 
 ! BJG         if(regen_fix) then
-            cldn_tmp = cldn(i,k) !* exp( -dtmicro/tau_cld_regenerate )!HW: there is a bug here; turn off regeneration,01/10/2012
+            cldn_tmp = cldn(i,kk) !* exp( -dtmicro/tau_cld_regenerate )!HW: there is a bug here; turn off regeneration,01/10/2012
 ! BJG         else
 ! BJG            cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
 ! BJG         endif
@@ -626,8 +626,8 @@ subroutine dropmixnuc( &
          if (cldn_tmp < cldo_tmp) then
             !  droplet loss in decaying cloud
             !++ sungsup
-            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
-            qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
+            nsource(i,kk) = nsource(i,kk) + qcld(kk)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
+            qcld(kk)      = qcld(kk)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
             !-- sungsup
 
             ! convert activated aerosol to interstitial in decaying cloud
@@ -635,14 +635,14 @@ subroutine dropmixnuc( &
             dumc = (cldn_tmp - cldo_tmp)/cldo_tmp
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               dact   = raercol_cw(k,mm,nsav)*dumc
-               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               dact   = raercol_cw(kk,mm,nsav)*dumc
+               raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact   ! cloud-borne aerosol
+               raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  dact    = raercol_cw(k,mm,nsav)*dumc
-                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+                  dact    = raercol_cw(kk,mm,nsav)*dumc
+                  raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
+                  raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
                end do
             end do
          end if
@@ -651,16 +651,16 @@ subroutine dropmixnuc( &
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
 ! BJG         if(regen_fix) then
-            cldo_tmp = cldo(i,k)! HW turned off the regeneration growing
+            cldo_tmp = cldo(i,kk)! HW turned off the regeneration growing
 ! BJG         else
 ! BJG            cldo_tmp = cldn_tmp
 ! BJG         endif
-         cldn_tmp = cldn(i,k)
+         cldn_tmp = cldn(i,kk)
 
          if (cldn_tmp-cldo_tmp > 0.01_r8) then
 
             ! rce-comment - use wtke at layer centers for new-cloud activation
-            wbar  = wtke_cen(i,k)
+            wbar  = wtke_cen(i,kk)
             wmix  = 0._r8
             wmin  = 0._r8
             wmax  = 10._r8
@@ -674,7 +674,7 @@ subroutine dropmixnuc( &
 
 
                call loadaer( &
-                  state_q, i, i, k, &
+                  state_q, i, i, kk, &
                   imode, nspec_amode(imode), cs, phase, na, va, &
                   hy )
                naermod(imode)  = na(i)
@@ -684,26 +684,26 @@ subroutine dropmixnuc( &
 
             call activate_modal( &
                wbar, wmax,                       &
-               temp(i,k), cs(i,k), naermod, ntot_amode, &
+               temp(i,kk), cs(i,kk), naermod, ntot_amode, &
                vaerosol, hygro, fn, fm, fluxn,                      &
-               fluxm,flux_fullact(k))
+               fluxm,flux_fullact(kk))
 
-            factnum(i,k,:) = fn
+            factnum(i,kk,:) = fn
 
             dumc = (cldn_tmp - cldo_tmp)
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               dact   = dumc*fn(imode)*raer(mm)%fld(i,k) ! interstitial only
-               qcld(k) = qcld(k) + dact
-               nsource(i,k) = nsource(i,k) + dact*dtinv
-               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               dact   = dumc*fn(imode)*raer(mm)%fld(i,kk) ! interstitial only
+               qcld(kk) = qcld(kk) + dact
+               nsource(i,kk) = nsource(i,kk) + dact*dtinv
+               raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
+               raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
                dum = dumc*fm(imode)
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  dact    = dum*raer(mm)%fld(i,k) ! interstitial only
-                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+                  dact    = dum*raer(mm)%fld(i,kk) ! interstitial only
+                  raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
+                  raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
                enddo
             enddo
          endif
@@ -727,21 +727,21 @@ subroutine dropmixnuc( &
 ! BJG      else
 ! BJG         loop_up_bnd = pver
 ! BJG      endif
-      do k = top_lev, loop_up_bnd!pver
-         kp1 = min0(k+1, pver)
+      do kk = top_lev, loop_up_bnd!pver
+         kp1 = min0(kk+1, pver)
          taumix_internal_pver_inv = 0.0_r8
 
-         if (cldn(i,k) > 0.01_r8) then
+         if (cldn(i,kk) > 0.01_r8) then
 
             wdiab = 0
             wmix  = 0._r8                       ! single updraft
-            wbar  = wtke(i,k)                   ! single updraft
+            wbar  = wtke(i,kk)                   ! single updraft
 ! BJG            if (k == pver) wbar = wtke_cen(i,k) ! single updraft
             wmax  = 10._r8
             wmin  = 0._r8
 
 ! BJG            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
-            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 ) then
+            if (cldn(i,kk) - cldn(i,kp1) > 0.01_r8 ) then
 
                ! cloud base
 
@@ -756,9 +756,9 @@ subroutine dropmixnuc( &
                !      The sq2pi factor assumes a normal draft spectrum.
                !      The fluxn/fluxm from activate must be consistent with the
                !      fluxes calculated in explmix.
-               ekd(k) = wbar/zs(k)
+               ekd(kk) = wbar/zs(kk)
 
-               alogarg = max(1.e-20_r8, 1/cldn(i,k) - 1._r8)
+               alogarg = max(1.e-20_r8, 1/cldn(i,kk) - 1._r8)
                wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
                phase   = 1   ! interstitial
 
@@ -776,14 +776,14 @@ subroutine dropmixnuc( &
 
                call activate_modal( &
                   wbar, wmax,                       &
-                  temp(i,k), cs(i,k), naermod, ntot_amode, &
+                  temp(i,kk), cs(i,kk), naermod, ntot_amode, &
                   vaerosol, hygro, fn, fm, fluxn,                      &
-                  fluxm, flux_fullact(k))
+                  fluxm, flux_fullact(kk))
 
-               factnum(i,k,:) = fn
+               factnum(i,kk,:) = fn
 
 ! BJG               if (k < pver) then
-                  dumc = cldn(i,k) - cldn(i,kp1)
+                  dumc = cldn(i,kk) - cldn(i,kp1)
 ! BJG               else
 ! BJG                 if(regen_fix) then
 ! BJG                     dumc=0._r8
@@ -801,7 +801,7 @@ subroutine dropmixnuc( &
                !       = actmassflux/(cs(i,k)*dz(i,k))
                !    so need factor of csbot_cscen = csbot(k)/cs(i,k)
                !                   dum=1./(dz(i,k))
-               dum=csbot_cscen(k)/(dz(i,k))
+               dum=csbot_cscen(kk)/(dz(i,kk))
 
                ! rce-comment 2
                !    code for k=pver was changed to use the following conceptual model
@@ -839,12 +839,12 @@ subroutine dropmixnuc( &
                   mm = mam_idx(imode,0)
                   fluxn(imode) = fluxn(imode)*dumc
                   fluxm(imode) = fluxm(imode)*dumc
-                  nact(k,imode) = nact(k,imode) + fluxn(imode)*dum
-                  mact(k,imode) = mact(k,imode) + fluxm(imode)*dum
+                  nact(kk,imode) = nact(kk,imode) + fluxn(imode)*dum
+                  mact(kk,imode) = mact(kk,imode) + fluxm(imode)*dum
 ! BJG                  if (k < pver) then
                      ! note that kp1 is used here
                      fluxntot = fluxntot &
-                        + fluxn(imode)*raercol(kp1,mm,nsav)*cs(i,k)
+                        + fluxn(imode)*raercol(kp1,mm,nsav)*cs(i,kk)
 !BJG                  else
 ! BJG                     tmpa = raercol(kp1,mm,nsav)*fluxn(m) &
 ! BJG                          + raercol_cw(kp1,mm,nsav)*(fluxn(m) &
@@ -852,8 +852,8 @@ subroutine dropmixnuc( &
 ! BJG                     fluxntot = fluxntot + max(0.0_r8, tmpa)*cs(i,k)
 !BJG                  end if
                end do
-               srcn(k)      = srcn(k) + fluxntot/(cs(i,k)*dz(i,k))
-               nsource(i,k) = nsource(i,k) + fluxntot/(cs(i,k)*dz(i,k))
+               srcn(kk)      = srcn(kk) + fluxntot/(cs(i,kk)*dz(i,kk))
+               nsource(i,kk) = nsource(i,kk) + fluxntot/(cs(i,kk)*dz(i,kk))
 
 ! BJG            endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01 .or. k == pver)
             endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01)
@@ -862,20 +862,20 @@ subroutine dropmixnuc( &
 
             ! no cloud
 
-            nsource(i,k) = nsource(i,k) - qcld(k)*dtinv
-            qcld(k)      = 0
+            nsource(i,kk) = nsource(i,kk) - qcld(kk)*dtinv
+            qcld(kk)      = 0
 
             ! convert activated aerosol to interstitial in decaying cloud
 
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
-               raercol_cw(k,mm,nsav) = 0._r8
+               raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) + raercol_cw(kk,mm,nsav)  ! cloud-borne aerosol
+               raercol_cw(kk,mm,nsav) = 0._r8
 
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
-                  raercol_cw(k,mm,nsav) = 0._r8
+                  raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) + raercol_cw(kk,mm,nsav) ! cloud-borne aerosol
+                  raercol_cw(kk,mm,nsav) = 0._r8
                end do
             end do
          end if
@@ -892,20 +892,20 @@ subroutine dropmixnuc( &
       dtmin     = dtmicro
       ekk(top_lev-1)    = 0.0_r8
       ekk(pver) = 0.0_r8
-      do k = top_lev, pver-1
+      do kk = top_lev, pver-1
          ! rce-comment -- ekd(k) is eddy-diffusivity at k/k+1 interface
          !   want ekk(k) = ekd(k) * (density at k/k+1 interface)
          !   so use pint(i,k+1) as pint is 1:pverp
          !           ekk(k)=ekd(k)*2.*pint(i,k)/(rair*(temp(i,k)+temp(i,k+1)))
          !           ekk(k)=ekd(k)*2.*pint(i,k+1)/(rair*(temp(i,k)+temp(i,k+1)))
-         ekk(k) = ekd(k)*csbot(k)
+         ekk(kk) = ekd(kk)*csbot(kk)
       end do
 
-      do k = top_lev, pver
-         km1     = max0(k-1, top_lev)
-         ekkp(k) = zn(k)*ekk(k)*zs(k)
-         ekkm(k) = zn(k)*ekk(k-1)*zs(km1)
-         tinv    = ekkp(k) + ekkm(k)
+      do kk = top_lev, pver
+         km1     = max0(kk-1, top_lev)
+         ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
+         ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
+         tinv    = ekkp(kk) + ekkm(kk)
 
          ! rce-comment -- tinv is the sum of all first-order-loss-rates
          !    for the layer.  for most layers, the activation loss rate
@@ -916,7 +916,7 @@ subroutine dropmixnuc( &
          !    can be too big, and explmix can produce negative values.
          !    the negative values are reset to zero, resulting in an
          !    artificial source.
-         if (k == pver) tinv = tinv + taumix_internal_pver_inv
+         if (kk == pver) tinv = tinv + taumix_internal_pver_inv
 
          if (tinv .gt. 1.e-6_r8) then
             dtt   = 1._r8/tinv
@@ -934,19 +934,19 @@ subroutine dropmixnuc( &
       count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
       dtmix = dtmicro/nsubmix
 
-      do k = top_lev, pver
-         kp1 = min(k+1, pver)
-         km1 = max(k-1, top_lev)
+      do kk = top_lev, pver
+         kp1 = min(kk+1, pver)
+         km1 = max(kk-1, top_lev)
          ! maximum overlap assumption
          if (cldn(i,kp1) > 1.e-10_r8) then
-            overlapp(k) = min(cldn(i,k)/cldn(i,kp1), 1._r8)
+            overlapp(kk) = min(cldn(i,kk)/cldn(i,kp1), 1._r8)
          else
-            overlapp(k) = 1._r8
+            overlapp(kk) = 1._r8
          end if
          if (cldn(i,km1) > 1.e-10_r8) then
-            overlapm(k) = min(cldn(i,k)/cldn(i,km1), 1._r8)
+            overlapm(kk) = min(cldn(i,kk)/cldn(i,km1), 1._r8)
          else
-            overlapm(k) = 1._r8
+            overlapm(kk) = 1._r8
          end if
       end do
 
@@ -957,10 +957,10 @@ subroutine dropmixnuc( &
       !       from kp1 to k which = ekkp(k)*raercol(kp1,lmass)
       !    however it might if things are not "just right" in subr activate
       !    the following is a safety measure to avoid negatives in explmix
-      do k = top_lev, pver-1
+      do kk = top_lev, pver-1
          do imode = 1, ntot_amode
-            nact(k,imode) = min( nact(k,imode), ekkp(k) )
-            mact(k,imode) = min( mact(k,imode), ekkp(k) )
+            nact(kk,imode) = min( nact(kk,imode), ekkp(kk) )
+            mact(kk,imode) = min( mact(kk,imode), ekkp(kk) )
          end do
       end do
 
@@ -1051,21 +1051,21 @@ subroutine dropmixnuc( &
 
       ! evaporate particles again if no cloud
 
-      do k = top_lev, pver
-         if (cldn(i,k) == 0._r8) then
+      do kk = top_lev, pver
+         if (cldn(i,kk) == 0._r8) then
             ! no cloud
-            qcld(k)=0._r8
+            qcld(kk)=0._r8
 
             ! convert activated aerosol to interstitial in decaying cloud
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
-               raercol_cw(k,mm,nnew) = 0._r8
+               raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+               raercol_cw(kk,mm,nnew) = 0._r8
 
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
-                  raercol_cw(k,mm,nnew) = 0._r8
+                  raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+                  raercol_cw(kk,mm,nnew) = 0._r8
                end do
             end do
          end if
@@ -1074,10 +1074,10 @@ subroutine dropmixnuc( &
       ! droplet number
 
       ndropcol(i) = 0._r8
-      do k = top_lev, pver
-         ndropmix(i,k) = (qcld(k) - ncldwtr(i,k))*dtinv - nsource(i,k)
-         tendnd(i,k)   = (max(qcld(k), 1.e-6_r8) - ncldwtr(i,k))*dtinv
-         ndropcol(i)   = ndropcol(i) + ncldwtr(i,k)*pdel(i,k)
+      do kk = top_lev, pver
+         ndropmix(i,kk) = (qcld(kk) - ncldwtr(i,kk))*dtinv - nsource(i,kk)
+         tendnd(i,kk)   = (max(qcld(kk), 1.e-6_r8) - ncldwtr(i,kk))*dtinv
+         ndropcol(i)   = ndropcol(i) + ncldwtr(i,kk)*pdel(i,kk)
       end do
       ndropcol(i) = ndropcol(i)/gravit
 
@@ -1147,22 +1147,22 @@ subroutine dropmixnuc( &
       ccn3d(:ncol, :) = ccn(:ncol, :, 4)
       ccn3col = 0.0_r8; ccn4col = 0.0_r8
       do i=1, ncol
-        do k=1, pver
-          ccn3col(i) = ccn3col(i) + ccn(i,k,3) * 1.0e6*   &
-             pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair))  !#/cm3 --> #/m2
-          ccn4col(i) = ccn4col(i) + ccn(i,k,4) * 1.0e6*   &
-             pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair))  !#/cm3 --> #/m2
+        do kk=1, pver
+          ccn3col(i) = ccn3col(i) + ccn(i,kk,3) * 1.0e6*   &
+             pdel(i,kk)/gravit/(pmid(i,kk)/(temp(i,kk)*rair))  !#/cm3 --> #/m2
+          ccn4col(i) = ccn4col(i) + ccn(i,kk,4) * 1.0e6*   &
+             pdel(i,kk)/gravit/(pmid(i,kk)/(temp(i,kk)*rair))  !#/cm3 --> #/m2
         enddo
 
 ! calculate CCN at 1km
         zi2 = 0.0
         zm2 = 0.0
         zmflag = .true.
-        do k=pver, 1, -1
-          zi2(k) = zi2(k+1) + pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair)) !
-          zm2(k) = (zi2(k+1)+zi2(k))/2._r8
-          if(zm2(k).gt.1000. .and. zmflag) then
-            idx1000 = min(k, pver-1)
+        do kk=pver, 1, -1
+          zi2(kk) = zi2(kk+1) + pdel(i,kk)/gravit/(pmid(i,kk)/(temp(i,kk)*rair)) !
+          zm2(kk) = (zi2(kk+1)+zi2(kk))/2._r8
+          if(zm2(kk).gt.1000. .and. zmflag) then
+            idx1000 = min(kk, pver-1)
             zmflag = .false.
           end if
         end do
