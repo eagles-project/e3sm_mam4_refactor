@@ -6,14 +6,14 @@ module aero_model
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use constituents,   only: pcnst, cnst_name, cnst_get_ind
   use ppgrid,         only: pcols, pver, pverp
-  use cam_abortutils,     only: endrun
+  use cam_abortutils, only: endrun
   use cam_logfile,    only: iulog
   use perf_mod,       only: t_startf, t_stopf
   use camsrfexch,     only: cam_in_t, cam_out_t
   use aerodep_flx,    only: aerodep_flx_prescribed
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
-  use physics_buffer, only: physics_buffer_desc
-  use physics_buffer, only: pbuf_get_field, pbuf_get_index, pbuf_set_field
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index, pbuf_set_field
+  use phys_control,   only: phys_getopts
   use physconst,      only: gravit, rair, rhoh2o, spec_class_gas
   use spmd_utils,     only: masterproc
 
@@ -21,8 +21,7 @@ module aero_model
   use chem_mods,      only: gas_pcnst, adv_mass
   use mo_tracname,    only: solsym
 
-  use modal_aero_data,only: cnst_name_cw
-  use modal_aero_data,only: ntot_amode, modename_amode
+  use modal_aero_data,only: cnst_name_cw, ntot_amode
 
   implicit none
   private
@@ -34,14 +33,7 @@ module aero_model
   public :: aero_model_drydep     ! aerosol dry deposition and sediment
   public :: aero_model_wetdep     ! aerosol wet removal
   public :: aero_model_emissions  ! aerosol emissions
-
-  ! These are made public to be used by MMF w/ ECPP
   public :: calc_1_impact_rate
-  public :: dlndg_nimptblgrow
-  public :: nimptblgrow_mind
-  public :: nimptblgrow_maxd
-  public :: scavimptblnum
-  public :: scavimptblvol
 
  ! Misc private data 
   integer :: nmodes  ! number of modes
@@ -67,13 +59,13 @@ module aero_model
   integer :: dp_frac_idx        = 0
 
   integer :: imozart             = -1 
-  logical :: history_aero_prevap_resusp = .false. ! controls output of prevap resusp tendencies to history
 
   ! variables for table lookup of aerosol impaction/interception scavenging rates
-  integer, parameter :: nimptblgrow_mind=-7, nimptblgrow_maxd=12
-  real(r8) :: dlndg_nimptblgrow  = log( 1.25_r8 )
-  real(r8) :: scavimptblnum(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
-  real(r8) :: scavimptblvol(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
+  ! These are made public to be used by MMF w/ ECPP
+  integer, public, parameter :: nimptblgrow_mind=-7, nimptblgrow_maxd=12
+  real(r8), public :: dlndg_nimptblgrow  = log( 1.25_r8 )
+  real(r8), public :: scavimptblnum(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
+  real(r8), public :: scavimptblvol(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
 
   character(len=fieldname_len) :: dgnum_name(ntot_amode)
 
@@ -173,9 +165,7 @@ contains
 
     use mo_chem_utls,    only: get_inv_ndx
     use cam_history,     only: addfld, horiz_only, add_default
-    use phys_control,    only: phys_getopts
     use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
-    use modal_aero_data, only: cnst_name_cw
     use modal_aero_initialize_data, only: modal_aero_initialize
     use rad_constituents,           only: rad_cnst_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
@@ -257,10 +247,6 @@ contains
                ' is not a well tested configuration,  may produce incorrect results!!'        
        endif
     endif
-
-!   resuspend to coarse mode, full non-linear method (so4_a1 & so4_c1 --> so4_a3)
-    history_aero_prevap_resusp = .true.
-
 
     dgnum_idx      = pbuf_get_index('DGNUM')
     dgnumwet_idx   = pbuf_get_index('DGNUMWET')
@@ -491,19 +477,14 @@ contains
             horiz_only,  'A',unit_basename//'/m2/s ','Wet deposition flux (belowcloud, convective) at surface')
        call addfld (trim(wetdep_list(m))//'SFSBS', &
             horiz_only,  'A',unit_basename//'/m2/s ','Wet deposition flux (belowcloud, stratiform) at surface')
-
-       if ( history_aero_prevap_resusp ) then
-          call addfld (trim(wetdep_list(m))//'SFSEC', &
-               horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, convective) at surface')  !RCE
-          call addfld (trim(wetdep_list(m))//'SFSES', &
-               horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, stratiform) at surface')  !RCE
-          if (convproc_do_aer) then
+       call addfld (trim(wetdep_list(m))//'SFSEC', &
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, convective) at surface')  !RCE
+       call addfld (trim(wetdep_list(m))//'SFSES', &
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, stratiform) at surface')  !RCE
+       if (convproc_do_aer) then
           call addfld (trim(wetdep_list(m))//'SFSED', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, deep convective) at surface')  !RCE
-          endif
-       endif
-       if (convproc_do_aer) then
-                    call addfld (trim(wetdep_list(m))//'SFSID', &
+          call addfld (trim(wetdep_list(m))//'SFSID', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (incloud, deep convective) at surface')  !RCE
           call addfld (trim(wetdep_list(m))//'SFSBD', &
                horiz_only,  'A','kg/m2/s','Wet deposition flux (belowcloud, deep convective) at surface')  !RCE
@@ -526,10 +507,8 @@ contains
              call add_default (trim(wetdep_list(m))//'SFSIS', 1, ' ')
              call add_default (trim(wetdep_list(m))//'SFSBC', 1, ' ')
              call add_default (trim(wetdep_list(m))//'SFSBS', 1, ' ')
-             if ( history_aero_prevap_resusp ) then
-                call add_default (trim(wetdep_list(m))//'SFSEC', 1, ' ')
-                call add_default (trim(wetdep_list(m))//'SFSES', 1, ' ')
-             endif
+             call add_default (trim(wetdep_list(m))//'SFSEC', 1, ' ')
+             call add_default (trim(wetdep_list(m))//'SFSES', 1, ' ')
           endif
        endif
 
@@ -563,15 +542,13 @@ contains
 !      if(nspc > 0 .and. .not.cnst_name_cw(nspc) == ' ') then   ! REASTER 08/04/2015
        if( nspc > 0 ) then                                      ! REASTER 08/04/2015
         if ( .not. cnst_name_cw(nspc) == ' ') then              ! REASTER 08/04/2015
-          if ( history_aero_prevap_resusp ) then
-             call addfld (trim(cnst_name_cw(nspc))//'SFSEC',horiz_only,  'A','kg/m2/s', &
-                  trim(cnst_name_cw(nspc))//' wet deposition flux (precip evap, convective) at surface')  !RCE
-             call addfld (trim(cnst_name_cw(nspc))//'SFSES',horiz_only,  'A','kg/m2/s', &
-                  trim(cnst_name_cw(nspc))//' wet deposition flux (precip evap, stratiform) at surface')  !RCE             
-             if(history_aerosol .and. history_verbose) then
-                call add_default (trim(cnst_name_cw(nspc))//'SFSEC', 1, ' ')  !RCE
-                call add_default (trim(cnst_name_cw(nspc))//'SFSES', 1, ' ')  !RCE
-             endif
+          call addfld (trim(cnst_name_cw(nspc))//'SFSEC',horiz_only,  'A','kg/m2/s', &
+               trim(cnst_name_cw(nspc))//' wet deposition flux (precip evap, convective) at surface')  !RCE
+          call addfld (trim(cnst_name_cw(nspc))//'SFSES',horiz_only,  'A','kg/m2/s', &
+               trim(cnst_name_cw(nspc))//' wet deposition flux (precip evap, stratiform) at surface')  !RCE             
+          if(history_aerosol .and. history_verbose) then
+             call add_default (trim(cnst_name_cw(nspc))//'SFSEC', 1, ' ')  !RCE
+             call add_default (trim(cnst_name_cw(nspc))//'SFSES', 1, ' ')  !RCE
           endif
         endif
        endif
@@ -755,11 +732,11 @@ contains
        do lphase = 1, 2   ! loop over interstitial / cloud-borne forms
 
           if (lphase == 1) then   ! interstial aerosol - calc settling/dep velocities of mode
-! rad_aer = volume mean wet radius (m)
-! dgncur_awet = geometric mean wet diameter for number distribution (m)
+             ! rad_aer = volume mean wet radius (m)
+             ! dgncur_awet = geometric mean wet diameter for number distribution (m)
              rad_aer(1:ncol,:) = 0.5_r8*dgncur_awet(1:ncol,:,m)   &
                                  *exp(1.5_r8*(alnsg_amode(m)**2))
-! dens_aer(1:ncol,:) = wet density (kg/m3)
+             ! dens_aer(1:ncol,:) = wet density (kg/m3)
              dens_aer(1:ncol,:) = wetdens(1:ncol,:,m)
              sg_aer(1:ncol,:) = sigmag_amode(m)
 
@@ -792,7 +769,7 @@ contains
                    jvlc = 4
                 endif
              else   ! water mass
-!   bypass dry deposition of aerosol water
+                !   bypass dry deposition of aerosol water
                 cycle
                 if (lphase == 1) then
                    mm = 0
@@ -840,35 +817,6 @@ contains
              call outfld( trim(cnst_name(mm))//'DTQ', ptend%q(:,:,mm), pcols, lchnk)
              aerdepdryis(:ncol,mm) = sflx(:ncol)
 
-!          else if ((lphase == 1) .and. (lspec == nspec_amode(m)+1)) then  ! aerosol water
- !            ! use pvprogseasalts instead (means making the top level 0)
-  !           pvmzaer(:ncol,1)=0._r8
-   !          pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
-
-!             if(.true.) then ! use phil's method
-!             !      convert from meters/sec to pascals/sec
-!             !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
-!               pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
-
-             !      calculate the tendencies and sfc fluxes from the above velocities
-!                call dust_sediment_tend( &
-!                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-!                     qaerwat(:,:,mm),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-!             else   !use charlie's method
-!                call d3ddflux( ncol, vlc_dry(:,:,jvlc), qaerwat(:,:,mm), state%pmid, &
-!                               state%pdel, tvs, sflx, dqdt_tmp(:,:), dt )
-!             endif
-
-!             ! apportion dry deposition into turb and gravitational settling for tapes
-!             do i=1,ncol
-!                if (vlc_dry(i,pver,jvlc) .ne. 0._r8) then
-!                   dep_trb(i)=sflx(i)*vlc_trb(i,jvlc)/vlc_dry(i,pver,jvlc)
-!                   dep_grv(i)=sflx(i)*vlc_grv(i,pver,jvlc)/vlc_dry(i,pver,jvlc)
-!                endif
-!             enddo
-!
-!             qaerwat(1:ncol,:,mm) = qaerwat(1:ncol,:,mm) + dqdt_tmp(1:ncol,:) * dt
-
           else  ! lphase == 2
              ! use pvprogseasalts instead (means making the top level 0)
              pvmzaer(:ncol,1)=0._r8
@@ -915,17 +863,14 @@ contains
   endsubroutine aero_model_drydep
 
 
-! REASTER 08/04/2015 BEGIN
   !=============================================================================
   !=============================================================================
     subroutine mam_prevap_resusp_init( )
 
     use modal_aero_data, only: &
-       lmassptr_amode, lspectype_amode, &
-       modeptr_coarse, &
+       lmassptr_amode, lspectype_amode, modeptr_coarse, &
        nspec_amode, ntot_amode, numptr_amode, &
        mmtoo_prevap_resusp, ntoo_prevap_resusp
-    use phys_control,    only: phys_getopts
 
     integer :: lspec, lspec2
     integer :: mm, mmtoo, mm2
@@ -950,9 +895,6 @@ contains
           do lspec = 1, nspec_amode(n)   ! loop over chem constituents that was wet-removed
              mm = lmassptr_amode(lspec,n)  ! q-array index of the species that was wet-removed
              nch = len( trim( cnst_name(mm) ) ) - 1
-!             if (n >=  10) nch = nch - 1
-!             if (n >= 100) nch = nch - 1
-!            lspectype = lspectype_amode(lspec,n)
 
              mmtoo = -1   ! q-array index of the coarse mode species that gets the resuspension
              do lspec2 = 1, nspec_amode(ntoo)
@@ -964,11 +906,6 @@ contains
                 endif
              enddo
 
-!             if (mmtoo <= 0) then
-!                msg = 'modal_aero_wetscav_init: cannot find mmtoo for resuspension of:  ' // cnst_name(mm)
-!                write(iulog,'(a)') msg
-!                call endrun( msg )
-!             end if
              if ( masterproc ) then
                 write(iulog,'(a,3(2x,a))') 'modal_aero_wetscav_init mmfrm/too:  ', &
                    cnst_name(mm), cnst_name(mmtoo), cnst_name(numptr_amode(ntoo))
@@ -996,7 +933,6 @@ contains
     endif
 
     end subroutine mam_prevap_resusp_init
-! REASTER 08/04/2015 END
 
 
   !=============================================================================
@@ -1230,7 +1166,6 @@ contains
                 tmpdust = max( 0.0_r8, state%q(i,k,lcoardust) + ptend%q(i,k,lcoardust)*dt )
                 tmpnacl = max( 0.0_r8, state%q(i,k,lcoarnacl) + ptend%q(i,k,lcoarnacl)*dt )
                 if ((tmpdust+tmpnacl) > 1.0e-30_r8) then
-                   ! sol_factic_coarse(i,k) = (0.2_r8*tmpdust + 0.4_r8*tmpnacl)/(tmpdust+tmpnacl) ! tuned 1/6
                    f_act_conv_coarse(i,k) = (f_act_conv_coarse_dust*tmpdust &
                         + f_act_conv_coarse_nacl*tmpnacl)/(tmpdust+tmpnacl) ! rce 2010/05/02
                 endif
@@ -1386,13 +1321,6 @@ lspec_loop_aa: &
                 else
                    cycle
                 endif
-!                if (lphase == 1) then
-!                   mm = 0
-!                   jnv = 2
-!                else
-!                   mm = 0
-!                   jnv = 0
-!                endif
              endif
 
              if (mm <= 0) cycle
@@ -1401,25 +1329,17 @@ lspec_loop_aa: &
 
 ! mam_prevap_resusp_optcc values control the prevap_resusp calculations in wetdepa_v2:
 !     0 = no resuspension
-!     1 = linear resuspension of aerosol mass or number following original mam coding
-!         and history_aero_prevap_resusp = .false.
-!     2 = same as 1 but history_aero_prevap_resusp = .true.
-!     3 = same as 2 but with some added "xxx = max( 0, xxx)" lines
-!
 !   130 = non-linear resuspension of aerosol mass   based on scavenged aerosol mass
 !   230 = non-linear resuspension of aerosol number based on raindrop number
 !   the 130 thru 230 all use the new prevap_resusp code block in subr wetdepa_v2
-!       and all have history_aero_prevap_resusp = .true.
 !
              mam_prevap_resusp_optcc = 0
 
-                if ( jnummaswtr == jaeromass ) then
+             if ( jnummaswtr == jaeromass ) then
                    mam_prevap_resusp_optcc = 130
-                elseif ( jnummaswtr == jaeronumb .and. &
-                          lphase == 1     .and. &
-                          m == modeptr_coarse ) then
+             elseif ( jnummaswtr == jaeronumb .and. lphase == 1 .and. m == modeptr_coarse ) then
                    mam_prevap_resusp_optcc = 230
-                endif
+             endif
 
 
              ! set f_act_conv for interstitial (lphase=1) coarse mode species
@@ -1442,7 +1362,6 @@ lspec_loop_aa: &
 
 lphase_jnmw_conditional: &
              if ((lphase == 1) .and. (jnummaswtr /= jaerowater)) then
-!            if ((lphase == 1) .and. (lspec <= nspec_amode(m))) then
                 ptend%lq(mm) = .true.
                 dqdt_tmp(:,:) = 0.0_r8
                 ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
@@ -1540,28 +1459,24 @@ lphase_jnmw_conditional: &
                 enddo
                 call outfld( trim(cnst_name(mm))//'SFSBS', sflx, pcols, lchnk)
                
-                if ( history_aero_prevap_resusp ) then
                 ! here the prevap resuspension is in rcscavt & rsscavt and column integral is written to history
-                   !BSINGH(09/15/2014):Following two nested do-loops are new additions for unified convection 
-                   !BSINGH(09/15/2014):After these do-loops, code was added by RCE, the comments by RCE are kept as it is
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+rcscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
+                !BSINGH(09/15/2014):Following two nested do-loops are new additions for unified convection 
+                !BSINGH(09/15/2014):After these do-loops, code was added by RCE, the comments by RCE are kept as it is
+                sflx(:)=0._r8
+                do k=1,pver
+                   do i=1,ncol
+                      sflx(i)=sflx(i)+rcscavt(i,k)*state%pdel(i,k)/gravit
                    enddo
-                   if (convproc_do_aer) sflxec = sflx
+                enddo
+                if (convproc_do_aer) sflxec = sflx
                    
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+rsscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
+                sflx(:)=0._r8
+                do k=1,pver
+                   do i=1,ncol
+                      sflx(i)=sflx(i)+rsscavt(i,k)*state%pdel(i,k)/gravit
                    enddo
-                   call outfld( trim(cnst_name(mm))//'SFSES', sflx, pcols, lchnk)                   
-!                else
- !                  if (convproc_do_aer) sflxec(:) = 0._r8
-                endif ! ( history_aero_prevap_resusp )
+                enddo
+                call outfld( trim(cnst_name(mm))//'SFSES', sflx, pcols, lchnk)                   
                    
                 ! apportion convective surface fluxes to deep and shallow conv
                 ! this could be done more accurately in subr wetdepa
@@ -1583,15 +1498,11 @@ lphase_jnmw_conditional: &
                          sflxbcdp(i) = sflxbc(i)*tmpa
                       
                          ! assume that resuspension is proportional to (wet removal)*[(precip evap)/(precip production)]
-                         if ( history_aero_prevap_resusp ) then
-                            tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp), 1.0_r8 )
-                            tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh), 1.0_r8 )
-                            tmpb = max( tmp_resudp, 1.0e-35_r8 ) / max( (tmp_resudp+tmp_resush), 1.0e-35_r8 )
-                            tmpb = max( 0.0_r8, min( 1.0_r8, tmpb ) )
-                            sflxecdp(i) = sflxec(i)*tmpb
-!                         else
- !                           sflxecdp(i) = 0.0_r8
-                         endif
+                         tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp), 1.0_r8 )
+                         tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh), 1.0_r8 )
+                         tmpb = max( tmp_resudp, 1.0e-35_r8 ) / max( (tmp_resudp+tmp_resush), 1.0e-35_r8 )
+                         tmpb = max( 0.0_r8, min( 1.0_r8, tmpb ) )
+                         sflxecdp(i) = sflxec(i)*tmpb
                    enddo
                    call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
                    ! when ma_convproc_intr is used, convective in-cloud wet removal is done there
@@ -1602,78 +1513,13 @@ lphase_jnmw_conditional: &
                 endif ! ( convproc_do_aer )
                  
 
-!                if (do_hygro_sum_del) then
-!                   tmpa = spechygro(lspectype_amode(lspec,m))/ &
-!                        specdens_amode(lspectype_amode(lspec,m))
-!                   tmpb = tmpa*dt
-!                   hygro_sum_old(1:ncol,:) = hygro_sum_old(1:ncol,:) &
-!                        + tmpa*q_tmp(1:ncol,:)
-!                   hygro_sum_del(1:ncol,:) = hygro_sum_del(1:ncol,:) &
-!                        + tmpb*dqdt_tmp(1:ncol,:)
-!                endif
-
-
-elseif (.false.) then lphase_jnmw_conditional
-!             elseif ((lphase == 1) .and. (jnummaswtr == jaerowater)) then lphase_jnmw_conditional
-                do_lphase1 = .true.
-                if (convproc_do_aer) then
-                   do_lphase1 = .false.
-                   if (do_aero_water_removal) do_lphase1 = .true.
-                endif
-                if (do_lphase1) then
-                   ! aerosol water -- because of how wetdepa treats evaporation of stratiform
-                   ! precip, it is not appropriate to apply wetdepa to aerosol water
-                   ! instead, "hygro_sum" = [sum of (mass*hygro/dens)] is calculated before and
-                   ! after wet removal, and new water is calculated using
-                   ! new_water = old_water*min(10,(hygro_sum_new/hygro_sum_old))
-                   ! the "min(10,...)" is to avoid potential problems when hygro_sum_old ~= 0
-                   ! also, individual wet removal terms (ic,is,bc,bs) are not output to history
-                   ! ptend%lq(mm) = .TRUE.
-                   ! dqdt_tmp(:,:) = 0.0_r8
-                   do k = 1, pver
-                      do i = 1, ncol
-                         ! water_old = max( 0.0_r8, state%q(i,k,mm)+ptend%q(i,k,mm)*dt )
-                         water_old = max( 0.0_r8, qaerwat(i,k,mm) )
-                         hygro_sum_old_ik = max( 0.0_r8, hygro_sum_old(i,k) )
-                         hygro_sum_new_ik = max( 0.0_r8, hygro_sum_old_ik+hygro_sum_del(i,k) )
-                         if (hygro_sum_new_ik >= 10.0_r8*hygro_sum_old_ik) then
-                            water_new = 10.0_r8*water_old
-                         else
-                            water_new = water_old*(hygro_sum_new_ik/hygro_sum_old_ik)
-                         end if
-                         ! dqdt_tmp(i,k) = (water_new - water_old)/dt
-                         qaerwat(i,k,mm) = water_new
-                      end do
-                   end do
-                   
-                   ! ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
-                   
-                   ! call outfld( trim(cnst_name(mm))
-                   
-                   ! sflx(:)=0._r8
-                   ! do k=1,pver
-                   ! do i=1,ncol
-                   ! sflx(i)=sflx(i)+dqdt_tmp(i,k)*state%pdel(i,k)/gravit
-                   ! enddo
-                   ! enddo
-                   ! call outfld( trim(cnst_name(mm))
-                endif ! (do_lphase1)
-
-
-
              elseif (lphase == 2) then lphase_jnmw_conditional ! lphase == 2
                 do_lphase2 = .true.
-! REASTER 08/11/2015 start
 ! There is no cloud-borne aerosol water in the model, so the do_lphase2 code block
 ! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = jaerowater).
 ! The code only worked because the "do lspec" loop cycles when lspec = nspec_amode(m)+1,
 ! but that does not make the code correct.
-!               if (convproc_do_aer) then
-!                  do_lphase2 = .false.
-!                  if (lspec <= nspec_amode(m)) do_lphase2 = .true.
-!               endif
                 if (jnummaswtr == jaerowater) do_lphase2 = .false.
-! REASTER 08/11/2015 end
 do_lphase2_conditional: &
                 if ( do_lphase2 ) then
                    dqdt_tmp(:,:) = 0.0_r8
@@ -1750,23 +1596,17 @@ do_lphase2_conditional: &
                    enddo
                    call outfld( trim(cnst_name_cw(mm))//'SFSBS', sflx, pcols, lchnk)
 
-!                  if (convproc_do_aer) then
-!                     !BSINGH(09/15/2014):Following two nested do-loops are new additions for unified convection                       
-                   ! REASTER 08/10/2015 - NO.  They are new additions for resus_fix=.true.
-                   if ( history_aero_prevap_resusp ) then
-                      sflx(:)=0.0_r8
-                      do k=1,pver
-                         sflx(1:ncol)=sflx(1:ncol)+rcscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
-                      enddo
-                      call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
+                   sflx(:)=0.0_r8
+                   do k=1,pver
+                      sflx(1:ncol)=sflx(1:ncol)+rcscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
+                   enddo
+                   call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
                       
-                      sflx(:)=0.0_r8
-                      do k=1,pver
-                         sflx(1:ncol)=sflx(1:ncol)+rsscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
-                      enddo
-                      call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
-                      !RCE 2012/01/12 end - prev ~40 lines are changed
-                   endif
+                   sflx(:)=0.0_r8
+                   do k=1,pver
+                      sflx(1:ncol)=sflx(1:ncol)+rsscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
+                   enddo
+                   call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
 
                 endif do_lphase2_conditional
 
@@ -1818,8 +1658,7 @@ do_lphase2_conditional: &
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
     use mo_setsox,             only : setsox, has_sox
-    use modal_aero_data,       only : cnst_name_cw, qqcw_get_field
-    use phys_control,          only : phys_getopts
+    use modal_aero_data,       only : qqcw_get_field
 
     !-----------------------------------------------------------------------
     !      ... dummy arguments
@@ -1981,7 +1820,6 @@ do_lphase2_conditional: &
     use seasalt_model, only: seasalt_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
          has_mam_mom, nslt_om
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
-    use physics_types, only: physics_state
 
     ! Arguments:
 
@@ -2075,9 +1913,7 @@ do_lphase2_conditional: &
     !
     !-----------------------------------------------------------------------
     
-    use shr_kind_mod,only: r8 => shr_kind_r8
     use modal_aero_data, only: dgnum_amode, sigmag_amode, lspectype_amode, specdens_amode
-    use cam_abortutils,  only: endrun
 
     implicit none
 
@@ -2098,7 +1934,6 @@ do_lphase2_conditional: &
 
     
     lunerr = 6
-!    dlndg_nimptblgrow = log( 1.25_r8 )
 
     modeloop: do mode = 1, ntot_amode
 
@@ -2172,10 +2007,9 @@ do_lphase2_conditional: &
     !
     ! !USES
     !
-    use physconst,     only: pi,boltz, gravit, rair
+    use physconst,     only: pi,boltz
     use mo_drydep,     only: n_land_type, fraction_landuse
     use ieee_arithmetic, only: ieee_is_nan
-    use phys_control,    only: phys_getopts
 
     ! !ARGUMENTS:
     !
@@ -2222,7 +2056,6 @@ do_lphase2_conditional: &
     integer  :: lt
     real(r8) :: lnd_frc
     real(r8) :: wrk1, wrk2, wrk3
-    logical  :: use_MMF
 
     ! constants
     real(r8) gamma(11)      ! exponent of schmidt number
@@ -2249,7 +2082,6 @@ do_lphase2_conditional: &
               -1/
     save iwet
 
-    call phys_getopts( use_MMF_out = use_MMF )
     !------------------------------------------------------------------------
     do k=1,pver
        do i=1,ncol
@@ -2412,7 +2244,6 @@ do_lphase2_conditional: &
    !   scavratevol = volume or mass scavenging rate (1/h)
    !   lunerr = logical unit for error message
    !
-   use shr_kind_mod, only: r8 => shr_kind_r8
    use mo_constants, only: boltz_cgs, pi, rhowater => rhoh2o_cgs, &
                            gravity => gravity_cgs, rgas => rgas_cgs
 
@@ -2635,12 +2466,9 @@ do_lphase2_conditional: &
   !=============================================================================
   subroutine qqcw2vmr(lchnk, vmr, mbar, ncol, im, pbuf)
     use modal_aero_data, only : qqcw_get_field
-    use physics_buffer, only : physics_buffer_desc
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
     !-----------------------------------------------------------------
-
-    use chem_mods, only : adv_mass, gas_pcnst
 
     implicit none
 
@@ -2681,9 +2509,7 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
 
     use m_spc_id
-    use chem_mods,       only : adv_mass, gas_pcnst
     use modal_aero_data, only : qqcw_get_field
-    use physics_buffer,  only : physics_buffer_desc
 
     implicit none
 
