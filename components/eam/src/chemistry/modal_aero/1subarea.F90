@@ -372,6 +372,7 @@ subroutine mam_amicphys_1subarea(&
          qaer_sv1 = qaer_cur
 
          call mam_coag_1subarea( &
+            lchnk,      ii,      kk,        &
             dtsubstep,                                &! in
             temp,      pmid,     aircon,              &! in
             dgn_a,     dgn_awet, wetdens,             &! in

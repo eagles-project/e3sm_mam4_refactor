@@ -9,7 +9,7 @@
 !   Hui Wan 2022: Refactored code: removed non-4-mode codes; restructured subroutines.
 !--------------------------------------------------------------------------------------
 module modal_aero_coag
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod,    only:  wp => shr_kind_r8
   use cam_logfile,     only:  iulog
 
@@ -74,6 +74,7 @@ subroutine set_coagulation_pairs( masterproc )
 end subroutine set_coagulation_pairs
 
 subroutine mam_coag_1subarea(                                   &
+     y_lchnk,      y_i,      y_k,        &
      deltat,                                                    &
      temp,              pmid,             aircon,               &
      dgn_a,             dgn_awet,         wetdens,              &
@@ -90,7 +91,7 @@ subroutine mam_coag_1subarea(                                   &
       implicit none
 
       ! Arguments
-
+ 
       real(wp), intent(in) :: deltat             ! timestep used for integrating the coag. equations [s]
       real(wp), intent(in) :: temp               ! temperature at layer center [K]
       real(wp), intent(in) :: pmid               ! pressure at layer center [Pa]
@@ -120,7 +121,7 @@ subroutine mam_coag_1subarea(                                   &
                                                    ! as the arithmetic mean of the begin- and end-values
 
       real(wp), dimension(1:max_aer,1:max_mode) :: qaer_bgn ! mass mixing ratios before coagulation
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_1subarea_beg_yml.f90"
       !----------------------------------------------------
       ! Preparation
       !----------------------------------------------------
@@ -145,6 +146,7 @@ subroutine mam_coag_1subarea(                                   &
          dest_mode = dest_mode_coagpair(ip)
 
          call getcoags_wrapper_f(                      &
+            y_lchnk,      y_i,      y_k,        &
             temp,                pmid,                 &! in
             dgn_awet(src_mode),  dgn_awet(dest_mode),  &! in
             sigmag_aer(src_mode),sigmag_aer(dest_mode),&! in
@@ -167,17 +169,19 @@ subroutine mam_coag_1subarea(                                   &
       !---------------------------------------------------------------------------------------
       ! First update number mixing ratios 
 
-      call mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, &! in
+      call mam_coag_num_update( y_lchnk,      y_i,      y_k,        &
+                                ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, &! in
                                 qnum_cur, qnum_tavg                             )! inout, out 
 
       ! Then calculate mass transfers between modes and update mass mixing ratios
 
-      call mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, &! in
+      call mam_coag_aer_update( y_lchnk,      y_i,      y_k,        &
+                                ybetaij3, deltat, qnum_tavg, qaer_bgn, &! in
                                 qaer_cur, qaer_del_coag_out            )! inout, out
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_1subarea_end_yml.f90"
 end subroutine mam_coag_1subarea
 
-subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
+subroutine mam_coag_num_update( y_lchnk,      y_i,      y_k, ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
 !----------------------------------------------------------------------------------------------------
 ! Purpose: update aerosol number mixing ratios by taking into account both the intramodal and 
 !          intermodal coagulation.
@@ -207,7 +211,7 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       real(wp) :: bijqnumj    ! intermodal coag coefficient bij multiplied by number mixing ratio of mode j
       real(wp) :: bijdtqnumj  ! intermodal coag coefficient bij multiplied by time step dt and the
                               ! number mixing ratio of mode j
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_num_update_beg_yml.f90"
       !-------------------------------------------------------
       ! accumulaiton mode number loss due to intramodal coag
       !-------------------------------------------------------
@@ -238,7 +242,7 @@ subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, 
       call update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnum_bgn(nait), qnum_end(nait) )
 
       qnum_tavg(nait) = (qnum_bgn(nait) + qnum_end(nait))*0.5_wp
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_num_update_end_yml.f90"
 
 end subroutine mam_coag_num_update
 
@@ -287,7 +291,7 @@ subroutine update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnumi_b
 end subroutine update_qnum_for_intra_and_intermodal_coag
 
 
-subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
+subroutine mam_coag_aer_update( y_lchnk,      y_i,      y_k, ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
 !=====================================================================================================
 ! Purpose: update aerosol mass mixing ratios by taking into account coagulation-induced inter-modal
 !          mass transfer.
@@ -344,7 +348,7 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
       integer :: iaer   ! aerosol species index
 
       real(wp), parameter :: epsilonx2 = epsilon( 1.0_wp )*2.0_wp
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_aer_update_beg_yml.f90"
       !--------------------------------------------------------------------
       ! Initialize the array that will be passed onto aging
       !--------------------------------------------------------------------
@@ -402,10 +406,10 @@ subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end,
             qaer_end(iaer,nacc) = qaer_end(iaer,nacc) + tmp_dq    ! add to accumulaiton mode
          end do
       end if
-
+#include "../yaml/modal_aero_coag/f90_yaml/mam_coag_aer_update_end_yml.f90"
 end subroutine mam_coag_aer_update
 
-subroutine getcoags_wrapper_f(&
+subroutine getcoags_wrapper_f(y_lchnk,      y_i,      y_k,&
              airtemp, airprs,   dgatk,   dgacc,    sgatk, sgacc, &
              xxlsgat, xxlsgac,  pdensat, pdensac,                &
              betaij0, betaij3,  betaii0, betajj0                 )
@@ -467,7 +471,7 @@ subroutine getcoags_wrapper_f(&
 
     ! For unit conversion
     real(wp)  dumatk3
-
+#include "../yaml/modal_aero_coag/f90_yaml/getcoags_wrapper_f_beg_yml.f90"
     !-----------------------------------------------
     ! Prepare input to subr. getcoags 
     !-----------------------------------------------
@@ -506,7 +510,8 @@ subroutine getcoags_wrapper_f(&
     !  - Coag. coefficients of the 0th moment (qn11, qn22, qn12) correspond to aerosol number changes;
     !  - Coag. coefficient  of the 3rd moment (qv12) correspond to aerosol mass changes.
     !-------------------------------------------------------------------------------------------------
-    call getcoags( lamda, kfmatac, kfmat, kfmac, knc,            &! in
+    call getcoags( y_lchnk,      y_i,      y_k,&
+                   lamda, kfmatac, kfmat, kfmac, knc,            &! in
                    dgatk, dgacc, sgatk, sgacc, xxlsgat, xxlsgac, &! in
                    qn11, qn22, qn12, qv12                        )! out
 
@@ -524,11 +529,12 @@ subroutine getcoags_wrapper_f(&
 
     dumatk3 = ( (dgatk**3) * exp( 4.5_wp*xxlsgat*xxlsgat ) )
     betaij3  = max( 0.0_wp, qv12 / dumatk3 )
-
+#include "../yaml/modal_aero_coag/f90_yaml/getcoags_wrapper_f_end_yml.f90"
 end subroutine getcoags_wrapper_f
 
 
-subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
+subroutine getcoags( y_lchnk,      y_i,      y_k,&
+                     lamda, kfmatac, kfmat, kfmac, knc,           &
                      dgatk, dgacc, sgatk, sgacc, xxlsgat,xxlsgac, &
                      qn11, qn22, qn12, qv12 )
 !//////////////////////////////////////////////////////////////////
@@ -623,7 +629,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
     real(wp) r1, r2, r3, rx4
     real(wp) ri1, ri2, ri3
     real(wp) rat
-
+#include "../yaml/modal_aero_coag/f90_yaml/getcoags_beg_yml.f90"
     !----------------------------------------------------------
     ! Start calculations
     !----------------------------------------------------------
@@ -740,7 +746,7 @@ subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
            esac01, esac04, esac05, esac08, esac20, esac25, &! in
            n2a,                                            &! in
            qn22                                            )! out
-
+#include "../yaml/modal_aero_coag/f90_yaml/getcoags_end_yml.f90"
 end subroutine getcoags
 
 
