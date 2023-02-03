@@ -322,7 +322,7 @@ contains
 
     pvmzaer(:ncol,2:pverp) = sed_vel(:ncol,:)
 
-    ! Convert from velocity to (gravitiy * mass fluxes of the air);
+    ! Convert velocity from height coordinate to pressure coordinate; 
     ! units: convert from meters/sec to pascals/sec.
     ! (This was referred to as "Phil's method" in the code before refactoring.)
  
@@ -343,7 +343,7 @@ contains
 
     do ii = 1,ncol
        dtmassflux(ii,1)     = 0                                         ! no flux at model top 
-       dtmassflux(ii,pverp) = qq_in(ii,pver) * pvmzaer(ii,pverp) * dt   ! surface flux by upstream scheme
+       dtmassflux(ii,pverp) = qq_in(ii,pver) * pvmzaer(ii,pverp) * dt   ! surface flux by upwind scheme
     end do
 
     ! Limit the flux out of the bottom of each column:

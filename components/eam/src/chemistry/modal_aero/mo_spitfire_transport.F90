@@ -22,11 +22,18 @@ module mo_spitfire_transport
 contains
 
 !===============================================================================
+! Calculate tracer fluxes across cell boundaries using the 1D SPITFIRE
+! (SPlit Implementation of Transport using Flux Integral REpresentation) 
+! algorithm of Rasch and Lawrence (1998):
+!   Rasch, P. J., and M. Lawrence, Recent development in transport methods
+!   at NCAR, MPI-Rep. 265, pp. 65 – 75, Max-Planck-Inst. fuer Meteorol.,
+!   Hamburg, Germany, 1998. 
+!===============================================================================
   subroutine getflx(ncol, xw, phi, vel, deltat, flux)
 
 !-----------------------------------------------------------------
 ! Assumed grid staggering:
-
+!
 ! Input:
 !
 !     xw1.......xw2.......xw3.......xw4.......xw5.......xw6
@@ -37,24 +44,27 @@ contains
 !
 !    psi1......psi2......psi3......psi4......psi5......psi6
 !
+! Output:
+!
+!   flux1.....flux2.....flux3.....flux4.....flux5.....flux6
 !-----------------------------------------------------------------
 
     implicit none
 
     integer, intent(in) :: ncol     ! number of colums to process
 
-    real(r8),intent(in) ::  xw(pcols,pverp)     ! pint
-    real(r8),intent(in) :: phi(pcols,pverp-1)   ! qq
-    real(r8),intent(in) :: vel(pcols,pverp)     ! grav * rho * v
-
+    real(r8),intent(in) ::  xw(pcols,pverp)     ! coordinate variable, values at layer interfaces. In EAM this is pint.
+    real(r8),intent(in) :: phi(pcols,pverp-1)   ! grid cell mean tracer mixing ratio
+    real(r8),intent(in) :: vel(pcols,pverp)     ! velocity in the xw coordinate. In EAM this is grav * rho * v
+                                                ! where v is velocity in the height (z) coordinate 
     real(r8),intent(in) :: deltat
 
     real(r8),intent(out) :: flux(pcols,pverp)
 
-    real(r8) psi(pcols,pverp)
-    real(r8) fdot(pcols,pverp)
-    real(r8) xxk(pcols,pver)
-    real(r8) psistar(pcols)
+    real(r8) psi(pcols,pverp)    ! integral of phi along the xw coordinate
+    real(r8) xxk(pcols,pver)     ! departure point in the xw coordinate
+    real(r8) psistar(pcols)      ! integral of phi at departure point
+    real(r8) fdot(pcols,pverp)   ! derivative of interpolating polynomial
 
     integer :: kk  ! vertical layer index
 
@@ -63,7 +73,8 @@ contains
     flux(:ncol,1) = 0
     flux(:ncol,pverp) = 0._r8
 
-    ! Get the vertical integral of phi
+    ! Get the vertical integral of phi. 
+    ! See Rasch and Lawrence (1998), Eq (3) but note we are using a pressure coordinate here.
 
     psi(:ncol,1) = 0._r8
     do kk = 2,pverp
@@ -79,10 +90,16 @@ contains
 
     do kk = 2,pver
 
-       xxk(:ncol,kk) = xw(:ncol,kk)-vel(:ncol,kk)*deltat
+       ! Find departure point. Rasch and Lawrence (1998), Eq (4)
+
+       xxk(:ncol,kk) = xw(:ncol,kk)-vel(:ncol,kk)*deltat   
+
+       ! Calculate the integral, psistar, at the departure point xxk.
 
        call cfint2(ncol, xw, psi, fdot, xxk(:,kk), &! in
                    psistar                         )! out
+
+       ! Calculate the flux at interface kk. Rasch and Lawrence (1998), Eq (5)
 
        flux(:ncol,kk) = psi(:ncol,kk)-psistar(:ncol)
     end do
