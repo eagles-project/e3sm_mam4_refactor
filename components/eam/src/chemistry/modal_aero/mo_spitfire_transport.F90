@@ -143,14 +143,6 @@ contains
     real (r8) cfnew
     real (r8) xins(pcols)
 
-    ! the minmod function 
-    real (r8) aa, bb, cc
-    real (r8) minmod
-    real (r8) medan
-
-    minmod(aa,bb) = 0.5_r8*(sign(1._r8,aa) + sign(1._r8,bb))*min(abs(aa),abs(bb))
-    medan(aa,bb,cc) = aa + minmod(bb-aa,cc-aa)
-
     do ii = 1,ncol
        xins(ii) = medan(xw(ii,1), xin(ii), xw(ii,pverp))
        intz(ii) = 0
@@ -268,13 +260,6 @@ contains
     real (r8) tmax
     real (r8) delxh(pcols,pverp)
 
-    ! The minmod function 
-
-    real (r8) minmod
-    real (r8) medan
-
-    minmod(aa,bb) = 0.5_r8*(sign(1._r8,aa) + sign(1._r8,bb))*min(abs(aa),abs(bb))
-    medan(aa,bb,cc) = aa + minmod(bb-aa,cc-aa)
 
     !-----------------
     do kk = 1,pver
@@ -382,5 +367,29 @@ contains
     end do
 
   end subroutine cfdotmc_pro
+
+  !##############################################################################
+  ! The minmod function 
+  !##############################################################################
+  real(r8) function minmod(aa,bb)
+
+    implicit none
+    real(r8),intent(in) :: aa, bb
+
+    minmod = 0.5_r8*(sign(1._r8,aa) + sign(1._r8,bb))*min(abs(aa),abs(bb))
+
+  end function minmod
+
+  !##############################################################################
+  ! The medan function
+  !##############################################################################
+  real(r8) function medan(aa,bb,cc)
+
+    implicit none
+    real(r8),intent(in) :: aa, bb, cc
+
+    medan = aa + minmod(bb-aa,cc-aa)
+
+  end function medan
 
 end module mo_spitfire_transport
