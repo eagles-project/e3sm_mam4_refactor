@@ -321,21 +321,21 @@ subroutine dropmixnuc( &
    real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
 
    ! output arguments
-   real(r8), intent(out) :: tendnd(pcols,pver) ! change in droplet number concentration (#/kg/s)
+   real(r8), intent(out) :: tendnd(pcols,pver) ! tendency in droplet number mixing ratio [#/kg/s]
    real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number
    !--------------------Local storage-------------------------------------
 
    integer  :: lchnk               ! chunk identifier
    integer  :: ncol                ! number of columns
-   integer  :: loop_up_bnd
-   real(r8), pointer :: ncldwtr(:,:) ! droplet number concentration (#/kg)
-   real(r8), pointer :: temp(:,:)    ! temperature (K)
-   real(r8), pointer :: omega(:,:)   ! vertical velocity (Pa/s)
-   real(r8), pointer :: pmid(:,:)    ! mid-level pressure (Pa)
-   real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces (Pa)
-   real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer (Pa)
-   real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer (/Pa)
-   real(r8), pointer :: zm(:,:)      ! geopotential height of level (m)
+!  BJG not necessary   integer  :: loop_up_bnd
+   real(r8), pointer :: ncldwtr(:,:) ! droplet number mixing ratio [#/kg]
+   real(r8), pointer :: temp(:,:)    ! temperature [K]
+! BJG not used   real(r8), pointer :: omega(:,:)   ! vertical velocity [Pa/s]
+   real(r8), pointer :: pmid(:,:)    ! mid-level pressure [Pa]
+   real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces [Pa]
+   real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer [Pa]
+   real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer [/Pa]
+   real(r8), pointer :: zm(:,:)      ! geopotential height of level [m]
    real(r8), pointer :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
 
    real(r8), pointer :: kvh(:,:)     ! vertical diffusivity (m2/s)
@@ -346,12 +346,12 @@ subroutine dropmixnuc( &
    real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios
 
 
-   real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8
-   real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity (m/s)
+   real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8  ! min, max vertical diffusivity [m2/s]
+   real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
    real(r8) :: sq2pi
 
-! BJG i,k,l,m replaced by icol, kk, lspec/lsat,imode which are defined below  integer  :: i, k, l, m, mm, n
-   integer  :: mm, n
+! BJG i,k,l,m,n replaced by icol, kk, lspec/lsat,imode,isub which are defined below  integer  :: i, k, l, m, mm, n
+   integer  :: mm
    integer  :: km1, kp1
    integer  :: nnew, nsav, ntemp
    integer  :: lptr
@@ -374,12 +374,13 @@ subroutine dropmixnuc( &
 
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k (m/s)
    real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k (m/s)
-   real(r8) :: wbar, wmix, wmin, wmax
+!  BJG  wmix, wmin not used or zero  real(r8) :: wbar, wmix, wmin, wmax
+   real(r8) :: wbar, wmax
 
    real(r8) :: zn(pver)   ! g/pdel (m2/g) for layer
-   real(r8) :: flxconv    ! convergence of flux into lowest layer
+! BJG not used   real(r8) :: flxconv    ! convergence of flux into lowest layer
 
-   real(r8) :: wdiab           ! diabatic vertical velocity
+! BJG not used or zero   real(r8) :: wdiab           ! diabatic vertical velocity
    real(r8) :: ekd(pver)       ! diffusivity for droplets (m2/s)
    real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets (kg/m3 m2/s)
    real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity
@@ -390,16 +391,15 @@ subroutine dropmixnuc( &
    real(r8) :: dact
    real(r8) :: fluxntot         ! (#/cm2/s)
    real(r8) :: dtmix
-   real(r8) :: alogarg
+!  BJG not used    real(r8) :: alogarg
    real(r8) :: overlapp(pver), overlapm(pver) ! cloud overlap
 
    real(r8) :: nsource(pcols,pver)            ! droplet number source (#/kg/s)
    real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing (#/kg/s)
    real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
    real(r8) :: cldo_tmp, cldn_tmp
-   real(r8) :: tau_cld_regenerate
-   real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
-
+! BJG not used   real(r8) :: tau_cld_regenerate
+! BJG not currently nonzero   real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
 
    real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate (/s)
    real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate (/s)
@@ -444,6 +444,7 @@ subroutine dropmixnuc( &
   integer :: kk          ! level index
   integer :: lspec      ! species index for given mode
   integer :: lsat       !  level of supersaturation
+  integer :: isub       ! substep index
   integer :: spc_idx, num_idx
   real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
   real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
@@ -458,7 +459,7 @@ subroutine dropmixnuc( &
 
    ncldwtr  => state%q(:,:,numliq_idx)
    temp     => state%t
-   omega    => state%omega
+!  BJG   omega    => state%omega
    pmid     => state%pmid
    pint     => state%pint
    pdel     => state%pdel
@@ -605,7 +606,7 @@ subroutine dropmixnuc( &
 
       ! tau_cld_regenerate = time scale for regeneration of cloudy air
       !    by (horizontal) exchange with clear air
-      tau_cld_regenerate = 3600.0_r8 * 3.0_r8
+!  BJG      tau_cld_regenerate = 3600.0_r8 * 3.0_r8
 
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
@@ -662,10 +663,10 @@ subroutine dropmixnuc( &
 
             ! rce-comment - use wtke at layer centers for new-cloud activation
             wbar  = wtke_cen(icol,kk)
-            wmix  = 0._r8
-            wmin  = 0._r8
+! BJG            wmix  = 0._r8
+! BJG            wmin  = 0._r8
             wmax  = 10._r8
-            wdiab = 0
+! BJG            wdiab = 0
 
             ! load aerosol properties, assuming external mixtures
 
@@ -724,22 +725,23 @@ subroutine dropmixnuc( &
 
       ! old_cloud_main_k_loop
 ! BJG      if(regen_fix) then
-         loop_up_bnd = pver - 1
+! BJG         loop_up_bnd = pver - 1
 ! BJG      else
 ! BJG         loop_up_bnd = pver
 ! BJG      endif
-      do kk = top_lev, loop_up_bnd!pver
+! BJG      do kk = top_lev, loop_up_bnd!pver
+      do kk = top_lev, pver - 1
          kp1 = min0(kk+1, pver)
-         taumix_internal_pver_inv = 0.0_r8
+! BJG         taumix_internal_pver_inv = 0.0_r8
 
          if (cldn(icol,kk) > 0.01_r8) then
 
-            wdiab = 0
-            wmix  = 0._r8                       ! single updraft
+! BJG            wdiab = 0
+!  BJG            wmix  = 0._r8                       ! single updraft
             wbar  = wtke(icol,kk)                   ! single updraft
 ! BJG            if (k == pver) wbar = wtke_cen(i,k) ! single updraft
             wmax  = 10._r8
-            wmin  = 0._r8
+! BJG            wmin  = 0._r8
 
 ! BJG            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
             if (cldn(icol,kk) - cldn(icol,kp1) > 0.01_r8 ) then
@@ -759,8 +761,9 @@ subroutine dropmixnuc( &
                !      fluxes calculated in explmix.
                ekd(kk) = wbar/zs(kk)
 
-               alogarg = max(1.e-20_r8, 1/cldn(icol,kk) - 1._r8)
-               wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
+! BJG               alogarg = max(1.e-20_r8, 1/cldn(icol,kk) - 1._r8)
+!  BJG:  wmix = 0.    wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
+! BJG wmin not used               wmin    = wbar 
                phase   = 1   ! interstitial
 
                do imode = 1, ntot_amode
@@ -917,7 +920,8 @@ subroutine dropmixnuc( &
          !    can be too big, and explmix can produce negative values.
          !    the negative values are reset to zero, resulting in an
          !    artificial source.
-         if (kk == pver) tinv = tinv + taumix_internal_pver_inv
+! BJG always 0        if (kk == pver) tinv = tinv + taumix_internal_pver_inv
+! BJG         if (kk == pver) tinv = tinv 
 
          if (tinv .gt. 1.e-6_r8) then
             dtt   = 1._r8/tinv
@@ -967,7 +971,7 @@ subroutine dropmixnuc( &
 
 
       ! old_cloud_nsubmix_loop
-      do n = 1, nsubmix
+      do isub = 1, nsubmix
          qncld(:) = qcld(:)
          ! switch nsav, nnew so that nsav is the updated aerosol
          ntemp   = nsav
@@ -986,7 +990,8 @@ subroutine dropmixnuc( &
             ! rce-comment- new formulation for k=pver
             !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
             tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
+! BJG always zero                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
             srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
          end do
          call explmix(  &
@@ -1009,9 +1014,10 @@ subroutine dropmixnuc( &
             ! rce-comment - new formulation for k=pver
             !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
             tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
+! BJG always 0                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
             source(pver) = max(0.0_r8, tmpa)
-            flxconv = 0._r8
+!  BJG not used            flxconv = 0._r8
 
             call explmix( &
                raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
@@ -1031,9 +1037,10 @@ subroutine dropmixnuc( &
                ! rce-comment- new formulation for k=pver
                !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
                tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
-                    + raercol_cw(pver,mm,nsav)*(mact(pver,imode) - taumix_internal_pver_inv)
+!  BJG always 0                    + raercol_cw(pver,mm,nsav)*(mact(pver,imode) - taumix_internal_pver_inv)
+                    + raercol_cw(pver,mm,nsav)*mact(pver,imode)
                source(pver) = max(0.0_r8, tmpa)
-               flxconv = 0._r8
+! BJG not used               flxconv = 0._r8
 
                call explmix( &
                   raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
