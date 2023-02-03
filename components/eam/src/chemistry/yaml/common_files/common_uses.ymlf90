@@ -12,7 +12,7 @@
 !#define YAML_WETDEP
 
 ! module_aero_coag.F90
-#define YAML_COAG
+!#define YAML_COAG
 
 use yaml_input_file_io
 

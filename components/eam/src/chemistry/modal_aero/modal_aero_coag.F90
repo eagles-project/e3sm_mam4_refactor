@@ -74,7 +74,6 @@ subroutine set_coagulation_pairs( masterproc )
 end subroutine set_coagulation_pairs
 
 subroutine mam_coag_1subarea(                                   &
-     y_lchnk,      y_i,      y_k,        &
      deltat,                                                    &
      temp,              pmid,             aircon,               &
      dgn_a,             dgn_awet,         wetdens,              &
@@ -146,7 +145,6 @@ subroutine mam_coag_1subarea(                                   &
          dest_mode = dest_mode_coagpair(ip)
 
          call getcoags_wrapper_f(                      &
-            y_lchnk,      y_i,      y_k,        &
             temp,                pmid,                 &! in
             dgn_awet(src_mode),  dgn_awet(dest_mode),  &! in
             sigmag_aer(src_mode),sigmag_aer(dest_mode),&! in
@@ -169,19 +167,17 @@ subroutine mam_coag_1subarea(                                   &
       !---------------------------------------------------------------------------------------
       ! First update number mixing ratios 
 
-      call mam_coag_num_update( y_lchnk,      y_i,      y_k,        &
-                                ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, &! in
+      call mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, &! in
                                 qnum_cur, qnum_tavg                             )! inout, out 
 
       ! Then calculate mass transfers between modes and update mass mixing ratios
 
-      call mam_coag_aer_update( y_lchnk,      y_i,      y_k,        &
-                                ybetaij3, deltat, qnum_tavg, qaer_bgn, &! in
+      call mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, &! in
                                 qaer_cur, qaer_del_coag_out            )! inout, out
 #include "../yaml/modal_aero_coag/f90_yaml/mam_coag_1subarea_end_yml.f90"
 end subroutine mam_coag_1subarea
 
-subroutine mam_coag_num_update( y_lchnk,      y_i,      y_k, ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
+subroutine mam_coag_num_update( ybetaij0, ybetaii0, ybetajj0, deltat, qnum_bgn, qnum_end, qnum_tavg )
 !----------------------------------------------------------------------------------------------------
 ! Purpose: update aerosol number mixing ratios by taking into account both the intramodal and 
 !          intermodal coagulation.
@@ -291,7 +287,7 @@ subroutine update_qnum_for_intra_and_intermodal_coag( bijdtqnumj, biidt, qnumi_b
 end subroutine update_qnum_for_intra_and_intermodal_coag
 
 
-subroutine mam_coag_aer_update( y_lchnk,      y_i,      y_k, ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
+subroutine mam_coag_aer_update( ybetaij3, deltat, qnum_tavg, qaer_bgn, qaer_end, qaer_del_coag_out)
 !=====================================================================================================
 ! Purpose: update aerosol mass mixing ratios by taking into account coagulation-induced inter-modal
 !          mass transfer.
@@ -409,7 +405,7 @@ subroutine mam_coag_aer_update( y_lchnk,      y_i,      y_k, ybetaij3, deltat, q
 #include "../yaml/modal_aero_coag/f90_yaml/mam_coag_aer_update_end_yml.f90"
 end subroutine mam_coag_aer_update
 
-subroutine getcoags_wrapper_f(y_lchnk,      y_i,      y_k,&
+subroutine getcoags_wrapper_f(&
              airtemp, airprs,   dgatk,   dgacc,    sgatk, sgacc, &
              xxlsgat, xxlsgac,  pdensat, pdensac,                &
              betaij0, betaij3,  betaii0, betajj0                 )
@@ -510,8 +506,7 @@ subroutine getcoags_wrapper_f(y_lchnk,      y_i,      y_k,&
     !  - Coag. coefficients of the 0th moment (qn11, qn22, qn12) correspond to aerosol number changes;
     !  - Coag. coefficient  of the 3rd moment (qv12) correspond to aerosol mass changes.
     !-------------------------------------------------------------------------------------------------
-    call getcoags( y_lchnk,      y_i,      y_k,&
-                   lamda, kfmatac, kfmat, kfmac, knc,            &! in
+    call getcoags( lamda, kfmatac, kfmat, kfmac, knc,            &! in
                    dgatk, dgacc, sgatk, sgacc, xxlsgat, xxlsgac, &! in
                    qn11, qn22, qn12, qv12                        )! out
 
@@ -533,8 +528,7 @@ subroutine getcoags_wrapper_f(y_lchnk,      y_i,      y_k,&
 end subroutine getcoags_wrapper_f
 
 
-subroutine getcoags( y_lchnk,      y_i,      y_k,&
-                     lamda, kfmatac, kfmat, kfmac, knc,           &
+subroutine getcoags( lamda, kfmatac, kfmat, kfmac, knc,           &
                      dgatk, dgacc, sgatk, sgacc, xxlsgat,xxlsgac, &
                      qn11, qn22, qn12, qv12 )
 !//////////////////////////////////////////////////////////////////
