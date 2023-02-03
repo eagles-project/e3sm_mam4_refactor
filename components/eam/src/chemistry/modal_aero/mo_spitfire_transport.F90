@@ -109,30 +109,31 @@ contains
 
 
 !##############################################################################
+! Given a coordinate xw, an interpolating polynomial ff and its derivative fdot,
+! calculate the value of the polynomial (psistar) at xin. 
+!##############################################################################
 
-  subroutine cfint2 (ncol, x, f, fdot, xin, psistar)
-
+  subroutine cfint2 (ncol, xw, ff, fdot, xin, psistar)
 
     implicit none
 
-! input
     integer ncol                      ! number of colums to process
 
-    real (r8) x(pcols, pverp)
-    real (r8) f(pcols, pverp)
-    real (r8) fdot(pcols, pverp)
-    real (r8) xin(pcols)
+    real(r8),intent(in) ::   xw(pcols, pverp)
+    real(r8),intent(in) ::   ff(pcols, pverp)
+    real(r8),intent(in) :: fdot(pcols, pverp)
+    real(r8),intent(in) ::  xin(pcols)
 
-! output
-    real (r8) fxdot(pcols)
-    real (r8) fxdd(pcols)
-    real (r8) psistar(pcols)
+    real(r8),intent(out) :: psistar(pcols)
 
-    integer i
-    integer k
+    real(r8) fxdot(pcols)
+    real(r8) fxdd(pcols)
+
+    integer ii
+    integer kk
     integer intz(pcols)
     real (r8) dx
-    real (r8) s
+    real (r8) ss
     real (r8) c2
     real (r8) c3
     real (r8) xx
@@ -142,76 +143,76 @@ contains
     real (r8) cfnew
     real (r8) xins(pcols)
 
-!     the minmod function 
-    real (r8) a, b, c
+    ! the minmod function 
+    real (r8) aa, bb, cc
     real (r8) minmod
     real (r8) medan
-    minmod(a,b) = 0.5_r8*(sign(1._r8,a) + sign(1._r8,b))*min(abs(a),abs(b))
-    medan(a,b,c) = a + minmod(b-a,c-a)
 
-    do i = 1,ncol
-       xins(i) = medan(x(i,1), xin(i), x(i,pverp))
-       intz(i) = 0
+    minmod(aa,bb) = 0.5_r8*(sign(1._r8,aa) + sign(1._r8,bb))*min(abs(aa),abs(bb))
+    medan(aa,bb,cc) = aa + minmod(bb-aa,cc-aa)
+
+    do ii = 1,ncol
+       xins(ii) = medan(xw(ii,1), xin(ii), xw(ii,pverp))
+       intz(ii) = 0
     end do
 
-! first find the interval 
-    do k =  1,pverp-1
-       do i = 1,ncol
-          if ((xins(i)-x(i,k))*(x(i,k+1)-xins(i)).ge.0._r8) then
-             intz(i) = k
-          endif
-       end do
+    ! first find the interval 
+    do kk =  1,pverp-1
+    do ii = 1,ncol
+       if ((xins(ii)-xw(ii,kk))*(xw(ii,kk+1)-xins(ii)).ge.0._r8) then
+          intz(ii) = kk
+       endif
+    end do
     end do
 
-    do i = 1,ncol
-       if (intz(i).eq.0) then
-          write(iulog,*) ' interval was not found for col i ', i
-          call endrun('DUST_SEDIMENT_MOD:cfint2 -- interval was not found ')
+    do ii = 1,ncol
+       if (intz(ii).eq.0) then
+          write(iulog,*) ' interval was not found for col i ', ii
+          call endrun('mo_spitfire_transport: cfint2 -- interval was not found ')
        endif
     end do
 
-! now interpolate
-    do i = 1,ncol
-       k = intz(i)
-       dx = (x(i,k+1)-x(i,k))
-       s = (f(i,k+1)-f(i,k))/dx
-       c2 = (3*s-2*fdot(i,k)-fdot(i,k+1))/dx
-       c3 = (fdot(i,k)+fdot(i,k+1)-2*s)/dx**2
-       xx = (xins(i)-x(i,k))
-       fxdot(i) =  (3*c3*xx + 2*c2)*xx + fdot(i,k)
-       fxdd(i) = 6*c3*xx + 2*c2
-       cfint = ((c3*xx + c2)*xx + fdot(i,k))*xx + f(i,k)
+    ! now interpolate
 
-!        limit the interpolant
-       psi1 = f(i,k)+(f(i,k+1)-f(i,k))*xx/dx
-       if (k.eq.1) then
-          psi2 = f(i,1)
+    do ii = 1,ncol
+       kk = intz(ii)
+       dx = (xw(ii,kk+1)-xw(ii,kk))
+       ss = (ff(ii,kk+1)-ff(ii,kk))/dx
+       c2 = (3*ss-2*fdot(ii,kk)-fdot(ii,kk+1))/dx
+       c3 = (fdot(ii,kk)+fdot(ii,kk+1)-2*ss)/dx**2
+       xx = (xins(ii)-xw(ii,kk))
+       fxdot(ii) =  (3*c3*xx + 2*c2)*xx + fdot(ii,kk)
+       fxdd (ii) = 6*c3*xx + 2*c2
+       cfint = ((c3*xx + c2)*xx + fdot(ii,kk))*xx + ff(ii,kk)
+
+       ! limit the interpolant
+
+       psi1 = ff(ii,kk)+(ff(ii,kk+1)-ff(ii,kk))*xx/dx
+
+       if (kk.eq.1) then
+          psi2 = ff(ii,1)
        else
-          psi2 = f(i,k) + (f(i,k)-f(i,k-1))*xx/(x(i,k)-x(i,k-1))
+          psi2 = ff(ii,kk) + (ff(ii,kk)-ff(ii,kk-1))*xx/(xw(ii,kk)-xw(ii,kk-1))
        endif
-       if (k+1.eq.pverp) then
-          psi3 = f(i,pverp)
+
+       if (kk+1.eq.pverp) then
+          psi3 = ff(ii,pverp)
        else
-          psi3 = f(i,k+1) - (f(i,k+2)-f(i,k+1))*(dx-xx)/(x(i,k+2)-x(i,k+1))
+          psi3 = ff(ii,kk+1) - (ff(ii,kk+2)-ff(ii,kk+1))*(dx-xx)/(xw(ii,kk+2)-xw(ii,kk+1))
        endif
+
        psim = medan(psi1, psi2, psi3)
        cfnew = medan(cfint, psi1, psim)
-       if (abs(cfnew-cfint)/(abs(cfnew)+abs(cfint)+1.e-36_r8)  .gt..03_r8) then
-!     CHANGE THIS BACK LATER!!!
-!     $        .gt..1) then
 
+       !if (abs(cfnew-cfint)/(abs(cfnew)+abs(cfint)+1.e-36_r8)  .gt..03_r8) then
+       !   write(iulog,*) ' cfint2 limiting important ', cfint, cfnew 
+       !endif
 
-!     UNCOMMENT THIS LATER!!!
-!            write(iulog,*) ' cfint2 limiting important ', cfint, cfnew
+       psistar(ii) = cfnew
 
-
-       endif
-       psistar(i) = cfnew
     end do
 
-    return
   end subroutine cfint2
-
 
 
 !##############################################################################
