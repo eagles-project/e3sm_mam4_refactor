@@ -35,6 +35,7 @@ call write_var(unit_input, unit_output, 'nspec', nspec)
 call write_1d_var(unit_input, unit_output,'dest_mode_of_mode',max_mode,dest_mode_of_mode)
 call write_2d_var(unit_input, unit_output,'q_mmr',max_aer,max_mode,q_mmr)
 call write_2d_var(unit_input, unit_output,'q_del_growth',max_aer,max_mode,q_del_growth)
+call write_1d_var(unit_input, unit_output,'mass_2_vol',max_aer,mass_2_vol)
 
      !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
      !call write_1d_var(unit_input, unit_output, fld_name,dim,field) ! writes 1D variables of any dimension
