@@ -38,7 +38,6 @@ real(r8) :: rh2o
 real(r8) :: rhoh2o
 real(r8) :: mwh2o
 real(r8) :: tmelt
-!real(r8) :: pi     ! commented out to avoid double declaring pi
 
 integer  :: iulog
 
@@ -54,7 +53,8 @@ real(r8), parameter :: nus = 1.e13_r8          ! frequ. of vibration [s-1] highe
 real(r8), parameter :: rhwincloud = 0.98_r8    ! 98% RH in mixed-phase clouds (Korolev & Isaac, JAS 2006)
 real(r8), parameter :: limfacbc = 0.01_r8      ! max. ice nucleating fraction soot
 
-real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
+real(r8), parameter :: pi = 4._r8*atan(1.0_r8) ! bad constant parameter, defined locally within the module.
+                                               ! use this one to avoid double declaring pi
 
 
 ! Wang et al., 2014 fitting parameters
@@ -101,7 +101,6 @@ subroutine hetfrz_classnuc_init( &
    rhoh2o = rhoh2o_in
    mwh2o  = mwh2o_in
    tmelt  = tmelt_in
-   ! pi     = pi_in              ! commented out to avoid double declaring pi
    iulog  = iulog_in
 
 end subroutine hetfrz_classnuc_init
@@ -310,6 +309,9 @@ end subroutine  hetfrz_classnuc_calc
 subroutine calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
 
    !****************************************************************************
+   ! Note for C++ port: The two variables can be initialized in the init
+   ! subroutine, as they stay constant for the entire simulation.
+   !
    ! calculate log normal pdf which represents the occurence probability of 
    ! one contact anlge for one particle
    !****************************************************************************
@@ -360,7 +362,7 @@ subroutine calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r
    real(r8), intent(in) :: r3lx                               ! volume mean drop radius [m]
 
    ! output
-   real(r8), intent(out) :: aw(hetfrz_aer_nspec)  ! water activity [unitless]
+   real(r8), intent(inout) :: aw(hetfrz_aer_nspec)  ! water activity [unitless]
 
    ! local variables
    real(r8) :: molal(3)                        ! molality [moles/kg]
@@ -488,12 +490,12 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    dg0imm_dust_a3 = 4*pi/3._r8*sigma_iw*rgimm_dust_a3**2
 
    ! prefactor
-   Aimm_bc = n1*((vwice*rhplanck)/(rgimm_bc**3)*SQRT(3._r8/pi*kboltz*temperature*dg0imm_bc))
-   Aimm_dust_a1 = n1*((vwice*rhplanck)/(rgimm_dust_a1**3)*SQRT(3._r8/pi*kboltz*temperature*dg0imm_dust_a1))
-   Aimm_dust_a3 = n1*((vwice*rhplanck)/(rgimm_dust_a3**3)*SQRT(3._r8/pi*kboltz*temperature*dg0imm_dust_a3))
+   Aimm_bc = n1*((vwice*rhplanck)/(rgimm_bc**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_bc))
+   Aimm_dust_a1 = n1*((vwice*rhplanck)/(rgimm_dust_a1**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_dust_a1))
+   Aimm_dust_a3 = n1*((vwice*rhplanck)/(rgimm_dust_a3**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_dust_a3))
 
    ! nucleation rate per particle
-   Jimm_bc = Aimm_bc*r_bc**2/SQRT(f_imm_bc)*EXP((-dga_imm_bc-f_imm_bc*dg0imm_bc)/(kboltz*temperature))
+   Jimm_bc = Aimm_bc*r_bc**2/sqrt(f_imm_bc)*exp((-dga_imm_bc-f_imm_bc*dg0imm_bc)/(kboltz*temperature))
 
    dim_Jimm_dust_a1 = 0.0_r8
    dim_Jimm_dust_a3 = 0.0_r8
@@ -527,12 +529,12 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    endif
  
 
-   if (do_bc) frzbcimm = frzbcimm+MIN(limfacbc*total_cloudborne_aer_num(id_bc)/deltat, &
+   if (do_bc) frzbcimm = frzbcimm+min(limfacbc*total_cloudborne_aer_num(id_bc)/deltat, &
                                      total_cloudborne_aer_num(id_bc)/deltat*(1._r8-exp(-Jimm_bc*deltat)))
 
-   if (do_dst1) frzduimm = frzduimm+MIN(1*total_cloudborne_aer_num(id_dst1)/deltat,        &
+   if (do_dst1) frzduimm = frzduimm+min(1*total_cloudborne_aer_num(id_dst1)/deltat,        &
                                  total_cloudborne_aer_num(id_dst1)/deltat*(1._r8-sum_imm_dust_a1))
-   if (do_dst3) frzduimm = frzduimm+MIN(1*total_cloudborne_aer_num(id_dst3)/deltat,        &
+   if (do_dst3) frzduimm = frzduimm+min(1*total_cloudborne_aer_num(id_dst3)/deltat,        &
                                  total_cloudborne_aer_num(id_dst3)/deltat*(1._r8-sum_imm_dust_a3))
 
 
@@ -595,23 +597,23 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
 
    ! prefactor
    ! attention: division of small numbers
-   Adep = (rhwincloud*eswtr)**2*(vwice/(mwh2o*amu))/(kboltz*temperature*nus)*SQRT(sigma_iv/(kboltz*temperature))
+   Adep = (rhwincloud*eswtr)**2*(vwice/(mwh2o*amu))/(kboltz*temperature*nus)*sqrt(sigma_iv/(kboltz*temperature))
 
    ! nucleation rate per particle
    if (rgdep > 0) then
-      Jdep_bc = Adep*r_bc**2/SQRT(f_dep_bc)*EXP((-dga_dep_bc-f_dep_bc*dg0dep)/(kboltz*temperature))
-      Jdep_dust_a1 = Adep*r_dust_a1**2/SQRT(f_dep_dust_a1)*EXP((-dga_dep_dust-f_dep_dust_a1*dg0dep)/(kboltz*temperature))
-      Jdep_dust_a3 = Adep*r_dust_a3**2/SQRT(f_dep_dust_a3)*EXP((-dga_dep_dust-f_dep_dust_a3*dg0dep)/(kboltz*temperature))
+      Jdep_bc = Adep*r_bc**2/sqrt(f_dep_bc)*exp((-dga_dep_bc-f_dep_bc*dg0dep)/(kboltz*temperature))
+      Jdep_dust_a1 = Adep*r_dust_a1**2/sqrt(f_dep_dust_a1)*exp((-dga_dep_dust-f_dep_dust_a1*dg0dep)/(kboltz*temperature))
+      Jdep_dust_a3 = Adep*r_dust_a3**2/sqrt(f_dep_dust_a3)*exp((-dga_dep_dust-f_dep_dust_a3*dg0dep)/(kboltz*temperature))
    endif
 
    ! Limit to 1% of available potential IN (for BC), no limit for dust 
-   if (do_bc) frzbcdep = frzbcdep+MIN(limfacbc*uncoated_aer_num(id_bc)/deltat, &
+   if (do_bc) frzbcdep = frzbcdep+min(limfacbc*uncoated_aer_num(id_bc)/deltat, &
                                       uncoated_aer_num(id_bc)/deltat &
                                       *(1._r8-exp(-Jdep_bc*deltat)))
-   if (do_dst1) frzdudep = frzdudep+MIN(uncoated_aer_num(id_dst1)/deltat, &
+   if (do_dst1) frzdudep = frzdudep+min(uncoated_aer_num(id_dst1)/deltat, &
                                         uncoated_aer_num(id_dst1)/deltat &
                                         *(1._r8-exp(-Jdep_dust_a1*deltat)))
-   if (do_dst3) frzdudep = frzdudep+MIN(uncoated_aer_num(id_dst3)/deltat, &
+   if (do_dst3) frzdudep = frzdudep+min(uncoated_aer_num(id_dst3)/deltat, &
                                         uncoated_aer_num(id_dst3)/deltat &
                                         *(1._r8-exp(-Jdep_dust_a3*deltat)))
 
@@ -670,7 +672,7 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
 
    ! prefactor
    ! attention: division of small numbers
-   Acnt = rhwincloud*eswtr*4*pi/(nus*SQRT(2*pi*mwh2o*amu*kboltz*temperature))
+   Acnt = rhwincloud*eswtr*4*pi/(nus*sqrt(2*pi*mwh2o*amu*kboltz*temperature))
 
    ! nucleation rate per particle
    Jcnt_bc      = Acnt*r_bc**2*exp((-dga_dep_bc-f_cnt_bc*dg0cnt)/(kboltz*temperature))*Kcoll_bc*icnlx
