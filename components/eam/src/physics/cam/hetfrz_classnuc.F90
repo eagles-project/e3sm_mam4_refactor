@@ -394,7 +394,7 @@ subroutine calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature,
    !****************************************************************************
    
    ! input
-   real(r8), intent(in) :: vwice                ! density of ice [kg/m^3]
+   real(r8), intent(in) :: vwice                ! volume of a water molecule in ice [m^3]
    real(r8), intent(in) :: sigma_iw             ! surface tension between ice and water [J/m^2]
    real(r8), intent(in) :: temperature          ! temperature [K]
    real(r8), intent(in) :: aw                   ! water activity [unitless]
@@ -434,7 +434,7 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8), intent(in) :: total_cloudborne_aer_num(hetfrz_aer_nspec)   ! total bc and dust concentration (cloudborne) [#/cm^3]
    real(r8), intent(in) :: sigma_iw                      ! surface tension between ice and water [J/m^2]
    real(r8), intent(in) :: eswtr                         ! saturation vapor pressure over water [Pa]
-   real(r8), intent(in) :: vwice                         ! density of ice [kg/m^3]
+   real(r8), intent(in) :: vwice                         ! volume of a water molecule in ice [m^3]
    real(r8), intent(in) :: dim_theta(pdf_n_theta)        !
    real(r8), intent(in) :: pdf_imm_theta(pdf_n_theta)    ! 
    real(r8), intent(in) :: r_bc                          ! radius of BC [m]   
@@ -449,10 +449,6 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm^-3 s^-1]
 
    ! local variables
-   real(r8), parameter :: n1 = 1.e19_r8           ! number of water molecules in contact with unit area of substrate [m-2]
-   real(r8), parameter :: hplanck = 6.63e-34_r8   ! planck constant
-   real(r8), parameter :: rhplanck = 1._r8/hplanck
-
    real(r8) :: rgimm_bc                           ! critical germ radius for bc immersion freezing [m]
    real(r8) :: rgimm_dust_a1, rgimm_dust_a3       ! critical germ radius for dust immersion freezing [m]
    real(r8) :: dg0imm_bc                          ! homogeneous energy for germ formation [J]
@@ -485,14 +481,14 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
 
 
    ! homogeneous energy of germ formation
-   dg0imm_bc      = 4*pi/3._r8*sigma_iw*rgimm_bc**2
-   dg0imm_dust_a1 = 4*pi/3._r8*sigma_iw*rgimm_dust_a1**2
-   dg0imm_dust_a3 = 4*pi/3._r8*sigma_iw*rgimm_dust_a3**2
+   dg0imm_bc      = get_dg0imm(sigma_iw, rgimm_bc)
+   dg0imm_dust_a1 = get_dg0imm(sigma_iw, rgimm_dust_a1)
+   dg0imm_dust_a3 = get_dg0imm(sigma_iw, rgimm_dust_a3)
 
    ! prefactor
-   Aimm_bc = n1*((vwice*rhplanck)/(rgimm_bc**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_bc))
-   Aimm_dust_a1 = n1*((vwice*rhplanck)/(rgimm_dust_a1**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_dust_a1))
-   Aimm_dust_a3 = n1*((vwice*rhplanck)/(rgimm_dust_a3**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm_dust_a3))
+   Aimm_bc      = get_Aimm(vwice, rgimm_bc, temperature, dg0imm_bc)
+   Aimm_dust_a1 = get_Aimm(vwice, rgimm_dust_a1, temperature, dg0imm_dust_a1) 
+   Aimm_dust_a3 = get_Aimm(vwice, rgimm_dust_a3, temperature, dg0imm_dust_a3) 
 
    ! nucleation rate per particle
    Jimm_bc = Aimm_bc*r_bc**2/sqrt(f_imm_bc)*exp((-dga_imm_bc-f_imm_bc*dg0imm_bc)/(kboltz*temperature))
@@ -562,7 +558,7 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    real(r8), intent(in) :: sigma_iv             ! surface tension between ice and vapor [J/m^2]
    real(r8), intent(in) :: eswtr                ! saturation vapor pressure over water [Pa]
    real(r8), intent(in) :: rgdep                ! critical germ radius for deposition nucleation [m]
-   real(r8), intent(in) :: vwice                ! density of ice [kg/m^3]
+   real(r8), intent(in) :: vwice                ! volume of a water molecule in ice [m^3]
    real(r8), intent(in) :: r_bc                 ! radius of BC [m]   
    real(r8), intent(in) :: r_dust_a1            ! radius of dust in the accum mode [m]
    real(r8), intent(in) :: r_dust_a3            ! radius of dust in the coarse mode [m] 
@@ -713,6 +709,36 @@ pure function get_form_factor(alpha) result(f_form)
 
 end function
 
+
+pure function get_dg0imm(sigma_iw, rgimm) result(dg0imm)
+
+   implicit none
+   real(r8), intent(in) :: sigma_iw  ! surface tension between ice and water [J/m^2]
+   real(r8), intent(in) :: rgimm     ! critical germ radius for immersion freezing [m]
+
+   real(r8) :: dg0imm                ! homogeneous energy for germ formation [J]
+
+   dg0imm = 4*pi/3._r8*sigma_iw*rgimm**2
+
+end function
+
+
+pure function get_Aimm(vwice, rgimm, temperature, dg0imm) result(Aimm)
+
+   implicit none
+   real(r8), intent(in) :: vwice        ! volume of a water molecule in ice [m^3]
+   real(r8), intent(in) :: rgimm        ! critical germ radius for immersion freezing [m]
+   real(r8), intent(in) :: temperature  ! temperature [k]
+   real(r8), intent(in) :: dg0imm       ! homogeneous energy for germ formation [J]
+ 
+   real(r8) :: Aimm                     ! prefactor [m^-2 s^-1]
+   real(r8), parameter :: n1 = 1.e19_r8           ! number of water molecules in contact with unit area of substrate [m-2]
+   real(r8), parameter :: hplanck = 6.63e-34_r8   ! planck constant
+   real(r8), parameter :: rhplanck = 1._r8/hplanck
+
+   Aimm  = n1*((vwice*rhplanck)/(rgimm**3)*sqrt(3._r8/pi*kboltz*temperature*dg0imm))
+
+end function
 
 !===================================================================================================
 
