@@ -69,9 +69,6 @@ module aero_model
 
   character(len=fieldname_len) :: dgnum_name(ntot_amode)
 
-  !For aero_model_wetdep subroutine
-  integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
-
   ! Namelist variables
   logical :: sscav_tuning, convproc_do_aer, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -235,22 +232,13 @@ contains
     ! are removed as not been used/tested. These conditions are then not allowed.
     ! convproc_do_gas is not not used
     if ( ( .not. convproc_do_aer ) .or. ( .not. resus_fix ) ) then
-       errmes = 'aero_model_init - ' // &
-          'convproc_do_aer and resus_fix MUST BE .true.' 
+       errmes = 'aero_model_init - convproc_do_aer and resus_fix MUST BE .true.' 
        call endrun( errmes )
     endif
 
     dgnum_idx      = pbuf_get_index('DGNUM')
     dgnumwet_idx   = pbuf_get_index('DGNUMWET')
     
-    !BSINGH: Decide the loop counters for the lphase loop in aero_model_wetdep subroutine
-    !for cases with and without the unified convective transport
-    !Counters for "without" unified convective treatment (i.e. default case)
-    !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so that the resuspension of cloudborne 
-    !can be saved then applied to interstitial (RCE)
-    strt_loop   =  2
-    end_loop    =  1
-    stride_loop = -1
     call rad_cnst_get_info(0, nmodes=nmodes)
 
     call modal_aero_initialize(pbuf2d, imozart, species_class) 
@@ -524,7 +512,6 @@ contains
        endif
        
        call cnst_get_ind(trim(solsym(m)), nspc, abrtf=.false. ) ! REASTER 08/04/2015
-!      if(nspc > 0 .and. .not.cnst_name_cw(nspc) == ' ') then   ! REASTER 08/04/2015
        if( nspc > 0 ) then                                      ! REASTER 08/04/2015
         if ( .not. cnst_name_cw(nspc) == ' ') then              ! REASTER 08/04/2015
           call addfld (trim(cnst_name_cw(nspc))//'SFSEC',horiz_only,  'A','kg/m2/s', &
@@ -692,7 +679,7 @@ contains
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
     call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
 
-    tvs(:ncol,:) = state%t(:ncol,:)!*(1+state%q(:ncol,k)
+    tvs(:ncol,:) = state%t(:ncol,:)
     rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
 !
@@ -758,7 +745,6 @@ contains
                 cycle
                 if (lphase == 1) then
                    mm = 0
-!                  mm = lwaterptr_amode(m)
                    jvlc = 2
                 else
                    mm = 0
@@ -768,9 +754,8 @@ contains
 
           if (mm <= 0) cycle
 
-!         if (lphase == 1) then
           if ((lphase == 1) .and. (lspec <= nspec_amode(m))) then
-             ptend%lq(mm) = .TRUE.
+             ptend%lq(mm) = .true.
 
              ! use pvprogseasalts instead (means making the top level 0)
              pvmzaer(:ncol,1)=0._r8
@@ -937,10 +922,8 @@ contains
     use modal_aero_wateruptake,only: modal_aero_wateruptake_dr
     use modal_aero_convproc,   only: ma_convproc_intr
     use mo_constants,          only: pi
-    use infnan,                only: nan, assignment(=)
 
     ! args
-
     type(physics_state), intent(in)    :: state       ! Physics state variables
     real(r8),            intent(in)    :: dt          ! time step
     real(r8),            intent(in)    :: dlf(:,:)    ! shallow+deep convective detrainment [kg/kg/s]
@@ -987,6 +970,7 @@ contains
     integer :: mm, mmai, mmtoo ! tracer (q-array) index
     integer :: ncol ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
+    integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
     real(r8) :: iscavt(pcols, pver)
     real(r8) :: icscavt(pcols, pver)
@@ -1020,9 +1004,7 @@ contains
     real(r8) :: water_old, water_new ! temporary old/new aerosol water mix-rat
 
     logical  :: isprx(pcols,pver) ! true if precipation
-    logical, parameter :: do_aero_water_removal = .false. ! True if aerosol water reduction by wet removal is to be calculated
-                                                          ! (this has not been fully tested, so best to leave it off)
-    logical :: do_hygro_sum_del, do_lphase1, do_lphase2
+    logical :: do_lphase2
 
     real(r8) :: tmp_evapdp, tmp_evapsh  !RCE
     real(r8) :: tmp_precdp, tmp_precsh  !RCE
@@ -1033,7 +1015,6 @@ contains
     real(r8) :: rcscavt(pcols, pver)  !RCE
     real(r8) :: rsscavt(pcols, pver)  !RCE
     real(r8) :: qqcw_in(pcols,pver), qqcw_sav(pcols,pver,0:maxd_aspectype)       ! temporary array to hold qqcw for the current mode  !RCE
-!   real(r8) :: rtscavt_sv(pcols, pver, 0:maxd_aspectype)  !RCE
     real(r8) :: rtscavt_sv(pcols, pver, pcnst) ! REASTER 08/12/2015
     real(r8) :: rcscavt_cn_sv(pcols, pver)     ! REASTER 08/12/2015
     real(r8) :: rsscavt_cn_sv(pcols, pver)     ! REASTER 08/12/2015
@@ -1159,6 +1140,16 @@ contains
     rcscavt_cn_sv(:,:) = 0.0_r8
     rsscavt_cn_sv(:,:) = 0.0_r8
 
+    !BSINGH: Decide the loop counters for the lphase loop 
+    !for cases with and without the unified convective transport
+    !Counters for "without" unified convective treatment (i.e. default case)
+    !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so
+    !that the resuspension of cloudborne
+    !can be saved then applied to interstitial (RCE)
+    strt_loop   =  2
+    end_loop    =  1
+    stride_loop = -1
+
 mmode_loop_aa: &
     do mtmp = 1, ntot_amode ! main loop over aerosol modes
        m = mtmp
@@ -1171,8 +1162,6 @@ mmode_loop_aa: &
           endif
        endif
           
-       !BSINGH: loop counters (strt_loop,end_loop and stride_loop) are selected in the aero_model_init subroutine above
-
 lphase_loop_aa: &
        do lphase = strt_loop,end_loop, stride_loop ! loop over interstitial (1) and cloud-borne (2) forms
 
@@ -1292,7 +1281,7 @@ lspec_loop_aa: &
              else ! water mass
                 ! bypass wet removal of aerosol water
                 jnummaswtr = jaerowater
-                if ( .not. do_aero_water_removal ) cycle 
+                cycle 
              endif
 
              if (mm <= 0) cycle
@@ -1364,12 +1353,6 @@ lphase_jnmw_conditional: &
                 ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have resuspension contributions
                 !    from so4_a1/2/3 and so4c1/2/3
                 dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
-
-
-                do_hygro_sum_del = .false.
-                if ( (jnummaswtr == jaeromass) .and. do_aero_water_removal ) then
-                      do_hygro_sum_del = .true.
-                endif
 
                 ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
 
@@ -1503,8 +1486,6 @@ do_lphase2_conditional: &
                    mmtoo = mmtoo_prevap_resusp(mm)
                    if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-
-
                    
                    fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
@@ -1960,7 +1941,6 @@ do_lphase2_conditional: &
     !
     use physconst,     only: pi,boltz
     use mo_drydep,     only: n_land_type, fraction_landuse
-    use ieee_arithmetic, only: ieee_is_nan
 
     ! !ARGUMENTS:
     !
