@@ -329,11 +329,18 @@ subroutine calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
    real(r8),parameter :: imm_dust_mean_theta = 46.0_r8/180.0_r8*pi
    real(r8),parameter :: imm_dust_var_theta = 0.01_r8
    integer :: ibin
+   
+   real(r8) :: ln_theta_min, ln_theta_max
+   real(r8) :: ln_imm_dust_mean_theta
+   
+   ln_theta_min = log(theta_min)
+   ln_theta_max = log(theta_max)
+   ln_imm_dust_mean_theta = log(imm_dust_mean_theta)
 
    ! calculate the integral in the denominator
-   x1_imm = (log(theta_min)-log(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-   x2_imm = (log(theta_max)-log(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-      
+   x1_imm = (ln_theta_min - ln_imm_dust_mean_theta)/(sqrt(2.0_r8)*imm_dust_var_theta)
+   x2_imm = (ln_theta_max - ln_imm_dust_mean_theta)/(sqrt(2.0_r8)*imm_dust_var_theta)
+
    norm_theta_imm = (erf(x2_imm)-erf(x1_imm))*0.5_r8
    
    dim_theta = 0.0_r8
@@ -341,7 +348,7 @@ subroutine calculate_vars_for_pdf_imm(dim_theta, pdf_imm_theta)
       
    do ibin = itheta_bin_beg, itheta_bin_end
       dim_theta(ibin) = 1._r8/180._r8*pi+(ibin-1)*pdf_d_theta
-      pdf_imm_theta(ibin) = exp(-((log(dim_theta(ibin))-log(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
+      pdf_imm_theta(ibin) = exp(-((log(dim_theta(ibin))-ln_imm_dust_mean_theta)**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
                                 (dim_theta(ibin)*imm_dust_var_theta*sqrt(2*pi))/norm_theta_imm
    enddo
 
