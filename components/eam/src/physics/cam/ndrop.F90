@@ -327,10 +327,8 @@ subroutine dropmixnuc( &
 
    integer  :: lchnk               ! chunk identifier
    integer  :: ncol                ! number of columns
-!  BJG not necessary   integer  :: loop_up_bnd
    real(r8), pointer :: ncldwtr(:,:) ! droplet number mixing ratio [#/kg]
    real(r8), pointer :: temp(:,:)    ! temperature [K]
-! BJG not used   real(r8), pointer :: omega(:,:)   ! vertical velocity [Pa/s]
    real(r8), pointer :: pmid(:,:)    ! mid-level pressure [Pa]
    real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces [Pa]
    real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer [Pa]
@@ -350,7 +348,6 @@ subroutine dropmixnuc( &
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
    real(r8) :: sq2pi
 
-! BJG i,k,l,m,n replaced by icol, kk, lspec/lsat,imode,isub which are defined below  integer  :: i, k, l, m, mm, n
    integer  :: mm
    integer  :: km1, kp1
    integer  :: nnew, nsav, ntemp
@@ -374,13 +371,10 @@ subroutine dropmixnuc( &
 
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k (m/s)
    real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k (m/s)
-!  BJG  wmix, wmin not used or zero  real(r8) :: wbar, wmix, wmin, wmax
    real(r8) :: wbar, wmax
 
    real(r8) :: zn(pver)   ! g/pdel (m2/g) for layer
-! BJG not used   real(r8) :: flxconv    ! convergence of flux into lowest layer
 
-! BJG not used or zero   real(r8) :: wdiab           ! diabatic vertical velocity
    real(r8) :: ekd(pver)       ! diffusivity for droplets (m2/s)
    real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets (kg/m3 m2/s)
    real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity
@@ -391,15 +385,12 @@ subroutine dropmixnuc( &
    real(r8) :: dact
    real(r8) :: fluxntot         ! (#/cm2/s)
    real(r8) :: dtmix
-!  BJG not used    real(r8) :: alogarg
    real(r8) :: overlapp(pver), overlapm(pver) ! cloud overlap
 
    real(r8) :: nsource(pcols,pver)            ! droplet number source (#/kg/s)
    real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing (#/kg/s)
    real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
    real(r8) :: cldo_tmp, cldn_tmp
-! BJG not used   real(r8) :: tau_cld_regenerate
-! BJG not currently nonzero   real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
 
    real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate (/s)
    real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate (/s)
@@ -420,7 +411,7 @@ subroutine dropmixnuc( &
 
    real(r8), allocatable :: fluxn(:)           ! number  activation fraction flux (cm/s)
    real(r8), allocatable :: fluxm(:)           ! mass    activation fraction flux (cm/s)
-   real(r8)              :: flux_fullact(pver) ! 100%    activation fraction flux (cm/s)
+!  BJG not used   real(r8)              :: flux_fullact(pver) ! 100%    activation fraction flux (cm/s)
    !     note:  activation fraction fluxes are defined as
    !     fluxn = [flux of activated aero. number into cloud (#/cm2/s)]
    !           / [aero. number conc. in updraft, just below cloudbase (#/cm3)]
@@ -459,7 +450,6 @@ subroutine dropmixnuc( &
 
    ncldwtr  => state%q(:,:,numliq_idx)
    temp     => state%t
-!  BJG   omega    => state%omega
    pmid     => state%pmid
    pint     => state%pint
    pdel     => state%pdel
@@ -549,16 +539,19 @@ subroutine dropmixnuc( &
 
       do kk = top_lev, pver
 
+! BJG:  srcn, qncld may not actually need to be zeroed out here?
          qcld(kk)  = ncldwtr(icol,kk)
          qncld(kk) = 0._r8
          srcn(kk)  = 0._r8
          cs(icol,kk)  = pmid(icol,kk)/(rair*temp(icol,kk))        ! air density (kg/m3)
          dz(icol,kk)  = 1._r8/(cs(icol,kk)*gravit*rpdel(icol,kk)) ! layer thickness in m
 
-         do imode = 1, ntot_amode
-            nact(kk,imode) = 0._r8
-            mact(kk,imode) = 0._r8
-         end do
+! BJG         do imode = 1, ntot_amode
+! BJG            nact(kk,imode) = 0._r8
+         nact(kk,1:ntot_amode) = 0._r8
+!BJG            mact(kk,imode) = 0._r8
+         mact(kk,1:ntot_amode) = 0._r8
+!BJG         end do
 
          zn(kk) = gravit*rpdel(icol,kk)
 
@@ -606,7 +599,6 @@ subroutine dropmixnuc( &
 
       ! tau_cld_regenerate = time scale for regeneration of cloudy air
       !    by (horizontal) exchange with clear air
-!  BJG      tau_cld_regenerate = 3600.0_r8 * 3.0_r8
 
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
@@ -617,11 +609,7 @@ subroutine dropmixnuc( &
          !    and also dissipate the portion of the cloud that will be regenerated
          cldo_tmp = cldo(icol,kk)
 
-! BJG         if(regen_fix) then
             cldn_tmp = cldn(icol,kk) !* exp( -dtmicro/tau_cld_regenerate )!HW: there is a bug here; turn off regeneration,01/10/2012
-! BJG         else
-! BJG            cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
-! BJG         endif
          !    alternate formulation
          !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
 
@@ -652,21 +640,14 @@ subroutine dropmixnuc( &
          ! growing cloud ......................................................
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
-! BJG         if(regen_fix) then
-            cldo_tmp = cldo(icol,kk)! HW turned off the regeneration growing
-! BJG         else
-! BJG            cldo_tmp = cldn_tmp
-! BJG         endif
-         cldn_tmp = cldn(icol,kk)
+! BJG redundant         cldo_tmp = cldo(icol,kk)! HW turned off the regeneration growing
+! BJG redundant         cldn_tmp = cldn(icol,kk)
 
          if (cldn_tmp-cldo_tmp > 0.01_r8) then
 
             ! rce-comment - use wtke at layer centers for new-cloud activation
             wbar  = wtke_cen(icol,kk)
-! BJG            wmix  = 0._r8
-! BJG            wmin  = 0._r8
             wmax  = 10._r8
-! BJG            wdiab = 0
 
             ! load aerosol properties, assuming external mixtures
 
@@ -724,26 +705,14 @@ subroutine dropmixnuc( &
       !       so they are incorrectly depleted with no replacement
 
       ! old_cloud_main_k_loop
-! BJG      if(regen_fix) then
-! BJG         loop_up_bnd = pver - 1
-! BJG      else
-! BJG         loop_up_bnd = pver
-! BJG      endif
-! BJG      do kk = top_lev, loop_up_bnd!pver
       do kk = top_lev, pver - 1
          kp1 = min0(kk+1, pver)
-! BJG         taumix_internal_pver_inv = 0.0_r8
 
          if (cldn(icol,kk) > 0.01_r8) then
 
-! BJG            wdiab = 0
-!  BJG            wmix  = 0._r8                       ! single updraft
             wbar  = wtke(icol,kk)                   ! single updraft
-! BJG            if (k == pver) wbar = wtke_cen(i,k) ! single updraft
             wmax  = 10._r8
-! BJG            wmin  = 0._r8
 
-! BJG            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
             if (cldn(icol,kk) - cldn(icol,kp1) > 0.01_r8 ) then
 
                ! cloud base
@@ -761,9 +730,6 @@ subroutine dropmixnuc( &
                !      fluxes calculated in explmix.
                ekd(kk) = wbar/zs(kk)
 
-! BJG               alogarg = max(1.e-20_r8, 1/cldn(icol,kk) - 1._r8)
-!  BJG:  wmix = 0.    wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
-! BJG wmin not used               wmin    = wbar 
                phase   = 1   ! interstitial
 
                do imode = 1, ntot_amode
@@ -786,15 +752,7 @@ subroutine dropmixnuc( &
 
                factnum(icol,kk,:) = fn
 
-! BJG               if (k < pver) then
                   dumc = cldn(icol,kk) - cldn(icol,kp1)
-! BJG               else
-! BJG                 if(regen_fix) then
-! BJG                     dumc=0._r8
-! BJG                 else
-! BJG                    dumc = cldn(i,k)
-! BJG                 endif
-! BJG               endif
 
                fluxntot = 0
 
@@ -835,9 +793,6 @@ subroutine dropmixnuc( &
                !    in the cam3_5_37 version, wtke is done differently and is much
                !       larger in k=pver, so the activation is stronger there
                !
-! BJG               if (k == pver) then
-! BJG                  taumix_internal_pver_inv = flux_fullact(k)/dz(i,k)
-! BJG               end if
 
                do imode = 1, ntot_amode
                   mm = mam_idx(imode,0)
@@ -845,21 +800,13 @@ subroutine dropmixnuc( &
                   fluxm(imode) = fluxm(imode)*dumc
                   nact(kk,imode) = nact(kk,imode) + fluxn(imode)*dum
                   mact(kk,imode) = mact(kk,imode) + fluxm(imode)*dum
-! BJG                  if (k < pver) then
                      ! note that kp1 is used here
                      fluxntot = fluxntot &
                         + fluxn(imode)*raercol(kp1,mm,nsav)*cs(icol,kk)
-!BJG                  else
-! BJG                     tmpa = raercol(kp1,mm,nsav)*fluxn(m) &
-! BJG                          + raercol_cw(kp1,mm,nsav)*(fluxn(m) &
-! BJG                          - taumix_internal_pver_inv*dz(i,k))
-! BJG                     fluxntot = fluxntot + max(0.0_r8, tmpa)*cs(i,k)
-!BJG                  end if
                end do
                srcn(kk)      = srcn(kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
                nsource(icol,kk) = nsource(icol,kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
 
-! BJG            endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01 .or. k == pver)
             endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01)
 
          else
@@ -920,8 +867,6 @@ subroutine dropmixnuc( &
          !    can be too big, and explmix can produce negative values.
          !    the negative values are reset to zero, resulting in an
          !    artificial source.
-! BJG always 0        if (kk == pver) tinv = tinv + taumix_internal_pver_inv
-! BJG         if (kk == pver) tinv = tinv 
 
          if (tinv .gt. 1.e-6_r8) then
             dtt   = 1._r8/tinv
@@ -990,7 +935,6 @@ subroutine dropmixnuc( &
             ! rce-comment- new formulation for k=pver
             !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
             tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-! BJG always zero                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
                  + raercol_cw(pver,mm,nsav)*nact(pver,imode)
             srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
          end do
@@ -1014,10 +958,8 @@ subroutine dropmixnuc( &
             ! rce-comment - new formulation for k=pver
             !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
             tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-! BJG always 0                 + raercol_cw(pver,mm,nsav)*(nact(pver,imode) - taumix_internal_pver_inv)
                  + raercol_cw(pver,mm,nsav)*nact(pver,imode)
             source(pver) = max(0.0_r8, tmpa)
-!  BJG not used            flxconv = 0._r8
 
             call explmix( &
                raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
@@ -1037,10 +979,8 @@ subroutine dropmixnuc( &
                ! rce-comment- new formulation for k=pver
                !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
                tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
-!  BJG always 0                    + raercol_cw(pver,mm,nsav)*(mact(pver,imode) - taumix_internal_pver_inv)
                     + raercol_cw(pver,mm,nsav)*mact(pver,imode)
                source(pver) = max(0.0_r8, tmpa)
-! BJG not used               flxconv = 0._r8
 
                call explmix( &
                   raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
