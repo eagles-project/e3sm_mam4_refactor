@@ -73,7 +73,7 @@ module aero_model
   integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
   ! Namelist variables
-  logical :: sscav_tuning, convproc_do_aer, convproc_do_gas, resus_fix  
+  logical :: sscav_tuning, convproc_do_aer, resus_fix  
   character(len=16) :: wetdep_list(pcnst) = ' '
   character(len=16) :: drydep_list(pcnst) = ' '
   real(r8)          :: sol_facti_cloud_borne = 1._r8
@@ -198,7 +198,6 @@ contains
     call phys_getopts( history_aerosol_out=history_aerosol, &
          history_verbose_out=history_verbose, &
          convproc_do_aer_out = convproc_do_aer, & 
-         convproc_do_gas_out = convproc_do_gas, &
          resus_fix_out       = resus_fix    ) 
 
     ! This section cannot execute until chemini, ..., chm_diags_inti have been called
@@ -211,21 +210,18 @@ contains
        endif
 
        ! These WD_ and DF_ fields should always been in a MAM history file, 
-       !    but for now they are conditional on convproc_do_aer
-       if ( convproc_do_aer ) then 
-          do m = 1,gas_pcnst
-             call cnst_get_ind( solsym(m), l, abrtf=.false. )
-             if ( ( history_aerosol ) .and. (l > 0) ) then
-                if  ( species_class(l) == spec_class_gas ) then !RCE - only output WD_xxx and DF_xxx for gases
-                   wetdep_name = 'WD_'//trim(solsym(m))
-                   depflx_name = 'DF_'//trim(solsym(m)) 
-                   nspc = get_het_ndx(solsym(m)) 
-                   if (nspc > 0) call add_default( wetdep_name, 1, ' ' )
-                   call add_default( depflx_name, 1, ' ' )
-                endif
+       do m = 1,gas_pcnst
+          call cnst_get_ind( solsym(m), l, abrtf=.false. )
+          if ( ( history_aerosol ) .and. (l > 0) ) then
+             if  ( species_class(l) == spec_class_gas ) then !RCE - only output WD_xxx and DF_xxx for gases
+                wetdep_name = 'WD_'//trim(solsym(m))
+                depflx_name = 'DF_'//trim(solsym(m)) 
+                nspc = get_het_ndx(solsym(m)) 
+                if (nspc > 0) call add_default( wetdep_name, 1, ' ' )
+                call add_default( depflx_name, 1, ' ' )
              endif
-          enddo ! m = 1,gas_pcnst
-       endif
+          endif
+       enddo ! m = 1,gas_pcnst
        return
     endif ! ( iflagaa == 2 )
 
@@ -235,17 +231,13 @@ contains
     !    (1) All of the "if ( convproc_do_aer .or. convproc_do_gas ) then" statements 
     !        in aero_model.F90 have been changed to "if ( convproc_do_aer ) then"
     !    (2) convproc_do_aer=.false. and convproc_do_gas=.true. is no longer allowed.
-    if ( ( .not. convproc_do_aer ) .and. convproc_do_gas ) then
+    ! for C++ porting: All convproc_do_aer=.false. and resus_fix=.false. conditions
+    ! are removed as not been used/tested. These conditions are then not allowed.
+    ! convproc_do_gas is not not used
+    if ( ( .not. convproc_do_aer ) .or. ( .not. resus_fix ) ) then
        errmes = 'aero_model_init - ' // &
-          'convproc_do_aer MUST BE .true. when convproc_do_gas is .true.' 
+          'convproc_do_aer and resus_fix MUST BE .true.' 
        call endrun( errmes )
-    endif
-
-    if (masterproc) then
-       if ( convproc_do_aer .and. ( .not. resus_fix ) ) then
-          write(iulog,*)'WARNING: resus_fix=.false. and convproc_do_aer=.true.' //&
-               ' is not a well tested configuration,  may produce incorrect results!!'        
-       endif
     endif
 
     dgnum_idx      = pbuf_get_index('DGNUM')
@@ -254,16 +246,11 @@ contains
     !BSINGH: Decide the loop counters for the lphase loop in aero_model_wetdep subroutine
     !for cases with and without the unified convective transport
     !Counters for "without" unified convective treatment (i.e. default case)
-    strt_loop   = 1
-    end_loop    = 2
-    stride_loop = 1
-    if (convproc_do_aer) then
-       !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so that the resuspension of cloudborne 
-       !can be saved then applied to interstitial (RCE)
-       strt_loop   =  2
-       end_loop    =  1
-       stride_loop = -1
-    endif
+    !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so that the resuspension of cloudborne 
+    !can be saved then applied to interstitial (RCE)
+    strt_loop   =  2
+    end_loop    =  1
+    stride_loop = -1
     call rad_cnst_get_info(0, nmodes=nmodes)
 
     call modal_aero_initialize(pbuf2d, imozart, species_class) 
@@ -478,17 +465,15 @@ contains
        call addfld (trim(wetdep_list(m))//'SFSBS', &
             horiz_only,  'A',unit_basename//'/m2/s ','Wet deposition flux (belowcloud, stratiform) at surface')
        call addfld (trim(wetdep_list(m))//'SFSEC', &
-            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, convective) at surface')  !RCE
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, convective) at surface')
        call addfld (trim(wetdep_list(m))//'SFSES', &
-            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, stratiform) at surface')  !RCE
-       if (convproc_do_aer) then
-          call addfld (trim(wetdep_list(m))//'SFSED', &
-               horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, deep convective) at surface')  !RCE
-          call addfld (trim(wetdep_list(m))//'SFSID', &
-               horiz_only,  'A','kg/m2/s','Wet deposition flux (incloud, deep convective) at surface')  !RCE
-          call addfld (trim(wetdep_list(m))//'SFSBD', &
-               horiz_only,  'A','kg/m2/s','Wet deposition flux (belowcloud, deep convective) at surface')  !RCE
-       endif
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, stratiform) at surface')
+       call addfld (trim(wetdep_list(m))//'SFSED', &
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (precip evap, deep convective) at surface')
+       call addfld (trim(wetdep_list(m))//'SFSID', &
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (incloud, deep convective) at surface')
+       call addfld (trim(wetdep_list(m))//'SFSBD', &
+            horiz_only,  'A','kg/m2/s','Wet deposition flux (belowcloud, deep convective) at surface')
 
        call addfld (trim(wetdep_list(m))//'WET',(/ 'lev' /), 'A',unit_basename//'/kg/s ','wet deposition tendency')
        call addfld (trim(wetdep_list(m))//'SIC',(/ 'lev' /), 'A',unit_basename//'/kg/s ', &
@@ -1139,19 +1124,12 @@ contains
        endwhere
        prec(:ncol) = prec(:ncol) + (dep_inputs%prain(:ncol,k) + dep_inputs%cmfdqr(:ncol,k) - dep_inputs%evapr(:ncol,k)) &
             *state%pdel(:ncol,k)/gravit
-    end do
+    enddo
     
-    if (convproc_do_aer) then
-       qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  !RCE
-       aerdepwetis(:,:)          = 0.0_r8  !RCE
-       aerdepwetcw(:,:)          = 0.0_r8  !RCE
-       qqcw_tmp(:,:)             = 0.0_r8  !RCE
-    else
-       !Fill in nans for the default case
-       qsrflx_mzaer2cnvpr(:,:,:) = nan
-       aerdepwetis(:,:)          = nan
-       aerdepwetcw(:,:)          = nan
-    endif
+    qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  !RCE
+    aerdepwetis(:,:)          = 0.0_r8  !RCE
+    aerdepwetcw(:,:)          = 0.0_r8  !RCE
+    qqcw_tmp(:,:)             = 0.0_r8  !RCE
 
     ! calculate the mass-weighted sol_factic for coarse mode species
     f_act_conv_coarse(:,:) = 0.60_r8 ! rce 2010/05/02
@@ -1193,8 +1171,7 @@ mmode_loop_aa: &
           endif
        endif
           
-       !BSINGH: loop counters (strt_loop,end_loop and stride_loop) are selected based on whether
-       ! convproc_do_aer is true or false in the aero_model_init subroutine above
+       !BSINGH: loop counters (strt_loop,end_loop and stride_loop) are selected in the aero_model_init subroutine above
 
 lphase_loop_aa: &
        do lphase = strt_loop,end_loop, stride_loop ! loop over interstitial (1) and cloud-borne (2) forms
@@ -1259,8 +1236,7 @@ lphase_loop_aa: &
 
           endif
 
-          if( convproc_do_aer .and. lphase == 1 ) then  ! FORTRAN refactor: can be merged above
-             ! RCE 2012/01/12
+          if( lphase == 1 ) then  ! FORTRAN refactor: can be merged above
              ! if modal aero convproc is turned on for aerosols, then
              !    turn off the convective in-cloud removal for interstitial aerosols
              !    (but leave the below-cloud on, as convproc only does in-cloud)
@@ -1316,11 +1292,7 @@ lspec_loop_aa: &
              else ! water mass
                 ! bypass wet removal of aerosol water
                 jnummaswtr = jaerowater
-                if (convproc_do_aer) then
-                   if ( .not. do_aero_water_removal ) cycle 
-                else
-                   cycle
-                endif
+                if ( .not. do_aero_water_removal ) cycle 
              endif
 
              if (mm <= 0) cycle
@@ -1366,13 +1338,8 @@ lphase_jnmw_conditional: &
                 dqdt_tmp(:,:) = 0.0_r8
                 ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
                 q_tmp(1:ncol,:) = state%q(1:ncol,:,mm) + ptend%q(1:ncol,:,mm)*dt
-                if (convproc_do_aer) then
-                   !Feed in the saved cloudborne mixing ratios from phase 2
-                   qqcw_in(:,:) = qqcw_sav(:,:,lspec)
-                else
-                   fldcw => qqcw_get_field(pbuf, mm,lchnk)
-                   qqcw_in(:,:) = fldcw(:,:)
-                endif
+                !Feed in the saved cloudborne mixing ratios from phase 2
+                qqcw_in(:,:) = qqcw_sav(:,:,lspec)
 
                 call wetdepa_v2( &
                      ncol, dt, state%pdel, &
@@ -1386,26 +1353,22 @@ lphase_jnmw_conditional: &
                      fracis(:,:,mm), dqdt_tmp, iscavt, &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt )
 
-                   ! resuspension goes to coarse mode
-                   ! first deduct the current resuspension from the dqdt_tmp of the current species
-                   dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                   ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
-                   mmtoo = mmtoo_prevap_resusp(mm)
-                   if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
+                ! resuspension goes to coarse mode
+                ! first deduct the current resuspension from the dqdt_tmp of the current species
+                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
+                ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
+                mmtoo = mmtoo_prevap_resusp(mm)
+                if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                   ! then add the rtscavt_sv of the current species to the dqdt_tmp of the current species
-                   ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have resuspension contributions
-                   !    from so4_a1/2/3 and so4c1/2/3
-                   dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
+                ! then add the rtscavt_sv of the current species to the dqdt_tmp of the current species
+                ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have resuspension contributions
+                !    from so4_a1/2/3 and so4c1/2/3
+                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
 
 
                 do_hygro_sum_del = .false.
-                if ( jnummaswtr == jaeromass ) do_hygro_sum_del = .true. 
-                if (convproc_do_aer) then
-                   do_hygro_sum_del = .false.
-                   if ( (jnummaswtr == jaeromass) .and. do_aero_water_removal ) then
+                if ( (jnummaswtr == jaeromass) .and. do_aero_water_removal ) then
                       do_hygro_sum_del = .true.
-                   endif
                 endif
 
                 ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
@@ -1422,7 +1385,6 @@ lphase_jnmw_conditional: &
                       sflx(i)=sflx(i)+dqdt_tmp(i,k)*state%pdel(i,k)/gravit
                    enddo
                 enddo
-                if ( .not. convproc_do_aer ) call outfld( trim(cnst_name(mm))//'SFWET', sflx, pcols, lchnk)
                 aerdepwetis(:ncol,mm) = sflx(:ncol)
 
                 sflx(:)=0._r8
@@ -1431,8 +1393,7 @@ lphase_jnmw_conditional: &
                       sflx(i)=sflx(i)+icscavt(i,k)*state%pdel(i,k)/gravit
                    enddo
                 enddo
-                if ( .not. convproc_do_aer ) call outfld( trim(cnst_name(mm))//'SFSIC', sflx, pcols, lchnk)
-                if (convproc_do_aer) sflxic = sflx
+                sflxic = sflx
 
                 sflx(:)=0._r8
                 do k=1,pver
@@ -1449,7 +1410,7 @@ lphase_jnmw_conditional: &
                    enddo
                 enddo
                 call outfld( trim(cnst_name(mm))//'SFSBC', sflx, pcols, lchnk)
-                if (convproc_do_aer) sflxbc = sflx
+                sflxbc = sflx
 
                 sflx(:)=0._r8
                 do k=1,pver
@@ -1468,7 +1429,7 @@ lphase_jnmw_conditional: &
                       sflx(i)=sflx(i)+rcscavt(i,k)*state%pdel(i,k)/gravit
                    enddo
                 enddo
-                if (convproc_do_aer) sflxec = sflx
+                sflxec = sflx
                    
                 sflx(:)=0._r8
                 do k=1,pver
@@ -1484,34 +1445,31 @@ lphase_jnmw_conditional: &
                 !    fields are just diagnostics, this approximate method is adequate
                 ! only do this for interstitial aerosol, because conv clouds to not
                 !    affect the stratiform-cloudborne aerosol
-                if ( convproc_do_aer ) then
-                   do i = 1, ncol
-                         tmp_precdp = max( rprddpsum(i),  1.0e-35_r8 )
-                         tmp_precsh = max( rprdshsum(i),  1.0e-35_r8 )
-                         tmp_evapdp = max( evapcdpsum(i), 0.1e-35_r8 )
-                         tmp_evapsh = max( evapcshsum(i), 0.1e-35_r8 )
+                do i = 1, ncol
+                  tmp_precdp = max( rprddpsum(i),  1.0e-35_r8 )
+                  tmp_precsh = max( rprdshsum(i),  1.0e-35_r8 )
+                  tmp_evapdp = max( evapcdpsum(i), 0.1e-35_r8 )
+                  tmp_evapsh = max( evapcshsum(i), 0.1e-35_r8 )
                       
-                         ! assume that in- and below-cloud removal are proportional to column precip production
-                         tmpa = tmp_precdp / (tmp_precdp + tmp_precsh)
-                         tmpa = max( 0.0_r8, min( 1.0_r8, tmpa ) )
-                         sflxicdp(i) = sflxic(i)*tmpa
-                         sflxbcdp(i) = sflxbc(i)*tmpa
+                  ! assume that in- and below-cloud removal are proportional to column precip production
+                  tmpa = tmp_precdp / (tmp_precdp + tmp_precsh)
+                  tmpa = max( 0.0_r8, min( 1.0_r8, tmpa ) )
+                  sflxicdp(i) = sflxic(i)*tmpa
+                  sflxbcdp(i) = sflxbc(i)*tmpa
                       
-                         ! assume that resuspension is proportional to (wet removal)*[(precip evap)/(precip production)]
-                         tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp), 1.0_r8 )
-                         tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh), 1.0_r8 )
-                         tmpb = max( tmp_resudp, 1.0e-35_r8 ) / max( (tmp_resudp+tmp_resush), 1.0e-35_r8 )
-                         tmpb = max( 0.0_r8, min( 1.0_r8, tmpb ) )
-                         sflxecdp(i) = sflxec(i)*tmpb
-                   enddo
-                   call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
-                   ! when ma_convproc_intr is used, convective in-cloud wet removal is done there
-                   ! the convective (total and deep) precip-evap-resuspension includes in- and below-cloud
-                   ! contributions, so pass the below-cloud contribution to ma_convproc_intr
-                   qsrflx_mzaer2cnvpr(1:ncol,mm,1) = sflxec(  1:ncol)
-                   qsrflx_mzaer2cnvpr(1:ncol,mm,2) = sflxecdp(1:ncol)
-                endif ! ( convproc_do_aer )
-                 
+                  ! assume that resuspension is proportional to (wet removal)*[(precip evap)/(precip production)]
+                  tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp), 1.0_r8 )
+                  tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh), 1.0_r8 )
+                  tmpb = max( tmp_resudp, 1.0e-35_r8 ) / max( (tmp_resudp+tmp_resush), 1.0e-35_r8 )
+                  tmpb = max( 0.0_r8, min( 1.0_r8, tmpb ) )
+                  sflxecdp(i) = sflxec(i)*tmpb
+                enddo
+                call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
+                ! when ma_convproc_intr is used, convective in-cloud wet removal is done there
+                ! the convective (total and deep) precip-evap-resuspension includes in- and below-cloud
+                ! contributions, so pass the below-cloud contribution to ma_convproc_intr
+                qsrflx_mzaer2cnvpr(1:ncol,mm,1) = sflxec(  1:ncol)
+                qsrflx_mzaer2cnvpr(1:ncol,mm,2) = sflxecdp(1:ncol)
 
              elseif (lphase == 2) then lphase_jnmw_conditional ! lphase == 2
                 do_lphase2 = .true.
@@ -1523,13 +1481,8 @@ lphase_jnmw_conditional: &
 do_lphase2_conditional: &
                 if ( do_lphase2 ) then
                    dqdt_tmp(:,:) = 0.0_r8
-                   if (convproc_do_aer) then
-                      fldcw => qqcw_get_field(pbuf,mm,lchnk)
-                      qqcw_sav(1:ncol,:,lspec) = fldcw(1:ncol,:)  !RCE 2012/01/12
-                   else
-                      qqcw_tmp(:,:) = 0.0_r8 ! rce 2010/05/01
-                      fldcw => qqcw_get_field(pbuf, mm,lchnk)
-                   endif
+                   fldcw => qqcw_get_field(pbuf,mm,lchnk)
+                   qqcw_sav(1:ncol,:,lspec) = fldcw(1:ncol,:)  !RCE 2012/01/12
                    
                 call wetdepa_v2( &
                      ncol, dt, state%pdel, &
@@ -1539,7 +1492,7 @@ do_lphase2_conditional: &
                      dep_inputs%cldvcu, dep_inputs%cldvst, &
                      sol_factb, sol_facti, sol_factic, &
                      mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, &
-                     fldcw, qqcw_tmp,  &
+                     fldcw, qqcw_tmp,  & ! FIXIT: is it a bug using qqcw_tmp here? Different with the previous call
                      fracis_cw, dqdt_tmp, iscavt, &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
 
@@ -1622,15 +1575,14 @@ do_lphase2_conditional: &
        call set_srf_wetdep(aerdepwetis, aerdepwetcw, cam_out)
     endif
 
-    if (convproc_do_aer) then 
        
-       call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
-       call pbuf_get_field(pbuf, icwmrsh_idx,     icwmrsh )
-       call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
-       call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
+    call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
+    call pbuf_get_field(pbuf, icwmrsh_idx,     icwmrsh )
+    call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
+    call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
-       call t_startf('ma_convproc')
-       call ma_convproc_intr( state, dt,                      & ! in
+    call t_startf('ma_convproc')
+    call ma_convproc_intr( state, dt,                      & ! in
             dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
             sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
@@ -1638,8 +1590,7 @@ do_lphase2_conditional: &
             mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
             ideep, lengath,  species_class,                   & ! in
             ptend, aerdepwetis                                ) ! inout
-       call t_stopf('ma_convproc')       
-    endif
+    call t_stopf('ma_convproc')       
 
     call wetdep_inputs_unset(dep_inputs)
 
