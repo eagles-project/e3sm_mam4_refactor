@@ -230,7 +230,7 @@ contains
     !    (2) convproc_do_aer=.false. and convproc_do_gas=.true. is no longer allowed.
     ! for C++ porting: All convproc_do_aer=.false. and resus_fix=.false. conditions
     ! are removed as not been used/tested. These conditions are then not allowed.
-    ! convproc_do_gas is not not used
+    ! convproc_do_gas is not used
     if ( ( .not. convproc_do_aer ) .or. ( .not. resus_fix ) ) then
        errmes = 'aero_model_init - convproc_do_aer and resus_fix MUST BE .true.' 
        call endrun( errmes )
@@ -1911,11 +1911,6 @@ do_lphase2_conditional: &
           xxfitvol(1,nnfit) = 1._r8
           yyfitvol(nnfit) = log( scavratevol )
 
-          !
-          ! skip mlinfit stuff because scav table no longer has dependencies on
-          !    air temp, air press, and particle wet density
-          ! just load the log( scavrate--- ) values
-          !
           scavimptblnum(jgrow,mode) = yyfitnum(1)
           scavimptblvol(jgrow,mode) = yyfitvol(1)
 
