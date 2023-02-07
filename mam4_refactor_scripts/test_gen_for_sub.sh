@@ -7,16 +7,16 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=clddiag
+    sub_name=wateruptake_wetdens
 
     #module name
-    module_name=wetdep
+    module_name=modal_aero_wateruptake
 
     #file path
-    dir_path=components/eam/src/chemistry/aerosol/
+    dir_path=components/eam/src/chemistry/utils/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_WETDEP
+    cpp_directive=YAML_WUPTAKE
 
     #-------------------------
     #USER INPUT ENDS
