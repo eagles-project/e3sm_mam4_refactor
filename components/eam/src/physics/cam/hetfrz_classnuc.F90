@@ -212,11 +212,9 @@ subroutine hetfrz_classnuc_calc( &
    r_dust_a3 = hetraer(3)    
 
    ! calculate collision kernels as a function of environmental parameters and aerosol/droplet sizes
-   call collkernel(temperature, pressure, eswtr, r3lx,         &
-                   r_bc,                                  &  ! BC modes
-                   r_dust_a1, r_dust_a3,                  &  ! dust modes
-                   Kcoll_bc,                              &  ! collision kernel [cm3 s-1]
-                   Kcoll_dust_a1, Kcoll_dust_a3)
+   call collkernel(temperature, pressure, eswtr, r3lx, &     ! in
+                   r_bc, r_dust_a1, r_dust_a3, &             ! in 
+                   Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3)   ! out
         
    !*****************************************************************************
    !                take water activity into account 
@@ -234,19 +232,12 @@ subroutine hetfrz_classnuc_calc( &
    ! If the index of IN is 0, it means three freezing modes of this aerosol are depressed.
 
    call calculate_water_activity(total_interstitial_aer_num, awcam, awfacm, r3lx, &   ! in
-                                 aw)                                                  ! out
+                                 aw)                                                  ! inout
 
 
    !*****************************************************************************
    !                immersion freezing begin 
    !*****************************************************************************    
-
-   frzbcimm = 0._r8
-   frzduimm = 0._r8
-   frzbccnt = 0._r8
-   frzducnt = 0._r8
-   frzbcdep = 0._r8
-   frzdudep = 0._r8
 
    ! critical germ size
    rgimm = 2*vwice*sigma_iw/(kboltz*temperature*log(supersatice))
@@ -257,13 +248,16 @@ subroutine hetfrz_classnuc_calc( &
    rgimm_dust_a3 = rgimm
 
    call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_bc), supersatice, & ! in
-                                                rgimm_bc, do_bc)                                        ! out
+                                                rgimm_bc, &                                   ! inout
+                                                do_bc)                                        ! out
 
    call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst1), supersatice, & ! in
-                                                rgimm_dust_a1, do_dst1)                                   ! out
+                                                rgimm_dust_a1, &                           ! inout
+                                                do_dst1)                                   ! out
 
    call calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature, aw(id_dst3), supersatice, & ! in
-                                                rgimm_dust_a3, do_dst3)                                   ! out
+                                                rgimm_dust_a3, &                           ! inout
+                                                do_dst3)                                   ! out
 
 
    call calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_aer_num,  &               ! in
@@ -408,7 +402,7 @@ subroutine calculate_rgimm_and_determine_spec_flag(vwice, sigma_iw, temperature,
    real(r8), intent(in) :: supersatice          ! supersaturation ratio wrt ice at 100%rh over water [unitless]
 
    ! output
-   real(r8), intent(out) :: rgimm               ! critical germ radius for immersion freezing [m]
+   real(r8), intent(inout) :: rgimm               ! critical germ radius for immersion freezing [m]
    logical, intent(out)  :: do_spec_flag        ! logical flag for calculating ice nucleation
   
    do_spec_flag = .false.
@@ -473,6 +467,8 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8) :: sum_imm_dust_a1, sum_imm_dust_a3
 
    
+   frzbcimm = 0._r8
+   frzduimm = 0._r8   
 
    ! form factor
    ! only consider flat surfaces due to uncertainty of curved surfaces
@@ -586,6 +582,9 @@ subroutine calculate_hetfrz_deposition_nucleation(deltat, temperature, uncoated_
    real(r8) :: Adep                          ! prefactor [m^-2 s^-1]
 
 
+   frzbcdep = 0._r8
+   frzdudep = 0._r8
+
    Jdep_bc      = 0._r8
    Jdep_dust_a1 = 0._r8
    Jdep_dust_a3 = 0._r8
@@ -664,6 +663,10 @@ subroutine calculate_hetfrz_contact_nucleation(deltat, temperature, uncoated_aer
    real(r8) :: Jcnt_dust_a1,Jcnt_dust_a3      ! contact nucleation rate for dust [/s]
    real(r8) :: dg0cnt                         ! homogeneous energy of germ formation [J]
    real(r8) :: Acnt                           ! prefactor [m^-2 s^-1]
+
+
+   frzbccnt = 0._r8
+   frzducnt = 0._r8
 
    ! form factor
    f_cnt_bc      = get_form_factor(theta_dep_bc*pi/180._r8)
