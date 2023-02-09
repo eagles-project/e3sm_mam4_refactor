@@ -666,8 +666,6 @@ contains
     !format statement to write in double precision
 10  format(E17.10)
 11  format(A, E17.10)
-!12  format(E17.10, A, E17.10)
-!13  format(A,E17.10, A, E17.10)
 
     ! real part
     write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
@@ -771,6 +769,7 @@ contains
     enddo
     write(unit_output,'(A)')'],]'
 
+    ! imaginary part
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.imag_',trim(adjustl(fld_name)),'=[['
     do k = 1, dim
        write(unit_output,12,advance="no"),aimag(field(k)),', '
