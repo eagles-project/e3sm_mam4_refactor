@@ -51,7 +51,7 @@
         yaml%flag_print  = .true.!(**remove these if generating data for a dependent subroutines**)
 
         !open I/O yaml files (it can have an extra optional argument to pass a unique string to differentiate file names)
-        call open_files('wateruptake_wetdens', &  !intent-in
+        call open_files('modal_aero_wateruptake_wetdens', &  !intent-in
              unit_input, unit_output) !intent-out
 !             unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
