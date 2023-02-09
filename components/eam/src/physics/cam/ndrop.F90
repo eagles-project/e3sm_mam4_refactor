@@ -306,11 +306,12 @@ subroutine dropmixnuc( &
    ! doesn't distinguish between warm, cold clouds
 
    use output_aerocom_aie , only: do_aerocom_ind3
-   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype
+   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype, &
+      lmassptr_amode, numptr_amode
 
    ! input arguments
    type(physics_state), target, intent(in)    :: state
-   real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics (s)
+   real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics [s]
    type(physics_buffer_desc), pointer :: pbuf(:)
    real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity [m/s]
    real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction [fraction]
@@ -335,7 +336,7 @@ subroutine dropmixnuc( &
 
    real(r8), pointer :: kvh(:,:)     ! vertical diffusivity [m^2/s]
 
-   type(ptr2d_t), allocatable :: raer(:)     ! interstitial aerosol mass, number mixing ratios [# or kg/kg]
+! BJG   type(ptr2d_t), allocatable :: raer(:)     ! interstitial aerosol mass, number mixing ratios [# or kg/kg]
    type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [# or kg/kg]
    real(r8) :: raertend(pver)  ! tendency of interstitial aerosol mass, number mixing ratios [# or kg/kg/s]
    real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [# or kg/kg/s]
@@ -387,8 +388,8 @@ subroutine dropmixnuc( &
    real(r8) :: dtmix    ! timescale for subloop [s] 
    real(r8) :: overlapp(pver), overlapm(pver) ! cloud overlap [fraction]
 
-   real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source outside of subloop [#/kg/s]
-   real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to subloop only [#/kg/s]
+   real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source tendency [#/kg/s]
+   real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to mixing [#/kg/s]
    real(r8) :: ndropcol(pcols)               ! column droplet number [#/m2]
 ! BJG   real(r8) :: cldo_tmp, cldn_tmp    ! grid point old, new cloud fraction [fraction]
 
@@ -484,7 +485,7 @@ subroutine dropmixnuc( &
    allocate( &
       nact(pver,ntot_amode),          &
       mact(pver,ntot_amode),          &
-      raer(ncnst_tot),                &
+! BJG      raer(ncnst_tot),                &
       qqcw(ncnst_tot),                &
       raercol(pver,ncnst_tot,2),      &
       raercol_cw(pver,ncnst_tot,2),   &
@@ -502,11 +503,11 @@ subroutine dropmixnuc( &
    ! intersitial and cloud borne phases.
    do imode = 1, ntot_amode
       mm = mam_idx(imode, 0)
-      call rad_cnst_get_mode_num(0, imode, 'a', state, pbuf, raer(mm)%fld)
+! BJG      call rad_cnst_get_mode_num(0, imode, 'a', state, pbuf, raer(mm)%fld)
       call rad_cnst_get_mode_num(0, imode, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
       do lspec = 1, nspec_amode(imode)
          mm = mam_idx(imode, lspec)
-         call rad_cnst_get_aer_mmr(0, imode, lspec, 'a', state, pbuf, raer(mm)%fld)
+! BJG         call rad_cnst_get_aer_mmr(0, imode, lspec, 'a', state, pbuf, raer(mm)%fld)
          call rad_cnst_get_aer_mmr(0, imode, lspec, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
       end do
    end do
@@ -589,13 +590,18 @@ subroutine dropmixnuc( &
          raercol_cw(:,mm,nsav) = 0.0_r8
          raercol(:,mm,nsav)    = 0.0_r8
          raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(icol,top_lev:pver)
-         raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver)
+! BJG         raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver) 
+         num_idx = numptr_amode(imode)
+         raercol(top_lev:pver,mm,nsav) = state_q(icol,top_lev:pver,num_idx)
          do lspec = 1, nspec_amode(imode)
             mm = mam_idx(imode,lspec)
             raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(icol,top_lev:pver)
-            raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver)
+! BJG            raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver)
+            spc_idx=lmassptr_amode(lspec,imode)
+            raercol(top_lev:pver,mm,nsav)    = state_q(icol,top_lev:pver,spc_idx)
          end do
       end do
+
 
       ! droplet nucleation/aerosol activation
 
@@ -677,9 +683,12 @@ subroutine dropmixnuc( &
             factnum(icol,kk,:) = fn
 
             dumc = (cldn(icol,kk) - cldo(icol,kk))
+
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               dact   = dumc*fn(imode)*raer(mm)%fld(icol,kk) ! interstitial only
+! BJG               dact   = dumc*fn(imode)*raer(mm)%fld(icol,kk) ! interstitial only
+               num_idx = numptr_amode(imode)
+               dact = dumc*fn(imode)*state_q(icol,kk,num_idx) ! interstitial only
                qcld(kk) = qcld(kk) + dact
                nsource(icol,kk) = nsource(icol,kk) + dact*dtinv
                raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
@@ -687,7 +696,9 @@ subroutine dropmixnuc( &
                dum = dumc*fm(imode)
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  dact    = dum*raer(mm)%fld(icol,kk) ! interstitial only
+! BJG                  dact    = dum*raer(mm)%fld(icol,kk) ! interstitial only
+                  spc_idx=lmassptr_amode(lspec,imode)
+                  dact    = dum*state_q(icol,kk,spc_idx) ! interstitial only
                   raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
                   raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
                enddo
@@ -1046,7 +1057,14 @@ subroutine dropmixnuc( &
                mm   = mam_idx(imode,lspec)
                lptr = mam_cnst_idx(imode,lspec)
 
-               raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(icol,top_lev:pver))*dtinv
+! BJG               raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(icol,top_lev:pver))*dtinv
+               if( lspec.eq.0 ) then
+                  num_idx = numptr_amode(imode)
+                  raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,num_idx))*dtinv
+               else
+                  spc_idx=lmassptr_amode(lspec,imode)
+                  raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,spc_idx))*dtinv
+               endif
                qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
 
                coltend(icol,mm)    = sum( pdel(icol,:)*raertend )/gravit
@@ -1145,7 +1163,7 @@ subroutine dropmixnuc( &
    deallocate( &
       nact,       &
       mact,       &
-      raer,       &
+! BJG      raer,       &
       qqcw,       &
       raercol,    &
       raercol_cw, &
