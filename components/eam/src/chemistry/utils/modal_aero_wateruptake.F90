@@ -235,14 +235,14 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    call modal_aero_wateruptake_dryaer( ncol,                         & ! in
                                 state_q,                dgncur_a,    & ! in
                                 hygro, naer, dryrad, dryvol, drymass,& ! out
-                                rhcrystal, rhdeliques,  specdens_1 ,lchnk  ) ! out
+                                rhcrystal, rhdeliques,  specdens_1   ) ! out
 
    !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
 
    call modal_aero_wateruptake_rh_clearair( ncol,         & ! in
                         temperature, pmid,  h2ommr, cldn, & ! in
-                        rh                   ,lchnk             ) ! out
+                        rh                                ) ! out
 
    !----------------------------------------------------------------------------
    ! compute wet aerosol properties
@@ -251,13 +251,13 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    call modal_aero_wateruptake_wetaer( ncol,                    & ! in
                 rhcrystal,      rhdeliques,     dgncur_a,       & ! in
                 dryrad, hygro,  rh,     naer,   dryvol,         & ! in
-                wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat ,lchnk  ) ! out
+                wetrad, wetvol, wtrvol, dgncur_awet,  qaerwat   ) ! out
 
    ! compute wet aerosol density
    if (compute_wetdens) then
         call modal_aero_wateruptake_wetdens( ncol,           & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
-             wetdens     ,lchnk                                    ) ! inout
+             wetdens                                         ) ! inout
    endif
 
    !----------------------------------------------------------------------------
@@ -288,7 +288,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
                                           state_q,  dgncur_a,    & ! in
                                           hygro,        naer,    & ! out
                                 dryrad,   dryvol,     drymass,   & ! out
-                                rhcrystal,rhdeliques, specdens_1, y_lchnk ) ! out
+                                rhcrystal,rhdeliques, specdens_1 ) ! out
 !-----------------------------------------------------------------------
 ! retreive dry aerosol properties
 ! output variables are declared in the module so no output variables in this subroutine
@@ -403,7 +403,7 @@ end subroutine modal_aero_wateruptake_dryaer
 !===============================================================================
 subroutine modal_aero_wateruptake_rh_clearair( ncol,         & ! in
                      temperature,    pmid,   h2ommr,  cldn,  & ! in
-                     rh    ,  y_lchnk                                ) ! out
+                     rh                                      ) ! out
 !-----------------------------------------------------------------------
 ! estimate clear air relative humidity using cloud fraction
 !-----------------------------------------------------------------------
@@ -449,7 +449,7 @@ end subroutine modal_aero_wateruptake_rh_clearair
 subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
              rhcrystal,      rhdeliques,    dgncur_a,     & ! in
              dryrad, hygro,  rh,     naer,  dryvol,       & ! in
-             wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ,  y_lchnk) ! out
+             wetrad, wetvol, wtrvol, dgncur_awet, qaerwat ) ! out
 !-----------------------------------------------------------------------
 !
 ! Purpose: Compute aerosol wet radius and other properties
@@ -494,7 +494,7 @@ subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
             ! compute wet radius for each mode
             call modal_aero_kohler(dryrad(icol,kk,imode),               & ! in
                                 hygro(icol,kk,imode), rh(icol,kk),      & ! in
-                                wetrad(icol,kk,imode)   ,icol,kk,y_lchnk                ) ! out
+                                wetrad(icol,kk,imode)                   ) ! out
 
             wetrad(icol,kk,imode) = max(wetrad(icol,kk,imode), dryrad(icol,kk,imode))
             wetvol(icol,kk,imode) = pi43*wetrad(icol,kk,imode)**3
@@ -531,7 +531,7 @@ end subroutine modal_aero_wateruptake_wetaer
 
 !===============================================================================
 subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
-                              rwet_out   ,y_i,y_k,y_lchnk            ) ! out
+                              rwet_out               ) ! out
 !-----------------------------------------------------------------------
 ! calculates equlibrium radius r of haze droplets as function of
 ! dry particle mass and relative humidity s using kohler solution
@@ -591,9 +591,9 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
 !      approximate solution for small particles
        rwet = rdry * (1._r8 + pp*third/(1._r8-slog*rdry/aa))
    else
-       call makoh_quartic(cx4,p43,p42,p41,p40, yaml)
+       call makoh_quartic(cx4,p43,p42,p41,p40)
 !      find smallest real(r8) solution
-       call find_real_solution( rdry, cx4, rwet,nsol, yaml)
+       call find_real_solution( rdry, cx4, rwet,nsol)
    endif
 
 
@@ -606,7 +606,7 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
 end subroutine modal_aero_kohler
 
 !===============================================================================
-subroutine makoh_quartic( cx, p3, p2, p1, p0,yaml)
+subroutine makoh_quartic( cx, p3, p2, p1, p0)
 !-----------------------------------------------------------------------
 !     solves x**4 + p3 x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2, p3 are real
@@ -664,7 +664,7 @@ end subroutine makoh_quartic
 !===============================================================================
 subroutine find_real_solution(               &
              rdry,   cx,                     & ! in
-             rwet,   nsol      ,yaml              ) ! out
+             rwet,   nsol                    ) ! out
 !----------------------------------------------------------------------
 !  find the smallest real solution from the polynomial solver
 !----------------------------------------------------------------------
@@ -701,7 +701,7 @@ end subroutine find_real_solution
 !===============================================================================
 subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
              wetvol, wtrvol, drymass,      specdens_1,       & ! in
-             wetdens    ,y_lchnk                                     ) ! inout
+             wetdens                                         ) ! inout
 !-----------------------------------------------------------------------
 ! compute aerosol wet density
 !-----------------------------------------------------------------------

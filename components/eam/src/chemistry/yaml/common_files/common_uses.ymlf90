@@ -13,7 +13,7 @@ use spmd_utils,   only : masterproc
 !#define YAML_WETDEP
 
 ! modal_aero_wateruptake.F90
-#define YAML_WUPTAKE
+! #define YAML_WUPTAKE
 
 use yaml_input_file_io
 
