@@ -664,19 +664,25 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10, E17.10)
-11  format(A,E17.10, E17.10)
-12  format(E17.10, A, E17.10)
-13  format(A,E17.10, A, E17.10)
+10  format(E17.10)
+11  format(A, E17.10)
+!12  format(E17.10, A, E17.10)
+!13  format(A,E17.10, A, E17.10)
 
-    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
-
-    write(unit_input,12,advance="no") real(field(1)),' + i ',aimag(field(1))
-
+    ! real part
+    write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
+    write(unit_input,10,advance="no") real(field(1))
     do k = 2, dim
-       write(unit_input,13,advance="no")', ', real(field(k)),' + i ',aimag(field(k))
+       write(unit_input,11,advance="no")', ', real(field(k))
     enddo
+    write(unit_input,'(A)')']'
 
+    ! imaginary part
+    write(unit_input,'(3A)',advance="no")'    imag_',trim(adjustl(fld_name)),': ['
+    write(unit_input,10,advance="no") aimag(field(1))
+    do k = 2, dim
+       write(unit_input,11,advance="no")', ', aimag(field(k))
+    enddo
     write(unit_input,'(A)')']'
 
     call write_1d_output_var_complex(unit_output, fld_name, dim, field, "input")
@@ -751,20 +757,24 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(E17.10,E17.10,A)
-13  format(E17.10,A,E17.10,A)
+12  format(E17.10,A)
 
     object = "output"
     if (present(inp_out_str)) then
        object = trim(adjustl(inp_out_str))
     endif
 
-    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
-
+    ! real part
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.real_',trim(adjustl(fld_name)),'=[['
     do k = 1, dim
-       write(unit_output,13,advance="no"),real(field(k)),' + i ',aimag(field(k)),', '
+       write(unit_output,12,advance="no"),real(field(k)),', '
     enddo
+    write(unit_output,'(A)')'],]'
 
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.imag_',trim(adjustl(fld_name)),'=[['
+    do k = 1, dim
+       write(unit_output,12,advance="no"),aimag(field(k)),', '
+    enddo
     write(unit_output,'(A)')'],]'
 
   end subroutine write_1d_output_var_complex
