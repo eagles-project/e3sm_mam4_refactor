@@ -15,5 +15,8 @@ use spmd_utils,   only : masterproc
 ! modal_aero_wateruptake.F90
 ! #define YAML_WUPTAKE
 
+! module_aero_coag.F90
+!#define YAML_COAG
+
 use yaml_input_file_io
 
