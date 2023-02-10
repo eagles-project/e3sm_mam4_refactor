@@ -1430,7 +1430,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use tracers,            only: tracers_timestep_tend
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o, latvap,latice, rga
-    use aero_model,         only: aero_model_drydep
+    use modal_aero_drydep,  only: aero_model_drydep
     use check_energy,       only: check_energy_chng, check_water, & 
                                   check_prect, check_qflx , &
                                   check_tracers_data, check_tracers_init, &
