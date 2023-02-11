@@ -1,4 +1,5 @@
 module modal_aero_wateruptake
+#include "../yaml/common_files/common_uses.ymlf90"
 
 !   RCE 07.04.13:  Adapted from MIRAGE2 code
 
@@ -319,6 +320,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
    real(r8)     :: maer(pcols,pver)             ! total mass mixing ratio of aerosol species [kg/kg]
    real(r8)     :: vol_tmp                      ! temporary aerosol volume [m3/kg]
    real(r8)     :: raer(pcols,pver)             ! aerosol species mixing ratio [kg/kg]
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_dryaer_beg_yml.f90"
 
    ! initiate variable
    hygro(:,:,:)   = 0._r8 
@@ -394,6 +396,7 @@ subroutine modal_aero_wateruptake_dryaer( ncol,                  & ! in
       enddo ! kk
 
    enddo    ! modes
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_dryaer_end_yml.f90"
 
 end subroutine modal_aero_wateruptake_dryaer
 
@@ -419,6 +422,7 @@ use wv_saturation,    only: qsat_water
    real(r8)  :: es(pcols)               ! saturation vapor pressure [Pa]
    real(r8)  :: qs(pcols)               ! saturation specific humidity [kg/kg]
    real(r8), parameter  :: cldn_thresh = 1.0_r8      ! threshold cloud fraction
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_rh_clearair_beg_yml.f90"
 
    do kk = top_lev, pver
       call qsat_water(temperature(:ncol,kk), pmid(:ncol,kk), es(:ncol), qs(:ncol))
@@ -437,6 +441,7 @@ use wv_saturation,    only: qsat_water
          rh(icol,kk) = max(rh(icol,kk), 0.0_r8)
       enddo ! i = 1, ncol
    enddo ! k = top_lev, pver
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_rh_clearair_end_yml.f90"
 
 end subroutine modal_aero_wateruptake_rh_clearair
 
@@ -475,6 +480,7 @@ subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
    ! local variables
    integer :: icol, kk, imode
    real(r8) :: hystfac                ! working variable for hysteresis
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_wetaer_beg_yml.f90"
 
    !-----------------------------------------------------------------------
    ! loop over all aerosol modes
@@ -519,6 +525,7 @@ subroutine modal_aero_wateruptake_wetaer(   ncol,         & ! in
       enddo     ! levels
 
    enddo ! modes
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_wetaer_end_yml.f90"
 
 end subroutine modal_aero_wateruptake_wetaer
 
@@ -562,6 +569,7 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
    real(r8), parameter :: factor_um2m = 1.e-6_r8  ! convert micron to m
    real(r8), parameter :: factor_m2um = 1.e6_r8   ! convert m to micron
    real(r8), parameter :: rmax = 30._r8           ! upper bound of radius [microns]
+#include "../yaml/modal_aero_wateruptake/f90_yaml/modal_aero_kohler_beg_yml.f90"
 
 !  effect of organics on surface tension is neglected
    aa=2.e4_r8*mw*surften/(ugascon*tair*rhow)
@@ -593,6 +601,7 @@ subroutine modal_aero_kohler( rdry_in, hygro, rh,    & ! in
    rwet = min(rwet, rmax) ! upper bound based on 1 day lifetime
    rwet_out = rwet*factor_um2m
 
+#include "../yaml/modal_aero_wateruptake/f90_yaml/modal_aero_kohler_end_yml.f90"
    return
 end subroutine modal_aero_kohler
 
@@ -607,6 +616,7 @@ subroutine makoh_quartic( cx, p3, p2, p1, p0)
 
    real(r8) :: third, qq, rr    ! temporary variables
    complex(r8) :: cb, cb0, cb1, crad, cy, czero ! temporary variables
+#include "../yaml/modal_aero_wateruptake/f90_yaml/makoh_quartic_beg_yml.f90"
 
    ! set complex zeros and 1/3 values
    czero=cmplx(0.0_r8,0.0_r8,r8)
@@ -646,6 +656,7 @@ subroutine makoh_quartic( cx, p3, p2, p1, p0)
          cx(3) = (-cb+crad)/2._r8
          cx(4) = (-cb-crad)/2._r8
    endif
+#include "../yaml/modal_aero_wateruptake/f90_yaml/makoh_quartic_end_yml.f90"
 
    return
 end subroutine makoh_quartic
@@ -667,6 +678,7 @@ subroutine find_real_solution(               &
    integer  :: n_cx     ! length of cx
    integer  :: nn       ! index of cx
    real(r8) :: xr, xi   ! real and image part of cx
+#include "../yaml/modal_aero_wateruptake/f90_yaml/find_real_solution_beg_yml.f90"
 
    n_cx = size(cx, dim=1)
 
@@ -682,6 +694,7 @@ subroutine find_real_solution(               &
        rwet = xr
        nsol = nn
    enddo
+#include "../yaml/modal_aero_wateruptake/f90_yaml/find_real_solution_end_yml.f90"
 
 end subroutine find_real_solution
 
@@ -700,6 +713,7 @@ subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
    real(r8),intent(inout) :: wetdens(:,:,:)     ! wet aerosol density [kg/m3]
    ! local variables
    integer :: icol, kk, imode
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_wetdens_beg_yml.f90"
 
    ! compute aerosol wet density (kg/m3)
    do imode = 1, nmodes
@@ -717,6 +731,7 @@ subroutine modal_aero_wateruptake_wetdens( ncol,             & ! in
          enddo ! i = 1, ncol
       enddo ! k = top_lev, pver
    enddo ! m = 1, nmodes
+#include "../yaml/modal_aero_wateruptake/f90_yaml/wateruptake_wetdens_end_yml.f90"
 
 end subroutine modal_aero_wateruptake_wetdens
 

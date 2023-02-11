@@ -63,12 +63,14 @@ module yaml_input_file_io
   end interface write_output_var
 
   interface write_1d_var
+     module procedure write_1d_var_complex
      module procedure write_1d_var_real
      module procedure write_1d_var_int
      module procedure write_1d_var_logical
   end interface write_1d_var
 
   interface write_1d_output_var
+     module procedure write_1d_output_var_complex
      module procedure write_1d_output_var_real
      module procedure write_1d_output_var_int
      module procedure write_1d_output_var_logical
@@ -640,6 +642,50 @@ contains
 
   end subroutine write_output_var_real
 
+
+  !================================================================================
+
+  subroutine write_1d_var_complex(unit_input, unit_output, fld_name,dim,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    complex(r8), intent(in)  :: field(:)        ! field values in r8
+
+    integer :: k
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+10  format(E17.10)
+11  format(A, E17.10)
+
+    ! real part
+    write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
+    write(unit_input,10,advance="no") real(field(1))
+    do k = 2, dim
+       write(unit_input,11,advance="no")', ', real(field(k))
+    enddo
+    write(unit_input,'(A)')']'
+
+    ! imaginary part
+    write(unit_input,'(3A)',advance="no")'    imag_',trim(adjustl(fld_name)),': ['
+    write(unit_input,10,advance="no") aimag(field(1))
+    do k = 2, dim
+       write(unit_input,11,advance="no")', ', aimag(field(k))
+    enddo
+    write(unit_input,'(A)')']'
+
+    call write_1d_output_var_complex(unit_output, fld_name, dim, field, "input")
+
+  end subroutine write_1d_var_complex
   !================================================================================
 
   subroutine write_1d_var_real(unit_input, unit_output, fld_name,dim,field)
@@ -677,6 +723,60 @@ contains
     call write_1d_output_var_real(unit_output, fld_name, dim, field, "input")
 
   end subroutine write_1d_var_real
+
+
+  !================================================================================
+
+  subroutine write_1d_output_var_complex(unit_output, fld_name, dim, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    complex(r8), intent(in)  :: field(:)        ! field values in r8
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format,
+    !this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: k
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(E17.10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    ! real part
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.real_',trim(adjustl(fld_name)),'=[['
+    do k = 1, dim
+       write(unit_output,12,advance="no"),real(field(k)),', '
+    enddo
+    write(unit_output,'(A)')'],]'
+
+    ! imaginary part
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.imag_',trim(adjustl(fld_name)),'=[['
+    do k = 1, dim
+       write(unit_output,12,advance="no"),aimag(field(k)),', '
+    enddo
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_1d_output_var_complex
 
   !================================================================================
 
