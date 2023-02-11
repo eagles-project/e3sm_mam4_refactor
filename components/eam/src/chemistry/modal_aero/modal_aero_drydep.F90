@@ -536,12 +536,9 @@ contains
           ! Size-independent thermokinetic properties
 
           vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
-          mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
+              mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
           vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
-
-          slp_crc(ii,kk) = 1.0_r8 + mfp_atm(ii,kk) * &
-                           (1.257_r8+0.4_r8*exp(-1.1_r8*radius_moment(ii,kk)/(mfp_atm(ii,kk)))) / &
-                           radius_moment(ii,kk)   ![frc] Slip correction factor SeP97 p. 464
+              slp_crc(ii,kk) = slip_correction_factor( mfp_atm(ii,kk), radius_moment(ii,kk) ) 
 
           vlc_grv(ii,kk) = (4.0_r8/18.0_r8) * radius_moment(ii,kk)*radius_moment(ii,kk)*density_part(ii,kk)* &
                            gravit*slp_crc(ii,kk) / vsc_dyn_atm(ii,kk) ![m s-1] Stokes' settling velocity SeP97 p. 466
@@ -760,5 +757,19 @@ real(r8) function air_mean_free_path( dyn_visc, pres, temp, rair, pi )
   air_mean_free_path = 2.0_r8*dyn_visc/( pres*sqrt( 8.0_r8/(pi*rair*temp) ) )
 
 end function air_mean_free_path
+
+  !======================================================
+  ! Slip correction factor [unitless], SeP97 p. 464
+  !======================================================
+  real(r8) function slip_correction_factor( mean_free_path, particle_radius ) 
+
+    real(r8),intent(in) :: mean_free_path
+    real(r8),intent(in) :: particle_radius
+
+    slip_correction_factor = 1.0_r8 + mean_free_path * &
+                             ( 1.257_r8+0.4_r8*exp(-1.1_r8*particle_radius/mean_free_path) ) / &
+                             particle_radius
+
+  end function slip_correction_factor
 
 end module modal_aero_drydep
