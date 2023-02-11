@@ -536,8 +536,7 @@ contains
           ! Size-independent thermokinetic properties
 
           vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
-          mfp_atm(ii,kk) = 2.0_r8 * vsc_dyn_atm(ii,kk) / &   ![m] SeP97 p. 455
-                          ( pmid(ii,kk)*sqrt(8.0_r8/(pi*rair*tair(ii,kk))) )
+          mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
           vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
 
           slp_crc(ii,kk) = 1.0_r8 + mfp_atm(ii,kk) * &
@@ -743,8 +742,23 @@ real(r8) function air_dynamic_viscosity( temp )
   real(r8),intent(in) :: temp   ! air temperature [K]
 
   air_dynamic_viscosity = 1.72e-5_r8 * ( (temp/273.0_r8)**1.5_r8) * 393.0_r8 &
-                                        /(temp+120.0_r8)  
+                                        /(temp+120.0_r8)
 
 end function air_dynamic_viscosity
+
+!==========================================================================
+! Calculate mean free path of air, unit [m]. See SeP97 p. 455
+!==========================================================================
+real(r8) function air_mean_free_path( dyn_visc, pres, temp, rair, pi )
+
+  real(r8),intent(in) :: dyn_visc  ! dynamic viscosity of air [kg m-1 s-1]
+  real(r8),intent(in) :: pres      ! air pressure [Pa]
+  real(r8),intent(in) :: temp      ! air temperature [K]
+  real(r8),intent(in) :: rair      ! gas constant of air [J/K/kg]
+  real(r8),intent(in) :: pi        ! constant pi = 3.14159....
+
+  air_mean_free_path = 2.0_r8*dyn_visc/( pres*sqrt( 8.0_r8/(pi*rair*temp) ) )
+
+end function air_mean_free_path
 
 end module modal_aero_drydep
