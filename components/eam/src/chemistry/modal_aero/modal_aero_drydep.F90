@@ -526,19 +526,34 @@ contains
     do kk=1,pver
        do ii=1,ncol
 
+          vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
+              mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
+
+          rho=pmid(ii,kk)/rair/tair(ii,kk)
+          vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
+
+       enddo
+    enddo
+
+
+    do kk=1,pver
+       do ii=1,ncol
+
+          lnsig = log(sig_part(ii,kk))
+          radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+          slp_crc(ii,kk) = slip_correction_factor( mfp_atm(ii,kk), radius_moment(ii,kk) ) 
+       enddo
+    enddo
+
+    do kk=1,pver
+       do ii=1,ncol
+
           lnsig = log(sig_part(ii,kk))
           radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
           dispersion = exp(2._r8*lnsig*lnsig)
-
-          rho=pmid(ii,kk)/rair/tair(ii,kk)
-
-          vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
-              mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
-          vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
-              slp_crc(ii,kk) = slip_correction_factor( mfp_atm(ii,kk), radius_moment(ii,kk) ) 
-              vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
-                                                         gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
-                                                         dispersion )
+          vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
+                                                     gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
+                                                     dispersion )
        enddo
     enddo
 
