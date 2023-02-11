@@ -532,18 +532,13 @@ contains
 
           rho=pmid(ii,kk)/rair/tair(ii,kk)
 
-          ! Quasi-laminar layer resistance: 
-          ! Size-independent thermokinetic properties
-
           vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
               mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
           vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
               slp_crc(ii,kk) = slip_correction_factor( mfp_atm(ii,kk), radius_moment(ii,kk) ) 
-
-          vlc_grv(ii,kk) = (4.0_r8/18.0_r8) * radius_moment(ii,kk)*radius_moment(ii,kk)*density_part(ii,kk)* &
-                           gravit*slp_crc(ii,kk) / vsc_dyn_atm(ii,kk) ![m s-1] Stokes' settling velocity SeP97 p. 466
-          vlc_grv(ii,kk) = vlc_grv(ii,kk) * dispersion
-
+              vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
+                                                         gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
+                                                         dispersion )
        enddo
     enddo
 
@@ -771,5 +766,27 @@ end function air_mean_free_path
                              particle_radius
 
   end function slip_correction_factor
+
+  !=======================================================================================
+  ! gravitational settling velocity [m s-1], Stokes' settling velocity SeP97 p. 466
+  !=======================================================================================
+  real(r8) function gravit_settling_velocity( particle_radius, particle_density, gravit,     &
+                                              slip_correction, dynamic_viscosity, dispersion )
+
+    real(r8),intent(in) :: particle_radius   ! [m]
+    real(r8),intent(in) :: particle_density  ! [kg/m3]
+    real(r8),intent(in) :: gravit            ! [kg/m2/s], gravitational acceleration
+    real(r8),intent(in) :: slip_correction   ! [unitless]
+    real(r8),intent(in) :: dynamic_viscosity ! [kg/m/s], dynamic viscosity of air
+    real(r8),intent(in) :: dispersion        ! accounts for influence of size dist dispersion on bulk settling velocity
+                                             ! assuming particle radius is number mode radius * exp(1.5 ln(sigma)) 
+
+    gravit_settling_velocity = (4.0_r8/18.0_r8) * particle_radius*particle_radius* &
+                               particle_density*gravit*slip_correction&
+                               /dynamic_viscosity
+
+    gravit_settling_velocity = gravit_settling_velocity * dispersion
+
+  end function gravit_settling_velocity
 
 end module modal_aero_drydep
