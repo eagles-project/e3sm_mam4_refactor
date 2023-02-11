@@ -53,7 +53,6 @@ contains
     type(physics_ptend),    intent(out)   :: ptend     ! indivdual parameterization tendencies
     type(physics_buffer_desc),    pointer :: pbuf(:)
 
-  ! local vars
     real(r8), pointer :: landfrac(:) ! land fraction
     real(r8), pointer :: icefrac(:)  ! ice fraction
     real(r8), pointer :: ocnfrac(:)  ! ocean fraction
@@ -64,6 +63,8 @@ contains
     real(r8), pointer :: pmid(:,:)   ! air pressure at layer midpoint [Pa]
     real(r8), pointer :: pint(:,:)   ! air pressure at layer interface [Pa]
     real(r8), pointer :: pdel(:,:)   ! layer thickness [Pa]
+
+  ! local vars
 
     real(r8) :: fv(pcols)            ! for dry dep velocities, from land modified over ocean & ice
     real(r8) :: ram1(pcols)          ! for dry dep velocities, from land modified over ocean & ice
@@ -531,11 +532,10 @@ contains
 
           rho=pmid(ii,kk)/rair/tair(ii,kk)
 
-          ! Quasi-laminar layer resistance: call rss_lmn_get
+          ! Quasi-laminar layer resistance: 
           ! Size-independent thermokinetic properties
 
-          vsc_dyn_atm(ii,kk) = 1.72e-5_r8 * ( (tair(ii,kk)/273.0_r8)**1.5_r8) * 393.0_r8 &
-                                             /(tair(ii,kk)+120.0_r8)  ![kg m-1 s-1] RoY94 p. 102
+          vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
           mfp_atm(ii,kk) = 2.0_r8 * vsc_dyn_atm(ii,kk) / &   ![m] SeP97 p. 455
                           ( pmid(ii,kk)*sqrt(8.0_r8/(pi*rair*tair(ii,kk))) )
           vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
@@ -550,6 +550,8 @@ contains
 
        enddo
     enddo
+
+
     vlc_dry(:ncol,:)=vlc_grv(:ncol,:)
 
     !------------------------------------------------------------------------------------
@@ -732,5 +734,17 @@ contains
      enddo ! loop over grid columns
 
   end subroutine calcram
+
+!==========================================================================
+! Calculate dynamic viscosity of air, unit [kg m-1 s-1]. See RoY94 p. 102
+!==========================================================================
+real(r8) function air_dynamic_viscosity( temp )
+
+  real(r8),intent(in) :: temp   ! air temperature [K]
+
+  air_dynamic_viscosity = 1.72e-5_r8 * ( (temp/273.0_r8)**1.5_r8) * 393.0_r8 &
+                                        /(temp+120.0_r8)  
+
+end function air_dynamic_viscosity
 
 end module modal_aero_drydep
