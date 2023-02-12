@@ -519,27 +519,10 @@ contains
 
     real(r8),parameter :: radiaus_max = 50.0e-6_r8
 
-    !------------------------------------------------------------------------
-    ! Calculate particle velocity of gravitational settling
-    !------------------------------------------------------------------------
-    !Dynamic viscosity of air
-
-    do kk=1,pver
-    do ii=1,ncol
-       vsc_dyn_atm = air_dynamic_viscosity( tair(ii,kk) )
-
-       lnsig = log(sig_part(ii,kk))
-       radius_moment = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
-
-       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
-
-       lnsig = log(sig_part(ii,kk))
-       dispersion = exp(2._r8*lnsig*lnsig)
-       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk), &
-                                                  gravit, slp_crc, vsc_dyn_atm,&
-                                                  dispersion )
-    enddo
-    enddo
+    call  modal_aero_gravit_settling_velocity( moment, ncol, pcols, pver,                       &! in
+                                               gravit, rair, pi, radiaus_max,                   &! in
+                                               tair, pmid, radius_part, density_part, sig_part, &! in
+                                               vlc_grv                                          )! out
 
     vlc_dry(:ncol,:)=vlc_grv(:ncol,:)
 
@@ -733,6 +716,67 @@ contains
      enddo ! loop over grid columns
 
   end subroutine calcram
+
+  !==========================================================================
+  ! Calculate particle velocity of gravitational settling
+  !==========================================================================
+  subroutine modal_aero_gravit_settling_velocity( moment, ncol, pcols, nver,                       &! in
+                                                  gravit, rair, pi, radiaus_max,                   &! in
+                                                  tair, pmid, radius_part, density_part, sig_part, &! in
+                                                  vlc_grv                                          )! out
+
+    ! Arguments
+
+    integer,  intent(in) :: moment       ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
+    integer,  intent(in) :: ncol         ! # of grid columns to do calculations for
+    integer,  intent(in) :: pcols        ! dimension size (# of columns) 
+    integer,  intent(in) :: nver         ! dimension size (# of model layers) 
+
+    real(r8), intent(in) :: gravit            ! gravitational acceleration, [kg/m2/s]
+    real(r8), intent(in) :: rair              ! gas constant of air [J/K/kg]
+    real(r8), intent(in) :: pi                ! constant pi = 3.14159....
+    real(r8), intent(in) :: radiaus_max       ! upper bound of radius used for the calculation of deposition velocity [m]
+
+    real(r8), intent(in) :: tair(pcols,nver)    ! air temperature [K]
+    real(r8), intent(in) :: pmid(pcols,nver)    ! air pressure [Pa]
+
+    real(r8), intent(in) :: radius_part(pcols,nver)    ! mean (volume or number) particle radius [m]
+    real(r8), intent(in) :: density_part(pcols,nver)   ! density of particle material [kg/m3]
+    real(r8), intent(in) :: sig_part(pcols,nver)       ! geometric standard deviation of particle size distribution
+
+    real(r8), intent(out) :: vlc_grv(pcols,nver)    ! gravitational deposition velocity [m/s]
+
+    ! Local Variables
+
+    integer  :: ii, kk        ! grid column and layer indices
+    real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
+    real(r8) :: slp_crc       ! [frc] Slip correction factor
+    real(r8) :: radius_moment ! median radius [m] for moment
+
+    real(r8) :: lnsig         ! ln(sig_part)
+    real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
+                              ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
+
+    !------------------------
+    do kk=1,nver
+    do ii=1,ncol
+
+       vsc_dyn_atm = air_dynamic_viscosity( tair(ii,kk) )
+
+       lnsig = log(sig_part(ii,kk))
+       radius_moment = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+
+       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
+
+       dispersion = exp(2._r8*lnsig*lnsig)
+       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk), &
+                                                  gravit, slp_crc, vsc_dyn_atm,&
+                                                  dispersion )
+    enddo
+    enddo
+    !------------------------
+
+    end subroutine modal_aero_gravit_settling_velocity
 
 !==========================================================================
 ! Calculate dynamic viscosity of air, unit [kg m-1 s-1]. See RoY94 p. 102
