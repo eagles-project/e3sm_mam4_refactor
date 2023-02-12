@@ -466,7 +466,7 @@ contains
     real(r8) :: rho                       ! air density [kg/m**3]
     real(r8) :: vsc_dyn_atm(pcols,pver)   ! [kg m-1 s-1] Dynamic viscosity of air
     real(r8) :: vsc_knm_atm(pcols,pver)   ! [m2 s-1] Kinematic viscosity of atmosphere
-    real(r8) :: mfp_atm(pcols,pver)       ! [m] Mean free path of air
+  ! real(r8) :: mfp_atm(pcols,pver)       ! [m] Mean free path of air
     real(r8) :: slp_crc(pcols,pver)       ! [frc] Slip correction factor
     real(r8) :: radius_moment(pcols,pver) ! median radius [m] for moment
 
@@ -523,40 +523,37 @@ contains
     !------------------------------------------------------------------------
     ! Calculate particle velocity of gravitational settling
     !------------------------------------------------------------------------
+    !Dynamic viscosity of air
+
     do kk=1,pver
-       do ii=1,ncol
-
-          vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
-              mfp_atm(ii,kk) = air_mean_free_path( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi )
-
-          rho=pmid(ii,kk)/rair/tair(ii,kk)
-          vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
-
-       enddo
+    do ii=1,ncol
+       vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
     enddo
-
-
-    do kk=1,pver
-       do ii=1,ncol
-
-          lnsig = log(sig_part(ii,kk))
-          radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
-          slp_crc(ii,kk) = slip_correction_factor( mfp_atm(ii,kk), radius_moment(ii,kk) ) 
-       enddo
     enddo
 
     do kk=1,pver
-       do ii=1,ncol
-
-          lnsig = log(sig_part(ii,kk))
-          radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
-          dispersion = exp(2._r8*lnsig*lnsig)
-          vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
-                                                     gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
-                                                     dispersion )
-       enddo
+    do ii=1,ncol
+       lnsig = log(sig_part(ii,kk))
+       radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+    enddo
     enddo
 
+    do kk=1,pver
+    do ii=1,ncol
+       slp_crc(ii,kk) = slip_correction_factor( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi, &
+                                                radius_moment(ii,kk) ) 
+    enddo
+    enddo
+
+    do kk=1,pver
+    do ii=1,ncol
+       lnsig = log(sig_part(ii,kk))
+       dispersion = exp(2._r8*lnsig*lnsig)
+       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
+                                                  gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
+                                                  dispersion )
+    enddo
+    enddo
 
     vlc_dry(:ncol,:)=vlc_grv(:ncol,:)
 
@@ -565,6 +562,12 @@ contains
     ! This process is assumed to only occur in the lowest model layer.
     !------------------------------------------------------------------------------------
     kk = pver
+
+    do ii=1,ncol
+       rho=pmid(ii,kk)/rair/tair(ii,kk)
+       vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
+    enddo
+
     do ii=1,ncol
 
        dff_aer = boltz * tair(ii,kk) * slp_crc(ii,kk) / &    ![m2 s-1]
@@ -753,28 +756,21 @@ real(r8) function air_dynamic_viscosity( temp )
 
 end function air_dynamic_viscosity
 
-!==========================================================================
-! Calculate mean free path of air, unit [m]. See SeP97 p. 455
-!==========================================================================
-real(r8) function air_mean_free_path( dyn_visc, pres, temp, rair, pi )
-
-  real(r8),intent(in) :: dyn_visc  ! dynamic viscosity of air [kg m-1 s-1]
-  real(r8),intent(in) :: pres      ! air pressure [Pa]
-  real(r8),intent(in) :: temp      ! air temperature [K]
-  real(r8),intent(in) :: rair      ! gas constant of air [J/K/kg]
-  real(r8),intent(in) :: pi        ! constant pi = 3.14159....
-
-  air_mean_free_path = 2.0_r8*dyn_visc/( pres*sqrt( 8.0_r8/(pi*rair*temp) ) )
-
-end function air_mean_free_path
-
   !======================================================
   ! Slip correction factor [unitless], SeP97 p. 464
   !======================================================
-  real(r8) function slip_correction_factor( mean_free_path, particle_radius ) 
+  real(r8) function slip_correction_factor( dyn_visc, pres, temp, rair, pi, particle_radius ) 
 
-    real(r8),intent(in) :: mean_free_path
-    real(r8),intent(in) :: particle_radius
+    real(r8),intent(in) :: dyn_visc         ! dynamic viscosity of air [kg m-1 s-1]
+    real(r8),intent(in) :: pres             ! air pressure [Pa]
+    real(r8),intent(in) :: temp             ! air temperature [K]
+    real(r8),intent(in) :: rair             ! gas constant of air [J/K/kg]
+    real(r8),intent(in) :: pi               ! constant pi = 3.14159....
+    real(r8),intent(in) :: particle_radius  ! particle radius [m]
+
+    real(r8) :: mean_free_path
+
+    mean_free_path = 2.0_r8*dyn_visc/( pres*sqrt( 8.0_r8/(pi*rair*temp) ) )
 
     slip_correction_factor = 1.0_r8 + mean_free_path * &
                              ( 1.257_r8+0.4_r8*exp(-1.1_r8*particle_radius/mean_free_path) ) / &
