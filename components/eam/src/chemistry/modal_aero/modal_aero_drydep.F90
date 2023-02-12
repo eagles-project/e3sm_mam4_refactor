@@ -773,12 +773,12 @@ contains
 
     do ii=1,ncol
 
+       radius_moment = radius_for_moment( moment,sig_part(ii),radius_part(ii),radius_max )
+
        vsc_dyn_atm = air_dynamic_viscosity( tair(ii) )
 
-       rho=pmid(ii)/rair/tair(ii)
-       vsc_knm_atm = vsc_dyn_atm/rho ![m2 s-1] Kinematic viscosity of air
+       vsc_knm_atm = air_kinematic_viscosity( tair(ii), pmid(ii), rair )
 
-       radius_moment = radius_for_moment( moment,sig_part(ii),radius_part(ii),radius_max )
        slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii), tair(ii), rair, pi, radius_moment ) 
 
        dff_aer = boltz * tair(ii) * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius_moment) 
@@ -856,6 +856,25 @@ contains
 
   end function air_dynamic_viscosity
 
+  !==========================================================================
+  ! Calculate kinematic viscosity of air, unit [m2 s-1]
+  !==========================================================================
+  real(r8) function air_kinematic_viscosity( temp, pres, rair )
+
+    real(r8),intent(in) :: temp   ! air temperature [K]
+    real(r8),intent(in) :: pres   ! air pressure [Pa]
+    real(r8),intent(in) :: rair   ! gas constant of air [J/K/kg]
+
+    real(r8) :: vsc_dyn_atm  ! kinematic viscosity of air [m2 s-1]
+    real(r8) :: rho          ! density of air [kg/m3]
+
+    vsc_dyn_atm = air_dynamic_viscosity( temp)
+    rho = pres/rair/temp
+
+    air_kinematic_viscosity = vsc_dyn_atm/rho
+
+  end function air_kinematic_viscosity
+
   !======================================================
   ! Slip correction factor [unitless], SeP97 p. 464
   !======================================================
@@ -868,7 +887,7 @@ contains
     real(r8),intent(in) :: pi               ! constant pi = 3.14159....
     real(r8),intent(in) :: particle_radius  ! particle radius [m]
 
-    real(r8) :: mean_free_path
+    real(r8) :: mean_free_path  ! [m]
 
     mean_free_path = 2.0_r8*dyn_visc/( pres*sqrt( 8.0_r8/(pi*rair*temp) ) )
 
