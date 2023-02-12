@@ -528,25 +528,13 @@ contains
     do kk=1,pver
     do ii=1,ncol
        vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
-    enddo
-    enddo
 
-    do kk=1,pver
-    do ii=1,ncol
        lnsig = log(sig_part(ii,kk))
        radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
-    enddo
-    enddo
 
-    do kk=1,pver
-    do ii=1,ncol
        slp_crc(ii,kk) = slip_correction_factor( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi, &
                                                 radius_moment(ii,kk) ) 
-    enddo
-    enddo
 
-    do kk=1,pver
-    do ii=1,ncol
        lnsig = log(sig_part(ii,kk))
        dispersion = exp(2._r8*lnsig*lnsig)
        vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
@@ -564,8 +552,15 @@ contains
     kk = pver
 
     do ii=1,ncol
+       vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
+
        rho=pmid(ii,kk)/rair/tair(ii,kk)
        vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
+
+       lnsig = log(sig_part(ii,kk))
+       radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+       slp_crc(ii,kk) = slip_correction_factor( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi, &
+                                                radius_moment(ii,kk) ) 
     enddo
 
     do ii=1,ncol
