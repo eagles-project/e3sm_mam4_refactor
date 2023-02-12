@@ -651,9 +651,6 @@ contains
     real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
     real(r8) :: slp_crc       ! [frc] Slip correction factor
     real(r8) :: radius_moment ! median radius [m] for moment
-    real(r8) :: lnsig         ! ln(sig_part)
-    real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
-                              ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
 
     !-----------
     do kk=1,nver
@@ -665,10 +662,8 @@ contains
 
        slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
 
-       lnsig = log(sig_part(ii,kk)) ;  dispersion = exp(2._r8*lnsig*lnsig)
-
        vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk),      &
-                                                  gravit, slp_crc, vsc_dyn_atm, dispersion )
+                                                  gravit, slp_crc, vsc_dyn_atm, sig_part(ii,kk) )
     enddo
     enddo
     !----
@@ -718,7 +713,7 @@ contains
     !------------------------------------------------------------------------
     ! Local Variables
 
-    integer  :: ii                        ! grid column index
+    integer  :: ii            ! grid column index
     real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
     real(r8) :: vsc_knm_atm   ! [m2 s-1] Kinematic viscosity of atmosphere
     real(r8) :: slp_crc       ! [frc] Slip correction factor
@@ -733,9 +728,6 @@ contains
     real(r8) :: impaction     ! collection efficiency for impaction
     real(r8) :: interception  ! collection efficiency for interception
     real(r8) :: stickfrac     ! fraction of particles sticking to surface
-    real(r8) :: lnsig         ! ln(sig_part)
-    real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
-                              ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
 
     integer  :: lt              ! land type index
     real(r8) :: lnd_frc         ! land type fraction [unitless]
@@ -881,7 +873,9 @@ contains
   end function air_kinematic_viscosity
 
   !======================================================
-  ! Slip correction factor [unitless], SeP97 p. 464
+  ! Slip correction factor [unitless]. 
+  ! See, e.g., SeP97 p. 464 and Zhang L. et al. (2001),
+  ! DOI: 10.1016/S1352-2310(00)00326-5, Eq. (3).
   !======================================================
   real(r8) function slip_correction_factor( dyn_visc, pres, temp, rair, pi, particle_radius ) 
 
@@ -927,24 +921,41 @@ contains
   end function schmidt_number
 
   !=======================================================================================
-  ! gravitational settling velocity [m s-1], Stokes' settling velocity SeP97 p. 466
+  ! Calculate the bulk gravitational settling velocity [m/s-1] 
+  !  - using the terminal velocity of sphere falling in a fluid based on Stokes's law and 
+  !  - taking into account the influces of size distribution.
   !=======================================================================================
-  real(r8) function gravit_settling_velocity( particle_radius, particle_density, gravit,     &
-                                              slip_correction, dynamic_viscosity, dispersion )
+  real(r8) function gravit_settling_velocity( particle_radius, particle_density, gravit,       &
+                                              slip_correction, dynamic_viscosity, particle_sig )
 
     real(r8),intent(in) :: particle_radius   ! [m]
     real(r8),intent(in) :: particle_density  ! [kg/m3]
     real(r8),intent(in) :: gravit            ! [kg/m2/s], gravitational acceleration
     real(r8),intent(in) :: slip_correction   ! [unitless]
     real(r8),intent(in) :: dynamic_viscosity ! [kg/m/s], dynamic viscosity of air
-    real(r8),intent(in) :: dispersion        ! accounts for influence of size dist dispersion on bulk settling velocity
-                                             ! assuming particle radius is number mode radius * exp(1.5 ln(sigma)) 
+    real(r8),intent(in) :: particle_sig      ! geometric standard deviation of particle size distribution
+
+    real(r8) :: lnsig         ! ln(particle_sig)
+    real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
+                              ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
+
+    ! Calculate terminal velocity following, e.g., 
+    !  -  Seinfeld and Pandis (1997),  p. 466
+    !  - Zhang L. et al. (2001), DOI: 10.1016/S1352-2310(00)00326-5, Eq. 2.
 
     gravit_settling_velocity = (4.0_r8/18.0_r8) * particle_radius*particle_radius* &
                                particle_density*gravit*slip_correction&
                                /dynamic_viscosity
 
+    ! Account for size distribution (i.e., we are calculating the bulk velocity
+    ! for a particle population instead of a single particle).
+
+    lnsig = log(particle_sig)
+    dispersion = exp(2._r8*lnsig*lnsig)
+
     gravit_settling_velocity = gravit_settling_velocity * dispersion
+
+    !---------
 
   end function gravit_settling_velocity
 
