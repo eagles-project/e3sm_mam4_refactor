@@ -698,7 +698,7 @@ contains
     real(r8), intent(in) :: gravit            ! gravitational acceleration, [kg/m2/s]
     real(r8), intent(in) :: rair              ! gas constant of air [J/K/kg]
     real(r8), intent(in) :: pi                ! constant pi = 3.14159....
-    real(r8), intent(in) :: boltz             ! Boltzmann constant 
+    real(r8), intent(in) :: boltz             ! Boltzman's constant [J/K/molecule] 
     real(r8), intent(in) :: radius_max       ! upper bound of radius used for the calculation of deposition velocity [m]
 
     real(r8), intent(in) :: tair(pcols)    ! air temperature [K]
@@ -719,7 +719,6 @@ contains
     ! Local Variables
 
     integer  :: ii                        ! grid column index
-    real(r8) :: rho                       ! air density [kg/m**3]
     real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
     real(r8) :: vsc_knm_atm   ! [m2 s-1] Kinematic viscosity of atmosphere
     real(r8) :: slp_crc       ! [frc] Slip correction factor
@@ -770,22 +769,27 @@ contains
               -1/
     save iwet
 
-
+    !---------
     do ii=1,ncol
 
-       radius_moment = radius_for_moment( moment,sig_part(ii),radius_part(ii),radius_max )
+       ! Calculate size-INdependent thermokinetic properties of the air
 
        vsc_dyn_atm = air_dynamic_viscosity( tair(ii) )
-
        vsc_knm_atm = air_kinematic_viscosity( tair(ii), pmid(ii), rair )
 
-       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii), tair(ii), rair, pi, radius_moment ) 
+       ! Calculate the mean radius and Schmidt number of the moment
 
-       dff_aer = boltz * tair(ii) * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius_moment) 
-       shm_nbr = vsc_knm_atm / dff_aer ![frc] SeP97 p.972
+       radius_moment = radius_for_moment( moment,sig_part(ii),radius_part(ii),radius_max )
+       shm_nbr = schmidt_number( tair(ii), pmid(ii), radius_moment, rair, pi, boltz, vsc_dyn_atm, vsc_knm_atm )
+
+       ! Initialize deposition velocities averages over different land surface types
 
        vlc_trb_wgtsum = 0._r8
        vlc_dry_wgtsum = 0._r8
+
+       ! Loop over different land surface types. Calculate deposition velocities of 
+       ! those different surface types. The overall deposition velocity of a grid cell 
+       ! is the area-weighted average of those land-type-specific velocities.
 
        do lt = 1,n_land_type
 
@@ -824,6 +828,7 @@ contains
        vlc_dry(ii) = vlc_dry_wgtsum
 
     enddo ! ii=1,ncol
+    !-------
 
   end subroutine modal_aero_turb_drydep_velocity
 
@@ -896,6 +901,30 @@ contains
                              particle_radius
 
   end function slip_correction_factor
+
+  !====================================================================
+  ! Calculate the Schmidt number of air [unitless], see SeP97 p.972
+  !====================================================================
+  real(r8) function schmidt_number( temp, pres, radius, rair, pi, boltz, vsc_dyn_atm, vsc_knm_atm )
+
+    real(r8),intent(in) :: temp             ! air temperature [K]
+    real(r8),intent(in) :: pres             ! air pressure [Pa]
+    real(r8),intent(in) :: radius           ! particle radius [m]
+    real(r8),intent(in) :: rair             ! gas constant of air [J/K/kg]
+    real(r8),intent(in) :: pi               ! constant pi = 3.14159....
+    real(r8),intent(in) :: boltz            ! Boltzman's constant [J/K/molecule] 
+    real(r8),intent(in) :: vsc_dyn_atm      ! dynamic viscosity of air [kg m-1 s-1]
+    real(r8),intent(in) :: vsc_knm_atm      ! kinematic viscosity of air [m2 s-1]
+
+    real(r8) :: slp_crc   ! slip correction factor [unitless]
+    real(r8) :: dff_aer   !
+
+    slp_crc = slip_correction_factor( vsc_dyn_atm, pres, temp, rair, pi, radius )
+    dff_aer = boltz * temp * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius) 
+
+    schmidt_number = vsc_knm_atm / dff_aer
+
+  end function schmidt_number
 
   !=======================================================================================
   ! gravitational settling velocity [m s-1], Stokes' settling velocity SeP97 p. 466
