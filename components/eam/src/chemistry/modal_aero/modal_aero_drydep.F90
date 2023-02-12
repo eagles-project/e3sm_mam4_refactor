@@ -464,11 +464,10 @@ contains
 
     integer  :: ii, kk                    ! grid column and layer indices
     real(r8) :: rho                       ! air density [kg/m**3]
-    real(r8) :: vsc_dyn_atm(pcols,pver)   ! [kg m-1 s-1] Dynamic viscosity of air
-    real(r8) :: vsc_knm_atm(pcols,pver)   ! [m2 s-1] Kinematic viscosity of atmosphere
-  ! real(r8) :: mfp_atm(pcols,pver)       ! [m] Mean free path of air
-    real(r8) :: slp_crc(pcols,pver)       ! [frc] Slip correction factor
-    real(r8) :: radius_moment(pcols,pver) ! median radius [m] for moment
+    real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
+    real(r8) :: vsc_knm_atm   ! [m2 s-1] Kinematic viscosity of atmosphere
+    real(r8) :: slp_crc       ! [frc] Slip correction factor
+    real(r8) :: radius_moment ! median radius [m] for moment
 
     real(r8) :: shm_nbr       ! [frc] Schmidt number
     real(r8) :: stk_nbr       ! [frc] Stokes number
@@ -527,18 +526,17 @@ contains
 
     do kk=1,pver
     do ii=1,ncol
-       vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
+       vsc_dyn_atm = air_dynamic_viscosity( tair(ii,kk) )
 
        lnsig = log(sig_part(ii,kk))
-       radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+       radius_moment = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
 
-       slp_crc(ii,kk) = slip_correction_factor( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi, &
-                                                radius_moment(ii,kk) ) 
+       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
 
        lnsig = log(sig_part(ii,kk))
        dispersion = exp(2._r8*lnsig*lnsig)
-       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment(ii,kk), density_part(ii,kk), &
-                                                  gravit, slp_crc(ii,kk), vsc_dyn_atm(ii,kk),&
+       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk), &
+                                                  gravit, slp_crc, vsc_dyn_atm,&
                                                   dispersion )
     enddo
     enddo
@@ -552,23 +550,20 @@ contains
     kk = pver
 
     do ii=1,ncol
-       vsc_dyn_atm(ii,kk) = air_dynamic_viscosity( tair(ii,kk) )
+       vsc_dyn_atm = air_dynamic_viscosity( tair(ii,kk) )
 
        rho=pmid(ii,kk)/rair/tair(ii,kk)
-       vsc_knm_atm(ii,kk) = vsc_dyn_atm(ii,kk) / rho ![m2 s-1] Kinematic viscosity of air
+       vsc_knm_atm = vsc_dyn_atm/rho ![m2 s-1] Kinematic viscosity of air
 
        lnsig = log(sig_part(ii,kk))
-       radius_moment(ii,kk) = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
-       slp_crc(ii,kk) = slip_correction_factor( vsc_dyn_atm(ii,kk), pmid(ii,kk), tair(ii,kk), rair, pi, &
-                                                radius_moment(ii,kk) ) 
-    enddo
+       radius_moment = min(radiaus_max,radius_part(ii,kk))*exp((float(moment)-1.5_r8)*lnsig*lnsig)
+       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, &
+                                                radius_moment ) 
 
-    do ii=1,ncol
+       dff_aer = boltz * tair(ii,kk) * slp_crc / &     ![m2 s-1]
+                 (6.0_r8*pi*vsc_dyn_atm*radius_moment) !SeP97 p.474
 
-       dff_aer = boltz * tair(ii,kk) * slp_crc(ii,kk) / &    ![m2 s-1]
-                 (6.0_r8*pi*vsc_dyn_atm(ii,kk)*radius_moment(ii,kk)) !SeP97 p.474
-
-       shm_nbr = vsc_knm_atm(ii,kk) / dff_aer                        ![frc] SeP97 p.972
+       shm_nbr = vsc_knm_atm / dff_aer                        ![frc] SeP97 p.972
 
        vlc_trb_wgtsum = 0._r8
        vlc_dry_wgtsum = 0._r8
@@ -582,10 +577,10 @@ contains
 
              if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
                 stk_nbr = vlc_grv(ii,kk) * fv(ii) / (gravit*radius_collector(lt))
-                interception = 2.0_r8*(radius_moment(ii,kk)/radius_collector(lt))**2.0_r8
+                interception = 2.0_r8*(radius_moment/radius_collector(lt))**2.0_r8
 
              else ! non-vegetated surface
-                stk_nbr = vlc_grv(ii,kk) * fv(ii) * fv(ii) / (gravit*vsc_knm_atm(ii,kk))  ![frc] SeP97 p.965
+                stk_nbr = vlc_grv(ii,kk) * fv(ii) * fv(ii) / (gravit*vsc_knm_atm)  ![frc] SeP97 p.965
                 interception = 0.0_r8
              endif
              impaction = (stk_nbr/(alpha(lt)+stk_nbr))**2.0_r8   
