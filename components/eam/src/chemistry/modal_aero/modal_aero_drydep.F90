@@ -62,7 +62,7 @@ contains
     real(r8), pointer :: landfrac(:) ! land fraction [unitless]
     real(r8), pointer :: icefrac(:)  ! ice fraction [unitless]
     real(r8), pointer :: ocnfrac(:)  ! ocean fraction [unitless]
-    real(r8), pointer :: fvin(:)     ! friction velocity [m/s] from land model
+    real(r8), pointer :: fricvelin(:)! friction velocity [m/s] from land model
     real(r8), pointer :: ram1in(:)   ! aerodynamical resistance [s/m] from land model 
 
     real(r8), pointer :: tair(:,:)   ! air temperture [k]
@@ -70,8 +70,8 @@ contains
     real(r8), pointer :: pint(:,:)   ! air pressure at layer interface [Pa]
     real(r8), pointer :: pdel(:,:)   ! layer thickness [Pa]
 
-    real(r8) ::   fv(pcols)          ! friction velocity [m/s] used in the calculaiton of turbulent dry deposition velocity 
-    real(r8) :: ram1(pcols)          ! aerodynamical resistance [s/m] used in the calculaiton of turbulent dry deposition velocity 
+    real(r8) :: fricvel(pcols)     ! friction velocity [m/s] used in the calculaiton of turbulent dry deposition velocity 
+    real(r8) ::    ram1(pcols)     ! aerodynamical resistance [s/m] used in the calculaiton of turbulent dry deposition velocity 
 
     integer :: lchnk   ! chunk identifier
     integer :: ncol    ! number of active atmospheric columns
@@ -109,11 +109,11 @@ contains
     !---------------------------------------------------------------------------
     ! Retrieve input variables; initialize output (i.e., ptend).
     !---------------------------------------------------------------------------
-    landfrac => cam_in%landfrac(:)
-    icefrac  => cam_in%icefrac(:)
-    ocnfrac  => cam_in%ocnfrac(:)
-    fvin     => cam_in%fv(:)
-    ram1in   => cam_in%ram1(:)
+    landfrac  => cam_in%landfrac(:)
+    icefrac   => cam_in%icefrac(:)
+    ocnfrac   => cam_in%ocnfrac(:)
+    fricvelin => cam_in%fv(:)
+    ram1in    => cam_in%ram1(:)
 
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -130,10 +130,10 @@ contains
 
     call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 
-    !---------------------------------------------------------------------------
-    ! For turbulent dry deposition: calculate ram and fv over ocean and sea ice; 
+    !--------------------------------------------------------------------------------
+    ! For turbulent dry deposition: calculate ram and fricvel over ocean and sea ice; 
     ! copy values over land
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------
     call calcram( ncol,         &! in: state%ncol
                   landfrac,     &! in: cam_in%landfrac
                   icefrac,      &! in: cam_in%icefrac
@@ -144,13 +144,13 @@ contains
                   pmid(:,pver), &! in. note: bottom level only
                   pdel(:,pver), &! in. note: bottom level only
                   ram1in,       &! in: cam_in%ram1
-                  fvin,         &! in: cam_in%fv
+                  fricvelin,    &! in: cam_in%fv
                   ram1,         &! out: aerodynamical resistance (s/m)
-                  fv            &! out: friction velocity
+                  fricvel       &! out: bulk friction velocity of a grid cell
                   )
 
-    call outfld( 'airFV', fv(:), pcols, lchnk )
-    call outfld( 'RAM1', ram1(:), pcols, lchnk )
+    call outfld( 'airFV', fricvel(:), pcols, lchnk )
+    call outfld( 'RAM1',     ram1(:), pcols, lchnk )
  
     !======================
     ! cloud-borne aerosols
@@ -167,18 +167,18 @@ contains
     sg_drop(:,:) = 1.46_r8
 
     jvlc = 3 ; imnt = 0  ! cloud-borne aerosol number
-    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv,  &! in
-                                 rad_drop, dens_drop, sg_drop, imnt, &! in
-                                 vlc_dry(:,:,jvlc),                  &! out
-                                 vlc_trb(:,  jvlc),                  &! out
-                                 vlc_grv(:,:,jvlc)                   )! out
+    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel,  &! in
+                                 rad_drop, dens_drop, sg_drop, imnt,      &! in
+                                 vlc_dry(:,:,jvlc),                       &! out
+                                 vlc_trb(:,  jvlc),                       &! out
+                                 vlc_grv(:,:,jvlc)                        )! out
 
     jvlc = 4 ; imnt = 3  ! cloud-borne aerosol volume/mass
-    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv,  &! in
-                                 rad_drop, dens_drop, sg_drop, imnt, &! in
-                                 vlc_dry(:,:,jvlc),                  &! out
-                                 vlc_trb(:,  jvlc),                  &! out
-                                 vlc_grv(:,:,jvlc)                   )! out
+    call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel, &! in
+                                 rad_drop, dens_drop, sg_drop, imnt,     &! in
+                                 vlc_dry(:,:,jvlc),                      &! out
+                                 vlc_trb(:,  jvlc),                      &! out
+                                 vlc_grv(:,:,jvlc)                       )! out
 
     !----------------------------------------------------------------------------------
     ! Loop over all modes and all aerosol tracers (number + mass species).
@@ -230,18 +230,18 @@ contains
          sg_aer(1:ncol,:) = sigmag_amode(imode)
 
        jvlc = 1  ; imnt = 0  ! interstitial aerosol number
-       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv, &! in
-                                    rad_aer, dens_aer, sg_aer, imnt,   &! in
-                                    vlc_dry(:,:,jvlc),                 &! out
-                                    vlc_trb(:,  jvlc),                 &! out
-                                    vlc_grv(:,:,jvlc)                  )! out
+       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel, &! in
+                                    rad_aer, dens_aer, sg_aer, imnt,        &! in
+                                    vlc_dry(:,:,jvlc),                      &! out
+                                    vlc_trb(:,  jvlc),                      &! out
+                                    vlc_grv(:,:,jvlc)                       )! out
 
        jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
-       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv, &! in
-                                    rad_aer, dens_aer, sg_aer, imnt,   &! in
-                                    vlc_dry(:,:,jvlc),                 &! out
-                                    vlc_trb(:,  jvlc),                 &! out
-                                    vlc_grv(:,:,jvlc)                  )! out
+       call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel, &! in
+                                    rad_aer, dens_aer, sg_aer, imnt,        &! in
+                                    vlc_dry(:,:,jvlc),                      &! out
+                                    vlc_trb(:,  jvlc),                      &! out
+                                    vlc_grv(:,:,jvlc)                       )! out
 
        !-----------------------------------------------------------
        ! Loop over number + mass species of the mode. 
@@ -436,7 +436,7 @@ contains
   !  - Calculations for gravitational and turbulent dry deposition separated into 
   !    different subroutines by Hui Wan, 2023.
   !==========================================================================================
-  subroutine modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fv,            &! in
+  subroutine modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel,       &! in
                                      radius_part, density_part, sig_part, moment,  &! in
                                      vlc_dry, vlc_trb, vlc_grv                     )! out
 
@@ -450,7 +450,7 @@ contains
     real(r8), intent(in) :: pmid(pcols,pver)    ! air pressure [Pa]
 
     real(r8), intent(in) :: ram1(pcols)     ! aerodynamical resistance [s/m]
-    real(r8), intent(in) :: fv(pcols)       ! sfc friction velocity from land model [m/s]
+    real(r8), intent(in) :: fricvel(pcols)  ! sfc friction velocity from land model [m/s]
 
     real(r8), intent(in) :: radius_part(pcols,pver)    ! mean (volume or number) particle radius [m]
     real(r8), intent(in) :: density_part(pcols,pver)   ! density of particle material [kg/m3]
@@ -485,7 +485,7 @@ contains
                                           tair(:,pver), pmid(:,pver),                &! in
                                           radius_part(:,pver), density_part(:,pver), &! in
                                           sig_part(:,pver),                          &! in
-                                          fv(:), ram1(:), vlc_grv(:,pver),           &! in
+                                          fricvel(:), ram1(:), vlc_grv(:,pver),      &! in
                                           vlc_trb(:), vlc_dry(:,pver)                )! out
 
   end subroutine modal_aero_depvel_part
@@ -675,40 +675,40 @@ contains
   ! This process is assumed to only occur in the lowest model layer.
   !------------------------------------------------------------------------------------
   subroutine modal_aero_turb_drydep_velocity( moment, ncol, pcols, lchnk,           &! in
-                                              gravit, rair, pi, boltz, radius_max, &! in
+                                              gravit, rair, pi, boltz, radius_max,  &! in
                                               tair, pmid,                           &! in
                                               radius_part, density_part, sig_part,  &! in
-                                              fv, ram1, vlc_grv,                    &! in
+                                              fricvel, ram1, vlc_grv,               &! in
                                               vlc_trb, vlc_dry                      )! out
 
     use mo_drydep,     only: n_land_type, fraction_landuse
 
     implicit none
 
-    integer,  intent(in) :: moment                ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
-    integer,  intent(in) :: ncol
-    integer,  intent(in) :: pcols
-    integer,  intent(in) :: lchnk
+    integer,  intent(in) :: moment           ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
+    integer,  intent(in) :: ncol             ! # of grid columns to do calculations for
+    integer,  intent(in) :: pcols            ! dimension size (# of grid columns)
+    integer,  intent(in) :: lchnk            ! index of grid chunk
 
-    real(r8), intent(in) :: gravit            ! gravitational acceleration, [kg/m2/s]
-    real(r8), intent(in) :: rair              ! gas constant of air [J/K/kg]
-    real(r8), intent(in) :: pi                ! constant pi = 3.14159....
-    real(r8), intent(in) :: boltz             ! Boltzman's constant [J/K/molecule] 
+    real(r8), intent(in) :: gravit           ! gravitational acceleration, [kg/m2/s]
+    real(r8), intent(in) :: rair             ! gas constant of air [J/K/kg]
+    real(r8), intent(in) :: pi               ! constant pi = 3.14159....
+    real(r8), intent(in) :: boltz            ! Boltzman's constant [J/K/molecule] 
     real(r8), intent(in) :: radius_max       ! upper bound of radius used for the calculation of deposition velocity [m]
 
-    real(r8), intent(in) :: tair(pcols)    ! air temperature [K]
-    real(r8), intent(in) :: pmid(pcols)    ! air pressure [Pa]
+    real(r8), intent(in) :: tair(pcols)      ! air temperature [K]
+    real(r8), intent(in) :: pmid(pcols)      ! air pressure [Pa]
 
     real(r8), intent(in) ::  radius_part(pcols)   ! mean (volume or number) particle radius [m]
     real(r8), intent(in) :: density_part(pcols)   ! density of particle material [kg/m3]
     real(r8), intent(in) ::     sig_part(pcols)   ! geometric standard deviation of particle size distribution
 
-    real(r8), intent(in) ::   fv(pcols)    ! friction velocity [m/s]
-    real(r8), intent(in) :: ram1(pcols)    ! aerodynamical resistance [s/m]
+    real(r8), intent(in) :: fricvel(pcols)   ! friction velocity [m/s]
+    real(r8), intent(in) :: ram1(pcols)      ! aerodynamical resistance [s/m]
 
-    real(r8), intent(in)  :: vlc_grv(pcols)    ! gravitational deposition velocity [m/s]
-    real(r8), intent(out) :: vlc_trb(pcols)    ! turbulent dry deposition velocity [m/s]
-    real(r8), intent(out) :: vlc_dry(pcols)    ! total     dry deposition velocity [m/s]
+    real(r8), intent(in)  :: vlc_grv(pcols)  ! gravitational deposition velocity [m/s]
+    real(r8), intent(out) :: vlc_trb(pcols)  ! turbulent dry deposition velocity [m/s]
+    real(r8), intent(out) :: vlc_dry(pcols)  ! total     dry deposition velocity [m/s]
 
     !------------------------------------------------------------------------
     ! Local Variables
@@ -721,7 +721,6 @@ contains
 
     real(r8) :: shm_nbr       ! [frc] Schmidt number
     real(r8) :: stk_nbr       ! [frc] Stokes number
-    real(r8) :: dff_aer       ! [m2 s-1] Brownian diffusivity of particle, see SeP97 p.474
     real(r8) :: rss_trb       ! [s m-1] Resistance to turbulent deposition
     real(r8) :: rss_lmn       ! [s m-1] Quasi-laminar layer resistance
     real(r8) :: brownian      ! collection efficiency for Browning diffusion
@@ -736,6 +735,10 @@ contains
     real(r8) :: vlc_dry_wgtsum  ! total     dry dep. velocity averaged over land types [m/s]
 
     ! constants
+
+    real(r8),parameter :: eps0 = 3.0_r8 ! empirical parameter $\varepsilon_0$ in Eq. (5) of Zhang L. et al. (2001)
+    real(r8),parameter :: beta = 2.0_r8 ! empirical parameter $\beta$ in Eq. (7c) of Zhang L. et al. (2001)
+    real(r8),parameter :: stickfrac_lowerbnd  = 1.0e-10_r8  ! lower bound of stick fraction
 
     real(r8) gamma(11)      ! exponent of schmidt number
     data gamma/0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &        
@@ -788,28 +791,57 @@ contains
           lnd_frc = fraction_landuse(ii,lt,lchnk)
 
           if ( lnd_frc /= 0._r8 ) then
+
+             !----------------------------------------------------------------------
+             ! Collection efficiency of deposition mechanism 1 - Brownian diffusion
+             !----------------------------------------------------------------------
              brownian = shm_nbr**(-gamma(lt))
 
+             !----------------------------------------------------------------------
+             ! Collection efficiency of deposition mechanism 2 - interception 
+             !----------------------------------------------------------------------
              if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
-                stk_nbr = vlc_grv(ii) * fv(ii) / (gravit*radius_collector(lt))
                 interception = 2.0_r8*(radius_moment/radius_collector(lt))**2.0_r8
-
              else ! non-vegetated surface
-                stk_nbr = vlc_grv(ii) * fv(ii) * fv(ii) / (gravit*vsc_knm_atm)  ![frc] SeP97 p.965
                 interception = 0.0_r8
              endif
-             impaction = (stk_nbr/(alpha(lt)+stk_nbr))**2.0_r8   
 
+             !----------------------------------------------------------------------
+             ! Collection efficiency of deposition mechanism 3 - impaction 
+             !----------------------------------------------------------------------
+             if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
+                stk_nbr = vlc_grv(ii) * fricvel(ii) / (gravit*radius_collector(lt))
+             else ! non-vegetated surface
+                stk_nbr = vlc_grv(ii) * fricvel(ii) * fricvel(ii) / (gravit*vsc_knm_atm)  ![frc] SeP97 p.965
+             endif
+
+             impaction = (stk_nbr/(alpha(lt)+stk_nbr))**beta   ! Eq. (7c) of Zhang L. et al.  (2001)
+
+             !-----------------------------------------------------
+             ! Stick fraction, Eq. (10) of Zhang L. et al.  (2001)
+             !-----------------------------------------------------
              if (iwet(lt) > 0) then
                 stickfrac = 1.0_r8
              else
-                stickfrac = exp(-sqrt(stk_nbr))
-                if (stickfrac < 1.0e-10_r8) stickfrac = 1.0e-10_r8
+                stickfrac = max( stickfrac_lowerbnd, exp(-sqrt(stk_nbr)) )
              endif
-             rss_lmn = 1.0_r8 / (3.0_r8 * fv(ii) * stickfrac * (brownian+interception+impaction))
-             rss_trb = ram1(ii) + rss_lmn + ram1(ii)*rss_lmn*vlc_grv(ii)
 
+             !----------------------------------------------------------------------------------
+             ! Using the numbers calculated above, compute the quasi-laminar layer resistance
+             ! following Zhang L. et al. (2001), Eq. (5)
+             !----------------------------------------------------------------------------------
+             rss_lmn = 1.0_r8 / (eps0 * fricvel(ii) * stickfrac * (brownian+interception+impaction))
+
+             !--------------------------------------------------------------------
+             ! Total resistence and deposition velocity of turbulent deposition,
+             ! see Eq. (21) of Zender et al. (2003)
+             !--------------------------------------------------------------------
+             rss_trb = ram1(ii) + rss_lmn + ram1(ii)*rss_lmn*vlc_grv(ii)
              vlc_trb_ontype = 1.0_r8 / rss_trb
+
+             !--------------------------------------------------------------------------------
+             ! Contributions to the single-value bulk deposition velocities of the grid cell
+             !--------------------------------------------------------------------------------
              vlc_trb_wgtsum = vlc_trb_wgtsum + lnd_frc*( vlc_trb_ontype )
              vlc_dry_wgtsum = vlc_dry_wgtsum + lnd_frc*( vlc_trb_ontype + vlc_grv(ii) )
           endif
@@ -911,7 +943,7 @@ contains
     real(r8),intent(in) :: vsc_knm_atm      ! kinematic viscosity of air [m2 s-1]
 
     real(r8) :: slp_crc   ! slip correction factor [unitless]
-    real(r8) :: dff_aer   !
+    real(r8) :: dff_aer   ! Brownian diffusivity of particle [m2/s], see SeP97 p.474
 
     slp_crc = slip_correction_factor( vsc_dyn_atm, pres, temp, rair, pi, radius )
     dff_aer = boltz * temp * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius) 
