@@ -1877,62 +1877,36 @@ do_lphase2_conditional: &
 
    !
    !   compute aerosol concentrations
-   !	aaerosv = particle radius (cm)
-   !	fnumaerosv = fraction of total number in the bin (--)
-   !	fvolaerosv = fraction of total volume in the bin (--)
    !
-   anumsum = 0._r8
-   avolsum = 0._r8
-   do i = 1, na
-      x = xlo + (i-1)*dx
-      a = exp( x )
-      aaerosv(i) = a
-      dum = (x - xg0)/sx
-      ynumaerosv(i) = exp( -0.5_r8*dum*dum )
-      yvolaerosv(i) = ynumaerosv(i)*1.3333_r8*pi*a*a*a
-      anumsum = anumsum + ynumaerosv(i)
-      avolsum = avolsum + yvolaerosv(i)
-   enddo
-
-   do i = 1, na
-      ynumaerosv(i) = ynumaerosv(i)/anumsum
-      yvolaerosv(i) = yvolaerosv(i)/avolsum
-   enddo
-
+   call calc_aer_conc_frac( na, xlo, dx, xg0, sx,      & ! in
+                        aaerosv, ynumaerosv, yvolaerosv) ! out
 
    !
    !   compute scavenging
    !
    scavsumnum = 0._r8
    scavsumvol = 0._r8
-   !
    !   outer loop for rain drop radius
-   !
    jr_loop: do jr = 1, nr
 
+      ! rain droplet radius
       r = rrainsv(jr)
       vfall = vfallrainsv(jr)
 
-      !
       !   inner loop for aerosol particle radius
-      !
       scavsumnumbb = 0._r8
       scavsumvolbb = 0._r8
-
       ja_loop: do ja = 1, na
-
+         ! aerosol particle radius
          a = aaerosv(ja)
-
          call calc_impact_efficiency( a,  r,  temp,     & ! in
                              freepath, rhoaero, rhoair, & ! in
                              vfall, airkinvisc,         & ! in
                              etotal                     ) ! out
 
          rainsweepout = xnumrainsv(jr)*4._r8*pi*r*r*vfall
-
          scavsumnumbb = scavsumnumbb + rainsweepout*etotal*ynumaerosv(ja)
          scavsumvolbb = scavsumvolbb + rainsweepout*etotal*yvolaerosv(ja)
-
       enddo ja_loop
 
       scavsumnum = scavsumnum + scavsumnumbb
@@ -1945,7 +1919,58 @@ do_lphase2_conditional: &
 
    return
  end subroutine calc_1_impact_rate
+ 
+  !=============================================================================
+  subroutine calc_aer_conc_frac( na, xlo, dx, xg0, sx,      & ! in
+                             aaerosv, ynumaerosv, yvolaerosv) ! out
+  !-----------------------------------------------------------------
+  !   compute aerosol concentration, radius and volume in each bin
+  !    aaerosv = particle radius (cm)
+  !    ynumaerosv = fraction of total number in the bin (--)
+  !    yvolaerosv = fraction of total volume in the bin (--)
+  !-----------------------------------------------------------------
   
+   use mo_constants, only: pi  
+
+   integer,  intent(in) :: na           ! number of aerosol bins
+   real(r8), intent(in) :: xlo          ! lower limit of aerosol radius (log)
+   real(r8), intent(in) :: dx           ! aerosol radius bin width (log)
+   real(r8), intent(in) :: xg0          ! log(mean radius)
+   real(r8), intent(in) :: sx           ! standard deviation (log)
+
+   real(r8), intent(out):: aaerosv(:)   ! aerosol radius [cm]
+   real(r8), intent(out):: ynumaerosv(:)! fraction of total number in the bin [fraction]
+   real(r8), intent(out):: yvolaerosv(:)! fraction of total volume in the bin [fraction]
+
+   ! local variables
+   integer  :: ii                       ! index of aerosol bins
+   real(r8) :: xx                       ! aerosol radius in the bin (log)
+   real(r8) :: aa                       ! aerosol radius in the bin [cm]
+   real(r8) :: dum                      ! working variable
+   real(r8) :: anumsum, avolsum         ! total aerosol number and volume
+ 
+   ! calculate total aerosol number and volume
+   anumsum = 0._r8
+   avolsum = 0._r8
+   do ii = 1, na
+      xx = xlo + (ii-1)*dx
+      aa = exp( xx )
+      aaerosv(ii) = aa
+      dum = (xx - xg0)/sx
+      ynumaerosv(ii) = exp( -0.5_r8*dum*dum )
+      yvolaerosv(ii) = ynumaerosv(ii)*1.3333_r8*pi*aa*aa*aa
+      anumsum = anumsum + ynumaerosv(ii)
+      avolsum = avolsum + yvolaerosv(ii)
+   enddo
+
+   ! calculate fraction in each aerosol bin
+   do ii = 1, na
+      ynumaerosv(ii) = ynumaerosv(ii)/anumsum
+      yvolaerosv(ii) = yvolaerosv(ii)/avolsum
+   enddo
+
+  end subroutine calc_aer_conc_frac
+ 
   !=============================================================================
   subroutine calc_impact_efficiency( r_aer,  r_rain,  temp,     & ! in
                                      freepath, rhoaero, rhoair, & ! in
