@@ -2007,8 +2007,6 @@ do_lphase2_conditional: &
   ! calculate aerosol-collection efficiency for a given radius of rain and aerosol particles
   !-----------------------------------------------------------------
  
-   use mo_constants, only: boltz_cgs, pi
- 
       real(r8), intent(in)  :: r_aer         ! aerosol radius [cm]
       real(r8), intent(in)  :: r_rain        ! rain radius [cm]
       real(r8), intent(in)  :: temp          ! temperature [K]
@@ -2022,10 +2020,7 @@ do_lphase2_conditional: &
       ! local variables
       real(r8)  :: chi  ! ratio of aerosol and rain radius [fraction]
       real(r8)  :: dum, sstar   ! working variables [unitless]
-      real(r8)  :: dumfuchs     ! [fraction]
-      real(r8)  :: taurelax     ! relaxation time [s]
-      real(r8)  :: aeromass     ! single-particle aerosol mass [g]
-      real(r8)  :: aerodiffus   ! aerosol diffusivity [cm^2/s]
+      real(r8)  :: taurelax     ! Stokes number relaxation time [s]
       real(r8)  :: schmidt      ! Schmidt number [unitless]
       real(r8)  :: stokes       ! Stokes number [unitless]
       real(r8)  :: reynolds     ! Raynold number [unitless]
@@ -2039,15 +2034,11 @@ do_lphase2_conditional: &
       chi = r_aer/r_rain
 
       ! ---------- calcualte Brown effect ------------
-      dum = freepath/r_aer
-      dumfuchs = 1._r8 + 1.246_r8*dum + 0.42_r8*dum*exp(-0.87_r8/dum)
-      taurelax = 2._r8*rhoaero*r_aer*r_aer*dumfuchs/(9._r8*rhoair*airkinvisc) ! [s]
-
-      aeromass = 4._r8*pi*r_aer*r_aer*r_aer*rhoaero/3._r8 ![g]
-      aerodiffus = boltz_cgs*temp*taurelax/aeromass  ! [cm^2/s]
 
       ! calculate unitless numbers
-      schmidt = airkinvisc/aerodiffus
+      call calc_schmidt_number( freepath, r_aer, temp,        & ! in
+                              rhoaero, rhoair, airkinvisc,    & ! in
+                              schmidt,   taurelax             ) ! out
       stokes = vfall*taurelax/r_rain
       reynolds = r_rain * vfall / airkinvisc
       sqrtreynolds = sqrt( reynolds )
@@ -2072,6 +2063,48 @@ do_lphase2_conditional: &
       etotal = min( etotal, 1.0_r8 )
 
   end subroutine calc_impact_efficiency
+
+  !=============================================================================
+  subroutine calc_schmidt_number( freepath, r_aer, temp,        & ! in
+                                rhoaero, rhoair, airkinvisc,    & ! in
+                                schmidt,   taurelax             ) ! out
+    !-----------------------------------------------------------------
+    ! calculate Schmidt number
+    ! also output relaxation time for Stokes number
+    !
+    ! note that there is a similar calculation of Schmidt number in dry
+    ! depositon (in modal_aero_drydep.F90) but the calculation of dumfuchs (or
+    ! slip_correction_factor) looks differently
+    !-----------------------------------------------------------------
+
+    use mo_constants, only: boltz_cgs, pi
+
+      real(r8), intent(in)  :: freepath      ! molecular freepath [cm]
+      real(r8), intent(in)  :: r_aer         ! aerosol radius [cm]
+      real(r8), intent(in)  :: temp          ! temperature [K]
+      real(r8), intent(in)  :: rhoaero       ! density of aerosol particles [g/cm^3]
+      real(r8), intent(in)  :: rhoair        ! air mass density [g/cm^3]
+      real(r8), intent(in)  :: airkinvisc    ! air kinematic viscosity [cm2/s]
+
+      real(r8), intent(out) :: schmidt       ! Schmidt number [unitless]
+      real(r8), intent(out) :: taurelax      ! relaxation time for Stokes number [s]
+
+      ! local variables
+      real(r8)  :: dum          ! working variables [unitless]
+      real(r8)  :: dumfuchs     ! slip correction factor [unitless]
+      real(r8)  :: aeromass     ! single-particle aerosol mass [g]
+      real(r8)  :: aerodiffus   ! aerosol diffusivity [cm^2/s]
+
+      dum = freepath/r_aer
+      dumfuchs = 1._r8 + 1.246_r8*dum + 0.42_r8*dum*exp(-0.87_r8/dum)
+      taurelax = 2._r8*rhoaero*r_aer*r_aer*dumfuchs/(9._r8*rhoair*airkinvisc)
+
+      aeromass = 4._r8*pi*r_aer*r_aer*r_aer*rhoaero/3._r8 ![g]
+      aerodiffus = boltz_cgs*temp*taurelax/aeromass  ! [cm^2/s]
+
+      schmidt = airkinvisc/aerodiffus
+
+  end subroutine calc_schmidt_number
 
   !=============================================================================
   subroutine qqcw2vmr(lchnk, vmr, mbar, ncol, im, pbuf)
