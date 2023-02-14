@@ -1829,11 +1829,8 @@ do_lphase2_conditional: &
    rhoair = 28.966_r8*cair
    !   molecular freepath [cm]
    freepath = 2.8052e-10_r8/cair
-   !   air dynamic viscosity
-   airdynvisc = 1.8325e-4_r8 * (416.16_r8/(temp+120._r8)) *    &
-        ((temp/296.16_r8)**1.5_r8)
    !   air kinematic viscosity
-   airkinvisc = airdynvisc/rhoair
+   airkinvisc = air_kinematic_viscosity( temp, rhoair )
    !   ratio of water viscosity to air viscosity (from Slinn)
    xmuwaterair = 60.0_r8
 
@@ -2152,5 +2149,39 @@ do_lphase2_conditional: &
     enddo
 
   end subroutine vmr2qqcw
+
+  !=============================================================================
+  real(r8) function air_dynamic_viscosity( temp )
+    !-----------------------------------------------------------------
+    ! Calculate dynamic viscosity of air, unit [g/cm/s]
+    !
+    ! note that this calculation is different with that used in dry deposition
+    ! see the same-name function in modal_aero_drydep.F90 
+    !-----------------------------------------------------------------
+
+    real(r8),intent(in) :: temp   ! air temperature [K]
+
+    air_dynamic_viscosity = 1.8325e-4_r8 * (416.16_r8/(temp+120._r8)) *    &
+                            ((temp/296.16_r8)**1.5_r8)
+
+  end function air_dynamic_viscosity
+
+  !=============================================================================
+  real(r8) function air_kinematic_viscosity( temp, rhoair )
+    !-----------------------------------------------------------------
+    ! Calculate kinematic viscosity of air, unit [cm^2/s]
+    !-----------------------------------------------------------------
+
+    real(r8),intent(in) :: temp     ! air temperature [K]
+    real(r8),intent(in) :: rhoair   ! air density [g/cm2]
+
+    real(r8) :: vsc_dyn_atm  ! dynamic viscosity of air [g/cm/s]
+
+    vsc_dyn_atm = air_dynamic_viscosity( temp)
+    air_kinematic_viscosity = vsc_dyn_atm/rhoair
+
+  end function air_kinematic_viscosity
+
+  !=============================================================================
 
 end module aero_model
