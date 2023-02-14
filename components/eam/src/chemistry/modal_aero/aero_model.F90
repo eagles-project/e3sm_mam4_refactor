@@ -1800,7 +1800,7 @@ do_lphase2_conditional: &
 
    ! this subroutine is calculated for a fix rainrate of 1 mm/hr
    precipmmhr = 1.0_r8
-   precip = precipmmhr/36000._r8        ! mm/hr to cm/s (FORTRAN refactor: Is this unit right?)
+   precip = precipmmhr/36000._r8        ! mm/hr to cm/s
 
    ag0 = dg0/2._r8      ! mean radius of aerosol
    sx = log( sigmag )   ! standard deviation (log-normal distribution)
@@ -1839,41 +1839,9 @@ do_lphase2_conditional: &
 
    !
    !   compute rain drop number concentrations
-   !	rrainsv = raindrop radius (cm)
-   !	xnumrainsv = raindrop number concentration (#/cm^3)
-   !		(number in the bin, not number density)
-   !	vfallrainsv = fall velocity (cm/s)
    !
-   precipsum = 0._r8
-   do i = 1, nr
-      r = rlo + (i-1)*dr
-      rrainsv(i) = r
-      xnumrainsv(i) = exp( -r/2.7e-2_r8 )
-
-      d = 2._r8*r
-      if (d .le. 0.007_r8) then
-         vfallstp = 2.88e5_r8 * d**2._r8
-      elseif (d .le. 0.025_r8) then
-         vfallstp = 2.8008e4_r8 * d**1.528_r8
-      elseif (d .le. 0.1_r8) then
-         vfallstp = 4104.9_r8 * d**1.008_r8
-      elseif (d .le. 0.25_r8) then
-         vfallstp = 1812.1_r8 * d**0.638_r8
-      else
-         vfallstp = 1069.8_r8 * d**0.235_r8
-      endif
-
-      vfall = vfallstp * sqrt(1.204e-3_r8/rhoair)
-      vfallrainsv(i) = vfall
-      precipsum = precipsum + vfall*(r**3)*xnumrainsv(i)
-   enddo
-   precipsum = precipsum*pi*1.333333_r8
-
-   rnumsum = 0._r8
-   do i = 1, nr
-      xnumrainsv(i) = xnumrainsv(i)*(precip/precipsum)
-      rnumsum = rnumsum + xnumrainsv(i)
-   enddo
+   call calc_rain_drop_conc( nr, rlo, dr, rhoair, precip, & ! in
+                         rrainsv, xnumrainsv, vfallrainsv ) ! out
 
    !
    !   compute aerosol concentrations
@@ -1918,8 +1886,69 @@ do_lphase2_conditional: &
    scavratevol = scavsumvol*3600._r8
 
    return
- end subroutine calc_1_impact_rate
+  end subroutine calc_1_impact_rate
  
+  !=============================================================================
+  subroutine calc_rain_drop_conc( nr, rlo, dr, rhoair, precip, & ! in
+                              rrainsv, xnumrainsv, vfallrainsv ) ! out
+   !-----------------------------------------------------------------
+   !   compute rain drop number concentrations
+   !    rrainsv = raindrop radius (cm)
+   !    xnumrainsv = raindrop number concentration (#/cm^3)
+   !            (number in the bin, not number density)
+   !    vfallrainsv = fall velocity (cm/s)
+   !-----------------------------------------------------------------
+   use mo_constants, only: pi
+   
+   integer,  intent(in) :: nr           ! number of rain bins
+   real(r8), intent(in) :: rlo          ! lower limit of rain radius [cm]
+   real(r8), intent(in) :: dr           ! rain radius bin width [cm]
+   real(r8), intent(in) :: rhoair       ! air mass density [g/cm^3]
+   real(r8), intent(in) :: precip       ! precipitation [cm/s] 
+
+   real(r8), intent(out) :: rrainsv(:)  ! rain radius in each bin [cm]
+   real(r8), intent(out) :: xnumrainsv(:)  ! rain number concentration in each bin [#/cm3]
+   real(r8), intent(out) :: vfallrainsv(:) ! rain droplet falling velocity [cm/s]
+
+   ! local variables
+   integer  :: ii                       ! index of cloud bins
+   real(r8) :: precipsum                ! sum of precipitation in all bins
+   real(r8) :: rr                       ! rain radius in the bin [cm]
+   real(r8) :: dd                       ! rain diameter in the bin [cm]
+   real(r8) :: vfall, vfallstp          ! rain droplet falling speed [cm/s]
+
+   precipsum = 0._r8
+   do ii = 1, nr
+      rr = rlo + (ii-1)*dr
+      rrainsv(ii) = rr
+      xnumrainsv(ii) = exp( -rr/2.7e-2_r8 )
+
+      dd = 2._r8*rr
+      if (dd .le. 0.007_r8) then
+         vfallstp = 2.88e5_r8 * dd**2._r8
+      elseif (dd .le. 0.025_r8) then
+         vfallstp = 2.8008e4_r8 * dd**1.528_r8
+      elseif (dd .le. 0.1_r8) then
+         vfallstp = 4104.9_r8 * dd**1.008_r8
+      elseif (dd .le. 0.25_r8) then
+         vfallstp = 1812.1_r8 * dd**0.638_r8
+      else
+         vfallstp = 1069.8_r8 * dd**0.235_r8
+      endif
+
+      vfall = vfallstp * sqrt(1.204e-3_r8/rhoair)
+      vfallrainsv(ii) = vfall
+      precipsum = precipsum + vfall*(rr**3)*xnumrainsv(ii)
+   enddo
+  ! 1.333333 is simplified 4/3 for sphere volume calculation
+   precipsum = precipsum*pi*1.333333_r8
+
+   do ii = 1, nr
+      xnumrainsv(ii) = xnumrainsv(ii)*(precip/precipsum)
+   enddo
+
+  end subroutine calc_rain_drop_conc
+
   !=============================================================================
   subroutine calc_aer_conc_frac( na, xlo, dx, xg0, sx,      & ! in
                              aaerosv, ynumaerosv, yvolaerosv) ! out
@@ -1958,7 +1987,8 @@ do_lphase2_conditional: &
       aaerosv(ii) = aa
       dum = (xx - xg0)/sx
       ynumaerosv(ii) = exp( -0.5_r8*dum*dum )
-      yvolaerosv(ii) = ynumaerosv(ii)*1.3333_r8*pi*aa*aa*aa
+      ! 1.3333 is simplified 4/3 for sphere volume calculation
+      yvolaerosv(ii) = ynumaerosv(ii)*1.3333_r8*pi*aa*aa*aa 
       anumsum = anumsum + ynumaerosv(ii)
       avolsum = avolsum + yvolaerosv(ii)
    enddo
