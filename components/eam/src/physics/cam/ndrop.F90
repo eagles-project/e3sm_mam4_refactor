@@ -504,13 +504,18 @@ subroutine dropmixnuc( &
    do imode = 1, ntot_amode
       mm = mam_idx(imode, 0)
 ! BJG      call rad_cnst_get_mode_num(0, imode, 'a', state, pbuf, raer(mm)%fld)
-      call rad_cnst_get_mode_num(0, imode, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
+! BJG      call rad_cnst_get_mode_num(0, imode, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
+      num_idx = numptrcw_amode(imode)
+      qqcw(mm)%fld => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
       do lspec = 1, nspec_amode(imode)
          mm = mam_idx(imode, lspec)
+         spc_idx = lmassptrcw_amode(lspec,imode)
+         qqcw(mm)%fld => qqcw_get_field(pbuf,spc_idx,lchnk,.true.)
 ! BJG         call rad_cnst_get_aer_mmr(0, imode, lspec, 'a', state, pbuf, raer(mm)%fld)
-         call rad_cnst_get_aer_mmr(0, imode, lspec, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
+! BJG         call rad_cnst_get_aer_mmr(0, imode, lspec, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
       end do
    end do
+
 
 
    !initialize variables to zero
@@ -583,6 +588,8 @@ subroutine dropmixnuc( &
 
       end do
 
+
+
       nsav = 1
       nnew = 2
       do imode = 1, ntot_amode
@@ -593,12 +600,18 @@ subroutine dropmixnuc( &
 ! BJG         raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver) 
          num_idx = numptr_amode(imode)
          raercol(top_lev:pver,mm,nsav) = state_q(icol,top_lev:pver,num_idx)
+!! BJG         num_idx = numptrcw_amode(imode)
+!! BJG         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+!! BJG         raercol_cw(top_lev:pver,mm,nsav) = fldcw(icol,top_lev:pver) 
          do lspec = 1, nspec_amode(imode)
             mm = mam_idx(imode,lspec)
             raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(icol,top_lev:pver)
 ! BJG            raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(icol,top_lev:pver)
             spc_idx=lmassptr_amode(lspec,imode)
             raercol(top_lev:pver,mm,nsav)    = state_q(icol,top_lev:pver,spc_idx)
+!! BJG            spc_idx = lmassptrcw_amode(lspec,imode)
+!! BJG            fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
+!! BJG            raercol_cw(top_lev:pver,mm,nsav) = fldcw(icol,top_lev:pver)
          end do
       end do
 
@@ -1058,14 +1071,21 @@ subroutine dropmixnuc( &
                lptr = mam_cnst_idx(imode,lspec)
 
 ! BJG               raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(icol,top_lev:pver))*dtinv
+               qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
+
                if( lspec.eq.0 ) then
                   num_idx = numptr_amode(imode)
                   raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,num_idx))*dtinv
+!! BJG                  num_idx = numptrcw_amode(imode)
+!! BJG                  fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+!! BJG                  qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - fldcw(icol,top_lev:pver))*dtinv
                else
                   spc_idx=lmassptr_amode(lspec,imode)
                   raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,spc_idx))*dtinv
+!! BJG                  spc_idx = lmassptrcw_amode(lspec,imode)
+!! BJG                  fldcw => qqcw_get_field(pbuf,spc_idx,lchnk,.true.)
+!! BJG                  qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - fldcw(icol,top_lev:pver))*dtinv
                endif
-               qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
 
                coltend(icol,mm)    = sum( pdel(icol,:)*raertend )/gravit
                coltend_cw(icol,mm) = sum( pdel(icol,:)*qqcwtend )/gravit
@@ -1073,7 +1093,9 @@ subroutine dropmixnuc( &
                ptend%q(icol,:,lptr) = 0.0_r8
                ptend%q(icol,top_lev:pver,lptr) = raertend(top_lev:pver)           ! set tendencies for interstitial aerosol
                qqcw(mm)%fld(icol,:) = 0.0_r8
+!! BJG               fldcw(icol,:) = 0.0
                qqcw(mm)%fld(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
+!! BJG               fldcw(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
             end do
          end do
 
@@ -1095,13 +1117,17 @@ subroutine dropmixnuc( &
    do imode=1,ntot_amode
       do kk=top_lev,pver
          do lspec =1, nspec_amode(imode)
-           spc_idx = lmassptrcw_amode(lspec,imode)
-           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
-           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
+!! BJG           spc_idx = lmassptrcw_amode(lspec,imode)
+!! BJG           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
+!! BJG           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
+           mm   = mam_idx(imode,lspec)
+           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
          enddo
-         num_idx = numptrcw_amode(imode)
-         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
-         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
+!! BJG         num_idx = numptrcw_amode(imode)
+!! BJG         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+!! BJG         qcldbrn_num(:,kk,imode) = fldcw(:,kk)
+         mm   = mam_idx(imode,0) 
+         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
       enddo
    enddo
 
