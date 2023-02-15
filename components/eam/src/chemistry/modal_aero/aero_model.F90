@@ -1784,7 +1784,7 @@ do_lphase2_conditional: &
    real(r8) :: cair                     ! air molar density [dyne/cm^2/erg*mol = mol/cm^3]
    real(r8) :: rhoair                   ! air mass density [g/cm^3]
    real(r8) :: rlo, rhi, dr             ! rain droplet bin information [cm]
-   real(r8) :: rainsweepout             ! rain droplet sweep out area [cm3/cm3/s]
+   real(r8) :: rainsweepout             ! rain droplet sweep out volume [cm3/cm3/s]
    real(r8) :: scavsumnum, scavsumnumbb ! scavenging rate of aerosol number, "*bb" is for each rain droplet radius bin [1/s] 
    real(r8) :: scavsumvol, scavsumvolbb ! scavenging rate of aerosol volume, "*bb" is for each rain droplet radius bin [1/s]
    real(r8) :: sx                       ! standard deviation (log-normal distribution)
@@ -2192,7 +2192,7 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
 
     real(r8),intent(in) :: temp     ! air temperature [K]
-    real(r8),intent(in) :: rhoair   ! air density [g/cm2]
+    real(r8),intent(in) :: rhoair   ! air density [g/cm3]
 
     real(r8) :: vsc_dyn_atm  ! dynamic viscosity of air [g/cm/s]
 
