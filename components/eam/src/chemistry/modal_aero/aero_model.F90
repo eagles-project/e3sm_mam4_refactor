@@ -15,6 +15,7 @@ module aero_model
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index, pbuf_set_field
   use phys_control,   only: phys_getopts
   use physconst,      only: gravit, rair, rhoh2o, spec_class_gas
+  use mo_constants,   only: pi
   use spmd_utils,     only: masterproc
 
   use cam_history,    only: outfld, fieldname_len
@@ -671,7 +672,6 @@ contains
     use modal_aero_calcsize,   only: modal_aero_calcsize_sub
     use modal_aero_wateruptake,only: modal_aero_wateruptake_dr
     use modal_aero_convproc,   only: ma_convproc_intr
-    use mo_constants,          only: pi
 
     ! args
     type(physics_state), intent(in)    :: state       ! Physics state variables
@@ -1741,227 +1741,133 @@ do_lphase2_conditional: &
   end subroutine modal_aero_bcscavcoef_get
 
   !===============================================================================
-	subroutine calc_1_impact_rate(             &
-     		dg0, sigmag, rhoaero, temp, press, &
-     		scavratenum, scavratevol, lunerr )
+  subroutine calc_1_impact_rate(                        &
+                     dg0, sigmag, rhoaero, temp, press, & ! in
+                     scavratenum, scavratevol, lunerr   ) ! out
    !
-   !   routine computes a single impaction scavenging rate
-   !	for precipitation rate of 1 mm/h
+   !   this subroutine computes a single impaction scavenging rate
+   !   for precipitation rate of 1 mm/h
    !
-   !   dg0 = geometric mean diameter of aerosol number size distrib. (cm)
-   !   sigmag = geometric standard deviation of size distrib.
-   !   rhoaero = density of aerosol particles (g/cm^3)
-   !   temp = temperature (K)
-   !   press = pressure (dyne/cm^2)
-   !   scavratenum = number scavenging rate (1/h)
-   !   scavratevol = volume or mass scavenging rate (1/h)
-   !   lunerr = logical unit for error message
-   !
-   use mo_constants, only: boltz_cgs, pi, rhowater => rhoh2o_cgs, &
-                           gravity => gravity_cgs, rgas => rgas_cgs
+   !-----------------------------------------------------------------
+   
+   use mo_constants, only: rgas => rgas_cgs
 
    implicit none
 
-   !   subr. parameters
-   integer lunerr
-   real(r8) dg0, sigmag, rhoaero, temp, press, scavratenum, scavratevol
+   !   subroutine parameters
+   real(r8), intent(in)  :: dg0         ! geometric mean diameter of aerosol [cm]
+   real(r8), intent(in)  :: sigmag      ! geometric standard deviation of size distribution
+   real(r8), intent(in)  :: rhoaero     ! aerosol density [g/cm^3]
+   real(r8), intent(in)  :: temp        ! temperature [K]
+   real(r8), intent(in)  :: press       ! pressure [dyne/cm^2]
+   real(r8), intent(out) :: scavratenum, scavratevol  ! scavenging rate for aerosol number and volume [1/hour]
+   integer,  intent(out) :: lunerr      ! logical unit for error message
 
    !   local variables
-   integer nrainsvmax
-   parameter (nrainsvmax=50)
-   real(r8) rrainsv(nrainsvmax), xnumrainsv(nrainsvmax),&
-        vfallrainsv(nrainsvmax)
+   integer, parameter :: nrainsvmax=50  ! maximum bin number for rain
+   real(r8) :: rrainsv(nrainsvmax)      ! rain radius for each bin [cm]
+   real(r8) :: xnumrainsv(nrainsvmax)   ! rain number for each bin [#/cm3]
+   real(r8) :: vfallrainsv(nrainsvmax)  ! rain falling velocity for each bin [cm/s]
 
-   integer naerosvmax
-   parameter (naerosvmax=51)
-   real(r8) aaerosv(naerosvmax), &
-     	ynumaerosv(naerosvmax), yvolaerosv(naerosvmax)
+   integer, parameter :: naerosvmax=51  ! maximum bin number for aerosol
+   real(r8) :: raerosv(naerosvmax)      ! aerosol particle radius in each bin [cm] 
+   real(r8) :: fnumaerosv(naerosvmax)   ! fraction of total number in the bin [fraction]
+   real(r8) :: fvolaerosv(naerosvmax)   ! fraction of total volume in the bin [fraction]
 
-   integer i, ja, jr, na, nr
-   real(r8) a, aerodiffus, aeromass, ag0, airdynvisc, airkinvisc
-   real(r8) anumsum, avolsum, cair, chi
-   real(r8) d, dr, dum, dumfuchs, dx
-   real(r8) ebrown, eimpact, eintercept, etotal, freepath
-   real(r8) precip, precipmmhr, precipsum
-   real(r8) r, rainsweepout, reynolds, rhi, rhoair, rlo, rnumsum
-   real(r8) scavsumnum, scavsumnumbb
-   real(r8) scavsumvol, scavsumvolbb
-   real(r8) schmidt, sqrtreynolds, sstar, stokes, sx              
-   real(r8) taurelax, vfall, vfallstp
-   real(r8) x, xg0, xg3, xhi, xlo, xmuwaterair                     
+   integer  :: ja, jr                   ! index for aerosol and rain
+   integer  :: na, nr                   ! number of aerosol and rain bins
+   real(r8) :: airkinvisc               ! air kinematic viscosity [cm^2/s]
+   real(r8) :: freepath                 ! molecular freepath [cm]
+   real(r8) :: etotal                   ! efficiency of total scavenging effects [fraction]
+   real(r8) :: precip                   ! precipitation rate, fix as 1 mm/hr in this subroutine [cm/s]
+   real(r8) :: r_rain, r_aer            ! rain droplet and aerosol particle radius [cm]
+   real(r8) :: cair                     ! air molar density [dyne/cm^2/erg*mol = mol/cm^3]
+   real(r8) :: rhoair                   ! air mass density [g/cm^3]
+   real(r8) :: rlo, rhi, dr             ! rain droplet bin information [cm]
+   real(r8) :: rainsweepout             ! rain droplet sweep out volume [cm3/cm3/s]
+   real(r8) :: scavsumnum, scavsumnumbb ! scavenging rate of aerosol number, "*bb" is for each rain droplet radius bin [1/s] 
+   real(r8) :: scavsumvol, scavsumvolbb ! scavenging rate of aerosol volume, "*bb" is for each rain droplet radius bin [1/s]
+   real(r8) :: sx                       ! standard deviation (log-normal distribution)
+   real(r8) :: vfall                    ! rain droplet fall speed [cm/s]
+   real(r8) :: ag0, xg0, xg3, xhi, xlo,dx    ! aerosol bin information
+   !-----------------------------------------------------------------
 
-   
+   ! this subroutine is calculated for a fix rainrate of 1 mm/hr
+   precip = 1.0_r8/36000._r8        ! 1 mm/hr in cm/s
+
+   ! set the iteration radius for rain droplet
    rlo = .005_r8
    rhi = .250_r8
    dr = 0.005_r8
    nr = 1 + nint( (rhi-rlo)/dr )
    if (nr .gt. nrainsvmax) then
-      write(lunerr,9110)
+      write(lunerr,*) '*** subr. calc_1_impact_rate -- nr > nrainsvmax'
       call endrun()
    endif
-9110 format( '*** subr. calc_1_impact_rate -- nr > nrainsvmax' )
 
-   precipmmhr = 1.0_r8
-   precip = precipmmhr/36000._r8
+   ! aerosol modal information
+   ag0 = dg0/2._r8      ! mean radius of aerosol
+   sx = log( sigmag )   ! standard deviation (log-normal distribution)
+   xg0 = log( ag0 )     ! log(mean radius) (log-normal distribution)
+   xg3 = xg0 + 3._r8*sx*sx      ! mean + 3*std^2
 
-   ag0 = dg0/2._r8
-   sx = log( sigmag )
-   xg0 = log( ag0 )
-   xg3 = xg0 + 3._r8*sx*sx
-
-   xlo = xg3 - 4._r8*sx
-   xhi = xg3 + 4._r8*sx
-   dx = 0.2_r8*sx
-
+   ! set the iteration radius for aerosol particles
    dx = max( 0.2_r8*sx, 0.01_r8 )
    xlo = xg3 - max( 4._r8*sx, 2._r8*dx )
    xhi = xg3 + max( 4._r8*sx, 2._r8*dx )
-
    na = 1 + nint( (xhi-xlo)/dx )
    if (na .gt. naerosvmax) then
-      write(lunerr,9120)
+      write(lunerr,*) '*** subr. calc_1_impact_rate -- na > naerosvmax'
       call endrun()
    endif
-9120 format( '*** subr. calc_1_impact_rate -- na > naerosvmax' )
 
-   !   air molar density
-   cair = press/(rgas*temp)
-   !   air mass density
+   !   air molar density [dyne/cm^2/erg*mol = mol/cm^3]
+   cair = press/(rgas*temp)   
+   !   air mass density [g/cm^3]
    rhoair = 28.966_r8*cair
-   !   molecular freepath
+   !   molecular freepath [cm]
    freepath = 2.8052e-10_r8/cair
-   !   air dynamic viscosity
-   airdynvisc = 1.8325e-4_r8 * (416.16_r8/(temp+120._r8)) *    &
-        ((temp/296.16_r8)**1.5_r8)
-   !   air kinemaic viscosity
-   airkinvisc = airdynvisc/rhoair
-   !   ratio of water viscosity to air viscosity (from Slinn)
-   xmuwaterair = 60.0_r8
+   !   air kinematic viscosity
+   airkinvisc = air_kinematic_viscosity( temp, rhoair )
 
    !
    !   compute rain drop number concentrations
-   !	rrainsv = raindrop radius (cm)
-   !	xnumrainsv = raindrop number concentration (#/cm^3)
-   !		(number in the bin, not number density)
-   !	vfallrainsv = fall velocity (cm/s)
    !
-   precipsum = 0._r8
-   do i = 1, nr
-      r = rlo + (i-1)*dr
-      rrainsv(i) = r
-      xnumrainsv(i) = exp( -r/2.7e-2_r8 )
-
-      d = 2._r8*r
-      if (d .le. 0.007_r8) then
-         vfallstp = 2.88e5_r8 * d**2._r8
-      elseif (d .le. 0.025_r8) then
-         vfallstp = 2.8008e4_r8 * d**1.528_r8
-      elseif (d .le. 0.1_r8) then
-         vfallstp = 4104.9_r8 * d**1.008_r8
-      elseif (d .le. 0.25_r8) then
-         vfallstp = 1812.1_r8 * d**0.638_r8
-      else
-         vfallstp = 1069.8_r8 * d**0.235_r8
-      endif
-
-      vfall = vfallstp * sqrt(1.204e-3_r8/rhoair)
-      vfallrainsv(i) = vfall
-      precipsum = precipsum + vfall*(r**3)*xnumrainsv(i)
-   enddo
-   precipsum = precipsum*pi*1.333333_r8
-
-   rnumsum = 0._r8
-   do i = 1, nr
-      xnumrainsv(i) = xnumrainsv(i)*(precip/precipsum)
-      rnumsum = rnumsum + xnumrainsv(i)
-   enddo
+   call calc_rain_drop_conc( nr, rlo, dr, rhoair, precip, & ! in
+                         rrainsv, xnumrainsv, vfallrainsv ) ! out
 
    !
    !   compute aerosol concentrations
-   !	aaerosv = particle radius (cm)
-   !	fnumaerosv = fraction of total number in the bin (--)
-   !	fvolaerosv = fraction of total volume in the bin (--)
    !
-   anumsum = 0._r8
-   avolsum = 0._r8
-   do i = 1, na
-      x = xlo + (i-1)*dx
-      a = exp( x )
-      aaerosv(i) = a
-      dum = (x - xg0)/sx
-      ynumaerosv(i) = exp( -0.5_r8*dum*dum )
-      yvolaerosv(i) = ynumaerosv(i)*1.3333_r8*pi*a*a*a
-      anumsum = anumsum + ynumaerosv(i)
-      avolsum = avolsum + yvolaerosv(i)
-   enddo
-
-   do i = 1, na
-      ynumaerosv(i) = ynumaerosv(i)/anumsum
-      yvolaerosv(i) = yvolaerosv(i)/avolsum
-   enddo
-
+   call calc_aer_conc_frac( na, xlo, dx, xg0, sx,      & ! in
+                        raerosv, fnumaerosv, fvolaerosv) ! out
 
    !
    !   compute scavenging
    !
    scavsumnum = 0._r8
    scavsumvol = 0._r8
-   !
    !   outer loop for rain drop radius
-   !
    jr_loop: do jr = 1, nr
 
-      r = rrainsv(jr)
+      ! rain droplet radius
+      r_rain = rrainsv(jr)
       vfall = vfallrainsv(jr)
 
-      reynolds = r * vfall / airkinvisc
-      sqrtreynolds = sqrt( reynolds )
-
-      !
       !   inner loop for aerosol particle radius
-      !
       scavsumnumbb = 0._r8
       scavsumvolbb = 0._r8
-
       ja_loop: do ja = 1, na
+         ! aerosol particle radius
+         r_aer = raerosv(ja)
+         call calc_impact_efficiency( r_aer, r_rain, temp,  & ! in
+                                 freepath, rhoaero, rhoair, & ! in
+                                 vfall, airkinvisc,         & ! in
+                                 etotal                     ) ! out
 
-         a = aaerosv(ja)
-
-         chi = a/r
-
-         dum = freepath/a
-         dumfuchs = 1._r8 + 1.246_r8*dum + 0.42_r8*dum*exp(-0.87_r8/dum)
-         taurelax = 2._r8*rhoaero*a*a*dumfuchs/(9._r8*rhoair*airkinvisc)
-
-         aeromass = 4._r8*pi*a*a*a*rhoaero/3._r8
-         aerodiffus = boltz_cgs*temp*taurelax/aeromass
-
-         schmidt = airkinvisc/aerodiffus
-         stokes = vfall*taurelax/r
-
-         ebrown = 4._r8*(1._r8 + 0.4_r8*sqrtreynolds*(schmidt**0.3333333_r8)) /  &
-              (reynolds*schmidt)
-
-         dum = (1._r8 + 2._r8*xmuwaterair*chi) /         &
-              (1._r8 + xmuwaterair/sqrtreynolds)
-         eintercept = 4._r8*chi*(chi + dum)
-
-         dum = log( 1._r8 + reynolds )
-         sstar = (1.2_r8 + dum/12._r8) / (1._r8 + dum)
-         eimpact = 0._r8
-         if (stokes .gt. sstar) then
-	    dum = stokes - sstar
-	    eimpact = (dum/(dum+0.6666667_r8)) ** 1.5_r8
-         endif
-
-         etotal = ebrown + eintercept + eimpact
-         etotal = min( etotal, 1.0_r8 )
-
-         rainsweepout = xnumrainsv(jr)*4._r8*pi*r*r*vfall
-
-         scavsumnumbb = scavsumnumbb + rainsweepout*etotal*ynumaerosv(ja)
-         scavsumvolbb = scavsumvolbb + rainsweepout*etotal*yvolaerosv(ja)
-
+         rainsweepout = xnumrainsv(jr)*4._r8*pi*r_rain*r_rain*vfall
+         scavsumnumbb = scavsumnumbb + rainsweepout*etotal*fnumaerosv(ja)
+         scavsumvolbb = scavsumvolbb + rainsweepout*etotal*fvolaerosv(ja)
       enddo ja_loop
 
       scavsumnum = scavsumnum + scavsumnumbb
@@ -1973,9 +1879,219 @@ do_lphase2_conditional: &
    scavratevol = scavsumvol*3600._r8
 
    return
- end subroutine calc_1_impact_rate
-  
+  end subroutine calc_1_impact_rate
+ 
   !=============================================================================
+  subroutine calc_rain_drop_conc( nr, rlo, dr, rhoair, precip, & ! in
+                              rrainsv, xnumrainsv, vfallrainsv ) ! out
+   !-----------------------------------------------------------------
+   !   compute rain drop number concentrations, radius and falling velocity
+   !-----------------------------------------------------------------
+   
+   integer,  intent(in) :: nr           ! number of rain bins
+   real(r8), intent(in) :: rlo          ! lower limit of rain radius [cm]
+   real(r8), intent(in) :: dr           ! rain radius bin width [cm]
+   real(r8), intent(in) :: rhoair       ! air mass density [g/cm^3]
+   real(r8), intent(in) :: precip       ! precipitation [cm/s] 
+
+   real(r8), intent(out) :: rrainsv(:)  ! rain radius in each bin [cm]
+   real(r8), intent(out) :: xnumrainsv(:)  ! rain number concentration in each bin [#/cm3]
+   real(r8), intent(out) :: vfallrainsv(:) ! rain droplet falling velocity [cm/s]
+
+   ! local variables
+   integer  :: ii                       ! index of cloud bins
+   real(r8) :: precipsum                ! sum of precipitation in all bins
+   real(r8) :: rr                       ! rain radius in the bin [cm]
+   real(r8) :: dd                       ! rain diameter in the bin [cm]
+   real(r8) :: vfall, vfallstp          ! rain droplet falling speed [cm/s]
+
+   precipsum = 0._r8
+   do ii = 1, nr
+      rr = rlo + (ii-1)*dr
+      rrainsv(ii) = rr
+      xnumrainsv(ii) = exp( -rr/2.7e-2_r8 )
+
+      dd = 2._r8*rr
+      if (dd .le. 0.007_r8) then
+         vfallstp = 2.88e5_r8 * dd**2._r8
+      elseif (dd .le. 0.025_r8) then
+         vfallstp = 2.8008e4_r8 * dd**1.528_r8
+      elseif (dd .le. 0.1_r8) then
+         vfallstp = 4104.9_r8 * dd**1.008_r8
+      elseif (dd .le. 0.25_r8) then
+         vfallstp = 1812.1_r8 * dd**0.638_r8
+      else
+         vfallstp = 1069.8_r8 * dd**0.235_r8
+      endif
+
+      vfall = vfallstp * sqrt(1.204e-3_r8/rhoair)
+      vfallrainsv(ii) = vfall
+      precipsum = precipsum + vfall*(rr**3)*xnumrainsv(ii)
+   enddo
+  ! 1.333333 is simplified 4/3 for sphere volume calculation
+   precipsum = precipsum*pi*1.333333_r8
+
+   do ii = 1, nr
+      xnumrainsv(ii) = xnumrainsv(ii)*(precip/precipsum)
+   enddo
+
+  end subroutine calc_rain_drop_conc
+
+  !=============================================================================
+  subroutine calc_aer_conc_frac( na, xlo, dx, xg0, sx,      & ! in
+                             raerosv, fnumaerosv, fvolaerosv) ! out
+  !-----------------------------------------------------------------
+  !   compute aerosol concentration, radius and volume in each bin
+  !-----------------------------------------------------------------
+  
+   integer,  intent(in) :: na           ! number of aerosol bins
+   real(r8), intent(in) :: xlo          ! lower limit of aerosol radius (log)
+   real(r8), intent(in) :: dx           ! aerosol radius bin width (log)
+   real(r8), intent(in) :: xg0          ! log(mean radius)
+   real(r8), intent(in) :: sx           ! standard deviation (log)
+
+   real(r8), intent(out):: raerosv(:)   ! aerosol radius [cm]
+   real(r8), intent(out):: fnumaerosv(:)! fraction of total number in the bin [fraction]
+   real(r8), intent(out):: fvolaerosv(:)! fraction of total volume in the bin [fraction]
+
+   ! local variables
+   integer  :: ii                       ! index of aerosol bins
+   real(r8) :: xx                       ! aerosol radius in the bin (log)
+   real(r8) :: aa                       ! aerosol radius in the bin [cm]
+   real(r8) :: dum                      ! working variable
+   real(r8) :: anumsum, avolsum         ! total aerosol number and volume
+ 
+   ! calculate total aerosol number and volume
+   anumsum = 0._r8
+   avolsum = 0._r8
+   do ii = 1, na
+      xx = xlo + (ii-1)*dx
+      aa = exp( xx )
+      raerosv(ii) = aa
+      dum = (xx - xg0)/sx
+      fnumaerosv(ii) = exp( -0.5_r8*dum*dum )
+      ! 1.3333 is simplified 4/3 for sphere volume calculation
+      fvolaerosv(ii) = fnumaerosv(ii)*1.3333_r8*pi*aa*aa*aa 
+      anumsum = anumsum + fnumaerosv(ii)
+      avolsum = avolsum + fvolaerosv(ii)
+   enddo
+
+   ! calculate fraction in each aerosol bin
+   do ii = 1, na
+      fnumaerosv(ii) = fnumaerosv(ii)/anumsum
+      fvolaerosv(ii) = fvolaerosv(ii)/avolsum
+   enddo
+
+  end subroutine calc_aer_conc_frac
+ 
+  !=============================================================================
+  subroutine calc_impact_efficiency( r_aer,  r_rain,  temp,     & ! in
+                                     freepath, rhoaero, rhoair, & ! in
+                                     vfall, airkinvisc,         & ! in
+                                     etotal                     ) ! out
+  !-----------------------------------------------------------------
+  ! calculate aerosol-collection efficiency for a given radius of rain and aerosol particles
+  !-----------------------------------------------------------------
+ 
+      real(r8), intent(in)  :: r_aer         ! aerosol radius [cm]
+      real(r8), intent(in)  :: r_rain        ! rain radius [cm]
+      real(r8), intent(in)  :: temp          ! temperature [K]
+      real(r8), intent(in)  :: freepath      ! molecular freepath [cm]
+      real(r8), intent(in)  :: rhoaero       ! density of aerosol particles [g/cm^3]
+      real(r8), intent(in)  :: rhoair        ! air mass density [g/cm^3]
+      real(r8), intent(in)  :: airkinvisc    ! air kinematic viscosity [cm^2/s]
+      real(r8), intent(in)  :: vfall         ! rain droplet falling speed [cm/s]
+      real(r8), intent(out) :: etotal        ! efficiency of total effects [fraction]
+
+      ! local variables
+      real(r8)  :: chi  ! ratio of aerosol and rain radius [fraction]
+      real(r8)  :: dum, sstar   ! working variables [unitless]
+      real(r8)  :: taurelax     ! Stokes number relaxation time [s]
+      real(r8)  :: schmidt      ! Schmidt number [unitless]
+      real(r8)  :: stokes       ! Stokes number [unitless]
+      real(r8)  :: reynolds     ! Raynold number [unitless]
+      real(r8)  :: sqrtreynolds ! sqrt of Raynold number [unitless]
+      real(r8)  :: ebrown, eintercept, eimpact ! efficiency of aerosol-collection in different processes
+
+      ! ratio of water viscosity to air viscosity (from Slinn)
+      real(r8), parameter ::  xmuwaterair = 60.0_r8 ! [fraction]
+
+
+      chi = r_aer/r_rain
+
+      ! ---------- calcualte Brown effect ------------
+
+      ! calculate unitless numbers
+      call calc_schmidt_number( freepath, r_aer, temp,        & ! in
+                              rhoaero, rhoair, airkinvisc,    & ! in
+                              schmidt,   taurelax             ) ! out
+      stokes = vfall*taurelax/r_rain
+      reynolds = r_rain * vfall / airkinvisc
+      sqrtreynolds = sqrt( reynolds )
+
+      ebrown = 4._r8*(1._r8 + 0.4_r8*sqrtreynolds*(schmidt**0.3333333_r8)) / (reynolds*schmidt)
+
+      ! ------------ calculate intercept effect ------------
+      dum = (1._r8 + 2._r8*xmuwaterair*chi) / (1._r8 + xmuwaterair/sqrtreynolds)
+      eintercept = 4._r8*chi*(chi + dum)
+
+      ! ------------ calculate impact effect ------------
+      dum = log( 1._r8 + reynolds )
+      sstar = (1.2_r8 + dum/12._r8) / (1._r8 + dum)
+      eimpact = 0._r8
+      if (stokes > sstar) then
+            dum = stokes - sstar
+            eimpact = (dum/(dum+0.6666667_r8)) ** 1.5_r8
+      endif
+
+      ! ------------ calculate total effects ------------
+      etotal = ebrown + eintercept + eimpact
+      etotal = min( etotal, 1.0_r8 )
+
+  end subroutine calc_impact_efficiency
+
+  !=============================================================================
+  subroutine calc_schmidt_number( freepath, r_aer, temp,        & ! in
+                                rhoaero, rhoair, airkinvisc,    & ! in
+                                schmidt,   taurelax             ) ! out
+    !-----------------------------------------------------------------
+    ! calculate Schmidt number
+    ! also output relaxation time for Stokes number
+    !
+    ! note that there is a similar calculation of Schmidt number in dry
+    ! depositon (in modal_aero_drydep.F90) but the calculation of dumfuchs (or
+    ! slip_correction_factor) looks differently
+    !-----------------------------------------------------------------
+
+    use mo_constants, only: boltz_cgs
+
+      real(r8), intent(in)  :: freepath      ! molecular freepath [cm]
+      real(r8), intent(in)  :: r_aer         ! aerosol radius [cm]
+      real(r8), intent(in)  :: temp          ! temperature [K]
+      real(r8), intent(in)  :: rhoaero       ! density of aerosol particles [g/cm^3]
+      real(r8), intent(in)  :: rhoair        ! air mass density [g/cm^3]
+      real(r8), intent(in)  :: airkinvisc    ! air kinematic viscosity [cm2/s]
+
+      real(r8), intent(out) :: schmidt       ! Schmidt number [unitless]
+      real(r8), intent(out) :: taurelax      ! relaxation time for Stokes number [s]
+
+      ! local variables
+      real(r8)  :: dum          ! working variables [unitless]
+      real(r8)  :: dumfuchs     ! slip correction factor [unitless]
+      real(r8)  :: aeromass     ! single-particle aerosol mass [g]
+      real(r8)  :: aerodiffus   ! aerosol diffusivity [cm^2/s]
+
+      dum = freepath/r_aer
+      dumfuchs = 1._r8 + 1.246_r8*dum + 0.42_r8*dum*exp(-0.87_r8/dum)
+      taurelax = 2._r8*rhoaero*r_aer*r_aer*dumfuchs/(9._r8*rhoair*airkinvisc)
+
+      aeromass = 4._r8*pi*r_aer*r_aer*r_aer*rhoaero/3._r8 ![g]
+      aerodiffus = boltz_cgs*temp*taurelax/aeromass  ! [cm^2/s]
+
+      schmidt = airkinvisc/aerodiffus
+
+  end subroutine calc_schmidt_number
+
   !=============================================================================
   subroutine qqcw2vmr(lchnk, vmr, mbar, ncol, im, pbuf)
     use modal_aero_data, only : qqcw_get_field
@@ -2052,5 +2168,39 @@ do_lphase2_conditional: &
     enddo
 
   end subroutine vmr2qqcw
+
+  !=============================================================================
+  real(r8) function air_dynamic_viscosity( temp )
+    !-----------------------------------------------------------------
+    ! Calculate dynamic viscosity of air, unit [g/cm/s]
+    !
+    ! note that this calculation is different with that used in dry deposition
+    ! see the same-name function in modal_aero_drydep.F90 
+    !-----------------------------------------------------------------
+
+    real(r8),intent(in) :: temp   ! air temperature [K]
+
+    air_dynamic_viscosity = 1.8325e-4_r8 * (416.16_r8/(temp+120._r8)) *    &
+                            ((temp/296.16_r8)**1.5_r8)
+
+  end function air_dynamic_viscosity
+
+  !=============================================================================
+  real(r8) function air_kinematic_viscosity( temp, rhoair )
+    !-----------------------------------------------------------------
+    ! Calculate kinematic viscosity of air, unit [cm^2/s]
+    !-----------------------------------------------------------------
+
+    real(r8),intent(in) :: temp     ! air temperature [K]
+    real(r8),intent(in) :: rhoair   ! air density [g/cm3]
+
+    real(r8) :: vsc_dyn_atm  ! dynamic viscosity of air [g/cm/s]
+
+    vsc_dyn_atm = air_dynamic_viscosity( temp)
+    air_kinematic_viscosity = vsc_dyn_atm/rhoair
+
+  end function air_kinematic_viscosity
+
+  !=============================================================================
 
 end module aero_model
