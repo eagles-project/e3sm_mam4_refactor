@@ -1607,10 +1607,10 @@ do_lphase2_conditional: &
     real(r8), parameter :: temp_0C = 273.16_r8        ! K
     real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
 
-    real(r8) :: dg0, dg0_cgs, press, &
-         rhodryaero, rhowetaero, rhowetaero_cgs, rmserr, &
+    real(r8) :: dg0, dg0_cgs, &
+         rhodryaero, rhowetaero, rhowetaero_cgs, &
          scavratenum, scavratevol, sigmag,                &
-         temp, wetdiaratio, wetvolratio
+         wetdiaratio, wetvolratio
     
     lunerr = 6
 
@@ -1630,9 +1630,17 @@ do_lphase2_conditional: &
           rhowetaero = 1.0_r8 + (rhodryaero-1.0_r8)/wetvolratio
           rhowetaero = min( rhowetaero, rhodryaero )
 
-          !   compute impaction scavenging rates at 1 temp-press pair and save
+! FIXME: not sure why wet aerosol density is set as dry aerosol density here
+! but the above calculation of rhowetaero is incorrect. 
+! I think the number 1.0_r8 should be 1000._r8 as the unit is kg/m3
+! the above calculation gives wet aerosol density very small number (a few kg/m3)
+! this may cause some problem. I guess this is the reason of using dry density.
+! should be better if fix the wet density bug and use it. Keep it for now for BFB testing
+! -- (commented by Shuaiqi Tang when refactoring for MAM4xx)
           rhowetaero = rhodryaero
 
+          ! compute impaction scavenging rates at 1 temp-press pair and save
+          ! note that the subroutine calc_1_impact_rate uses CGS units
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
           call calc_1_impact_rate( &
