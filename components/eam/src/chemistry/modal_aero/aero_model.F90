@@ -1658,7 +1658,8 @@ do_lphase2_conditional: &
   end subroutine modal_aero_bcscavcoef_init
 
   !===============================================================================
-  subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, scavcoefnum, scavcoefvol )
+  subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, & ! in
+                                        scavcoefnum, scavcoefvol  ) ! out
     !-----------------------------------------------------------------------
     ! compute impaction scavenging removal amount for aerosol volume and number
     !-----------------------------------------------------------------------
@@ -1674,8 +1675,10 @@ do_lphase2_conditional: &
     real(r8), intent(out):: scavcoefvol(pcols,pver)     ! scavenging removal for aerosol volume [1/h]
 
     ! local variables
-    integer :: i, k, jgrow      ! index
-    real(r8) dumdgratio, xgrow, dumfhi, dumflo, scavimpvol, scavimpnum
+    integer  :: i, k, jgrow      ! index
+    real(r8) :: wetdiaratio     ! ratio of wet and dry aerosol diameter [fraction]
+    real(r8) :: xgrow, dumfhi, dumflo   ! working variables
+    real(r8) :: scavimpvol, scavimpnum  ! log of scavenging rates for volume and number
 
 
     do k = 1, pver
@@ -1685,15 +1688,16 @@ do_lphase2_conditional: &
           if ( isprx(i,k) ) then
              
              ! interpolate table values using log of (actual-wet-size)/(base-dry-size)
-             dumdgratio = dgn_awet(i,k,m)/dgnum_amode(m)
+             wetdiaratio = dgn_awet(i,k,m)/dgnum_amode(m)
 
-             if ((dumdgratio .ge. 0.99_r8) .and. (dumdgratio .le. 1.01_r8)) then
+             if ((wetdiaratio .ge. 0.99_r8) .and. (wetdiaratio .le. 1.01_r8)) then
                 scavimpvol = scavimptblvol(0,m)
                 scavimpnum = scavimptblnum(0,m)
              else
-                xgrow = log( dumdgratio ) / dlndg_nimptblgrow
+                xgrow = log( wetdiaratio ) / dlndg_nimptblgrow
                 jgrow = int( xgrow )
                 if (xgrow .lt. 0._r8) jgrow = jgrow - 1
+
                 if (jgrow .lt. nimptblgrow_mind) then
                    jgrow = nimptblgrow_mind
                    xgrow = jgrow
@@ -1703,7 +1707,6 @@ do_lphase2_conditional: &
 
                 dumfhi = xgrow - jgrow
                 dumflo = 1._r8 - dumfhi
-
                 scavimpvol = dumflo*scavimptblvol(jgrow,m) + &
                      dumfhi*scavimptblvol(jgrow+1,m)
                 scavimpnum = dumflo*scavimptblnum(jgrow,m) + &
