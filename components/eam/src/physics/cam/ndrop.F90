@@ -325,7 +325,7 @@ subroutine dropmixnuc( &
 
    real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8  ! min, max vertical diffusivity [m^2/s]
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
-   real(r8) :: sq2pi
+
    real(r8) :: arg        ! argument for erf test [dimensionless]
    real(r8) :: dtinv      ! inverse time step for microphysics [s^-1]
    real(r8) :: dtmin      ! time step to determine subloop time step [s]
@@ -426,10 +426,9 @@ subroutine dropmixnuc( &
 
    !-------------------------------------------------------------------------------
 
-   sq2pi = sqrt(2._r8*pi)
-
-!  NOTE FOR C++ PORT:  Extract fields from state vector below.
-!  Move upward in scope, and /or replace with appropriate C++ structures.
+!  NOTES FOR C++ PORT:  Below code extracts fields from state vector
+!  During port, can move this code upward in subroutine hierarcy, 
+!  and /or replace with appropriate C++ structures.
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -443,7 +442,7 @@ subroutine dropmixnuc( &
    rpdel    => state%rpdel
    zm       => state%zm
 
-!  prog_modal_aero is always true in our tests.
+!  prog_modal_aero is always true in our particular test configuration.
    if (prog_modal_aero) then
       ! aerosol tendencies
       call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
@@ -452,9 +451,7 @@ subroutine dropmixnuc( &
       call physics_ptend_init(ptend, state%psetcols, 'ndrop')
    endif
 
-!  END NOTE FOR C++ PORT
-
-!  NOTE FOR C++ PORT:  Below is not used in our tests since do_aerocom_ind3 = .false. by default.
+!  Below code is not used in our tests since do_aerocom_ind3 = .false. by default.
 !  Likely can be removed
 
    if(do_aerocom_ind3) then
@@ -462,7 +459,7 @@ subroutine dropmixnuc( &
        call pbuf_get_field(pbuf, ccn3d_idx, ccn3d)
    endif
 
-! END NOTE FOR C++ PORT
+! END NOTES FOR C++ PORT
 
 !  Allocate / define local variables
 
@@ -586,7 +583,7 @@ subroutine dropmixnuc( &
       enddo
 
 
-!  Part I:  changes of aerosol and cloud water from temporal changes in cloud fraction
+!  PART I:  changes of aerosol and cloud water from temporal changes in cloud fraction
 
       ! droplet nucleation/aerosol activation
 
@@ -690,7 +687,7 @@ subroutine dropmixnuc( &
 
       ! old_cloud_main_k_loop
 
-!  Part II: changes in aerosol and cloud water from vertical gradients of new cloud fraction
+!  PART II: changes in aerosol and cloud water from vertical gradients of new cloud fraction
 
       do kk = top_lev, pver - 1
          kp1 = min0(kk+1, pver)
@@ -858,7 +855,7 @@ subroutine dropmixnuc( &
             dtt   = 1._r8/tinv
             dtmin = min(dtmin, dtt)
          endif
-      end do
+      enddo
 
       dtmix   = 0.9_r8*dtmin
       nsubmix = dtmicro/dtmix + 1
@@ -1082,7 +1079,8 @@ subroutine dropmixnuc( &
    enddo
 
 
-!  NOTE FOR C++ PORT:  Below is not used in our tests since do_aerocom_ind3 = .false. by default.
+!  NOTE FOR C++ PORT:  Below if/then branch is not used in our tests since do_aerocom_ind3 = .false. by default.
+!  Furthermore, code seems to assume ccn is in #/cm^3 when it is actually in #/m^3.
 !  if/then branch below likely can be removed
 
    if(do_aerocom_ind3) then
@@ -1121,7 +1119,7 @@ subroutine dropmixnuc( &
 
 
 ! do column tendencies
-! NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
+! NOTE FOR C++ PORT:  prog_modal_aero is always true in our particular tests.
    if (prog_modal_aero) then
       do imode = 1, ntot_amode
          do lspec = 0, nspec_amode(imode)
