@@ -397,7 +397,6 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [# or kg/kg]
 
-
    integer, save :: count_submix(100)
    integer  :: lchnk               ! chunk identifier
    integer  :: ncol                ! number of columns
@@ -416,6 +415,8 @@ subroutine dropmixnuc( &
    integer  :: isub       ! substep index
    integer  :: spc_idx, num_idx  ! species, number indices  
 
+! NOTE FOR C++ PORT:  Below fields are not used in our tests since do_aerocom_ind3 = .false. by default.
+! Likely can be removed
 !+++ AeroCOM IND3 output
    real(r8) :: ccn3col(pcols), ccn4col(pcols)
    real(r8) :: ccn3bl(pcols), ccn4bl(pcols)
@@ -427,7 +428,8 @@ subroutine dropmixnuc( &
 
    sq2pi = sqrt(2._r8*pi)
 
-!  Extract fields from state vector
+!  NOTE FOR C++ PORT:  Extract fields from state vector below.
+!  Move upward in scope, and /or replace with appropriate C++ structures.
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -440,16 +442,27 @@ subroutine dropmixnuc( &
    pdel     => state%pdel
    rpdel    => state%rpdel
    zm       => state%zm
-    
-!  Extract fields from pbuf
 
-   call pbuf_get_field(pbuf, kvh_idx, kvh)
+!  prog_modal_aero is always true in our tests.
+   if (prog_modal_aero) then
+      ! aerosol tendencies
+      call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
+   else
+      ! no aerosol tendencies
+      call physics_ptend_init(ptend, state%psetcols, 'ndrop')
+   endif
 
-!  BJG:  below probably always false?
+!  END NOTE FOR C++ PORT
+
+!  NOTE FOR C++ PORT:  Below is not used in our tests since do_aerocom_ind3 = .false. by default.
+!  Likely can be removed
+
    if(do_aerocom_ind3) then
        ccn3d_idx = pbuf_get_index('ccn3d')
        call pbuf_get_field(pbuf, ccn3d_idx, ccn3d)
    endif
+
+! END NOTE FOR C++ PORT
 
 !  Allocate / define local variables
 
@@ -469,8 +482,13 @@ subroutine dropmixnuc( &
       fluxn(ntot_amode),              &
       fluxm(ntot_amode)               )
 
+!  Extract field from pbuf
+
+   call pbuf_get_field(pbuf, kvh_idx, kvh)
+
    ! Init pointers to mode number and species mass mixing ratios for
    ! cloud borne phases.
+
    do imode = 1, ntot_amode
       mm = mam_idx(imode, 0)
       num_idx = numptrcw_amode(imode)
@@ -496,26 +514,13 @@ subroutine dropmixnuc( &
 
    dtinv = 1._r8/dtmicro
 
-
    !initialize variables to zero
    ndropmix(:,:) = 0._r8
    nsource(:,:) = 0._r8
    wtke(:,:)    = 0._r8
    factnum(:,:,:) = 0._r8
 
-
-!  BJG:  below probably always true?
-   if (prog_modal_aero) then
-      ! aerosol tendencies
-      call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
-   else
-      ! no aerosol tendencies
-      call physics_ptend_init(ptend, state%psetcols, 'ndrop')
-   endif
-
-
-
-   ! overall_main_i_loop
+   ! overall_main_icol_loop
    do icol = 1, ncol
 
       do kk = top_lev, pver-1
@@ -530,8 +535,6 @@ subroutine dropmixnuc( &
          cs(icol,kk)  = pmid(icol,kk)/(rair*temp(icol,kk))        ! air density (kg/m3)
          dz(icol,kk)  = 1._r8/(cs(icol,kk)*gravit*rpdel(icol,kk)) ! layer thickness in m
          zn(kk) = gravit*rpdel(icol,kk)
-
-! BJG:  srcn, qncld may not actually need to be zeroed out here?
          qcld(kk)  = ncldwtr(icol,kk)
          qncld(kk) = 0._r8
          srcn(kk)  = 0._r8
@@ -1012,7 +1015,7 @@ subroutine dropmixnuc( &
       enddo
       ndropcol(icol) = ndropcol(icol)/gravit
 
-!  BJG:  below probably always true?
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
       if (prog_modal_aero) then
 
          raertend = 0._r8
@@ -1042,7 +1045,7 @@ subroutine dropmixnuc( &
                qqcw(mm)%fld(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
             enddo  ! lspec loop
          enddo   ! imode loop
-
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
       endif  ! if (prog_modal_aero)
 
    enddo  ! overall_main_i_loop
@@ -1053,9 +1056,9 @@ subroutine dropmixnuc( &
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
 
-  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+  !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
 
-   ! Extract cloud borne MMRs from pbuf 
+   ! Extract cloud borne MMRs from qqcw pointer
 
    qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
    do imode=1,ntot_amode
@@ -1069,7 +1072,9 @@ subroutine dropmixnuc( &
       enddo
    enddo
 
-  !End note for C++ port
+  !END NOTE FOR C++ PORT
+
+!  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
    call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    do lsat = 1, psat
@@ -1077,7 +1082,9 @@ subroutine dropmixnuc( &
    enddo
 
 
-!  BJG:  below probably always false?
+!  NOTE FOR C++ PORT:  Below is not used in our tests since do_aerocom_ind3 = .false. by default.
+!  if/then branch below likely can be removed
+
    if(do_aerocom_ind3) then
       ccn3d(:ncol, :) = ccn(:ncol, :, 4)
       ccn3col = 0.0_r8; ccn4col = 0.0_r8
@@ -1112,8 +1119,9 @@ subroutine dropmixnuc( &
       call outfld('ccn.3bl', ccn4bl, pcols, lchnk)
    endif
 
-!  BJG:  below probably always true?
-   ! do column tendencies
+
+! do column tendencies
+! NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
    if (prog_modal_aero) then
       do imode = 1, ntot_amode
          do lspec = 0, nspec_amode(imode)
@@ -1123,6 +1131,7 @@ subroutine dropmixnuc( &
          enddo
       enddo
    endif
+
 
    deallocate( &
       nact,       &
