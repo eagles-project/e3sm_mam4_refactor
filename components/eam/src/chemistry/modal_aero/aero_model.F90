@@ -1599,15 +1599,16 @@ do_lphase2_conditional: &
 
     implicit none
 
-
     !   local variables
-    integer nnfit_maxd
-    parameter (nnfit_maxd=27)
+    integer,parameter :: nnfit_maxd=27
+    integer :: jgrow, ll, imode, nnfit
+    integer :: lunerr
 
-    integer i, jgrow, jdens, jpress, jtemp, ll, mode, nnfit
-    integer lunerr
+    ! set up temperature-pressure pair to compute impaction scavenging rates
+    real(r8), parameter :: temp_0C = 273.16_r8        ! K
+    real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
 
-    real(r8) dg0, dg0_cgs, press, &
+    real(r8) :: dg0, dg0_cgs, press, &
          rhodryaero, rhowetaero, rhowetaero_cgs, rmserr, &
          scavratenum, scavratevol, sigmag,                &
          temp, wetdiaratio, wetvolratio
@@ -1617,43 +1618,38 @@ do_lphase2_conditional: &
     
     lunerr = 6
 
-    modeloop: do mode = 1, ntot_amode
+    modeloop: do imode = 1, ntot_amode
 
-       sigmag = sigmag_amode(mode)
+       sigmag = sigmag_amode(imode)
 
-       ll = lspectype_amode(1,mode)
+       ll = lspectype_amode(1,imode)
        rhodryaero = specdens_amode(ll)
 
        growloop: do jgrow = nimptblgrow_mind, nimptblgrow_maxd
 
           wetdiaratio = exp( jgrow*dlndg_nimptblgrow )
-          dg0 = dgnum_amode(mode)*wetdiaratio
+          dg0 = dgnum_amode(imode)*wetdiaratio
 
           wetvolratio = exp( jgrow*dlndg_nimptblgrow*3._r8 )
           rhowetaero = 1.0_r8 + (rhodryaero-1.0_r8)/wetvolratio
           rhowetaero = min( rhowetaero, rhodryaero )
 
-          !
           !   compute impaction scavenging rates at 1 temp-press pair and save
-          !
           nnfit = 0
 
-          temp = 273.16_r8
-          press = 0.75e6_r8   ! dynes/cm2
           rhowetaero = rhodryaero
 
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
           call calc_1_impact_rate( &
-               dg0_cgs, sigmag, rhowetaero_cgs, temp, press, &
+               dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
                scavratenum, scavratevol, lunerr )
 
           nnfit = nnfit + 1
           if (nnfit .gt. nnfit_maxd) then
-             write(lunerr,9110)
+             write(lunerr,*), '*** subr. modal_aero_bcscavcoef_init -- nnfit too big'
              call endrun()
           endif
-9110      format( '*** subr. modal_aero_bcscavcoef_init -- nnfit too big' )
 
           xxfitnum(1,nnfit) = 1._r8
           yyfitnum(nnfit) = log( scavratenum )
@@ -1661,8 +1657,8 @@ do_lphase2_conditional: &
           xxfitvol(1,nnfit) = 1._r8
           yyfitvol(nnfit) = log( scavratevol )
 
-          scavimptblnum(jgrow,mode) = yyfitnum(1)
-          scavimptblvol(jgrow,mode) = yyfitvol(1)
+          scavimptblnum(jgrow,imode) = yyfitnum(1)
+          scavimptblvol(jgrow,imode) = yyfitvol(1)
 
        enddo growloop
     enddo modeloop
