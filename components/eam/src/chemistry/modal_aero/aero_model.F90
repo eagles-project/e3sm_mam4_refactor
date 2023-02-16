@@ -1659,28 +1659,32 @@ do_lphase2_conditional: &
 
   !===============================================================================
   subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, scavcoefnum, scavcoefvol )
+    !-----------------------------------------------------------------------
+    ! compute impaction scavenging removal amount for aerosol volume and number
+    !-----------------------------------------------------------------------
 
     use modal_aero_data, only: dgnum_amode
-    !-----------------------------------------------------------------------
+
     implicit none
 
-    integer,intent(in) :: m, ncol
-    logical,intent(in):: isprx(pcols,pver)
-    real(r8), intent(in) :: dgn_awet(pcols,pver,ntot_amode)
-    real(r8), intent(out) :: scavcoefnum(pcols,pver), scavcoefvol(pcols,pver)
+    integer,  intent(in) :: m, ncol
+    logical,  intent(in) :: isprx(pcols,pver)           ! if there is precip
+    real(r8), intent(in) :: dgn_awet(pcols,pver,ntot_amode)  ! wet aerosol diameter [m]
+    real(r8), intent(out):: scavcoefnum(pcols,pver)     ! scavenging removal for aerosol number [1/h]
+    real(r8), intent(out):: scavcoefvol(pcols,pver)     ! scavenging removal for aerosol volume [1/h]
 
-    integer i, k, jgrow
+    ! local variables
+    integer :: i, k, jgrow      ! index
     real(r8) dumdgratio, xgrow, dumfhi, dumflo, scavimpvol, scavimpnum
 
 
     do k = 1, pver
        do i = 1, ncol
 
-          ! do only if no precip
+          ! do only if there is precip
           if ( isprx(i,k) ) then
-             !
+             
              ! interpolate table values using log of (actual-wet-size)/(base-dry-size)
-
              dumdgratio = dgn_awet(i,k,m)/dgnum_amode(m)
 
              if ((dumdgratio .ge. 0.99_r8) .and. (dumdgratio .le. 1.01_r8)) then
@@ -1712,12 +1716,7 @@ do_lphase2_conditional: &
              ! impaction scavenging removal amount to number
              scavcoefnum(i,k) = exp( scavimpnum )
 
-             ! scavcoef = impaction scav rate (1/h) for precip = 1 mm/h
-             ! scavcoef = impaction scav rate (1/s) for precip = pfx_inrain
-             ! (scavcoef/3600) = impaction scav rate (1/s) for precip = 1 mm/h
-             ! (pfx_inrain*3600) = in-rain-area precip rate (mm/h)
-             ! impactrate = (scavcoef/3600) * (pfx_inrain*3600)
-          else
+          else ! if no precip
              scavcoefvol(i,k) = 0._r8
              scavcoefnum(i,k) = 0._r8
           endif
