@@ -1658,8 +1658,8 @@ do_lphase2_conditional: &
   end subroutine modal_aero_bcscavcoef_init
 
   !===============================================================================
-  subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, & ! in
-                                        scavcoefnum, scavcoefvol  ) ! out
+  subroutine modal_aero_bcscavcoef_get( imode, ncol, isprx, dgn_awet, & ! in
+                                        scavcoefnum, scavcoefvol      ) ! out
     !-----------------------------------------------------------------------
     ! compute impaction scavenging removal amount for aerosol volume and number
     !-----------------------------------------------------------------------
@@ -1668,37 +1668,37 @@ do_lphase2_conditional: &
 
     implicit none
 
-    integer,  intent(in) :: m, ncol
+    integer,  intent(in) :: imode, ncol
     logical,  intent(in) :: isprx(pcols,pver)           ! if there is precip
     real(r8), intent(in) :: dgn_awet(pcols,pver,ntot_amode)  ! wet aerosol diameter [m]
     real(r8), intent(out):: scavcoefnum(pcols,pver)     ! scavenging removal for aerosol number [1/h]
     real(r8), intent(out):: scavcoefvol(pcols,pver)     ! scavenging removal for aerosol volume [1/h]
 
     ! local variables
-    integer  :: i, k, jgrow      ! index
-    real(r8) :: wetdiaratio     ! ratio of wet and dry aerosol diameter [fraction]
+    integer  :: icol, kk, jgrow         ! index
+    real(r8) :: wetdiaratio             ! ratio of wet and dry aerosol diameter [fraction]
     real(r8) :: xgrow, dumfhi, dumflo   ! working variables
     real(r8) :: scavimpvol, scavimpnum  ! log of scavenging rates for volume and number
 
 
-    do k = 1, pver
-       do i = 1, ncol
+    do kk = 1, pver
+       do icol = 1, ncol
 
           ! do only if there is precip
-          if ( isprx(i,k) ) then
+          if ( isprx(icol,kk) ) then
              
              ! interpolate table values using log of (actual-wet-size)/(base-dry-size)
-             wetdiaratio = dgn_awet(i,k,m)/dgnum_amode(m)
+             wetdiaratio = dgn_awet(icol,kk,imode)/dgnum_amode(imode)
 
-             if ((wetdiaratio .ge. 0.99_r8) .and. (wetdiaratio .le. 1.01_r8)) then
-                scavimpvol = scavimptblvol(0,m)
-                scavimpnum = scavimptblnum(0,m)
+             if ((wetdiaratio >= 0.99_r8) .and. (wetdiaratio <= 1.01_r8)) then
+                scavimpvol = scavimptblvol(0,imode)
+                scavimpnum = scavimptblnum(0,imode)
              else
                 xgrow = log( wetdiaratio ) / dlndg_nimptblgrow
                 jgrow = int( xgrow )
-                if (xgrow .lt. 0._r8) jgrow = jgrow - 1
+                if (xgrow < 0._r8) jgrow = jgrow - 1
 
-                if (jgrow .lt. nimptblgrow_mind) then
+                if (jgrow < nimptblgrow_mind) then
                    jgrow = nimptblgrow_mind
                    xgrow = jgrow
                 else
@@ -1707,21 +1707,21 @@ do_lphase2_conditional: &
 
                 dumfhi = xgrow - jgrow
                 dumflo = 1._r8 - dumfhi
-                scavimpvol = dumflo*scavimptblvol(jgrow,m) + &
-                     dumfhi*scavimptblvol(jgrow+1,m)
-                scavimpnum = dumflo*scavimptblnum(jgrow,m) + &
-                     dumfhi*scavimptblnum(jgrow+1,m)
+                scavimpvol = dumflo*scavimptblvol(jgrow,imode) + &
+                     dumfhi*scavimptblvol(jgrow+1,imode)
+                scavimpnum = dumflo*scavimptblnum(jgrow,imode) + &
+                     dumfhi*scavimptblnum(jgrow+1,imode)
 
              endif
 
              ! impaction scavenging removal amount for volume
-             scavcoefvol(i,k) = exp( scavimpvol )
+             scavcoefvol(icol,kk) = exp( scavimpvol )
              ! impaction scavenging removal amount to number
-             scavcoefnum(i,k) = exp( scavimpnum )
+             scavcoefnum(icol,kk) = exp( scavimpnum )
 
           else ! if no precip
-             scavcoefvol(i,k) = 0._r8
-             scavcoefnum(i,k) = 0._r8
+             scavcoefvol(icol,kk) = 0._r8
+             scavcoefnum(icol,kk) = 0._r8
           endif
 
        enddo
