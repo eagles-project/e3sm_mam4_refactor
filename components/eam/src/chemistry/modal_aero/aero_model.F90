@@ -1600,8 +1600,7 @@ do_lphase2_conditional: &
     implicit none
 
     !   local variables
-    integer,parameter :: nnfit_maxd=27
-    integer :: jgrow, ll, imode, nnfit
+    integer :: jgrow, ll, imode
     integer :: lunerr
 
     ! set up temperature-pressure pair to compute impaction scavenging rates
@@ -1612,9 +1611,6 @@ do_lphase2_conditional: &
          rhodryaero, rhowetaero, rhowetaero_cgs, rmserr, &
          scavratenum, scavratevol, sigmag,                &
          temp, wetdiaratio, wetvolratio
-    real(r8) aafitnum(1), xxfitnum(1,nnfit_maxd), yyfitnum(nnfit_maxd)
-    real(r8) aafitvol(1), xxfitvol(1,nnfit_maxd), yyfitvol(nnfit_maxd)
-
     
     lunerr = 6
 
@@ -1635,8 +1631,6 @@ do_lphase2_conditional: &
           rhowetaero = min( rhowetaero, rhodryaero )
 
           !   compute impaction scavenging rates at 1 temp-press pair and save
-          nnfit = 0
-
           rhowetaero = rhodryaero
 
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
@@ -1645,20 +1639,8 @@ do_lphase2_conditional: &
                dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
                scavratenum, scavratevol, lunerr )
 
-          nnfit = nnfit + 1
-          if (nnfit .gt. nnfit_maxd) then
-             write(lunerr,*), '*** subr. modal_aero_bcscavcoef_init -- nnfit too big'
-             call endrun()
-          endif
-
-          xxfitnum(1,nnfit) = 1._r8
-          yyfitnum(nnfit) = log( scavratenum )
-
-          xxfitvol(1,nnfit) = 1._r8
-          yyfitvol(nnfit) = log( scavratevol )
-
-          scavimptblnum(jgrow,imode) = yyfitnum(1)
-          scavimptblvol(jgrow,imode) = yyfitvol(1)
+          scavimptblnum(jgrow,imode) = log( scavratenum )
+          scavimptblvol(jgrow,imode) = log( scavratevol )
 
        enddo growloop
     enddo modeloop
