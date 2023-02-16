@@ -1600,24 +1600,26 @@ do_lphase2_conditional: &
     implicit none
 
     !   local variables
-    integer :: jgrow, ll, imode
-    integer :: lunerr
+    integer :: jgrow, ll, imode ! indexes
+    integer :: lunerr           ! logical unit for error message
+    real(r8) :: dg0             ! aerosol diameter [m]
+    real(r8) :: dg0_cgs         ! aerosol diameter in CGS unit [cm]
+    real(r8) :: sigmag          ! standard deviation of aerosol size distribution 
+    real(r8) :: rhodryaero, rhowetaero   ! dry and wet aerosol density [kg/m3] 
+    real(r8) :: rhowetaero_cgs  ! wet aerosol density in CGS unit [g/cm3]
+    real(r8) :: scavratenum     ! scavenging rate of aerosol number [1/s]
+    real(r8) :: scavratevol     ! scavenging rate of aerosol volume [1/s]
+    real(r8) :: wetdiaratio, wetvolratio ! ratio of diameter and volume for wet/dry aerosols [fraction]
 
     ! set up temperature-pressure pair to compute impaction scavenging rates
     real(r8), parameter :: temp_0C = 273.16_r8        ! K
     real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
-
-    real(r8) :: dg0, dg0_cgs, &
-         rhodryaero, rhowetaero, rhowetaero_cgs, &
-         scavratenum, scavratevol, sigmag,                &
-         wetdiaratio, wetvolratio
     
     lunerr = 6
 
     modeloop: do imode = 1, ntot_amode
 
        sigmag = sigmag_amode(imode)
-
        ll = lspectype_amode(1,imode)
        rhodryaero = specdens_amode(ll)
 
@@ -1625,7 +1627,6 @@ do_lphase2_conditional: &
 
           wetdiaratio = exp( jgrow*dlndg_nimptblgrow )
           dg0 = dgnum_amode(imode)*wetdiaratio
-
           wetvolratio = exp( jgrow*dlndg_nimptblgrow*3._r8 )
           rhowetaero = 1.0_r8 + (rhodryaero-1.0_r8)/wetvolratio
           rhowetaero = min( rhowetaero, rhodryaero )
@@ -1653,6 +1654,7 @@ do_lphase2_conditional: &
        enddo growloop
     enddo modeloop
     return
+
   end subroutine modal_aero_bcscavcoef_init
 
   !===============================================================================
