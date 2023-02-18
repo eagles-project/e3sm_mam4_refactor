@@ -30,29 +30,9 @@ module seasalt_model
   public :: init_ocean_data           ! initialize ocean data variables
   public :: ocean_data_readnl         ! read ocean data namelist
 
-#if  ( defined MODAL_AERO_9MODE )
-  integer, parameter :: nslt = 4
-#else
   integer, parameter :: nslt = max(3,ntot_amode-3)
-#endif
   integer, parameter :: nnum = nslt
 
-#if  ( defined MODAL_AERO_7MODE )
-  integer, parameter :: nslt_om = 0
-  integer, parameter :: nnum_om = 0
-  integer, parameter :: om_num_modes = 0
-  character(len=6),parameter :: seasalt_names(nslt+nslt_om+nnum+nnum_om) = &
-       (/ 'ncl_a1', 'ncl_a2', 'ncl_a4', 'ncl_a6', 'num_a1', 'num_a2', 'num_a4', 'num_a6' /)
-  integer, parameter :: om_num_ind = 0
-#elif( defined MODAL_AERO_3MODE || defined MODAL_AERO_4MODE )
-  integer, parameter :: nslt_om = 0
-  integer, parameter :: nnum_om = 0
-  integer, parameter :: om_num_modes = 0
-  character(len=6),parameter :: seasalt_names(nslt+nslt_om+nnum+nnum_om) = &
-       (/ 'ncl_a1', 'ncl_a2', 'ncl_a3', &
-          'num_a1', 'num_a2', 'num_a3'/)
-  integer, parameter :: om_num_ind = 0
-#elif( defined MODAL_AERO_4MODE_MOM )
   integer, parameter :: nslt_om = 3
   integer, parameter :: nnum_om = 1
   integer, parameter :: om_num_modes = 3
@@ -61,20 +41,6 @@ module seasalt_model
        'mom_a1', 'mom_a2', 'mom_a4', &
        'num_a1', 'num_a2', 'num_a3', 'num_a4'/)
   integer, dimension(om_num_modes), parameter :: om_num_ind =  (/ 1, 2, 4 /)
-#elif (defined MODAL_AERO_9MODE)
-  integer, parameter :: nslt_om = 12
-  integer, parameter :: nnum_om = 2
-  integer, parameter :: om_num_modes = 4
-  character(len=8),parameter :: seasalt_names(nslt+nslt_om+nnum+nnum_om) = &
-       (/'ncl_a1  ', 'ncl_a2  ', 'ncl_a4  ', 'ncl_a6  ', &
-         'mpoly_a1', 'mpoly_a2', 'mpoly_a8', 'mpoly_a9', &
-         'mprot_a1', 'mprot_a2', 'mprot_a8', 'mprot_a9', &
-         'mlip_a1 ', 'mlip_a2 ', 'mlip_a8 ', 'mlip_a9 ', &
-         'num_a1  ', 'num_a2  ', 'num_a4  ', 'num_a6  ', &
-         'num_a8  ', 'num_a9  ' &
-         /)
-  integer, dimension(om_num_modes), parameter :: om_num_ind =  (/ 1, 2, 5, 6 /)
-#endif
 
   integer, parameter :: seasalt_nbin = nslt+nslt_om
   integer, parameter :: seasalt_nnum = nnum+nnum_om
@@ -140,11 +106,7 @@ module seasalt_model
    integer             :: fmoa = 1
 
 ! TODO SMB: Implement better mechanism for setting this switch.
-#if (defined MODAL_AERO_9MODE || defined MODAL_AERO_4MODE_MOM)
    logical :: has_mam_mom = .true.
-#else
-   logical :: has_mam_mom = .false.
-#endif
 
 ! Order: mpoly, mprot, mlip
     real(r8), dimension(n_org_burrows), parameter :: & ! OM:OC mass ratios for input fields (mpoly, mprot, mlip)
@@ -157,35 +119,12 @@ module seasalt_model
     real(r8), dimension(n_org_burrows), parameter :: & ! mass per sq. m at saturation
          g_per_m2_org = (/ 0.1376_r8, 0.00219_r8, 0.002593_r8 /) ! Mw_org / a_org
 
-#if  ( defined MODAL_AERO_7MODE )
-    real(r8), parameter :: sst_sz_range_lo (nslt+nslt_om) = (/ 0.08e-6_r8, 0.02e-6_r8, 0.3e-6_r8,  1.0e-6_r8 /)  ! accu, aitken, fine, coarse
-    real(r8), parameter :: sst_sz_range_hi (nslt+nslt_om) = (/ 0.3e-6_r8,  0.08e-6_r8, 1.0e-6_r8, 10.0e-6_r8 /)
-#elif ( defined MODAL_AERO_9MODE )
-    real(r8), parameter :: sst_sz_range_lo(nslt+nslt_om) = &
-              (/0.08e-6_r8, 0.02e-6_r8, 0.3e-6_r8, 1.0e-6_r8, &  ! accu, aitken, fine, coarse
-                0.08e-6_r8, 0.02e-6_r8, 0.08e-6_r8, 0.02e-6_r8, &  ! accu, aitken, MOM accu, MOM aitken
-                0.08e-6_r8, 0.02e-6_r8, 0.08e-6_r8, 0.02e-6_r8, &
-                0.08e-6_r8, 0.02e-6_r8, 0.08e-6_r8, 0.02e-6_r8  &
-               /)
-    real(r8), parameter :: sst_sz_range_hi(nslt+nslt_om) = &
-              (/0.3e-6_r8, 0.08e-6_r8, 1.0e-6_r8, 10.0e-6_r8, &
-                0.3e-6_r8, 0.08e-6_r8, 0.3e-6_r8, 0.08e-6_r8, &  ! accu, aitken, MOM accu, MOM aitken
-                0.3e-6_r8, 0.08e-6_r8, 0.3e-6_r8, 0.08e-6_r8, &
-                0.3e-6_r8, 0.08e-6_r8, 0.3e-6_r8, 0.08e-6_r8  &
-              /)
-#elif ( defined MODAL_AERO_3MODE || defined MODAL_AERO_4MODE )
-    real(r8), parameter :: sst_sz_range_lo (nslt+nslt_om) = &
-         (/ 0.08e-6_r8,  0.02e-6_r8,  1.0e-6_r8 /)  ! accu, aitken, coarse
-    real(r8), parameter :: sst_sz_range_hi (nslt+nslt_om) = &
-         (/ 1.0e-6_r8,   0.08e-6_r8, 10.0e-6_r8 /)  ! accu, aitken, coarse
-#elif ( defined MODAL_AERO_4MODE_MOM )
     real(r8), parameter :: sst_sz_range_lo (nslt+nslt_om) = &
          (/ 0.08e-6_r8,  0.02e-6_r8,  1.0e-6_r8, &  ! accu, aitken, coarse
             0.08e-6_r8,  0.02e-6_r8,  0.08e-6_r8 /) ! accu, aitken, POM accu
     real(r8), parameter :: sst_sz_range_hi (nslt+nslt_om) = &
          (/ 1.0e-6_r8,   0.08e-6_r8, 10.0e-6_r8, &  ! accu, aitken, coarse
             1.0e-6_r8,   0.08e-6_r8,  1.0e-6_r8 /)  ! accu, aitken, POM accu
-#endif
 
 contains
   
@@ -497,27 +436,10 @@ end subroutine ocean_data_readnl
     om_ssa(:ncol,:) = 0.0_r8
     F_eff(:ncol) = 0.0_r8
 
-    if (fmoa==1) then ! Burrows et al. organic sea spray
+    !if (fmoa==1) then ! Burrows et al. organic sea spray
        n_org = n_org_burrows
        call calc_om_ssa_burrows(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &
                                 mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :), F_eff(:ncol), lchnk)
-    else if (fmoa==2) then ! Use Gantt et al. (2011) parameterization to calculate
-                           ! the total organic mass fraction in the bubble.
-       n_org = n_org_gantt
-       call calc_om_ssa_gantt(chla(:ncol), u10(:), mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :))
-    else if (fmoa==3) then ! Use Quinn et al. (2014) to calculate
-                           ! the total organic mass fraction in the bubble --
-                           ! 80% in Aitken mode and 5% in accumulation mode,
-                           ! everywhere and always.
-       n_org = n_org_quinn
-       call calc_om_ssa_quinn(mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :))
-    else if (fmoa==4) then ! Use Rinaldi et al. (2013) parameterization to calculate
-                           ! the total organic mass fraction in the bubble.
-       n_org = n_org_rinaldi
-       call calc_om_ssa_rinaldi(chla(:ncol), u10(:), mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :))
-    else
-       call endrun('Unknown value of fmoa (marine organic aerosol parameterization flag)')
-    end if
  end if calculate_organic_fraction
 
     tracer_loop: do ibin = 1,nslt
@@ -529,76 +451,32 @@ end subroutine ocean_data_readnl
        if (mn>0) then
 !! Total number flux per mode
           section_loop_ssa_num: do i=1, nsections
-             if ( has_mam_mom ) then
              cflx_help2(:ncol) = 0.0_r8
              if (Dg(i).ge.sst_sz_range_lo(ibin) .and. Dg(i).lt.sst_sz_range_hi(ibin)) then
                 cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
-                if ((ibin==3).or.(ibin==4)) then
-                   ! Don't apply OM parameterization to fine or coarse SS mode
-                   cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)
-                else if ( ( mixing_state == 1 ) .or. ( mixing_state == 3 ) ) then
+
                    ! Mixing state 1: external mixture, add OM to mass and number
                    ! Mixing state 3: internal mixture, add OM to mass and number
                    cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)
-                else if ( ( mixing_state == 0 ) .or. ( mixing_state == 2 ) ) then
-                   ! Apply OM parameterization to Aitken (m=2) and accumulation (m=1) modes
-                   ! Mixing state 0: external mixture, replace mass and number
-                   !                 of mode with mass and number in MOM modes
-                   ! Mixing state 2: internal mixture, replace mass with OM,
-                   !                 total number not modified
-                   cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol) * &
-                        (1._r8 - om_ssa(:ncol, i)) ! Subtract OM from SS (per section)
-                else
-                   ! Unknown mixing state assumption
-                   call endrun("Error: Unknown mixing_state value in seasalt_model.F90")
-                endif
              endif
-          else
-             if (Dg(i).ge.sst_sz_range_lo(ibin) .and. Dg(i).lt.sst_sz_range_hi(ibin)) then
-                cflx(:ncol,mn)=cflx(:ncol,mn)+fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
-             endif
-          end if
           enddo section_loop_ssa_num
        endif
 
        cflx(:ncol,mm)=0.0_r8
        section_loop_sslt_mass: do i=1, nsections
-          if ( has_mam_mom ) then
           if (Dg(i).ge.sst_sz_range_lo(ibin) .and. Dg(i).lt.sst_sz_range_hi(ibin)) then
              cflx_help2(:ncol) = 0.0_r8
              cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
                   *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
-             if ((ibin==3).or.(ibin==4)) then
-                ! Don't apply OM parameterization to fine or coarse SS mode
-                cflx(:ncol,mm) = cflx(:ncol,mm) + cflx_help2(:ncol)
-             else if ( ( mixing_state == 1 ) .or. ( mixing_state == 3 ) ) then
+
                 ! Mixing state 1: external mixture, add OM to mass and number
                 ! Mixing state 3: internal mixture, add OM to mass and number
                 cflx(:ncol,mm)      = cflx(:ncol,mm)      +cflx_help2(:ncol)
-             else if ( ( mixing_state == 0 ) .or. ( mixing_state == 2 ) ) then
-                ! Apply OM parameterization to Aitken (m=2) and accumulation (m=1) modes
-                ! Mixing state 0: external mixture, replace mass and number
-                !                 of mode with mass and number in MOM modes
-                ! Mixing state 2: internal mixture, replace mass with OM,
-                !                 total number not modified
-                cflx(:ncol,mm) = cflx(:ncol,mm) + cflx_help2(:ncol) * &
-                     (1._r8 - om_ssa(:ncol, i)) ! Subtract OM from SS (per section)
-             else
-                ! Unknown mixing state assumption
-                call endrun("Error: Unknown mixing_state value in seasalt_model.F90")
-             endif
           endif
-       else
-          if (Dg(i).ge.sst_sz_range_lo(ibin) .and. Dg(i).lt.sst_sz_range_hi(ibin)) then
-             cflx(:ncol,mm)=cflx(:ncol,mm)+fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
-                  *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
-          endif
-       endif
        enddo section_loop_sslt_mass
 
 enddo tracer_loop
 
-#if ( defined MODAL_AERO_9MODE || defined MODAL_AERO_4MODE_MOM )
 
 add_om_species: if ( has_mam_mom ) then
 ! Calculate emission of MOM mass.
@@ -618,19 +496,7 @@ add_om_species: if ( has_mam_mom ) then
     ! Mixing state 0: external mixture, replace mass and number
     !                 of mode with mass and number in MOM modes
     ! Mixing state 1: external mixture, add OM to mass and number
-#if ( defined MODAL_AERO_9MODE )
-    if ((mixing_state == 1) .or. (mixing_state == 0)) then
-       emit_this_mode = (/ .false., .false., .true., .true. /)
-       ! Total internal mixture: emit only in modes 1, 2
-       ! Mixing state 2: internal mixture, replace mass with OM,
-       !                 total number not modified
-       ! Mixing state 3: internal mixture, add OM to mass and number
-    else if ((mixing_state == 2) .or. (mixing_state == 3)) then
-       emit_this_mode = (/ .true., .true., .false., .false. /)
-    else
-       call endrun("Error: Unknown mixing_state value in seasalt_model.F90")
-    end if
-#elif ( defined MODAL_AERO_4MODE_MOM )
+
     if ((mixing_state == 1) .or. (mixing_state == 0)) then
        emit_this_mode = (/ .false., .true., .true. /)
     else if ((mixing_state == 2) .or. (mixing_state == 3)) then
@@ -638,7 +504,6 @@ add_om_species: if ( has_mam_mom ) then
     else
        call endrun("Error: Unknown mixing_state value in seasalt_model.F90")
     end if
-#endif
 
 ! Loop over OM modes
     om_num_mode_loop: do m_om=1,om_num_modes ! modes in which to emit OM
@@ -658,22 +523,11 @@ add_om_species: if ( has_mam_mom ) then
                 cflx_help2(:ncol) = 0.0_r8
                 if (Dg(i).ge.sst_sz_range_lo(nslt+m_om) .and. Dg(i).lt.sst_sz_range_hi(nslt+m_om)) then
                    cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale
-                   if ( ( mixing_state == 0 ) .or. ( mixing_state == 2 ) ) then
-                      ! Mixing state 0: external mixture, replace mass with OM,
-                      !                 total number not modified
-                      ! Mixing state 2: internal mixture, replace mass with OM,
-                      !                 total number not modified
-                      cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)*om_ssa(:ncol, i)
-                   else if ( ( mixing_state == 1 ) .or. ( mixing_state == 3 ) ) then
+
                       ! Mixing state 1: external mixture, add OM to mass and number
                       ! Mixing state 3: internal mixture, add OM to mass and number
                       cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol) * &
                                        (1._r8 / (1._r8 - om_ssa(:ncol, i)) - 1._r8)
-                   else
-                      ! Unknown mixing state assumption
-                      write(iulog, *) "Error: Unknown mixing_state value in seasalt_model.F90"
-                      exit
-                   end if
                 end if
 
              end do section_loop_OM_num
@@ -681,11 +535,7 @@ add_om_species: if ( has_mam_mom ) then
        end do om_num_mode_loop
 
     om_mode_loop: do m_om=1,nslt_om
-#if ( defined MODAL_AERO_9MODE )
-       mm = seasalt_indices(nslt+(n-1)*om_num_modes+m_om)
-#elif ( defined MODAL_AERO_4MODE_MOM )
        mm = seasalt_indices(nslt+m_om)
-#endif
 
        cflx(:ncol,mm)=0.0_r8
        if (emit_this_mode(m_om)) then
@@ -697,14 +547,7 @@ add_om_species: if ( has_mam_mom ) then
                 cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale &
                      *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
                 !  mass_frac_bub_section(pcols, n_org_max, nsections) -- org classes in dim 2, size nsections in dim 3
-                if ( ( mixing_state == 0 ) .or. ( mixing_state == 2 ) ) then
-                   ! Mixing state 0: external mixture, replace mass with OM,
-                   !                 total number not modified
-                   ! Mixing state 2: internal mixture, replace mass with OM,
-                   !                 total number not modified
-                   cflx(:ncol,mm) = cflx(:ncol,mm) + cflx_help2(:ncol) &
-                        * mass_frac_bub_section(:ncol, n, i)
-                else if ( ( mixing_state == 1 ) .or. ( mixing_state == 3 ) ) then
+             
                    ! Mixing state 1: external mixture, add OM to mass and number
                    ! Mixing state 3: internal mixture, add OM to mass and number
                    where (om_ssa(:ncol, i) .gt. 0.0_r8) ! avoid division by zero
@@ -714,11 +557,6 @@ add_om_species: if ( has_mam_mom ) then
                    elsewhere
                       cflx(:ncol,mm) = cflx(:ncol,mm)
                    end where
-                else
-                   ! Unknown mixing state assumption
-                   write(iulog, *) "Error: Unknown mixing_state value in seasalt_model.F90"
-                   exit
-                endif
              endif
           enddo section_loop_OM_mass
        end do om_type_loop
@@ -731,136 +569,9 @@ add_om_species: if ( has_mam_mom ) then
     end do om_mode_loop
 
  end if add_om_species
-#endif
 
   end subroutine seasalt_emis
 
-  subroutine calc_om_ssa_quinn(mass_frac_bub_section, om_ssa)
-   !-----------------------------------------------------------------------
-   ! Purpose:
-   ! Calculate OM fraction for five organic classes, and overall
-   ! effective organic enrichment, based on Quinn et al., Nat. Geosci. (2014)
-   !
-   ! Author:
-   ! Susannah Burrows, 9 Mar 2015
-   !-----------------------------------------------------------------------
-    use sslt_sections, only: nsections, Dg
-    implicit none
-   !-----------------------------------------------------------------------
-   ! Output variables
-    real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)
-    real(r8), intent(inout) :: om_ssa(:,:)
-   !
-   ! Local variables
-    integer  :: i
-
-! For now, set OM fraction = 0.8 in Aitken mode, 0.05 in accumulation mode
-! 0.03 in all other sizes
-
-    om_ssa = 0.00_r8 ! initialize
-    section_loop: do i=1, nsections
-       if (Dg(i).ge.sst_sz_range_lo(1) .and. Dg(i).lt.sst_sz_range_hi(1)) then
-          om_ssa = 0.05_r8 ! Accumulation mode
-       else if (Dg(i).ge.sst_sz_range_lo(2) .and. Dg(i).lt.sst_sz_range_hi(2)) then
-          om_ssa = 0.80_r8 ! Aitken mode
-       end if
-    end do section_loop
-
-! Divide mass amonst organic tracers
-! For now, put 75% in polys, 20% in lipids, and 5% in proteins
-!  mass_frac_bub_section(pcols, nsections) -- org classes in dim 2, size nsections in dim 3
-    mass_frac_bub_section(:, :, :)   = 0.0_r8
-    mass_frac_bub_section(:, 1, :)   = 0.75_r8*om_ssa(:, :) ! polys
-    mass_frac_bub_section(:, 2, :)   = 0.05_r8*om_ssa(:, :) ! prot
-    mass_frac_bub_section(:, 3, :)   = 0.20_r8*om_ssa(:, :) ! lip
-
-  end subroutine calc_om_ssa_quinn
-
-  subroutine calc_om_ssa_rinaldi(chla_in, u10, mass_frac_bub_section, om_ssa)
-   !-----------------------------------------------------------------------
-   ! Purpose:
-   ! Calculate OM fraction for five organic classes, and overall
-   ! effective organic enrichment, based on Rinaldi et al., JGR (2013)
-   !
-   ! Author:
-   ! Susannah Burrows, 2015
-   !-----------------------------------------------------------------------
-    use sslt_sections, only: nsections
-    implicit none
-   !-----------------------------------------------------------------------
-   ! Output variables
-    real(r8), intent(in) :: chla_in(:)
-    real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)
-    real(r8), intent(inout) :: om_ssa(:,:)
-    real(r8), intent(in) :: u10(:)               ! Needed in Gantt et al. calculation of organic mass fraction
-   !
-   ! Local variables
-    integer  :: i
-
-! For now, just use Rinaldi values for both Aitken and accumulation modes
-! Rinaldi et al., JGR, 2013, Eq. 1:
-!   OM_SS = 75.9 * Chl-a [mg m-3] - 3.99
-!
-! Eq. 2 (incl. wind speed):
-!   OM_SS = (56.9 * Chl-a [mg m-3]) + (-4.64 * WS [m s-1]) + 40.9
-!
-    om_ssa = 0.00_r8 ! initialize
-    section_loop: do i=1, nsections
-!       om_ssa(:, i) = 75.9_r8 * chla_in(:) - 3.99_r8
-       om_ssa(:, i) = 56.9_r8 * chla_in(:) - 4.64_r8 * u10(:) + 40.9_r8
-    end do section_loop
-
-! Divide mass amonst organic tracers
-! For now, put 75% in polys, 20% in lipids, and 5% in proteins
-!  mass_frac_bub_section(pcols, nsections) -- org classes in dim 2, size nsections in dim 3
-    mass_frac_bub_section(:, :, :)   = 0.0_r8
-    mass_frac_bub_section(:, 1, :)   = 0.75_r8*om_ssa(:, :) ! polys
-    mass_frac_bub_section(:, 2, :)   = 0.05_r8*om_ssa(:, :) ! prot
-    mass_frac_bub_section(:, 3, :)   = 0.20_r8*om_ssa(:, :) ! lip
-
-  end subroutine calc_om_ssa_rinaldi
-
-  subroutine calc_om_ssa_gantt(chla_in, u10, mass_frac_bub_section, om_ssa)
-   !-----------------------------------------------------------------------
-   ! Purpose:
-   ! Calculate OM fraction for five organic classes, and overall
-   ! effective organic enrichment, based on Gantt et al., ACP (2011)
-   !
-   ! Author:
-   ! Susannah Burrows, 2015
-   !-----------------------------------------------------------------------
-   implicit none
-   !-----------------------------------------------------------------------
-
-    ! Input variables
-    real(r8), intent(in) :: chla_in(:)          ! for Gantt et al. (2011) organic mass fraction
-    real(r8), intent(in) :: u10(:)               ! Needed in Gantt et al. calculation of organic mass fraction
-
-    ! Output variables
-    real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)
-    real(r8), intent(inout) :: om_ssa(:,:)
-
-    ! Local variables
-    real(r8) :: mass_frac_bub_tot(pcols)
-    integer  :: i
-
-    mass_frac_bub_tot(:) = 1.0_r8
-
-! Calculate the organic (mass/number) fraction in each size section, using
-! the Gantt et al. (2011) parameterization of size dependence and the
-! bubble mass fractions just calculated.
-
-! om_ssa(pcols, nsections) -- size nsections in dimension 2
-    call gantt_omfrac_size(mass_frac_bub_tot(:), om_ssa(:, :))
-
-!  mass_frac_bub_section(pcols, nsections) -- org classes in dim 2, size nsections in dim 3
-   mass_frac_bub_section(:, :, :)   = 0.0_r8
-
-   sec_loop: do i=1,size(om_ssa, 2)
-      mass_frac_bub_section(:, 1, i)   = om_ssa(:, i) / (1. + exp(-2.63 * chla_in(:) + 0.18 * u10(:)))
-   end do sec_loop
-
- end subroutine calc_om_ssa_gantt
 
  subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
                                 mass_frac_bub_section, om_ssa, F_eff, lchnk)
@@ -1215,11 +926,7 @@ subroutine init_ocean_data()
        call add_default ('mass_frac_bub_lip', 1, ' ')
 
        om_mode_loop: do m_om=1,nslt_om
-#if ( defined MODAL_AERO_9MODE )
-          m = nslt+(n-1)*om_num_modes+m_om
-#elif ( defined MODAL_AERO_4MODE_MOM )
           m = nslt+m_om
-#endif
           call addfld('cflx_'//trim(seasalt_names(m))//'_debug', horiz_only, 'A', ' ', 'accumulation organic mass emissions' ) 
           call add_default ('cflx_'//trim(seasalt_names(m))//'_debug', 1, ' ')
        enddo om_mode_loop
