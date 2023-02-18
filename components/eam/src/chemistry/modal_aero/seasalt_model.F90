@@ -408,7 +408,6 @@ end subroutine ocean_data_readnl
 
     fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
-    calculate_organic_fraction: if ( has_mam_mom ) then
 
        nullify(chla)
        nullify(mpoly)
@@ -440,7 +439,7 @@ end subroutine ocean_data_readnl
        n_org = n_org_burrows
        call calc_om_ssa_burrows(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &
                                 mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :), F_eff(:ncol), lchnk)
- end if calculate_organic_fraction
+
 
     tracer_loop: do ibin = 1,nslt
        ! Index of mass mode
@@ -478,7 +477,6 @@ end subroutine ocean_data_readnl
 enddo tracer_loop
 
 
-add_om_species: if ( has_mam_mom ) then
 ! Calculate emission of MOM mass.
    if(masterproc .and. debug_mam_mom) then
       write(iulog, *) "Adding MOM species in seasalt_model.F90"
@@ -497,13 +495,7 @@ add_om_species: if ( has_mam_mom ) then
     !                 of mode with mass and number in MOM modes
     ! Mixing state 1: external mixture, add OM to mass and number
 
-    if ((mixing_state == 1) .or. (mixing_state == 0)) then
-       emit_this_mode = (/ .false., .true., .true. /)
-    else if ((mixing_state == 2) .or. (mixing_state == 3)) then
-       emit_this_mode = (/ .true., .true., .false. /)
-    else
-       call endrun("Error: Unknown mixing_state value in seasalt_model.F90")
-    end if
+    emit_this_mode = (/ .true., .true., .false. /)
 
 ! Loop over OM modes
     om_num_mode_loop: do m_om=1,om_num_modes ! modes in which to emit OM
@@ -567,8 +559,6 @@ add_om_species: if ( has_mam_mom ) then
     endif
 
     end do om_mode_loop
-
- end if add_om_species
 
   end subroutine seasalt_emis
 
