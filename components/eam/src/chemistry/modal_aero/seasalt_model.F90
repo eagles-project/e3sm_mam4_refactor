@@ -347,21 +347,6 @@ subroutine ocean_data_readnl(nlfile)
    mixing_state  = mam_mom_mixing_state
    fmoa          = mam_mom_parameterization
 
-   if(masterproc .and. debug_mam_mom) then
-      write(iulog,*) 'Read namelist mam_mom_nl from file: '//trim(nlfile)
-      write(iulog,*) 'mam_mom_specifier = ',specifier
-      write(iulog,*) 'mam_mom_filename  = '//trim(filename)
-      write(iulog,*) 'mam_mom_filelist  = '//trim(filelist)
-      write(iulog,*) 'mam_mom_datapath  = '//trim(datapath)
-      write(iulog,*) 'mam_mom_datatype  = '//trim(datatype)
-      write(iulog,*) 'mam_mom_rmv_file  = ',rmv_file
-      write(iulog,*) 'mam_mom_cycle_yr  = ',data_cycle_yr
-      write(iulog,*) 'mam_mom_fixed_ymd = ',fixed_ymd
-      write(iulog,*) 'mam_mom_fixed_tod = ',fixed_tod
-      write(iulog,*) 'mam_mom_bubble_thickness = ',l_bub
-      write(iulog,*) 'mam_mom_mixing_state     = ',mixing_state
-      write(iulog,*) 'mam_mom_parameterization = ',fmoa
-   endif
 
 !   ! Turn on mam_mom aerosols if user has specified an input dataset.
 !   has_mam_mom = len_trim(filename) > 0
@@ -478,9 +463,6 @@ enddo tracer_loop
 
 
 ! Calculate emission of MOM mass.
-   if(masterproc .and. debug_mam_mom) then
-      write(iulog, *) "Adding MOM species in seasalt_model.F90"
-   endif
 
 ! Determine which modes to emit MOM in depending on mixing state assumption
 
@@ -508,9 +490,6 @@ enddo tracer_loop
 
           ! add number tracers for organics-only modes
           if (emit_this_mode(m_om)) then
-             if(masterproc .and. debug_mam_mom) then
-                write(iulog,"(A30,A10,I3)") "Constituent name and number: ", trim(seasalt_names(nslt+m_om)), mn ! for debugging
-             endif
              section_loop_OM_num: do i=1, nsections
                 cflx_help2(:ncol) = 0.0_r8
                 if (Dg(i).ge.sst_sz_range_lo(nslt+m_om) .and. Dg(i).lt.sst_sz_range_hi(nslt+m_om)) then
@@ -554,9 +533,6 @@ enddo tracer_loop
        end do om_type_loop
     endif
 
-    if (debug_mam_mom) then
-       call outfld('cflx_'//trim(seasalt_names(nslt+m_om))//'_debug',cflx(:ncol,mm),pcols,lchnk)
-    endif
 
     end do om_mode_loop
 
@@ -620,9 +596,6 @@ enddo tracer_loop
    g_per_m3(:, 2) = mprot_in(:)  * 1.0e-3_r8 * OM_to_OC_in(2) * Aw_carbon
    g_per_m3(:, 3) = mlip_in(:)   * 1.0e-3_r8 * OM_to_OC_in(3) * Aw_carbon
 
-   if (debug_mam_mom) then
-      call outfld('mpoly_debug',mpoly_in(:),pcols,lchnk)
-   endif
 
 ! Calculate the surface coverage by class
    do i=1,n_org_burrows
@@ -666,9 +639,6 @@ enddo tracer_loop
 
    mass_frac_bub_tot(:) = sum(mass_frac_bub, dim=2)
 
-   if (debug_mam_mom) then
-      call outfld('mass_frac_bub_tot',mass_frac_bub_tot(:),pcols,lchnk)
-   endif
 
 ! Effective mass enrichment ratio (for bulk OM) -- diagnostic variable
 !
@@ -697,14 +667,6 @@ enddo tracer_loop
       call omfrac_accu_aitk(mass_frac_bub(:, i), mass_frac_bub_section(:, i, :))
    end do
 
-   if (debug_mam_mom) then
-      call outfld('mass_frac_bub_poly',mass_frac_bub(:,1),pcols,lchnk)
-      call outfld('mass_frac_bub_prot',mass_frac_bub(:,2),pcols,lchnk)
-      call outfld('mass_frac_bub_lip',mass_frac_bub(:,3),pcols,lchnk)
-      call outfld('omf_bub_section_mpoly',mass_frac_bub_section(:,1,1),pcols,lchnk)
-      call outfld('omf_bub_section_mprot',mass_frac_bub_section(:,2,1),pcols,lchnk)
-      call outfld('omf_bub_section_mlip', mass_frac_bub_section(:,3,1),pcols,lchnk)
-   endif
 
  end subroutine calc_om_ssa_burrows
 
@@ -897,40 +859,6 @@ subroutine init_ocean_data()
        endif
 
     enddo fldloop
-
-! FOR DEBUGGING
-    debug: if (debug_mam_mom) then
-       call addfld('mpoly_debug', horiz_only, 'A', ' ', 'mpoly_debug' ) 
-       call add_default ('mpoly_debug', 1, ' ')
-
-       call addfld('mass_frac_bub_tot', horiz_only, 'A', ' ', 'total organic mass fraction of bubble' ) 
-       call add_default ('mass_frac_bub_tot', 1, ' ')
-
-       call addfld('mass_frac_bub_poly', horiz_only, 'A', ' ', 'total organic mass fraction (poly)' ) 
-       call add_default ('mass_frac_bub_poly', 1, ' ')
-
-       call addfld('mass_frac_bub_prot', horiz_only, 'A', ' ', 'total organic mass fraction (prot)' ) 
-       call add_default ('mass_frac_bub_prot', 1, ' ')
-
-       call addfld('mass_frac_bub_lip', horiz_only, 'A', ' ', 'total organic mass fraction (lip)' ) 
-       call add_default ('mass_frac_bub_lip', 1, ' ')
-
-       om_mode_loop: do m_om=1,nslt_om
-          m = nslt+m_om
-          call addfld('cflx_'//trim(seasalt_names(m))//'_debug', horiz_only, 'A', ' ', 'accumulation organic mass emissions' ) 
-          call add_default ('cflx_'//trim(seasalt_names(m))//'_debug', 1, ' ')
-       enddo om_mode_loop
-
-       call addfld('omf_bub_section_mpoly', horiz_only, 'A',' ', 'omf poly' ) 
-       call add_default ('omf_bub_section_mpoly', 1, ' ')
-
-       call addfld('omf_bub_section_mprot', horiz_only, 'A',' ', 'omf prot' ) 
-       call add_default ('omf_bub_section_mprot', 1, ' ')
-
-       call addfld('omf_bub_section_mlip', horiz_only, 'A',' ', 'omf lip' ) 
-       call add_default ('omf_bub_section_mlip', 1, ' ')
-
-    endif debug
 
     if ( masterproc ) then
        write(iulog,*) 'Done initializing marine organics data'
