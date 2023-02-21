@@ -1169,64 +1169,61 @@ lphase_jnmw_conditional: &
                 qsrflx_mzaer2cnvpr(1:ncol,mm,1) = sflxec(  1:ncol)
                 qsrflx_mzaer2cnvpr(1:ncol,mm,2) = sflxecdp(1:ncol)
 
-             elseif (lphase == 2) then lphase_jnmw_conditional ! lphase == 2
-                do_lphase2 = .true.
-! There is no cloud-borne aerosol water in the model, so the do_lphase2 code block
+             elseif (lphase == 2 .and. jnummaswtr /= jaerowater) then lphase_jnmw_conditional
+! There is no cloud-borne aerosol water in the model, so this code block
 ! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = jaerowater).
 ! The code only worked because the "do lspec" loop cycles when lspec = nspec_amode(m)+1,
 ! but that does not make the code correct.
-                if (jnummaswtr == jaerowater) do_lphase2 = .false.
-do_lphase2_conditional: &
-                if ( do_lphase2 ) then
-                   dqdt_tmp(:,:) = 0.0_r8
-                   fldcw => qqcw_get_field(pbuf,mm,lchnk)
-                   qqcw_sav(1:ncol,:,lspec) = fldcw(1:ncol,:)  !RCE 2012/01/12
-                   
+                dqdt_tmp(:,:) = 0.0_r8
+                fldcw => qqcw_get_field(pbuf,mm,lchnk)
+                qqcw_sav(1:ncol,:,lspec) = fldcw(1:ncol,:)  !RCE 2012/01/12
+            
+                ! FIXME: Not sure if this is a bug or not as qqcw_tmp seem different
+                ! from the previous call and qqcw_tmp is always zero. May need
+                ! further check.  - Shuaiqi Tang in refactoring for MAM4xx
                 call wetdepa_v2( &
-                     ncol, dt, state%pdel, &
-                     dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
-                     dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
-                     dep_inputs%cldt, dep_inputs%cldcu, &
-                     dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     sol_factb, sol_facti, sol_factic, &
-                     mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, &
-                     fldcw, qqcw_tmp,  & ! FIXIT: is it a bug using qqcw_tmp here? Different with the previous call
-                     fracis_cw, dqdt_tmp, iscavt, &
-                     icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
+                   ncol, dt, state%pdel, &
+                   dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
+                   dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
+                   dep_inputs%cldt, dep_inputs%cldcu, &
+                   dep_inputs%cldvcu, dep_inputs%cldvst, &
+                   sol_factb, sol_facti, sol_factic, &
+                   mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, &
+                   fldcw, qqcw_tmp,  & 
+                   fracis_cw, dqdt_tmp, iscavt, &
+                   icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
 
-                   ! resuspension goes to coarse mode
-                   ! first deduct the current resuspension from the dqdt_tmp of the current species
-                   dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                   ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
-                   mmtoo = mmtoo_prevap_resusp(mm)
-                   if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
+                ! resuspension goes to coarse mode
+                ! first deduct the current resuspension from the dqdt_tmp of the current species
+                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
+                ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
+                mmtoo = mmtoo_prevap_resusp(mm)
+                if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
                    
-                   fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+                fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-                   call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFWET', sflx, pcols, lchnk)
-                   aerdepwetcw(:ncol,mm) = sflx(:ncol)
+                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFWET', sflx, pcols, lchnk)
+                aerdepwetcw(:ncol,mm) = sflx(:ncol)
                    
-                   call calc_sfc_flux(icscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSIC', sflx, pcols, lchnk)
+                call calc_sfc_flux(icscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSIC', sflx, pcols, lchnk)
 
-                   call calc_sfc_flux(isscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSIS', sflx, pcols, lchnk)
+                call calc_sfc_flux(isscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSIS', sflx, pcols, lchnk)
 
-                   call calc_sfc_flux(bcscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSBC', sflx, pcols, lchnk)
+                call calc_sfc_flux(bcscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSBC', sflx, pcols, lchnk)
 
-                   call calc_sfc_flux(bsscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSBS', sflx, pcols, lchnk)
+                call calc_sfc_flux(bsscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSBS', sflx, pcols, lchnk)
 
-                   call calc_sfc_flux(rcscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
+                call calc_sfc_flux(rcscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
                       
-                   call calc_sfc_flux(rsscavt, state%pdel, sflx)
-                   call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
-
-                endif do_lphase2_conditional
+                call calc_sfc_flux(rsscavt, state%pdel, sflx)
+                call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
 
              endif lphase_jnmw_conditional
 
