@@ -1548,7 +1548,6 @@ lphase_jnmw_conditional: &
 
     !   local variables
     integer :: jgrow, ll, imode ! indexes
-    integer :: lunerr           ! logical unit for error message
     real(r8) :: dg0             ! aerosol diameter [m]
     real(r8) :: dg0_cgs         ! aerosol diameter in CGS unit [cm]
     real(r8) :: sigmag          ! standard deviation of aerosol size distribution 
@@ -1562,8 +1561,6 @@ lphase_jnmw_conditional: &
     real(r8), parameter :: temp_0C = 273.16_r8        ! K
     real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
     
-    lunerr = 6
-
     modeloop: do imode = 1, ntot_amode
 
        sigmag = sigmag_amode(imode)
@@ -1593,7 +1590,7 @@ lphase_jnmw_conditional: &
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
           call calc_1_impact_rate( &
                dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
-               scavratenum, scavratevol, lunerr )
+               scavratenum, scavratevol )
 
           scavimptblnum(jgrow,imode) = log( scavratenum )
           scavimptblvol(jgrow,imode) = log( scavratevol )
@@ -1680,7 +1677,7 @@ lphase_jnmw_conditional: &
   !===============================================================================
   subroutine calc_1_impact_rate(                        &
                      dg0, sigmag, rhoaero, temp, press, & ! in
-                     scavratenum, scavratevol, lunerr   ) ! out
+                     scavratenum, scavratevol           ) ! out
    !
    !   this subroutine computes a single impaction scavenging rate
    !   for precipitation rate of 1 mm/h
@@ -1698,9 +1695,10 @@ lphase_jnmw_conditional: &
    real(r8), intent(in)  :: temp        ! temperature [K]
    real(r8), intent(in)  :: press       ! pressure [dyne/cm^2]
    real(r8), intent(out) :: scavratenum, scavratevol  ! scavenging rate for aerosol number and volume [1/hour]
-   integer,  intent(out) :: lunerr      ! logical unit for error message
 
    !   local variables
+   integer, parameter :: lunerr = 6     ! logical unit for error message
+
    integer, parameter :: nrainsvmax=50  ! maximum bin number for rain
    real(r8) :: rrainsv(nrainsvmax)      ! rain radius for each bin [cm]
    real(r8) :: xnumrainsv(nrainsvmax)   ! rain number for each bin [#/cm3]
