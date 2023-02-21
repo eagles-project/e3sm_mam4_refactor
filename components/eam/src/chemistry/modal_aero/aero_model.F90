@@ -1112,64 +1112,29 @@ lphase_jnmw_conditional: &
                 call outfld( trim(cnst_name(mm))//'SBC', bcscavt, pcols, lchnk)
                 call outfld( trim(cnst_name(mm))//'SBS', bsscavt, pcols, lchnk)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+dqdt_tmp(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
                 aerdepwetis(:ncol,mm) = sflx(:ncol)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+icscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(icscavt, state%pdel, sflx)
                 sflxic = sflx
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+isscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(isscavt, state%pdel, sflx)
                 call outfld( trim(cnst_name(mm))//'SFSIS', sflx, pcols, lchnk)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bcscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(bcscavt, state%pdel, sflx)
                 call outfld( trim(cnst_name(mm))//'SFSBC', sflx, pcols, lchnk)
                 sflxbc = sflx
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bsscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(bsscavt, state%pdel, sflx)
                 call outfld( trim(cnst_name(mm))//'SFSBS', sflx, pcols, lchnk)
                
                 ! here the prevap resuspension is in rcscavt & rsscavt and column integral is written to history
                 !BSINGH(09/15/2014):Following two nested do-loops are new additions for unified convection 
                 !BSINGH(09/15/2014):After these do-loops, code was added by RCE, the comments by RCE are kept as it is
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+rcscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(rcscavt, state%pdel, sflx)
                 sflxec = sflx
                    
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+rsscavt(i,k)*state%pdel(i,k)/gravit
-                   enddo
-                enddo
+                call calc_sfc_flux(rsscavt, state%pdel, sflx)
                 call outfld( trim(cnst_name(mm))//'SFSES', sflx, pcols, lchnk)                   
                    
                 ! apportion convective surface fluxes to deep and shallow conv
@@ -1239,57 +1204,26 @@ do_lphase2_conditional: &
                    
                    fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+dqdt_tmp(i,k)*state%pdel(i,k)/gravit
-                      enddo
-                   enddo
+                   call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFWET', sflx, pcols, lchnk)
                    aerdepwetcw(:ncol,mm) = sflx(:ncol)
                    
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+icscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
-                   enddo
+                   call calc_sfc_flux(icscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSIC', sflx, pcols, lchnk)
 
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+isscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
-                   enddo
+                   call calc_sfc_flux(isscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSIS', sflx, pcols, lchnk)
 
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+bcscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
-                   enddo
+                   call calc_sfc_flux(bcscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSBC', sflx, pcols, lchnk)
 
-                   sflx(:)=0._r8
-                   do k=1,pver
-                      do i=1,ncol
-                         sflx(i)=sflx(i)+bsscavt(i,k)*state%pdel(i,k)/gravit
-                      enddo
-                   enddo
+                   call calc_sfc_flux(bsscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSBS', sflx, pcols, lchnk)
 
-                   sflx(:)=0.0_r8
-                   do k=1,pver
-                      sflx(1:ncol)=sflx(1:ncol)+rcscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
-                   enddo
+                   call calc_sfc_flux(rcscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
                       
-                   sflx(:)=0.0_r8
-                   do k=1,pver
-                      sflx(1:ncol)=sflx(1:ncol)+rsscavt(1:ncol,k)*state%pdel(1:ncol,k)/gravit
-                   enddo
+                   call calc_sfc_flux(rsscavt, state%pdel, sflx)
                    call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
 
                 endif do_lphase2_conditional
@@ -1327,7 +1261,23 @@ do_lphase2_conditional: &
 
   end subroutine aero_model_wetdep
 
+  !=============================================================================
+  subroutine calc_sfc_flux(layer_tend, pdel, sflx)
+    !-----------------------------------------------------------------------
+    ! calculate surface fluxes of wet deposition from vertical integration of tendencies 
+    !-----------------------------------------------------------------------
+    real(r8), intent(in) :: pdel(:,:)      ! pressure difference between two layers [Pa]
+    real(r8), intent(in) :: layer_tend(:,:)! physical tendencies in each layer [kg/kg/s]
+    real(r8), intent(out):: sflx(:)        ! integrated surface fluxes [kg/m2/s]
 
+    integer :: kk
+
+     sflx(:)=0.0_r8
+     do kk=1,pver
+        sflx(:) = sflx(:) + layer_tend(:,kk)*pdel(:,kk)/gravit
+     enddo
+
+  end subroutine calc_sfc_flux
   !=============================================================================
   !=============================================================================
   subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt, &
