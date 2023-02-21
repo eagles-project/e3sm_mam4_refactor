@@ -334,11 +334,11 @@ subroutine dropmixnuc( &
    real(r8) :: wmax       ! vertical velocity upper bound [m/s]
    real(r8) :: dum, dumc        ! temporary variables
    real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
-   real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [# or kg/kg]
+   real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
    real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
    real(r8) :: dtmix    ! timescale for subloop [s] 
-   real(r8) :: raertend(pver)  ! tendency of interstitial aerosol mass, number mixing ratios [# or kg/kg/s]
-   real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [# or kg/kg/s]
+   real(r8) :: raertend(pver)  ! tendency of interstitial aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
+   real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
    real(r8) :: zs(pver) ! inverse of distance between levels [m^-1]
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio [#/kg]
    real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
@@ -379,8 +379,8 @@ subroutine dropmixnuc( &
    real(r8), pointer :: ccn3d(:, :)  !  CCN at 0.2% supersat [#/m^3]
    real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate [/s]
    real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
-   real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios [# or kg/kg]
-   real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [# or kg/kg]
+   real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios [#/kg or kg/kg]
+   real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
    real(r8), allocatable :: naermod(:)  ! aerosol number concentration [#/m^3]
    real(r8), allocatable :: hygro(:)    ! hygroscopicity of aerosol mode [dimensionless]
    real(r8), allocatable :: vaerosol(:) ! aerosol volume conc [m^3/m^3]
@@ -395,7 +395,7 @@ subroutine dropmixnuc( &
 
    real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
-   type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [# or kg/kg]
+   type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
    integer, save :: count_submix(100)
    integer  :: lchnk               ! chunk identifier
@@ -415,15 +415,6 @@ subroutine dropmixnuc( &
    integer  :: isub       ! substep index
    integer  :: spc_idx, num_idx  ! species, number indices  
 
-! NOTE FOR C++ PORT:  Below fields are not used in our tests since do_aerocom_ind3 = .false. by default.
-! Likely can be removed
-!+++ AeroCOM IND3 output
-   real(r8) :: ccn3col(pcols), ccn4col(pcols)
-   real(r8) :: ccn3bl(pcols), ccn4bl(pcols)
-   real(r8) :: zi2(pver+1), zm2(pver)
-   integer  :: idx1000
-   logical  :: zmflag
-
    !-------------------------------------------------------------------------------
 
 !  NOTES FOR C++ PORT:  Below code extracts fields from state vector
@@ -442,7 +433,7 @@ subroutine dropmixnuc( &
    rpdel    => state%rpdel
    zm       => state%zm
 
-!  prog_modal_aero is always true in our particular test configuration.
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our particular test configuration.
    if (prog_modal_aero) then
       ! aerosol tendencies
       call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
@@ -451,15 +442,11 @@ subroutine dropmixnuc( &
       call physics_ptend_init(ptend, state%psetcols, 'ndrop')
    endif
 
-!  Below code is not used in our tests since do_aerocom_ind3 = .false. by default.
-!  Likely can be removed
+!  do_aerocom_ind3 = .false. by default, .true. option not tested.
 
    if(do_aerocom_ind3) then
-       ccn3d_idx = pbuf_get_index('ccn3d')
-       call pbuf_get_field(pbuf, ccn3d_idx, ccn3d)
+      call endrun('The do_aerocom_ind3 option is no longer supported')
    endif
-
-! END NOTES FOR C++ PORT
 
 !  Allocate / define local variables
 
@@ -638,7 +625,7 @@ subroutine dropmixnuc( &
                naermod(imode)  = na(icol)
                vaerosol(imode) = va(icol)
                hygro(imode)    = hy(icol)
-            end do
+            enddo
 
             ! rce-comment - use wtke at layer centers for new-cloud activation
 
@@ -785,7 +772,7 @@ subroutine dropmixnuc( &
                      ! note that kp1 is used here
                   fluxntot = fluxntot &
                         + fluxn(imode)*raercol(kp1,mm,nsav)*cs(icol,kk)
-               end do
+               enddo
                srcn(kk)      = srcn(kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
                nsource(icol,kk) = nsource(icol,kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
 
@@ -851,7 +838,7 @@ subroutine dropmixnuc( &
          !    the negative values are reset to zero, resulting in an
          !    artificial source.
 
-         if (tinv .gt. 1.e-6_r8) then
+         if (tinv > 1.e-6_r8) then
             dtt   = 1._r8/tinv
             dtmin = min(dtmin, dtt)
          endif
@@ -875,7 +862,7 @@ subroutine dropmixnuc( &
             overlapp(kk) = min(cldn(icol,kk)/cldn(icol,kp1), 1._r8)
          else
             overlapp(kk) = 1._r8
-         end if
+         endif
          if (cldn(icol,km1) > 1.e-10_r8) then
             overlapm(kk) = min(cldn(icol,kk)/cldn(icol,km1), 1._r8)
          else
@@ -1025,7 +1012,7 @@ subroutine dropmixnuc( &
                lptr = mam_cnst_idx(imode,lspec)
                qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
 
-               if( lspec.eq.0 ) then
+               if( lspec == 0 ) then
                   num_idx = numptr_amode(imode)
                   raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,num_idx))*dtinv
                else
@@ -1077,46 +1064,6 @@ subroutine dropmixnuc( &
    do lsat = 1, psat
       call outfld(ccn_name(lsat), ccn(1,1,lsat), pcols, lchnk)
    enddo
-
-
-!  NOTE FOR C++ PORT:  Below if/then branch is not used in our tests since do_aerocom_ind3 = .false. by default.
-!  Furthermore, code seems to assume ccn is in #/cm^3 when it is actually in #/m^3.
-!  if/then branch below likely can be removed
-
-   if(do_aerocom_ind3) then
-      ccn3d(:ncol, :) = ccn(:ncol, :, 4)
-      ccn3col = 0.0_r8; ccn4col = 0.0_r8
-      do icol=1, ncol
-        do kk=1, pver
-          ccn3col(icol) = ccn3col(icol) + ccn(icol,kk,3) * 1.0e6*   &
-             pdel(icol,kk)/gravit/(pmid(icol,kk)/(temp(icol,kk)*rair))  !#/cm3 --> #/m2
-          ccn4col(icol) = ccn4col(icol) + ccn(icol,kk,4) * 1.0e6*   &
-             pdel(icol,kk)/gravit/(pmid(icol,kk)/(temp(icol,kk)*rair))  !#/cm3 --> #/m2
-        enddo
-
-! calculate CCN at 1km
-        zi2 = 0.0
-        zm2 = 0.0
-        zmflag = .true.
-        do kk=pver, 1, -1
-          zi2(kk) = zi2(kk+1) + pdel(icol,kk)/gravit/(pmid(icol,kk)/(temp(icol,kk)*rair)) !
-          zm2(kk) = (zi2(kk+1)+zi2(kk))/2._r8
-          if(zm2(kk).gt.1000. .and. zmflag) then
-            idx1000 = min(kk, pver-1)
-            zmflag = .false.
-          endif
-        enddo
-        ccn3bl(icol) = (ccn(icol,idx1000,3)*(1000.-zm2(idx1000+1))+ccn(icol,idx1000+1,3) * (zm2(idx1000)-1000.)) & 
-                    /(zm2(idx1000)-zm2(idx1000+1)) * 1.0e6  ! #/cm3 -->#/m3
-        ccn4bl(icol) = (ccn(icol,idx1000,4)*(1000.-zm2(idx1000+1))+ccn(icol,idx1000+1,4) * (zm2(idx1000)-1000.)) &
-                     /(zm2(idx1000)-zm2(idx1000+1)) *1.0e6   ! #/cm3 -->#/m3
-      enddo
-      call outfld('colccn.1', ccn3col, pcols, lchnk)
-      call outfld('colccn.3', ccn4col, pcols, lchnk)
-      call outfld('ccn.1bl', ccn3bl, pcols, lchnk)
-      call outfld('ccn.3bl', ccn4bl, pcols, lchnk)
-   endif
-
 
 ! do column tendencies
 ! NOTE FOR C++ PORT:  prog_modal_aero is always true in our particular tests.
@@ -1284,7 +1231,7 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &
   if ( present( smax_prescribed ) ) then
      !return if max supersaturation is 0 or negative
      if (smax_prescribed <= 0.0_r8) return
-  end if
+  endif
 
   pres=rair*rhoair*tair !pressure
   !Obtain Saturation vapor pressure (es) and saturation specific humidity (qs)
