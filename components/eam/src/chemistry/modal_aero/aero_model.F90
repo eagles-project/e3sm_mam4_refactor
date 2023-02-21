@@ -1599,110 +1599,106 @@ do_lphase2_conditional: &
 
     implicit none
 
-
     !   local variables
-    integer nnfit_maxd
-    parameter (nnfit_maxd=27)
+    integer :: jgrow, ll, imode ! indexes
+    integer :: lunerr           ! logical unit for error message
+    real(r8) :: dg0             ! aerosol diameter [m]
+    real(r8) :: dg0_cgs         ! aerosol diameter in CGS unit [cm]
+    real(r8) :: sigmag          ! standard deviation of aerosol size distribution 
+    real(r8) :: rhodryaero, rhowetaero   ! dry and wet aerosol density [kg/m3] 
+    real(r8) :: rhowetaero_cgs  ! wet aerosol density in CGS unit [g/cm3]
+    real(r8) :: scavratenum     ! scavenging rate of aerosol number [1/s]
+    real(r8) :: scavratevol     ! scavenging rate of aerosol volume [1/s]
+    real(r8) :: wetdiaratio, wetvolratio ! ratio of diameter and volume for wet/dry aerosols [fraction]
 
-    integer i, jgrow, jdens, jpress, jtemp, ll, mode, nnfit
-    integer lunerr
-
-    real(r8) dg0, dg0_cgs, press, &
-         rhodryaero, rhowetaero, rhowetaero_cgs, rmserr, &
-         scavratenum, scavratevol, sigmag,                &
-         temp, wetdiaratio, wetvolratio
-    real(r8) aafitnum(1), xxfitnum(1,nnfit_maxd), yyfitnum(nnfit_maxd)
-    real(r8) aafitvol(1), xxfitvol(1,nnfit_maxd), yyfitvol(nnfit_maxd)
-
+    ! set up temperature-pressure pair to compute impaction scavenging rates
+    real(r8), parameter :: temp_0C = 273.16_r8        ! K
+    real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
     
     lunerr = 6
 
-    modeloop: do mode = 1, ntot_amode
+    modeloop: do imode = 1, ntot_amode
 
-       sigmag = sigmag_amode(mode)
-
-       ll = lspectype_amode(1,mode)
+       sigmag = sigmag_amode(imode)
+       ll = lspectype_amode(1,imode)
        rhodryaero = specdens_amode(ll)
 
        growloop: do jgrow = nimptblgrow_mind, nimptblgrow_maxd
 
           wetdiaratio = exp( jgrow*dlndg_nimptblgrow )
-          dg0 = dgnum_amode(mode)*wetdiaratio
-
+          dg0 = dgnum_amode(imode)*wetdiaratio
           wetvolratio = exp( jgrow*dlndg_nimptblgrow*3._r8 )
           rhowetaero = 1.0_r8 + (rhodryaero-1.0_r8)/wetvolratio
           rhowetaero = min( rhowetaero, rhodryaero )
 
-          !
-          !   compute impaction scavenging rates at 1 temp-press pair and save
-          !
-          nnfit = 0
-
-          temp = 273.16_r8
-          press = 0.75e6_r8   ! dynes/cm2
+! FIXME: not sure why wet aerosol density is set as dry aerosol density here
+! but the above calculation of rhowetaero is incorrect. 
+! I think the number 1.0_r8 should be 1000._r8 as the unit is kg/m3
+! the above calculation gives wet aerosol density very small number (a few kg/m3)
+! this may cause some problem. I guess this is the reason of using dry density.
+! should be better if fix the wet density bug and use it. Keep it for now for BFB testing
+! -- (commented by Shuaiqi Tang when refactoring for MAM4xx)
           rhowetaero = rhodryaero
 
+          ! compute impaction scavenging rates at 1 temp-press pair and save
+          ! note that the subroutine calc_1_impact_rate uses CGS units
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
           call calc_1_impact_rate( &
-               dg0_cgs, sigmag, rhowetaero_cgs, temp, press, &
+               dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
                scavratenum, scavratevol, lunerr )
 
-          nnfit = nnfit + 1
-          if (nnfit .gt. nnfit_maxd) then
-             write(lunerr,9110)
-             call endrun()
-          endif
-9110      format( '*** subr. modal_aero_bcscavcoef_init -- nnfit too big' )
-
-          xxfitnum(1,nnfit) = 1._r8
-          yyfitnum(nnfit) = log( scavratenum )
-
-          xxfitvol(1,nnfit) = 1._r8
-          yyfitvol(nnfit) = log( scavratevol )
-
-          scavimptblnum(jgrow,mode) = yyfitnum(1)
-          scavimptblvol(jgrow,mode) = yyfitvol(1)
+          scavimptblnum(jgrow,imode) = log( scavratenum )
+          scavimptblvol(jgrow,imode) = log( scavratevol )
 
        enddo growloop
     enddo modeloop
     return
+
   end subroutine modal_aero_bcscavcoef_init
 
   !===============================================================================
-  subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, scavcoefnum, scavcoefvol )
+  subroutine modal_aero_bcscavcoef_get( imode, ncol, isprx, dgn_awet, & ! in
+                                        scavcoefnum, scavcoefvol      ) ! out
+    !-----------------------------------------------------------------------
+    ! compute impaction scavenging removal amount for aerosol volume and number
+    !-----------------------------------------------------------------------
 
     use modal_aero_data, only: dgnum_amode
-    !-----------------------------------------------------------------------
+
     implicit none
 
-    integer,intent(in) :: m, ncol
-    logical,intent(in):: isprx(pcols,pver)
-    real(r8), intent(in) :: dgn_awet(pcols,pver,ntot_amode)
-    real(r8), intent(out) :: scavcoefnum(pcols,pver), scavcoefvol(pcols,pver)
+    integer,  intent(in) :: imode, ncol
+    logical,  intent(in) :: isprx(pcols,pver)           ! if there is precip
+    real(r8), intent(in) :: dgn_awet(pcols,pver,ntot_amode)  ! wet aerosol diameter [m]
+    real(r8), intent(out):: scavcoefnum(pcols,pver)     ! scavenging removal for aerosol number [1/h]
+    real(r8), intent(out):: scavcoefvol(pcols,pver)     ! scavenging removal for aerosol volume [1/h]
 
-    integer i, k, jgrow
-    real(r8) dumdgratio, xgrow, dumfhi, dumflo, scavimpvol, scavimpnum
+    ! local variables
+    integer  :: icol, kk, jgrow         ! index
+    real(r8) :: wetdiaratio             ! ratio of wet and dry aerosol diameter [fraction]
+    real(r8) :: xgrow, dumfhi, dumflo   ! working variables
+    real(r8) :: scavimpvol, scavimpnum  ! log of scavenging rates for volume and number
 
 
-    do k = 1, pver
-       do i = 1, ncol
+    do kk = 1, pver
+       do icol = 1, ncol
 
-          ! do only if no precip
-          if ( isprx(i,k) ) then
-             !
+          ! do only if there is precip
+          if ( isprx(icol,kk) ) then
+             
              ! interpolate table values using log of (actual-wet-size)/(base-dry-size)
+             wetdiaratio = dgn_awet(icol,kk,imode)/dgnum_amode(imode)
 
-             dumdgratio = dgn_awet(i,k,m)/dgnum_amode(m)
-
-             if ((dumdgratio .ge. 0.99_r8) .and. (dumdgratio .le. 1.01_r8)) then
-                scavimpvol = scavimptblvol(0,m)
-                scavimpnum = scavimptblnum(0,m)
+             if ((wetdiaratio >= 0.99_r8) .and. (wetdiaratio <= 1.01_r8)) then
+                scavimpvol = scavimptblvol(0,imode)
+                scavimpnum = scavimptblnum(0,imode)
              else
-                xgrow = log( dumdgratio ) / dlndg_nimptblgrow
+                xgrow = log( wetdiaratio ) / dlndg_nimptblgrow
                 jgrow = int( xgrow )
-                if (xgrow .lt. 0._r8) jgrow = jgrow - 1
-                if (jgrow .lt. nimptblgrow_mind) then
+                if (xgrow < 0._r8) jgrow = jgrow - 1
+
+                if (jgrow < nimptblgrow_mind) then
                    jgrow = nimptblgrow_mind
                    xgrow = jgrow
                 else
@@ -1711,27 +1707,21 @@ do_lphase2_conditional: &
 
                 dumfhi = xgrow - jgrow
                 dumflo = 1._r8 - dumfhi
-
-                scavimpvol = dumflo*scavimptblvol(jgrow,m) + &
-                     dumfhi*scavimptblvol(jgrow+1,m)
-                scavimpnum = dumflo*scavimptblnum(jgrow,m) + &
-                     dumfhi*scavimptblnum(jgrow+1,m)
+                scavimpvol = dumflo*scavimptblvol(jgrow,imode) + &
+                     dumfhi*scavimptblvol(jgrow+1,imode)
+                scavimpnum = dumflo*scavimptblnum(jgrow,imode) + &
+                     dumfhi*scavimptblnum(jgrow+1,imode)
 
              endif
 
              ! impaction scavenging removal amount for volume
-             scavcoefvol(i,k) = exp( scavimpvol )
+             scavcoefvol(icol,kk) = exp( scavimpvol )
              ! impaction scavenging removal amount to number
-             scavcoefnum(i,k) = exp( scavimpnum )
+             scavcoefnum(icol,kk) = exp( scavimpnum )
 
-             ! scavcoef = impaction scav rate (1/h) for precip = 1 mm/h
-             ! scavcoef = impaction scav rate (1/s) for precip = pfx_inrain
-             ! (scavcoef/3600) = impaction scav rate (1/s) for precip = 1 mm/h
-             ! (pfx_inrain*3600) = in-rain-area precip rate (mm/h)
-             ! impactrate = (scavcoef/3600) * (pfx_inrain*3600)
-          else
-             scavcoefvol(i,k) = 0._r8
-             scavcoefnum(i,k) = 0._r8
+          else ! if no precip
+             scavcoefvol(icol,kk) = 0._r8
+             scavcoefnum(icol,kk) = 0._r8
           endif
 
        enddo
