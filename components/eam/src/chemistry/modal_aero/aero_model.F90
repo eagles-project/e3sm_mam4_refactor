@@ -834,17 +834,11 @@ contains
     call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh  )
     call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
     call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
-    evapcdpsum(:) = 0.0_r8
-    rprddpsum(:)  = 0.0_r8  
-    evapcshsum(:) = 0.0_r8
-    rprdshsum(:)  = 0.0_r8
-    do k = 1, pver
-       rprddpsum(:ncol)  = rprddpsum(:ncol)  +  rprddp(:ncol,k)*state%pdel(:ncol,k)/gravit
-       rprdshsum(:ncol)  = rprdshsum(:ncol)  +  rprdsh(:ncol,k)*state%pdel(:ncol,k)/gravit
-       evapcdpsum(:ncol) = evapcdpsum(:ncol) + evapcdp(:ncol,k)*state%pdel(:ncol,k)/gravit
-       evapcshsum(:ncol) = evapcshsum(:ncol) + evapcsh(:ncol,k)*state%pdel(:ncol,k)/gravit
-    enddo  !RCE 2012/01/12 end
 
+    call calc_sfc_flux(rprdsh,  state%pdel, rprdshsum)
+    call calc_sfc_flux(rprddp,  state%pdel, rprddpsum)
+    call calc_sfc_flux(evapcsh, state%pdel, evapcshsum)
+    call calc_sfc_flux(evapcdp, state%pdel, evapcdpsum)
 
     prec(:ncol)=0._r8
     do k=1,pver
@@ -1136,25 +1130,11 @@ lphase_jnmw_conditional: &
                 !    fields are just diagnostics, this approximate method is adequate
                 ! only do this for interstitial aerosol, because conv clouds to not
                 !    affect the stratiform-cloudborne aerosol
-                do i = 1, ncol
-                  tmp_precdp = max( rprddpsum(i),  1.0e-35_r8 )
-                  tmp_precsh = max( rprdshsum(i),  1.0e-35_r8 )
-                  tmp_evapdp = max( evapcdpsum(i), 0.1e-35_r8 )
-                  tmp_evapsh = max( evapcshsum(i), 0.1e-35_r8 )
-                      
-                  ! assume that in- and below-cloud removal are proportional to column precip production
-                  tmpa = tmp_precdp / (tmp_precdp + tmp_precsh)
-                  tmpa = max( 0.0_r8, min( 1.0_r8, tmpa ) )
-                  sflxicdp(i) = sflxic(i)*tmpa
-                  sflxbcdp(i) = sflxbc(i)*tmpa
-                      
-                  ! assume that resuspension is proportional to (wet removal)*[(precip evap)/(precip production)]
-                  tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp), 1.0_r8 )
-                  tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh), 1.0_r8 )
-                  tmpb = max( tmp_resudp, 1.0e-35_r8 ) / max( (tmp_resudp+tmp_resush), 1.0e-35_r8 )
-                  tmpb = max( 0.0_r8, min( 1.0_r8, tmpb ) )
-                  sflxecdp(i) = sflxec(i)*tmpb
-                enddo
+                call apportion_sfc_flux_deep ( ncol,              & ! in
+                        rprddpsum,rprdshsum,evapcdpsum,evapcshsum,& ! in
+                        sflxbc,             sflxec,               & ! in
+                        sflxbcdp,           sflxecdp              ) ! out
+
                 call outfld( trim(cnst_name(mm))//'SFSBD', sflxbcdp, pcols, lchnk)
                 ! when ma_convproc_intr is used, convective in-cloud wet removal is done there
                 ! the convective (total and deep) precip-evap-resuspension includes in- and below-cloud
@@ -1247,6 +1227,64 @@ lphase_jnmw_conditional: &
     call wetdep_inputs_unset(dep_inputs)
 
   end subroutine aero_model_wetdep
+
+!=============================================================================
+   subroutine apportion_sfc_flux_deep ( ncol,                     & ! in
+                        rprddpsum,rprdshsum,evapcdpsum,evapcshsum,& ! in
+                        sflxbc,   sflxec,                         & ! in
+                        sflxbcdp, sflxecdp                        ) ! out
+     !-----------------------------------------------------------------------
+     ! apportion convective surface fluxes to deep and shallow conv
+     ! this could be done more accurately in subr wetdepa
+     ! since deep and shallow rarely occur simultaneously, and these
+     ! fields are just diagnostics, this approximate method is adequate
+     ! only do this for interstitial aerosol, because conv clouds to not
+     ! affect the stratiform-cloudborne aerosol
+     !-----------------------------------------------------------------------
+     use mam_support,     only: min_max_bound
+
+     integer, intent(in) :: ncol
+     real(r8),intent(in) :: rprddpsum(:)  ! vertical integration of deep rain production
+     real(r8),intent(in) :: rprdshsum(:)  ! vertical integration of shallow rain production
+     real(r8),intent(in) :: evapcdpsum(:) ! vertical integration of deep rain evaporation
+     real(r8),intent(in) :: evapcshsum(:) ! vertical integration of shallow rain evaporation
+     real(r8),intent(in) :: sflxbc(:)     ! surface flux of resuspension from bcscavt [kg/m2/s]
+     real(r8),intent(in) :: sflxec(:)     ! surface flux of resuspension from rcscavt [kg/m2/s]
+     real(r8),intent(out):: sflxbcdp(:)   ! surface flux of resuspension from bcscavt in deep conv. [kg/m2/s]
+     real(r8),intent(out):: sflxecdp(:)   ! surface flux of resuspension from rcscavt in deep conv. [kg/m2/s]
+
+
+     integer :: ii
+     real(r8) :: tmp_precdp, tmp_precsh, tmp_evapdp, tmp_evapsh ! working variables for precipitation and evaporation from deep and shallow convection
+     real(r8) :: tmp_resudp, tmp_resush         ! working variables for resuspension from deep and shallow convection
+     real(r8) :: tmpa, tmpb   ! working variables of deep fraction
+     real(r8), parameter :: small_value_35 = 1.0e-35_r8
+     real(r8), parameter :: small_value_36 = 1.0e-36_r8
+
+     do ii = 1, ncol
+          tmp_precdp = max( rprddpsum(ii),  small_value_35 )
+          tmp_precsh = max( rprdshsum(ii),  small_value_35 )
+          tmp_evapdp = max( evapcdpsum(ii), small_value_36 )
+          tmp_evapsh = max( evapcshsum(ii), small_value_36 )
+
+          ! assume that in- and below-cloud removal are proportional to
+          ! column precip production
+          tmpa = tmp_precdp / (tmp_precdp + tmp_precsh)
+          tmpa = min_max_bound(0.0_r8, 1.0_r8, tmpa)
+          sflxbcdp(ii) = sflxbc(ii)*tmpa
+
+          ! assume that resuspension is proportional to
+          ! (wet removal)*[(precip evap)/(precip production)]
+          tmp_resudp =           tmpa  * min( (tmp_evapdp/tmp_precdp),1.0_r8 )
+          tmp_resush = (1.0_r8 - tmpa) * min( (tmp_evapsh/tmp_precsh),1.0_r8 )
+          tmpb = max( tmp_resudp, small_value_35 ) / &
+                 max((tmp_resudp+tmp_resush), small_value_35)
+          tmpb = min_max_bound(0.0_r8, 1.0_r8, tmpb)
+
+          sflxecdp(ii) = sflxec(ii)*tmpb
+      enddo
+
+   end subroutine apportion_sfc_flux_deep
 
 !=============================================================================
    subroutine calc_resusp_to_coarse(    ncol,   mm,     & ! in
