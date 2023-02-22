@@ -308,6 +308,7 @@ subroutine dropmixnuc( &
    use output_aerocom_aie , only: do_aerocom_ind3
    use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype, &
       lmassptr_amode, numptr_amode
+   use mam_support, only: min_max_bound
 
    ! input arguments
    type(physics_state), target, intent(in)    :: state
@@ -526,9 +527,7 @@ subroutine dropmixnuc( &
          mact(kk,1:ntot_amode) = 0._r8
 
          if (kk < pver) then
-            ekd(kk)   = kvh(icol,kk+1)
-            ekd(kk)   = max(ekd(kk), zkmin)
-            ekd(kk)   = min(ekd(kk), zkmax)
+            ekd(kk)   = min_max_bound(zkmin,zkmax,kvh(icol,kk+1))
             csbot(kk) = 2.0_r8*pint(icol,kk+1)/(rair*(temp(icol,kk) + temp(icol,kk+1)))
             csbot_cscen(kk) = csbot(kk)/cs(icol,kk)
          else
