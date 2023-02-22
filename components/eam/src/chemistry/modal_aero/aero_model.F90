@@ -770,8 +770,6 @@ contains
     real(r8) :: rsscavt(pcols, pver)  !RCE
     real(r8) :: qqcw_in(pcols,pver), qqcw_sav(pcols,pver,0:maxd_aspectype)       ! temporary array to hold qqcw for the current mode  !RCE
     real(r8) :: rtscavt_sv(pcols, pver, pcnst) ! REASTER 08/12/2015
-    real(r8) :: rcscavt_cn_sv(pcols, pver)     ! REASTER 08/12/2015
-    real(r8) :: rsscavt_cn_sv(pcols, pver)     ! REASTER 08/12/2015
     
     real(r8), pointer :: fldcw(:,:)
 
@@ -828,10 +826,10 @@ contains
 
     call wetdep_inputs_set( state, pbuf, dep_inputs )
 
-    call pbuf_get_field(pbuf, dgnumwet_idx,       dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-    call pbuf_get_field(pbuf, qaerwat_idx,        qaerwat,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+    call pbuf_get_field(pbuf, qaerwat_idx,  qaerwat,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
     call pbuf_get_field(pbuf, rate1_cw2pr_st_idx, rate1ord_cw2pr_st)
-    call pbuf_get_field(pbuf, fracis_idx,         fracis, start=(/1,1,1/), kount=(/pcols, pver, pcnst/) )
+    call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
 
     !Compute variables needed for convproc unified convective transport
     call pbuf_get_field(pbuf, rprddp_idx,      rprddp  )
@@ -855,10 +853,15 @@ contains
             *state%pdel(:ncol,k)/gravit
     enddo
     
+    ! initiate variables
     qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  !RCE
     aerdepwetis(:,:)          = 0.0_r8  !RCE
     aerdepwetcw(:,:)          = 0.0_r8  !RCE
     qqcw_tmp(:,:)             = 0.0_r8  !RCE
+    ! below-cloud scavcoef = 0.0 for cloud-borne species
+    scavcoefnv(:,:,0)         = 0.0_r8
+    ! resuspension goes to a different phase or mode
+    rtscavt_sv(:,:,:)         = 0.0_r8
 
     ! calculate the mass-weighted sol_factic for coarse mode species
     f_act_conv_coarse(:,:) = 0.60_r8 ! rce 2010/05/02
@@ -880,13 +883,6 @@ contains
           enddo
        endif
     endif
-
-    scavcoefnv(:,:,0) = 0.0_r8 ! below-cloud scavcoef = 0.0 for cloud-borne species
-
-       ! resuspension goes to a different phase or mode
-    rtscavt_sv(:,:,:) = 0.0_r8
-    rcscavt_cn_sv(:,:) = 0.0_r8
-    rsscavt_cn_sv(:,:) = 0.0_r8
 
     !BSINGH: Decide the loop counters for the lphase loop 
     !for cases with and without the unified convective transport
