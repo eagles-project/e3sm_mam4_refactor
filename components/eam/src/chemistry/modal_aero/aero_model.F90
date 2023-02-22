@@ -1092,16 +1092,10 @@ lphase_jnmw_conditional: &
                      icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt       ) ! out
 
                 ! resuspension goes to coarse mode
-                ! first deduct the current resuspension from the dqdt_tmp of the current species
-                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
-                mmtoo = mmtoo_prevap_resusp(mm)
-                if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
-                                  + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                ! then add the rtscavt_sv of the current species to the dqdt_tmp of the current species
-                ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have
-                !  resuspension contributions from so4_a1/2/3 and so4c1/2/3
-                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
+                call calc_resusp_to_coarse(     ncol,   mm,     & ! in
+                        mmtoo_prevap_resusp,    .true.,         & ! in
+                        rcscavt,        rsscavt,                & ! in
+                        dqdt_tmp,       rtscavt_sv              ) ! inout
 
                 ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
 
@@ -1192,12 +1186,10 @@ lphase_jnmw_conditional: &
                    icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt         ) ! out 
 
                 ! resuspension goes to coarse mode
-                ! first deduct the current resuspension from the dqdt_tmp of the current species
-                dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
-                ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
-                mmtoo = mmtoo_prevap_resusp(mm)
-                if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
-                                  + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
+                call calc_resusp_to_coarse(    ncol,   mm,      & ! in
+                        mmtoo_prevap_resusp,   .false.,         & ! in
+                        rcscavt,        rsscavt,                & ! in
+                        dqdt_tmp,       rtscavt_sv              ) ! inout
                    
                 fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
@@ -1255,6 +1247,44 @@ lphase_jnmw_conditional: &
     call wetdep_inputs_unset(dep_inputs)
 
   end subroutine aero_model_wetdep
+
+!=============================================================================
+   subroutine calc_resusp_to_coarse(    ncol,   mm,     & ! in
+                mmtoo_prevap_resusp,    update_dqdt,    & ! in
+                rcscavt,        rsscavt,                & ! in
+                dqdt_tmp,       rtscavt_sv              ) ! inout
+     !-----------------------------------------------------------------------
+     ! resuspension goes to coarse mode
+     !-----------------------------------------------------------------------
+     integer, intent(in) :: ncol, mm
+     integer, intent(in) :: mmtoo_prevap_resusp(:)  ! pointers for resuspension
+     logical, intent(in) :: update_dqdt  ! if update dqdt_tmp with rtscavt_sv
+     real(r8),intent(in) :: rcscavt(:,:) ! resuspention from convective [kg/kg/s]
+     real(r8),intent(in) :: rsscavt(:,:) ! resuspention from stratiform [kg/kg/s]
+
+     real(r8), intent(inout) :: dqdt_tmp(:,:) ! temporary array to hold tendency for the "current" aerosol species [kg/kg/s]
+     real(r8), intent(inout) :: rtscavt_sv(:,:,:) ! resuspension that goes to coarse mode [kg/kg/s]
+
+     integer :: mmtoo
+
+     mmtoo = mmtoo_prevap_resusp(mm)
+
+     ! first deduct the current resuspension from the dqdt_tmp of the current species
+     dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) - ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
+     ! then add the current resuspension to the rtscavt_sv of the appropriate coarse mode species
+     if (mmtoo > 0) then
+        rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) &
+                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
+     endif
+     ! then add the rtscavt_sv of the current species to the dqdt_tmp
+     ! of the current species. This is not called when lphase==2
+     ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have
+     !  resuspension contributions from so4_a1/2/3 and so4c1/2/3
+     if (update_dqdt) then
+        dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
+     endif
+
+  end subroutine calc_resusp_to_coarse
 
   !=============================================================================
   subroutine calc_sfc_flux(layer_tend, pdel, sflx)
