@@ -1074,23 +1074,22 @@ lspec_loop_aa: &
 lphase_jnmw_conditional: &
              if ((lphase == 1) .and. (jnummaswtr /= jaerowater)) then
                 ptend%lq(mm) = .true.
-                dqdt_tmp(:,:) = 0.0_r8
                 ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
                 q_tmp(1:ncol,:) = state%q(1:ncol,:,mm) + ptend%q(1:ncol,:,mm)*dt
                 !Feed in the saved cloudborne mixing ratios from phase 2
                 qqcw_in(:,:) = qqcw_sav(:,:,lspec)
 
                 call wetdepa_v2( &
-                     ncol, dt, state%pdel, &
-                     dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
-                     dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
-                     dep_inputs%cldt, dep_inputs%cldcu, &
-                     dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     sol_factb, sol_facti, sol_factic, &
-                     mam_prevap_resusp_optcc, .false., scavcoefnv(:,:,jnv), f_act_conv, &
-                     q_tmp, qqcw_in(:,:), &
-                     fracis(:,:,mm), dqdt_tmp, iscavt, &
-                     icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt )
+                     ncol, dt, state%pdel,                                      & ! in
+                     dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, & ! in
+                     dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond,    & ! in
+                     dep_inputs%cldt, dep_inputs%cldcu,                         & ! in
+                     dep_inputs%cldvcu, dep_inputs%cldvst,                      & ! in
+                     sol_factb, sol_facti, sol_factic,                          & ! in
+                     mam_prevap_resusp_optcc, .false., scavcoefnv(:,:,jnv), f_act_conv, & ! in
+                     q_tmp, qqcw_in(:,:),                                       & ! in
+                     fracis(:,:,mm), dqdt_tmp, iscavt,                          & ! out
+                     icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt       ) ! out
 
                 ! resuspension goes to coarse mode
                 ! first deduct the current resuspension from the dqdt_tmp of the current species
@@ -1100,8 +1099,8 @@ lphase_jnmw_conditional: &
                 if (mmtoo > 0) rtscavt_sv(1:ncol,:,mmtoo) = rtscavt_sv(1:ncol,:,mmtoo) & 
                                   + ( rcscavt(1:ncol,:) + rsscavt(1:ncol,:) )
                 ! then add the rtscavt_sv of the current species to the dqdt_tmp of the current species
-                ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have resuspension contributions
-                !    from so4_a1/2/3 and so4c1/2/3
+                ! note that for so4_a3 and mam3, the rtscavt_sv at this point will have
+                !  resuspension contributions from so4_a1/2/3 and so4c1/2/3
                 dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
 
                 ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
@@ -1174,7 +1173,6 @@ lphase_jnmw_conditional: &
 ! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = jaerowater).
 ! The code only worked because the "do lspec" loop cycles when lspec = nspec_amode(m)+1,
 ! but that does not make the code correct.
-                dqdt_tmp(:,:) = 0.0_r8
                 fldcw => qqcw_get_field(pbuf,mm,lchnk)
                 qqcw_sav(1:ncol,:,lspec) = fldcw(1:ncol,:)  !RCE 2012/01/12
             
@@ -1182,16 +1180,16 @@ lphase_jnmw_conditional: &
                 ! from the previous call and qqcw_tmp is always zero. May need
                 ! further check.  - Shuaiqi Tang in refactoring for MAM4xx
                 call wetdepa_v2( &
-                   ncol, dt, state%pdel, &
-                   dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, &
-                   dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond, &
-                   dep_inputs%cldt, dep_inputs%cldcu, &
-                   dep_inputs%cldvcu, dep_inputs%cldvst, &
-                   sol_factb, sol_facti, sol_factic, &
-                   mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, &
-                   fldcw, qqcw_tmp,  & 
-                   fracis_cw, dqdt_tmp, iscavt, &
-                   icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt ) 
+                   ncol, dt, state%pdel,                                        & ! in
+                   dep_inputs%cmfdqr, dep_inputs%evapc, dlf, dep_inputs%conicw, & ! in
+                   dep_inputs%prain, dep_inputs%evapr, dep_inputs%totcond,      & ! in
+                   dep_inputs%cldt, dep_inputs%cldcu,                           & ! in
+                   dep_inputs%cldvcu, dep_inputs%cldvst,                        & ! in
+                   sol_factb, sol_facti, sol_factic,                            & ! in
+                   mam_prevap_resusp_optcc, .true., scavcoefnv(:,:,jnv), f_act_conv, & ! in
+                   fldcw, qqcw_tmp,                                             & ! in 
+                   fracis_cw, dqdt_tmp, iscavt,                                 & ! out
+                   icscavt, isscavt, bcscavt, bsscavt, rcscavt, rsscavt         ) ! out 
 
                 ! resuspension goes to coarse mode
                 ! first deduct the current resuspension from the dqdt_tmp of the current species
