@@ -141,6 +141,10 @@ contains
     call mpibcast(seasalt_emis_scale, 1, mpir8,   0, mpicom)
 #endif
 
+    if (sscav_tuning == .false.) then
+       call endrun('ERROR: sscav_tuning==.false. option is removed in MAM4xx')
+    endif
+
     wetdep_list = aer_wetdep_list
     drydep_list = aer_drydep_list
 
@@ -931,77 +935,36 @@ lphase_loop_aa: &
           ! sol_factic is strictly a tuning factor
           !
           if (lphase == 1) then ! interstial aerosol
-             hygro_sum_old(:,:) = 0.0_r8
-             hygro_sum_del(:,:) = 0.0_r8
              call modal_aero_bcscavcoef_get( m, ncol, isprx, dgnumwet, &
                   scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
 
              sol_facti = 0.0_r8 ! strat in-cloud scav totally OFF for institial
-             sol_factic = 0.4_r8 ! xl 2010/05/20
-             if (sscav_tuning) then
-                sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor")  ! tuned 1/6
-             else
-                sol_factb  = 0.1_r8    ! all below-cloud scav ON (0.1 "tuning factor")
-             endif
+             ! if modal aero convproc is turned on for aerosols, then
+             ! turn off the convective in-cloud removal for interstitial aerosols
+             ! (but leave the below-cloud on, as convproc only does in-cloud)
+             ! and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls
+             ! for (stratiform)-cloudborne aerosols, convective wet removal
+             ! (all forms) is zero, so no action is needed
+             sol_factic = 0.0_r8
+             sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor")  ! tuned 1/6
              if (m == modeptr_pcarbon) then
                 f_act_conv = 0.0_r8 ! rce 2010/05/02
-             elseif ((m == modeptr_finedust) .or. (m == modeptr_coardust)) then
-                f_act_conv = 0.4_r8 ! rce 2010/05/02
              else
-                if (sscav_tuning) then
-                   f_act_conv = 0.4_r8   ! rce 2010/05/02
-                else
-                   f_act_conv = 0.8_r8   ! rce 2010/05/02
-                endif
+                f_act_conv = 0.4_r8   ! rce 2010/05/02
              endif
-
           else ! cloud-borne aerosol (borne by stratiform cloud drops)
-
              sol_factb  = 0.0_r8   ! all below-cloud scav OFF (anything cloud-borne is located "in-cloud")
-             if (sscav_tuning) then 
-                sol_facti  = min(0.6_r8, sol_facti_cloud_borne)  ! strat  in-cloud scav totally ON for cloud-borne  ! tuned 1/6
-             else
-                sol_facti  = sol_facti_cloud_borne   ! strat  in-cloud scav cloud-borne tuning factor
-             endif
+             sol_facti  = min(0.6_r8, sol_facti_cloud_borne)  ! strat  in-cloud scav totally ON for cloud-borne  ! tuned 1/6
              sol_factic = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
                                    !        that conv precip collects strat droplets)
              f_act_conv = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
-
           endif
-
-          if( lphase == 1 ) then  ! FORTRAN refactor: can be merged above
-             ! if modal aero convproc is turned on for aerosols, then
-             !    turn off the convective in-cloud removal for interstitial aerosols
-             !    (but leave the below-cloud on, as convproc only does in-cloud)
-             !    and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls 
-             ! for (stratiform)-cloudborne aerosols, convective wet removal
-             !    (all forms) is zero, so no action is needed
-             sol_factic = 0.0_r8
-          endif
-          !
-          ! rce 2010/05/03
-          ! wetdepa has 6 "sol_fact" parameters:
-          ! sol_facti, sol_factic, sol_factb for liquid cloud
-          ! sol_factii, sol_factiic, sol_factbi for ice cloud
-          ! the ice cloud parameters are optional, and if not provided, they default to
-          ! one of the other sol_fact parameters (see subr. wetdepa about this)
-          ! for now, we set the ice cloud parameters equal
-          ! to their liquid cloud counterparts
-          ! currently the ice parameters are not used in wetdepa as
-          ! wetdepa sets "weight" (the ice cloud fraction) to 0.0
-          ! if this changes, we will have to give more thought to
-          ! the ice cloud parameter values
-          !
-          sol_factbi = sol_factb
-          sol_factii = sol_facti
-          sol_factiic = sol_factic(1,1)
 
 
 ! REASTER 08/12/2015 - changed ordering (mass then number) for prevap resuspend to coarse
 lspec_loop_aa: &
           do lspec = 1, nspec_amode(m)+2 ! loop over number + chem constituents + water
 
-             mmai = 0
              if (lspec <= nspec_amode(m)) then ! non-water mass
                 jnummaswtr = jaeromass
                 if (lphase == 1) then
@@ -1009,7 +972,6 @@ lspec_loop_aa: &
                    jnv = 2
                 else
                    mm = lmassptrcw_amode(lspec,m)
-                   mmai = lmassptr_amode(lspec,m)
                    jnv = 0
                 endif
              elseif (lspec == nspec_amode(m)+1) then ! number
@@ -1019,7 +981,6 @@ lspec_loop_aa: &
                    jnv = 1
                 else
                    mm = numptrcw_amode(m)
-                   mmai = numptr_amode(m)
                    jnv = 0
                 endif
              else ! water mass
@@ -1029,8 +990,6 @@ lspec_loop_aa: &
              endif
 
              if (mm <= 0) cycle
-
-
 
 ! mam_prevap_resusp_optcc values control the prevap_resusp calculations in wetdepa_v2:
 !     0 = no resuspension
@@ -1046,7 +1005,6 @@ lspec_loop_aa: &
                    mam_prevap_resusp_optcc = 230
              endif
 
-
              ! set f_act_conv for interstitial (lphase=1) coarse mode species
              ! for the convective in-cloud, we conceptually treat the coarse dust and seasalt
              ! as being externally mixed, and apply f_act_conv = f_act_conv_coarse_dust/nacl to dust/seasalt
@@ -1054,19 +1012,18 @@ lspec_loop_aa: &
              ! on a mass basis, so the f_act_conv for number and sulfate are
              ! mass-weighted averages of the values used for dust/seasalt
              if ((lphase == 1) .and. (m == modeptr_coarse)) then
-                f_act_conv = f_act_conv_coarse ! rce 2010/05/02
+                f_act_conv = f_act_conv_coarse 
                 if (jnummaswtr == jaeromass) then
                    if (lmassptr_amode(lspec,m) == lptr_dust_a_amode(m)) then
-                      f_act_conv = f_act_conv_coarse_dust ! rce 2010/05/02
+                      f_act_conv = f_act_conv_coarse_dust 
                    elseif (lmassptr_amode(lspec,m) == lptr_nacl_a_amode(m)) then
-                      f_act_conv = f_act_conv_coarse_nacl ! rce 2010/05/02
+                      f_act_conv = f_act_conv_coarse_nacl 
                    endif
                 endif
              endif
 
-
 lphase_jnmw_conditional: &
-             if ((lphase == 1) .and. (jnummaswtr /= jaerowater)) then
+             if (lphase == 1) then
                 ptend%lq(mm) = .true.
                 ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
                 q_tmp(1:ncol,:) = state%q(1:ncol,:,mm) + ptend%q(1:ncol,:,mm)*dt
@@ -1142,7 +1099,7 @@ lphase_jnmw_conditional: &
                 qsrflx_mzaer2cnvpr(1:ncol,mm,1) = sflxec(  1:ncol)
                 qsrflx_mzaer2cnvpr(1:ncol,mm,2) = sflxecdp(1:ncol)
 
-             elseif (lphase == 2 .and. jnummaswtr /= jaerowater) then lphase_jnmw_conditional
+             elseif (lphase == 2) then lphase_jnmw_conditional
 ! There is no cloud-borne aerosol water in the model, so this code block
 ! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = jaerowater).
 ! The code only worked because the "do lspec" loop cycles when lspec = nspec_amode(m)+1,
