@@ -111,7 +111,7 @@ contains
 
     namelist /aerosol_nl/ aer_wetdep_list, aer_drydep_list, sol_facti_cloud_borne, seasalt_emis_scale,&
        sscav_tuning,sol_factb_interstitial, sol_factic_interstitial
-
+    ! FIXME: many of these namelists are not used, can be cleaned up.
     !-----------------------------------------------------------------------------
 
     ! Read namelist
@@ -732,7 +732,6 @@ contains
     real(r8) :: bsscavt(pcols, pver)
     real(r8) :: sol_factb, sol_facti
     real(r8) :: sol_factic(pcols,pver)
-    real(r8) :: sol_factbi, sol_factii, sol_factiic
 
     real(r8) :: sflx(pcols) ! deposition flux
 
@@ -907,54 +906,13 @@ mmode_loop_aa: &
           
 lphase_loop_aa: &
        do lphase = strt_loop,end_loop, stride_loop ! loop over interstitial (1) and cloud-borne (2) forms
-
-          ! sol_factb and sol_facti values
-          ! sol_factb - currently this is basically a tuning factor
-          ! sol_facti & sol_factic - currently has a physical basis, and reflects activation fraction
-          !
-          ! 2008-mar-07 rce - sol_factb (interstitial) changed from 0.3 to 0.1
-          ! - sol_factic (interstitial, dust modes) changed from 1.0 to 0.5
-          ! - sol_factic (cloud-borne, pcarb modes) no need to set it to 0.0
-          ! because the cloud-borne pcarbon == 0 (no activation)
-          !
-          ! rce 2010/05/02
-          ! prior to this date, sol_factic was used for convective in-cloud wet removal,
-          ! and its value reflected a combination of an activation fraction (which varied between modes)
-          ! and a tuning factor
-          ! from this date forward, two parameters are used for convective in-cloud wet removal
-          ! f_act_conv is the activation fraction
-          ! note that "non-activation" of aerosol in air entrained into updrafts should
-          ! be included here
-          ! eventually we might use the activate routine (with w ~= 1 m/s) to calculate
-          ! this, but there is still the entrainment issue
-          ! sol_factic is strictly a tuning factor
-          !
           if (lphase == 1) then ! interstial aerosol
              call modal_aero_bcscavcoef_get( m, ncol, isprx, dgnumwet, &
                   scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
-
-             sol_facti = 0.0_r8 ! strat in-cloud scav totally OFF for institial
-             ! if modal aero convproc is turned on for aerosols, then
-             ! turn off the convective in-cloud removal for interstitial aerosols
-             ! (but leave the below-cloud on, as convproc only does in-cloud)
-             ! and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls
-             ! for (stratiform)-cloudborne aerosols, convective wet removal
-             ! (all forms) is zero, so no action is needed
-             sol_factic = 0.0_r8
-             sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor")  ! tuned 1/6
-             if (m == modeptr_pcarbon) then
-                f_act_conv = 0.0_r8 ! rce 2010/05/02
-             else
-                f_act_conv = 0.4_r8   ! rce 2010/05/02
-             endif
-          else ! cloud-borne aerosol (borne by stratiform cloud drops)
-             sol_factb  = 0.0_r8   ! all below-cloud scav OFF (anything cloud-borne is located "in-cloud")
-             sol_facti  = min(0.6_r8, sol_facti_cloud_borne)  ! strat  in-cloud scav totally ON for cloud-borne  ! tuned 1/6
-             sol_factic = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
-                                   !        that conv precip collects strat droplets)
-             f_act_conv = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
           endif
 
+          call define_act_frac ( lphase,     m,             & ! in
+                sol_facti, sol_factic, sol_factb, f_act_conv) ! out
 
 ! REASTER 08/12/2015 - changed ordering (mass then number) for prevap resuspend to coarse
 lspec_loop_aa: &
@@ -1159,6 +1117,70 @@ lphase_jnmw_conditional: &
     call wetdep_inputs_unset(dep_inputs)
 
   end subroutine aero_model_wetdep
+
+!=============================================================================
+   subroutine define_act_frac ( lphase, imode,          & ! in
+                sol_facti, sol_factic, sol_factb, f_act_conv) ! out
+     !-----------------------------------------------------------------------
+     ! define sol_factb and sol_facti values, and f_act_conv
+     ! sol_factb - currently this is basically a tuning factor
+     ! sol_facti & sol_factic - currently has a physical basis, and
+     ! reflects activation fraction
+     ! f_act_conv is the activation fraction
+     !
+     ! 2008-mar-07 rce - sol_factb (interstitial) changed from 0.3 to 0.1
+     ! - sol_factic (interstitial, dust modes) changed from 1.0 to 0.5
+     ! - sol_factic (cloud-borne, pcarb modes) no need to set it to 0.0
+     ! because the cloud-borne pcarbon == 0 (no activation)
+     !
+     ! rce 2010/05/02
+     ! prior to this date, sol_factic was used for convective in-cloud wet removal,
+     ! and its value reflected a combination of an activation fraction
+     ! (which varied between modes) and a tuning factor
+     ! from this date forward, two parameters are used for convective
+     ! in-cloud wet removal
+     !
+     ! note that "non-activation" of aerosol in air entrained into updrafts should
+     ! be included here
+     ! eventually we might use the activate routine (with w ~= 1 m/s) to calculate
+     ! this, but there is still the entrainment issue
+     !
+     ! sol_factic is strictly a tuning factor
+     !-----------------------------------------------------------------------
+     use modal_aero_data, only: modeptr_pcarbon
+
+     integer, intent(in) :: lphase ! index for interstitial / cloudborne aerosol
+     integer, intent(in) :: imode  ! index for aerosol mode
+
+     real(r8), intent(out) :: sol_facti  ! in-cloud scavenging fraction
+     real(r8), intent(out) :: sol_factb  ! below-cloud scavenging fraction
+     real(r8), intent(out) :: sol_factic(pcols,pver) ! in-cloud convective scavenging fraction
+     real(r8), intent(out) :: f_act_conv(pcols,pver) ! convection activation fraction
+
+     if (lphase == 1) then ! interstial aerosol
+        sol_facti = 0.0_r8 ! strat in-cloud scav totally OFF for institial
+        ! if modal aero convproc is turned on for aerosols, then
+        ! turn off the convective in-cloud removal for interstitial aerosols
+        ! (but leave the below-cloud on, as convproc only does in-cloud)
+        ! and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls
+        ! for (stratiform)-cloudborne aerosols, convective wet removal
+        ! (all forms) is zero, so no action is needed
+        sol_factic(:,:) = 0.0_r8
+        sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor") 
+        if (imode == modeptr_pcarbon) then
+           f_act_conv(:,:) = 0.0_r8 
+        else
+           f_act_conv(:,:) = 0.4_r8 
+        endif
+     else ! cloud-borne aerosol (borne by stratiform cloud drops)
+        sol_factb  = 0.0_r8   ! all below-cloud scav OFF (anything cloud-borne is located "in-cloud")
+        sol_facti  = min(0.6_r8, sol_facti_cloud_borne)  ! strat  in-cloud scav totally ON for cloud-borne
+        sol_factic(:,:) = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
+                              ! that conv precip collects strat droplets)
+        f_act_conv(:,:) = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
+     endif
+
+   end subroutine define_act_frac
 
 !=============================================================================
    subroutine index_ordering (                    &
