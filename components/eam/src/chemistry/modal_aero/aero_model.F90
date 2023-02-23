@@ -679,101 +679,98 @@ contains
 
     ! args
     type(physics_state), intent(in)    :: state       ! Physics state variables
-    real(r8),            intent(in)    :: dt          ! time step
+    type(physics_buffer_desc), pointer :: pbuf(:)
+    type(physics_ptend), intent(out)   :: ptend       ! indivdual parameterization tendencies
+    type(cam_out_t),     intent(inout) :: cam_out     ! export state
+
+    real(r8),            intent(in)    :: dt          ! time step [s]
     real(r8),            intent(in)    :: dlf(:,:)    ! shallow+deep convective detrainment [kg/kg/s]
-    real(r8),            intent(in)    :: dlf2(:,:)   ! Shal conv cldwtr detrainment (kg/kg/s - grid avg)
-    real(r8),            intent(in)    :: cmfmc2(pcols,pverp) ! Shal conv mass flux (kg/m2/s)
-    real(r8),            intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
+    real(r8),            intent(in)    :: dlf2(:,:)   ! Shal conv cldwtr detrainment [kg/kg/s]
+    real(r8),            intent(in)    :: cmfmc2(pcols,pverp) ! Shal conv mass flux [kg/m2/s]
+    real(r8),            intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio [fraction]
     ! mu, md, ..., ideep, lengath are all deep conv variables
     ! *** AND ARE GATHERED ***
     ! eu, ed, du are "d(massflux)/dp" and are all positive
-    real(r8),            intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive)
-    real(r8),            intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative)
-    real(r8),            intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft
-    real(r8),            intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft
-    real(r8),            intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft
-    real(r8),            intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces
+    real(r8),            intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
+    real(r8),            intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative) [mb/s]
+    real(r8),            intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
+    real(r8),            intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
+    real(r8),            intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft [1/s]
+    real(r8),            intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces [mb]
     
     integer,             intent(in)    :: jt(pcols)         ! Index of cloud top for each column
     integer,             intent(in)    :: maxg(pcols)       ! Index of cloud top for each column
     integer,             intent(in)    :: ideep(pcols)      ! Gathering array
     integer,             intent(in)    :: lengath           ! Gathered min lon indices over which to operate
-    integer,             intent(in)    :: species_class(:)
+    integer,             intent(in)    :: species_class(:)  ! species index
     
-    type(cam_out_t),     intent(inout) :: cam_out     ! export state
-    type(physics_buffer_desc), pointer :: pbuf(:)
-
-    type(physics_ptend), intent(out)   :: ptend       ! indivdual parameterization tendencies
-
-
 
     ! local vars
+    type(wetdep_inputs_t) :: dep_inputs
 
-    integer :: jnv ! index for scavcoefnv 3rd dimension
+    integer :: jnv         ! index for scavcoefnv 3rd dimension
     integer :: jnummaswtr  ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water)
-    integer :: imode
-    integer :: lchnk ! chunk identifier
+    integer :: lchnk  ! chunk identifier
     integer :: lphase ! index for interstitial / cloudborne aerosol
-    integer :: lspec ! index for aerosol number / chem-mass / water-mass
-    integer :: mtmp ! mode index
-    integer :: mm ! tracer (q-array) index
-    integer :: ncol ! number of atmospheric columns
+    integer :: lspec  ! index for aerosol number / chem-mass / water-mass
+    integer :: mtmp   ! original mode index 
+    integer :: imode  ! working mode index (swith 3 and 4)
+    integer :: mm     ! tracer (q-array) index
+    integer :: ncol   ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
-
-    real(r8) :: iscavt(pcols, pver)
-    real(r8) :: icscavt(pcols, pver)
-    real(r8) :: isscavt(pcols, pver)
-    real(r8) :: bcscavt(pcols, pver)
-    real(r8) :: bsscavt(pcols, pver)
-    real(r8) :: sol_factb, sol_facti
-    real(r8) :: sol_factic(pcols,pver)
-
-    real(r8) :: sflx(pcols) ! deposition flux
-
-    real(r8) :: dqdt_tmp(pcols,pver)      ! temporary array to hold tendency for the "current" aerosol species
-    real(r8) :: f_act_conv(pcols,pver) ! prescribed aerosol activation fraction for convective cloud 
-    real(r8) :: f_act_conv_coarse(pcols,pver) ! similar but for coarse mode 
-    real(r8) :: f_act_conv_coarse_dust, f_act_conv_coarse_nacl
-    real(r8) :: fracis_cw(pcols,pver)
-    real(r8) :: prec(pcols) ! precipitation rate
-    real(r8) :: q_tmp(pcols,pver) ! temporary array to hold "most current" mixing ratio for 1 species
-    real(r8) :: qqcw_tmp(pcols,pver), qqcw_in(pcols,pver) ! temporary array to hold qqcw 
-    real(r8) :: qqcw_sav(pcols,pver,0:maxd_aspectype) ! temporary array to hold qqcw for the current mode  !RCE
-    real(r8) :: scavcoefnv(pcols,pver,0:2) ! Dana and Hales coefficient (/mm) for
-                                           ! cloud-borne num & vol (0),
-                                           ! interstitial num (1), interstitial vol (2)
 
     logical  :: isprx(pcols,pver) ! true if precipation
 
-    real(r8) :: sflxec(pcols), sflxecdp(pcols)  ! deposition flux  !RCE
-    real(r8) :: sflxic(pcols), sflxicdp(pcols)  ! deposition flux  !RCE
-    real(r8) :: sflxbc(pcols), sflxbcdp(pcols)  ! deposition flux  !RCE
-    real(r8) :: rcscavt(pcols, pver)  !RCE
-    real(r8) :: rsscavt(pcols, pver)  !RCE
-    real(r8) :: rtscavt_sv(pcols, pver, pcnst) ! REASTER 08/12/2015
-    
-    real(r8), pointer :: fldcw(:,:)
-    real(r8), pointer :: dgnumwet(:,:,:)
+    real(r8) :: dqdt_tmp(pcols,pver)    ! temporary array to hold tendency for the "current" aerosol species [kg/kg/s]
+    real(r8) :: f_act_conv(pcols,pver)  ! prescribed aerosol activation fraction for convective cloud [fraction]
+    real(r8) :: f_act_conv_coarse(pcols,pver) ! similar but for coarse mode [fraction]
+    real(r8) :: f_act_conv_coarse_dust, f_act_conv_coarse_nacl ! similar but for dust or seasalt
+    real(r8) :: prec(pcols)             ! precipitation rate [kg/m2/s]
+    real(r8) :: sflx(pcols)             ! deposition flux at surface [kg/m2/s]
+    real(r8) :: sflxec(pcols), sflxecdp(pcols)  ! deposition flux [kg/m2/s]
+    real(r8) :: sflxic(pcols), sflxicdp(pcols)  ! deposition flux [kg/m2/s]
+    real(r8) :: sflxbc(pcols), sflxbcdp(pcols)  ! deposition flux [kg/m2/s]
+    real(r8) :: rtscavt_sv(pcols, pver, pcnst)  ! resuspension that goes to coarse mode [kg/kg/s]
+    real(r8) :: rprddpsum(pcols)  ! vertical integration of deep rain production [kg/m2/s]
+    real(r8) :: rprdshsum(pcols)  ! vertical integration of shallow rain production [kg/m2/s]
+    real(r8) :: evapcdpsum(pcols) ! vertical integration of deep rain evaporation [kg/m2/s]
+    real(r8) :: evapcshsum(pcols) ! vertical integration of shallow rain evaporation [kg/m2/s]
 
+    real(r8), pointer :: dgnumwet(:,:,:) ! wet aerosol diameter [m]
     real(r8), pointer :: fracis(:,:,:)   ! fraction of transported species that are insoluble
 
-    integer, parameter:: nsrflx_mzaer2cnvpr = 2  !RCE 2012/01/12 bgn
-    real(r8)          :: aerdepwetis(pcols,pcnst) ! aerosol wet deposition (interstitial) 
-    real(r8)          :: aerdepwetcw(pcols,pcnst) ! aerosol wet deposition (cloud water)  
-    real(r8)          :: qsrflx_mzaer2cnvpr(pcols,pcnst,nsrflx_mzaer2cnvpr)
-    real(r8)          :: rprddpsum(pcols),  rprdshsum(pcols)  
-    real(r8)          :: evapcdpsum(pcols), evapcshsum(pcols) 
-    real(r8), pointer :: rprddp(:,:)     ! rain production, deep convection
-    real(r8), pointer :: rprdsh(:,:)     ! rain production, deep convection
-    real(r8), pointer :: evapcsh(:,:)    ! Evaporation rate of shallow convective precipitation >=0.
-    real(r8), pointer :: evapcdp(:,:)    ! Evaporation rate of deep    convective precipitation >=0.
-
-    real(r8), pointer :: icwmrdp(:,:)    ! in cloud water mixing ratio, deep convection
-    real(r8), pointer :: icwmrsh(:,:)    ! in cloud water mixing ratio, deep convection
-    real(r8), pointer :: sh_frac(:,:)    ! Shallow convective cloud fraction
-    real(r8), pointer :: dp_frac(:,:)    ! Deep convective cloud fraction
-
-    type(wetdep_inputs_t) :: dep_inputs
+    ! args for wetdepa_v2
+    real(r8) :: iscavt(pcols, pver)  ! incloud scavenging tends [kg/kg/s]
+    real(r8) :: icscavt(pcols, pver) ! incloud, convective [kg/kg/s]
+    real(r8) :: isscavt(pcols, pver) ! incloud, stratiform [kg/kg/s]
+    real(r8) :: bcscavt(pcols, pver) ! below cloud, convective [kg/kg/s]
+    real(r8) :: bsscavt(pcols, pver) ! below cloud, stratiform [kg/kg/s]
+    real(r8) :: rcscavt(pcols,pver)  ! resuspension, convective [kg/kg/s]
+    real(r8) :: rsscavt(pcols,pver)  ! resuspension, stratiform [kg/kg/s]
+    real(r8) :: sol_factb, sol_facti ! solubility factor (fraction of aerosol scavenged below or in cloud)
+    real(r8) :: sol_factic(pcols,pver)  ! sol_facti for convective clouds [fraction]
+    real(r8) :: fracis_cw(pcols,pver)   ! fraction of species not scavenged [fraction]
+    real(r8) :: q_tmp(pcols,pver)       ! temporary array to hold "most current" mixing ratio for 1 species [kg/kg]
+    real(r8) :: qqcw_tmp(pcols,pver), qqcw_in(pcols,pver) ! temporary array to hold qqcw [kg/kg]
+    real(r8) :: qqcw_sav(pcols,pver,0:maxd_aspectype) ! temporary array to hold qqcw for the current mode [kg/kg]
+    real(r8) :: scavcoefnv(pcols,pver,0:2) ! Dana and Hales coefficient (1/mm) 
+                                           ! for cloud-borne num & vol (0),
+                                           ! interstitial num (1), interstitial vol (2)
+    real(r8), pointer :: fldcw(:,:)      ! trace species [kg/kg]
+    
+    ! args for ma_convproc_intr
+    integer, parameter:: nsrflx_mzaer2cnvpr = 2   ! last dimension of qsrflx_mzaer2cnvpr
+    real(r8)          :: qsrflx_mzaer2cnvpr(pcols,pcnst,nsrflx_mzaer2cnvpr) ! process-specific column tracer tendencies [kg/m2/s]
+    real(r8)          :: aerdepwetis(pcols,pcnst) ! aerosol wet deposition (interstitial) [kg/m2/s]
+    real(r8)          :: aerdepwetcw(pcols,pcnst) ! aerosol wet deposition (cloud water)  [kg/m2/s]
+    real(r8), pointer :: rprddp(:,:)     ! rain production, deep convection [kg/kg/s]
+    real(r8), pointer :: rprdsh(:,:)     ! rain production, deep convection [kg/kg/s]
+    real(r8), pointer :: evapcsh(:,:)    ! Evaporation rate of shallow convective precipitation >=0. [kg/kg/s]
+    real(r8), pointer :: evapcdp(:,:)    ! Evaporation rate of deep    convective precipitation >=0. [kg/kg/s]
+    real(r8), pointer :: icwmrdp(:,:)    ! in cloud water mixing ratio, deep convection [kg/kg]
+    real(r8), pointer :: icwmrsh(:,:)    ! in cloud water mixing ratio, deep convection [kg/kg]
+    real(r8), pointer :: sh_frac(:,:)    ! Shallow convective cloud fraction [fraction]
+    real(r8), pointer :: dp_frac(:,:)    ! Deep convective cloud fraction [fraction]
 
 
     lchnk = state%lchnk
@@ -1272,10 +1269,10 @@ lphase_jnmw_conditional: &
      use mam_support,     only: min_max_bound
 
      integer, intent(in) :: ncol
-     real(r8),intent(in) :: rprddpsum(:)  ! vertical integration of deep rain production
-     real(r8),intent(in) :: rprdshsum(:)  ! vertical integration of shallow rain production
-     real(r8),intent(in) :: evapcdpsum(:) ! vertical integration of deep rain evaporation
-     real(r8),intent(in) :: evapcshsum(:) ! vertical integration of shallow rain evaporation
+     real(r8),intent(in) :: rprddpsum(:)  ! vertical integration of deep rain production [kg/m2/s]
+     real(r8),intent(in) :: rprdshsum(:)  ! vertical integration of shallow rain production [kg/m2/s]
+     real(r8),intent(in) :: evapcdpsum(:) ! vertical integration of deep rain evaporation [kg/m2/s]
+     real(r8),intent(in) :: evapcshsum(:) ! vertical integration of shallow rain evaporation [kg/m2/s]
      real(r8),intent(in) :: sflxbc(:)     ! surface flux of resuspension from bcscavt [kg/m2/s]
      real(r8),intent(in) :: sflxec(:)     ! surface flux of resuspension from rcscavt [kg/m2/s]
      real(r8),intent(out):: sflxbcdp(:)   ! surface flux of resuspension from bcscavt in deep conv. [kg/m2/s]
