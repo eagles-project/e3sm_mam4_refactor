@@ -810,8 +810,6 @@ contains
     call wetdep_inputs_set( state, pbuf, dep_inputs )
 
     call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-!    call pbuf_get_field(pbuf, qaerwat_idx,  qaerwat,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-!    call pbuf_get_field(pbuf, rate1_cw2pr_st_idx, rate1ord_cw2pr_st)
     call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
 
     !Compute variables needed for convproc unified convective transport
@@ -847,25 +845,10 @@ contains
     rtscavt_sv(:,:,:)         = 0.0_r8
 
     ! calculate the mass-weighted sol_factic for coarse mode species
-    f_act_conv_coarse(:,:) = 0.60_r8 
-    f_act_conv_coarse_dust = 0.40_r8 
-    f_act_conv_coarse_nacl = 0.80_r8 
-    if (modeptr_coarse > 0) then
-       lcoardust = lptr_dust_a_amode(modeptr_coarse)
-       lcoarnacl = lptr_nacl_a_amode(modeptr_coarse)
-       if ((lcoardust > 0) .and. (lcoarnacl > 0)) then
-          do k = 1, pver
-             do i = 1, ncol
-                tmpdust = max( 0.0_r8, state%q(i,k,lcoardust) + ptend%q(i,k,lcoardust)*dt )
-                tmpnacl = max( 0.0_r8, state%q(i,k,lcoarnacl) + ptend%q(i,k,lcoarnacl)*dt )
-                if ((tmpdust+tmpnacl) > 1.0e-30_r8) then
-                   f_act_conv_coarse(i,k) = (f_act_conv_coarse_dust*tmpdust &
-                        + f_act_conv_coarse_nacl*tmpnacl)/(tmpdust+tmpnacl) 
-                endif
-             enddo
-          enddo
-       endif
-    endif
+    call set_f_act_coarse(      ncol,                           & ! in
+                state%q,        ptend%q,        dt,             & ! in
+                f_act_conv_coarse, f_act_conv_coarse_dust,      & ! out
+                f_act_conv_coarse_nacl                          ) ! out
 
     !BSINGH: Decide the loop counters for the lphase loop 
     !for cases with and without the unified convective transport
@@ -887,7 +870,10 @@ mmode_loop_aa: &
        elseif (mtmp > modeptr_coarse) then
              m = mtmp - 1
        endif
-          
+
+! loop over interstitial (1) and cloud-borne (2) forms         
+!BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so
+!that the resuspension of cloudborne can be saved then applied to interstitial (RCE) 
 lphase_loop_aa: &
        do lphase = strt_loop,end_loop, stride_loop ! loop over interstitial (1) and cloud-borne (2) forms
           if (lphase == 1) then ! interstial aerosol
@@ -1103,6 +1089,55 @@ lphase_jnmw_conditional: &
 
   end subroutine aero_model_wetdep
 
+!=============================================================================
+   subroutine set_f_act_coarse( ncol,                           & ! in
+                state_q,        ptend_q,        dt,             & ! in
+                f_act_conv_coarse, f_act_conv_coarse_dust,      & ! out
+                f_act_conv_coarse_nacl                          ) ! out
+     !-----------------------------------------------------------------------
+     ! set the mass-weighted sol_factic for coarse mode species
+     !-----------------------------------------------------------------------
+     use modal_aero_data, only: modeptr_coarse, &
+                   lptr_dust_a_amode, lptr_nacl_a_amode
+
+     integer, intent(in)  :: ncol
+     ! state_q and ptend_q only use dust and seasalt in this subroutine
+     real(r8),intent(in)  :: state_q(:,:,:)     ! tracer of state%q [kg/kg]
+     real(r8),intent(in)  :: ptend_q(:,:,:)     ! tracer tendency (ptend%q) [kg/kg/s]
+     real(r8),intent(in)  :: dt                 ! time step [s]
+     real(r8),intent(out) :: f_act_conv_coarse(pcols,pver) ! prescribed coarse mode aerosol activation fraction for convective cloud [fraction]
+     real(r8),intent(out) :: f_act_conv_coarse_dust ! prescribed dust aerosol activation fraction for convective cloud [fraction]
+     real(r8),intent(out) :: f_act_conv_coarse_nacl ! prescribed seasalt aerosol activation fraction for convective cloud [fraction]
+    
+     ! local variables
+     integer  :: lcoardust, lcoarnacl ! indices for coarse mode dust and seasalt masses
+     integer  :: kk,icol
+     real(r8) :: tmpdust, tmpnacl    ! dust and seasalt mass concentration [kg/kg] 
+     real(r8), parameter :: small_value_30 = 1.0e-30_r8
+
+     ! initial value
+     f_act_conv_coarse(:,:) = 0.60_r8
+     f_act_conv_coarse_dust = 0.40_r8
+     f_act_conv_coarse_nacl = 0.80_r8
+
+     if (modeptr_coarse > 0) then
+       lcoardust = lptr_dust_a_amode(modeptr_coarse)
+       lcoarnacl = lptr_nacl_a_amode(modeptr_coarse)
+       if ((lcoardust > 0) .and. (lcoarnacl > 0)) then
+          do kk = 1, pver
+             do icol = 1, ncol
+                tmpdust = max( 0.0_r8, state_q(icol,kk,lcoardust) + ptend_q(icol,kk,lcoardust)*dt )
+                tmpnacl = max( 0.0_r8, state_q(icol,kk,lcoarnacl) + ptend_q(icol,kk,lcoarnacl)*dt )
+                if ((tmpdust+tmpnacl) > small_value_30) then
+                   f_act_conv_coarse(icol,kk) = (f_act_conv_coarse_dust*tmpdust &
+                        + f_act_conv_coarse_nacl*tmpnacl)/(tmpdust+tmpnacl)
+                endif
+             enddo
+          enddo
+       endif
+     endif
+
+   end subroutine set_f_act_coarse
 !=============================================================================
    subroutine define_act_frac ( lphase, imode,          & ! in
                 sol_facti, sol_factic, sol_factb, f_act_conv) ! out
