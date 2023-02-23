@@ -822,17 +822,6 @@ contains
     call calc_sfc_flux(evapcsh, state%pdel, evapcshsum)
     call calc_sfc_flux(evapcdp, state%pdel, evapcdpsum)
 
-    prec(:ncol)=0._r8
-    do k=1,pver
-       where (prec(:ncol) >= 1.e-7_r8)
-          isprx(:ncol,k) = .true.
-       elsewhere
-          isprx(:ncol,k) = .false.
-       endwhere
-       prec(:ncol) = prec(:ncol) + (dep_inputs%prain(:ncol,k) + dep_inputs%cmfdqr(:ncol,k) - dep_inputs%evapr(:ncol,k)) &
-            *state%pdel(:ncol,k)/gravit
-    enddo
-    
     ! initiate variables
     qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  
     aerdepwetis(:,:)          = 0.0_r8  
@@ -842,6 +831,12 @@ contains
     scavcoefnv(:,:,0)         = 0.0_r8
     ! resuspension goes to a different phase or mode
     rtscavt_sv(:,:,:)         = 0.0_r8
+
+    ! examine if there is precipitation falling from above in each grid
+    call examine_prec_exist ( ncol,  state%pdel,      & ! in
+                 dep_inputs%prain,  dep_inputs%cmfdqr,& ! in
+                 dep_inputs%evapr,                    & ! in
+                 isprx                                ) ! out
 
     ! calculate the mass-weighted sol_factic for coarse mode species
     call set_f_act_coarse(      ncol,                           & ! in
@@ -1077,6 +1072,40 @@ lphase_jnmw_conditional: &
     call wetdep_inputs_unset(dep_inputs)
 
   end subroutine aero_model_wetdep
+
+!=============================================================================
+   subroutine examine_prec_exist ( ncol,  pdel,      & ! in
+                        prain,  cmfdqr,   evapr,     & ! in
+                        isprx                        ) ! out
+     !-----------------------------------------------------------------------
+     ! examine if each grid has precipitation exist from all layers above
+     !-----------------------------------------------------------------------
+     integer,  intent(in) :: ncol
+     real(r8), intent(in) :: pdel(:,:)      ! pressure difference between two layers [Pa]
+     real(r8), intent(in) :: prain(pcols,pver)    ! rain production rate from stratiform clouds [kg/kg/s]
+     real(r8), intent(in) :: cmfdqr(pcols,pver)   ! dq/dt due to convective rainout [kg/kg/s]
+     real(r8), intent(in) :: evapr(pcols,pver)    ! rain evaporation rate [kg/kg/s]
+     logical, intent(out) :: isprx(pcols,pver)    ! if there is precipitation falling into this grid
+
+     ! local variables
+     integer  :: kk
+     real(r8) :: prec(pcols)    ! precipitation falling from layers above [kg/m2/s]
+     real(r8), parameter :: small_value_7=1.0e-7_r8
+
+     ! initiate precipitation at the top level
+     prec(:ncol)=0._r8
+     do kk=1,pver  ! check from the top level downward
+       where (prec(:ncol) >= small_value_7)
+          isprx(:ncol,kk) = .true.
+       elsewhere
+          isprx(:ncol,kk) = .false.
+       endwhere
+       ! update precipitation to the level below kk
+       prec(:ncol) = prec(:ncol) + &
+           (prain(:ncol,kk)+cmfdqr(:ncol,kk)-evapr(:ncol,kk)) * pdel(:ncol,kk)/gravit
+     enddo
+
+   end subroutine examine_prec_exist
 
 !=============================================================================
    subroutine set_f_act_coarse( ncol,                           & ! in
