@@ -722,7 +722,6 @@ contains
     integer :: mm ! tracer (q-array) index
     integer :: ncol ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
-    integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
 
     real(r8) :: iscavt(pcols, pver)
     real(r8) :: icscavt(pcols, pver)
@@ -850,16 +849,6 @@ contains
                 f_act_conv_coarse, f_act_conv_coarse_dust,      & ! out
                 f_act_conv_coarse_nacl                          ) ! out
 
-    !BSINGH: Decide the loop counters for the lphase loop 
-    !for cases with and without the unified convective transport
-    !Counters for "without" unified convective treatment (i.e. default case)
-    !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so
-    !that the resuspension of cloudborne
-    !can be saved then applied to interstitial (RCE)
-    strt_loop   =  2
-    end_loop    =  1
-    stride_loop = -1
-
 mmode_loop_aa: &
     do mtmp = 1, ntot_amode ! main loop over aerosol modes
        m = mtmp
@@ -875,7 +864,7 @@ mmode_loop_aa: &
 !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so
 !that the resuspension of cloudborne can be saved then applied to interstitial (RCE) 
 lphase_loop_aa: &
-       do lphase = strt_loop,end_loop, stride_loop ! loop over interstitial (1) and cloud-borne (2) forms
+       do lphase = 2,1,-1  ! do cloudborne (2) first then interstitial (1)
           if (lphase == 1) then ! interstial aerosol
              call modal_aero_bcscavcoef_get( m, ncol, isprx, dgnumwet, &
                   scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
