@@ -662,12 +662,12 @@ contains
 
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_wetdep(dt, dlf, dlf2, cmfmc2, state,                    &!Intent-ins
-       sh_e_ed_ratio, mu, md, du, eu, ed, dp, dsubcld, jt, maxg, ideep, lengath,&
-       species_class,                                                           &
-       cam_out,                                                                 & !Intent-inout
-       pbuf,                                                                    & !Pointer
-       ptend                                                                    ) !Intent-out
+  subroutine aero_model_wetdep(dt, dlf, dlf2, cmfmc2, state,                    & ! in
+       sh_e_ed_ratio, mu, md, du, eu, ed, dp, jt, maxg, ideep, lengath,         & ! in
+       species_class,                                                           & ! in
+       cam_out,                                                                 & ! inout
+       pbuf,                                                                    & ! Pointer
+       ptend                                                                    ) ! out
 
     use modal_aero_deposition, only: set_srf_wetdep
     use wetdep,                only: wetdepa_v2, wetdep_inputs_set, &
@@ -684,16 +684,15 @@ contains
     real(r8),            intent(in)    :: dlf2(:,:)   ! Shal conv cldwtr detrainment (kg/kg/s - grid avg)
     real(r8),            intent(in)    :: cmfmc2(pcols,pverp) ! Shal conv mass flux (kg/m2/s)
     real(r8),            intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
-                                                ! mu, md, ..., ideep, lengath are all deep conv variables
-                                                ! *** AND ARE GATHERED ***
+    ! mu, md, ..., ideep, lengath are all deep conv variables
+    ! *** AND ARE GATHERED ***
+    ! eu, ed, du are "d(massflux)/dp" and are all positive
     real(r8),            intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive)
     real(r8),            intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative)
     real(r8),            intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft
     real(r8),            intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft
     real(r8),            intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft
-    ! eu, ed, du are "d(massflux)/dp" and are all positive
     real(r8),            intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces
-    real(r8),            intent(in)    :: dsubcld(pcols)   ! Delta pressure from cloud base to sfc
     
     integer,             intent(in)    :: jt(pcols)         ! Index of cloud top for each column
     integer,             intent(in)    :: maxg(pcols)       ! Index of cloud top for each column
