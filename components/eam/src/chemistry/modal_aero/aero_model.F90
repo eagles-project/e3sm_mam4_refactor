@@ -710,15 +710,13 @@ contains
 
     ! local vars
 
-    integer :: i
     integer :: jnv ! index for scavcoefnv 3rd dimension
     integer :: jnummaswtr  ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water)
-    integer :: k
+    integer :: imode
     integer :: lchnk ! chunk identifier
     integer :: lphase ! index for interstitial / cloudborne aerosol
     integer :: lspec ! index for aerosol number / chem-mass / water-mass
-    integer :: lcoardust, lcoarnacl ! indices for coarse mode dust and seasalt masses
-    integer :: m, mtmp ! mode index
+    integer :: mtmp ! mode index
     integer :: mm ! tracer (q-array) index
     integer :: ncol ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
@@ -745,7 +743,6 @@ contains
     real(r8) :: scavcoefnv(pcols,pver,0:2) ! Dana and Hales coefficient (/mm) for
                                            ! cloud-borne num & vol (0),
                                            ! interstitial num (1), interstitial vol (2)
-    real(r8) :: tmpdust, tmpnacl
 
     logical  :: isprx(pcols,pver) ! true if precipation
 
@@ -765,8 +762,8 @@ contains
     real(r8)          :: aerdepwetis(pcols,pcnst) ! aerosol wet deposition (interstitial) 
     real(r8)          :: aerdepwetcw(pcols,pcnst) ! aerosol wet deposition (cloud water)  
     real(r8)          :: qsrflx_mzaer2cnvpr(pcols,pcnst,nsrflx_mzaer2cnvpr)
-    real(r8)          :: rprddpsum(pcols),  rprdshsum(pcols)   ! RCE 2012/01/12
-    real(r8)          :: evapcdpsum(pcols), evapcshsum(pcols)  ! RCE 2012/01/12
+    real(r8)          :: rprddpsum(pcols),  rprdshsum(pcols)  
+    real(r8)          :: evapcdpsum(pcols), evapcshsum(pcols) 
     real(r8), pointer :: rprddp(:,:)     ! rain production, deep convection
     real(r8), pointer :: rprdsh(:,:)     ! rain production, deep convection
     real(r8), pointer :: evapcsh(:,:)    ! Evaporation rate of shallow convective precipitation >=0.
@@ -776,8 +773,6 @@ contains
     real(r8), pointer :: icwmrsh(:,:)    ! in cloud water mixing ratio, deep convection
     real(r8), pointer :: sh_frac(:,:)    ! Shallow convective cloud fraction
     real(r8), pointer :: dp_frac(:,:)    ! Deep convective cloud fraction
-
-    character(len=100) :: msg
 
     type(wetdep_inputs_t) :: dep_inputs
 
@@ -846,13 +841,13 @@ contains
 
 mmode_loop_aa: &
     do mtmp = 1, ntot_amode ! main loop over aerosol modes
-       m = mtmp
+       imode = mtmp
        ! for mam4, do accum, aitken, pcarbon, then coarse 
        ! so change the order of 3 and 4 here
        if (mtmp == modeptr_coarse) then
-             m = ntot_amode
+             imode = ntot_amode
        elseif (mtmp > modeptr_coarse) then
-             m = mtmp - 1
+             imode = mtmp - 1
        endif
 
 ! loop over interstitial (1) and cloud-borne (2) forms         
@@ -861,20 +856,20 @@ mmode_loop_aa: &
 lphase_loop_aa: &
        do lphase = 2,1,-1  ! do cloudborne (2) first then interstitial (1)
           if (lphase == 1) then ! interstial aerosol
-             call modal_aero_bcscavcoef_get( m, ncol, isprx, dgnumwet, &
+             call modal_aero_bcscavcoef_get( imode, ncol, isprx, dgnumwet, &
                   scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
           endif
 
-          call define_act_frac ( lphase,     m,             & ! in
+          call define_act_frac ( lphase,     imode,         & ! in
                 sol_facti, sol_factic, sol_factb, f_act_conv) ! out
 
 ! REASTER 08/12/2015 - changed ordering (mass then number) for prevap resuspend to coarse
 lspec_loop_aa: &
-          do lspec = 1, nspec_amode(m)+2 ! loop over number + chem constituents + water
+          do lspec = 1, nspec_amode(imode)+2 ! loop over number + chem constituents + water
 
-             call index_ordering ( &
-                        lspec, m,  lphase,                & ! in
-                        mm, jnv, jnummaswtr               ) ! out
+             call index_ordering (                 &
+                        lspec, imode,  lphase,     & ! in
+                        mm,    jnv, jnummaswtr     ) ! out
 
              if (mm <= 0 .or. jnummaswtr == 2) cycle  ! by pass wet aerosols
 
@@ -888,7 +883,7 @@ lspec_loop_aa: &
 
              if ( jnummaswtr == 1 ) then  ! dry mass
                    mam_prevap_resusp_optcc = 130
-             elseif ( jnummaswtr == 0 .and. lphase == 1 .and. m == modeptr_coarse ) then ! number
+             elseif ( jnummaswtr == 0 .and. lphase == 1 .and. imode == modeptr_coarse ) then ! number
                    mam_prevap_resusp_optcc = 230
              endif
 
@@ -899,12 +894,12 @@ lspec_loop_aa: &
              ! number and sulfate are conceptually partitioned to the dust and seasalt
              ! on a mass basis, so the f_act_conv for number and sulfate are
              ! mass-weighted averages of the values used for dust/seasalt
-             if ((lphase == 1) .and. (m == modeptr_coarse)) then
+             if ((lphase == 1) .and. (imode == modeptr_coarse)) then
                 f_act_conv = f_act_conv_coarse 
                 if (jnummaswtr == 1) then
-                   if (lmassptr_amode(lspec,m) == lptr_dust_a_amode(m)) then
+                   if (lmassptr_amode(lspec,imode) == lptr_dust_a_amode(imode)) then
                       f_act_conv = f_act_conv_coarse_dust 
-                   elseif (lmassptr_amode(lspec,m) == lptr_nacl_a_amode(m)) then
+                   elseif (lmassptr_amode(lspec,imode) == lptr_nacl_a_amode(imode)) then
                       f_act_conv = f_act_conv_coarse_nacl 
                    endif
                 endif
