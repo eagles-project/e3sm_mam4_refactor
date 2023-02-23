@@ -717,10 +717,9 @@ contains
     integer :: lchnk ! chunk identifier
     integer :: lphase ! index for interstitial / cloudborne aerosol
     integer :: lspec ! index for aerosol number / chem-mass / water-mass
-    integer :: lspectype
     integer :: lcoardust, lcoarnacl ! indices for coarse mode dust and seasalt masses
     integer :: m, mtmp ! mode index
-    integer :: mm, mmai, mmtoo ! tracer (q-array) index
+    integer :: mm ! tracer (q-array) index
     integer :: ncol ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
     integer :: strt_loop, end_loop, stride_loop !loop indices for the lphase loop
@@ -735,45 +734,31 @@ contains
 
     real(r8) :: sflx(pcols) ! deposition flux
 
-    real(r8) :: d1p_prevap_resusp, v1p_prevap_resusp
     real(r8) :: dqdt_tmp(pcols,pver)      ! temporary array to hold tendency for the "current" aerosol species
-    real(r8) :: dqdt_sv(pcols,pver,pcnst) ! temporary array to hold tendency for all interstitial aerosol species
-    real(r8) :: f_act_conv(pcols,pver) ! prescribed aerosol activation fraction for convective cloud ! rce 2010/05/01
-    real(r8) :: f_act_conv_coarse(pcols,pver) ! similar but for coarse mode ! rce 2010/05/02
-    real(r8) :: f_act_conv_coarse_dust, f_act_conv_coarse_nacl ! rce 2010/05/02
+    real(r8) :: f_act_conv(pcols,pver) ! prescribed aerosol activation fraction for convective cloud 
+    real(r8) :: f_act_conv_coarse(pcols,pver) ! similar but for coarse mode 
+    real(r8) :: f_act_conv_coarse_dust, f_act_conv_coarse_nacl
     real(r8) :: fracis_cw(pcols,pver)
-    real(r8) :: hygro_sum_old(pcols,pver) ! before removal [sum of (mass*hydro/dens)]
-    real(r8) :: hygro_sum_del(pcols,pver) ! removal change to [sum of (mass*hydro/dens)]
-    real(r8) :: hygro_sum_old_ik, hygro_sum_new_ik
     real(r8) :: prec(pcols) ! precipitation rate
     real(r8) :: q_tmp(pcols,pver) ! temporary array to hold "most current" mixing ratio for 1 species
-    real(r8) :: qqcw_tmp(pcols,pver) ! temporary array to hold qqcw ! rce 2010/05/01
+    real(r8) :: qqcw_tmp(pcols,pver), qqcw_in(pcols,pver) ! temporary array to hold qqcw 
+    real(r8) :: qqcw_sav(pcols,pver,0:maxd_aspectype) ! temporary array to hold qqcw for the current mode  !RCE
     real(r8) :: scavcoefnv(pcols,pver,0:2) ! Dana and Hales coefficient (/mm) for
                                            ! cloud-borne num & vol (0),
                                            ! interstitial num (1), interstitial vol (2)
-    real(r8) :: tmpa, tmpb
     real(r8) :: tmpdust, tmpnacl
-    real(r8) :: water_old, water_new ! temporary old/new aerosol water mix-rat
 
     logical  :: isprx(pcols,pver) ! true if precipation
-    logical :: do_lphase2
 
-    real(r8) :: tmp_evapdp, tmp_evapsh  !RCE
-    real(r8) :: tmp_precdp, tmp_precsh  !RCE
-    real(r8) :: tmp_resudp, tmp_resush  !RCE
     real(r8) :: sflxec(pcols), sflxecdp(pcols)  ! deposition flux  !RCE
     real(r8) :: sflxic(pcols), sflxicdp(pcols)  ! deposition flux  !RCE
     real(r8) :: sflxbc(pcols), sflxbcdp(pcols)  ! deposition flux  !RCE
     real(r8) :: rcscavt(pcols, pver)  !RCE
     real(r8) :: rsscavt(pcols, pver)  !RCE
-    real(r8) :: qqcw_in(pcols,pver), qqcw_sav(pcols,pver,0:maxd_aspectype)       ! temporary array to hold qqcw for the current mode  !RCE
     real(r8) :: rtscavt_sv(pcols, pver, pcnst) ! REASTER 08/12/2015
     
     real(r8), pointer :: fldcw(:,:)
-
     real(r8), pointer :: dgnumwet(:,:,:)
-    real(r8), pointer :: qaerwat(:,:,:)  ! aerosol water
-    real(r8), pointer :: rate1ord_cw2pr_st(:,:)
 
     real(r8), pointer :: fracis(:,:,:)   ! fraction of transported species that are insoluble
 
@@ -825,8 +810,8 @@ contains
     call wetdep_inputs_set( state, pbuf, dep_inputs )
 
     call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-    call pbuf_get_field(pbuf, qaerwat_idx,  qaerwat,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-    call pbuf_get_field(pbuf, rate1_cw2pr_st_idx, rate1ord_cw2pr_st)
+!    call pbuf_get_field(pbuf, qaerwat_idx,  qaerwat,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+!    call pbuf_get_field(pbuf, rate1_cw2pr_st_idx, rate1ord_cw2pr_st)
     call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
 
     !Compute variables needed for convproc unified convective transport
@@ -852,19 +837,19 @@ contains
     enddo
     
     ! initiate variables
-    qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  !RCE
-    aerdepwetis(:,:)          = 0.0_r8  !RCE
-    aerdepwetcw(:,:)          = 0.0_r8  !RCE
-    qqcw_tmp(:,:)             = 0.0_r8  !RCE
+    qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  
+    aerdepwetis(:,:)          = 0.0_r8  
+    aerdepwetcw(:,:)          = 0.0_r8  
+    qqcw_tmp(:,:)             = 0.0_r8  
     ! below-cloud scavcoef = 0.0 for cloud-borne species
     scavcoefnv(:,:,0)         = 0.0_r8
     ! resuspension goes to a different phase or mode
     rtscavt_sv(:,:,:)         = 0.0_r8
 
     ! calculate the mass-weighted sol_factic for coarse mode species
-    f_act_conv_coarse(:,:) = 0.60_r8 ! rce 2010/05/02
-    f_act_conv_coarse_dust = 0.40_r8 ! rce 2010/05/02
-    f_act_conv_coarse_nacl = 0.80_r8 ! rce 2010/05/02
+    f_act_conv_coarse(:,:) = 0.60_r8 
+    f_act_conv_coarse_dust = 0.40_r8 
+    f_act_conv_coarse_nacl = 0.80_r8 
     if (modeptr_coarse > 0) then
        lcoardust = lptr_dust_a_amode(modeptr_coarse)
        lcoarnacl = lptr_nacl_a_amode(modeptr_coarse)
@@ -875,7 +860,7 @@ contains
                 tmpnacl = max( 0.0_r8, state%q(i,k,lcoarnacl) + ptend%q(i,k,lcoarnacl)*dt )
                 if ((tmpdust+tmpnacl) > 1.0e-30_r8) then
                    f_act_conv_coarse(i,k) = (f_act_conv_coarse_dust*tmpdust &
-                        + f_act_conv_coarse_nacl*tmpnacl)/(tmpdust+tmpnacl) ! rce 2010/05/02
+                        + f_act_conv_coarse_nacl*tmpnacl)/(tmpdust+tmpnacl) 
                 endif
              enddo
           enddo
@@ -895,13 +880,12 @@ contains
 mmode_loop_aa: &
     do mtmp = 1, ntot_amode ! main loop over aerosol modes
        m = mtmp
-       if (ntot_amode == 4) then
-          ! for mam4, do accum, aitken, pcarbon, then coarse 
-          if (mtmp == modeptr_coarse) then
+       ! for mam4, do accum, aitken, pcarbon, then coarse 
+       ! so change the order of 3 and 4 here
+       if (mtmp == modeptr_coarse) then
              m = ntot_amode
-          else if (mtmp > modeptr_coarse) then
+       elseif (mtmp > modeptr_coarse) then
              m = mtmp - 1
-          endif
        endif
           
 lphase_loop_aa: &
@@ -940,7 +924,8 @@ lspec_loop_aa: &
 
              ! set f_act_conv for interstitial (lphase=1) coarse mode species
              ! for the convective in-cloud, we conceptually treat the coarse dust and seasalt
-             ! as being externally mixed, and apply f_act_conv = f_act_conv_coarse_dust/nacl to dust/seasalt
+             ! as being externally mixed, and apply 
+             ! f_act_conv = f_act_conv_coarse_dust/nacl to dust/seasalt
              ! number and sulfate are conceptually partitioned to the dust and seasalt
              ! on a mass basis, so the f_act_conv for number and sulfate are
              ! mass-weighted averages of the values used for dust/seasalt
