@@ -713,7 +713,6 @@ contains
     integer :: i
     integer :: jnv ! index for scavcoefnv 3rd dimension
     integer :: jnummaswtr  ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water)
-    integer, parameter :: jaeronumb=0, jaeromass=1, jaerowater=2
     integer :: k
     integer :: lchnk ! chunk identifier
     integer :: lphase ! index for interstitial / cloudborne aerosol
@@ -961,31 +960,11 @@ lphase_loop_aa: &
 lspec_loop_aa: &
           do lspec = 1, nspec_amode(m)+2 ! loop over number + chem constituents + water
 
-             if (lspec <= nspec_amode(m)) then ! non-water mass
-                jnummaswtr = jaeromass
-                if (lphase == 1) then
-                   mm = lmassptr_amode(lspec,m)
-                   jnv = 2
-                else
-                   mm = lmassptrcw_amode(lspec,m)
-                   jnv = 0
-                endif
-             elseif (lspec == nspec_amode(m)+1) then ! number
-                jnummaswtr = jaeronumb
-                if (lphase == 1) then
-                   mm = numptr_amode(m)
-                   jnv = 1
-                else
-                   mm = numptrcw_amode(m)
-                   jnv = 0
-                endif
-             else ! water mass
-                ! bypass wet removal of aerosol water
-                jnummaswtr = jaerowater
-                cycle 
-             endif
+             call index_ordering ( &
+                        lspec, m,  lphase,                & ! in
+                        mm, jnv, jnummaswtr               ) ! out
 
-             if (mm <= 0) cycle
+             if (mm <= 0 .or. jnummaswtr == 2) cycle  ! by pass wet aerosols
 
 ! mam_prevap_resusp_optcc values control the prevap_resusp calculations in wetdepa_v2:
 !     0 = no resuspension
@@ -995,9 +974,9 @@ lspec_loop_aa: &
 !
              mam_prevap_resusp_optcc = 0
 
-             if ( jnummaswtr == jaeromass ) then
+             if ( jnummaswtr == 1 ) then  ! dry mass
                    mam_prevap_resusp_optcc = 130
-             elseif ( jnummaswtr == jaeronumb .and. lphase == 1 .and. m == modeptr_coarse ) then
+             elseif ( jnummaswtr == 0 .and. lphase == 1 .and. m == modeptr_coarse ) then ! number
                    mam_prevap_resusp_optcc = 230
              endif
 
@@ -1009,7 +988,7 @@ lspec_loop_aa: &
              ! mass-weighted averages of the values used for dust/seasalt
              if ((lphase == 1) .and. (m == modeptr_coarse)) then
                 f_act_conv = f_act_conv_coarse 
-                if (jnummaswtr == jaeromass) then
+                if (jnummaswtr == 1) then
                    if (lmassptr_amode(lspec,m) == lptr_dust_a_amode(m)) then
                       f_act_conv = f_act_conv_coarse_dust 
                    elseif (lmassptr_amode(lspec,m) == lptr_nacl_a_amode(m)) then
@@ -1097,7 +1076,7 @@ lphase_jnmw_conditional: &
 
              elseif (lphase == 2) then lphase_jnmw_conditional
 ! There is no cloud-borne aerosol water in the model, so this code block
-! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = jaerowater).
+! should NEVER execute for lspec = nspec_amode(m)+1 (i.e., jnummaswtr = 2).
 ! The code only worked because the "do lspec" loop cycles when lspec = nspec_amode(m)+1,
 ! but that does not make the code correct.
                 fldcw => qqcw_get_field(pbuf,mm,lchnk)
@@ -1180,6 +1159,48 @@ lphase_jnmw_conditional: &
     call wetdep_inputs_unset(dep_inputs)
 
   end subroutine aero_model_wetdep
+
+!=============================================================================
+   subroutine index_ordering (                    &
+                lspec,     imode,     lphase,     & ! in
+                mm,        jnv,       jnummaswtr  ) ! out
+     !-----------------------------------------------------------------------
+     ! changed ordering (mass then number) for prevap resuspend to coarse
+     !-----------------------------------------------------------------------
+     use modal_aero_data, only: &
+       lmassptr_amode, lmassptrcw_amode, &
+       nspec_amode,  numptr_amode, numptrcw_amode
+
+     integer, intent(in) :: lspec  ! index for aerosol number / chem-mass / water-mass
+     integer, intent(in) :: imode  ! index for aerosol mode
+     integer, intent(in) :: lphase ! index for interstitial / cloudborne aerosol 
+     integer, intent(out) :: mm         ! index of the tracers
+     integer, intent(out) :: jnv        ! index for scavcoefnv 3rd dimension
+     integer, intent(out) :: jnummaswtr ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water) 
+
+     if (lspec <= nspec_amode(imode)) then ! non-water mass
+          jnummaswtr = 1
+          if (lphase == 1) then
+             mm = lmassptr_amode(lspec,imode)
+             jnv = 2
+          else
+             mm = lmassptrcw_amode(lspec,imode)
+             jnv = 0
+          endif
+     elseif (lspec == nspec_amode(imode)+1) then ! number
+          jnummaswtr = 0
+          if (lphase == 1) then
+             mm = numptr_amode(imode)
+             jnv = 1
+          else
+             mm = numptrcw_amode(imode)
+             jnv = 0
+          endif
+     else ! water mass
+          jnummaswtr = 2
+     endif
+
+   end subroutine index_ordering
 
 !=============================================================================
    subroutine apportion_sfc_flux_deep ( ncol,                     & ! in
