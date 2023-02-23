@@ -47,14 +47,23 @@ integer, parameter :: id_dst1 = 2
 integer, parameter :: id_dst3 = 3
 integer, parameter :: hetfrz_aer_nspec = 3
 
+! Note for C++ port: this constant is probably defined in many 
+! other subroutines outside of this module. 
+! This one is used within the module except for subroutine 
+! calculate_collkernel_sub
 real(r8), parameter :: kboltz = 1.38e-23_r8    ! Boltzmann constant
+
 real(r8), parameter :: amu = 1.66053886e-27_r8 
 real(r8), parameter :: nus = 1.e13_r8          ! frequ. of vibration [s-1] higher freq. (as in P&K, consistent with Anupam's data) 
 real(r8), parameter :: rhwincloud = 0.98_r8    ! 98% RH in mixed-phase clouds (Korolev & Isaac, JAS 2006)
 real(r8), parameter :: limfacbc = 0.01_r8      ! max. ice nucleating fraction soot
 
-real(r8), parameter :: pi = 4._r8*atan(1.0_r8) ! bad constant parameter, defined locally within the module.
-                                               ! use this one to avoid double declaring pi
+! Note for C++ port: defined locally within the module
+! Due to BFB for Fortran code, we use this one instead 
+! of the one from hetfrz_classnuc_init
+! parameter pdf_d_theta below depends on pi constant here
+real(r8), parameter :: pi = 4._r8*atan(1.0_r8)
+                                              
 
 
 ! Wang et al., 2014 fitting parameters
@@ -761,12 +770,9 @@ end function
 ! Modifications: Yong Wang and Xiaohong Liu, UWyo, 12/2012
 !-----------------------------------------------------------------------
 
-subroutine collkernel( &
-   t, pres, eswtr, r3lx,       &
-   r_bc,                                   &  ! BC modes
-   r_dust_a1, r_dust_a3,                   &  ! dust modes
-   Kcoll_bc,                               &  ! collision kernel [cm3 s-1]
-   Kcoll_dust_a1, Kcoll_dust_a3)
+subroutine collkernel( t, pres, eswtr, r3lx,       &
+                       r_bc, r_dust_a1, r_dust_a3,  &
+                       Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3)
 
    real(r8), intent(in) :: t                ! temperature [K]
    real(r8), intent(in) :: pres             ! pressure [Pa]
@@ -776,35 +782,27 @@ subroutine collkernel( &
    real(r8), intent(in) :: r_dust_a1        ! model radii of dust modes [m]
    real(r8), intent(in) :: r_dust_a3        ! model radii of dust modes [m]
 
-   real(r8), intent(out) :: Kcoll_bc        ! collision kernel [cm3 s-1]
-   real(r8), intent(out) :: Kcoll_dust_a1
-   real(r8), intent(out) :: Kcoll_dust_a3
+   real(r8), intent(out) :: Kcoll_bc        ! collision kernel [cm^3/s]
+   real(r8), intent(out) :: Kcoll_dust_a1   ! collision kernel [cm^3/s]
+   real(r8), intent(out) :: Kcoll_dust_a3   ! collision kernel [cm^3/s]
 
    ! local variables
-   real(r8) :: a, b, c, a_f, b_f, c_f, f
    real(r8) :: tc          ! temperature [deg C]
    real(r8) :: rho_air     ! air density [kg m-3]
    real(r8) :: viscos_air  ! dynamic viscosity of air [kg m-1 s-1]
    real(r8) :: Ktherm_air  ! thermal conductivity of air [J/(m s K)]
    real(r8) :: lambda      ! mean free path [m]
-   real(r8) :: Kn          ! Knudsen number [ ]
    real(r8) :: Re          ! Reynolds number [ ]
    real(r8) :: Pr          ! Prandtl number [ ]
-   real(r8) :: Sc          ! Schmidt number [ ]
-   real(r8) :: vterm       ! terminal velocity [m s-1]
-   real(r8) :: Ktherm      ! thermal conductivity of aerosol [J/(m s K)]
    real(r8) :: Dvap        ! water vapor diffusivity [m2 s-1]
-   real(r8) :: Daer        ! aerosol diffusivity [m2 s-1]
    real(r8) :: latvap      ! latent heat of vaporization [J kg-1]
-   real(r8) :: kboltz      ! Boltzmann constant [J K-1]
    real(r8) :: G           ! thermodynamic function in Cotton et al. [kg m-1 s-1]
-   real(r8) :: r_a         ! aerosol radius [m]
-   real(r8) :: f_t         ! factor by Waldmann & Schmidt [ ]
-   real(r8) :: Q_heat      ! heat flux [J m-2 s-1]
-   real(r8) :: Tdiff_cotton ! temperature difference between droplet and environment [K]
-   real(r8) :: K_brownian,K_thermo_cotton,K_diffusio_cotton   ! collision kernels [m3 s-1]
-   real(r8) :: K_total     ! total collision kernel [cm3 s-1]
-   integer  :: i
+   real(r8) :: Tdiff       ! temperature difference between droplet and environment [K]
+  
+
+   ! thermal conductivities from Seinfeld & Pandis, Table 8.6
+   real(r8), parameter :: Ktherm_bc = 4.2_r8 ! Carbon
+   real(r8), parameter :: Ktherm_dust = 0.72_r8 ! clay
    !------------------------------------------------------------------------------------------------
         
    Kcoll_bc      = 0._r8
@@ -812,77 +810,149 @@ subroutine collkernel( &
    Kcoll_dust_a3 = 0._r8
 
    tc     = t - tmelt
-   kboltz = 1.38065e-23_r8
 
    ! air viscosity for tc<0, from depvel_part.F90
    viscos_air = (1.718_r8+0.0049_r8*tc-1.2e-5_r8*tc*tc)*1.e-5_r8
+   
    ! air density
    rho_air = pres/(rair*t)
+   
    ! mean free path: Seinfeld & Pandis 8.6
    lambda = 2*viscos_air/(pres*SQRT(8/(pi*rair*t)))
+   
    ! latent heat of vaporization, varies with T
-   latvap = 1000*(-0.0000614342_r8*tc**3 + 0.00158927_r8*tc**2 - 2.36418_r8*tc + 2500.79_r8)
-   ! droplet terminal velocity after Chen & Liu, QJRMS 2004
-   a = 8.8462e2_r8
-   b = 9.7593e7_r8
-   c = -3.4249e-11_r8
-   a_f = 3.1250e-1_r8
-   b_f = 1.0552e-3_r8
-   c_f = -2.4023_r8
-   f = EXP(EXP(a_f + b_f*(LOG(r3lx))**3 + c_f*rho_air**1.5_r8))
-   vterm = (a+ (b + c*r3lx)*r3lx)*r3lx*f
+   latvap = get_latent_heat_vapor(tc)   
 
    ! Reynolds number
-   Re = 2*vterm*r3lx*rho_air/viscos_air
+   Re = get_reynolds_num(r3lx, rho_air, viscos_air)
+
    ! thermal conductivity of air: Seinfeld & Pandis eq. 15.75
    Ktherm_air = 1.e-3_r8*(4.39_r8+0.071_r8*t)  !J/(m s K)
+   
    ! Prandtl number
    Pr = viscos_air*cpair/Ktherm_air
+   
    ! water vapor diffusivity: Pruppacher & Klett 13-3
    Dvap = 0.211e-4_r8*(t/273.15_r8)*(101325._r8/pres) 
+   
    ! G-factor = rhoh2o*Xi in Rogers & Yau, p. 104
    G = rhoh2o/((latvap/(rh2o*t) - 1)*latvap*rhoh2o/(Ktherm_air*t) &
        + rhoh2o*rh2o*t/(Dvap*eswtr))
+
+   ! calculate T-Tc as in Cotton et al.
+   Tdiff = -G*(rhwincloud - 1._r8)*latvap/Ktherm_air
       
    ! variables depending on aerosol radius
    ! loop over 3 aerosol modes
-   do i = 1, 3
-      if (i == 1) r_a = r_bc
-      if (i == 2) r_a = r_dust_a1
-      if (i == 3) r_a = r_dust_a3
-      ! Knudsen number (Seinfeld & Pandis 8.1)
-      Kn = lambda/r_a
-      ! aerosol diffusivity
-      Daer = kboltz*t*(1 + Kn)/(6*pi*r_a*viscos_air)
-      ! Schmidt number
-      Sc = viscos_air/(Daer*rho_air)
+  
+   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_bc, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_bc, Pr, Tdiff, Kcoll_bc)
+   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_dust_a1, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, Kcoll_dust_a1)
+   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_dust_a3, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, Kcoll_dust_a3) 
+       
+end subroutine collkernel
 
-      ! Young (1974) first equ. on page 771
-      K_brownian = 4*pi*r3lx*Daer*(1 + 0.3_r8*Re**0.5_r8*Sc**0.33_r8)
+subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, lambda, & 
+                                    latvap, viscos_air, Re, Ktherm_air, Ktherm, Pr, Tdiff, & 
+                                    K_total)
 
-      ! thermal conductivities from Seinfeld & Pandis, Table 8.6
-      if (i == 1) Ktherm = 4.2_r8 ! Carbon
-      if (i == 2 .or. i == 3) Ktherm = 0.72_r8 ! clay
-      ! form factor
-      f_t = 0.4_r8*(1._r8 + 1.45_r8*Kn + 0.4_r8*Kn*EXP(-1._r8/Kn))      &
+   ! input
+   real(r8), intent(in) :: temperature      ! temperature [k]   
+   real(r8), intent(in) :: pressure         ! pressure [Pa]
+   real(r8), intent(in) :: rho_air          ! air density [kg/m^3]
+   real(r8), intent(in) :: r3lx             ! volume mean drop radius [m]
+   real(r8), intent(in) :: r_a              ! aerosol radius [m]
+   real(r8), intent(in) :: lambda           ! mean free path [m]
+   real(r8), intent(in) :: latvap           ! latent heat of vaporization [J kg-1]
+   real(r8), intent(in) :: viscos_air       ! dynamic viscosity of air [kg m-1 s-1]
+   real(r8), intent(in) :: Re               ! Reynolds number [unitless]
+   real(r8), intent(in) :: Ktherm_air       ! thermal conductivity of air [J/(m s K)]   
+   real(r8), intent(in) :: Ktherm           ! thermal conductivity of aerosol [J/(m s K)]
+   real(r8), intent(in) :: Pr               ! Prandtl number [unitless]
+   real(r8), intent(in) :: Tdiff            ! temperature difference between droplet and environment [K]
+ 
+   ! output
+   real(r8), intent(out) :: K_total         ! collision kernel [cm^3/s]
+
+   ! local variables
+   real(r8) :: Kn          ! Knudsen number [unitless]
+   real(r8) :: Sc          ! Schmidt number [unitless]
+   real(r8) :: Daer        ! aerosol diffusivity [m2 s-1] 
+   real(r8) :: f_t         ! factor by Waldmann & Schmidt [ ]
+   real(r8) :: Q_heat      ! heat flux [J m-2 s-1]
+   real(r8) :: K_brownian,K_thermo_cotton,K_diffusio_cotton   ! collision kernels [m3 s-1]
+
+   ! Note for C++ port: Due to BFB for Fortran code, we have to declare
+   ! Boltzmann constant here again. This value is only used in this
+   ! subroutine.
+   real(r8), parameter :: kboltz2 = 1.38065e-23_r8      ! Boltzmann constant [J/K]
+
+         
+   ! Knudsen number (Seinfeld & Pandis 8.1)
+   Kn = lambda/r_a
+      
+   ! aerosol diffusivity
+   Daer = kboltz2*temperature*(1 + Kn)/(6*pi*r_a*viscos_air)
+      
+   ! Schmidt number
+   Sc = viscos_air/(Daer*rho_air)
+
+   ! Young (1974) first equ. on page 771
+   K_brownian = 4*pi*r3lx*Daer*(1 + 0.3_r8*Re**0.5_r8*Sc**0.33_r8)
+
+   ! form factor
+   f_t = 0.4_r8*(1._r8 + 1.45_r8*Kn + 0.4_r8*Kn*EXP(-1._r8/Kn))      &
                   *(Ktherm_air + 2.5_r8*Kn*Ktherm)                      &
                /((1._r8 + 3._r8*Kn)*(2._r8*Ktherm_air + 5._r8*Kn*Ktherm+Ktherm))
-      ! calculate T-Tc as in Cotton et al.
-      Tdiff_cotton = -G*(rhwincloud - 1._r8)*latvap/Ktherm_air
-      Q_heat = Ktherm_air/r3lx*(1._r8 + 0.3_r8*Re**0.5_r8*Pr**0.33_r8)*Tdiff_cotton
-      K_thermo_cotton = 4._r8*pi*r3lx*r3lx*f_t*Q_heat/pres
-      K_diffusio_cotton = -(1._r8/f_t)*(rh2o*t/latvap)*K_thermo_cotton
-      K_total = 1.e6_r8*(K_brownian + K_thermo_cotton + K_diffusio_cotton)  ! convert m3/s -> cm3/s
-      ! set K to 0 if negative
-      if (K_total .lt. 0._r8) K_total = 0._r8
 
-      if (i == 1) Kcoll_bc = K_total
-      if (i == 2) Kcoll_dust_a1 = K_total
-      if (i == 3) Kcoll_dust_a3 = K_total
-        
-   end do
-      
-end subroutine collkernel
+   Q_heat = Ktherm_air/r3lx*(1._r8 + 0.3_r8*Re**0.5_r8*Pr**0.33_r8)*Tdiff
+
+   K_thermo_cotton = 4._r8*pi*r3lx*r3lx*f_t*Q_heat/pressure
+
+   K_diffusio_cotton = -(1._r8/f_t)*(rh2o*temperature/latvap)*K_thermo_cotton
+   K_total = 1.e6_r8*(K_brownian + K_thermo_cotton + K_diffusio_cotton)  ! convert m3/s -> cm3/s
+
+   ! set K to 0 if negative
+   if (K_total .lt. 0._r8) K_total = 0._r8
+
+end subroutine
+
+pure function get_latent_heat_vapor(tc) result(latvap)
+
+   implicit none
+   real(r8), intent(in) :: tc  ! temperature [deg C]
+
+   real(r8) :: latvap          ! latent heat of vaporization [J kg-1]
+
+   latvap = 1000*(-0.0000614342_r8*tc**3 + 0.00158927_r8*tc**2 - 2.36418_r8*tc + 2500.79_r8)
+
+end function
+
+
+pure function get_reynolds_num(r3lx, rho_air, viscos_air) result(Re)
+
+   implicit none
+   real(r8), intent(in) :: r3lx         ! volume mean drop radius [m] 
+   real(r8), intent(in) :: rho_air      ! air density [kg/m^3] 
+   real(r8), intent(in) :: viscos_air   ! dynamic viscosity of air [kg m-1 s-1]
+
+   real(r8) :: vlc_drop                   
+   real(r8) :: f
+   real(r8) :: Re
+   real(r8), parameter :: a = 8.8462e2_r8            
+   real(r8), parameter :: b = 9.7593e7_r8
+   real(r8), parameter :: c = -3.4249e-11_r8
+   real(r8), parameter :: a_f = 3.1250e-1_r8
+   real(r8), parameter :: b_f = 1.0552e-3_r8
+   real(r8), parameter :: c_f = -2.4023_r8
+
+   ! droplet terminal velocity after Chen & Liu, QJRMS 2004
+   f = EXP(EXP(a_f + b_f*(LOG(r3lx))**3 + c_f*rho_air**1.5_r8))
+   vlc_drop = (a+ (b + c*r3lx)*r3lx)*r3lx*f
+
+   ! Reynolds number
+   Re = 2*vlc_drop*r3lx*rho_air/viscos_air
+
+end function
 
 !===================================================================================================
 
