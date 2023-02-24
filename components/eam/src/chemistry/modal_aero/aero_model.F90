@@ -706,7 +706,7 @@ contains
     
 
     ! local vars
-    type(wetdep_inputs_t) :: dep_inputs
+    type(wetdep_inputs_t) :: dep_inputs ! wet deposition variables defined from wetdep_inputs_set
 
     integer :: jnv         ! index for scavcoefnv 3rd dimension
     integer :: jnummaswtr  ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water)
@@ -795,6 +795,7 @@ contains
     call modal_aero_wateruptake_dr(state, pbuf)
     call t_stopf('wateruptake')
 
+    ! skip wet deposition if nwetdep is non-positive
     if (nwetdep<1) return
 
     call wetdep_inputs_set( state, pbuf, dep_inputs )
@@ -851,11 +852,11 @@ mmode_loop_aa: &
 !that the resuspension of cloudborne can be saved then applied to interstitial (RCE) 
 lphase_loop_aa: &
        do lphase = 2,1,-1  ! do cloudborne (2) first then interstitial (1)
+
           if (lphase == 1) then ! interstial aerosol
              call modal_aero_bcscavcoef_get( imode, ncol, isprx, dgnumwet, &
                   scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
           endif
-
           call define_act_frac ( lphase,     imode,         & ! in
                 sol_facti, sol_factic, sol_factb, f_act_conv) ! out
 
@@ -1043,14 +1044,13 @@ lphase_jnmw_conditional: &
        call set_srf_wetdep(aerdepwetis, aerdepwetcw, cam_out)
     endif
 
-       
     call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
     call pbuf_get_field(pbuf, icwmrsh_idx,     icwmrsh )
     call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
     call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
     call t_startf('ma_convproc')
-    call ma_convproc_intr( state, dt,                      & ! in
+    call ma_convproc_intr( state, dt,                         & ! in
             dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
             sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
             dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
