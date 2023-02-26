@@ -770,12 +770,12 @@ end function
 ! Modifications: Yong Wang and Xiaohong Liu, UWyo, 12/2012
 !-----------------------------------------------------------------------
 
-subroutine collkernel( t, pres, eswtr, r3lx,       &
+subroutine collkernel( temperature, pressure, eswtr, r3lx,       &
                        r_bc, r_dust_a1, r_dust_a3,  &
                        Kcoll_bc, Kcoll_dust_a1, Kcoll_dust_a3)
 
-   real(r8), intent(in) :: t                ! temperature [K]
-   real(r8), intent(in) :: pres             ! pressure [Pa]
+   real(r8), intent(in) :: temperature      ! temperature [K]
+   real(r8), intent(in) :: pressure         ! pressure [Pa]
    real(r8), intent(in) :: eswtr            ! saturation vapor pressure of water [Pa]
    real(r8), intent(in) :: r3lx             ! volume mean drop radius [m]
    real(r8), intent(in) :: r_bc             ! model radii of BC modes [m]
@@ -788,15 +788,13 @@ subroutine collkernel( t, pres, eswtr, r3lx,       &
 
    ! local variables
    real(r8) :: tc          ! temperature [deg C]
-   real(r8) :: rho_air     ! air density [kg m-3]
-   real(r8) :: viscos_air  ! dynamic viscosity of air [kg m-1 s-1]
+   real(r8) :: rho_air     ! air density [kg/m^3]
+   real(r8) :: viscos_air  ! dynamic viscosity of air [kg/m/s]
    real(r8) :: Ktherm_air  ! thermal conductivity of air [J/(m s K)]
    real(r8) :: lambda      ! mean free path [m]
-   real(r8) :: Re          ! Reynolds number [ ]
-   real(r8) :: Pr          ! Prandtl number [ ]
-   real(r8) :: Dvap        ! water vapor diffusivity [m2 s-1]
-   real(r8) :: latvap      ! latent heat of vaporization [J kg-1]
-   real(r8) :: G           ! thermodynamic function in Cotton et al. [kg m-1 s-1]
+   real(r8) :: Re          ! Reynolds number [unitless]
+   real(r8) :: Pr          ! Prandtl number [unitless]
+   real(r8) :: latvap      ! latent heat of vaporization [J/kg]
    real(r8) :: Tdiff       ! temperature difference between droplet and environment [K]
   
 
@@ -809,16 +807,16 @@ subroutine collkernel( t, pres, eswtr, r3lx,       &
    Kcoll_dust_a1 = 0._r8
    Kcoll_dust_a3 = 0._r8
 
-   tc     = t - tmelt
+   tc     = temperature - tmelt
 
    ! air viscosity for tc<0, from depvel_part.F90
-   viscos_air = (1.718_r8+0.0049_r8*tc-1.2e-5_r8*tc*tc)*1.e-5_r8
-   
+   viscos_air = get_air_viscosity(tc)   
+
    ! air density
-   rho_air = pres/(rair*t)
+   rho_air = pressure/(rair*temperature)
    
    ! mean free path: Seinfeld & Pandis 8.6
-   lambda = 2*viscos_air/(pres*SQRT(8/(pi*rair*t)))
+   lambda = 2*viscos_air/(pressure*SQRT(8/(pi*rair*temperature)))
    
    ! latent heat of vaporization, varies with T
    latvap = get_latent_heat_vapor(tc)   
@@ -827,29 +825,31 @@ subroutine collkernel( t, pres, eswtr, r3lx,       &
    Re = get_reynolds_num(r3lx, rho_air, viscos_air)
 
    ! thermal conductivity of air: Seinfeld & Pandis eq. 15.75
-   Ktherm_air = 1.e-3_r8*(4.39_r8+0.071_r8*t)  !J/(m s K)
+   Ktherm_air = 1.e-3_r8*(4.39_r8+0.071_r8*temperature)  !J/(m s K)
    
    ! Prandtl number
    Pr = viscos_air*cpair/Ktherm_air
-   
-   ! water vapor diffusivity: Pruppacher & Klett 13-3
-   Dvap = 0.211e-4_r8*(t/273.15_r8)*(101325._r8/pres) 
-   
-   ! G-factor = rhoh2o*Xi in Rogers & Yau, p. 104
-   G = rhoh2o/((latvap/(rh2o*t) - 1)*latvap*rhoh2o/(Ktherm_air*t) &
-       + rhoh2o*rh2o*t/(Dvap*eswtr))
 
    ! calculate T-Tc as in Cotton et al.
-   Tdiff = -G*(rhwincloud - 1._r8)*latvap/Ktherm_air
+   Tdiff = get_temperature_diff(temperature, pressure, eswtr, latvap, Ktherm_air)
       
-   ! variables depending on aerosol radius
-   ! loop over 3 aerosol modes
   
-   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_bc, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_bc, Pr, Tdiff, Kcoll_bc)
-   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_dust_a1, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, Kcoll_dust_a1)
-   call calculate_collkernel_sub(t, pres, rho_air, r3lx, r_dust_a3, lambda, latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, Kcoll_dust_a3) 
+   call calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_bc, lambda, &       ! in
+                                 latvap, viscos_air, Re, Ktherm_air, Ktherm_bc, Pr, Tdiff, & ! in
+                                 Kcoll_bc)                                                   ! out
+
+
+   call calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_dust_a1, lambda, &    ! in
+                                 latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, & ! in
+                                 Kcoll_dust_a1)                                                ! out
+
+
+   call calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_dust_a3, lambda, &    ! in
+                                 latvap, viscos_air, Re, Ktherm_air, Ktherm_dust, Pr, Tdiff, & ! in
+                                 Kcoll_dust_a3)                                                ! out 
        
 end subroutine collkernel
+
 
 subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, lambda, & 
                                     latvap, viscos_air, Re, Ktherm_air, Ktherm, Pr, Tdiff, & 
@@ -862,8 +862,8 @@ subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, l
    real(r8), intent(in) :: r3lx             ! volume mean drop radius [m]
    real(r8), intent(in) :: r_a              ! aerosol radius [m]
    real(r8), intent(in) :: lambda           ! mean free path [m]
-   real(r8), intent(in) :: latvap           ! latent heat of vaporization [J kg-1]
-   real(r8), intent(in) :: viscos_air       ! dynamic viscosity of air [kg m-1 s-1]
+   real(r8), intent(in) :: latvap           ! latent heat of vaporization [J/kg]
+   real(r8), intent(in) :: viscos_air       ! dynamic viscosity of air [kg/m/s]
    real(r8), intent(in) :: Re               ! Reynolds number [unitless]
    real(r8), intent(in) :: Ktherm_air       ! thermal conductivity of air [J/(m s K)]   
    real(r8), intent(in) :: Ktherm           ! thermal conductivity of aerosol [J/(m s K)]
@@ -876,10 +876,10 @@ subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, l
    ! local variables
    real(r8) :: Kn          ! Knudsen number [unitless]
    real(r8) :: Sc          ! Schmidt number [unitless]
-   real(r8) :: Daer        ! aerosol diffusivity [m2 s-1] 
-   real(r8) :: f_t         ! factor by Waldmann & Schmidt [ ]
-   real(r8) :: Q_heat      ! heat flux [J m-2 s-1]
-   real(r8) :: K_brownian,K_thermo_cotton,K_diffusio_cotton   ! collision kernels [m3 s-1]
+   real(r8) :: Daer        ! aerosol diffusivity [m2/s] 
+   real(r8) :: f_t         ! factor by Waldmann & Schmidt [unitless]
+   real(r8) :: Q_heat      ! heat flux [J/m2/s]
+   real(r8) :: K_brownian,K_thermo_cotton,K_diffusio_cotton   ! collision kernels [m3/s]
 
    ! Note for C++ port: Due to BFB for Fortran code, we have to declare
    ! Boltzmann constant here again. This value is only used in this
@@ -916,14 +916,34 @@ subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, l
 
 end subroutine
 
+
+pure function get_air_viscosity(tc) result(viscos_air)
+
+   implicit none
+   real(r8), intent(in) :: tc  ! temperature [deg C]
+
+   real(r8) :: viscos_air      ! dynamic viscosity of air [kg/m/s]
+   real(r8), parameter :: coeff_a = -1.2e-5_r8
+   real(r8), parameter :: coeff_b = 0.0049_r8
+   real(r8), parameter :: coeff_c = 1.718_r8
+  
+   viscos_air = (coeff_a*tc**2 + coeff_b*tc + coeff_c)*1.e-5_r8   
+
+end function
+
+
 pure function get_latent_heat_vapor(tc) result(latvap)
 
    implicit none
    real(r8), intent(in) :: tc  ! temperature [deg C]
 
-   real(r8) :: latvap          ! latent heat of vaporization [J kg-1]
+   real(r8) :: latvap          ! latent heat of vaporization [J/kg]
+   real(r8), parameter :: coeff_a = -0.0000614342_r8
+   real(r8), parameter :: coeff_b = 0.00158927_r8
+   real(r8), parameter :: coeff_c = -2.36418_r8
+   real(r8), parameter :: coeff_d = 2500.79_r8
 
-   latvap = 1000*(-0.0000614342_r8*tc**3 + 0.00158927_r8*tc**2 - 2.36418_r8*tc + 2500.79_r8)
+   latvap = 1000*(coeff_a*tc**3 + coeff_b*tc**2 + coeff_c*tc + coeff_d)
 
 end function
 
@@ -933,24 +953,51 @@ pure function get_reynolds_num(r3lx, rho_air, viscos_air) result(Re)
    implicit none
    real(r8), intent(in) :: r3lx         ! volume mean drop radius [m] 
    real(r8), intent(in) :: rho_air      ! air density [kg/m^3] 
-   real(r8), intent(in) :: viscos_air   ! dynamic viscosity of air [kg m-1 s-1]
+   real(r8), intent(in) :: viscos_air   ! dynamic viscosity of air [kg/m/s]
 
-   real(r8) :: vlc_drop                   
-   real(r8) :: f
-   real(r8) :: Re
-   real(r8), parameter :: a = 8.8462e2_r8            
-   real(r8), parameter :: b = 9.7593e7_r8
-   real(r8), parameter :: c = -3.4249e-11_r8
-   real(r8), parameter :: a_f = 3.1250e-1_r8
-   real(r8), parameter :: b_f = 1.0552e-3_r8
-   real(r8), parameter :: c_f = -2.4023_r8
+   real(r8) :: vlc_drop                 ! terminal cloud drop velocity [m/s]
+   real(r8) :: vlc_drop_adjfunc         ! auxiliary functions for terminal velocity adjustment [unitless]
+   real(r8) :: Re                       ! Reynolds number [unitless]
+   real(r8), parameter :: coeff_vlc_a = 8.8462e2_r8            
+   real(r8), parameter :: coeff_vlc_b = 9.7593e7_r8
+   real(r8), parameter :: coeff_vlc_c = -3.4249e-11_r8
+
+   real(r8), parameter :: coeff_adj_a = 3.1250e-1_r8
+   real(r8), parameter :: coeff_adj_b = 1.0552e-3_r8
+   real(r8), parameter :: coeff_adj_c = -2.4023_r8
 
    ! droplet terminal velocity after Chen & Liu, QJRMS 2004
-   f = EXP(EXP(a_f + b_f*(LOG(r3lx))**3 + c_f*rho_air**1.5_r8))
-   vlc_drop = (a+ (b + c*r3lx)*r3lx)*r3lx*f
+   vlc_drop_adjfunc = EXP(EXP(coeff_adj_a + coeff_adj_b*(LOG(r3lx))**3 + coeff_adj_c*rho_air**1.5_r8))
+   vlc_drop = (coeff_vlc_a+ (coeff_vlc_b + coeff_vlc_c*r3lx)*r3lx)*r3lx*vlc_drop_adjfunc
 
    ! Reynolds number
    Re = 2*vlc_drop*r3lx*rho_air/viscos_air
+
+end function
+
+
+pure function get_temperature_diff(temperature, pressure, eswtr, latvap, Ktherm_air) result(Tdiff)
+
+   implicit none
+   real(r8), intent(in) :: temperature      ! temperature [K]
+   real(r8), intent(in) :: pressure         ! pressure [Pa]
+   real(r8), intent(in) :: eswtr            ! saturation vapor pressure of water [Pa]
+   real(r8), intent(in) :: latvap           ! latent heat of vaporization [J/kg]
+   real(r8), intent(in) :: Ktherm_air       ! thermal conductivity of air [J/(m s K)]
+
+   real(r8) :: Tdiff       ! temperature difference between droplet and environment [K]
+   real(r8) :: Dvap        ! water vapor diffusivity [m2/s]
+   real(r8) :: G_factor    ! thermodynamic function in Cotton et al. [kg/m/s]
+ 
+   ! water vapor diffusivity: Pruppacher & Klett 13-3
+   Dvap = 0.211e-4_r8*(temperature/273.15_r8)*(101325._r8/pressure)
+
+   ! G-factor = rhoh2o*Xi in Rogers & Yau, p. 104
+   G_factor = rhoh2o/((latvap/(rh2o*temperature) -1)*latvap*rhoh2o/(Ktherm_air*temperature) &
+            + rhoh2o*rh2o*temperature/(Dvap*eswtr))
+
+   ! calculate T-Tc as in Cotton et al.
+   Tdiff = -G_factor*(rhwincloud - 1._r8)*latvap/Ktherm_air
 
 end function
 
