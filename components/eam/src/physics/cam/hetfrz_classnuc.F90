@@ -912,7 +912,7 @@ subroutine calculate_collkernel_sub(temperature, pressure, rho_air, r3lx, r_a, l
    K_total = 1.e6_r8*(K_brownian + K_thermo_cotton + K_diffusio_cotton)  ! convert m3/s -> cm3/s
 
    ! set K to 0 if negative
-   if (K_total .lt. 0._r8) K_total = 0._r8
+   if (K_total < 0._r8) K_total = 0._r8
 
 end subroutine
 
