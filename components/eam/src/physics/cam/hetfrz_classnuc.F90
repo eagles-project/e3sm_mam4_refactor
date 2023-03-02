@@ -926,8 +926,8 @@ pure function get_air_viscosity(tc) result(viscos_air)
    real(r8), parameter :: coeff_a = -1.2e-5_r8
    real(r8), parameter :: coeff_b = 0.0049_r8
    real(r8), parameter :: coeff_c = 1.718_r8
-  
-   viscos_air = (coeff_a*tc**2 + coeff_b*tc + coeff_c)*1.e-5_r8   
+
+   viscos_air = (coeff_c + coeff_b*tc + coeff_a*tc*tc)*1.e-5_r8
 
 end function
 
