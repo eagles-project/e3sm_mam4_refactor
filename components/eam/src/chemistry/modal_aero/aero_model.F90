@@ -2094,7 +2094,8 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol, im
+    integer, intent(in)     :: lchnk, ncol  ! indexes
+    integer, intent(in)     :: im ! offset applied to modal aero "pointers"
     real(r8), intent(in)    :: mbar(ncol,pver)
     real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst)
     type(physics_buffer_desc), pointer :: pbuf(:)
@@ -2102,18 +2103,18 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
+    integer :: kk, mm
     real(r8), pointer :: fldcw(:,:)
 
-    do m=1,gas_pcnst
-       if( adv_mass(m) /= 0._r8 ) then
-          fldcw => qqcw_get_field(pbuf, m+im,lchnk,errorhandle=.true.)
+    do mm=1,gas_pcnst
+       if( adv_mass(mm) /= 0._r8 ) then
+          fldcw => qqcw_get_field(pbuf, mm+im,lchnk,errorhandle=.true.)
           if(associated(fldcw)) then
-             do k=1,pver
-                vmr(:ncol,k,m) = mbar(:ncol,k) * fldcw(:ncol,k) / adv_mass(m)
+             do kk=1,pver
+                vmr(:ncol,kk,mm) = mbar(:ncol,kk) * fldcw(:ncol,kk) / adv_mass(mm)
              enddo
           else
-             vmr(:,:,m) = 0.0_r8
+             vmr(:,:,mm) = 0.0_r8
           endif
        endif
     enddo
@@ -2135,7 +2136,8 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol, im
+    integer, intent(in)     :: lchnk, ncol  ! indexes
+    integer, intent(in)     :: im ! offset applied to modal aero "pointers"
     real(r8), intent(in)    :: mbar(ncol,pver)
     real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)
     type(physics_buffer_desc), pointer :: pbuf(:)
@@ -2143,16 +2145,16 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
+    integer :: kk, mm
     real(r8), pointer :: fldcw(:,:)
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
-    do m = 1,gas_pcnst
-       fldcw => qqcw_get_field(pbuf, m+im,lchnk,errorhandle=.true.)
-       if( adv_mass(m) /= 0._r8 .and. associated(fldcw)) then
-          do k = 1,pver
-             fldcw(:ncol,k) = adv_mass(m) * vmr(:ncol,k,m) / mbar(:ncol,k)
+    do mm = 1,gas_pcnst
+       fldcw => qqcw_get_field(pbuf, mm+im,lchnk,errorhandle=.true.)
+       if( adv_mass(mm) /= 0._r8 .and. associated(fldcw)) then
+          do kk = 1,pver
+             fldcw(:ncol,kk) = adv_mass(mm) * vmr(:ncol,kk,mm) / mbar(:ncol,kk)
           enddo
        endif
     enddo
