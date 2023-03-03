@@ -2087,6 +2087,10 @@ do_lphase2_conditional: &
     use modal_aero_data, only : qqcw_get_field
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
+    ! C++ porting: this subroutine is similar to the subroutine mmr2vmr
+    ! in mozart/mo_mass_xforms.F90. Maybe can merge them
+    ! Note that the subroutine needs adv_mass from module chem_mod,
+    ! but the values are assigned from module mo_sim_dat
     !-----------------------------------------------------------------
 
     implicit none
@@ -2096,15 +2100,15 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     integer, intent(in)     :: lchnk, ncol  ! indexes
     integer, intent(in)     :: im ! offset applied to modal aero "pointers"
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst)
+    real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
     type(physics_buffer_desc), pointer :: pbuf(:)
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
     integer :: kk, mm
-    real(r8), pointer :: fldcw(:,:)
+    real(r8), pointer :: fldcw(:,:) ! mass mixing ratio [kg/kg]
 
     do mm=1,gas_pcnst
        if( adv_mass(mm) /= 0._r8 ) then
@@ -2126,9 +2130,12 @@ do_lphase2_conditional: &
   subroutine vmr2qqcw( lchnk, vmr, mbar, ncol, im, pbuf )
     !-----------------------------------------------------------------
     !	... Xfrom from volume to mass mixing ratio
+    ! C++ porting: this subroutine is similar to the subroutine vmr2mmr 
+    ! in mozart/mo_mass_xforms.F90. Maybe can merge them
+    ! Note that the subroutine needs adv_mass from module chem_mod, 
+    ! but the values are assigned from module mo_sim_dat
     !-----------------------------------------------------------------
 
-    use m_spc_id
     use modal_aero_data, only : qqcw_get_field
 
     implicit none
@@ -2138,15 +2145,15 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     integer, intent(in)     :: lchnk, ncol  ! indexes
     integer, intent(in)     :: im ! offset applied to modal aero "pointers"
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)
+    real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
     type(physics_buffer_desc), pointer :: pbuf(:)
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
     integer :: kk, mm
-    real(r8), pointer :: fldcw(:,:)
+    real(r8), pointer :: fldcw(:,:) ! mass mixing ratio [kg/kg]
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
