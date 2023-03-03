@@ -360,7 +360,7 @@ subroutine dropmixnuc( &
    real(r8) :: cs(pcols,pver)      ! air density [kg/m^3]
    real(r8) :: dz(pcols,pver)      ! geometric thickness of layers [m]
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k [m/s]
-   real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k [m/s]
+! BJG   real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k [m/s]
    real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source tendency [#/kg/s]
    real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to mixing [#/kg/s]
 
@@ -382,9 +382,9 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
    real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios [#/kg or kg/kg]
    real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
-   real(r8), allocatable :: naermod(:)  ! aerosol number concentration [#/m^3]
-   real(r8), allocatable :: hygro(:)    ! hygroscopicity of aerosol mode [dimensionless]
-   real(r8), allocatable :: vaerosol(:) ! aerosol volume conc [m^3/m^3]
+! BJG   real(r8), allocatable :: naermod(:)  ! aerosol number concentration [#/m^3]
+! BJG   real(r8), allocatable :: hygro(:)    ! hygroscopicity of aerosol mode [dimensionless]
+! BJG   real(r8), allocatable :: vaerosol(:) ! aerosol volume conc [m^3/m^3]
    real(r8), allocatable :: fn(:)              ! activation fraction for aerosol number [fraction]
    real(r8), allocatable :: fm(:)              ! activation fraction for aerosol mass [fraction]
    real(r8), allocatable :: fluxn(:)           ! number  activation fraction flux [m/s]
@@ -459,9 +459,9 @@ subroutine dropmixnuc( &
       raercol_cw(pver,ncnst_tot,2),   &
       coltend(pcols,ncnst_tot),       &
       coltend_cw(pcols,ncnst_tot),    &
-      naermod(ntot_amode),            &
-      hygro(ntot_amode),              &
-      vaerosol(ntot_amode),           &
+! BJG      naermod(ntot_amode),            &
+! BJG      hygro(ntot_amode),              &
+! BJG      vaerosol(ntot_amode),           &
       fn(ntot_amode),                 &
       fm(ntot_amode),                 &
       fluxn(ntot_amode),              &
@@ -505,53 +505,84 @@ subroutine dropmixnuc( &
    wtke(:,:)    = 0._r8
    factnum(:,:,:) = 0._r8
 
+
    ! overall_main_icol_loop
    do icol = 1, ncol
 
-      do kk = top_lev, pver-1
-         zs(kk) = 1._r8/(zm(icol,kk) - zm(icol,kk+1))
-      enddo
-      zs(pver) = zs(pver-1)
+      qncld(:) = 0._r8
+      srcn(:) = 0._r8   
+      nact(:,1:ntot_amode) = 0._r8
+      mact(:,1:ntot_amode) = 0._r8
+      cs(icol,:)  = pmid(icol,:)/(rair*temp(icol,:))        ! air density (kg/m3)
 
-      ! load number nucleated into qcld on cloud boundaries
-
-      do kk = top_lev, pver
-
-         cs(icol,kk)  = pmid(icol,kk)/(rair*temp(icol,kk))        ! air density (kg/m3)
-         dz(icol,kk)  = 1._r8/(cs(icol,kk)*gravit*rpdel(icol,kk)) ! layer thickness in m
-         zn(kk) = gravit*rpdel(icol,kk)
-         qcld(kk)  = ncldwtr(icol,kk)
-         qncld(kk) = 0._r8
-         srcn(kk)  = 0._r8
-         nact(kk,1:ntot_amode) = 0._r8
-         mact(kk,1:ntot_amode) = 0._r8
-
-         if (kk < pver) then
-            ekd(kk)   = min_max_bound(zkmin,zkmax,kvh(icol,kk+1))
-            csbot(kk) = 2.0_r8*pint(icol,kk+1)/(rair*(temp(icol,kk) + temp(icol,kk+1)))
-            csbot_cscen(kk) = csbot(kk)/cs(icol,kk)
-         else
-            ekd(kk)   = 0._r8
-            csbot(kk) = cs(icol,kk)
-            csbot_cscen(kk) = 1.0_r8
-         endif
+! BJG:  think dz can just be 1D, not needed outside icol loop
+      dz(icol,:)  = 1._r8/(cs(icol,:)*gravit*rpdel(icol,:)) ! layer thickness in m
+      zn(:) = gravit*rpdel(icol,:)
 
          ! rce-comment - define wtke at layer centers for new-cloud activation
          !    and at layer boundaries for old-cloud activation
          !++ag
-         wtke_cen(icol,kk) = wsub(icol,kk)
-         wtke(icol,kk)     = wsub(icol,kk)
+! BJG:   wtke_cen and wtke are identical here so only need one variable.
+! BJG         wtke_cen(icol,kk) = wsub(icol,kk)
+      wtke(icol,:)     = max(wsub(icol,:),wmixmin)
          !--ag
-         wtke_cen(icol,kk) = max(wtke_cen(icol,kk), wmixmin)
-         wtke(icol,kk)     = max(wtke(icol,kk), wmixmin)
+! BJG         wtke_cen(icol,kk) = max(wtke_cen(icol,kk), wmixmin)
+! BJG      wtke(icol,:)     = max(wtke(icol,:), wmixmin)
 
-         nsource(icol,kk) = 0._r8
+      ! load number nucleated into qcld on cloud boundaries
 
+      qcld(:)  = ncldwtr(icol,:)
+
+      do kk = top_lev, pver-1
+         zs(kk) = 1._r8/(zm(icol,kk) - zm(icol,kk+1))
+         ekd(kk)   = min_max_bound(zkmin,zkmax,kvh(icol,kk+1))
+         csbot(kk) = 2.0_r8*pint(icol,kk+1)/(rair*(temp(icol,kk) + temp(icol,kk+1)))
+         csbot_cscen(kk) = csbot(kk)/cs(icol,kk)
       enddo
+      zs(pver) = zs(pver-1)
+      ekd(pver)   = 0._r8
+      csbot(pver) = cs(icol,pver)
+      csbot_cscen(pver) = 1.0_r8
+
+! BJG      do kk = top_lev, pver
+
+! BJG         cs(icol,kk)  = pmid(icol,kk)/(rair*temp(icol,kk))        ! air density (kg/m3)
+! BJG         dz(icol,kk)  = 1._r8/(cs(icol,kk)*gravit*rpdel(icol,kk)) ! layer thickness in m
+! BJG         zn(kk) = gravit*rpdel(icol,kk)
+! BJG         qcld(kk)  = ncldwtr(icol,kk)
+! BJG         qncld(kk) = 0._r8
+! BJG         srcn(kk)  = 0._r8
+! BJG         nact(kk,1:ntot_amode) = 0._r8
+! BJG         mact(kk,1:ntot_amode) = 0._r8
+
+! BJG         if (kk < pver) then
+! BJG            ekd(kk)   = min_max_bound(zkmin,zkmax,kvh(icol,kk+1))
+! BJG            csbot(kk) = 2.0_r8*pint(icol,kk+1)/(rair*(temp(icol,kk) + temp(icol,kk+1)))
+! BJG            csbot_cscen(kk) = csbot(kk)/cs(icol,kk)
+! BJG         else
+! BJG            ekd(kk)   = 0._r8
+! BJG            csbot(kk) = cs(icol,kk)
+! BJG            csbot_cscen(kk) = 1.0_r8
+! BJG         endif
+
+         ! rce-comment - define wtke at layer centers for new-cloud activation
+         !    and at layer boundaries for old-cloud activation
+         !++ag
+!  BJG wtke_cen and wtke are identical here so use one variable.
+! BJG         wtke_cen(icol,kk) = wsub(icol,kk)
+! BJG         wtke(icol,kk)     = wsub(icol,kk)
+         !--ag
+! BJG         wtke_cen(icol,kk) = max(wtke_cen(icol,kk), wmixmin)
+! BJG         wtke(icol,kk)     = max(wtke(icol,kk), wmixmin)
+
+! BJG         nsource(icol,kk) = 0._r8
+
+! BJG      enddo
 
 !  Initialize 1D (in space) versions of interstitial and airborne aerosol
 
       nsav = 1
+!  BJG:  note nnew is not actually needed here
       nnew = 2
       do imode = 1, ntot_amode
          mm = mam_idx(imode,0)
@@ -570,6 +601,8 @@ subroutine dropmixnuc( &
 
 
 !  PART I:  changes of aerosol and cloud water from temporal changes in cloud fraction
+! BJG: for shrinking cloud,  inputs are cldn(icol,kk), cldo(icol,kk), qcld(kk) = ncldwtr(icol,kk), raercol(kk,mm,1), raercol_cw(kk.mm,1)
+! outputs are updated qcld(kk), nsource(icol,kk), updated raercol(kk,mm,1), updated raercol_cw(kk,mm,1)
 
       ! droplet nucleation/aerosol activation
 
@@ -584,6 +617,7 @@ subroutine dropmixnuc( &
          if (cldn(icol,kk) < cldo(icol,kk)) then
             !  droplet loss in decaying cloud
             !++ sungsup
+! BJG nsource is zero below, can be removed from RHS
             nsource(icol,kk) = nsource(icol,kk) + qcld(kk)*(cldn(icol,kk) - cldo(icol,kk))/cldo(icol,kk)*dtinv
             qcld(kk)      = qcld(kk)*(1._r8 + (cldn(icol,kk) - cldo(icol,kk))/cldo(icol,kk))
             !-- sungsup
@@ -608,31 +642,43 @@ subroutine dropmixnuc( &
          ! growing cloud ......................................................
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
+! BJG: for growing cloud (at least by 0.01),  inputs are cldn(icol,kk), cldo(icol,kk), qcld(kk) = ncldwtr(icol,kk), raercol(kk,mm,1), raercol_cw(kk.mm,1),
+! state_q(icol,kk,index) = raercol(kk,mm,1), cs(icol,kk)
+! outputs are updated qcld(kk), nsource(icol,kk), updated raercol(kk,mm,1), updated raercol_cw(kk,mm,1), factnum(icol,kk,imode)
 
          if (cldn(icol,kk)-cldo(icol,kk) > 0.01_r8) then
 
-            wmax  = 10._r8
+            call get_activate_frac(  &
+                 state_q, icol, kk, kk, &
+                 cs,    &
+                 wtke(icol,kk), temp(icol,kk),    &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact(kk) )
+
+
+! BJG            wmax  = 10._r8
 
             ! load aerosol properties, assuming external mixtures
 
-            phase = 1 ! interstitial
-            do imode = 1, ntot_amode
-               call loadaer( &
-                  state_q, icol, icol, kk, &
-                  imode, nspec_amode(imode), cs, phase, na, va, &
-                  hy )
-               naermod(imode)  = na(icol)
-               vaerosol(imode) = va(icol)
-               hygro(imode)    = hy(icol)
-            enddo
+! BJG            phase = 1 ! interstitial
+! BJG            do imode = 1, ntot_amode
+! BJG               call loadaer( &
+! BJG                  state_q, icol, icol, kk, &
+! BJG                  imode, nspec_amode(imode), cs, phase, na, va, &
+! BJG                  hy )
+! BJG               naermod(imode)  = na(icol)
+! BJG               vaerosol(imode) = va(icol)
+! BJG               hygro(imode)    = hy(icol)
+! BJG            enddo
 
             ! rce-comment - use wtke at layer centers for new-cloud activation
 
-            call activate_modal( &
-               wtke_cen(icol,kk), wmax,                       &
-               temp(icol,kk), cs(icol,kk), naermod, ntot_amode, &
-               vaerosol, hygro, fn, fm, fluxn,                      &
-               fluxm,flux_fullact(kk))
+! BJG            call activate_modal( &
+! BJG               wtke_cen(icol,kk), wmax,                       &
+! BJG               wtke(icol,kk), wmax,                       &
+! BJG               temp(icol,kk), cs(icol,kk), naermod, ntot_amode, &
+! BJG               vaerosol, hygro, fn, fm, fluxn,                      &
+! BJG               fluxm,flux_fullact(kk))
 
 !  store for output activation fraction of aerosol
             factnum(icol,kk,:) = fn
@@ -643,6 +689,7 @@ subroutine dropmixnuc( &
                num_idx = numptr_amode(imode)
                dact = dumc*fn(imode)*state_q(icol,kk,num_idx) ! interstitial only
                qcld(kk) = qcld(kk) + dact
+!  BJG nsource is zero below, can be removed from RHS
                nsource(icol,kk) = nsource(icol,kk) + dact*dtinv
                raercol_cw(kk,mm,nsav) = raercol_cw(kk,mm,nsav) + dact  ! cloud-borne aerosol
                raercol(kk,mm,nsav)    = raercol(kk,mm,nsav) - dact
@@ -682,6 +729,13 @@ subroutine dropmixnuc( &
 
             wmax  = 10._r8
 
+! BJG:  if cldn > 0.01_r8 at any level except kk=pver, and is greater by 0.01 than cldn at kk+1
+! (actually second condition automatically includes the first):
+! Inputs:  cldn(icol,kk), wtke(icol,kk), zs(kk), raercol(kk,mm,1), raercol_cw(kk.mm,1),
+! state_q(icol,kk,index) = raercol(kk,mm,1), cs(icol,kk), temp(icol,kk),csbot_cscen(kk),dz(icol,kk)
+! Outputs:  ekd(kk) (needed for subloop), factnum(icol,kk,imode), nact(kk,imode), mact(kk,imode) (used as input to explmix subroutine),
+! updated nsource(icol,kk), updated qcld(kk) (value not actually used, but is set to zero when cldn <= 0.01)
+
             if (cldn(icol,kk) - cldn(icol,kp1) > 0.01_r8 ) then
 
                ! cloud base
@@ -700,24 +754,33 @@ subroutine dropmixnuc( &
 
                ekd(kk) = wtke(icol,kk)/zs(kk)
 
-               phase   = 1   ! interstitial
-               do imode = 1, ntot_amode
+
                   ! rce-comment - use kp1 here as old-cloud activation involves
                   !   aerosol from layer below
-                  call loadaer( &
-                     state_q, icol, icol, kp1,  &
-                     imode, nspec_amode(imode), cs, phase, na, va,   &
-                     hy )
-                  naermod(imode)  = na(icol)
-                  vaerosol(imode) = va(icol)
-                  hygro(imode)    = hy(icol)
-               enddo
+            call get_activate_frac(  &
+                 state_q, icol, kp1, kk, &
+                 cs,    &
+                 wtke(icol,kk), temp(icol,kk),    &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact(kk) )
 
-               call activate_modal( &
-                  wtke(icol,kk), wmax,                       &
-                  temp(icol,kk), cs(icol,kk), naermod, ntot_amode, &
-                  vaerosol, hygro, fn, fm, fluxn,                      &
-                  fluxm, flux_fullact(kk))
+! BJG               phase   = 1   ! interstitial
+! BJG               do imode = 1, ntot_amode
+
+! BJG                  call loadaer( &
+! BJG                     state_q, icol, icol, kp1,  &
+! BJG                     imode, nspec_amode(imode), cs, phase, na, va,   &
+! BJG                     hy )
+! BJG                  naermod(imode)  = na(icol)
+! BJG                  vaerosol(imode) = va(icol)
+! BJG                  hygro(imode)    = hy(icol)
+! BJG               enddo
+
+! BJG               call activate_modal( &
+! BJG                  wtke(icol,kk), wmax,                       &
+! BJG                  temp(icol,kk), cs(icol,kk), naermod, ntot_amode, &
+! BJG                  vaerosol, hygro, fn, fm, fluxn,                      &
+! BJG                  fluxm, flux_fullact(kk))
 
 !  store for output activation fraction of aerosol
                factnum(icol,kk,:) = fn
@@ -772,13 +835,16 @@ subroutine dropmixnuc( &
                   fluxntot = fluxntot &
                         + fluxn(imode)*raercol(kp1,mm,nsav)*cs(icol,kk)
                enddo
-               srcn(kk)      = srcn(kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
+! BJG:  srcn(kk) is apparently not used before the whole array is set to zero, so remove below
+!               srcn(kk)      = srcn(kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
                nsource(icol,kk) = nsource(icol,kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
 
-            endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01)
+            endif  ! (cldn(icol,kk) - cldn(icol,kp1) > 0.01)
 
          else
-
+!  BJG:  if cldn < 0.01_r8 at any level except kk=pver, deplete qcld, turn all raercol_cw to raercol, put appropriate tendency
+!  in nsource
+!  Note that if cldn(kk) >= 0.01_r8 but cldn(kk) - cldn(kp1)  <= 0.01, nothing is done.
             ! no cloud
 
             nsource(icol,kk) = nsource(icol,kk) - qcld(kk)*dtinv
@@ -803,10 +869,16 @@ subroutine dropmixnuc( &
       enddo  ! old_cloud_main_k_loop
 
       ! switch nsav, nnew so that nnew is the updated aerosol
+! BJG -- these fields aren't used until switched again, so can remove this switching statement, 
+! BJG -- provided the first instance of the next switching statement is also removed.
       ntemp = nsav
       nsav  = nnew
       nnew  = ntemp
 
+
+! BJG:  below inputs for submix:  ekd(kk), csbot(kk) = cs(icol,kk), zn(kk), cldn(icol,kk), mact, nact(kk,imode),
+! raercol, raercol_cw(kk,mm,1 or 2), qcld(kk)
+! outputs:  updated qcld, raercol, raercol_cw(kk,mm,1,2), 
       ! load new droplets in layers above, below clouds
 
       dtmin     = dtmicro
@@ -1085,9 +1157,9 @@ subroutine dropmixnuc( &
       raercol_cw, &
       coltend,    &
       coltend_cw, &
-      naermod,    &
-      hygro,      &
-      vaerosol,   &
+! BJG      naermod,    &
+! BJG      hygro,      &
+! BJG      vaerosol,   &
       fn,         &
       fm,         &
       fluxn,      &
@@ -1095,6 +1167,80 @@ subroutine dropmixnuc( &
 
 
 end subroutine dropmixnuc
+
+!===============================================================================
+
+
+subroutine get_activate_frac(  &
+                 state_q, icol, k_act, kk, &
+                 cs,       &
+                 wtke, tair,           &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact)
+
+  ! input arguments
+  real(r8), intent(in) :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
+
+
+  integer,  intent(in) :: icol        ! column index
+  integer,  intent(in) :: k_act       ! level to compute activation
+  integer,  intent(in) :: kk          ! vertical level index
+  real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
+  real(r8), intent(in) :: wtke      ! subgrid vertical velocity [m/s]
+  real(r8), intent(in) :: tair      ! air temperature [K]
+
+  ! output arguments
+  real(r8), intent(out) :: fn(:)        ! number fraction of aerosols activated [fraction]
+  real(r8), intent(out) :: fm(:)        ! mass fraction of aerosols activated [fraction]
+  real(r8), intent(out) :: fluxn(:)     ! flux of activated aerosol number fraction into cloud [m/s]
+  real(r8), intent(out) :: fluxm(:)     ! flux of activated aerosol mass fraction into cloud [m/s]
+  real(r8), intent(out) :: flux_fullact ! flux of activated aerosol fraction assuming 100% activation [m/s]
+
+  ! local arguments
+
+  integer  :: phase                 ! phase of aerosol
+  real(r8) :: wmax       ! vertical velocity upper bound [m/s]
+  integer  :: imode       ! mode index
+  real(r8) :: naermod(ntot_amode)  ! aerosol number concentration [#/m^3]
+  real(r8) :: hygro(ntot_amode)    ! hygroscopicity of aerosol mode [dimensionless]
+  real(r8) :: vaerosol(ntot_amode) ! aerosol volume conc [m^3/m^3]
+  real(r8) :: na(pcols), va(pcols), hy(pcols) ! naermod, vaerosol, hygro at level k_act
+
+
+  wmax  = 10._r8
+
+  ! load aerosol properties, assuming external mixtures
+
+  phase = 1 ! interstitial
+      do imode = 1, ntot_amode
+         call loadaer( &
+            state_q, icol, icol, k_act, &
+            imode, nspec_amode(imode), cs, phase, na, va, &
+            hy )
+         naermod(imode)  = na(icol)
+         vaerosol(imode) = va(icol)
+         hygro(imode)    = hy(icol)
+       enddo
+
+      ! rce-comment - use wtke at layer centers for new-cloud activation
+! BJG: seems wtke = wtke_cen in current code, comment above may no longer apply
+  
+! BJG:  below is to avoid warning about not assigning value to intent(out)
+! BJG:  the assignment should have no affect because flux_fullact is intent(out)
+! BJG:  in activate_modal (and in that subroutine is initialized to zero anyway).
+
+      flux_fullact=0._r8
+
+      call activate_modal( &
+! BJG               wtke_cen(icol,kk), wmax,                       &
+         wtke, wmax,                       &
+         tair, cs(icol,kk), naermod, ntot_amode, &
+         vaerosol, hygro, fn, fm, fluxn,                      &
+         fluxm,flux_fullact)
+
+
+end subroutine get_activate_frac
+
 
 !===============================================================================
 
