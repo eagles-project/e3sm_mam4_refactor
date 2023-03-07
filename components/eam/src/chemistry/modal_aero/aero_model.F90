@@ -1380,8 +1380,8 @@ do_lphase2_conditional: &
     real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
     real(r8), pointer :: pblh(:)                    ! pbl height (m)
 
-    real(r8), dimension(ncol) :: wrk
-    character(len=32)         :: name
+    real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/kg/m2/s]
+    character(len=32)         :: out_name
 !    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
     real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
     real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry (vmr)
@@ -1406,12 +1406,12 @@ do_lphase2_conditional: &
     ! calculate tendency due to gas phase chemistry and processes
     dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
     do m = 1, gas_pcnst
-      wrk(:) = 0._r8
+      dvmrdt_col(:) = 0._r8
       do k = 1,pver
-        wrk(:ncol) = wrk(:ncol) + dvmrdt(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
       enddo
-      name = 'GS_'//trim(solsym(m))
-      call outfld( name, wrk(:ncol), ncol, lchnk )
+      out_name = 'GS_'//trim(solsym(m))
+      call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
     enddo
 
 !
@@ -1451,13 +1451,13 @@ do_lphase2_conditional: &
       ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
       !           rather than interstitial here
       do m = 1, gas_pcnst
-        wrk(:) = 0._r8
+        dvmrdt_col(:) = 0._r8
         do k = 1,pver
-            wrk(:ncol) = wrk(:ncol) + ((vmr(:ncol,k,m)-vmr_pregas(:ncol,k,m))/delt) &
+            dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + ((vmr(:ncol,k,m)-vmr_pregas(:ncol,k,m))/delt) &
                                                         * adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
         enddo
-        name = 'AQ_'//trim(solsym(m))
-        call outfld( name, wrk(:ncol), ncol, lchnk )
+        out_name = 'AQ_'//trim(solsym(m))
+        call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
       enddo
 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
