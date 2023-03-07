@@ -1336,15 +1336,16 @@ do_lphase2_conditional: &
                                     zm,  qh2o, cwat, cldfr, cldnum, &
                                     airdens, invariants,&
                                     vmr0, vmr, pbuf )
+    !-----------------------------------------------------------------------
+    ! interface to gas-aerosol exchange
+    !-----------------------------------------------------------------------
 
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
     use mo_setsox,             only : setsox, has_sox
     use modal_aero_data,       only : qqcw_get_field
 
-    !-----------------------------------------------------------------------
-    !      ... dummy arguments
-    !-----------------------------------------------------------------------
+    !  dummy arguments
     integer,  intent(in) :: loffset                ! offset applied to modal aero "pointers"
     integer,  intent(in) :: ncol                   ! number columns in chunk
     integer,  intent(in) :: lchnk                  ! chunk index
@@ -1385,6 +1386,9 @@ do_lphase2_conditional: &
 
     real(r8), pointer :: fldcw(:,:)
 
+    !-----------------------------------------------------------------------
+
+    ! read additional variables from pbuf
     call pbuf_get_field(pbuf, dgnum_idx,      dgnum,  start=(/1,1,1/), kount=(/pcols,pver,ntot_amode/) )
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgnumwet )
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
@@ -1398,7 +1402,7 @@ do_lphase2_conditional: &
 
     nstep = get_nstep()
 
-    ! calculate tendency due to gas phase chemistry and processes
+    ! calculate and output column-integrated tendency due to gas phase chemistry and processes
     dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
     do m = 1, gas_pcnst
       dvmrdt_col(:) = 0._r8
@@ -1412,16 +1416,16 @@ do_lphase2_conditional: &
 !
 ! Aerosol processes ...
 !
+    ! calculate cloudborne aerosol mixing ratio
     call qqcw2vmr( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
 
-    !------------------------------------------------------
 
-      vmr_pregas(:ncol,:,:) = vmr(:ncol,:,:)
-      vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
+    ! assign mixing ratios values before gas chemistry and aqueous chemistry
+    vmr_pregas(:ncol,:,:) = vmr(:ncol,:,:)
+    vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
 
-      ! aqueous chemistry ...
-
-      if( has_sox ) then
+    ! aqueous chemistry ...
+    if( has_sox ) then
          call setsox(   &
               ncol,     &
               lchnk,    &
@@ -1439,13 +1443,13 @@ do_lphase2_conditional: &
               vmrcw,    &
               vmr       &
               )
-      endif
+    endif
 
-      ! Tendency due to aqueous chemistry 
-      ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
-      ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
-      !           rather than interstitial here
-      do m = 1, gas_pcnst
+    ! calculate and output column tendency due to aqueous chemistry 
+    ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
+    ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
+    !           rather than interstitial here
+    do m = 1, gas_pcnst
         dvmrdt_col(:) = 0._r8
         do k = 1,pver
             dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + ((vmr(:ncol,k,m)-vmr_pregas(:ncol,k,m))/delt) &
@@ -1453,16 +1457,15 @@ do_lphase2_conditional: &
         enddo
         out_name = 'AQ_'//trim(solsym(m))
         call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
-      enddo
+    enddo
 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
 
-       call t_startf('modal_aero_amicphys')
-
-       ! note that:
-       !     vmr0 holds vmr before gas-phase chemistry
-       !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
-       call modal_aero_amicphys_intr(                &
+    call t_startf('modal_aero_amicphys')
+    ! note that:
+    !     vmr0 holds vmr before gas-phase chemistry
+    !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
+    call modal_aero_amicphys_intr(                   &
             1,                  1,                   & ! in
             1,                  1,                   & ! in
             lchnk,     ncol,    nstep,               & ! in
@@ -1476,10 +1479,9 @@ do_lphase2_conditional: &
             vmr_pregas,         vmr_precld,          & ! in
             dgnum,              dgnumwet,            & ! inout
             wetdens                                  ) ! inout
+    call t_stopf('modal_aero_amicphys')
 
-       call t_stopf('modal_aero_amicphys')
-
-
+    ! write cloudborne aerosols after exchange into pbuf
     call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
 
     ! diagnostics for cloud-borne aerosols... 
@@ -1488,7 +1490,7 @@ do_lphase2_conditional: &
        if(associated(fldcw)) then
           call outfld( cnst_name_cw(n), fldcw(:,:), pcols, lchnk )
        endif
-    end do
+    enddo
 
   end subroutine aero_model_gasaerexch
 
