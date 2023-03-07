@@ -1331,10 +1331,10 @@ do_lphase2_conditional: &
   !=============================================================================
   !=============================================================================
   subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt, &
-                                    latndx, lonndx, reaction_rates, &
-                                    tfld, pmid, pdel, mbar, relhum, &
+                                    latndx, lonndx, &
+                                    tfld, pmid, pdel, mbar, &
                                     zm,  qh2o, cwat, cldfr, cldnum, &
-                                    airdens, invariants, del_h2so4_gasprod,  &
+                                    airdens, invariants,&
                                     vmr0, vmr, pbuf )
 
     use time_manager,          only : get_nstep
@@ -1351,15 +1351,12 @@ do_lphase2_conditional: &
     integer,  intent(in) :: latndx(pcols)          ! latitude indices
     integer,  intent(in) :: lonndx(pcols)          ! longitude indices
     real(r8), intent(in) :: delt                   ! time step size (sec)
-    real(r8), intent(in) :: reaction_rates(:,:,:)  ! reaction rates
     real(r8), intent(in) :: tfld(:,:)              ! temperature (K)
     real(r8), intent(in) :: pmid(:,:)              ! pressure at model levels (Pa)
     real(r8), intent(in) :: pdel(:,:)              ! pressure thickness of levels (Pa)
     real(r8), intent(in) :: mbar(:,:)              ! mean wet atmospheric mass ( amu )
-    real(r8), intent(in) :: relhum(:,:)            ! relative humidity
     real(r8), intent(in) :: airdens(:,:)           ! total atms density (molec/cm**3)
     real(r8), intent(in) :: invariants(:,:,:)
-    real(r8), intent(in) :: del_h2so4_gasprod(:,:) 
     real(r8), intent(in) :: zm(:,:) 
     real(r8), intent(in) :: qh2o(:,:) 
     real(r8), intent(in) :: cwat(:,:)          ! cloud liquid water content (kg/kg)
@@ -1374,8 +1371,6 @@ do_lphase2_conditional: &
     integer :: n, m
     integer :: i,k
     integer :: nstep
-
-    real(r8) :: del_h2so4_aeruptk(ncol,pver)
 
     real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
     real(r8), pointer :: pblh(:)                    ! pbl height (m)
