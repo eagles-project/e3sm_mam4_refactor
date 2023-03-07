@@ -1382,8 +1382,10 @@ do_lphase2_conditional: &
 
     real(r8), dimension(ncol) :: wrk
     character(len=32)         :: name
-    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
+!    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
     real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
+    real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry (vmr)
+    real(r8) :: vmr_precld(ncol,pver,gas_pcnst) ! mixing ratio before cloud chemistry (vmr)
     real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
 
     real(r8), pointer :: fldcw(:,:)
@@ -1419,8 +1421,8 @@ do_lphase2_conditional: &
 
     !------------------------------------------------------
 
-      dvmrdt(:ncol,:,:) = vmr(:ncol,:,:)
-      dvmrcwdt(:ncol,:,:) = vmrcw(:ncol,:,:)
+      vmr_pregas(:ncol,:,:) = vmr(:ncol,:,:)
+      vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
 
       ! aqueous chemistry ...
 
@@ -1451,8 +1453,7 @@ do_lphase2_conditional: &
       do m = 1, gas_pcnst
         wrk(:) = 0._r8
         do k = 1,pver
-            ! here dvmrdt is vmr before aqueous chemistry, so need to calculate (delta vmr)/(delt)
-            wrk(:ncol) = wrk(:ncol) + ((vmr(:ncol,k,m)-dvmrdt(:ncol,k,m))/delt) &
+            wrk(:ncol) = wrk(:ncol) + ((vmr(:ncol,k,m)-vmr_pregas(:ncol,k,m))/delt) &
                                                         * adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
         enddo
         name = 'AQ_'//trim(solsym(m))
@@ -1465,21 +1466,21 @@ do_lphase2_conditional: &
 
        ! note that:
        !     vmr0 holds vmr before gas-phase chemistry
-       !     dvmrdt and dvmrcwdt hold vmr and vmrcw before aqueous chemistry
+       !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
        call modal_aero_amicphys_intr(                &
-            1,                  1,                   &
-            1,                  1,                   &
-            lchnk,     ncol,    nstep,               &
-            loffset,   delt,                         &
-            latndx,    lonndx,                       &
-            tfld,      pmid,    pdel,                &
-            zm,        pblh,                         &
-            qh2o,      cldfr,                        &
-            vmr,                vmrcw,               &
-            vmr0,                                    &
-            dvmrdt,             dvmrcwdt,            &
-            dgnum,              dgnumwet,            &
-            wetdens                                  )
+            1,                  1,                   & ! in
+            1,                  1,                   & ! in
+            lchnk,     ncol,    nstep,               & ! in
+            loffset,   delt,                         & ! in
+            latndx,    lonndx,                       & ! in
+            tfld,      pmid,    pdel,                & ! in
+            zm,        pblh,                         & ! in
+            qh2o,      cldfr,                        & ! in
+            vmr,                vmrcw,               & ! inout
+            vmr0,                                    & ! in
+            vmr_pregas,         vmr_precld,          & ! in
+            dgnum,              dgnumwet,            & ! inout
+            wetdens                                  ) ! inout
 
        call t_stopf('modal_aero_amicphys')
 
