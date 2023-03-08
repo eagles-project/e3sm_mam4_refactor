@@ -1342,7 +1342,7 @@ do_lphase2_conditional: &
 
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
-    use mo_setsox,             only : setsox, has_sox
+    use mo_setsox,             only : setsox
     use modal_aero_data,       only : qqcw_get_field
 
     !  dummy arguments
@@ -1400,8 +1400,6 @@ do_lphase2_conditional: &
        call outfld(dgnum_name(imode),dgnumwet(1:ncol,1:pver,imode), ncol, lchnk )
     enddo
 
-! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
-
     nstep = get_nstep()
 
     ! calculate and output column-integrated tendency due to gas phase chemistry and processes
@@ -1409,7 +1407,8 @@ do_lphase2_conditional: &
     do mm = 1, gas_pcnst
       dvmrdt_col(:) = 0._r8
       do kk = 1,pver
-        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,kk,mm)*adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
+        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,kk,mm) * &
+                            adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
       enddo
       out_name = 'GS_'//trim(solsym(mm))
       call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
@@ -1436,25 +1435,11 @@ do_lphase2_conditional: &
     vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
 
     ! aqueous chemistry ...
-    if( has_sox ) then
-         call setsox(   &
-              ncol,     &
-              lchnk,    &
-              loffset,  &
-              delt,     &
-              pmid,     &
-              pdel,     &
-              tfld,     &
-              mbar,     &
-              cwat,     &
-              cldfr,    &
-              cldnum,   &
-              airdens,  &
-              invariants, &
-              vmrcw,    &
-              vmr       &
-              )
-    endif
+    call setsox( ncol, lchnk, loffset,  & ! in
+              delt, pmid, pdel, tfld,   & ! in
+              mbar, cwat, cldfr,cldnum, & ! in
+              airdens,    invariants,   & ! in
+              vmrcw,      vmr           ) ! inout
 
     ! calculate and output column tendency due to aqueous chemistry 
     ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
