@@ -1330,12 +1330,12 @@ do_lphase2_conditional: &
 
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt, &
-                                    latndx, lonndx, &
-                                    tfld, pmid, pdel, mbar, &
-                                    zm,  qh2o, cwat, cldfr, cldnum, &
-                                    airdens, invariants,&
-                                    vmr0, vmr, pbuf )
+  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt,     & ! in
+                                    latndx, lonndx,                 & ! in
+                                    tfld, pmid, pdel, mbar,         & ! in
+                                    zm,  qh2o, cwat, cldfr, cldnum, & ! in
+                                    airdens, invariants,            & ! in
+                                    vmr0, vmr, pbuf                 ) ! inout
     !-----------------------------------------------------------------------
     ! interface to gas-aerosol exchange
     !-----------------------------------------------------------------------
@@ -1346,25 +1346,25 @@ do_lphase2_conditional: &
     use modal_aero_data,       only : qqcw_get_field
 
     !  dummy arguments
-    integer,  intent(in) :: loffset                ! offset applied to modal aero "pointers"
-    integer,  intent(in) :: ncol                   ! number columns in chunk
-    integer,  intent(in) :: lchnk                  ! chunk index
-    integer,  intent(in) :: latndx(pcols)          ! latitude indices
-    integer,  intent(in) :: lonndx(pcols)          ! longitude indices
-    real(r8), intent(in) :: delt                   ! time step size (sec)
-    real(r8), intent(in) :: tfld(:,:)              ! temperature (K)
-    real(r8), intent(in) :: pmid(:,:)              ! pressure at model levels (Pa)
-    real(r8), intent(in) :: pdel(:,:)              ! pressure thickness of levels (Pa)
-    real(r8), intent(in) :: mbar(:,:)              ! mean wet atmospheric mass ( amu )
-    real(r8), intent(in) :: airdens(:,:)           ! total atms density (molec/cm**3)
-    real(r8), intent(in) :: invariants(:,:,:)
-    real(r8), intent(in) :: zm(:,:) 
-    real(r8), intent(in) :: qh2o(:,:) 
-    real(r8), intent(in) :: cwat(:,:)          ! cloud liquid water content (kg/kg)
-    real(r8), intent(in) :: cldfr(:,:) 
-    real(r8), intent(in) :: cldnum(:,:)       ! droplet number concentration (#/kg)
-    real(r8), intent(in) :: vmr0(:,:,:)       ! initial mixing ratios (before gas-phase chem changes)
-    real(r8), intent(inout) :: vmr(:,:,:)         ! mixing ratios ( vmr )
+    integer,  intent(in) :: loffset           ! offset applied to modal aero "pointers"
+    integer,  intent(in) :: ncol              ! number columns in chunk
+    integer,  intent(in) :: lchnk             ! chunk index
+    integer,  intent(in) :: latndx(pcols)     ! latitude indices
+    integer,  intent(in) :: lonndx(pcols)     ! longitude indices
+    real(r8), intent(in) :: delt              ! time step size [sec]
+    real(r8), intent(in) :: tfld(:,:)         ! temperature [K]
+    real(r8), intent(in) :: pmid(:,:)         ! pressure at model levels [Pa]
+    real(r8), intent(in) :: pdel(:,:)         ! pressure thickness of levels [Pa]
+    real(r8), intent(in) :: mbar(:,:)         ! mean wet atmospheric mass [amu or g/mol]
+    real(r8), intent(in) :: airdens(:,:)      ! total atms density [molecules/cm**3]
+    real(r8), intent(in) :: invariants(:,:,:) ! invariant density [molecules/cm**3]
+    real(r8), intent(in) :: zm(:,:)           ! midpoint geopotential height above the surface [m]
+    real(r8), intent(in) :: qh2o(:,:)         ! specific humidity [kg/kg]
+    real(r8), intent(in) :: cwat(:,:)         ! cloud liquid water content [kg/kg]
+    real(r8), intent(in) :: cldfr(:,:)        ! cloud fraction [fraction]
+    real(r8), intent(in) :: cldnum(:,:)       ! droplet number concentration [#/kg]
+    real(r8), intent(in) :: vmr0(:,:,:)       ! initial mixing ratios (before gas-phase chem changes) [vmr or mol/mol]
+    real(r8), intent(inout) :: vmr(:,:,:)     ! mixing ratios [vmr or mol/mol]
     type(physics_buffer_desc), pointer :: pbuf(:)
     
     ! local vars 
@@ -1373,18 +1373,19 @@ do_lphase2_conditional: &
     integer :: i,k
     integer :: nstep
 
-    real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
-    real(r8), pointer :: pblh(:)                    ! pbl height (m)
+    real(r8), pointer :: dgnum(:,:,:)           ! aerosol diameter [m]
+    real(r8), pointer :: dgnumwet(:,:,:)        ! aerosol wet diameter [m]
+    real(r8), pointer :: wetdens(:,:,:)         ! aerosol wet density [kg/m3] 
+    real(r8), pointer :: pblh(:)                ! pbl height [m]
 
     real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/kg/m2/s]
-    character(len=32)         :: out_name
-!    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
-    real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
-    real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry (vmr)
-    real(r8) :: vmr_precld(ncol,pver,gas_pcnst) ! mixing ratio before cloud chemistry (vmr)
-    real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
+    character(len=32)         :: out_name       ! output variable name string
+    real(r8) :: dvmrdt(ncol,pver,gas_pcnst)     ! mixing ratio tendency [vmr/s or mol/mol/s]
+    real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry [vmr or mol/mol]
+    real(r8) :: vmr_precld(ncol,pver,gas_pcnst) ! mixing ratio before cloud chemistry [vmr or mol/mol]
+    real(r8) :: vmrcw(ncol,pver,gas_pcnst)      ! cloud-borne aerosol [vmr or mol/mol]
 
-    real(r8), pointer :: fldcw(:,:)
+    real(r8), pointer :: fldcw(:,:)             ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------------
 
