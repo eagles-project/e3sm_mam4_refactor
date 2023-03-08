@@ -1369,8 +1369,8 @@ do_lphase2_conditional: &
     
     ! local vars 
     
-    integer :: n, m, mm
-    integer :: i,k
+    integer :: imode, mm
+    integer :: icol,kk
     integer :: nstep
 
     real(r8), pointer :: dgnum(:,:,:)           ! aerosol diameter [m]
@@ -1396,8 +1396,8 @@ do_lphase2_conditional: &
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
     call pbuf_get_field(pbuf, pblh_idx,       pblh)
 
-    do n=1,ntot_amode
-       call outfld(dgnum_name(n),dgnumwet(1:ncol,1:pver,n), ncol, lchnk )
+    do imode=1,ntot_amode
+       call outfld(dgnum_name(imode),dgnumwet(1:ncol,1:pver,imode), ncol, lchnk )
     enddo
 
 ! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
@@ -1406,12 +1406,12 @@ do_lphase2_conditional: &
 
     ! calculate and output column-integrated tendency due to gas phase chemistry and processes
     dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
-    do m = 1, gas_pcnst
+    do mm = 1, gas_pcnst
       dvmrdt_col(:) = 0._r8
-      do k = 1,pver
-        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+      do kk = 1,pver
+        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,kk,mm)*adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
       enddo
-      out_name = 'GS_'//trim(solsym(m))
+      out_name = 'GS_'//trim(solsym(mm))
       call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
     enddo
 
@@ -1460,13 +1460,13 @@ do_lphase2_conditional: &
     ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
     ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
     !           rather than interstitial here
-    do m = 1, gas_pcnst
+    do mm = 1, gas_pcnst
         dvmrdt_col(:) = 0._r8
-        do k = 1,pver
-            dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + ((vmr(:ncol,k,m)-vmr_pregas(:ncol,k,m))/delt) &
-                                                        * adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+        do kk = 1,pver
+            dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + ((vmr(:ncol,kk,mm)-vmr_pregas(:ncol,kk,mm))/delt) &
+                                                  * adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
         enddo
-        out_name = 'AQ_'//trim(solsym(m))
+        out_name = 'AQ_'//trim(solsym(mm))
         call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
     enddo
 
@@ -1501,10 +1501,10 @@ do_lphase2_conditional: &
     enddo
 
     ! diagnostics for cloud-borne aerosols... 
-    do n = 1,pcnst
-       fldcw => qqcw_get_field(pbuf,n,lchnk,errorhandle=.true.)
+    do mm = 1,pcnst
+       fldcw => qqcw_get_field(pbuf,mm,lchnk,errorhandle=.true.)
        if(associated(fldcw)) then
-          call outfld( cnst_name_cw(n), fldcw(:,:), pcols, lchnk )
+          call outfld( cnst_name_cw(mm), fldcw(:,:), pcols, lchnk )
        endif
     enddo
 
