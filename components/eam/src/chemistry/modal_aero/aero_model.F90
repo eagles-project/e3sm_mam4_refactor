@@ -1371,7 +1371,7 @@ do_lphase2_conditional: &
     
     ! local vars 
     
-    integer :: n, m
+    integer :: n, m, mm
     integer :: i,k
     integer :: nstep
 
@@ -1379,6 +1379,7 @@ do_lphase2_conditional: &
 
     real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
     real(r8), pointer :: pblh(:)                    ! pbl height (m)
+    real(r8)  :: fldcw_all(ncol,pver,gas_pcnst)     ! all gas mass mixing ratio [kg/kg]
 
     real(r8), dimension(ncol) :: wrk
     character(len=32)         :: name
@@ -1415,7 +1416,17 @@ do_lphase2_conditional: &
 !
 ! Aerosol processes ...
 !
-    call qqcw2vmr( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+    ! get mass mixing ratio from pbuf 
+    do mm = 1,gas_pcnst
+       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       if(associated(fldcw)) then
+           fldcw_all(:,:,mm) = fldcw(:,:)
+       else
+           fldcw_all(:,:,mm) = 0.0_r8
+       endif
+    enddo
+    ! change to volume mixing ratio
+    call qqcw2vmr( vmrcw, mbar, ncol, fldcw_all )
 
     !------------------------------------------------------
 
@@ -1484,7 +1495,12 @@ do_lphase2_conditional: &
        call t_stopf('modal_aero_amicphys')
 
 
-    call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+    call vmr2qqcw( vmrcw, mbar, ncol, fldcw_all )
+    ! assign mass mixing ratio back to pbuf
+    do mm = 1,gas_pcnst
+       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       if(associated(fldcw))   fldcw = fldcw_all(:,:,mm)
+    enddo
 
     ! diagnostics for cloud-borne aerosols... 
     do n = 1,pcnst
@@ -2083,8 +2099,7 @@ do_lphase2_conditional: &
   end subroutine calc_schmidt_number
 
   !=============================================================================
-  subroutine qqcw2vmr(lchnk, vmr, mbar, ncol, im, pbuf)
-    use modal_aero_data, only : qqcw_get_field
+  subroutine qqcw2vmr(vmr, mbar, ncol, fldcw_all)
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
     ! C++ porting: this subroutine is similar to the subroutine mmr2vmr
@@ -2098,28 +2113,23 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol  ! indexes
-    integer, intent(in)     :: im ! offset applied to modal aero "pointers"
+    integer, intent(in)     :: ncol  ! indexes
     real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: fldcw_all(ncol,pver,gas_pcnst) ! mass mixing ratio [kg/kg]
     real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
-    type(physics_buffer_desc), pointer :: pbuf(:)
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: kk, mm
-    real(r8), pointer :: fldcw(:,:) ! mass mixing ratio [kg/kg]
+    integer  :: kk, mm
+    real(r8) :: fldcw(ncol,pver) ! mass mixing ratio [kg/kg]
 
     do mm=1,gas_pcnst
        if( adv_mass(mm) /= 0._r8 ) then
-          fldcw => qqcw_get_field(pbuf, mm+im,lchnk,errorhandle=.true.)
-          if(associated(fldcw)) then
-             do kk=1,pver
-                vmr(:ncol,kk,mm) = mbar(:ncol,kk) * fldcw(:ncol,kk) / adv_mass(mm)
-             enddo
-          else
-             vmr(:,:,mm) = 0.0_r8
-          endif
+          fldcw = fldcw_all(:,:,mm)
+          do kk=1,pver
+             vmr(:ncol,kk,mm) = mbar(:ncol,kk) * fldcw(:ncol,kk) / adv_mass(mm)
+          enddo
        endif
     enddo
   end subroutine qqcw2vmr
@@ -2127,7 +2137,7 @@ do_lphase2_conditional: &
 
   !=============================================================================
   !=============================================================================
-  subroutine vmr2qqcw( lchnk, vmr, mbar, ncol, im, pbuf )
+  subroutine vmr2qqcw( vmr, mbar, ncol, fldcw_all )
     !-----------------------------------------------------------------
     !	... Xfrom from volume to mass mixing ratio
     ! C++ porting: this subroutine is similar to the subroutine vmr2mmr 
@@ -2136,32 +2146,28 @@ do_lphase2_conditional: &
     ! but the values are assigned from module mo_sim_dat
     !-----------------------------------------------------------------
 
-    use modal_aero_data, only : qqcw_get_field
-
     implicit none
 
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol  ! indexes
-    integer, intent(in)     :: im ! offset applied to modal aero "pointers"
+    integer, intent(in)     :: ncol  ! indexes
     real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
     real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8), intent(out)   :: fldcw_all(ncol,pver,gas_pcnst) ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: kk, mm
-    real(r8), pointer :: fldcw(:,:) ! mass mixing ratio [kg/kg]
+    integer  :: kk, mm
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
+    fldcw_all(:,:,:) = 0.0_r8
     do mm = 1,gas_pcnst
-       fldcw => qqcw_get_field(pbuf, mm+im,lchnk,errorhandle=.true.)
-       if( adv_mass(mm) /= 0._r8 .and. associated(fldcw)) then
+       if( adv_mass(mm) /= 0._r8) then
           do kk = 1,pver
-             fldcw(:ncol,kk) = adv_mass(mm) * vmr(:ncol,kk,mm) / mbar(:ncol,kk)
+             fldcw_all(:ncol,kk,mm) = adv_mass(mm) * vmr(:ncol,kk,mm) / mbar(:ncol,kk)
           enddo
        endif
     enddo
