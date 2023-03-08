@@ -1426,7 +1426,7 @@ do_lphase2_conditional: &
        endif
     enddo
     ! change to volume mixing ratio
-    call qqcw2vmr( vmrcw, mbar, ncol, fldcw_all )
+    call qqcw2vmr( vmrcw, mbar, fldcw_all )
 
     !------------------------------------------------------
 
@@ -1495,7 +1495,7 @@ do_lphase2_conditional: &
        call t_stopf('modal_aero_amicphys')
 
 
-    call vmr2qqcw( vmrcw, mbar, ncol, fldcw_all )
+    call vmr2qqcw( vmrcw, mbar, fldcw_all )
     ! assign mass mixing ratio back to pbuf
     do mm = 1,gas_pcnst
        fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
@@ -2099,7 +2099,7 @@ do_lphase2_conditional: &
   end subroutine calc_schmidt_number
 
   !=============================================================================
-  subroutine qqcw2vmr(vmr, mbar, ncol, fldcw_all)
+  subroutine qqcw2vmr(vmr, mbar, fldcw_all)
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
     ! C++ porting: this subroutine is similar to the subroutine mmr2vmr
@@ -2113,22 +2113,20 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol  ! indexes
-    real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
-    real(r8), intent(in)    :: fldcw_all(ncol,pver,gas_pcnst) ! mass mixing ratio [kg/kg]
-    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
+    real(r8), intent(in)    :: mbar(:,:) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: fldcw_all(:,:,:) ! mass mixing ratio [kg/kg]
+    real(r8), intent(out)   :: vmr(:,:,:) ! volume mixing ratios [mol/mol]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
     integer  :: kk, mm
-    real(r8) :: fldcw(ncol,pver) ! mass mixing ratio [kg/kg]
 
+    vmr(:,:,:) = 0.0_r8
     do mm=1,gas_pcnst
        if( adv_mass(mm) /= 0._r8 ) then
-          fldcw = fldcw_all(:,:,mm)
           do kk=1,pver
-             vmr(:ncol,kk,mm) = mbar(:ncol,kk) * fldcw(:ncol,kk) / adv_mass(mm)
+             vmr(:,kk,mm) = mbar(:,kk) * fldcw_all(:,kk,mm) / adv_mass(mm)
           enddo
        endif
     enddo
@@ -2137,7 +2135,7 @@ do_lphase2_conditional: &
 
   !=============================================================================
   !=============================================================================
-  subroutine vmr2qqcw( vmr, mbar, ncol, fldcw_all )
+  subroutine vmr2qqcw( vmr, mbar, fldcw_all )
     !-----------------------------------------------------------------
     !	... Xfrom from volume to mass mixing ratio
     ! C++ porting: this subroutine is similar to the subroutine vmr2mmr 
@@ -2151,10 +2149,9 @@ do_lphase2_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol  ! indexes
-    real(r8), intent(in)    :: mbar(ncol,pver) ! mean wet atmospheric mass [g/mol]
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratios [mol/mol]
-    real(r8), intent(out)   :: fldcw_all(ncol,pver,gas_pcnst) ! mass mixing ratio [kg/kg]
+    real(r8), intent(in)    :: mbar(:,:) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: vmr(:,:,:) ! volume mixing ratios [mol/mol]
+    real(r8), intent(out)   :: fldcw_all(:,:,:) ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------
     !	... Local variables
@@ -2167,7 +2164,7 @@ do_lphase2_conditional: &
     do mm = 1,gas_pcnst
        if( adv_mass(mm) /= 0._r8) then
           do kk = 1,pver
-             fldcw_all(:ncol,kk,mm) = adv_mass(mm) * vmr(:ncol,kk,mm) / mbar(:ncol,kk)
+             fldcw_all(:,kk,mm) = adv_mass(mm) * vmr(:,kk,mm) / mbar(:,kk)
           enddo
        endif
     enddo
