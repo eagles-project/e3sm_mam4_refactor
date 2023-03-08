@@ -63,7 +63,7 @@
         !< add code for writing data here>
         call write_var(unit_input, unit_output, 'ncol', ncol)
         call write_1d_var(unit_input, unit_output, 'dgncur_a', nmodes,dgncur_a(yaml%col_print, yaml%lev_print,:)) 
-        call write_1d_var(unit_input, unit_output, 'state_q', nmodes, state_q(yaml%col_print, yaml%lev_print,:))
+        call write_1d_var(unit_input, unit_output, 'state_q', size(state_q,3), state_q(yaml%col_print, yaml%lev_print,:))
 
         !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
         !call write_1d_var(unit_input, unit_output, fld_name,dim,field) ! writes 1D variables of any dimension
