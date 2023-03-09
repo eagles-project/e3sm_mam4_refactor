@@ -1,0 +1,14 @@
+# Data at [lat=   71.9201421331276      , lon=   71.5690366721838      , k=          62 , time step=        1403 ] 
+mam4xx:
+  function: compute_tendencies
+input:
+  fixed:
+    dt:    0.00
+    wbar: [ 0.2000000000E+00]
+    tair: [ 0.2369643763E+03]
+    pmid: [ 0.9134903010E+05]
+    relhum: [ 0.8297163298E+00]
+    cldn: [ 0.9990000000E+00]
+    rhoair: [ 0.1342996745E+01]
+    so4_num: [ 0.5901113453E+02]
+    dst3_num: [ 0.8633937165E-03]
