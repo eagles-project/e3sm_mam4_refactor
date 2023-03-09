@@ -358,7 +358,6 @@ subroutine dropmixnuc( &
    real(r8) :: ndropcol(pcols)               ! column-integrated droplet number [#/m2]
    real(r8) :: na(pcols), va(pcols), hy(pcols) ! naermod, vaerosol, hygro at level kk
    real(r8) :: cs(pcols,pver)      ! air density [kg/m^3]
-! BJG   real(r8) :: dz(pcols,pver)      ! geometric thickness of layers [m]
    real(r8) :: dz(pver)      ! geometric thickness of layers [m]
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k [m/s]
    real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source tendency [#/kg/s]
@@ -382,10 +381,6 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
    real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios [#/kg or kg/kg]
    real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
-! BJG   real(r8), allocatable :: fn(:)              ! activation fraction for aerosol number [fraction]
-! BJG   real(r8), allocatable :: fm(:)              ! activation fraction for aerosol mass [fraction]
-! BJG   real(r8), allocatable :: fluxn(:)           ! number  activation fraction flux [m/s]
-! BJG   real(r8), allocatable :: fluxm(:)           ! mass    activation fraction flux [m/s]
 
    !     note:  activation fraction fluxes are defined as
    !     fluxn = [flux of activated aero. number into cloud [#/m^2/s]]
@@ -455,12 +450,7 @@ subroutine dropmixnuc( &
       raercol(pver,ncnst_tot,2),      &
       raercol_cw(pver,ncnst_tot,2),   &
       coltend(pcols,ncnst_tot),       &
-! BJG      coltend_cw(pcols,ncnst_tot),    &
       coltend_cw(pcols,ncnst_tot)          )
-! BJG      fn(ntot_amode),                 &
-! BJG      fm(ntot_amode),                 &
-! BJG      fluxn(ntot_amode),              &
-! BJG      fluxm(ntot_amode)               )
 
 !  Extract field from pbuf
 
@@ -509,17 +499,14 @@ subroutine dropmixnuc( &
       nact(:,1:ntot_amode) = 0._r8
       mact(:,1:ntot_amode) = 0._r8
       cs(icol,:)  = pmid(icol,:)/(rair*temp(icol,:))        ! air density (kg/m3)
-
-! BJG:  think dz can just be 1D, not needed outside icol loop
-! BJG      dz(icol,:)  = 1._r8/(cs(icol,:)*gravit*rpdel(icol,:)) ! layer thickness in m
       dz(:)  = 1._r8/(cs(icol,:)*gravit*rpdel(icol,:)) ! layer thickness in m
       zn(:) = gravit*rpdel(icol,:)
 
          ! rce-comment - define wtke at layer centers for new-cloud activation
          !    and at layer boundaries for old-cloud activation
          !++ag
-! BJG:   wtke_cen and wtke are identical here so only need one variable.
-! BJG         wtke_cen(icol,kk) = wsub(icol,kk)
+!    wtke_cen and wtke are identical here so only need one variable for both
+!          wtke_cen(icol,kk) = wsub(icol,kk)
       wtke(icol,:)     = max(wsub(icol,:),wmixmin)
          !--ag
 
@@ -541,7 +528,6 @@ subroutine dropmixnuc( &
 !  Initialize 1D (in space) versions of interstitial and airborne aerosol
 
       nsav = 1
-!  BJG:  note nnew is not actually needed here
       nnew = 2
       do imode = 1, ntot_amode
          mm = mam_idx(imode,0)
@@ -588,23 +574,21 @@ subroutine dropmixnuc( &
 
       ! old_cloud_main_k_loop
 
-!  PART II: changes in aerosol and cloud water from vertical gradients of new cloud fraction
+!  PART II: changes in aerosol and cloud water from vertical profile of new cloud fraction
 
       call update_from_cldn_profile(cldn(icol,:),dtinv,wtke(icol,:),zs(:),dz(:),temp(icol,:), &
-           cs(icol,:),csbot_cscen(:),state_q(icol,:,:),raercol(:,:,nsav),raercol_cw(:,:,nsav),nsource(icol,:), &
-           qcld(:),factnum(icol,:,:),ekd(:),nact(:,:),mact(:,:))
+           cs(icol,:),csbot_cscen(:),state_q(icol,:,:),raercol(:,:,nsav),raercol_cw(:,:,nsav), &
+           nsource(icol,:),qcld(:),factnum(icol,:,:),ekd(:),nact(:,:),mact(:,:))
 
       ! switch nsav, nnew so that nnew is the updated aerosol
-! BJG -- these fields aren't used until switched again, so can remove this switching statement, 
-! BJG -- provided the first instance of the next switching statement is also removed.
-      ntemp = nsav
-      nsav  = nnew
-      nnew  = ntemp
+! Note -- these fields aren't used until switched again, so can remove this switching statement, 
+!  -- provided the first instance of the next switching statement is also removed.
+!       ntemp = nsav
+!       nsav  = nnew
+!       nnew  = ntemp
 
+!  PART III:  perform explict integration of droplet/aerosol mixing using substepping
 
-! BJG:  below inputs for submix:  ekd(kk), csbot(kk) = cs(icol,kk), zn(kk), cldn(icol,kk), mact, nact(kk,imode),
-! raercol, raercol_cw(kk,mm,1 or 2), qcld(kk)
-! outputs:  updated qcld, raercol, raercol_cw(kk,mm,1,2), 
       ! load new droplets in layers above, below clouds
 
       dtmin     = dtmicro
@@ -619,9 +603,10 @@ subroutine dropmixnuc( &
          ekk(kk) = ekd(kk)*csbot(kk)
       enddo
 
-      do kk = top_lev, pver
-         km1     = max0(kk-1, top_lev)
+
+     do kk = top_lev, pver
          ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
+         km1     = max0(kk-1, top_lev)
          ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
          tinv    = ekkp(kk) + ekkm(kk)
 
@@ -686,9 +671,11 @@ subroutine dropmixnuc( &
       do isub = 1, nsubmix
          qncld(:) = qcld(:)
          ! switch nsav, nnew so that nsav is the updated aerosol
-         ntemp   = nsav
-         nsav    = nnew
-         nnew    = ntemp
+         if( isub > 1 ) then
+            ntemp   = nsav
+            nsav    = nnew
+            nnew    = ntemp
+         endif
          srcn(:) = 0.0_r8
 
          do imode = 1, ntot_amode
@@ -882,12 +869,7 @@ subroutine dropmixnuc( &
       raercol,    &
       raercol_cw, &
       coltend,    &
-! BJG      coltend_cw, &
       coltend_cw       )
-! BJG      fn,         &
-! BJG      fm,         &
-! BJG      fluxn,      &
-! BJG      fluxm       )
 
 
 end subroutine dropmixnuc
@@ -943,16 +925,15 @@ subroutine get_activate_frac(  &
        enddo
 
       ! rce-comment - use wtke at layer centers for new-cloud activation
-! BJG: seems wtke = wtke_cen in current code, comment above may no longer apply
+! NOTE: seems wtke = wtke_cen in current code, comment above may no longer apply
   
-! BJG:  below is to avoid warning about not assigning value to intent(out)
-! BJG:  the assignment should have no affect because flux_fullact is intent(out)
-! BJG:  in activate_modal (and in that subroutine is initialized to zero anyway).
+! Below is to avoid warning about not assigning value to intent(out)
+!  the assignment should have no affect because flux_fullact is intent(out)
+!  in activate_modal (and in that subroutine is initialized to zero anyway).
 
       flux_fullact=0._r8
 
       call activate_modal( &
-! BJG               wtke_cen(icol,kk), wmax,                       &
          wtke, wmax,                       &
          tair, cs_kk, naermod, ntot_amode, &
          vaerosol, hygro, fn, fm, fluxn,                      &
@@ -1008,7 +989,6 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
          if (cldn_in < cldo_in) then
             !  droplet loss in decaying cloud
             !++ sungsup
-! BJG nsource is zero below, can be removed from RHS
             nsource_out = nsource_out + qcld_in*(cldn_in - cldo_in)/cldo_in*dtinv
             qcld_in      = qcld_in*(1._r8 + (cldn_in - cldo_in)/cldo_in)
             !-- sungsup
@@ -1033,9 +1013,6 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
          ! growing cloud ......................................................
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
-! BJG: for growing cloud (at least by 0.01),  inputs are cldn(icol,kk), cldo(icol,kk), qcld(kk) = ncldwtr(icol,kk), raercol(kk,mm,1), raercol_cw(kk.mm,1),
-! state_q(icol,kk,index) = raercol(kk,mm,1), cs(icol,kk)
-! outputs are updated qcld(kk), nsource(icol,kk), updated raercol(kk,mm,1), updated raercol_cw(kk,mm,1), factnum(icol,kk,imode)
 
          if (cldn_in-cldo_in > 0.01_r8) then
 
@@ -1055,7 +1032,6 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
                num_idx = numptr_amode(imode)
                dact = dumc*fn(imode)*state_q_in(num_idx) ! interstitial only
                qcld_in = qcld_in + dact
-!  BJG nsource is zero below, can be removed from RHS
                nsource_out = nsource_out + dact*dtinv
                raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
                raercol_pt(mm)    = raercol_pt(mm) - dact
@@ -1117,17 +1093,9 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
 
       do kk = top_lev, pver - 1
 
-
          kp1 = min0(kk+1, pver)
 
          if (cldn_col_in(kk) > 0.01_r8) then
-
-! BJG:  if cldn > 0.01_r8 at any level except kk=pver, and is greater by 0.01 than cldn at kk+1
-! (actually second condition automatically includes the first):
-! Inputs:  cldn(icol,kk), wtke(icol,kk), zs(kk), raercol(kk,mm,1), raercol_cw(kk.mm,1),
-! state_q(icol,kk,index) = raercol(kk,mm,1), cs(icol,kk), temp(icol,kk),csbot_cscen(kk),dz(icol,kk)
-! Outputs:  ekd(kk) (needed for subloop), factnum(icol,kk,imode), nact(kk,imode), mact(kk,imode) (used as input to explmix subroutine),
-! updated nsource(icol,kk), updated qcld(kk) (value not actually used, but is set to zero when cldn <= 0.01)
 
             if (cldn_col_in(kk) - cldn_col_in(kp1) > 0.01_r8 ) then
 
@@ -1166,7 +1134,6 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
                !       = actmassflux/(cs(i,k)*dz(i,k))
                !    so need factor of csbot_cscen = csbot(k)/cs(i,k)
                !                   dum=1./(dz(i,k))
-! BJG               dum=csbot_cscen(kk)/(dz(icol,kk))
                dum=csbot_cscen(kk)/(dz(kk))
 
                ! rce-comment 2
@@ -1208,15 +1175,15 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
                   fluxntot = fluxntot &
                         + fluxn(imode)*raercol_nsav(kp1,mm)*cs_col_in(kk)
                enddo
-! BJG               nsource(icol,kk) = nsource(icol,kk) + fluxntot/(cs(icol,kk)*dz(icol,kk))
                nsource_col(kk) = nsource_col(kk) + fluxntot/(cs_col_in(kk)*dz(kk))
 
             endif  ! (cldn(icol,kk) - cldn(icol,kp1) > 0.01)
 
          else
-!  BJG:  if cldn < 0.01_r8 at any level except kk=pver, deplete qcld, turn all raercol_cw to raercol, put appropriate tendency
+!  if cldn < 0.01_r8 at any level except kk=pver, deplete qcld, turn all raercol_cw to raercol, put appropriate tendency
 !  in nsource
 !  Note that if cldn(kk) >= 0.01_r8 but cldn(kk) - cldn(kp1)  <= 0.01, nothing is done.
+
             ! no cloud
 
             nsource_col(kk) = nsource_col(kk) - qcld(kk)*dtinv
