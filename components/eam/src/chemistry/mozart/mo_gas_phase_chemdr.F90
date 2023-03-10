@@ -791,10 +791,10 @@ contains
 !
 
     call t_startf('aero_model_gasaerexch')
-    call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, reaction_rates, &
-                                tfld, pmid, pdel, mbar, relhum, &
+    call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, &
+                                tfld, pmid, pdel, mbar, &
                                 zm,  qh2o, cwat, cldfr, ncldwtr, &
-                                invariants(:,:,indexm), invariants, del_h2so4_gasprod,  &
+                                invariants(:,:,indexm), invariants,&
                                 vmr0, vmr, pbuf )
     call t_stopf('aero_model_gasaerexch')
 
