@@ -92,36 +92,38 @@ contains
     use mo_constants, only : pi
 
     ! input arguments
-    real(r8), intent(in) :: xl, cldnum, cfact, cldfrc, tfld,  press
+    real(r8), intent(in) :: xl          ! liquid water volume [cm^3/cm^3]
+    real(r8), intent(in) :: cldnum      ! droplet number concentration [#/kg]
+    real(r8), intent(in) :: cfact       ! total atms density [kg/L]
+    real(r8), intent(in) :: cldfrc      ! cloud fraction [fraction]
+    real(r8), intent(in) :: tfld        ! temperature [K]
+    real(r8), intent(in) :: press       ! pressure [Pa]
     ! output arguments
-    real(r8) :: uptkrate
+    real(r8) :: uptkrate        ! uptake rate [cm/cm/s]
     ! local variables
-    real(r8) :: rad_cd
-    real(r8) :: radxnum_cd
-    real(r8) :: num_cd
-    real(r8) :: gasdiffus
-    real(r8) :: gasspeed
-    real(r8) :: knudsen
-    real(r8) :: fuchs_sutugin
-    real(r8) :: volx34pi_cd
+    real(r8) :: rad_cd          ! droplet radius [cm]
+    real(r8) :: radxnum_cd      ! radius * number conc [cm/cm^3]
+    real(r8) :: num_cd          ! droplet number conc [1/cm^3]
+    real(r8) :: gasdiffus       ! H2SO4 gas diffusivity [cm^2/s]
+    real(r8) :: gasspeed        ! H2SO4 gas mean molecular speed [cm/s]
+    real(r8) :: knudsen         ! knudsen number [unitless]
+    real(r8) :: fuchs_sutugin   ! another dimensionless number
+    real(r8) :: volx34pi_cd     ! droplet volume * 3/4*pi [cm^3/cm^3]
 
     real(r8),parameter :: one_third = 0.3333333_r8
 
-! num_cd = (drop number conc in 1/cm^3)
+! change drop number conc from #/kg to #/cm^3
         num_cd = 1.0e-3_r8*cldnum*cfact/cldfrc
         num_cd = max( num_cd, 0.0_r8 )
 
-! rad_cd = (drop radius in cm), computed from liquid water and drop number,
-! then bounded by 0.5 and 50.0 micrometers
-! radxnum_cd = (drop radius)*(drop number conc)
 ! volx34pi_cd = (3/4*pi) * (liquid water volume in cm^3/cm^3)
-
         volx34pi_cd = xl*0.75_r8/pi
-
+! radxnum_cd = (drop radius)*(drop number conc)
 ! following holds because volx34pi_cd = num_cd*(rad_cd**3)
         radxnum_cd = (volx34pi_cd*num_cd*num_cd)**one_third
 
-! apply bounds to rad_cd to avoid the occasional unphysical value
+! rad_cd = (drop radius in cm), computed from liquid water and drop number,
+! then bounded by 0.5 and 50.0 micrometers to avoid the occasional unphysical value
         if (radxnum_cd <= volx34pi_cd*4.0e4_r8) then
             radxnum_cd = volx34pi_cd*4.0e4_r8
             rad_cd = 50.0e-4_r8
@@ -142,7 +144,7 @@ contains
 ! knudsen number
         knudsen = 3.0_r8*gasdiffus/(gasspeed*rad_cd)
 
-! following assumes accomodation coefficient = 0.65
+! following assumes accomodation coefficient accom=0.65
 ! (Adams & Seinfeld, 2002, JGR, and references therein)
 ! fuchs_sutugin = (0.75*accom*(1. + knudsen)) /
 ! (knudsen*(1.0 + knudsen + 0.283*accom) + 0.75*accom)
