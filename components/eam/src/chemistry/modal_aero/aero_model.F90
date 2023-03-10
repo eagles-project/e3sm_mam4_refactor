@@ -1378,7 +1378,7 @@ do_lphase2_conditional: &
     real(r8), pointer :: wetdens(:,:,:)         ! aerosol wet density [kg/m3] 
     real(r8), pointer :: pblh(:)                ! pbl height [m]
 
-    real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/kg/m2/s]
+    real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/m2/s]
     character(len=32)         :: out_name       ! output variable name string
     real(r8) :: dvmrdt(ncol,pver,gas_pcnst)     ! mixing ratio tendency [vmr/s or mol/mol/s]
     real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry [vmr or mol/mol]
