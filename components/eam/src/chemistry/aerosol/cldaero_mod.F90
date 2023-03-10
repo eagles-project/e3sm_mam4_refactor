@@ -79,24 +79,33 @@ contains
 ! utility function for cloud-borne aerosols
 !----------------------------------------------------------------------------------
 
+!==================================================================================
   function cldaero_uptakerate( xl, cldnum, cfact, cldfrc, tfld,  press ) result( uptkrate )
-    use mo_constants, only : pi
-
-    real(r8), intent(in) :: xl, cldnum, cfact, cldfrc, tfld,  press
-
-    real(r8) :: uptkrate
-
-    real(r8) :: &
-         rad_cd, radxnum_cd, num_cd, &
-         gasdiffus, gasspeed, knudsen, &
-         fuchs_sutugin, volx34pi_cd
-
 !-----------------------------------------------------------------------
 ! compute uptake of h2so4 and msa to cloud water
 !
 ! first-order uptake rate is
 ! 4*pi*(drop radius)*(drop number conc)
 ! *(gas diffusivity)*(fuchs sutugin correction)
+!-----------------------------------------------------------------------
+
+    use mo_constants, only : pi
+
+    ! input arguments
+    real(r8), intent(in) :: xl, cldnum, cfact, cldfrc, tfld,  press
+    ! output arguments
+    real(r8) :: uptkrate
+    ! local variables
+    real(r8) :: rad_cd
+    real(r8) :: radxnum_cd
+    real(r8) :: num_cd
+    real(r8) :: gasdiffus
+    real(r8) :: gasspeed
+    real(r8) :: knudsen
+    real(r8) :: fuchs_sutugin
+    real(r8) :: volx34pi_cd
+
+    real(r8),parameter :: one_third = 0.3333333_r8
 
 ! num_cd = (drop number conc in 1/cm^3)
         num_cd = 1.0e-3_r8*cldnum*cfact/cldfrc
@@ -110,18 +119,18 @@ contains
         volx34pi_cd = xl*0.75_r8/pi
 
 ! following holds because volx34pi_cd = num_cd*(rad_cd**3)
-        radxnum_cd = (volx34pi_cd*num_cd*num_cd)**0.3333333_r8
+        radxnum_cd = (volx34pi_cd*num_cd*num_cd)**one_third
 
 ! apply bounds to rad_cd to avoid the occasional unphysical value
-        if (radxnum_cd .le. volx34pi_cd*4.0e4_r8) then
+        if (radxnum_cd <= volx34pi_cd*4.0e4_r8) then
             radxnum_cd = volx34pi_cd*4.0e4_r8
             rad_cd = 50.0e-4_r8
-        else if (radxnum_cd .ge. volx34pi_cd*4.0e8_r8) then
+        elseif (radxnum_cd >= volx34pi_cd*4.0e8_r8) then
             radxnum_cd = volx34pi_cd*4.0e8_r8
             rad_cd = 0.5e-4_r8
         else
             rad_cd = radxnum_cd/num_cd
-        end if
+        endif
 
 ! gasdiffus = h2so4 gas diffusivity from mosaic code (cm^2/s)
 ! (pmid must be Pa)
@@ -144,5 +153,6 @@ contains
         uptkrate = 12.56637_r8*radxnum_cd*gasdiffus*fuchs_sutugin
 
   end function cldaero_uptakerate
+!==================================================================================
 
 end module cldaero_mod
