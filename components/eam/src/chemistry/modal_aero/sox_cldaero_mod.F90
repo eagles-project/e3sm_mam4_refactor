@@ -88,30 +88,26 @@ contains
   
   end subroutine sox_cldaero_init
 
-!----------------------------------------------------------------------------------
-!----------------------------------------------------------------------------------
+!===================================================================================
   function sox_cldaero_create_obj(cldfrc, qcw, lwc, cfact, ncol, loffset) result( conc_obj )
-    
+!----------------------------------------------------------------------------------
+!----------------------------------------------------------------------------------
+
+    ! input variables    
     real(r8), intent(in) :: cldfrc(:,:)
     real(r8), intent(in) :: qcw(:,:,:)
     real(r8), intent(in) :: lwc(:,:)
     real(r8), intent(in) :: cfact(:,:)
     integer,  intent(in) :: ncol
     integer,  intent(in) :: loffset
-
+    ! output variables
     type(cldaero_conc_t), pointer :: conc_obj
 
-
+    ! local variable indexes
     integer :: id_so4_1a, id_so4_2a, id_so4_3a, id_so4_4a, id_so4_5a, id_so4_6a
     integer :: id_nh4_1a, id_nh4_2a, id_nh4_3a, id_nh4_4a, id_nh4_5a, id_nh4_6a
     integer :: l,n
     integer :: i,k
-
-    logical :: mode7
-    logical :: mode9
-
-    mode7 = ntot_amode == 7
-    mode9 = ntot_amode == 9
 
     conc_obj => cldaero_allocate()
 
@@ -128,59 +124,24 @@ contains
 
     conc_obj%no3c(:,:) = 0._r8
 
-    if (mode7 .or. mode9) then
-#if ( defined MODAL_AERO_7MODE || defined MODAL_AERO_9MODE )
-!put ifdef here so ifort will compile 
-       id_so4_1a = lptr_so4_cw_amode(1) - loffset
-       id_so4_2a = lptr_so4_cw_amode(2) - loffset
-       id_so4_3a = lptr_so4_cw_amode(4) - loffset
-       id_so4_4a = lptr_so4_cw_amode(5) - loffset
-       id_so4_5a = lptr_so4_cw_amode(6) - loffset
-       id_so4_6a = lptr_so4_cw_amode(7) - loffset
+    ! FORTRAN refactor: remove code of MAM7 and MAM9
+    id_so4_1a = lptr_so4_cw_amode(1) - loffset
+    id_so4_2a = lptr_so4_cw_amode(2) - loffset
+    id_so4_3a = lptr_so4_cw_amode(3) - loffset
+    conc_obj%so4c(:ncol,:) = qcw(:,:,id_so4_1a) + qcw(:,:,id_so4_2a) + qcw(:,:,id_so4_3a)
 
-       id_nh4_1a = lptr_nh4_cw_amode(1) - loffset
-       id_nh4_2a = lptr_nh4_cw_amode(2) - loffset
-       id_nh4_3a = lptr_nh4_cw_amode(4) - loffset
-       id_nh4_4a = lptr_nh4_cw_amode(5) - loffset
-       id_nh4_5a = lptr_nh4_cw_amode(6) - loffset
-       id_nh4_6a = lptr_nh4_cw_amode(7) - loffset
-#endif
-       conc_obj%so4c(:ncol,:) &
-            = qcw(:ncol,:,id_so4_1a) &
-            + qcw(:ncol,:,id_so4_2a) &
-            + qcw(:ncol,:,id_so4_3a) &
-            + qcw(:ncol,:,id_so4_4a) &
-            + qcw(:ncol,:,id_so4_5a) &
-            + qcw(:ncol,:,id_so4_6a) 
+    ! for 3-mode, so4 is assumed to be nh4hso4
+    ! the partial neutralization of so4 is handled by using a 
+    !    -1 charge (instead of -2) in the electro-neutrality equation
+    conc_obj%nh4c(:ncol,:) = 0._r8
 
-       conc_obj%nh4c(:ncol,:) &
-            = qcw(:ncol,:,id_nh4_1a) &
-            + qcw(:ncol,:,id_nh4_2a) &
-            + qcw(:ncol,:,id_nh4_3a) &
-            + qcw(:ncol,:,id_nh4_4a) &
-            + qcw(:ncol,:,id_nh4_5a) &
-            + qcw(:ncol,:,id_nh4_6a) 
-    else
-       id_so4_1a = lptr_so4_cw_amode(1) - loffset
-       id_so4_2a = lptr_so4_cw_amode(2) - loffset
-       id_so4_3a = lptr_so4_cw_amode(3) - loffset
-       conc_obj%so4c(:ncol,:) &
-            = qcw(:,:,id_so4_1a) &
-            + qcw(:,:,id_so4_2a) &
-            + qcw(:,:,id_so4_3a)
+    ! with 3-mode, assume so4 is nh4hso4, and so half-neutralized
+    conc_obj%so4_fact = 1._r8
 
-        ! for 3-mode, so4 is assumed to be nh4hso4
-        ! the partial neutralization of so4 is handled by using a 
-        !    -1 charge (instead of -2) in the electro-neutrality equation
-       conc_obj%nh4c(:ncol,:) = 0._r8
-
-       ! with 3-mode, assume so4 is nh4hso4, and so half-neutralized
-       conc_obj%so4_fact = 1._r8
-
-    endif
 
   end function sox_cldaero_create_obj
 
+!=================================================================================
 !----------------------------------------------------------------------------------
 ! Update the mixing ratios
 !----------------------------------------------------------------------------------
