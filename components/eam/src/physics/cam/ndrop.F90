@@ -969,6 +969,7 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
 
    real(r8) :: delt_cld        ! new - old cloud fraction [fraction]
    real(r8) :: frac_delt_cld        ! fractional change in cloud fraction [fraction]
+   real(r8) :: fm_delt_cld        ! fm change from fractional change in cloud fraction [fraction]
    integer  :: imode       ! mode counter variable
    integer  :: lspec       ! species counter variable
    integer  :: mm                  ! local array index for MAM number, species
@@ -995,8 +996,7 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            delt_cld = (cldn_in - cldo_in)
-            frac_delt_cld = delt_cld / cldo_in
+            frac_delt_cld = (cldn_in - cldo_in) / cldo_in
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
                dact   = raercol_cw_pt(mm)*frac_delt_cld
@@ -1036,10 +1036,11 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
                nsource_out = nsource_out + dact*dtinv
                raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
                raercol_pt(mm)    = raercol_pt(mm) - dact
+               fm_delt_cld = delt_cld * fm(imode)
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
                   spc_idx=lmassptr_amode(lspec,imode)
-                  dact    = delt_cld*fm(imode)*state_q_in(spc_idx) ! interstitial only
+                  dact    = fm_delt_cld*state_q_in(spc_idx) ! interstitial only
                   raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
                   raercol_pt(mm)    = raercol_pt(mm) - dact
                enddo
@@ -1082,6 +1083,7 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
    integer  :: lspec       ! species counter variable
    integer  :: mm               ! local array index for MAM number, species
    real(r8) :: delz_cld        ! vertical change in cloud raction [fraction]
+   real(r8) :: crdz            ! conversion factor from flux to rate [m^{-1}]
    real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
    real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
    integer  :: num_idx  ! number index
@@ -1134,7 +1136,7 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
                !       = actmassflux/(cs(i,k)*dz(i,k))
                !    so need factor of csbot_cscen = csbot(k)/cs(i,k)
                !                   dum=1./(dz(i,k))
-
+               crdz=csbot_cscen(kk)/(dz(kk))
                ! rce-comment 2
                !    code for k=pver was changed to use the following conceptual model
                !    in k=pver, there can be no cloud-base activation unless one considers
@@ -1168,8 +1170,8 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col
                   mm = mam_idx(imode,0)
                   fluxn(imode) = fluxn(imode)*delz_cld
                   fluxm(imode) = fluxm(imode)*delz_cld
-                  nact(kk,imode) = nact(kk,imode) + fluxn(imode)*csbot_cscen(kk)/(dz(kk))
-                  mact(kk,imode) = mact(kk,imode) + fluxm(imode)*csbot_cscen(kk)/(dz(kk))
+                  nact(kk,imode) = nact(kk,imode) + fluxn(imode)*crdz
+                  mact(kk,imode) = mact(kk,imode) + fluxm(imode)*crdz
                      ! note that kp1 is used here
                   fluxntot = fluxntot &
                         + fluxn(imode)*raercol_nsav(kp1,mm)*cs_col_in(kk)
