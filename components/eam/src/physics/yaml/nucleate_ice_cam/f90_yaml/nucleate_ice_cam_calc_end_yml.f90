@@ -8,6 +8,12 @@
      !start writing data
      call write_output_var(unit_output, 'naai',  naai(yaml%col_print, yaml%lev_print))
      call write_output_var(unit_output, 'naai_hom', naai_hom(yaml%col_print, yaml%lev_print))
+
+     call write_output_var(unit_output, 'nihf',  nihf(yaml%col_print, yaml%lev_print))
+     call write_output_var(unit_output, 'niimm', niimm(yaml%col_print, yaml%lev_print))
+     call write_output_var(unit_output, 'nidep', nidep(yaml%col_print, yaml%lev_print))
+     call write_output_var(unit_output, 'nimey', nimey(yaml%col_print, yaml%lev_print))
+
      !<add code for writing data here>
      !call write_output_var(unit_output, fld_name, field, inp_out_str)  !write a single output variable
      !call write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str) !writes 1D variables of any dimension in the output python module

@@ -1,6 +1,6 @@
 # Data at [lat=   71.9201421331276      , lon=   71.5690366721838      , k=          64 , time step=        1402 ] 
 mam4xx:
-  function: compute_tendencies
+  function: nucleati
 input:
   fixed:
     dt:    0.00
@@ -12,3 +12,4 @@ input:
     rhoair: [ 0.1373572514E+01]
     so4_num: [ 0.6224210438E+02]
     dst3_num: [ 0.9478315467E-03]
+    subgrid: [ 0.1200000000E+01]

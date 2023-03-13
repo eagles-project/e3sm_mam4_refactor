@@ -18,8 +18,8 @@
   integer,save :: n_calls=0   ! some subroutines are called multiple times in one timestep, record the number of calls
 
   !populate YAML structure
-  yaml%lev_print = 64 !level (**remove these if generating data for a dependent subroutines**)
-  yaml%nstep_print = 1402 !time step(**remove these if generating data for a dependent subroutines**)
+  yaml%lev_print = 44 !level (**remove these if generating data for a dependent subroutines**)
+  yaml%nstep_print = 1410 !time step(**remove these if generating data for a dependent subroutines**)
 
   ! set ext_str if there are multiple sets of yaml output to be write out
   ! here gives an example that "flag" in the code can be 0, 1, or 2:
@@ -58,13 +58,14 @@
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'compute_tendencies',yaml%nstep_print, yaml%lev_print)
+             'hf',yaml%nstep_print, yaml%lev_print)
 
         !< add code for writing data here>
         call write_var(unit_input, unit_output, 'Temperature',Temperature)
         call write_var(unit_input, unit_output, 'w_vlc',w_vlc)
         call write_var(unit_input, unit_output, 'RH',RH)
         call write_var(unit_input, unit_output, 'Na',Na)
+        call write_var(unit_input, unit_output, 'subgrid', subgrid)
 
         !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
         !call write_1d_var(unit_input, unit_output, fld_name,dim,field) ! writes 1D variables of any dimension

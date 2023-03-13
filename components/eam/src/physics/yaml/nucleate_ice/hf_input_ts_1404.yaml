@@ -1,6 +1,6 @@
 # Data at [lat=   39.0553303768561      , lon=   352.440165015397      , k=          37 , time step=        1404 ] 
 mam4xx:
-  function: compute_tendencies
+  function: hf
 input:
   fixed:
     dt:    0.00
@@ -8,3 +8,4 @@ input:
     w_vlc: [ 0.2000000000E+00]
     RH: [ 0.7452682855E+00]
     Na: [ 0.5353090275E+01]
+    subgrid: [ 0.1200000000E+01]

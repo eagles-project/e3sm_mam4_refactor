@@ -1,6 +1,6 @@
 # Data at [lat=   71.9201421331276      , lon=   71.5690366721838      , k=          62 , time step=        1403 ] 
 mam4xx:
-  function: compute_tendencies
+  function: nucleate_ice_cam_calc
 input:
   fixed:
     dt:    0.00
@@ -16,6 +16,8 @@ input:
     lptr_pom_a_amode: [        17,-999888777,        33,        37]
     lptr_soa_a_amode: [        18,        25,        34,-999888777]
     lptr_mom_a_amode: [        22,        27,        35,        39]
+    so4_sz_thresh_icenuc: [ 0.8000000000E-07]
+    mincld: [ 0.1000000000E-03]
     ncol: [         4]
     lchnk: [       136]
     temperature: [ 0.2369643763E+03]

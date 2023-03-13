@@ -15,6 +15,7 @@ input.Temperature=[[-0.5714452694E+02],]
 input.w_vlc=[[ 0.2000000000E+00],]
 input.RH=[[ 0.7452682855E+00],]
 input.Na=[[ 0.5353090275E+01],]
+input.subgrid=[[ 0.1200000000E+01],]
 # Output data is stored here.
 output = Object()
 output.Ni=[[ 0.0000000000E+00],]

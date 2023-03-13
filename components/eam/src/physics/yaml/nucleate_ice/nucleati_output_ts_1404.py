@@ -19,6 +19,7 @@ input.cldn=[[ 0.7120661434E+00],]
 input.rhoair=[[ 0.3784315403E+00],]
 input.so4_num=[[ 0.5353090275E+01],]
 input.dst3_num=[[ 0.2138105217E-02],]
+input.subgrid=[[ 0.1200000000E+01],]
 # Output data is stored here.
 output = Object()
 output.nuci=[[ 0.0000000000E+00],]

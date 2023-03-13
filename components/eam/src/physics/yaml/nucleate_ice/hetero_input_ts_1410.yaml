@@ -1,6 +1,6 @@
 # Data at [lat=   27.8859484222059      , lon=   83.8815732902265      , k=          44 , time step=        1410 ] 
 mam4xx:
-  function: compute_tendencies
+  function: hetero
 input:
   fixed:
     dt:    0.00
