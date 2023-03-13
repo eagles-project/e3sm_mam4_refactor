@@ -106,17 +106,19 @@ contains
 
     ! local variable indexes
     integer :: id_so4_1a, id_so4_2a, id_so4_3a
-    integer :: i,k
+    integer :: icol,kk
 
     conc_obj => cldaero_allocate()
 
-    do k = 1,pver
-       do i = 1,ncol
-          if( cldfrc(i,k) >0._r8) then
-             conc_obj%xlwc(i,k) = lwc(i,k) *cfact(i,k) ! cloud water L(water)/L(air)
-             conc_obj%xlwc(i,k) = conc_obj%xlwc(i,k) / cldfrc(i,k) ! liquid water in the cloudy fraction of cell
+    do kk = 1,pver
+       do icol = 1,ncol
+          if( cldfrc(icol,kk) >0._r8) then
+             ! cloud water L(water)/L(air)
+             conc_obj%xlwc(icol,kk) = lwc(icol,kk) *cfact(icol,kk)
+             ! liquid water in the cloudy fraction of cell
+             conc_obj%xlwc(icol,kk) = conc_obj%xlwc(icol,kk) / cldfrc(icol,kk)
           else
-             conc_obj%xlwc(i,k) = 0._r8
+             conc_obj%xlwc(icol,kk) = 0._r8
           endif
        enddo
     enddo
