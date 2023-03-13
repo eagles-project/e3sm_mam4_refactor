@@ -7,7 +7,7 @@ module sox_cldaero_mod
   use cam_abortutils,      only : endrun
   use ppgrid,          only : pcols, pver
   use mo_chem_utls,    only : get_spc_ndx
-  use cldaero_mod,     only : cldaero_conc_t, cldaero_allocate, cldaero_deallocate
+  use cldaero_mod,     only : cldaero_conc_t
   use modal_aero_data, only : ntot_amode, modeptr_accum, lptr_so4_cw_amode, lptr_msa_cw_amode
   use modal_aero_data, only : numptrcw_amode, lptr_nh4_cw_amode
   use modal_aero_data, only : cnst_name_cw, specmw_so4_amode
@@ -92,6 +92,7 @@ contains
   function sox_cldaero_create_obj(cldfrc, qcw, lwc, cfact, ncol, loffset) result( conc_obj )
 !----------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------
+    use cldaero_mod, only : cldaero_allocate
 
     ! input variables    
     real(r8), intent(in) :: cldfrc(:,:)
@@ -104,9 +105,7 @@ contains
     type(cldaero_conc_t), pointer :: conc_obj
 
     ! local variable indexes
-    integer :: id_so4_1a, id_so4_2a, id_so4_3a, id_so4_4a, id_so4_5a, id_so4_6a
-    integer :: id_nh4_1a, id_nh4_2a, id_nh4_3a, id_nh4_4a, id_nh4_5a, id_nh4_6a
-    integer :: l,n
+    integer :: id_so4_1a, id_so4_2a, id_so4_3a
     integer :: i,k
 
     conc_obj => cldaero_allocate()
@@ -479,6 +478,8 @@ contains
   !----------------------------------------------------------------------------------
   !----------------------------------------------------------------------------------
   subroutine sox_cldaero_destroy_obj( conc_obj )
+    use cldaero_mod, only : cldaero_deallocate
+
     type(cldaero_conc_t), pointer :: conc_obj
 
     call cldaero_deallocate( conc_obj )
