@@ -29,8 +29,6 @@ module sox_cldaero_mod
 
   integer :: id_msa, id_h2so4, id_so2, id_h2o2, id_nh3
 
-  real(r8), parameter :: small_value = 1.e-20_r8
-
 contains
 
 !----------------------------------------------------------------------------------
@@ -220,6 +218,12 @@ contains
     integer :: i,k
     real(r8) :: xl      ! liquid water volume [cm^3/cm^3]
 
+    real(r8), parameter :: small_value_35 = 1.e-35_r8
+    real(r8), parameter :: small_value_20 = 1.e-20_r8
+    real(r8), parameter :: small_value_10 = 1.e-10_r8
+    real(r8), parameter :: small_value_8  = 1.e-8_r8
+    real(r8), parameter :: small_value_5  = 1.e-5_r8
+
     ! make sure dqdt is zero initially, for budgets
     dqdt_aqso4(:,:,:) = 0.0_r8
     dqdt_aqh2so4(:,:,:) = 0.0_r8
@@ -228,10 +232,10 @@ contains
 
     lev_loop: do k = 1,pver
        col_loop: do i = 1,ncol
-          cloud: if (cldfrc(i,k) >= 1.0e-5_r8) then
+          cloud: if (cldfrc(i,k) >= small_value_5) then
              xl = xlwc(i,k) ! / cldfrc(i,k)
 
-             IF (XL .ge. 1.e-8_r8) THEN !! WHEN CLOUD IS PRESENTED
+             IF (XL .ge. small_value_8) THEN !! WHEN CLOUD IS PRESENTED
 
                 delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
 
@@ -260,7 +264,7 @@ contains
                 ! force qnum_c(n) to be positive for n=modeptr_accum or n=1
                 n = modeptr_accum
                 if (n <= 0) n = 1
-                qnum_c(n) = max( 1.0e-10_r8, qnum_c(n) )
+                qnum_c(n) = max( small_value_10, qnum_c(n) )
 
                 ! faqgain_so4(n) = fraction of total so4_c gain going to mode n
                 ! these are proportional to the activated particle MR for each mode
@@ -361,7 +365,7 @@ contains
                          dqdt = dqdt_aq
                          qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
                       else
-                         dqdt = (qcw(i,k,l)/max(xnh4c(i,k),1.0e-35_r8)) &
+                         dqdt = (qcw(i,k,l)/max(xnh4c(i,k),small_value_35)) &
                               *delnh4/dtime*cldfrc(i,k)
                          qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
                       endif
@@ -422,23 +426,23 @@ contains
 
           l = lptr_so4_cw_amode(n) - loffset
           if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value )
+             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
           end if
           l = lptr_msa_cw_amode(n) - loffset
           if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value )
+             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
           end if
           l = lptr_nh4_cw_amode(n) - loffset
           if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value )
+             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
           end if
 
        end do
 
-       qin(:,k,id_so2) =  MAX( qin(:,k,id_so2),    small_value )
+       qin(:,k,id_so2) =  MAX( qin(:,k,id_so2),    small_value_20 )
 
        if ( id_nh3 > 0 ) then
-          qin(:,k,id_nh3) =  MAX( qin(:,k,id_nh3),    small_value )
+          qin(:,k,id_nh3) =  MAX( qin(:,k,id_nh3),    small_value_20 )
        endif
 
     end do
