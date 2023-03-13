@@ -453,48 +453,45 @@ contains
        m = lptr_so4_cw_amode(n)
        l = m - loffset
        if (l > 0) then
-          sflx(:)=0._r8
-          do k=1,pver
-             do i=1,ncol
-                sflx(i)=sflx(i)+dqdt_aqso4(i,k,l)*adv_mass(l)/mbar(i,k) &
-                     *pdel(i,k)/gravit ! kg/m2/s
-             enddo
-          enddo
+          call calc_sfc_flux( dqdt_aqso4(:,:,l)*adv_mass(l)/mbar, pdel, sflx)
           call outfld( trim(cnst_name_cw(m))//'AQSO4', sflx(:ncol), ncol, lchnk)
 
-          sflx(:)=0._r8
-          do k=1,pver
-             do i=1,ncol
-                sflx(i)=sflx(i)+dqdt_aqh2so4(i,k,l)*adv_mass(l)/mbar(i,k) &
-                     *pdel(i,k)/gravit ! kg/m2/s
-             enddo
-          enddo
+          call calc_sfc_flux( dqdt_aqh2so4(:,:,l)*adv_mass(l)/mbar, pdel, sflx)
           call outfld( trim(cnst_name_cw(m))//'AQH2SO4', sflx(:ncol), ncol, lchnk)
        endif
-    end do
+    enddo
 
-    sflx(:)=0._r8
-    do k=1,pver
-       do i=1,ncol
-          sflx(i)=sflx(i)+dqdt_aqhprxn(i,k)*specmw_so4_amode/mbar(i,k) &
-               *pdel(i,k)/gravit ! kg SO4 /m2/s
-       enddo
-    enddo
+    call calc_sfc_flux( dqdt_aqhprxn*specmw_so4_amode/mbar, pdel, sflx)
     call outfld( 'AQSO4_H2O2', sflx(:ncol), ncol, lchnk)
-    sflx(:)=0._r8
-    do k=1,pver
-       do i=1,ncol
-          sflx(i)=sflx(i)+dqdt_aqo3rxn(i,k)*specmw_so4_amode/mbar(i,k) &
-               *pdel(i,k)/gravit ! kg SO4 /m2/s
-       enddo
-    enddo
+
+    call calc_sfc_flux( dqdt_aqo3rxn*specmw_so4_amode/mbar, pdel, sflx)
     call outfld( 'AQSO4_O3', sflx(:ncol), ncol, lchnk)
 
   end subroutine sox_cldaero_update
 
-  !----------------------------------------------------------------------------------
-  !----------------------------------------------------------------------------------
+  !=============================================================================
+  subroutine calc_sfc_flux(layer_tend, pdel, sflx)
+    !-----------------------------------------------------------------------
+    ! calculate surface fluxes of wet deposition from vertical integration of
+    ! tendencies 
+    !-----------------------------------------------------------------------
+    real(r8), intent(in) :: pdel(:,:)      ! pressure difference between two layers [Pa]
+    real(r8), intent(in) :: layer_tend(:,:)! physical tendencies in each layer [kg/kg/s]
+    real(r8), intent(out):: sflx(:)        ! integrated surface fluxes [kg/m2/s]
+
+    integer :: kk
+
+     sflx(:)=0.0_r8
+     do kk=1,pver
+        sflx(:) = sflx(:) + layer_tend(:,kk)*pdel(:,kk)/gravit
+     enddo
+
+  end subroutine calc_sfc_flux
+
+  !=============================================================================
   subroutine sox_cldaero_destroy_obj( conc_obj )
+  !----------------------------------------------------------------------------------
+  !----------------------------------------------------------------------------------
     use cldaero_mod, only : cldaero_deallocate
 
     type(cldaero_conc_t), pointer :: conc_obj
