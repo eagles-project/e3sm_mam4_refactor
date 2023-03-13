@@ -219,7 +219,6 @@ contains
     real(r8) :: xl      ! liquid water volume [cm^3/cm^3]
 
     real(r8), parameter :: small_value_35 = 1.e-35_r8
-    real(r8), parameter :: small_value_20 = 1.e-20_r8
     real(r8), parameter :: small_value_10 = 1.e-10_r8
     real(r8), parameter :: small_value_8  = 1.e-8_r8
     real(r8), parameter :: small_value_5  = 1.e-5_r8
@@ -412,7 +411,7 @@ contains
                 dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
                 dqdt_aqo3rxn(i,k) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(i,k)
 
-             ENDIF !! WHEN CLOUD IS PRESENTED
+             endif !! WHEN CLOUD IS PRESENTED
           endif cloud
        enddo col_loop
     enddo lev_loop
@@ -420,32 +419,14 @@ contains
     !==============================================================
     ! ... Update the mixing ratios
     !==============================================================
-    do k = 1,pver
+    do n = 1, ntot_amode
+       call update_vmr_nonzero ( qcw, (lptr_so4_cw_amode(n) - loffset) )
+       call update_vmr_nonzero ( qcw, (lptr_msa_cw_amode(n) - loffset) )
+       call update_vmr_nonzero ( qcw, (lptr_nh4_cw_amode(n) - loffset) )
+    enddo
+    call update_vmr_nonzero ( qin, id_so2 )
+    call update_vmr_nonzero ( qin, id_nh3 )
 
-       do n = 1, ntot_amode
-
-          l = lptr_so4_cw_amode(n) - loffset
-          if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
-          end if
-          l = lptr_msa_cw_amode(n) - loffset
-          if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
-          end if
-          l = lptr_nh4_cw_amode(n) - loffset
-          if (l > 0) then
-             qcw(:,k,l) = MAX(qcw(:,k,l), small_value_20 )
-          end if
-
-       end do
-
-       qin(:,k,id_so2) =  MAX( qin(:,k,id_so2),    small_value_20 )
-
-       if ( id_nh3 > 0 ) then
-          qin(:,k,id_nh3) =  MAX( qin(:,k,id_nh3),    small_value_20 )
-       endif
-
-    end do
 
     ! diagnostics
 
@@ -470,10 +451,25 @@ contains
   end subroutine sox_cldaero_update
 
   !=============================================================================
+  subroutine update_vmr_nonzero ( vmr, idx )
+    !-----------------------------------------------------------------------
+    ! basically it just makes sure the value is greater than zero
+    !-----------------------------------------------------------------------
+    real(r8), intent(inout) :: vmr(:,:,:) ! species mixing ratio [vmr]
+    integer,  intent(in)    :: idx        ! index for the third dimension of vmr
+    
+    real(r8), parameter :: small_value_20 = 1.e-20_r8
+
+    if (idx>0) then
+        vmr(:,:,idx) = max(vmr(:,:,idx), small_value_20)
+    endif
+
+  end subroutine update_vmr_nonzero
+
+  !=============================================================================
   subroutine calc_sfc_flux(layer_tend, pdel, sflx)
     !-----------------------------------------------------------------------
-    ! calculate surface fluxes of wet deposition from vertical integration of
-    ! tendencies 
+    ! calculate surface fluxes of wet deposition from vertical integration of tendencies 
     !-----------------------------------------------------------------------
     real(r8), intent(in) :: pdel(:,:)      ! pressure difference between two layers [Pa]
     real(r8), intent(in) :: layer_tend(:,:)! physical tendencies in each layer [kg/kg/s]
