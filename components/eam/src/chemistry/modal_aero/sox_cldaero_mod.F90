@@ -95,12 +95,12 @@ contains
     use cldaero_mod, only : cldaero_allocate
 
     ! input variables    
-    real(r8), intent(in) :: cldfrc(:,:)
-    real(r8), intent(in) :: qcw(:,:,:)
-    real(r8), intent(in) :: lwc(:,:)
-    real(r8), intent(in) :: cfact(:,:)
+    real(r8), intent(in) :: cldfrc(:,:) ! cloud fraction [fraction]
+    real(r8), intent(in) :: qcw(:,:,:)  ! cloud-borne aerosol [vmr]
+    real(r8), intent(in) :: lwc(:,:)    ! cloud liquid water content [kg/kg]
+    real(r8), intent(in) :: cfact(:,:)  ! total atms density [kg/L]
     integer,  intent(in) :: ncol
-    integer,  intent(in) :: loffset
+    integer,  intent(in) :: loffset     ! # of tracers in the host model that are not part of MAM
     ! output variables
     type(cldaero_conc_t), pointer :: conc_obj
 
@@ -143,29 +143,30 @@ contains
   end function sox_cldaero_create_obj
 
 !=================================================================================
+  subroutine sox_cldaero_update( ncol, lchnk, loffset,  & ! in
+                dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, & ! in
+                delso4_hprxn, xh2so4, xso4, xso4_init, & ! in
+                nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, & ! in
+                qcw, qin ) ! inout
 !----------------------------------------------------------------------------------
 ! Update the mixing ratios
 !----------------------------------------------------------------------------------
-  subroutine sox_cldaero_update( &
-       ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, &
-       delso4_hprxn, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin )
-
     ! args 
 
     integer,  intent(in) :: ncol
     integer,  intent(in) :: lchnk ! chunk id
-    integer,  intent(in) :: loffset
+    integer,  intent(in) :: loffset     ! # of tracers in the host model that are not part of MAM
 
-    real(r8), intent(in) :: dtime ! time step (sec)
+    real(r8), intent(in) :: dtime ! time step [sec]
 
-    real(r8), intent(in) :: mbar(:,:) ! mean wet atmospheric mass ( amu )
-    real(r8), intent(in) :: pdel(:,:) 
-    real(r8), intent(in) :: press(:,:)
-    real(r8), intent(in) :: tfld(:,:)
+    real(r8), intent(in) :: mbar(:,:)   ! mean wet atmospheric mass [amu or g/mol]
+    real(r8), intent(in) :: pdel(:,:)   ! 
+    real(r8), intent(in) :: press(:,:)  ! pressure [Pa]
+    real(r8), intent(in) :: tfld(:,:)   ! temperature [K]
 
-    real(r8), intent(in) :: cldnum(:,:)
-    real(r8), intent(in) :: cldfrc(:,:)
-    real(r8), intent(in) :: cfact(:,:)
+    real(r8), intent(in) :: cldnum(:,:) ! droplet number concentration [#/kg]
+    real(r8), intent(in) :: cldfrc(:,:) ! cloud fraction [fraction]
+    real(r8), intent(in) :: cfact(:,:)  ! total atms density [kg/L]
     real(r8), intent(in) :: xlwc(:,:)
 
     real(r8), intent(in) :: delso4_hprxn(:,:)
@@ -182,32 +183,42 @@ contains
     real(r8), intent(in) :: xh2o2(:,:)
     real(r8), intent(in) :: xno3c(:,:)
 
-    real(r8), intent(inout) :: qcw(:,:,:) ! cloud-borne aerosol (vmr)
-    real(r8), intent(inout) :: qin(:,:,:) ! xported species ( vmr )
+    real(r8), intent(inout) :: qcw(:,:,:) ! cloud-borne aerosol [vmr]
+    real(r8), intent(inout) :: qin(:,:,:) ! xported species [vmr]
 
     ! local vars ...
 
-    real(r8) :: dqdt_aqso4(ncol,pver,gas_pcnst), &
-         dqdt_aqh2so4(ncol,pver,gas_pcnst), &
-         dqdt_aqhprxn(ncol,pver), dqdt_aqo3rxn(ncol,pver), &
-         sflx(1:ncol)
+    real(r8) :: dqdt_aqso4(ncol,pver,gas_pcnst)
+    real(r8) :: dqdt_aqh2so4(ncol,pver,gas_pcnst)
+    real(r8) :: dqdt_aqhprxn(ncol,pver)
+    real(r8) :: dqdt_aqo3rxn(ncol,pver)
+    real(r8) :: sflx(1:ncol)
 
-    real(r8) :: faqgain_msa(ntot_amode), faqgain_so4(ntot_amode), qnum_c(ntot_amode)
+    real(r8) :: faqgain_msa(ntot_amode)
+    real(r8) :: faqgain_so4(ntot_amode)
+    real(r8) :: qnum_c(ntot_amode)
 
-    real(r8) :: delso4_o3rxn, &
-         dso4dt_aqrxn, dso4dt_hprxn, &
-         dso4dt_gasuptk, dmsadt_gasuptk, &
-         dmsadt_gasuptk_tomsa, dmsadt_gasuptk_toso4, &
-         dqdt_aq, dqdt_wr, dqdt
+    real(r8) :: delso4_o3rxn
+    real(r8) :: dso4dt_aqrxn
+    real(r8) :: dso4dt_hprxn
+    real(r8) :: dso4dt_gasuptk
+    real(r8) :: dmsadt_gasuptk
+    real(r8) :: dmsadt_gasuptk_tomsa
+    real(r8) :: dmsadt_gasuptk_toso4
+    real(r8) :: dqdt_aq
+    real(r8) :: dqdt_wr
+    real(r8) :: dqdt
 
-    real(r8) :: fwetrem, sumf, uptkrate
+    real(r8) :: fwetrem
+    real(r8) :: sumf
+    real(r8) :: uptkrate
     real(r8) :: delnh3, delnh4
 
     integer :: l, n, m
     integer :: ntot_msa_c
 
     integer :: i,k
-    real(r8) :: xl
+    real(r8) :: xl      ! liquid water volume [cm^3/cm^3]
 
     ! make sure dqdt is zero initially, for budgets
     dqdt_aqso4(:,:,:) = 0.0_r8
