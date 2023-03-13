@@ -289,7 +289,7 @@ contains
                 ! now compute TMR tendencies
                 ! this includes the above aqueous so2 chemistry AND
                 ! the uptake of highly soluble aerosol precursor gases (h2so4, ...)
-                ! AND the wetremoval of dissolved, unreacted so2 and h2o2
+                ! The wetremoval of dissolved, unreacted so2 and h2o2 are assumed as zero
 
                 dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
                 dso4dt_hprxn = delso4_hprxn(i,k) / dtime
@@ -303,16 +303,13 @@ contains
                       dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
                       dqdt_wr =  0.0_r8 ! don't have wet removal here
                       call update_tmr ( qcw(i,k,l), dqdt_aq + dqdt_wr, dtime )
-                   end if
+                   endif
+                enddo
 
-                end do
-
-                ! For gas species, tendency includes
-                ! reactive uptake to cloud water that essentially transforms the gas to
-                ! a different species. Wet removal associated with this is applied
-                ! to the "new" species (e.g., so4_c) rather than to the gas.
-                ! wet removal of the unreacted gas that is dissolved in cloud water.
+                ! For gas species, tendency includes reactive uptake to cloud water
+                ! that essentially transforms the gas to a different species.
                 ! Need to multiply both these parts by cldfrc
+                ! Currently it assumes no wet removal here
 
                 ! h2so4 (g)         
                 qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
