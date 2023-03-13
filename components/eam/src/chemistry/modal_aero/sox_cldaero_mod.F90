@@ -383,7 +383,6 @@ contains
                 if (id_msa > 0) qin(i,k,id_msa) = qin(i,k,id_msa) - dmsadt_gasuptk * dtime * cldfrc(i,k)
 
                 ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
-                ! fwetrem = max( 0.0_r8, (1.0_r8-exp(-min(100._r8,dtime*frso2_c*clwlrat(i,k)))) )
                 fwetrem = 0.0_r8 ! don't include so2 wet removal here
 
                 dqdt_wr = -fwetrem*xso2(i,k)/dtime*cldfrc(i,k)
@@ -392,7 +391,6 @@ contains
                 qin(i,k,id_so2) = qin(i,k,id_so2) + dqdt * dtime
 
                 ! h2o2 -- the first order loss rate for h2o2 is frh2o2_c*clwlrat(i,k)
-                ! fwetrem = max( 0.0_r8, (1.0_r8-exp(-min(100._r8,dtime*frh2o2_c*clwlrat(i,k)))) )
                 fwetrem = 0.0_r8 ! don't include h2o2 wet removal here
 
                 dqdt_wr = -fwetrem*xh2o2(i,k)/dtime*cldfrc(i,k)
@@ -420,12 +418,12 @@ contains
     ! ... Update the mixing ratios
     !==============================================================
     do n = 1, ntot_amode
-       call update_vmr_nonzero ( qcw, (lptr_so4_cw_amode(n) - loffset) )
-       call update_vmr_nonzero ( qcw, (lptr_msa_cw_amode(n) - loffset) )
-       call update_vmr_nonzero ( qcw, (lptr_nh4_cw_amode(n) - loffset) )
+       call update_tmr_nonzero ( qcw, (lptr_so4_cw_amode(n) - loffset) )
+       call update_tmr_nonzero ( qcw, (lptr_msa_cw_amode(n) - loffset) )
+       call update_tmr_nonzero ( qcw, (lptr_nh4_cw_amode(n) - loffset) )
     enddo
-    call update_vmr_nonzero ( qin, id_so2 )
-    call update_vmr_nonzero ( qin, id_nh3 )
+    call update_tmr_nonzero ( qin, id_so2 )
+    call update_tmr_nonzero ( qin, id_nh3 )
 
 
     ! diagnostics
@@ -451,20 +449,20 @@ contains
   end subroutine sox_cldaero_update
 
   !=============================================================================
-  subroutine update_vmr_nonzero ( vmr, idx )
+  subroutine update_tmr_nonzero ( tmr, idx )
     !-----------------------------------------------------------------------
     ! basically it just makes sure the value is greater than zero
     !-----------------------------------------------------------------------
-    real(r8), intent(inout) :: vmr(:,:,:) ! species mixing ratio [vmr]
+    real(r8), intent(inout) :: tmr(:,:,:) ! tracer mixing ratio [vmr]
     integer,  intent(in)    :: idx        ! index for the third dimension of vmr
     
     real(r8), parameter :: small_value_20 = 1.e-20_r8
 
     if (idx>0) then
-        vmr(:,:,idx) = max(vmr(:,:,idx), small_value_20)
+        tmr(:,:,idx) = max(tmr(:,:,idx), small_value_20)
     endif
 
-  end subroutine update_vmr_nonzero
+  end subroutine update_tmr_nonzero
 
   !=============================================================================
   subroutine calc_sfc_flux(layer_tend, pdel, sflx)
