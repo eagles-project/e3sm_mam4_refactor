@@ -294,20 +294,15 @@ contains
                 dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
                 dso4dt_hprxn = delso4_hprxn(i,k) / dtime
 
-                ! fwetrem = fraction of in-cloud-water material that is wet removed
-                ! fwetrem = max( 0.0_r8, (1.0_r8-exp(-min(100._r8,dtime*clwlrat(i,k)))) )
-                fwetrem = 0.0_r8 ! don't have so4 wet removal here
-
                 ! compute TMR tendencies for so4 aerosol-in-cloud-water
                 do n = 1, ntot_amode
                    l = lptr_so4_cw_amode(n) - loffset
                    if (l > 0) then
                       dqdt_aqso4(i,k,l) = faqgain_so4(n)*dso4dt_aqrxn*cldfrc(i,k)
-                      dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)!&
+                      dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)
                       dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
-                      dqdt_wr = -fwetrem*dqdt_aq
-                      dqdt= dqdt_aq + dqdt_wr
-                      qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
+                      dqdt_wr =  0.0_r8 ! don't have wet removal here
+                      call update_tmr ( qcw(i,k,l), dqdt_aq + dqdt_wr, dtime )
                    end if
 
                 end do
@@ -319,24 +314,21 @@ contains
                 ! wet removal of the unreacted gas that is dissolved in cloud water.
                 ! Need to multiply both these parts by cldfrc
 
-                ! h2so4 (g)
+                ! h2so4 (g)         
                 qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
+! FORTRAN refactor: The order of multiplying cldfrc makes the following call
+! failing BFB test, so this calculation is not refactored with new subroutine
+                ! call update_tmr ( qin(i,k,id_h2so4), dso4dt_gasuptk*cldfrc(i,k), dtime )
 
                 ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
-                fwetrem = 0.0_r8 ! don't include so2 wet removal here
-
-                dqdt_wr = -fwetrem*xso2(i,k)/dtime*cldfrc(i,k)
+                dqdt_wr =  0.0_r8 ! don't have wet removal here
                 dqdt_aq = -dso4dt_aqrxn*cldfrc(i,k)
-                dqdt = dqdt_aq + dqdt_wr
-                qin(i,k,id_so2) = qin(i,k,id_so2) + dqdt * dtime
+                call update_tmr ( qin(i,k,id_so2), dqdt_aq + dqdt_wr, dtime )
 
                 ! h2o2 -- the first order loss rate for h2o2 is frh2o2_c*clwlrat(i,k)
-                fwetrem = 0.0_r8 ! don't include h2o2 wet removal here
-
-                dqdt_wr = -fwetrem*xh2o2(i,k)/dtime*cldfrc(i,k)
+                dqdt_wr =  0.0_r8 ! don't have wet removal here
                 dqdt_aq = -dso4dt_hprxn*cldfrc(i,k)
-                dqdt = dqdt_aq + dqdt_wr
-                qin(i,k,id_h2o2) = qin(i,k,id_h2o2) + dqdt * dtime
+                call update_tmr ( qin(i,k,id_h2o2), dqdt_aq + dqdt_wr, dtime )
 
                 ! for SO4 from H2O2/O3 budgets
                 dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
@@ -379,6 +371,18 @@ contains
 
   end subroutine sox_cldaero_update
 
+  !=============================================================================
+  subroutine update_tmr ( tmr, dqdt, dtime )
+    !-----------------------------------------------------------------------
+    ! basically it just makes sure the value is greater than zero
+    !-----------------------------------------------------------------------
+    real(r8), intent(inout) :: tmr   ! tracer mixing ratio [vmr]
+    real(r8), intent(in)    :: dqdt  ! tmr tendency [vmr/s]
+    real(r8), intent(in)    :: dtime ! time step [s]
+
+    tmr = tmr + dqdt * dtime
+
+  end subroutine update_tmr
   !=============================================================================
   subroutine update_tmr_nonzero ( tmr, idx )
     !-----------------------------------------------------------------------
