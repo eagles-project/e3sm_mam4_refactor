@@ -18,6 +18,7 @@ module sox_cldaero_mod
   use phys_control,    only : phys_getopts
   use cldaero_mod,     only : cldaero_uptakerate
   use chem_mods,       only : gas_pcnst
+use spmd_utils,   only : masterproc
 
   implicit none
   private
@@ -238,11 +239,6 @@ contains
 
                 delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
 
-                if (id_nh3>0) then
-                   delnh3 = nh3g(i,k) - xnh3(i,k)
-                   delnh4 = - delnh3
-                endif
-
                 !-------------------------------------------------------------------------
                 ! compute factors for partitioning aerosol mass gains among modes
                 ! the factors are proportional to the activated particle MR for each
@@ -262,7 +258,6 @@ contains
 
                 ! force qnum_c(n) to be positive for n=modeptr_accum or n=1
                 n = modeptr_accum
-                if (n <= 0) n = 1
                 qnum_c(n) = max( small_value_10, qnum_c(n) )
 
                 ! faqgain_so4(n) = fraction of total so4_c gain going to mode n
@@ -283,50 +278,17 @@ contains
                 end if
                 ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
 
-                ! faqgain_msa(n) = fraction of total msa_c gain going to mode n
-                ntot_msa_c = 0
-                sumf = 0.0_r8
-                do n = 1, ntot_amode
-                   faqgain_msa(n) = 0.0_r8
-                   if (lptr_msa_cw_amode(n) > 0) then
-                      faqgain_msa(n) = qnum_c(n)
-                      ntot_msa_c = ntot_msa_c + 1
-                   end if
-                   sumf = sumf + faqgain_msa(n)
-                end do
-
-                if (sumf > 0.0_r8) then
-                   do n = 1, ntot_amode
-                      faqgain_msa(n) = faqgain_msa(n) / sumf
-                   end do
-                end if
-                ! at this point (sumf <= 0.0) only when all the faqgain_msa are zero
-
                 uptkrate = cldaero_uptakerate( xl, cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k) )
                 ! average uptake rate over dtime
                 uptkrate = (1.0_r8 - exp(-min(100._r8,dtime*uptkrate))) / dtime
 
                 ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
-                ! dmsadt_gasuptk = msa_c tendency from msa gas uptake (mol/mol/s)
                 dso4dt_gasuptk = xh2so4(i,k) * uptkrate
-                if (id_msa > 0) then
-                   dmsadt_gasuptk = xmsa(i,k) * uptkrate
-                else
-                   dmsadt_gasuptk = 0.0_r8
-                end if
-
-                ! if no modes have msa aerosol, then "rename" scavenged msa gas to so4
-                dmsadt_gasuptk_toso4 = 0.0_r8
-                dmsadt_gasuptk_tomsa = dmsadt_gasuptk
-                if (ntot_msa_c == 0) then
-                   dmsadt_gasuptk_tomsa = 0.0_r8
-                   dmsadt_gasuptk_toso4 = dmsadt_gasuptk
-                end if
 
                 !-----------------------------------------------------------------------
                 ! now compute TMR tendencies
                 ! this includes the above aqueous so2 chemistry AND
-                ! the uptake of highly soluble aerosol precursor gases (h2so4, msa, ...)
+                ! the uptake of highly soluble aerosol precursor gases (h2so4, ...)
                 ! AND the wetremoval of dissolved, unreacted so2 and h2o2
 
                 dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
@@ -334,41 +296,20 @@ contains
 
                 ! fwetrem = fraction of in-cloud-water material that is wet removed
                 ! fwetrem = max( 0.0_r8, (1.0_r8-exp(-min(100._r8,dtime*clwlrat(i,k)))) )
-                fwetrem = 0.0_r8 ! don't have so4 & msa wet removal here
+                fwetrem = 0.0_r8 ! don't have so4 wet removal here
 
-                ! compute TMR tendencies for so4 and msa aerosol-in-cloud-water
+                ! compute TMR tendencies for so4 aerosol-in-cloud-water
                 do n = 1, ntot_amode
                    l = lptr_so4_cw_amode(n) - loffset
                    if (l > 0) then
                       dqdt_aqso4(i,k,l) = faqgain_so4(n)*dso4dt_aqrxn*cldfrc(i,k)
-                      dqdt_aqh2so4(i,k,l) = faqgain_so4(n)* &
-                           (dso4dt_gasuptk + dmsadt_gasuptk_toso4)*cldfrc(i,k)
+                      dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)!&
                       dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
                       dqdt_wr = -fwetrem*dqdt_aq
                       dqdt= dqdt_aq + dqdt_wr
                       qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
                    end if
 
-                   l = lptr_msa_cw_amode(n) - loffset
-                   if (l > 0) then
-                      dqdt_aq = faqgain_msa(n)*dmsadt_gasuptk_tomsa*cldfrc(i,k)
-                      dqdt_wr = -fwetrem*dqdt_aq
-                      dqdt = dqdt_aq + dqdt_wr
-                      qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
-                   end if
-
-                   l = lptr_nh4_cw_amode(n) - loffset
-                   if (l > 0) then
-                      if (delnh4 > 0.0_r8) then
-                         dqdt_aq = faqgain_so4(n)*delnh4/dtime*cldfrc(i,k)
-                         dqdt = dqdt_aq
-                         qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
-                      else
-                         dqdt = (qcw(i,k,l)/max(xnh4c(i,k),small_value_35)) &
-                              *delnh4/dtime*cldfrc(i,k)
-                         qcw(i,k,l) = qcw(i,k,l) + dqdt*dtime
-                      endif
-                   end if
                 end do
 
                 ! For gas species, tendency includes
@@ -378,9 +319,8 @@ contains
                 ! wet removal of the unreacted gas that is dissolved in cloud water.
                 ! Need to multiply both these parts by cldfrc
 
-                ! h2so4 (g) & msa (g)
+                ! h2so4 (g)
                 qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
-                if (id_msa > 0) qin(i,k,id_msa) = qin(i,k,id_msa) - dmsadt_gasuptk * dtime * cldfrc(i,k)
 
                 ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
                 fwetrem = 0.0_r8 ! don't include so2 wet removal here
@@ -398,13 +338,6 @@ contains
                 dqdt = dqdt_aq + dqdt_wr
                 qin(i,k,id_h2o2) = qin(i,k,id_h2o2) + dqdt * dtime
 
-                ! NH3
-                if (id_nh3>0) then
-                   dqdt_aq = delnh3/dtime*cldfrc(i,k)
-                   dqdt = dqdt_aq
-                   qin(i,k,id_nh3) = qin(i,k,id_nh3) + dqdt * dtime
-                endif
-
                 ! for SO4 from H2O2/O3 budgets
                 dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
                 dqdt_aqo3rxn(i,k) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(i,k)
@@ -419,11 +352,9 @@ contains
     !==============================================================
     do n = 1, ntot_amode
        call update_tmr_nonzero ( qcw, (lptr_so4_cw_amode(n) - loffset) )
-       call update_tmr_nonzero ( qcw, (lptr_msa_cw_amode(n) - loffset) )
        call update_tmr_nonzero ( qcw, (lptr_nh4_cw_amode(n) - loffset) )
     enddo
     call update_tmr_nonzero ( qin, id_so2 )
-    call update_tmr_nonzero ( qin, id_nh3 )
 
 
     ! diagnostics
