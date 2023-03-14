@@ -206,9 +206,8 @@ contains
 
     real(r8) :: uptkrate
 
-    integer :: l, n, m
-
-    integer :: i,k
+    integer :: ll, mm, imode
+    integer :: icol,kk
 
     real(r8), parameter :: small_value_8  = 1.e-8_r8
     real(r8), parameter :: small_value_5  = 1.e-5_r8
@@ -219,9 +218,9 @@ contains
     dqdt_aqhprxn(:,:)   = 0.0_r8
     dqdt_aqo3rxn(:,:)   = 0.0_r8
 
-    lev_loop: do k = 1,pver
-       col_loop: do i = 1,ncol
-          cloud: if ((cldfrc(i,k) >= small_value_5) .and. (xlwc(i,k) >= small_value_8)) then
+    lev_loop: do kk = 1,pver
+       col_loop: do icol = 1,ncol
+          cloud: if ((cldfrc(icol,kk) >= small_value_5) .and. (xlwc(icol,kk) >= small_value_8)) then
 
             !-------------------------------------------------------------------------
             ! compute factors for partitioning aerosol mass gains among modes
@@ -230,17 +229,18 @@ contains
             ! thus we are assuming the cloud drop size is independent of the
             ! associated aerosol mode properties (i.e., drops associated with
             ! Aitken and coarse sea-salt particles are same size)
-            call  compute_aer_factor(qcw(i,k,:), loffset, faqgain_so4)
+            call  compute_aer_factor(qcw(icol,kk,:), loffset, faqgain_so4)
 
-            uptkrate = cldaero_uptakerate(xlwc(i,k), cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k))
+            uptkrate = cldaero_uptakerate(xlwc(icol,kk), cldnum(icol,kk), &
+                        cfact(icol,kk), cldfrc(icol,kk), tfld(icol,kk),  press(icol,kk))
             ! average uptake rate over dtime
             uptkrate = (1.0_r8 - exp(-min(100._r8,dtime*uptkrate))) / dtime
             ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
-            dso4dt_gasuptk = xh2so4(i,k) * uptkrate
+            dso4dt_gasuptk = xh2so4(icol,kk) * uptkrate
 
-            delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
-            dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
-            dso4dt_hprxn = delso4_hprxn(i,k) / dtime
+            delso4_o3rxn = xso4(icol,kk) - xso4_init(icol,kk)
+            dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(icol,kk)) / dtime
+            dso4dt_hprxn = delso4_hprxn(icol,kk) / dtime
 
             !-----------------------------------------------------------------------
             ! now compute TMR tendencies
@@ -249,14 +249,14 @@ contains
             ! The wetremoval of dissolved, unreacted so2 and h2o2 are assumed as zero
 
             ! compute TMR tendencies for so4 aerosol-in-cloud-water
-            do n = 1, ntot_amode
-               l = lptr_so4_cw_amode(n) - loffset
-               if (l > 0) then
-                  dqdt_aqso4(i,k,l) = faqgain_so4(n)*dso4dt_aqrxn*cldfrc(i,k)
-                  dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)
-                  dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
+            do imode = 1, ntot_amode
+               ll = lptr_so4_cw_amode(imode) - loffset
+               if (ll > 0) then
+                  dqdt_aqso4(icol,kk,ll) = faqgain_so4(imode)*dso4dt_aqrxn*cldfrc(icol,kk)
+                  dqdt_aqh2so4(icol,kk,ll) = faqgain_so4(imode)*dso4dt_gasuptk*cldfrc(icol,kk)
+                  dqdt_aq = dqdt_aqso4(icol,kk,ll) + dqdt_aqh2so4(icol,kk,ll)
                   dqdt_wr =  0.0_r8 ! don't have wet removal here
-                  call update_tmr ( qcw(i,k,l), dqdt_aq + dqdt_wr, dtime )
+                  call update_tmr ( qcw(icol,kk,ll), dqdt_aq + dqdt_wr, dtime )
                endif
             enddo
 
@@ -266,23 +266,23 @@ contains
             ! Currently it assumes no wet removal here
 
             ! h2so4 (g)         
-            qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
+            qin(icol,kk,id_h2so4) = qin(icol,kk,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(icol,kk)
 ! FORTRAN refactor: The order of multiplying cldfrc makes the following call
 ! failing BFB test, so this calculation is not refactored with new subroutine
 
             ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
             dqdt_wr =  0.0_r8 ! don't have wet removal here
-            dqdt_aq = -dso4dt_aqrxn*cldfrc(i,k)
-            call update_tmr ( qin(i,k,id_so2), dqdt_aq + dqdt_wr, dtime )
+            dqdt_aq = -dso4dt_aqrxn*cldfrc(icol,kk)
+            call update_tmr ( qin(icol,kk,id_so2), dqdt_aq + dqdt_wr, dtime )
 
             ! h2o2 -- the first order loss rate for h2o2 is frh2o2_c*clwlrat(i,k)
             dqdt_wr =  0.0_r8 ! don't have wet removal here
-            dqdt_aq = -dso4dt_hprxn*cldfrc(i,k)
-            call update_tmr ( qin(i,k,id_h2o2), dqdt_aq + dqdt_wr, dtime )
+            dqdt_aq = -dso4dt_hprxn*cldfrc(icol,kk)
+            call update_tmr ( qin(icol,kk,id_h2o2), dqdt_aq + dqdt_wr, dtime )
 
             ! for SO4 from H2O2/O3 budgets
-            dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
-            dqdt_aqo3rxn(i,k) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(i,k)
+            dqdt_aqhprxn(icol,kk) = dso4dt_hprxn*cldfrc(icol,kk)
+            dqdt_aqo3rxn(icol,kk) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(icol,kk)
 
           endif cloud
        enddo col_loop
@@ -291,24 +291,24 @@ contains
     !==============================================================
     ! ... Update the mixing ratios
     !==============================================================
-    do n = 1, ntot_amode
-       call update_tmr_nonzero ( qcw, (lptr_so4_cw_amode(n) - loffset) )
-       call update_tmr_nonzero ( qcw, (lptr_nh4_cw_amode(n) - loffset) )
+    do imode = 1, ntot_amode
+       call update_tmr_nonzero ( qcw, (lptr_so4_cw_amode(imode) - loffset) )
+       call update_tmr_nonzero ( qcw, (lptr_nh4_cw_amode(imode) - loffset) )
     enddo
     call update_tmr_nonzero ( qin, id_so2 )
 
 
     ! diagnostics
 
-    do n = 1, ntot_amode
-       m = lptr_so4_cw_amode(n)
-       l = m - loffset
-       if (l > 0) then
-          call calc_sfc_flux( dqdt_aqso4(:,:,l)*adv_mass(l)/mbar, pdel, sflx)
-          call outfld( trim(cnst_name_cw(m))//'AQSO4', sflx(:ncol), ncol, lchnk)
+    do imode = 1, ntot_amode
+       mm = lptr_so4_cw_amode(imode)
+       ll = mm - loffset
+       if (ll > 0) then
+          call calc_sfc_flux( dqdt_aqso4(:,:,ll)*adv_mass(ll)/mbar, pdel, sflx)
+          call outfld( trim(cnst_name_cw(mm))//'AQSO4', sflx(:ncol), ncol, lchnk)
 
-          call calc_sfc_flux( dqdt_aqh2so4(:,:,l)*adv_mass(l)/mbar, pdel, sflx)
-          call outfld( trim(cnst_name_cw(m))//'AQH2SO4', sflx(:ncol), ncol, lchnk)
+          call calc_sfc_flux( dqdt_aqh2so4(:,:,ll)*adv_mass(ll)/mbar, pdel, sflx)
+          call outfld( trim(cnst_name_cw(mm))//'AQH2SO4', sflx(:ncol), ncol, lchnk)
        endif
     enddo
 
