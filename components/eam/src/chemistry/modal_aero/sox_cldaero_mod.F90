@@ -187,27 +187,26 @@ contains
 
     ! local vars ...
 
-    real(r8) :: dqdt_aqso4(ncol,pver,gas_pcnst)
-    real(r8) :: dqdt_aqh2so4(ncol,pver,gas_pcnst)
-    real(r8) :: dqdt_aqhprxn(ncol,pver)
-    real(r8) :: dqdt_aqo3rxn(ncol,pver)
-    real(r8) :: sflx(1:ncol)
+    ! FORTRAN refactor note: aqueous chemistry (aq) here reprent two processes:
+    !       S(IV) + H2O2 = S(VI)
+    !       S(IV) + O3   = S(VI)
+    ! see the parent subroutine in mo_setsox for reference
+    real(r8) :: delso4_o3rxn    ! change of so4 due to O3 chemistry [mol/mol]
+    real(r8) :: dso4dt_aqrxn    ! so4_c tendency from aqueous chemistry [mol/mol/s]
+    real(r8) :: dso4dt_hprxn    ! so4_c tendency from H2O2 chemistry [mol/mol/s]
+    real(r8) :: dso4dt_gasuptk  ! so4_c tendency from h2so4 gas uptake [mol/mol/s]
+    real(r8) :: dqdt_aq         ! dqdt due to aqueous chemistry [mol/mol/s]
+    real(r8) :: dqdt_wr         ! dqdt due to wet removal, currently set as zero [mol/mol/s]
+    real(r8) :: dqdt_aqso4(ncol,pver,gas_pcnst)    ! dqdt due to so4 aqueous chemistry [mol/mol/s]
+    real(r8) :: dqdt_aqh2so4(ncol,pver,gas_pcnst)  ! dqdt due to h2so4 uptake [mol/mol/s]
+    real(r8) :: dqdt_aqhprxn(ncol,pver)         ! dqdt due to H2O2 chemistry [mol/mol/s]
+    real(r8) :: dqdt_aqo3rxn(ncol,pver)         ! dqdt due to O3 chemistry [mol/mol/s]
+    real(r8) :: sflx(ncol)      ! integrated surface fluxes [kg/m2/s]
+    real(r8) :: faqgain_so4(ntot_amode) ! factor of TMR among modes [fraction]
+    real(r8) :: uptkrate        ! uptake rate [1/s]
 
-    real(r8) :: faqgain_msa(ntot_amode)
-    real(r8) :: faqgain_so4(ntot_amode)
-    real(r8) :: qnum_c(ntot_amode)
-
-    real(r8) :: delso4_o3rxn
-    real(r8) :: dso4dt_aqrxn
-    real(r8) :: dso4dt_hprxn
-    real(r8) :: dso4dt_gasuptk
-    real(r8) :: dqdt_aq
-    real(r8) :: dqdt_wr
-
-    real(r8) :: uptkrate
-
-    integer :: ll, mm, imode
-    integer :: icol,kk
+    integer :: ll, mm, imode    ! aerosol mode index
+    integer :: icol,kk          ! column and level index
 
     real(r8), parameter :: small_value_8  = 1.e-8_r8
     real(r8), parameter :: small_value_5  = 1.e-5_r8
