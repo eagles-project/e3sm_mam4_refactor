@@ -18,8 +18,8 @@
   integer,save :: n_calls=0   ! some subroutines are called multiple times in one timestep, record the number of calls
 
   !populate YAML structure
-  yaml%lev_print = 44 !level (**remove these if generating data for a dependent subroutines**)
-  yaml%nstep_print = 1410 !time step(**remove these if generating data for a dependent subroutines**)
+  yaml%lev_print = 64 !level (**remove these if generating data for a dependent subroutines**)
+  yaml%nstep_print = 1402 !time step(**remove these if generating data for a dependent subroutines**)
 
   ! set ext_str if there are multiple sets of yaml output to be write out
   ! here gives an example that "flag" in the code can be 0, 1, or 2:
@@ -76,6 +76,7 @@
         call write_1d_var(unit_input, unit_output, 'lptr_mom_a_amode', ntot_amode, lptr_mom_a_amode(:))
         call write_var(unit_input, unit_output, 'so4_sz_thresh_icenuc', so4_sz_thresh_icenuc)
         call write_var(unit_input, unit_output, 'mincld', mincld)
+        call write_var(unit_input, unit_output, 'nucleate_ice_subgrid', nucleate_ice_subgrid)
 
         call write_var(unit_input, unit_output,'ncol',ncol)
         call write_var(unit_input, unit_output,'lchnk',lchnk)

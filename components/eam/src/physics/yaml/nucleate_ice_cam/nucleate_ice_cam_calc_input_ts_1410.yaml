@@ -18,6 +18,7 @@ input:
     lptr_mom_a_amode: [        22,        27,        35,        39]
     so4_sz_thresh_icenuc: [ 0.8000000000E-07]
     mincld: [ 0.1000000000E-03]
+    nucleate_ice_subgrid: [ 0.1200000000E+01]
     ncol: [         4]
     lchnk: [       114]
     temperature: [ 0.2373950401E+03]
