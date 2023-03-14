@@ -166,7 +166,7 @@ contains
     real(r8), intent(in) :: cldnum(:,:) ! droplet number concentration [#/kg]
     real(r8), intent(in) :: cldfrc(:,:) ! cloud fraction [fraction]
     real(r8), intent(in) :: cfact(:,:)  ! total atms density [kg/L]
-    real(r8), intent(in) :: xlwc(:,:)
+    real(r8), intent(in) :: xlwc(:,:)   ! liquid water volume [cm^3/cm^3]
 
     real(r8), intent(in) :: delso4_hprxn(:,:)
     real(r8), intent(in) :: xh2so4(:,:)
@@ -217,7 +217,6 @@ contains
     integer :: ntot_msa_c
 
     integer :: i,k
-    real(r8) :: xl      ! liquid water volume [cm^3/cm^3]
 
     real(r8), parameter :: small_value_35 = 1.e-35_r8
     real(r8), parameter :: small_value_10 = 1.e-10_r8
@@ -225,81 +224,76 @@ contains
     real(r8), parameter :: small_value_5  = 1.e-5_r8
 
     ! make sure dqdt is zero initially, for budgets
-    dqdt_aqso4(:,:,:) = 0.0_r8
+    dqdt_aqso4(:,:,:)   = 0.0_r8
     dqdt_aqh2so4(:,:,:) = 0.0_r8
-    dqdt_aqhprxn(:,:) = 0.0_r8
-    dqdt_aqo3rxn(:,:) = 0.0_r8
+    dqdt_aqhprxn(:,:)   = 0.0_r8
+    dqdt_aqo3rxn(:,:)   = 0.0_r8
 
     lev_loop: do k = 1,pver
        col_loop: do i = 1,ncol
-          cloud: if (cldfrc(i,k) >= small_value_5) then
-             xl = xlwc(i,k) ! / cldfrc(i,k)
+          cloud: if ((cldfrc(i,k) >= small_value_5) .and. (xlwc(i,k) >= small_value_8)) then
 
-             IF (XL .ge. small_value_8) THEN !! WHEN CLOUD IS PRESENTED
+            !-------------------------------------------------------------------------
+            ! compute factors for partitioning aerosol mass gains among modes
+            ! the factors are proportional to the activated particle MR for each
+            ! mode, which is the MR of cloud drops "associated with" the mode
+            ! thus we are assuming the cloud drop size is independent of the
+            ! associated aerosol mode properties (i.e., drops associated with
+            ! Aitken and coarse sea-salt particles are same size)
+            call  compute_aer_factor(qcw(i,k,:), loffset, faqgain_so4)
 
-                !-------------------------------------------------------------------------
-                ! compute factors for partitioning aerosol mass gains among modes
-                ! the factors are proportional to the activated particle MR for each
-                ! mode, which is the MR of cloud drops "associated with" the mode
-                ! thus we are assuming the cloud drop size is independent of the
-                ! associated aerosol mode properties (i.e., drops associated with
-                ! Aitken and coarse sea-salt particles are same size)
-                call  compute_aer_factor(qcw(i,k,:), loffset, faqgain_so4)
+            uptkrate = cldaero_uptakerate(xlwc(i,k), cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k))
+            ! average uptake rate over dtime
+            uptkrate = (1.0_r8 - exp(-min(100._r8,dtime*uptkrate))) / dtime
+            ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
+            dso4dt_gasuptk = xh2so4(i,k) * uptkrate
 
-                uptkrate = cldaero_uptakerate( xl, cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k) )
-                ! average uptake rate over dtime
-                uptkrate = (1.0_r8 - exp(-min(100._r8,dtime*uptkrate))) / dtime
-                ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
-                dso4dt_gasuptk = xh2so4(i,k) * uptkrate
+            delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
+            dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
+            dso4dt_hprxn = delso4_hprxn(i,k) / dtime
 
-                delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
-                dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
-                dso4dt_hprxn = delso4_hprxn(i,k) / dtime
+            !-----------------------------------------------------------------------
+            ! now compute TMR tendencies
+            ! this includes the above aqueous so2 chemistry AND
+            ! the uptake of highly soluble aerosol precursor gases (h2so4, ...)
+            ! The wetremoval of dissolved, unreacted so2 and h2o2 are assumed as zero
 
-                !-----------------------------------------------------------------------
-                ! now compute TMR tendencies
-                ! this includes the above aqueous so2 chemistry AND
-                ! the uptake of highly soluble aerosol precursor gases (h2so4, ...)
-                ! The wetremoval of dissolved, unreacted so2 and h2o2 are assumed as zero
+            ! compute TMR tendencies for so4 aerosol-in-cloud-water
+            do n = 1, ntot_amode
+               l = lptr_so4_cw_amode(n) - loffset
+               if (l > 0) then
+                  dqdt_aqso4(i,k,l) = faqgain_so4(n)*dso4dt_aqrxn*cldfrc(i,k)
+                  dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)
+                  dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
+                  dqdt_wr =  0.0_r8 ! don't have wet removal here
+                  call update_tmr ( qcw(i,k,l), dqdt_aq + dqdt_wr, dtime )
+               endif
+            enddo
 
-                ! compute TMR tendencies for so4 aerosol-in-cloud-water
-                do n = 1, ntot_amode
-                   l = lptr_so4_cw_amode(n) - loffset
-                   if (l > 0) then
-                      dqdt_aqso4(i,k,l) = faqgain_so4(n)*dso4dt_aqrxn*cldfrc(i,k)
-                      dqdt_aqh2so4(i,k,l) = faqgain_so4(n)*dso4dt_gasuptk*cldfrc(i,k)
-                      dqdt_aq = dqdt_aqso4(i,k,l) + dqdt_aqh2so4(i,k,l)
-                      dqdt_wr =  0.0_r8 ! don't have wet removal here
-                      call update_tmr ( qcw(i,k,l), dqdt_aq + dqdt_wr, dtime )
-                   endif
-                enddo
+            ! For gas species, tendency includes reactive uptake to cloud water
+            ! that essentially transforms the gas to a different species.
+            ! Need to multiply both these parts by cldfrc
+            ! Currently it assumes no wet removal here
 
-                ! For gas species, tendency includes reactive uptake to cloud water
-                ! that essentially transforms the gas to a different species.
-                ! Need to multiply both these parts by cldfrc
-                ! Currently it assumes no wet removal here
-
-                ! h2so4 (g)         
-                qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
+            ! h2so4 (g)         
+            qin(i,k,id_h2so4) = qin(i,k,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(i,k)
 ! FORTRAN refactor: The order of multiplying cldfrc makes the following call
 ! failing BFB test, so this calculation is not refactored with new subroutine
-                ! call update_tmr ( qin(i,k,id_h2so4), dso4dt_gasuptk*cldfrc(i,k), dtime )
 
-                ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
-                dqdt_wr =  0.0_r8 ! don't have wet removal here
-                dqdt_aq = -dso4dt_aqrxn*cldfrc(i,k)
-                call update_tmr ( qin(i,k,id_so2), dqdt_aq + dqdt_wr, dtime )
+            ! so2 -- the first order loss rate for so2 is frso2_c*clwlrat(i,k)
+            dqdt_wr =  0.0_r8 ! don't have wet removal here
+            dqdt_aq = -dso4dt_aqrxn*cldfrc(i,k)
+            call update_tmr ( qin(i,k,id_so2), dqdt_aq + dqdt_wr, dtime )
 
-                ! h2o2 -- the first order loss rate for h2o2 is frh2o2_c*clwlrat(i,k)
-                dqdt_wr =  0.0_r8 ! don't have wet removal here
-                dqdt_aq = -dso4dt_hprxn*cldfrc(i,k)
-                call update_tmr ( qin(i,k,id_h2o2), dqdt_aq + dqdt_wr, dtime )
+            ! h2o2 -- the first order loss rate for h2o2 is frh2o2_c*clwlrat(i,k)
+            dqdt_wr =  0.0_r8 ! don't have wet removal here
+            dqdt_aq = -dso4dt_hprxn*cldfrc(i,k)
+            call update_tmr ( qin(i,k,id_h2o2), dqdt_aq + dqdt_wr, dtime )
 
-                ! for SO4 from H2O2/O3 budgets
-                dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
-                dqdt_aqo3rxn(i,k) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(i,k)
+            ! for SO4 from H2O2/O3 budgets
+            dqdt_aqhprxn(i,k) = dso4dt_hprxn*cldfrc(i,k)
+            dqdt_aqo3rxn(i,k) = (dso4dt_aqrxn - dso4dt_hprxn)*cldfrc(i,k)
 
-             endif !! WHEN CLOUD IS PRESENTED
           endif cloud
        enddo col_loop
     enddo lev_loop
