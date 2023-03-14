@@ -237,8 +237,6 @@ contains
 
              IF (XL .ge. small_value_8) THEN !! WHEN CLOUD IS PRESENTED
 
-                delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
-
                 !-------------------------------------------------------------------------
                 ! compute factors for partitioning aerosol mass gains among modes
                 ! the factors are proportional to the activated particle MR for each
@@ -246,36 +244,7 @@ contains
                 ! thus we are assuming the cloud drop size is independent of the
                 ! associated aerosol mode properties (i.e., drops associated with
                 ! Aitken and coarse sea-salt particles are same size)
-                !
-                ! qnum_c(n) = activated particle number MR for mode n (these are just
-                ! used for partitioning among modes, so don't need to divide by cldfrc)
-
-                do n = 1, ntot_amode
-                   qnum_c(n) = 0.0_r8
-                   l = numptrcw_amode(n) - loffset
-                   if (l > 0) qnum_c(n) = max( 0.0_r8, qcw(i,k,l) )
-                end do
-
-                ! force qnum_c(n) to be positive for n=modeptr_accum or n=1
-                n = modeptr_accum
-                qnum_c(n) = max( small_value_10, qnum_c(n) )
-
-                ! faqgain_so4(n) = fraction of total so4_c gain going to mode n
-                ! these are proportional to the activated particle MR for each mode
-                sumf = 0.0_r8
-                do n = 1, ntot_amode
-                   faqgain_so4(n) = 0.0_r8
-                   if (lptr_so4_cw_amode(n) > 0) then
-                      faqgain_so4(n) = qnum_c(n)
-                      sumf = sumf + faqgain_so4(n)
-                   end if
-                end do
-                ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
-                if (sumf > 0.0_r8) then
-                   do n = 1, ntot_amode
-                      faqgain_so4(n) = faqgain_so4(n) / sumf
-                   end do
-                end if
+                call  compute_aer_factor(qcw(i,k,:), loffset, faqgain_so4)
 
                 uptkrate = cldaero_uptakerate( xl, cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k) )
                 ! average uptake rate over dtime
@@ -283,6 +252,7 @@ contains
                 ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
                 dso4dt_gasuptk = xh2so4(i,k) * uptkrate
 
+                delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
                 dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
                 dso4dt_hprxn = delso4_hprxn(i,k) / dtime
 
@@ -365,6 +335,55 @@ contains
     call outfld( 'AQSO4_O3', sflx(:ncol), ncol, lchnk)
 
   end subroutine sox_cldaero_update
+
+  !=============================================================================
+  subroutine compute_aer_factor(tmr, loffset, faqgain_so4)
+    !-------------------------------------------------------------------------
+    ! compute factors for partitioning aerosol mass gains among modes
+    ! the factors are proportional to the activated particle MR for each
+    ! mode, which is the MR of cloud drops "associated with" the mode
+    ! thus we are assuming the cloud drop size is independent of the
+    ! associated aerosol mode properties (i.e., drops associated with
+    ! Aitken and coarse sea-salt particles are same size)
+    ! qnum_c(n) = activated particle number MR for mode n (these are just
+    ! used for partitioning among modes, so don't need to divide by cldfrc)
+    !-------------------------------------------------------------------------
+    real(r8), intent(in) :: tmr(:)   ! tracer mixing ratio [vmr]
+    integer,  intent(in) :: loffset  ! # of tracers in the host model that are not part of MAM
+    real(r8), intent(out) :: faqgain_so4(ntot_amode)   ! factor of TMR among modes [fraction]
+
+    ! local variables
+    integer  :: imode, ll               ! index
+    real(r8) :: sumf                    ! total TMR for all modes [vmr]
+    real(r8) :: qnum_c(ntot_amode)      ! tracer mixing ratio [vmr]
+    real(r8), parameter :: small_value_10 = 1.e-10_r8
+
+    !-------------------------------------------------------------------------
+    sumf  = 0.0_r8
+    qnum_c(:)  = 0.0_r8
+    faqgain_so4(:) = 0.0_r8
+
+    do imode = 1, ntot_amode
+
+       ll = numptrcw_amode(imode) - loffset
+       if (ll > 0) qnum_c(imode) = max( 0.0_r8, tmr(ll) )
+
+       ! force qnum_c(n) to be positive for n=modeptr_accum or n=1
+       if (imode == modeptr_accum) qnum_c(imode) = max(small_value_10, qnum_c(imode))
+
+       ! faqgain_so4(n) = fraction of total so4_c gain going to mode n
+       ! these are proportional to the activated particle MR for each mode
+       if (lptr_so4_cw_amode(imode) > 0) then
+          faqgain_so4(imode) = qnum_c(imode)
+          sumf = sumf + faqgain_so4(imode)
+       endif
+
+    enddo
+
+    ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
+    if (sumf > 0.0_r8) faqgain_so4(:) = faqgain_so4(:)/sumf
+
+  end subroutine compute_aer_factor
 
   !=============================================================================
   subroutine update_tmr ( tmr, dqdt, dtime )
