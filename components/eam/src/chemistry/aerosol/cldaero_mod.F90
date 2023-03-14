@@ -110,25 +110,32 @@ contains
     real(r8) :: fuchs_sutugin   ! another dimensionless number
     real(r8) :: volx34pi_cd     ! droplet volume * 3/4*pi [cm^3/cm^3]
 
-    real(r8),parameter :: one_third = 0.3333333_r8
+    real(r8),parameter :: one_third = 0.3333333_r8      ! 1/3
+    real(r8),parameter :: three_forth = 0.75_r8         ! 3/4
+    real(r8),parameter :: cm3_to_L = 1.0e-3_r8          ! conversion factor from cm^3 to L (or from 1/L to 1/cm^3)
+    ! artificial thresholds that assumes (radxnum_cd/volx34pi_cd < min)
+    ! and (radxnum_cd/volx34pi_cd > max) as unphysical
+    real(r8),parameter :: min_factor_volx34pi_radxnum = 4.0e4_r8
+    real(r8),parameter :: max_factor_volx34pi_radxnum = 4.0e8_r8
+
 
 ! change drop number conc from #/kg to #/cm^3
-        num_cd = 1.0e-3_r8*cldnum*cfact/cldfrc
+        num_cd = cm3_to_L*cldnum*cfact/cldfrc
         num_cd = max( num_cd, 0.0_r8 )
 
 ! volx34pi_cd = (3/4*pi) * (liquid water volume in cm^3/cm^3)
-        volx34pi_cd = xl*0.75_r8/pi
+        volx34pi_cd = xl*three_forth/pi
 ! radxnum_cd = (drop radius)*(drop number conc)
 ! following holds because volx34pi_cd = num_cd*(rad_cd**3)
         radxnum_cd = (volx34pi_cd*num_cd*num_cd)**one_third
 
 ! rad_cd = (drop radius in cm), computed from liquid water and drop number,
 ! then bounded by 0.5 and 50.0 micrometers to avoid the occasional unphysical value
-        if (radxnum_cd <= volx34pi_cd*4.0e4_r8) then
-            radxnum_cd = volx34pi_cd*4.0e4_r8
+        if (radxnum_cd <= volx34pi_cd*min_factor_volx34pi_radxnum) then
+            radxnum_cd = volx34pi_cd*min_factor_volx34pi_radxnum
             rad_cd = 50.0e-4_r8
-        elseif (radxnum_cd >= volx34pi_cd*4.0e8_r8) then
-            radxnum_cd = volx34pi_cd*4.0e8_r8
+        elseif (radxnum_cd >= volx34pi_cd*max_factor_volx34pi_radxnum) then
+            radxnum_cd = volx34pi_cd*max_factor_volx34pi_radxnum
             rad_cd = 0.5e-4_r8
         else
             rad_cd = radxnum_cd/num_cd
