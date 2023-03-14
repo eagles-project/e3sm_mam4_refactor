@@ -218,8 +218,6 @@ contains
 
     integer :: i,k
 
-    real(r8), parameter :: small_value_35 = 1.e-35_r8
-    real(r8), parameter :: small_value_10 = 1.e-10_r8
     real(r8), parameter :: small_value_8  = 1.e-8_r8
     real(r8), parameter :: small_value_5  = 1.e-5_r8
 
