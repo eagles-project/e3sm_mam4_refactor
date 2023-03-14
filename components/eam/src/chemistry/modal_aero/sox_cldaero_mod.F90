@@ -270,29 +270,27 @@ contains
                       sumf = sumf + faqgain_so4(n)
                    end if
                 end do
-
+                ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
                 if (sumf > 0.0_r8) then
                    do n = 1, ntot_amode
                       faqgain_so4(n) = faqgain_so4(n) / sumf
                    end do
                 end if
-                ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
 
                 uptkrate = cldaero_uptakerate( xl, cldnum(i,k), cfact(i,k), cldfrc(i,k), tfld(i,k),  press(i,k) )
                 ! average uptake rate over dtime
                 uptkrate = (1.0_r8 - exp(-min(100._r8,dtime*uptkrate))) / dtime
-
                 ! dso4dt_gasuptk = so4_c tendency from h2so4 gas uptake (mol/mol/s)
                 dso4dt_gasuptk = xh2so4(i,k) * uptkrate
+
+                dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
+                dso4dt_hprxn = delso4_hprxn(i,k) / dtime
 
                 !-----------------------------------------------------------------------
                 ! now compute TMR tendencies
                 ! this includes the above aqueous so2 chemistry AND
                 ! the uptake of highly soluble aerosol precursor gases (h2so4, ...)
                 ! The wetremoval of dissolved, unreacted so2 and h2o2 are assumed as zero
-
-                dso4dt_aqrxn = (delso4_o3rxn + delso4_hprxn(i,k)) / dtime
-                dso4dt_hprxn = delso4_hprxn(i,k) / dtime
 
                 ! compute TMR tendencies for so4 aerosol-in-cloud-water
                 do n = 1, ntot_amode
