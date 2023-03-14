@@ -111,7 +111,7 @@ contains
 
     namelist /aerosol_nl/ aer_wetdep_list, aer_drydep_list, sol_facti_cloud_borne, seasalt_emis_scale,&
        sscav_tuning,sol_factb_interstitial, sol_factic_interstitial
-    ! FIXME: many of these namelists are not used, can be cleaned up.
+    ! FIXME: namelists sscav_tuning,sol_factb_interstitial, sol_factic_interstitial are not used, can be cleaned up.
     !-----------------------------------------------------------------------------
 
     ! Read namelist
