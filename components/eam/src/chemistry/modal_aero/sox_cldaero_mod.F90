@@ -145,21 +145,19 @@ contains
   subroutine sox_cldaero_update( ncol, lchnk, loffset,  & ! in
                 dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, & ! in
                 delso4_hprxn, xh2so4, xso4, xso4_init, & ! in
-                nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, & ! in
                 qcw, qin ) ! inout
 !----------------------------------------------------------------------------------
 ! Update the mixing ratios
 !----------------------------------------------------------------------------------
-    ! args 
-
+   
+    ! args
     integer,  intent(in) :: ncol
-    integer,  intent(in) :: lchnk ! chunk id
+    integer,  intent(in) :: lchnk       ! chunk id
     integer,  intent(in) :: loffset     ! # of tracers in the host model that are not part of MAM
-
-    real(r8), intent(in) :: dtime ! time step [sec]
+    real(r8), intent(in) :: dtime       ! time step [sec]
 
     real(r8), intent(in) :: mbar(:,:)   ! mean wet atmospheric mass [amu or g/mol]
-    real(r8), intent(in) :: pdel(:,:)   ! 
+    real(r8), intent(in) :: pdel(:,:)   ! pressure interval [Pa] 
     real(r8), intent(in) :: press(:,:)  ! pressure [Pa]
     real(r8), intent(in) :: tfld(:,:)   ! temperature [K]
 
@@ -168,19 +166,10 @@ contains
     real(r8), intent(in) :: cfact(:,:)  ! total atms density [kg/L]
     real(r8), intent(in) :: xlwc(:,:)   ! liquid water volume [cm^3/cm^3]
 
-    real(r8), intent(in) :: delso4_hprxn(:,:)
-    real(r8), intent(in) :: xh2so4(:,:)
-    real(r8), intent(in) :: xso4(:,:)
-    real(r8), intent(in) :: xso4_init(:,:)
-    real(r8), intent(in) :: nh3g(:,:)
-    real(r8), intent(in) :: hno3g(:,:)
-    real(r8), intent(in) :: xnh3(:,:)
-    real(r8), intent(in) :: xhno3(:,:)
-    real(r8), intent(in) :: xnh4c(:,:)
-    real(r8), intent(in) :: xmsa(:,:)
-    real(r8), intent(in) :: xso2(:,:)
-    real(r8), intent(in) :: xh2o2(:,:)
-    real(r8), intent(in) :: xno3c(:,:)
+    real(r8), intent(in) :: delso4_hprxn(:,:)   ! change of so4 due to H2O2 chemistry [mol/mol]
+    real(r8), intent(in) :: xh2so4(:,:)         ! H2SO4 mass mixing ratio [mol/mol]
+    real(r8), intent(in) :: xso4(:,:)           ! final SO4 mass mixing ratio [mol/mol]
+    real(r8), intent(in) :: xso4_init(:,:)      ! initial SO4 mass mixing ratio [mol/mol]
 
     real(r8), intent(inout) :: qcw(:,:,:) ! cloud-borne aerosol [vmr]
     real(r8), intent(inout) :: qin(:,:,:) ! xported species [vmr]

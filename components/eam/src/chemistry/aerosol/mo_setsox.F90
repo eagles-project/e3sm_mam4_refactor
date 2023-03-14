@@ -859,8 +859,10 @@ contains
     end do ver_loop1
 
     call sox_cldaero_update( &
-         ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, cldconc%xlwc, &
-         xdelso4hp, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin )
+         ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, & ! in
+         cldnum, cldfrc, cfact, cldconc%xlwc, & ! in
+         xdelso4hp, xh2so4, xso4, xso4_init,  & ! in
+         qcw, qin  ) ! inout
     
     xphlwc(:,:) = 0._r8
     do k = 1, pver
