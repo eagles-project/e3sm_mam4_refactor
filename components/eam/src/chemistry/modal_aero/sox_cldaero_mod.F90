@@ -201,20 +201,12 @@ contains
     real(r8) :: dso4dt_aqrxn
     real(r8) :: dso4dt_hprxn
     real(r8) :: dso4dt_gasuptk
-    real(r8) :: dmsadt_gasuptk
-    real(r8) :: dmsadt_gasuptk_tomsa
-    real(r8) :: dmsadt_gasuptk_toso4
     real(r8) :: dqdt_aq
     real(r8) :: dqdt_wr
-    real(r8) :: dqdt
 
-    real(r8) :: fwetrem
-    real(r8) :: sumf
     real(r8) :: uptkrate
-    real(r8) :: delnh3, delnh4
 
     integer :: l, n, m
-    integer :: ntot_msa_c
 
     integer :: i,k
 
