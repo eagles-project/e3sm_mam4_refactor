@@ -112,6 +112,7 @@ contains
 
     real(r8),parameter :: one_third = 0.3333333_r8      ! 1/3
     real(r8),parameter :: three_forth = 0.75_r8         ! 3/4
+    real(r8),parameter :: pi4 = 12.56637_r8             ! pi*4
     real(r8),parameter :: cm3_to_L = 1.0e-3_r8          ! conversion factor from cm^3 to L (or from 1/L to 1/cm^3)
     ! artificial thresholds that assumes (radxnum_cd/volx34pi_cd < min)
     ! and (radxnum_cd/volx34pi_cd > max) as unphysical
@@ -159,7 +160,7 @@ contains
                         (knudsen*(1.184_r8 + knudsen) + 0.4875_r8)
 
 ! instantaneous uptake rate
-        uptkrate = 12.56637_r8*radxnum_cd*gasdiffus*fuchs_sutugin
+        uptkrate = pi4*radxnum_cd*gasdiffus*fuchs_sutugin
 
   end function cldaero_uptakerate
 !==================================================================================
