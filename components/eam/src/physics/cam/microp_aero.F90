@@ -40,7 +40,7 @@ use nucleate_ice_cam, only: use_preexisting_ice, nucleate_ice_cam_readnl, nuclea
 use ndrop,            only: ndrop_init, dropmixnuc
 use ndrop_bam,        only: ndrop_bam_init, ndrop_bam_run, ndrop_bam_ccn
 
-use hetfrz_classnuc_cam, only: hetfrz_classnuc_cam_readnl, hetfrz_classnuc_cam_register, hetfrz_classnuc_cam_init, &
+use hetfrz_classnuc_cam, only: hetfrz_classnuc_cam_readnl,  hetfrz_classnuc_cam_init, &
                                hetfrz_classnuc_cam_save_cbaero, hetfrz_classnuc_cam_calc
 
 use cam_history,      only: addfld, add_default, outfld
@@ -96,6 +96,11 @@ integer :: dgnum_idx = -1
 
 integer :: naai_idx
 integer :: naai_hom_idx
+
+! pbuf indices for fields provided by heterogeneous freezing
+integer :: frzimm_idx
+integer :: frzcnt_idx
+integer :: frzdep_idx
 
 ! Bulk aerosols
 character(len=20), allocatable :: aername(:)
@@ -153,7 +158,10 @@ subroutine microp_aero_register
    call pbuf_add_field('NAAI',     'physpkg', dtype_r8, (/pcols,pver/), naai_idx)
    call pbuf_add_field('NAAI_HOM', 'physpkg', dtype_r8, (/pcols,pver/), naai_hom_idx)   
  
-   call hetfrz_classnuc_cam_register()
+   ! pbuf fields provided by hetfrz_classnuc
+   call pbuf_add_field('FRZIMM', 'physpkg', dtype_r8, (/pcols,pver/), frzimm_idx)
+   call pbuf_add_field('FRZCNT', 'physpkg', dtype_r8, (/pcols,pver/), frzcnt_idx)
+   call pbuf_add_field('FRZDEP', 'physpkg', dtype_r8, (/pcols,pver/), frzdep_idx)
 
 end subroutine microp_aero_register
 
@@ -383,9 +391,8 @@ subroutine microp_aero_run ( &
    integer :: icol, kk, m
    integer :: itim_old
    integer :: nmodes 
- 
-   real(r8), pointer :: state_q(:,:,:)
-   real(r8), pointer :: temperature(:,:)
+
+   ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
    real(r8), pointer :: alst(:,:)        
    real(r8), pointer :: aist(:,:)        
@@ -405,6 +412,11 @@ subroutine microp_aero_run ( &
    ! naai and naai_hom are the outputs from nucleate_ice_cam_calc shared with the microphysics
    real(r8), pointer :: naai(:,:)       ! number of activated aerosol for ice nucleation [#/kg]
    real(r8), pointer :: naai_hom(:,:)   ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
+
+
+   real(r8), pointer :: frzimm(:,:)
+   real(r8), pointer :: frzcnt(:,:)
+   real(r8), pointer :: frzdep(:,:)
 
 
    real(r8)          :: icecldf(pcols,pver)    ! ice cloud fraction   
@@ -441,7 +453,8 @@ subroutine microp_aero_run ( &
    associate( &
       lchnk => state%lchnk,             &
       ncol  => state%ncol,              &
-      t     => state%t,                 &
+      temperature     => state%t,       &
+      state_q         => state%q,       &
       qc    => state%q(:pcols,:pver,cldliq_idx), &
       qi    => state%q(:pcols,:pver,cldice_idx), &
       nc    => state%q(:pcols,:pver,numliq_idx), &
@@ -471,9 +484,10 @@ subroutine microp_aero_run ( &
    call pbuf_get_field(pbuf, naai_idx, naai)
    call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
 
-
-   state_q => state%q
-   temperature => state%t
+   ! frzimm, frzcnt, frzdep are the outputs of hetfrz_classnuc_cam_calc used by the microphysics
+   call pbuf_get_field(pbuf, frzimm_idx, frzimm)
+   call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
+   call pbuf_get_field(pbuf, frzdep_idx, frzdep)
 
    liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
    icecldf(:ncol,:pver) = aist(:ncol,:pver)
@@ -606,7 +620,8 @@ subroutine microp_aero_run ( &
 
    ! heterogeneous freezing
    call t_startf('hetfrz_classnuc_cam_calc')
-   call hetfrz_classnuc_cam_calc(state, deltatin, factnum, pbuf)
+   call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, state_q, state, deltatin, factnum, pbuf, & 
+                                 frzimm, frzcnt, frzdep)
    call t_stopf('hetfrz_classnuc_cam_calc')
 
    deallocate(factnum)

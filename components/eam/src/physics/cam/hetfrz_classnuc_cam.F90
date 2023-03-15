@@ -37,7 +37,6 @@ save
 
 public :: &
    hetfrz_classnuc_cam_readnl,   &
-   hetfrz_classnuc_cam_register, &
    hetfrz_classnuc_cam_init,     &
    hetfrz_classnuc_cam_calc,     &
    hetfrz_classnuc_cam_save_cbaero
@@ -55,11 +54,6 @@ integer :: &
    numliq_idx = -1, &
    numice_idx = -1
 
-! pbuf indices for fields provided by heterogeneous freezing
-integer :: &
-   frzimm_idx, &
-   frzcnt_idx, &
-   frzdep_idx
 
 ! pbuf indices for fields needed by heterogeneous freezing
 integer :: &
@@ -184,19 +178,6 @@ subroutine hetfrz_classnuc_cam_readnl(nlfile)
 #endif
 
 end subroutine hetfrz_classnuc_cam_readnl
-
-!================================================================================================
-
-subroutine hetfrz_classnuc_cam_register()
-
-   if (.not. use_hetfrz_classnuc) return
-
-   ! pbuf fields provided by hetfrz_classnuc
-   call pbuf_add_field('FRZIMM', 'physpkg', dtype_r8, (/pcols,pver/), frzimm_idx)
-   call pbuf_add_field('FRZCNT', 'physpkg', dtype_r8, (/pcols,pver/), frzcnt_idx)
-   call pbuf_add_field('FRZDEP', 'physpkg', dtype_r8, (/pcols,pver/), frzdep_idx)
-
-end subroutine hetfrz_classnuc_cam_register
 
 !================================================================================================
 
@@ -539,22 +520,26 @@ end subroutine hetfrz_classnuc_cam_init
 
 !================================================================================================
 
-subroutine hetfrz_classnuc_cam_calc( &
-   state, deltatin, factnum, pbuf)
+subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
+                                     state, deltatin, factnum, pbuf, &
+                                     frzimm, frzcnt, frzdep)
 
    ! arguments
+   integer, intent(in) :: ncol
+   integer, intent(in) :: lchnk
+   real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
+   real(r8), intent(in) :: pmid(:,:)            ! pressure at layer midpoints [pa]
+   real(r8), intent(in) :: state_q(:,:,:)       ! input mixing ratio for all water and chem species [#/kg,kg/kg]
    type(physics_state), target, intent(in)    :: state
    real(r8),                    intent(in)    :: deltatin       ! time step (s)
    real(r8),                    intent(in)    :: factnum(:,:,:) ! activation fraction for aerosol number
    type(physics_buffer_desc),   pointer       :: pbuf(:)
+
+   real(r8), intent(out) :: frzimm(:,:)
+   real(r8), intent(out) :: frzcnt(:,:)
+   real(r8), intent(out) :: frzdep(:,:)
  
    ! local workspace
-
-   ! outputs shared with the microphysics via the pbuf
-   real(r8), pointer :: frzimm(:,:)
-   real(r8), pointer :: frzcnt(:,:)
-   real(r8), pointer :: frzdep(:,:)
-
    integer :: itim_old
    integer :: icol, kk, ispec
    integer :: lchnk_zb                  ! zero-based local chunk id
@@ -607,12 +592,8 @@ subroutine hetfrz_classnuc_cam_calc( &
    !-------------------------------------------------------------------------------
 
    associate( &
-      lchnk => state%lchnk,             &
-      ncol  => state%ncol,              &
-      temperature     => state%t,                 &
       qc    => state%q(:pcols,:pver,cldliq_idx), &
-      nc    => state%q(:pcols,:pver,numliq_idx), &
-      pmid  => state%pmid               )
+      nc    => state%q(:pcols,:pver,numliq_idx) )
 
    lchnk_zb = lchnk - begchunk
 
@@ -737,10 +718,6 @@ subroutine hetfrz_classnuc_cam_calc( &
    call outfld('na500',         na500,     pcols, lchnk)
    call outfld('totna500',      tot_na500, pcols, lchnk)
 
-   ! frzimm, frzcnt, frzdep are the outputs of this parameterization used by the microphysics
-   call pbuf_get_field(pbuf, frzimm_idx, frzimm)
-   call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
-   call pbuf_get_field(pbuf, frzdep_idx, frzdep)
     
    frzimm(:ncol,:) = 0._r8
    frzcnt(:ncol,:) = 0._r8
