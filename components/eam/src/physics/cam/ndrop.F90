@@ -530,29 +530,10 @@ subroutine dropmixnuc( &
 
       ! droplet nucleation/aerosol activation
 
-
-! BJG      do kk = top_lev, pver
-
-         call update_from_newcld(cldn(icol,:),cldo(icol,:),dtinv,     &   ! in
+      call update_from_newcld(cldn(icol,:),cldo(icol,:),dtinv,     &   ! in
                 wtke(icol,:),temp(icol,:),cs(icol,:),state_q(icol,:,:),  &  !in
                 qcld(:),raercol(:,:,nsav),raercol_cw(:,:,nsav), &  ! inout
                 nsource(icol,:), factnum(icol,:,:))  ! inout
-
-! BJG      enddo 
-
-      ! end of k-loop for growing/shrinking cloud calcs ......................
-
-      ! ......................................................................
-      ! start of k-loop for calc of old cloud activation tendencies ..........
-      !
-      ! rce-comment
-      !    changed this part of code to use current cloud fraction (cldn) exclusively
-      !    consider case of cldo(:)=0, cldn(k)=1, cldn(k+1)=0
-      !    previous code (which used cldo below here) would have no cloud-base activation
-      !       into layer k.  however, activated particles in k mix out to k+1,
-      !       so they are incorrectly depleted with no replacement
-
-      ! old_cloud_main_k_loop
 
 !  PART II: changes in aerosol and cloud water from vertical profile of new cloud fraction
 
@@ -561,202 +542,12 @@ subroutine dropmixnuc( &
            raercol(:,:,nsav),raercol_cw(:,:,nsav), &  ! inout
            nsource(icol,:),qcld(:),factnum(icol,:,:),ekd(:),nact(:,:),mact(:,:))  !inout
 
-
-      ! switch nsav, nnew so that nnew is the updated aerosol
-! Note -- these fields aren't used until switched again, so can remove this switching statement, 
-!  -- provided the first instance of the next switching statement is also removed.
-!       ntemp = nsav
-!       nsav  = nnew
-!       nnew  = ntemp
-
 !  PART III:  perform explict integration of droplet/aerosol mixing using substepping
-
-      ! load new droplets in layers above, below clouds
-
-      dtmin     = dtmicro
-      ekk(top_lev-1)    = 0.0_r8
-      ekk(pver) = 0.0_r8
-      do kk = top_lev, pver-1
-         ! rce-comment -- ekd(k) is eddy-diffusivity at k/k+1 interface
-         !   want ekk(k) = ekd(k) * (density at k/k+1 interface)
-         !   so use pint(i,k+1) as pint is 1:pverp
-         !           ekk(k)=ekd(k)*2.*pint(i,k)/(rair*(temp(i,k)+temp(i,k+1)))
-         !           ekk(k)=ekd(k)*2.*pint(i,k+1)/(rair*(temp(i,k)+temp(i,k+1)))
-         ekk(kk) = ekd(kk)*csbot(kk)
-      enddo
-
-
-     do kk = top_lev, pver
-         ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
-         km1     = max0(kk-1, top_lev)
-         ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
-         tinv    = ekkp(kk) + ekkm(kk)
-
-         ! rce-comment -- tinv is the sum of all first-order-loss-rates
-         !    for the layer.  for most layers, the activation loss rate
-         !    (for interstitial particles) is accounted for by the loss by
-         !    turb-transfer to the layer above.
-         !    k=pver is special, and the loss rate for activation within
-         !    the layer must be added to tinv.  if not, the time step
-         !    can be too big, and explmix can produce negative values.
-         !    the negative values are reset to zero, resulting in an
-         !    artificial source.
-
-         if (tinv > 1.e-6_r8) then
-            dtt   = 1._r8/tinv
-            dtmin = min(dtmin, dtt)
-         endif
-      enddo
-
-      dtmix   = 0.9_r8*dtmin
-      nsubmix = dtmicro/dtmix + 1
-      if (nsubmix > 100) then
-         nsubmix_bnd = 100
-      else
-         nsubmix_bnd = nsubmix
-      endif
-      count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
-      dtmix = dtmicro/nsubmix
-
-      do kk = top_lev, pver
-         kp1 = min(kk+1, pver)
-         km1 = max(kk-1, top_lev)
-         ! maximum overlap assumption
-         if (cldn(icol,kp1) > 1.e-10_r8) then
-            overlapp(kk) = min(cldn(icol,kk)/cldn(icol,kp1), 1._r8)
-         else
-            overlapp(kk) = 1._r8
-         endif
-         if (cldn(icol,km1) > 1.e-10_r8) then
-            overlapm(kk) = min(cldn(icol,kk)/cldn(icol,km1), 1._r8)
-         else
-            overlapm(kk) = 1._r8
-         endif
-      enddo
-
-
-      ! rce-comment
-      !    the activation source(k) = mact(k,m)*raercol(kp1,lmass)
-      !       should not exceed the rate of transfer of unactivated particles
-      !       from kp1 to k which = ekkp(k)*raercol(kp1,lmass)
-      !    however it might if things are not "just right" in subr activate
-      !    the following is a safety measure to avoid negatives in explmix
-      do kk = top_lev, pver-1
-         do imode = 1, ntot_amode
-            nact(kk,imode) = min( nact(kk,imode), ekkp(kk) )
-            mact(kk,imode) = min( mact(kk,imode), ekkp(kk) )
-         enddo
-      enddo
 
       nnew = 2
 
-      ! old_cloud_nsubmix_loop
-      do isub = 1, nsubmix
-         qncld(:) = qcld(:)
-         ! switch nsav, nnew so that nsav is the updated aerosol
-         if( isub > 1 ) then
-            ntemp   = nsav
-            nsav    = nnew
-            nnew    = ntemp
-         endif
-         srcn(:) = 0.0_r8
-
-         do imode = 1, ntot_amode
-            mm = mam_idx(imode,0)
-
-            ! update droplet source
-            ! rce-comment- activation source in layer k involves particles from k+1
-            !	       srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
-            srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
-
-            ! rce-comment- new formulation for k=pver
-            !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
-            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
-            srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
-         enddo
-         call explmix(  qcld, &   ! out
-            srcn, ekkp, ekkm, overlapp,  &   ! in
-            overlapm, qncld,  &  ! in
-            dtmix, .false.)   ! in
-
-         ! rce-comment
-         !    the interstitial particle mixratio is different in clear/cloudy portions
-         !    of a layer, and generally higher in the clear portion.  (we have/had
-         !    a method for diagnosing the the clear/cloudy mixratios.)  the activation
-         !    source terms involve clear air (from below) moving into cloudy air (above).
-         !    in theory, the clear-portion mixratio should be used when calculating
-         !    source terms
-         do imode = 1, ntot_amode
-            mm = mam_idx(imode,0)
-            ! rce-comment -   activation source in layer k involves particles from k+1
-            !	              source(:)= nact(:,m)*(raercol(:,mm,nsav))
-            source(top_lev:pver-1) = nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
-            ! rce-comment - new formulation for k=pver
-            !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
-            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
-                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
-            source(pver) = max(0.0_r8, tmpa)
-
-            call explmix( raercol_cw(:,mm,nnew), &  ! out
-               source, ekkp, ekkm, overlapp, &   ! in
-               overlapm, raercol_cw(:,mm,nsav),   &  ! in
-               dtmix, .false.)  ! in
-
-            call explmix( raercol(:,mm,nnew), &   ! out
-               source, ekkp, ekkm, overlapp,  &    ! in
-               overlapm, raercol(:,mm,nsav),  &  ! in
-               dtmix, .true., &  ! in
-               raercol_cw(:,mm,nsav))  ! optional in
-
-            do lspec = 1, nspec_amode(imode)
-               mm = mam_idx(imode,lspec)
-               ! rce-comment -   activation source in layer k involves particles from k+1
-               !	          source(:)= mact(:,m)*(raercol(:,mm,nsav))
-               source(top_lev:pver-1) = mact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
-               ! rce-comment- new formulation for k=pver
-               !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
-               tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
-                    + raercol_cw(pver,mm,nsav)*mact(pver,imode)
-               source(pver) = max(0.0_r8, tmpa)
-
-               call explmix( raercol_cw(:,mm,nnew), &  ! out
-                  source, ekkp, ekkm, overlapp, &  ! in
-                  overlapm, raercol_cw(:,mm,nsav),    &  ! in
-                  dtmix, .false.)  ! in
-
-               call explmix( raercol(:,mm,nnew), &  ! out
-                  source, ekkp, ekkm, overlapp,  &  ! in
-                  overlapm, raercol(:,mm,nsav),  &   ! in
-                  dtmix, .true., & ! in
-                  raercol_cw(:,mm,nsav))  ! optional in
-
-            enddo  ! lspec loop
-         enddo  !  imode loop
-
-      enddo ! old_cloud_nsubmix_loop
-
-      ! evaporate particles again if no cloud
-
-      do kk = top_lev, pver
-         if (cldn(icol,kk) == 0._r8) then
-            ! no cloud
-            qcld(kk)=0._r8
-
-            ! convert activated aerosol to interstitial in decaying cloud
-            do imode = 1, ntot_amode
-               mm = mam_idx(imode,0)
-               raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
-               raercol_cw(kk,mm,nnew) = 0._r8
-
-               do lspec = 1, nspec_amode(imode)
-                  mm = mam_idx(imode,lspec)
-                  raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
-                  raercol_cw(kk,mm,nnew) = 0._r8
-               enddo
-            enddo
-         endif
-      enddo
+      call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
+         nact,mact,qcld,raercol,raercol_cw,nsav,nnew)   ! inout
 
       ! droplet number
 
@@ -1021,7 +812,7 @@ subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
                enddo
             enddo
          endif    !  cldn(icol,kk)-cldo(icol,kk) > 0.01_r8
-      enddo  !  end kk loop
+      enddo  ! end of k-loop for growing/shrinking cloud calcs ......................
 
 
 
@@ -1071,6 +862,17 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,  &  ! i
    real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
    real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
    real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
+
+
+      ! ......................................................................
+      ! start of k-loop for calc of old cloud activation tendencies ..........
+      !
+      ! rce-comment
+      !    changed this part of code to use current cloud fraction (cldn) exclusively
+      !    consider case of cldo(:)=0, cldn(k)=1, cldn(k+1)=0
+      !    previous code (which used cldo below here) would have no cloud-base activation
+      !       into layer k.  however, activated particles in k mix out to k+1,
+      !       so they are incorrectly depleted with no replacement
 
       do kk = top_lev, pver - 1
 
@@ -1186,6 +988,242 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,  &  ! i
 
 
 end subroutine update_from_cldn_profile
+
+!===============================================================================
+
+subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
+         nact,mact,qcld,raercol,raercol_cw,nsav,nnew)   ! inout
+
+   ! input arguments
+
+   real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
+   real(r8), intent(in) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
+   real(r8), intent(in) :: cldn_col(:)   ! cloud fraction [fraction]
+   real(r8), intent(in) :: zn(pver)   ! g/pdel for layer [m^2/kg]
+   real(r8), intent(in) :: zs(:)            ! inverse of distance between levels [m^-1]
+   real(r8), intent(in) :: ekd(:)     ! diffusivity for droplets [m^2/s]
+
+
+   real(r8), intent(inout) :: nact(:,:)  ! fractional aero. number  activation rate [/s]
+   real(r8), intent(inout) :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
+   real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
+   real(r8), intent(inout) :: raercol(:,:,:)    ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
+   real(r8), intent(inout) :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
+   integer, intent(inout) :: nnew, nsav   ! indices for old, new time levels in substepping
+
+   ! local arguments
+
+   real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
+   real(r8) :: dtmin      ! time step to determine subloop time step [s]
+   real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
+   real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity [/s]
+   real(r8) :: ekkm(pver)      ! zn*zs*density*diffusivity   [/s]
+   real(r8) :: overlapp(pver)  ! cloud overlap involving level kk+1 [fraction]
+   real(r8) :: overlapm(pver)  ! cloud overlap involving level kk-1 [fraction]
+   real(r8) :: source(pver)
+   real(r8) :: tinv       ! inverse timescale of droplet diffusivity [s^-1]
+   real(r8) :: dtt        ! timescale of droplet diffusivity [s]
+   real(r8) :: dtmix    ! timescale for subloop [s] 
+   real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
+   real(r8) :: srcn(pver)       ! droplet source rate [/s] 
+! BJG if works as local, can delete all refs from dropmixnuc
+
+   integer :: kk           ! vertical level index
+   integer :: kp1          ! kk+1
+   integer :: km1          ! kk-1
+   integer  :: imode       ! mode counter variable
+   integer  :: mm          ! local array index for MAM number, species
+   integer  :: lspec       ! species counter variable
+   integer  :: nsubmix, nsubmix_bnd  ! number of substeps and bound
+   integer  :: ntemp   ! temporary index for substepping
+   integer  :: isub       ! substep index
+
+      ! load new droplets in layers above, below clouds
+
+      dtmin     = dtmicro
+      ekk(top_lev-1)    = 0.0_r8
+      ekk(pver) = 0.0_r8
+      do kk = top_lev, pver-1
+         ! rce-comment -- ekd(k) is eddy-diffusivity at k/k+1 interface
+         !   want ekk(k) = ekd(k) * (density at k/k+1 interface)
+         !   so use pint(i,k+1) as pint is 1:pverp
+         !           ekk(k)=ekd(k)*2.*pint(i,k)/(rair*(temp(i,k)+temp(i,k+1)))
+         !           ekk(k)=ekd(k)*2.*pint(i,k+1)/(rair*(temp(i,k)+temp(i,k+1)))
+         ekk(kk) = ekd(kk)*csbot(kk)
+      enddo
+
+
+     do kk = top_lev, pver
+         ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
+         km1     = max0(kk-1, top_lev)
+         ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
+         tinv   = ekkp(kk) + ekkm(kk)
+
+         ! rce-comment -- tinv is the sum of all first-order-loss-rates
+         !    for the layer.  for most layers, the activation loss rate
+         !    (for interstitial particles) is accounted for by the loss by
+         !    turb-transfer to the layer above.
+         !    k=pver is special, and the loss rate for activation within
+         !    the layer must be added to tinv.  if not, the time step
+         !    can be too big, and explmix can produce negative values.
+         !    the negative values are reset to zero, resulting in an
+         !    artificial source.
+
+         if (tinv > 1.e-6_r8) then
+            dtt   = 1._r8/tinv
+            dtmin = min(dtmin, dtt)
+         endif
+      enddo
+
+      dtmix   = 0.9_r8*dtmin
+      nsubmix = dtmicro/dtmix + 1
+      if (nsubmix > 100) then
+         nsubmix_bnd = 100
+      else
+         nsubmix_bnd = nsubmix
+      endif
+! BJG not needed      count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
+      dtmix = dtmicro/nsubmix
+
+      do kk = top_lev, pver
+         kp1 = min(kk+1, pver)
+         km1 = max(kk-1, top_lev)
+         ! maximum overlap assumption
+         if (cldn_col(kp1) > 1.e-10_r8) then
+            overlapp(kk) = min(cldn_col(kk)/cldn_col(kp1), 1._r8)
+         else
+            overlapp(kk) = 1._r8
+         endif
+         if (cldn_col(km1) > 1.e-10_r8) then
+            overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
+         else
+            overlapm(kk) = 1._r8
+         endif
+      enddo
+
+
+      ! rce-comment
+      !    the activation source(k) = mact(k,m)*raercol(kp1,lmass)
+      !       should not exceed the rate of transfer of unactivated particles
+      !       from kp1 to k which = ekkp(k)*raercol(kp1,lmass)
+      !    however it might if things are not "just right" in subr activate
+      !    the following is a safety measure to avoid negatives in explmix
+      do kk = top_lev, pver-1
+         do imode = 1, ntot_amode
+            nact(kk,imode) = min( nact(kk,imode), ekkp(kk) )
+            mact(kk,imode) = min( mact(kk,imode), ekkp(kk) )
+         enddo
+      enddo
+
+      ! old_cloud_nsubmix_loop
+      do isub = 1, nsubmix
+         qncld(:) = qcld(:)
+         ! after first pass, switch nsav, nnew so that nsav is the recently updated aerosol
+         if( isub > 1 ) then
+            ntemp   = nsav
+            nsav    = nnew
+            nnew    = ntemp
+         endif
+         srcn(:) = 0.0_r8
+
+         do imode = 1, ntot_amode
+            mm = mam_idx(imode,0)
+
+            ! update droplet source
+            ! rce-comment- activation source in layer k involves particles from k+1
+            !	       srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
+            srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+
+            ! rce-comment- new formulation for k=pver
+            !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
+            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+            srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
+         enddo
+         call explmix(  qcld, &   ! out
+            srcn, ekkp, ekkm, overlapp,  &   ! in
+            overlapm, qncld,  &  ! in
+            dtmix, .false.)   ! in
+
+         ! rce-comment
+         !    the interstitial particle mixratio is different in clear/cloudy portions
+         !    of a layer, and generally higher in the clear portion.  (we have/had
+         !    a method for diagnosing the the clear/cloudy mixratios.)  the activation
+         !    source terms involve clear air (from below) moving into cloudy air (above).
+         !    in theory, the clear-portion mixratio should be used when calculating
+         !    source terms
+         do imode = 1, ntot_amode
+            mm = mam_idx(imode,0)
+            ! rce-comment -   activation source in layer k involves particles from k+1
+            !	              source(:)= nact(:,m)*(raercol(:,mm,nsav))
+            source(top_lev:pver-1) = nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+            ! rce-comment - new formulation for k=pver
+            !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
+            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+            source(pver) = max(0.0_r8, tmpa)
+
+            call explmix( raercol_cw(:,mm,nnew), &  ! out
+               source, ekkp, ekkm, overlapp, &   ! in
+               overlapm, raercol_cw(:,mm,nsav),   &  ! in
+               dtmix, .false.)  ! in
+
+            call explmix( raercol(:,mm,nnew), &   ! out
+               source, ekkp, ekkm, overlapp,  &    ! in
+               overlapm, raercol(:,mm,nsav),  &  ! in
+               dtmix, .true., &  ! in
+               raercol_cw(:,mm,nsav))  ! optional in
+
+            do lspec = 1, nspec_amode(imode)
+               mm = mam_idx(imode,lspec)
+               ! rce-comment -   activation source in layer k involves particles from k+1
+               !	          source(:)= mact(:,m)*(raercol(:,mm,nsav))
+               source(top_lev:pver-1) = mact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+               ! rce-comment- new formulation for k=pver
+               !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
+               tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
+                    + raercol_cw(pver,mm,nsav)*mact(pver,imode)
+               source(pver) = max(0.0_r8, tmpa)
+
+               call explmix( raercol_cw(:,mm,nnew), &  ! out
+                  source, ekkp, ekkm, overlapp, &  ! in
+                  overlapm, raercol_cw(:,mm,nsav),    &  ! in
+                  dtmix, .false.)  ! in
+
+               call explmix( raercol(:,mm,nnew), &  ! out
+                  source, ekkp, ekkm, overlapp,  &  ! in
+                  overlapm, raercol(:,mm,nsav),  &   ! in
+                  dtmix, .true., & ! in
+                  raercol_cw(:,mm,nsav))  ! optional in
+
+            enddo  ! lspec loop
+         enddo  !  imode loop
+
+      enddo ! old_cloud_nsubmix_loop
+
+      ! evaporate particles again if no cloud
+
+      do kk = top_lev, pver
+         if (cldn_col(kk) == 0._r8) then
+            ! no cloud
+            qcld(kk)=0._r8
+
+            ! convert activated aerosol to interstitial in decaying cloud
+            do imode = 1, ntot_amode
+               mm = mam_idx(imode,0)
+               raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+               raercol_cw(kk,mm,nnew) = 0._r8
+
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
+                  raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+                  raercol_cw(kk,mm,nnew) = 0._r8
+               enddo
+            enddo
+         endif
+      enddo
+
+end subroutine update_from_explmix
 
 !===============================================================================
 
