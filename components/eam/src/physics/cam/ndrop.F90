@@ -530,15 +530,15 @@ subroutine dropmixnuc( &
 
       ! droplet nucleation/aerosol activation
 
-      ! k-loop for growing/shrinking cloud calcs .............................
-      do kk = top_lev, pver
 
-         call update_from_newcld(cldn(icol,kk),cldo(icol,kk),dtinv,     &   ! in
-                wtke(icol,kk),temp(icol,kk),cs(icol,kk),state_q(icol,kk,:),  &  !in
-                qcld(kk),raercol(kk,:,nsav),raercol_cw(kk,:,nsav), &  ! inout
-                nsource(icol,kk), factnum(icol,kk,:))  ! inout
+! BJG      do kk = top_lev, pver
 
-      enddo 
+         call update_from_newcld(cldn(icol,:),cldo(icol,:),dtinv,     &   ! in
+                wtke(icol,:),temp(icol,:),cs(icol,:),state_q(icol,:,:),  &  !in
+                qcld(:),raercol(:,:,nsav),raercol_cw(:,:,nsav), &  ! inout
+                nsource(icol,:), factnum(icol,:,:))  ! inout
+
+! BJG      enddo 
 
       ! end of k-loop for growing/shrinking cloud calcs ......................
 
@@ -915,25 +915,26 @@ end subroutine get_activate_frac
 
 !===============================================================================
 
-subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &    ! in
-                wtke_in,temp_in,cs_kk_in,state_q_in,  &     ! in
-                qcld_in,raercol_pt,raercol_cw_pt, &         ! inout
-                nsource_out, factnum_out)                   ! inout
+subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
+                wtke_col_in,temp_col_in,cs_col_in,state_q_col_in, & ! in
+                qcld,raercol_nsav,raercol_cw_nsav, &      ! inout
+                nsource_col_out, factnum_col_out)              ! inout
 
    ! input arguments
-   real(r8), intent(in) :: cldn_in   ! cloud fraction [fraction]
-   real(r8), intent(in) :: cldo_in   ! cloud fraction on previous time step [fraction]
+   real(r8), intent(in) :: cldn_col_in(:)   ! cloud fraction [fraction]
+   real(r8), intent(in) :: cldo_col_in(:)   ! cloud fraction on previous time step [fraction]
    real(r8), intent(in) :: dtinv     ! inverse time step for microphysics [s^{-1}]
-   real(r8), intent(in) :: wtke_in   ! subgrid vertical velocity [m/s]
-   real(r8), intent(in) :: temp_in   ! temperature [K]
-   real(r8), intent(in) :: cs_kk_in  ! air density at actual level kk [kg/m^3]
-   real(r8), intent(in) :: state_q_in(:) ! aerosol mmrs [kg/kg]
+   real(r8), intent(in) :: wtke_col_in(:)   ! subgrid vertical velocity [m/s]
+   real(r8), intent(in) :: temp_col_in(:)   ! temperature [K]
+   real(r8), intent(in) :: cs_col_in(:)  ! air density at actual level kk [kg/m^3]
+   real(r8), intent(in) :: state_q_col_in(:,:) ! aerosol mmrs [kg/kg]
 
-   real(r8), intent(inout) :: qcld_in
-   real(r8), intent(inout) :: nsource_out
-   real(r8), intent(inout) :: raercol_pt(:)
-   real(r8), intent(inout) :: raercol_cw_pt(:)
-   real(r8), intent(inout) :: factnum_out(:)
+   real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
+   real(r8), intent(inout) :: nsource_col_out(:)   ! droplet number mixing ratio source tendency [#/kg/s]
+   real(r8), intent(inout) :: raercol_nsav(:,:)   ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
+   real(r8), intent(inout) :: raercol_cw_nsav(:,:)  ! same as raercol_nsav but for cloud-borne phase [#/kg or kg/kg]
+   real(r8), intent(inout) :: factnum_col_out(:,:)  ! activation fraction for aerosol number [fraction]
+
 
 !  local variables
 
@@ -943,6 +944,7 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &    ! in
    integer  :: imode       ! mode counter variable
    integer  :: lspec       ! species counter variable
    integer  :: mm                  ! local array index for MAM number, species
+   integer  :: kk
    real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
    real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
    real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
@@ -953,33 +955,37 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &    ! in
    real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
 
 
-         delt_cld = (cldn_in - cldo_in)
+      ! k-loop for growing/shrinking cloud calcs .............................
+      do kk = top_lev, pver
+
+         delt_cld = (cldn_col_in(kk) - cldo_col_in(kk))
 
          ! shrinking cloud ......................................................
          !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
          !    and also dissipate the portion of the cloud that will be regenerated
 
-         if (cldn_in < cldo_in) then
+         if (cldn_col_in(kk) < cldo_col_in(kk)) then
             !  droplet loss in decaying cloud
             !++ sungsup
-            nsource_out = nsource_out + qcld_in*(cldn_in - cldo_in)/cldo_in*dtinv
-            qcld_in      = qcld_in*(1._r8 + (cldn_in - cldo_in)/cldo_in)
+            nsource_col_out(kk) = nsource_col_out(kk) &
+               + qcld(kk)*(cldn_col_in(kk) - cldo_col_in(kk))/cldo_col_in(kk)*dtinv
+            qcld(kk) =  qcld(kk)*(1._r8 + (cldn_col_in(kk)-cldo_col_in(kk))/cldo_col_in(kk))
             !-- sungsup
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            frac_delt_cld = (cldn_in - cldo_in) / cldo_in
+            frac_delt_cld = (cldn_col_in(kk) - cldo_col_in(kk)) / cldo_col_in(kk)
 
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
-               dact   = raercol_cw_pt(mm)*frac_delt_cld
-               raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact   ! cloud-borne aerosol
-               raercol_pt(mm)    = raercol_pt(mm) - dact
+               dact   = raercol_cw_nsav(kk,mm)*frac_delt_cld
+               raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact   ! cloud-borne aerosol
+               raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
-                  dact    = raercol_cw_pt(mm)*frac_delt_cld
-                  raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
-                  raercol_pt(mm)    = raercol_pt(mm) - dact
+                  dact    = raercol_cw_nsav(kk,mm)*frac_delt_cld
+                  raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact  ! cloud-borne aerosol
+                  raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
                enddo
             enddo
          endif   ! cldn(icol,kk) < cldo(icol,kk)
@@ -988,33 +994,36 @@ subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &    ! in
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
 
-         if (cldn_in-cldo_in > 0.01_r8) then
+         if (cldn_col_in(kk)-cldo_col_in(kk) > 0.01_r8) then
 
-            call get_activate_frac(state_q_in, cs_kk_in, cs_kk_in, wtke_in, temp_in, & ! in
+            call get_activate_frac(state_q_col_in(kk,:), cs_col_in(kk), cs_col_in(kk), & ! in
+                 wtke_col_in(kk), temp_col_in(kk), & ! in
                  fn, fm, fluxn, fluxm, flux_fullact) ! out
 
 !  store for output activation fraction of aerosol
-            factnum_out(:) = fn
-
+            factnum_col_out(kk,:) = fn
 
             do imode = 1, ntot_amode
                mm = mam_idx(imode,0)
                num_idx = numptr_amode(imode)
-               dact = delt_cld*fn(imode)*state_q_in(num_idx) ! interstitial only
-               qcld_in = qcld_in + dact
-               nsource_out = nsource_out + dact*dtinv
-               raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
-               raercol_pt(mm)    = raercol_pt(mm) - dact
+               dact = delt_cld*fn(imode)*state_q_col_in(kk,num_idx) ! interstitial only
+               qcld(kk) = qcld(kk) + dact
+               nsource_col_out(kk) = nsource_col_out(kk) + dact*dtinv
+               raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact  ! cloud-borne aerosol
+               raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
                fm_delt_cld = delt_cld * fm(imode)
                do lspec = 1, nspec_amode(imode)
                   mm = mam_idx(imode,lspec)
                   spc_idx=lmassptr_amode(lspec,imode)
-                  dact    = fm_delt_cld*state_q_in(spc_idx) ! interstitial only
-                  raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
-                  raercol_pt(mm)    = raercol_pt(mm) - dact
+                  dact    = fm_delt_cld*state_q_col_in(kk,spc_idx) ! interstitial only
+                  raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact  ! cloud-borne aerosol
+                  raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
                enddo
             enddo
          endif    !  cldn(icol,kk)-cldo(icol,kk) > 0.01_r8
+      enddo  !  end kk loop
+
+
 
 end subroutine update_from_newcld
 
