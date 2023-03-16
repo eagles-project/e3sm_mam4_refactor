@@ -334,39 +334,24 @@ subroutine dropmixnuc( &
    type(physics_ptend),         intent(out)   :: ptend
    real(r8), intent(out) :: tendnd(pcols,pver) ! tendency in droplet number mixing ratio [#/kg/s]
    real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number [fraction]
+
    !--------------------Local storage-------------------------------------
 
    real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8  ! min, max vertical diffusivity [m^2/s]
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
 
    real(r8) :: dtinv      ! inverse time step for microphysics [s^-1]
-   real(r8) :: dtmin      ! time step to determine subloop time step [s]
-   real(r8) :: tinv       ! inverse timescale of droplet diffusivity [s^-1]
-   real(r8) :: dtt        ! timescale of droplet diffusivity [s]
-   real(r8) :: wmax       ! vertical velocity upper bound [m/s]
-   real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
-   real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
-   real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
-   real(r8) :: dtmix    ! timescale for subloop [s] 
    real(r8) :: raertend(pver)  ! tendency of interstitial aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
    real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
    real(r8) :: zs(pver) ! inverse of distance between levels [m^-1]
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio [#/kg]
-   real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
-   real(r8) :: srcn(pver)       ! droplet source rate [/s]
+! BJG   real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
+! BJG   real(r8) :: srcn(pver)       ! droplet source rate [/s]
    real(r8) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
    real(r8) :: csbot_cscen(pver) ! inverse normalized air density csbot(i)/cs(i,k) [dimensionless]
    real(r8) :: zn(pver)   ! g/pdel for layer [m^2/kg]
    real(r8) :: ekd(pver)       ! diffusivity for droplets [m^2/s]
-   real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
-   real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity [/s]
-   real(r8) :: ekkm(pver)      ! zn*zs*density*diffusivity   [/s]
-   real(r8) :: overlapp(pver)  ! cloud overlap involving level kk+1 [fraction]
-   real(r8) :: overlapm(pver)  ! cloud overlap involving level kk-1 [fraction]
-   real(r8) :: source(pver)
-   real(r8) :: flux_fullact(pver) ! 100%    activation fraction flux [m/s]
    real(r8) :: ndropcol(pcols)               ! column-integrated droplet number [#/m2]
-   real(r8) :: na(pcols), va(pcols), hy(pcols) ! naermod, vaerosol, hygro at level kk
    real(r8) :: cs(pcols,pver)      ! air density [kg/m^3]
    real(r8) :: dz(pver)      ! geometric thickness of layers [m]
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k [m/s]
@@ -400,22 +385,17 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
-   integer, save :: count_submix(100)
    integer  :: lchnk               ! chunk identifier
    integer  :: ncol                ! number of columns
    integer  :: mm                  ! local array index for MAM number, species
-   integer  :: km1, kp1            ! level index -1, +1
-   integer  :: nnew, nsav, ntemp   ! indices for old, new time levels in substepping
+   integer  :: nnew, nsav          ! indices for old, new time levels in substepping
    integer  :: lptr
-   integer  :: nsubmix, nsubmix_bnd  ! number of substeps and bound
-   integer  :: phase                 ! phase of aerosol
    integer  :: ccn3d_idx   ! index of ccn3d in pbuf
    integer  :: icol        ! column index
    integer  :: imode       ! mode index
    integer  :: kk          ! level index
    integer  :: lspec      ! species index for given mode
    integer  :: lsat       !  level of supersaturation
-   integer  :: isub       ! substep index
    integer  :: spc_idx, num_idx  ! species, number indices  
 
    !-------------------------------------------------------------------------------
@@ -481,8 +461,8 @@ subroutine dropmixnuc( &
    ! overall_main_icol_loop
    do icol = 1, ncol
 
-      qncld(:) = 0._r8
-      srcn(:) = 0._r8   
+! BJG      qncld(:) = 0._r8
+! BJG      srcn(:) = 0._r8   
       nact(:,1:ntot_amode) = 0._r8
       mact(:,1:ntot_amode) = 0._r8
       cs(icol,:)  = pmid(icol,:)/(rair*temp(icol,:))        ! air density (kg/m3)
@@ -629,7 +609,6 @@ subroutine dropmixnuc( &
          call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
       enddo
    enddo
-
 
    deallocate( &
       nact,       &
@@ -1026,7 +1005,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
    real(r8) :: dtmix    ! timescale for subloop [s] 
    real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
    real(r8) :: srcn(pver)       ! droplet source rate [/s] 
-! BJG if works as local, can delete all refs from dropmixnuc
 
    integer :: kk           ! vertical level index
    integer :: kp1          ! kk+1
@@ -1082,7 +1060,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
       else
          nsubmix_bnd = nsubmix
       endif
-! BJG not needed      count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
       dtmix = dtmicro/nsubmix
 
       do kk = top_lev, pver
