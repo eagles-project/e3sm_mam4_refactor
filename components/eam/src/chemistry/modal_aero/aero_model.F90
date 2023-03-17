@@ -160,9 +160,7 @@ contains
   !=============================================================================
   subroutine aero_model_init( pbuf2d, species_class, iflagaa )
 
-    use mo_chem_utls,    only: get_inv_ndx
     use cam_history,     only: addfld, horiz_only, add_default
-    use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
     use modal_aero_initialize_data, only: modal_aero_initialize
     use rad_constituents,           only: rad_cnst_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
@@ -552,7 +550,7 @@ contains
     subroutine mam_prevap_resusp_init( )
 
     use modal_aero_data, only: &
-       lmassptr_amode, lspectype_amode, modeptr_coarse, &
+       lmassptr_amode, modeptr_coarse, &
        nspec_amode, ntot_amode, numptr_amode, &
        mmtoo_prevap_resusp, ntoo_prevap_resusp
 
