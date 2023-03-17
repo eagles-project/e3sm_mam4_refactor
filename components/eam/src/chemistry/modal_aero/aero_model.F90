@@ -48,8 +48,6 @@ module aero_model
   integer :: qaerwat_idx         = 0
 
   integer :: fracis_idx          = 0
-  integer :: prain_idx           = 0
-  integer :: nevapr_idx          = 0
   integer :: rprddp_idx          = 0 
   integer :: rprdsh_idx          = 0 
   integer :: nevapr_shcu_idx     = 0
@@ -252,8 +250,6 @@ contains
     call wetdep_init()
 
     fracis_idx      = pbuf_get_index('FRACIS') 
-    prain_idx       = pbuf_get_index('PRAIN')  
-    nevapr_idx      = pbuf_get_index('NEVAPR') 
     rprddp_idx      = pbuf_get_index('RPRDDP')  
     rprdsh_idx      = pbuf_get_index('RPRDSH')  
     
