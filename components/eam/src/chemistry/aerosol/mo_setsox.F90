@@ -528,12 +528,7 @@ contains
                 !    then you will have yposnet_lo > 0 and yposnet_hi < 0
                 converged = .false.
                 if (iter > 2) then
-                   if (ynetpos == 0.0_r8) then
-                      ! the exact solution was found (very unlikely)
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   else if (ynetpos >= 0.0_r8) then
+                   if (ynetpos >= 0.0_r8) then
                       ! net positive ions are >= 0 for both yph and yph_lo
                       !    so replace yph_lo with yph
                       yph_lo = yph
@@ -650,19 +645,9 @@ contains
           ho2s = kh0*xho2(i,k)*patm*(1._r8 + kh1/xph(i,k))  ! ho2s = ho2(a)+o2-
           r1h2o2 = kh4*ho2s*ho2s                         ! prod(h2o2) in mole/L(w)/s
 
-          if ( cloud_borne ) then
-             r2h2o2 = r1h2o2*xl        &    ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  / const0*1.e+6_r8  &    ! correct a bug here ????
-                  / xam
-          else
-             r2h2o2 = r1h2o2*xl  &          ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  * const0     &          ! mole/fm3(a)/s * 1.e-3       = mole/cm3(a)/s
-                  / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
-          endif
-
-          if ( .not. modal_aerosols ) then
-             xh2o2(i,k) = xh2o2(i,k) + r2h2o2*dtime         ! updated h2o2 by het production
-          endif
+          r2h2o2 = r1h2o2*xl        &    ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
+                 / const0*1.e+6_r8  &    ! FIXME: correct a bug here ????
+                 / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
 
           !-----------------------------------------------
           !       ... Partioning 
@@ -696,11 +681,7 @@ contains
           !         ... nh3
           !------------------------------------------------------------------------
           px = henh3(i,k) * Ra * tz * xl
-          if (id_nh3>0) then
-             nh3g(i,k) = (xnh3(i,k)+xnh4(i,k))/(1._r8+ px)
-          else
-             nh3g(i,k) = 0._r8
-          endif
+          nh3g(i,k) = 0._r8
 
           !-----------------------------------------------
           !       ... Aqueous phase reaction rates
@@ -739,21 +720,10 @@ contains
           
           IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED          
 
-             if (cloud_borne) then
-                patm_x = patm
-             else
-                patm_x = 1._r8
-             endif
+             patm_x = patm
 
-             if (modal_aerosols) then
-
-                pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
-                     * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
-             else
-                pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm_x  &
-                     * heso2(i,k)  * so2g  * patm_x    ! [M/s]
-
-             endif
+             pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
+                  * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
 
              pso4 = pso4 & ! [M/s] = [mole/L(w)/s]
                   * xl & ! [mole/L(a)/s]
@@ -769,13 +739,8 @@ contains
              IF (xh2o2(i,k) .gt. xso2(i,k)) THEN
                 if (ccc .gt. xso2(i,k)) then
                    xso4(i,k)=xso4(i,k)+xso2(i,k)
-                   if (cloud_borne) then
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                      xso2(i,k)=1.e-20_r8
-                   else       ! ???? bug ????
-                      xso2(i,k)=1.e-20_r8
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                   endif
+                   xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
+                   xso2(i,k)=1.e-20_r8
                 else
                    xso4(i,k)  = xso4(i,k)  + ccc
                    xh2o2(i,k) = xh2o2(i,k) - ccc
