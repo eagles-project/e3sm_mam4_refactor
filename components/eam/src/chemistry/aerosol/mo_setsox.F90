@@ -183,6 +183,7 @@ contains
     use sox_cldaero_mod, only : sox_cldaero_update, sox_cldaero_create_obj, sox_cldaero_destroy_obj
     use cldaero_mod,     only : cldaero_conc_t
     use phys_control, only : phys_getopts
+    use cam_abortutils,   only: endrun
 
     !
     implicit none
@@ -322,47 +323,22 @@ contains
     do k = 1,pver
        xph(:,k) = xph0                                ! initial PH value
 
-       if ( inv_so2 ) then
-          xso2 (:,k) = invariants(:,k,id_so2)/xhnm(:,k)  ! mixing ratio
-       else
-          xso2 (:,k) = qin(:,k,id_so2)                   ! mixing ratio
+       if ( inv_so2 .or. id_hno3>0 .or. inv_h2o2 .or. id_nh3>0 .or. inv_o3 &
+            .or. (.not. inv_ho2) .or. (.not. cloud_borne) .or. id_msa>0) then
+
+           call endrun('FORTRAN refactoring: Only keep the code for default MAM4. & 
+                The following options are removed:  inv_so2=.T.; id_hno3>0;       &
+                inv_h2o2=.T.; id_nh3>0;. inv_o3; inv_ho2=.F. cloud_borne=.F. id_msa>0')
+
        endif
 
-       if (id_hno3 > 0) then
-          xhno3(:,k) = qin(:,k,id_hno3)
-       else
-          xhno3(:,k) = 0.0_r8
-       endif
-
-       if ( inv_h2o2 ) then
-          xh2o2 (:,k) = invariants(:,k,id_h2o2)/xhnm(:,k)  ! mixing ratio
-       else
-          xh2o2 (:,k) = qin(:,k,id_h2o2)                   ! mixing ratio
-       endif
-
-       if (id_nh3  > 0) then
-          xnh3 (:,k) = qin(:,k,id_nh3)
-       else
-          xnh3 (:,k) = 0.0_r8
-       endif
-
-       if ( inv_o3 ) then
-          xo3  (:,k) = invariants(:,k,id_o3)/xhnm(:,k) ! mixing ratio
-       else
-          xo3  (:,k) = qin(:,k,id_o3)                  ! mixing ratio
-       endif
-       if ( inv_ho2 ) then
-          xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)! mixing ratio
-       else
-          xho2 (:,k) = qin(:,k,id_ho2)                 ! mixing ratio
-       endif
-
-       if (cloud_borne) then
-          xh2so4(:,k) = qin(:,k,id_h2so4)
-       else
-          xso4  (:,k) = qin(:,k,id_so4) ! mixing ratio
-       endif
-       if (id_msa > 0) xmsa (:,k) = qin(:,k,id_msa)
+       xso2 (:,k) = qin(:,k,id_so2)                 ! mixing ratio
+       xhno3(:,k) = 0.0_r8
+       xh2o2 (:,k) = qin(:,k,id_h2o2)               ! mixing ratio
+       xnh3 (:,k) = 0.0_r8
+       xo3  (:,k) = qin(:,k,id_o3)                  ! mixing ratio
+       xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)! mixing ratio
+       xh2so4(:,k) = qin(:,k,id_h2so4)
 
     end do
     
