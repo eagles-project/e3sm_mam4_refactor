@@ -183,26 +183,26 @@ contains
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
-    real(r8),         intent(in)    :: dtime             ! time step (sec)
-    real(r8),         intent(in)    :: press(:,:)        ! midpoint pressure ( Pa )
-    real(r8),         intent(in)    :: pdel(:,:)         ! pressure thickness of levels (Pa)
-    real(r8),         intent(in)    :: tfld(:,:)         ! temperature
-    real(r8),         intent(in)    :: mbar(:,:)         ! mean wet atmospheric mass ( amu )
-    real(r8), target, intent(in)    :: lwc(:,:)          ! cloud liquid water content (kg/kg)
-    real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction
-    real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration (#/kg)
-    real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density ( /cm**3)
-    real(r8),         intent(in)    :: invariants(:,:,:)
-    real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol (vmr)
-    real(r8),         intent(inout) :: qin(:,:,:)        ! transported species ( vmr )
+    real(r8),         intent(in)    :: dtime             ! time step [sec]
+    real(r8),         intent(in)    :: press(:,:)        ! midpoint pressure [Pa]
+    real(r8),         intent(in)    :: pdel(:,:)         ! pressure thickness of levels [Pa]
+    real(r8),         intent(in)    :: tfld(:,:)         ! temperature [K]
+    real(r8),         intent(in)    :: mbar(:,:)         ! mean wet atmospheric mass [amu or g/mol]
+    real(r8), target, intent(in)    :: lwc(:,:)          ! cloud liquid water content [kg/kg]
+    real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction [fraction]
+    real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration [#/kg]
+    real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density [#/cm**3]
+    real(r8),         intent(in)    :: invariants(:,:,:) ! invariant density [molecules/cm**3]
+    real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol [vmr]
+    real(r8),         intent(inout) :: qin(:,:,:)        ! transported species [vmr]
 
     !-----------------------------------------------------------------------      
     !      ... Local variables
     !
     !           xhno3 ... in mixing ratio
     !-----------------------------------------------------------------------      
-    integer,  parameter :: itermax = 20
-    real(r8), parameter :: ph0 = 5.0_r8  ! INITIAL PH VALUES
+    integer,  parameter :: itermax = 20  ! maximum number of iterations
+    real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
     real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
     real(r8), parameter :: xa0 = 11._r8
     real(r8), parameter :: xb0 = -.1_r8
