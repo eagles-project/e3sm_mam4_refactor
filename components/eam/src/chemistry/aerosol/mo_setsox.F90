@@ -1,5 +1,5 @@
 
-module MO_SETSOX
+module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
@@ -141,23 +141,12 @@ contains
   
 !-----------------------------------------------------------------------      
 !-----------------------------------------------------------------------      
-  subroutine SETSOX( &
-       ncol,   &
-       lchnk,  &
-       loffset,&
-       dtime,  &
-       press,  &
-       pdel,   &
-       tfld,   &
-       mbar,   &
-       lwc,    &
-       cldfrc, &
-       cldnum, &
-       xhnm,   &
-       invariants, &
-       qcw,    &
-       qin     &
-       )
+  subroutine setsox(   &
+       ncol,   lchnk,  loffset,   dtime,  & ! in
+       press,  pdel,   tfld,      mbar,   & ! in
+       lwc,    cldfrc, cldnum,            & ! in
+       xhnm,   invariants,                & ! in
+       qcw,    qin                        ) ! inout
 
     !-----------------------------------------------------------------------      
     !          ... Compute heterogeneous reactions of SOX
@@ -578,7 +567,7 @@ contains
              end do ! iter
 
              if( .not. converged ) then
-                write(iulog,*) 'SETSOX: pH failed to converge @ (',i,',',k,'), % change=', &
+                write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,'), % change=', &
                      100._r8*delta
              end if
           else
@@ -807,6 +796,6 @@ contains
 
     call sox_cldaero_destroy_obj(cldconc)
 
-  end subroutine SETSOX
+  end subroutine setsox 
 
-end module MO_SETSOX
+end module mo_setsox
