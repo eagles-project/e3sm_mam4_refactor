@@ -345,8 +345,6 @@ subroutine dropmixnuc( &
    real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
    real(r8) :: zs(pver) ! inverse of distance between levels [m^-1]
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio [#/kg]
-! BJG   real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
-! BJG   real(r8) :: srcn(pver)       ! droplet source rate [/s]
    real(r8) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
    real(r8) :: csbot_cscen(pver) ! inverse normalized air density csbot(i)/cs(i,k) [dimensionless]
    real(r8) :: zn(pver)   ! g/pdel for layer [m^2/kg]
@@ -359,8 +357,8 @@ subroutine dropmixnuc( &
    real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to mixing [#/kg/s]
 
    real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat [#/m^3]
-   real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
-   real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
+   real(r8) :: qcldbrn(maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
+   real(r8) :: qcldbrn_num(pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
 
    real(r8), pointer :: ncldwtr(:,:) ! initial droplet number mixing ratio [#/kg]
    real(r8), pointer :: temp(:,:)    ! temperature [K]
@@ -461,8 +459,6 @@ subroutine dropmixnuc( &
    ! overall_main_icol_loop
    do icol = 1, ncol
 
-! BJG      qncld(:) = 0._r8
-! BJG      srcn(:) = 0._r8   
       nact(:,1:ntot_amode) = 0._r8
       mact(:,1:ntot_amode) = 0._r8
       cs(icol,:)  = pmid(icol,:)/(rair*temp(icol,:))        ! air density (kg/m3)
@@ -543,6 +539,8 @@ subroutine dropmixnuc( &
       raertend = 0._r8
       qqcwtend = 0._r8
 
+      qcldbrn(:,:,:) = huge(qcldbrn) !store invalid values
+
       do imode = 1, ntot_amode
          do lspec = 0, nspec_amode(imode)
 
@@ -565,8 +563,25 @@ subroutine dropmixnuc( &
             ptend%q(icol,top_lev:pver,lptr) = raertend(top_lev:pver)           ! set tendencies for interstitial aerosol
             qqcw(mm)%fld(icol,:) = 0.0_r8
             qqcw(mm)%fld(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
+
+  !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+
+   ! Extract cloud borne MMRs from qqcw pointer
+           do kk = top_lev, pver
+              if( lspec == 0 ) then
+                 qcldbrn_num(kk,imode) = qqcw(mm)%fld(icol,kk)     
+              else
+                 qcldbrn(lspec,kk,imode) = qqcw(mm)%fld(icol,kk)
+              endif
+           enddo
+  !END NOTE FOR C++ PORT
+
          enddo  ! lspec loop
       enddo   ! imode loop
+
+!  Use interstitial and cloud-borne aerosol to compute output ccn fields.
+      call ccncalc_1col(state_q(icol,top_lev:pver,:), temp(icol,:), qcldbrn, qcldbrn_num, cs(icol,:), ccn(icol,:,:))
+
 
    enddo  ! overall_main_i_loop
    ! end of main loop over i/longitude ....................................
@@ -576,27 +591,6 @@ subroutine dropmixnuc( &
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
 
-  !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
-
-   ! Extract cloud borne MMRs from qqcw pointer
-
-   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
-   do imode=1,ntot_amode
-      do kk=top_lev,pver
-         do lspec =1, nspec_amode(imode)
-           mm   = mam_idx(imode,lspec)
-           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
-         enddo
-         mm   = mam_idx(imode,0) 
-         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
-      enddo
-   enddo
-
-  !END NOTE FOR C++ PORT
-
-!  Use interstitial and cloud-borne aerosol to compute output ccn fields.
-
-   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    do lsat = 1, psat
       call outfld(ccn_name(lsat), ccn(1,1,lsat), pcols, lchnk)
    enddo
@@ -1542,6 +1536,92 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    ccn(:ncol,:,:)=ccn(:ncol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
 
 end subroutine ccncalc
+
+!===============================================================================
+subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn_col)
+   ! calculates number concentration of aerosols activated as CCN at
+   ! supersaturation supersat.
+   ! assumes an internal mixture of a multiple externally-mixed aerosol modes
+   ! cgs units
+
+   ! Ghan et al., Atmos. Res., 1993, 198-221.
+
+  ! input arguments
+   real(r8), pointer, intent(in)  :: state_q_col(:,:) ! aerosol mmrs [kg/kg]     
+   real(r8), pointer, intent(in)  :: tair_col(:)     ! air temperature [K]
+   real(r8), intent(in)  :: qcldbrn(:,:,:), qcldbrn_num(:,:) ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+   real(r8), intent(in)  :: cs_col(pver)       ! air density [kg/m3]
+
+  ! output arguments
+   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
+
+   ! local
+
+   real(r8) :: naerosol ! interstit+activated aerosol number conc [#/m3]
+   real(r8) :: vaerosol ! interstit+activated aerosol volume conc [m3/m3]
+   real(r8) :: amcube  ! [m3]
+   real(r8) :: amcubecoef(ntot_amode) ! [dimensionless]
+   real(r8) :: argfactor(ntot_amode)  ! [dimensionless]
+   real(r8) :: surften_coef  ! [m-K]
+   real(r8) :: aparam ! surface tension parameter  [m]
+   real(r8) :: hygro  ! aerosol hygroscopicity [dimensionless]
+   real(r8) :: sm  ! critical supersaturation at mode radius [fraction]
+   real(r8) :: arg_erf_ccn ! [dimensionless] 
+   real(r8) :: smcoef  ! [m^(3/2)]
+   integer lsat,imode,kk
+   integer phase ! phase of aerosol
+
+   !     mathematical constants
+   real(r8) percent_to_fraction, per_m3_to_per_cm3
+   real(r8) smcoefcoef
+   real(r8) super(psat) ! supersaturation [fraction]
+   !-------------------------------------------------------------------------------
+
+   phase=3 ! interstitial+cloudborne
+
+   percent_to_fraction = 0.01_r8
+   per_m3_to_per_cm3 = 1.e-6_r8
+   super(:)=supersat(:)*percent_to_fraction
+   smcoefcoef=2._r8/sqrt(27._r8)
+
+   surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
+
+   ccn_col(:,:) = 0._r8
+
+   do imode=1,ntot_amode
+
+      amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
+      argfactor(imode)=twothird/(sq2*alogsig(imode))
+
+      do kk=top_lev,pver
+
+         call loadaer_1col( state_q_col(kk,:), &  ! in
+            imode, nspec_amode(imode), cs_col(kk), phase, &  ! in
+            naerosol, vaerosol, hygro, &  ! out
+            qcldbrn(:,kk,imode), qcldbrn_num(kk,imode) )  ! optional in
+
+         aparam = surften_coef/tair_col(kk)
+         smcoef=smcoefcoef*aparam*sqrt(aparam)
+
+         if(naerosol>1.e-3_r8) then
+            amcube=amcubecoef(imode)*vaerosol/naerosol
+            sm=smcoef/sqrt(hygro*amcube) ! critical supersaturation
+         else
+            sm=1._r8 ! value shouldn't matter much since naerosol is small
+         endif
+
+         do lsat=1,psat
+            arg_erf_ccn=argfactor(imode)*log(sm/super(lsat))
+            ccn_col(kk,lsat)=ccn_col(kk,lsat)+naerosol*0.5_r8*(1._r8-erf(arg_erf_ccn))
+         enddo
+
+      enddo
+
+   enddo
+
+   ccn_col(:,:)=ccn_col(:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
+
+end subroutine ccncalc_1col
 
 !===============================================================================
 
