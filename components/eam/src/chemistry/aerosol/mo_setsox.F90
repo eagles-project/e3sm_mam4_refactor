@@ -288,15 +288,25 @@ contains
     !      ... Initial values
     !           The values of so2, so4 are after (1) SLT, and CHEM
     !-----------------------------------------------------------------
-    xph0 = 10._r8**(-ph0)                      ! initial PH value
+    ! initial PH value, in H+ concentration
+    xph0 = 10._r8**(-ph0) 
 
+    ! calculate total atms density [kg/L]
     do k = 1,pver
        cfact(:,k) = xhnm(:,k)     &          ! /cm3(a)  
             * 1.e6_r8             &          ! /m3(a)
             * 1.38e-23_r8/287._r8 &          ! Kg(a)/m3(a)
             * 1.e-3_r8                       ! Kg(a)/L(a)
-    end do
+    enddo
 
+    if ( inv_so2 .or. id_hno3>0 .or. inv_h2o2 .or. id_nh3>0 .or. inv_o3 &
+                 .or. (.not. inv_ho2) .or. (.not. cloud_borne) .or. id_msa>0) then
+        call endrun('FORTRAN refactoring: Only keep the code for default MAM4. &
+             The following options are removed:  id_nh3>0  id_hno3>0  id_msa>0 &
+             inv_h2o2=.T. inv_so2=.T.  inv_o3=.T. inv_ho2=.F. cloud_borne=.F. ')
+    endif
+
+    ! initialize species concentrations
     cldconc => sox_cldaero_create_obj( cldfrc,qcw,lwc, cfact, ncol, loffset )
     xso4c => cldconc%so4c
     xnh4c => cldconc%nh4c
@@ -305,28 +315,16 @@ contains
     xso4(:,:) = 0._r8
     xno3(:,:) = 0._r8
     xnh4(:,:) = 0._r8
-
+    xnh3(:,:) = 0._r8
+    xhno3(:,:)= 0._r8
     do k = 1,pver
        xph(:,k) = xph0                                ! initial PH value
-
-       if ( inv_so2 .or. id_hno3>0 .or. inv_h2o2 .or. id_nh3>0 .or. inv_o3 &
-            .or. (.not. inv_ho2) .or. (.not. cloud_borne) .or. id_msa>0) then
-
-           call endrun('FORTRAN refactoring: Only keep the code for default MAM4. & 
-                The following options are removed:  inv_so2=.T.; id_hno3>0;       &
-                inv_h2o2=.T.; id_nh3>0;. inv_o3; inv_ho2=.F. cloud_borne=.F. id_msa>0')
-
-       endif
-
-       xso2 (:,k) = qin(:,k,id_so2)                 ! mixing ratio
-       xhno3(:,k) = 0.0_r8
-       xh2o2 (:,k) = qin(:,k,id_h2o2)               ! mixing ratio
-       xnh3 (:,k) = 0.0_r8
-       xo3  (:,k) = qin(:,k,id_o3)                  ! mixing ratio
-       xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)! mixing ratio
+       xso2 (:,k) = qin(:,k,id_so2)                 
+       xh2o2 (:,k) = qin(:,k,id_h2o2)               
+       xo3  (:,k) = qin(:,k,id_o3)                  
+       xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)
        xh2so4(:,k) = qin(:,k,id_h2so4)
-
-    end do
+    enddo
     
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
