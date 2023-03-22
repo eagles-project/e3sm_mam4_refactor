@@ -248,7 +248,7 @@ contains
 
     real(r8), dimension(ncol,pver)  ::             &
          xhno3, xh2o2, xso2, xso4, xno3, &
-         xnh3, xnh4, xo3,         &
+         xnh3, xnh4, xo3,         & ! x***: atom concentration [kg/L]
          cfact, &
          xph, xho2,         &
          xh2so4, xmsa, xso4_init, &
@@ -337,9 +337,11 @@ contains
              xnh4(i,k) = xnh4c(i,k) / cldfrc(i,k)
              xno3(i,k) = xno3c(i,k) / cldfrc(i,k)
           endif
-          xl = cldconc%xlwc(i,k)
 
+          ! cloud liquid water content
+          xl = cldconc%xlwc(i,k)
           if( xl >= 1.e-8_r8 ) then
+             ! working variable to convert to 25 degC (1/T - 1/[298K])
              work1(i) = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
 
              !-----------------------------------------------------------------
@@ -358,7 +360,7 @@ contains
              !-----------------------------------------------------------------
              pz = .01_r8*press(i,k)       !! pressure in mb
              tz = tfld(i,k)
-             patm = pz/1013._r8
+             patm = pz/1013._r8           ! pressure in atm
              xam  = press(i,k)/(1.38e-23_r8*tz)  !air density /M3
 
              !-----------------------------------------------------------------
@@ -455,6 +457,7 @@ contains
 
              !-----------------------------------------------------------------
              ! now use bisection method to solve electro-neutrality equation
+             ! to calculate PH value and H+ concentration
              !
              ! during the iteration loop,
              !    yph_lo = lower ph value that brackets the root (i.e., correct ph)
@@ -470,14 +473,15 @@ contains
                    yph_lo = 2.0_r8
                    yph_hi = yph_lo
                    yph = yph_lo
-                else if (iter == 2) then
+                elseif (iter == 2) then
                    ! 2nd iteration ph = upper bound value
                    yph_hi = 7.0_r8
                    yph = yph_hi
                 else
                    ! later iteration ph = mean of the two bracketing values
                    yph = 0.5_r8*(yph_lo + yph_hi)
-                end if
+                endif
+
                 ! calc current [H+] from ph
                 xph(i,k) = 10.0_r8**(-yph)
 
@@ -562,7 +566,7 @@ contains
                    ynetpos_hi = ynetpos
                 end if
 
-             end do ! iter
+             enddo ! iter
 
              if( .not. converged ) then
                 write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,'), % change=', &
