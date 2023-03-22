@@ -173,6 +173,7 @@ contains
     use cldaero_mod,     only : cldaero_conc_t
     use phys_control, only : phys_getopts
     use cam_abortutils,   only: endrun
+    use spmd_utils,   only : masterproc
 
     !
     implicit none
@@ -326,6 +327,14 @@ contains
        xh2so4(:,k) = qin(:,k,id_h2so4)
     enddo
     
+    ! NO3, are not incorporated in MAM4, remove the related code
+    ! assign 0 to input variables needed for subroutine sox_cldaero_update
+    ! this assignment can be removed when incorporating refaction of
+    ! sox_cldaero_update
+    hno3g(:,:) = 0._r8
+    xmsa(:,:)  = 0._r8
+    
+
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
     !-----------------------------------------------------------------
@@ -334,8 +343,6 @@ contains
           
           if (cloud_borne .and. cldfrc(i,k)>0._r8) then
              xso4(i,k) = xso4c(i,k) / cldfrc(i,k)
-             xnh4(i,k) = xnh4c(i,k) / cldfrc(i,k)
-             xno3(i,k) = xno3c(i,k) / cldfrc(i,k)
           endif
 
           ! cloud liquid water content
@@ -366,25 +373,7 @@ contains
              !-----------------------------------------------------------------
              !        ... hno3
              !-----------------------------------------------------------------
-             ! previous code
-             !    hehno3(i,k)  = xk*(1._r8 + xe/xph(i,k))
-             !    px = hehno3(i,k) * Ra * tz * xl
-             !    hno3g = xhno3(i,k)/(1._r8 + px)
-             !    Ehno3 = xk*xe*hno3g *patm
-             ! equivalent new code
-             !    hehno3 = xk + xk*xe/hplus
-             !    hno3g = xhno3/(1 + px)
-             !          = xhno3/(1 + hehno3*ra*tz*xl)
-             !          = xhno3/(1 + xk*ra*tz*xl*(1 + xe/hplus)
-             !    ehno3 = hno3g*xk*xe*patm
-             !          = xk*xe*patm*xhno3/(1 + xk*ra*tz*xl*(1 + xe/hplus)
-             !          = ( fact1_hno3    )/(1 + fact2_hno3 *(1 + fact3_hno3/hplus)
-             !    [hno3-] = ehno3/hplus
-             xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-             xe = 15.4_r8
-             fact1_hno3 = xk*xe*patm*xhno3(i,k)
-             fact2_hno3 = xk*ra*tz*xl
-             fact3_hno3 = xe
+             ! FORTRAN refactoring: not incorporated in MAM4 
 
              !-----------------------------------------------------------------
              !          ... so2
@@ -414,26 +403,7 @@ contains
              !-----------------------------------------------------------------
              !          ... nh3
              !-----------------------------------------------------------------
-             ! previous code
-             !    henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/xkw)
-             !    px = henh3(i,k) * Ra * tz * xl
-             !    nh3g = (xnh3(i,k)+xnh4(i,k))/(1._r8+ px)
-             !    Enh3 = xk*xe*nh3g/xkw *patm
-             ! equivalent new code
-             !    henh3 = xk + xk*xe*hplus/xkw
-             !    nh3g = xnh34/(1 + px)
-             !         = xnh34/(1 + henh3*ra*tz*xl)
-             !         = xnh34/(1 + xk*ra*tz*xl*(1 + xe*hplus/xkw)
-             !    enh3 = nh3g*xk*xe*patm/xkw
-             !          = ((xk*xe*patm/xkw)*xnh34)/(1 + xk*ra*tz*xl*(1 + xe*hplus/xkw)
-             !          = ( fact1_nh3            )/(1 + fact2_nh3  *(1 + fact3_nh3*hplus)
-             !    [nh4+] = enh3*hplus
-             xk = 58._r8   *EXP( 4085._r8*work1(i) )
-             xe = 1.7e-5_r8*EXP( -4325._r8*work1(i) )
-
-             fact1_nh3 = (xk*xe*patm/xkw)*(xnh3(i,k)+xnh4(i,k))
-             fact2_nh3 = xk*ra*tz*xl
-             fact3_nh3 = xe/xkw
+             ! FORTRAN refactoring: not incorporated in MAM4
 
              !-----------------------------------------------------------------
              !        ... h2o effects
@@ -486,30 +456,18 @@ contains
                 xph(i,k) = 10.0_r8**(-yph)
 
                 !-----------------------------------------------------------------
-                !        ... hno3
-                !-----------------------------------------------------------------
-                Ehno3 = fact1_hno3/(1.0_r8 + fact2_hno3*(1.0_r8 + fact3_hno3/xph(i,k)))
-
-                !-----------------------------------------------------------------
                 !          ... so2
                 !-----------------------------------------------------------------
                 Eso2 = fact1_so2/(1.0_r8 + fact2_so2*(1.0_r8 + (fact3_so2/xph(i,k)) &
                      *(1.0_r8 +  fact4_so2/xph(i,k))))
 
-                !-----------------------------------------------------------------
-                !          ... nh3
-                !-----------------------------------------------------------------
-                Enh3 = fact1_nh3/(1.0_r8 + fact2_nh3*(1.0_r8 + fact3_nh3*xph(i,k)))
-
-                tmp_nh4  = Enh3 * xph(i,k)
                 tmp_hso3 = Eso2 / xph(i,k)
                 tmp_so3  = tmp_hso3 * 2.0_r8*fact4_so2/xph(i,k)
                 tmp_hco3 = Eco2 / xph(i,k)
                 tmp_oh   = Eh2o / xph(i,k)
-                tmp_no3  = Ehno3 / xph(i,k)
                 tmp_so4 = cldconc%so4_fact*Eso4
-                tmp_pos = xph(i,k) + tmp_nh4
-                tmp_neg = tmp_oh + tmp_hco3 + tmp_no3 + tmp_hso3 + tmp_so3 + tmp_so4
+                tmp_pos = xph(i,k) 
+                tmp_neg = tmp_oh + tmp_hco3 + tmp_hso3 + tmp_so3 + tmp_so4
 
                 ynetpos = tmp_pos - tmp_neg
 
@@ -591,13 +549,6 @@ contains
           patm = press(i,k)/101300._r8        ! press is in pascal
           xam  = press(i,k)/(1.38e-23_r8*tz)  ! air density /M3
 
-          !-----------------------------------------------------------------------      
-          !        ... hno3
-          !-----------------------------------------------------------------------      
-          xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-          xe = 15.4_r8
-          hehno3(i,k)  = xk*(1._r8 + xe/xph(i,k))
-
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
@@ -614,13 +565,6 @@ contains
 
           wrk = xe/xph(i,k)
           heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
-
-          !-----------------------------------------------------------------
-          !          ... nh3
-          !-----------------------------------------------------------------
-          xk = 58._r8   *EXP( 4085._r8*work1(i) )
-          xe = 1.7e-5_r8*EXP(-4325._r8*work1(i) )
-          henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/xkw)
 
           !-----------------------------------------------------------------
           !        ... o3
@@ -644,12 +588,6 @@ contains
           !       ... Partioning 
           !-----------------------------------------------
 
-          !-----------------------------------------------------------------
-          !        ... hno3
-          !-----------------------------------------------------------------
-          px = hehno3(i,k) * Ra * tz * xl
-          hno3g(i,k) = (xhno3(i,k)+xno3(i,k))/(1._r8 + px)
-
           !------------------------------------------------------------------------
           !        ... h2o2
           !------------------------------------------------------------------------
@@ -667,12 +605,6 @@ contains
           !------------------------------------------------------------------------
           px = heo3(i,k) * Ra * tz * xl
           o3g =  xo3(i,k)/(1._r8+ px)
-
-          !------------------------------------------------------------------------
-          !         ... nh3
-          !------------------------------------------------------------------------
-          px = henh3(i,k) * Ra * tz * xl
-          nh3g(i,k) = 0._r8
 
           !-----------------------------------------------
           !       ... Aqueous phase reaction rates
