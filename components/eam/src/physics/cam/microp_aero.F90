@@ -620,7 +620,8 @@ subroutine microp_aero_run ( &
 
    ! heterogeneous freezing
    call t_startf('hetfrz_classnuc_cam_calc')
-   call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, state_q, state, deltatin, factnum, pbuf, & 
+   call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, qc, nc, state_q, &
+                                 state, deltatin, factnum, pbuf, & 
                                  frzimm, frzcnt, frzdep)
    call t_stopf('hetfrz_classnuc_cam_calc')
 

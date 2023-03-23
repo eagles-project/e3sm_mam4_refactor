@@ -136,6 +136,7 @@ real(r8), allocatable :: aer(:,:,:,:)
 
 real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
 real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
+real(r8), parameter :: frz_cm3_to_m3  = 1.0e6_r8        ! het. frz. unit conversion cm^-3 s^-1 to m^-3 s^-1
 
 !===============================================================================
 contains
@@ -520,7 +521,7 @@ end subroutine hetfrz_classnuc_cam_init
 
 !================================================================================================
 
-subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
+subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, qc, nc, state_q, &
                                      state, deltatin, factnum, pbuf, &
                                      frzimm, frzcnt, frzdep)
 
@@ -529,6 +530,11 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
    integer, intent(in) :: lchnk
    real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
    real(r8), intent(in) :: pmid(:,:)            ! pressure at layer midpoints [pa]
+   real(r8), intent(in) :: rho(:,:)             ! air density [kg/m^3]
+   real(r8), intent(in) :: ast(:,:)             !    
+   real(r8), intent(in) :: qc(:,:)
+   real(r8), intent(in) :: nc(:,:)
+
    real(r8), intent(in) :: state_q(:,:,:)       ! input mixing ratio for all water and chem species [#/kg,kg/kg]
    type(physics_state), target, intent(in)    :: state
    real(r8),                    intent(in)    :: deltatin       ! time step (s)
@@ -540,13 +546,10 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
    real(r8), intent(out) :: frzdep(:,:)
  
    ! local workspace
-   integer :: itim_old
    integer :: icol, kk, ispec
    integer :: lchnk_zb                  ! zero-based local chunk id
 
-   real(r8) :: rho(pcols,pver)          ! air density (kg m-3)
-
-   real(r8), pointer :: ast(:,:)        
+       
 
    real(r8) :: lcldm(pcols,pver)
 
@@ -591,23 +594,9 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
    character(128) :: errstring   ! Error status
    !-------------------------------------------------------------------------------
 
-   associate( &
-      qc    => state%q(:pcols,:pver,cldliq_idx), &
-      nc    => state%q(:pcols,:pver,numliq_idx) )
 
    lchnk_zb = lchnk - begchunk
 
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-
-   !initialize rho
-   rho(:,:) = 0.0_r8
-
-   do kk = top_lev, pver
-      do icol = 1, ncol
-         rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
-      enddo
-   enddo
 
    do kk = top_lev, pver
       do icol = 1, ncol
@@ -756,13 +745,15 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
             fn(3) = factnum(icol,kk,mode_coarse_idx) ! dust_a3 coarse mode
             
 
-            call hetfrz_classnuc_calc( &
-               deltatin,  temperature(icol,kk),  pmid(icol,kk),  supersatice,   &
-               fn,  r3lx,  ncic*rho(icol,kk)*1.0e-6_r8,  frzbcimm(icol,kk),  frzduimm(icol,kk),   &
-               frzbccnt(icol,kk),  frzducnt(icol,kk),  frzbcdep(icol,kk),  frzdudep(icol,kk),  hetraer(icol,kk,:), &
-               awcam(icol,kk,:), awfacm(icol,kk,:), dstcoat(icol,kk,:), total_aer_num(icol,kk,:),  &
-               coated_aer_num(icol,kk,:), uncoated_aer_num(icol,kk,:), total_interstitial_aer_num(icol,kk,:), &
-               total_cloudborne_aer_num(icol,kk,:), errstring)
+            call hetfrz_classnuc_calc( deltatin,  temperature(icol,kk),  pmid(icol,kk),  supersatice, &                      ! in
+                                       fn,  r3lx,  ncic*rho(icol,kk)*1.0e-6_r8,  &                                           ! in
+                                       hetraer(icol,kk,:), awcam(icol,kk,:), awfacm(icol,kk,:), dstcoat(icol,kk,:), &        ! in
+                                       total_aer_num(icol,kk,:), coated_aer_num(icol,kk,:), uncoated_aer_num(icol,kk,:), &   ! in
+                                       total_interstitial_aer_num(icol,kk,:), total_cloudborne_aer_num(icol,kk,:), &         ! in
+                                       frzbcimm(icol,kk),  frzduimm(icol,kk), &                                              ! out
+                                       frzbccnt(icol,kk),  frzducnt(icol,kk), &                                              ! out 
+                                       frzbcdep(icol,kk),  frzdudep(icol,kk), &                                              ! out
+                                       errstring)                                                                            ! out
 
             call handle_errmsg(errstring, subname="hetfrz_classnuc_calc")
 
@@ -780,25 +771,25 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
             frzdep(icol,kk) = 0._r8
          endif
 
-         nnuccc_bc(icol,kk) = frzbcimm(icol,kk)*1.0e6_r8*ast(icol,kk)
-         nnucct_bc(icol,kk) = frzbccnt(icol,kk)*1.0e6_r8*ast(icol,kk)
-         nnudep_bc(icol,kk) = frzbcdep(icol,kk)*1.0e6_r8*ast(icol,kk)
+         nnuccc_bc(icol,kk) = frzbcimm(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
+         nnucct_bc(icol,kk) = frzbccnt(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
+         nnudep_bc(icol,kk) = frzbcdep(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
 
-         nnuccc_dst(icol,kk) = frzduimm(icol,kk)*1.0e6_r8*ast(icol,kk)
-         nnucct_dst(icol,kk) = frzducnt(icol,kk)*1.0e6_r8*ast(icol,kk)
-         nnudep_dst(icol,kk) = frzdudep(icol,kk)*1.0e6_r8*ast(icol,kk)
+         nnuccc_dst(icol,kk) = frzduimm(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
+         nnucct_dst(icol,kk) = frzducnt(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
+         nnudep_dst(icol,kk) = frzdudep(icol,kk)*frz_cm3_to_m3*ast(icol,kk)
 
-         niimm_bc(icol,kk) = frzbcimm(icol,kk)*1.0e6_r8*deltatin
-         nicnt_bc(icol,kk) = frzbccnt(icol,kk)*1.0e6_r8*deltatin
-         nidep_bc(icol,kk) = frzbcdep(icol,kk)*1.0e6_r8*deltatin
+         niimm_bc(icol,kk) = frzbcimm(icol,kk)*frz_cm3_to_m3*deltatin
+         nicnt_bc(icol,kk) = frzbccnt(icol,kk)*frz_cm3_to_m3*deltatin
+         nidep_bc(icol,kk) = frzbcdep(icol,kk)*frz_cm3_to_m3*deltatin
 
-         niimm_dst(icol,kk) = frzduimm(icol,kk)*1.0e6_r8*deltatin
-         nicnt_dst(icol,kk) = frzducnt(icol,kk)*1.0e6_r8*deltatin
-         nidep_dst(icol,kk) = frzdudep(icol,kk)*1.0e6_r8*deltatin
+         niimm_dst(icol,kk) = frzduimm(icol,kk)*frz_cm3_to_m3*deltatin
+         nicnt_dst(icol,kk) = frzducnt(icol,kk)*frz_cm3_to_m3*deltatin
+         nidep_dst(icol,kk) = frzdudep(icol,kk)*frz_cm3_to_m3*deltatin
 
-         numice10s(icol,kk) = (frzimm(icol,kk)+frzcnt(icol,kk)+frzdep(icol,kk))*1.0e6_r8*deltatin*(10._r8/deltatin)
-         numice10s_imm_dst(icol,kk) = frzduimm(icol,kk)*1.0e6_r8*deltatin*(10._r8/deltatin)
-         numice10s_imm_bc(icol,kk) = frzbcimm(icol,kk)*1.0e6_r8*deltatin*(10._r8/deltatin)
+         numice10s(icol,kk) = (frzimm(icol,kk)+frzcnt(icol,kk)+frzdep(icol,kk))*frz_cm3_to_m3*deltatin*(10._r8/deltatin)
+         numice10s_imm_dst(icol,kk) = frzduimm(icol,kk)*frz_cm3_to_m3*deltatin*(10._r8/deltatin)
+         numice10s_imm_bc(icol,kk) = frzbcimm(icol,kk)*frz_cm3_to_m3*deltatin*(10._r8/deltatin)
       enddo
    enddo
 
@@ -833,8 +824,6 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, state_q, &
    call outfld('NUMICE10s',    numice10s,         pcols, lchnk)
    call outfld('NUMIMM10sDST', numice10s_imm_dst, pcols, lchnk)
    call outfld('NUMIMM10sBC',  numice10s_imm_bc,  pcols, lchnk)
-
-   end associate
 
 end subroutine hetfrz_classnuc_cam_calc
 
