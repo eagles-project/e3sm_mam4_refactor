@@ -3,6 +3,7 @@ module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
+    use spmd_utils,   only : masterproc
 
   private
   public :: sox_inti, setsox
@@ -173,7 +174,6 @@ contains
     use cldaero_mod,     only : cldaero_conc_t
     use phys_control, only : phys_getopts
     use cam_abortutils,   only: endrun
-    use spmd_utils,   only : masterproc
 
     !
     implicit none
@@ -348,188 +348,16 @@ contains
           ! cloud liquid water content
           xl = cldconc%xlwc(i,k)
           if( xl >= 1.e-8_r8 ) then
-             ! working variable to convert to 25 degC (1/T - 1/[298K])
-             work1(i) = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
-
-             !-----------------------------------------------------------------
-             ! 21-mar-2011 changes by rce
-             ! ph calculation now uses bisection method to solve the electro-neutrality equation
-             ! 3-mode aerosols (where so4 is assumed to be nh4hso4)
-             !    old code set xnh4c = so4c
-             !    new code sets xnh4c = 0, then uses a -1 charge (instead of -2)
-             !       for so4 when solving the electro-neutrality equation
-             !-----------------------------------------------------------------
-
-             !-----------------------------------------------------------------
-             !  calculations done before iterating
-             !-----------------------------------------------------------------
-
-             !-----------------------------------------------------------------
-             pz = .01_r8*press(i,k)       !! pressure in mb
-             tz = tfld(i,k)
-             patm = pz/1013._r8           ! pressure in atm
-             xam  = press(i,k)/(1.38e-23_r8*tz)  !air density /M3
-
-             !-----------------------------------------------------------------
-             !        ... hno3
-             !-----------------------------------------------------------------
-             ! FORTRAN refactoring: not incorporated in MAM4 
-
-             !-----------------------------------------------------------------
-             !          ... so2
-             !-----------------------------------------------------------------
-             ! previous code
-             !    heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
-             !    px = heso2(i,k) * Ra * tz * xl
-             !    so2g =  xso2(i,k)/(1._r8+ px)
-             !    Eso2 = xk*xe*so2g *patm
-             ! equivalent new code
-             !    heso2 = xk + xk*xe/hplus * xk*xe*x2/hplus**2
-             !    so2g = xso2/(1 + px)
-             !         = xso2/(1 + heso2*ra*tz*xl)
-             !         = xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
-             !    eso2 = so2g*xk*xe*patm
-             !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
-             !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
-             !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-             xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-             xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-             x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
-             fact1_so2 = xk*xe*patm*xso2(i,k)
-             fact2_so2 = xk*ra*tz*xl
-             fact3_so2 = xe
-             fact4_so2 = x2
-
-             !-----------------------------------------------------------------
-             !          ... nh3
-             !-----------------------------------------------------------------
-             ! FORTRAN refactoring: not incorporated in MAM4
-
-             !-----------------------------------------------------------------
-             !        ... h2o effects
-             !-----------------------------------------------------------------
-             Eh2o = xkw
-
-             !-----------------------------------------------------------------
-             !        ... co2 effects
-             !-----------------------------------------------------------------
-             co2g = 330.e-6_r8                            !330 ppm = 330.e-6 atm
-             xk = 3.1e-2_r8*EXP( 2423._r8*work1(i) )
-             xe = 4.3e-7_r8*EXP(-913._r8 *work1(i) )
-             Eco2 = xk*xe*co2g  *patm
-
-             !-----------------------------------------------------------------
-             !         ... so4 effect
-             !-----------------------------------------------------------------
-             Eso4 = xso4(i,k)*xhnm(i,k)   &         ! /cm3(a)
-                  *const0/xl
-
-
-             !-----------------------------------------------------------------
-             ! now use bisection method to solve electro-neutrality equation
-             ! to calculate PH value and H+ concentration
-             !
-             ! during the iteration loop,
-             !    yph_lo = lower ph value that brackets the root (i.e., correct ph)
-             !    yph_hi = upper ph value that brackets the root (i.e., correct ph)
-             !    yph    = current ph value
-             !    yposnet_lo and yposnet_hi = net positive ions for
-             !       yph_lo and yph_hi
-             !-----------------------------------------------------------------
-             do iter = 1,itermax
-
-                if (iter == 1) then
-                   ! 1st iteration ph = lower bound value
-                   yph_lo = 2.0_r8
-                   yph_hi = yph_lo
-                   yph = yph_lo
-                elseif (iter == 2) then
-                   ! 2nd iteration ph = upper bound value
-                   yph_hi = 7.0_r8
-                   yph = yph_hi
-                else
-                   ! later iteration ph = mean of the two bracketing values
-                   yph = 0.5_r8*(yph_lo + yph_hi)
-                endif
-
-                ! calc current [H+] from ph
-                xph(i,k) = 10.0_r8**(-yph)
-
-                !-----------------------------------------------------------------
-                !          ... so2
-                !-----------------------------------------------------------------
-                Eso2 = fact1_so2/(1.0_r8 + fact2_so2*(1.0_r8 + (fact3_so2/xph(i,k)) &
-                     *(1.0_r8 +  fact4_so2/xph(i,k))))
-
-                tmp_hso3 = Eso2 / xph(i,k)
-                tmp_so3  = tmp_hso3 * 2.0_r8*fact4_so2/xph(i,k)
-                tmp_hco3 = Eco2 / xph(i,k)
-                tmp_oh   = Eh2o / xph(i,k)
-                tmp_so4 = cldconc%so4_fact*Eso4
-                tmp_pos = xph(i,k) 
-                tmp_neg = tmp_oh + tmp_hco3 + tmp_hso3 + tmp_so3 + tmp_so4
-
-                ynetpos = tmp_pos - tmp_neg
-
-
-                ! yposnet = net positive ions/charge
-                ! if the correct ph is bracketed by yph_lo and yph_hi (with yph_lo < yph_hi),
-                !    then you will have yposnet_lo > 0 and yposnet_hi < 0
-                converged = .false.
-                if (iter > 2) then
-                   if (ynetpos >= 0.0_r8) then
-                      ! net positive ions are >= 0 for both yph and yph_lo
-                      !    so replace yph_lo with yph
-                      yph_lo = yph
-                      ynetpos_lo = ynetpos
-                   else
-                      ! net positive ions are <= 0 for both yph and yph_hi
-                      !    so replace yph_hi with yph
-                      yph_hi = yph
-                      ynetpos_hi = ynetpos
-                   end if
-
-                   if (abs(yph_hi - yph_lo) .le. 0.005_r8) then
-                      ! |yph_hi - yph_lo| <= convergence criterion, so set
-                      !    final ph to their midpoint and exit
-                      ! (.005 absolute error in pH gives .01 relative error in H+)
-                      tmp_hp = xph(i,k)
-                      yph = 0.5_r8*(yph_hi + yph_lo)
-                      xph(i,k) = 10.0_r8**(-yph)
-                      converged = .true.
-                      exit
-                   else 
-                      ! do another iteration
-                      converged = .false.
-                   end if
-
-                else if (iter == 1) then
-                   if (ynetpos <= 0.0_r8) then
-                      ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
-                      !    the correct ph, so use the lower bound
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   end if
-                   ynetpos_lo = ynetpos
-
-                else ! (iter == 2)
-                   if (ynetpos >= 0.0_r8) then
-                      ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
-                      !    the correct ph, so use they upper bound
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   end if
-                   ynetpos_hi = ynetpos
-                end if
-
-             enddo ! iter
-
+ 
+             call calc_ph_values(  &
+                tfld(i,k), press(i,k), xl, &
+                xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact,    &
+                Ra, xkw, const0,                &
+                converged, xph(i,k))
              if( .not. converged ) then
-                write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,'), % change=', &
-                     100._r8*delta
+                write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,').'
              end if
+
           else
              xph(i,k) =  1.e-7_r8
           end if
@@ -731,5 +559,229 @@ contains
     call sox_cldaero_destroy_obj(cldconc)
 
   end subroutine setsox 
+
+!===========================================================================
+  subroutine calc_ph_values(                    &
+                temperature, pressure, xlwc,    & ! in
+                xso2, xso4, xhnm,  so4_fact,    & ! in
+                Ra,   xkw,  const0,             & ! in
+                converged, xph                  ) ! out
+!---------------------------------------------------------------------------
+! calculate PH value and H+ concentration
+!
+! 21-mar-2011 changes by rce
+! now uses bisection method to solve the electro-neutrality equation
+! 3-mode aerosols (where so4 is assumed to be nh4hso4)
+!       old code set xnh4c = so4c
+!       new code sets xnh4c = 0, then uses a -1 charge (instead of -2)
+ !      for so4 when solving the electro-neutrality equation
+!---------------------------------------------------------------------------
+
+    real(r8),  intent(in) :: temperature        ! temperature [K]
+    real(r8),  intent(in) :: pressure           ! pressure [Pa]
+    real(r8),  intent(in) :: xso2               ! SO2 [kg/L]
+    real(r8),  intent(in) :: xso4               ! SO4 [kg/L]
+    real(r8),  intent(in) :: xhnm               ! [kg/L]
+    real(r8),  intent(in) :: xlwc               ! cloud LWC [kg/L]
+    real(r8),  intent(in) :: so4_fact           ! factor for SO4
+    real(r8),  intent(in) :: Ra                 ! constant parameter
+    real(r8),  intent(in) :: xkw                ! constant parameter
+    real(r8),  intent(in) :: const0             ! constant parameter
+
+    logical,  intent(out) :: converged          ! if the method converge
+    real(r8), intent(out) :: xph                ! H+ ions concentration [kg/L]
+
+
+    ! local variables
+    integer   :: iter  ! iteration number
+    real(r8)  :: yph_lo, yph_hi, yph    ! pH values, lower and upper bounds
+    real(r8)  :: t_factor       ! working variables to convert temperature
+    real(r8)  :: patm           ! pressure in atm
+    real(r8)  :: xk, xe, x2     ! working variables
+    real(r8)  :: fact1_so2, fact2_so2, fact3_so2, fact4_so2  ! SO2 factors
+    real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species
+    real(r8)  :: ynetpos        ! net positive ions
+
+    integer,  parameter :: itermax = 20  ! maximum number of iterations
+    real(r8), parameter :: co2g = 330.e-6_r8    !330 ppm = 330.e-6 atm
+
+
+    !----------------------------------------
+    ! calculate variables before iterating
+    !----------------------------------------
+
+    !  working variable to convert to 25 degC (1/T - 1/[298K])
+    t_factor = 1._r8 / temperature - 1._r8 / 298._r8
+    ! pressure in atm
+    patm = .01_r8*pressure/1013._r8
+
+    !----------------------------------------
+    ! effect of chemical species
+    !----------------------------------------
+
+    ! -------------- hno3 -------------------
+    ! FORTRAN refactoring: not incorporated in MAM4
+
+    ! -------------- nh3 -------------------
+    ! FORTRAN refactoring: not incorporated in MAM4
+
+    ! -------------- so2 -------------------
+    ! previous code
+    !    heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
+    !    px = heso2(i,k) * Ra * tz * xl
+    !    so2g =  xso2(i,k)/(1._r8+ px)
+    !    Eso2 = xk*xe*so2g *patm
+    ! equivalent new code
+    !    heso2 = xk + xk*xe/hplus * xk*xe*x2/hplus**2
+    !    so2g = xso2/(1 + px)
+    !         = xso2/(1 + heso2*ra*tz*xl)
+    !         = xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
+    !    eso2 = so2g*xk*xe*patm
+    !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
+    !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
+    !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
+    xk = 1.23_r8  *EXP( 3120._r8*t_factor )
+    xe = 1.7e-2_r8*EXP( 2090._r8*t_factor )
+    x2 = 6.0e-8_r8*EXP( 1120._r8*t_factor )
+    fact1_so2 = xk*xe*patm*xso2
+    fact2_so2 = xk*Ra*temperature*xlwc
+    fact3_so2 = xe
+    fact4_so2 = x2
+
+    ! -------------- h2o effects -------------------
+    Eh2o = xkw
+
+    ! -------------- co2 effects -------------------
+    xk = 3.1e-2_r8*EXP( 2423._r8*t_factor )
+    xe = 4.3e-7_r8*EXP(-913._r8 *t_factor )
+    Eco2 = xk*xe*co2g  *patm
+
+    ! -------------- so4 effects -------------------
+    Eso4 = xso4*xhnm   &         ! /cm3(a)
+               *const0/xlwc
+
+    !-----------------------------------------------------------------
+    ! now use bisection method to solve electro-neutrality equation
+    ! to calculate PH value and H+ concentration
+    !
+    ! during the iteration loop,
+    !    yph_lo = lower ph value that brackets the root (i.e., correct ph)
+    !    yph_hi = upper ph value that brackets the root (i.e., correct ph)
+    !    yph    = current ph value
+    !    yposnet_lo and yposnet_hi = net positive ions for
+    !       yph_lo and yph_hi
+    !-----------------------------------------------------------------
+
+    converged = .false.
+    ! ---------  1st iteration: set lower bound ph value ----------
+    yph_lo = 2.0_r8
+    yph_hi = yph_lo
+    yph = yph_lo
+    call calc_ynetpos (          yph,                   & ! in
+         fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+         Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+         xph,   ynetpos                                 ) ! out
+    if (ynetpos <= 0.0_r8) then
+    ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
+    !    the correct ph, so use the lower bound
+          converged = .true.
+          return
+    endif
+    ynetpos_lo = ynetpos
+
+    ! ---------  2nd iteration: set upper bound ph value ----------
+    yph_hi = 7.0_r8
+    yph = yph_hi
+    call calc_ynetpos (          yph,                   & ! in
+         fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+         Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+         xph,   ynetpos                                 ) ! out
+    if (ynetpos >= 0.0_r8) then
+    ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
+    !    the correct ph, so use the lower bound
+          converged = .true.
+          return
+    endif
+    ynetpos_hi = ynetpos
+
+    ! --------- 3rd iteration and more ------------
+    do iter = 3, itermax
+        yph = 0.5_r8*(yph_lo + yph_hi)
+        call calc_ynetpos (          yph,                   & ! in
+             fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+             Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+             xph,   ynetpos                                 ) ! out
+        if (ynetpos >= 0.0_r8) then
+           ! net positive ions are >= 0 for both yph and yph_lo
+           !    so replace yph_lo with yph
+           yph_lo = yph
+           ynetpos_lo = ynetpos
+        else
+           ! net positive ions are <= 0 for both yph and yph_hi
+           !    so replace yph_hi with yph
+           yph_hi = yph
+           ynetpos_hi = ynetpos
+        endif
+
+        if (abs(yph_hi - yph_lo) .le. 0.005_r8) then
+           ! |yph_hi - yph_lo| <= convergence criterion, so set
+           !    final ph to their midpoint and exit
+           ! (.005 absolute error in pH gives .01 relative error in H+)
+           yph = 0.5_r8*(yph_hi + yph_lo)
+           xph = 10.0_r8**(-yph)
+           converged = .true.
+           return
+        endif
+    enddo
+
+  end subroutine calc_ph_values
+
+
+!===========================================================================
+  subroutine calc_ynetpos(   yph,                               & ! in
+                fact1_so2, fact2_so2, fact3_so2, fact4_so2,     & ! in
+                Eco2,      Eh2o,      Eso4,      so4_fact,      & ! in
+                xph,       ynetpos                              ) ! out
+    !-----------------------------------------------------------------
+    ! calculate net positive ions (ynetpos) for iterations in calc_ph_values
+    ! also calculate H+ concentration (xph) from ph value
+    !-----------------------------------------------------------------
+    real(r8), intent(in) :: yph         ! pH value
+    real(r8), intent(in) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2 ! factors for SO2
+    real(r8), intent(in) :: Eco2, Eh2o, Eso4, so4_fact          ! effects from species
+
+    real(r8), intent(out) :: xph        ! H+ concentration from pH value [kg/L]
+    real(r8), intent(out) :: ynetpos    ! net positive ions
+
+    ! local variables
+    real(r8) :: Eso2    ! effect of so2, which is related to pH value
+    real(r8) :: tmp_hso3, tmp_so3, tmp_hco3, tmp_oh, tmp_so4  ! temporary variables
+    real(r8) :: tmp_pos, tmp_neg        ! positive and negative values to calculate ynetpos
+
+    ! calc current [H+] from ph
+    xph = 10.0_r8**(-yph)
+
+    !-----------------------------------------------------------------
+    !          ... so2
+    !-----------------------------------------------------------------
+    Eso2 = fact1_so2/(1.0_r8 + fact2_so2*(1.0_r8 +(fact3_so2/xph) &
+                    *(1.0_r8 + fact4_so2/xph)))
+
+    tmp_hso3 = Eso2 / xph
+    tmp_so3  = tmp_hso3 * 2.0_r8*fact4_so2/xph
+    tmp_hco3 = Eco2 / xph
+    tmp_oh   = Eh2o / xph
+    tmp_so4 = so4_fact*Eso4
+
+    ! positive ions are H+ only
+    tmp_pos = xph
+    ! all negative ions
+    tmp_neg = tmp_oh + tmp_hco3 + tmp_hso3 + tmp_so3 + tmp_so4
+
+    ynetpos = tmp_pos - tmp_neg
+
+  end subroutine calc_ynetpos
+
+!===========================================================================
 
 end module mo_setsox
