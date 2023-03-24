@@ -785,26 +785,18 @@ contains
 
     xso4_init=xso4
 
-    if (xh2o2 > xso2) then
-       if (delta_s > xso2) then
-          xso4=xso4+xso2
-          xh2o2=xh2o2-xso2
-          xso2=1.e-20_r8
-       else
-          xso4  = xso4  + delta_s
-          xh2o2 = xh2o2 - delta_s
-          xso2  = xso2  - delta_s
-       endif
+    if (delta_s<=xso2 .and. delta_s<=xh2o2) then
+        xso4  = xso4  + delta_s
+        xh2o2 = xh2o2 - delta_s
+        xso2  = xso2  - delta_s
+    elseif (xh2o2 > xso2) then
+        xso4=xso4+xso2
+        xh2o2=xh2o2-xso2
+        xso2=1.e-20_r8
     else
-       if (delta_s  > xh2o2) then
-          xso4=xso4+xh2o2
-          xso2=xso2-xh2o2
-          xh2o2=1.e-20_r8
-       else
-          xso4  = xso4  + delta_s
-          xh2o2 = xh2o2 - delta_s
-          xso2  = xso2  - delta_s
-       endif
+        xso4=xso4+xh2o2
+        xso2=xso2-xh2o2
+        xh2o2=1.e-20_r8
     endif
 
     if (modal_aerosols) then
