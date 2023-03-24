@@ -223,6 +223,7 @@ contains
 
     !
     real(r8) :: xdelso4hp(ncol,pver)
+    real(r8) :: xdelso4hp_ik
     real(r8) :: xphlwc(ncol,pver)
 
     integer  :: k, i, iter, file
@@ -341,7 +342,7 @@ contains
     ver_loop0: do k = 1,pver                               !! pver loop for STEP 0
        col_loop0: do i = 1,ncol
           
-          if (cldfrc(i,k)>0._r8) then
+          if (cloud_borne .and. cldfrc(i,k)>0._r8) then
              xso4(i,k) = xso4c(i,k) / cldfrc(i,k)
           endif
 
@@ -469,75 +470,17 @@ contains
           !       S(IV) + H2O2 = S(VI)
           !............................
           
-          IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED          
+          if (xl >= 1.e-8_r8) then    !! WHEN CLOUD IS PRESENTED          
 
-             patm_x = patm
+             call calc_sox_aqueous( modal_aerosols,       &
+                rah2o2, h2o2g, so2g, o3g,      rao3,   &
+                patm, dtime, work1(i), xl, const0, &
+                xhnm(i,k), heo3(i,k), heso2(i,k),      &
+                xso2(i,k), xso4(i,k), xso4_init(i,k), xh2o2(i,k), &
+                xdelso4hp_ik)
+             xdelso4hp(i,k) = xdelso4hp_ik
 
-             pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
-                  * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
-
-             pso4 = pso4 & ! [M/s] = [mole/L(w)/s]
-                  * xl & ! [mole/L(a)/s]
-                  / const0 & ! [/L(a)/s]
-                  / xhnm(i,k)
-
-
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             IF (xh2o2(i,k) .gt. xso2(i,k)) THEN
-                if (ccc .gt. xso2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xso2(i,k)
-                   xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                   xso2(i,k)=1.e-20_r8
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-
-             ELSE
-                if (ccc  .gt. xh2o2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xh2o2(i,k)
-                   xso2(i,k)=xso2(i,k)-xh2o2(i,k)
-                   xh2o2(i,k)=1.e-20_r8
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-             END IF
-             
-             if (modal_aerosols) then
-                xdelso4hp(i,k)  =  xso4(i,k) - xso4_init(i,k)
-             endif
-             !...........................
-             !       S(IV) + O3 = S(VI)
-             !...........................
-
-             pso4 = rao3 * heo3(i,k)*o3g*patm_x * heso2(i,k)*so2g*patm_x  ! [M/s]
-
-             pso4 = pso4        &                                ! [M/s] =  [mole/L(w)/s]
-                  * xl          &                                ! [mole/L(a)/s]
-                  / const0      &                                ! [/L(a)/s]
-                  / xhnm(i,k)                                    ! [mixing ratio/s]
-             
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             if (ccc .gt. xso2(i,k)) then
-                xso4(i,k) = xso4(i,k) + xso2(i,k)
-                xso2(i,k) = 1.e-20_r8
-             else
-                xso4(i,k) = xso4(i,k) + ccc
-                xso2(i,k) = xso2(i,k) - ccc
-             end if
-
-          END IF !! WHEN CLOUD IS PRESENTED
+          endif !! WHEN CLOUD IS PRESENTED
 
        end do col_loop1
     end do ver_loop1
@@ -576,6 +519,7 @@ contains
 !       new code sets xnh4c = 0, then uses a -1 charge (instead of -2)
  !      for so4 when solving the electro-neutrality equation
 !---------------------------------------------------------------------------
+    implicit none
 
     real(r8),  intent(in) :: temperature        ! temperature [K]
     real(r8),  intent(in) :: pressure           ! pressure [Pa]
@@ -595,11 +539,12 @@ contains
     ! local variables
     integer   :: iter  ! iteration number
     real(r8)  :: yph_lo, yph_hi, yph    ! pH values, lower and upper bounds
+    real(r8)  :: ynetpos_lo, ynetpos_hi ! lower and upper bounds of ynetpos
     real(r8)  :: t_factor       ! working variables to convert temperature
     real(r8)  :: patm           ! pressure in atm
     real(r8)  :: xk, xe, x2     ! working variables
     real(r8)  :: fact1_so2, fact2_so2, fact3_so2, fact4_so2  ! SO2 factors
-    real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species
+    real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species [1/cm3]
     real(r8)  :: ynetpos        ! net positive ions
 
     integer,  parameter :: itermax = 20  ! maximum number of iterations
@@ -746,9 +691,11 @@ contains
     ! calculate net positive ions (ynetpos) for iterations in calc_ph_values
     ! also calculate H+ concentration (xph) from ph value
     !-----------------------------------------------------------------
+    implicit none
+
     real(r8), intent(in) :: yph         ! pH value
     real(r8), intent(in) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2 ! factors for SO2
-    real(r8), intent(in) :: Eco2, Eh2o, Eso4, so4_fact          ! effects from species
+    real(r8), intent(in) :: Eco2, Eh2o, Eso4, so4_fact          ! effects from species [1/cm3]
 
     real(r8), intent(out) :: xph        ! H+ concentration from pH value [kg/L]
     real(r8), intent(out) :: ynetpos    ! net positive ions
@@ -781,6 +728,113 @@ contains
     ynetpos = tmp_pos - tmp_neg
 
   end subroutine calc_ynetpos
+
+!===========================================================================
+  subroutine calc_sox_aqueous( modal_aerosols,         &
+                rah2o2, h2o2g, so2g, o3g,      rao3,   &
+                patm, dtime, t_factor, xlwc, const0, &
+                xhnm, heo3, heso2,      &
+                xso2, xso4, xso4_init, xh2o2, &
+                xdelso4hp_ik)
+    !-----------------------------------------------------------------
+    !       ... Prediction after aqueous phase
+    !       so4
+    !       When Cloud is present
+    !
+    !       S(IV) + H2O2 = S(VI)
+    !       S(IV) + O3   = S(VI)
+    !
+    !       reference:
+    !           (1) Seinfeld
+    !           (2) Benkovitz
+    !-----------------------------------------------------------------
+    implicit none
+
+    logical,  intent(in) :: modal_aerosols      ! if using MAM
+    real(r8), intent(in) :: rah2o2      ! reaction rate with h2o2
+    real(r8), intent(in) :: rao3        ! reaction rate with o3
+    real(r8), intent(in) :: h2o2g, so2g, o3g    
+    real(r8), intent(in) :: patm        ! pressure [atm]
+    real(r8), intent(in) :: dtime       ! time step [s]
+    real(r8), intent(in) :: t_factor    ! working variables to convert temperature 
+    real(r8), intent(in) :: xlwc
+    real(r8), intent(in) :: const0
+    real(r8), intent(in) :: xhnm
+    real(r8), intent(in) :: heo3, heso2 ! henry law constant
+    real(r8), intent(inout) :: xso2, xso4, xso4_init, xh2o2 ! mixing ratios
+    real(r8), intent(out) :: xdelso4hp_ik ! change of so4 in (i,k)
+
+    ! local variables
+    real(r8) :: pso4    ! production rate of so4
+    real(r8) :: delta_s ! so4 production in the time step
+
+          !............................
+          !       S(IV) + H2O2 = S(VI)
+          !............................
+
+    pso4 = rah2o2 * 7.4e4_r8*exp(6621._r8*t_factor) * h2o2g * patm &
+                  * 1.23_r8 *exp(3120._r8*t_factor) * so2g * patm
+
+    pso4 = pso4   & ! [M/s] = [mole/L(w)/s]
+         * xlwc   & ! [mole/L(a)/s]
+         / const0 & ! [/L(a)/s]
+         / xhnm
+
+
+    delta_s = max(pso4*dtime, 1.e-30_r8)
+
+    xso4_init=xso4
+
+    if (xh2o2 > xso2) then
+       if (delta_s > xso2) then
+          xso4=xso4+xso2
+          xh2o2=xh2o2-xso2
+          xso2=1.e-20_r8
+       else
+          xso4  = xso4  + delta_s
+          xh2o2 = xh2o2 - delta_s
+          xso2  = xso2  - delta_s
+       endif
+    else
+       if (delta_s  > xh2o2) then
+          xso4=xso4+xh2o2
+          xso2=xso2-xh2o2
+          xh2o2=1.e-20_r8
+       else
+          xso4  = xso4  + delta_s
+          xh2o2 = xh2o2 - delta_s
+          xso2  = xso2  - delta_s
+       endif
+    endif
+
+    if (modal_aerosols) then
+       xdelso4hp_ik  =  xso4 - xso4_init
+    endif
+             !...........................
+             !       S(IV) + O3 = S(VI)
+             !...........................
+
+    pso4 = rao3 * heo3*o3g*patm * heso2*so2g*patm  ! [M/s]
+
+    pso4 = pso4        &                                ! [M/s] =[mole/L(w)/s]
+         * xlwc        &                                ! [mole/L(a)/s]
+         / const0      &                                ! [/L(a)/s]
+         / xhnm                                    ! [mixing ratio/s]
+
+    delta_s = max(pso4*dtime, 1.e-30_r8)
+
+    xso4_init=xso4
+
+    if (delta_s > xso2) then
+       xso4 = xso4 + xso2
+       xso2 = 1.e-20_r8
+    else
+       xso4 = xso4 + delta_s
+       xso2 = xso2 - delta_s
+    endif
+
+
+  end subroutine calc_sox_aqueous
 
 !===========================================================================
 
