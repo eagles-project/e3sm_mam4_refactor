@@ -595,9 +595,8 @@ subroutine dropmixnuc( &
 !  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
 ! BJG   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
-   ccn(:,:,:) = 0._r8
    do icol = 1, ncol
-      call ccncalc_1col(state_q(icol,top_lev:pver,:), temp(icol,:), qcldbrn(icol,:,:,:), qcldbrn_num(icol,:,:), cs(icol,:), ccn(icol,:,:))
+      call ccncalc_1col(state_q(icol,:,:), temp(icol,:), qcldbrn(icol,:,:,:), qcldbrn_num(icol,:,:), ncol, cs(icol,:), ccn, icol)
    enddo
 ! end BJG
 
@@ -1458,7 +1457,7 @@ end subroutine maxsat
 
 !===============================================================================
 
-subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn_col)
+subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, ncol, cs_col, ccn, icol)
    ! calculates number concentration of aerosols activated as CCN at
    ! supersaturation supersat.
    ! assumes an internal mixture of a multiple externally-mixed aerosol modes
@@ -1470,11 +1469,13 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn
    real(r8), pointer, intent(in)  :: state_q_col(:,:) ! aerosol mmrs [kg/kg]     
    real(r8), pointer, intent(in)  :: tair_col(:)     ! air temperature [K]
    real(r8), intent(in)  :: qcldbrn(:,:,:), qcldbrn_num(:,:) ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+   integer, intent(in)   :: ncol  ! number of columns
+   integer, intent(in)   :: icol 
    real(r8), intent(in)  :: cs_col(pver)       ! air density [kg/m3]
 
   ! output arguments
 ! BJG   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
-   real(r8), intent(inout) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
+   real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
 
@@ -1507,7 +1508,7 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn
 
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
 
-   ccn_col(:,:) = 0._r8
+   ccn(:,:,:) = 0._r8
 
    do imode=1,ntot_amode
 
@@ -1533,14 +1534,14 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn
 
          do lsat=1,psat
             arg_erf_ccn=argfactor(imode)*log(sm/super(lsat))
-            ccn_col(kk,lsat)=ccn_col(kk,lsat)+naerosol*0.5_r8*(1._r8-erf(arg_erf_ccn))
+            ccn(icol,kk,lsat)=ccn(icol,kk,lsat)+naerosol*0.5_r8*(1._r8-erf(arg_erf_ccn))
          enddo
 
       enddo
 
    enddo
 
-   ccn_col(:,:)=ccn_col(:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
+   ccn(icol,:,:)=ccn(icol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
 
 end subroutine ccncalc_1col
 
