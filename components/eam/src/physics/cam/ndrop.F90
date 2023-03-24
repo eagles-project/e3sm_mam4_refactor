@@ -1475,7 +1475,7 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, ncol, cs_co
 
   ! output arguments
 ! BJG   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
-   real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat [#/m3]
+   real(r8), intent(out), save :: ccn(pcols,pver,psat) = 0._r8 ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
 
@@ -1507,8 +1507,6 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, ncol, cs_co
    smcoefcoef=2._r8/sqrt(27._r8)
 
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
-
-   ccn(:,:,:) = 0._r8
 
    do imode=1,ntot_amode
 
