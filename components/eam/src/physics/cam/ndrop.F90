@@ -595,6 +595,7 @@ subroutine dropmixnuc( &
 !  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
 ! BJG   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
+   ccn(:,:,:) = 0._r8
    do icol = 1, ncol
       call ccncalc_1col(state_q(icol,top_lev:pver,:), temp(icol,:), qcldbrn(icol,:,:,:), qcldbrn_num(icol,:,:), cs(icol,:), ccn(icol,:,:))
    enddo
@@ -1472,7 +1473,8 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn
    real(r8), intent(in)  :: cs_col(pver)       ! air density [kg/m3]
 
   ! output arguments
-   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
+! BJG   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
+   real(r8), intent(inout) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
 
