@@ -341,7 +341,7 @@ contains
     ver_loop0: do k = 1,pver                               !! pver loop for STEP 0
        col_loop0: do i = 1,ncol
           
-          if (cloud_borne .and. cldfrc(i,k)>0._r8) then
+          if (cldfrc(i,k)>0._r8) then
              xso4(i,k) = xso4c(i,k) / cldfrc(i,k)
           endif
 
@@ -349,20 +349,20 @@ contains
           xl = cldconc%xlwc(i,k)
           if( xl >= 1.e-8_r8 ) then
  
-             call calc_ph_values(  &
-                tfld(i,k), press(i,k), xl, &
-                xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact,    &
-                Ra, xkw, const0,                &
-                converged, xph(i,k))
+             call calc_ph_values(               &
+                tfld(i,k), press(i,k), xl,      & ! in
+                xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact, & ! in
+                Ra, xkw, const0,                & ! in
+                converged, xph(i,k)             ) ! out
              if( .not. converged ) then
                 write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,').'
-             end if
+             endif
 
           else
              xph(i,k) =  1.e-7_r8
-          end if
-       end do col_loop0
-    end do ver_loop0 ! end pver loop for STEP 0
+          endif
+       enddo col_loop0
+    enddo ver_loop0 ! end pver loop for STEP 0
 
     !==============================================================
     !          ... Now use the actual PH
