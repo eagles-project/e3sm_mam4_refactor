@@ -594,10 +594,10 @@ subroutine dropmixnuc( &
 
 !  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
-! BJG   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
-   do icol = 1, ncol
-      call ccncalc_1col(state_q(icol,:,:), temp(icol,:), qcldbrn(icol,:,:,:), qcldbrn_num(icol,:,:), ncol, cs(icol,:), ccn, icol)
-   enddo
+   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
+! BJG   do icol = 1, ncol
+! BJG      call ccncalc_1col(state_q(icol,:,:), temp(icol,:), qcldbrn(icol,:,:,:), qcldbrn_num(icol,:,:), ncol, cs(icol,:), ccn, icol)
+! BJG   enddo
 ! end BJG
 
    do lsat = 1, psat
@@ -1475,7 +1475,7 @@ subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, ncol, cs_co
 
   ! output arguments
 ! BJG   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
-   real(r8), intent(out), save :: ccn(pcols,pver,psat) = 0._r8 ! number conc of aerosols activated at supersat [#/m3]
+   real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
 
@@ -1604,10 +1604,17 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
 
       do kk=top_lev,pver
 
-         call loadaer( state_q, 1, ncol, kk, &  ! in
-            imode, nspec_amode(imode), cs, phase, &  ! in
-            naerosol, vaerosol, hygro, &  ! out
-            qcldbrn(:,:,kk,imode), qcldbrn_num(:,kk,imode) )  ! optional in
+! BJG         call loadaer( state_q, 1, ncol, kk, &  ! in
+! BJG            imode, nspec_amode(imode), cs, phase, &  ! in
+! BJG            naerosol, vaerosol, hygro, &  ! out
+! BJG            qcldbrn(:,:,kk,imode), qcldbrn_num(:,kk,imode) )  ! optional in
+ 
+      do icol = 1, ncol
+         call loadaer_1col( state_q(icol,kk,:), &  ! in
+            imode, nspec_amode(imode), cs(icol,kk), phase, &  ! in
+            naerosol(icol), vaerosol(icol), hygro(icol), &  ! out
+            qcldbrn(icol,:,kk,imode), qcldbrn_num(icol,kk,imode) )  ! optional in
+      enddo
 
          aparam(1:ncol) = surften_coef/tair(1:ncol,kk)
          smcoef(1:ncol)=smcoefcoef*aparam(1:ncol)*sqrt(aparam(1:ncol))
