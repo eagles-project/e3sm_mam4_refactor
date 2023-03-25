@@ -129,12 +129,10 @@ integer, allocatable :: spec_idx(:)
 
 ! Copy of cloud borne aerosols before modification by droplet nucleation
 ! The basis is converted from mass to volume.
-!real(r8), allocatable :: aer_cb(:,:,:,:)
-real(r8), allocatable :: aer_cb(:,:,:)
+real(r8), allocatable :: aer_cb(:,:,:,:)
 
 ! Copy of interstitial aerosols with basis converted from mass to volume.
-!real(r8), allocatable :: aer(:,:,:,:)
-real(r8), allocatable :: aer(:,:,:)
+real(r8), allocatable :: aer(:,:,:,:)
 
 real(r8), parameter :: num_m3_to_cm3  = 1.0e-6_r8          ! volume unit conversion, #/m^3 to #/cm^3
 real(r8), parameter :: num_cm3_to_m3  = 1.0e6_r8          ! volume unit conversion, #/cm^3 to #/m^3
@@ -412,17 +410,13 @@ subroutine hetfrz_classnuc_cam_init(mincld_in)
 
    ! Allocate space for copy of cloud borne aerosols before modification by droplet nucleation.
    !pw: zero-basing the lchunk index to work around PGI bug/feature.
-!   allocate(aer_cb(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
-!   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
-   allocate(aer_cb(pcols,pver,ncnst), stat=istat)
-   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst)
+   allocate(aer_cb(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
+   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    ! Allocate space for copy of interstitial aerosols with modified basis
    !pw: zero-basing the lchunk index to work around PGI bug/feature.
-!   allocate(aer(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
-!   call alloc_err(istat, routine, 'aer', pcols*pver*ncnst*(endchunk-begchunk+1))
-   allocate(aer(pcols,pver,ncnst), stat=istat)
-   call alloc_err(istat, routine, 'aer', pcols*pver*ncnst)
+   allocate(aer(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
+   call alloc_err(istat, routine, 'aer', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    ! The following code sets the species and mode indices for each constituent
    ! in the list.  The indices are identical in the interstitial and the cloud
@@ -613,7 +607,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    ! Convert interstitial and cloud borne aerosols from a mass to a volume basis before
    ! being used in get_aer_num
    do ispec = 1, ncnst
-      aer_cb(:ncol,:,ispec) = aer_cb(:ncol,:,ispec) * rho(:ncol,:)
+      aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
 
       ! Check whether constituent is a mass or number mixing ratio
       if (spec_idx(ispec) == 0) then
@@ -621,7 +615,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
       else
          call rad_cnst_get_aer_mmr(0, mode_idx(ispec), spec_idx(ispec), 'a', state, pbuf, ptr2d)
       endif
-      aer(:ncol,:,ispec) = ptr2d(:ncol,:) * rho(:ncol,:)
+      aer(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:) * rho(:ncol,:)
    enddo
 
    ! Init top levels of outputs of get_aer_num
@@ -659,24 +653,24 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    ! output aerosols as reference information for heterogeneous freezing
    do kk = top_lev, pver
       do icol = 1, ncol
-         call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:), &      ! in 
+         call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:,lchnk_zb), &      ! in 
                                              total_interstitial_aer_num(icol,kk,:)) ! out
 
-         call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:), & ! in
+         call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:,lchnk_zb), & ! in
                                            total_cloudborne_aer_num(icol,kk,:)) ! out 
 
-         call calculate_mass_mean_radius(ncnst, aer(icol,kk,:), &         ! in
+         call calculate_mass_mean_radius(ncnst, aer(icol,kk,:,lchnk_zb), &         ! in
                                          total_interstitial_aer_num(icol,kk,:), &  ! in
                                          hetraer(icol,kk,:))                       ! out
 
 
-         call calculate_coated_fraction(ncnst, aer(icol,kk,:), rho(icol,kk), &                                      ! in
+         call calculate_coated_fraction(ncnst, aer(icol,kk,:,lchnk_zb), rho(icol,kk), &                                      ! in
                                         total_interstitial_aer_num(icol,kk,:), total_cloudborne_aer_num(icol,kk,:), &        ! in
                                         hetraer(icol,kk,:), &                                                                ! in
                                         total_aer_num(icol,kk,:), coated_aer_num(icol,kk,:), uncoated_aer_num(icol,kk,:), &  ! out
                                         dstcoat(icol,kk,:), na500(icol,kk), tot_na500(icol,kk))                              ! out
 
-         call calculate_vars_for_water_activity(ncnst, aer(icol,kk,:), &        ! in        
+         call calculate_vars_for_water_activity(ncnst, aer(icol,kk,:,lchnk_zb), &        ! in        
                                                 total_interstitial_aer_num(icol,kk,:), & ! in        
                                                 awcam(icol,kk,:), awfacm(icol,kk,:))     ! out
 
@@ -859,7 +853,7 @@ subroutine hetfrz_classnuc_cam_save_cbaero(state, pbuf)
       else
          call rad_cnst_get_aer_mmr(0, mode_idx(i), spec_idx(i), 'c', state, pbuf, ptr2d)
       end if
-      aer_cb(:,:,i) = ptr2d
+      aer_cb(:,:,i,lchnk_zb) = ptr2d
 
    end do
 
