@@ -525,6 +525,11 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
                                      state, deltatin, factnum, pbuf, &
                                      frzimm, frzcnt, frzdep)
 
+   use modal_aero_data,   only: modeptr_accum, modeptr_coarse, modeptr_pcarbon, numptr_amode
+   use modal_aero_data,   only: lptr_dust_a_amode, lptr_nacl_a_amode, lptr_so4_a_amode, &
+                                lptr_bc_a_amode, lptr_pom_a_amode, lptr_soa_a_amode, &
+                                lptr_mom_a_amode
+
    ! arguments
    integer, intent(in) :: ncol
    integer, intent(in) :: lchnk
@@ -609,14 +614,38 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    do ispec = 1, ncnst
       aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
 
-      ! Check whether constituent is a mass or number mixing ratio
-      if (spec_idx(ispec) == 0) then
-         call rad_cnst_get_mode_num(0, mode_idx(ispec), 'a', state, pbuf, ptr2d)
-      else
-         call rad_cnst_get_aer_mmr(0, mode_idx(ispec), spec_idx(ispec), 'a', state, pbuf, ptr2d)
-      endif
-      aer(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:) * rho(:ncol,:)
    enddo
+      ! Check whether constituent is a mass or number mixing ratio
+!      if (spec_idx(ispec) == 0) then
+!         call rad_cnst_get_mode_num(0, mode_idx(ispec), 'a', state, pbuf, ptr2d)
+!      else
+!         call rad_cnst_get_aer_mmr(0, mode_idx(ispec), spec_idx(ispec), 'a', state, pbuf, ptr2d)
+!      endif
+!      aer(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:) * rho(:ncol,:)
+!   enddo
+
+   aer(:ncol,:pver,so4_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_so4_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,bc_accum, lchnk_zb)  = state_q(:ncol,:pver,lptr_bc_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,pom_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_pom_a_amode(modeptr_accum)) * rho(:ncol,:)   
+   aer(:ncol,:pver,soa_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_soa_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,dst_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_dust_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,ncl_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_nacl_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,mom_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_mom_a_amode(modeptr_accum)) * rho(:ncol,:)
+   aer(:ncol,:pver,num_accum,lchnk_zb)  = state_q(:ncol,:pver,numptr_amode(modeptr_accum)) * rho(:ncol,:)
+
+   aer(:ncol,:pver,dst_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_dust_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,ncl_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_nacl_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,so4_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_so4_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,bc_coarse, lchnk_zb) = state_q(:ncol,:pver,lptr_bc_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,pom_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_pom_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,soa_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_soa_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,mom_coarse,lchnk_zb) = state_q(:ncol,:pver,lptr_mom_a_amode(modeptr_coarse)) * rho(:ncol,:)
+   aer(:ncol,:pver,num_coarse,lchnk_zb) = state_q(:ncol,:pver,numptr_amode(modeptr_coarse)) * rho(:ncol,:)
+
+   aer(:ncol,:pver,bc_pcarbon, lchnk_zb) = state_q(:ncol,:pver,lptr_bc_a_amode(modeptr_pcarbon)) * rho(:ncol,:)
+   aer(:ncol,:pver,pom_pcarbon,lchnk_zb) = state_q(:ncol,:pver,lptr_pom_a_amode(modeptr_pcarbon)) * rho(:ncol,:)
+   aer(:ncol,:pver,mom_pcarbon,lchnk_zb) = state_q(:ncol,:pver,lptr_mom_a_amode(modeptr_pcarbon)) * rho(:ncol,:)
+   aer(:ncol,:pver,num_pcarbon,lchnk_zb) = state_q(:ncol,:pver,numptr_amode(modeptr_pcarbon)) * rho(:ncol,:)
 
    ! Init top levels of outputs of get_aer_num
    total_aer_num              = 0._r8
