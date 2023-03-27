@@ -315,10 +315,6 @@ contains
     xno3c => cldconc%no3c
 
     xso4(:,:) = 0._r8
-    xno3(:,:) = 0._r8
-    xnh4(:,:) = 0._r8
-    xnh3(:,:) = 0._r8
-    xhno3(:,:)= 0._r8
     do k = 1,pver
        xph(:,k) = xph0                                ! initial PH value
        xso2 (:,k) = qin(:,k,id_so2)                 
@@ -328,13 +324,14 @@ contains
        xh2so4(:,k) = qin(:,k,id_h2so4)
     enddo
     
-    ! NO3, are not incorporated in MAM4, remove the related code
+    ! NO3 NH3 and MSA  are not incorporated in MAM4, remove the related code
     ! assign 0 to input variables needed for subroutine sox_cldaero_update
     ! this assignment can be removed when incorporating refaction of
     ! sox_cldaero_update
     hno3g(:,:) = 0._r8
     xmsa(:,:)  = 0._r8
-    
+    xnh3(:,:)  = 0._r8
+    xhno3(:,:) = 0._r8    
 
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
@@ -482,8 +479,8 @@ contains
 
           endif !! WHEN CLOUD IS PRESENTED
 
-       end do col_loop1
-    end do ver_loop1
+       enddo col_loop1
+    enddo ver_loop1
 
     call sox_cldaero_update( &
          ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, cldconc%xlwc, &
@@ -495,8 +492,8 @@ contains
           if (cldfrc(i,k)>=1.e-5_r8 .and. lwc(i,k)>=1.e-8_r8) then
              xphlwc(i,k) = -1._r8*log10(xph(i,k)) * lwc(i,k)
           endif
-       end do
-    end do
+       enddo
+    enddo
     call outfld( 'XPH_LWC', xphlwc(:ncol,:), ncol , lchnk )
 
     call sox_cldaero_destroy_obj(cldconc)
