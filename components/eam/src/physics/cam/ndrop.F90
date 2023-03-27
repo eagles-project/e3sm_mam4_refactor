@@ -454,6 +454,10 @@ subroutine dropmixnuc( &
    wtke(:,:)    = 0._r8
    factnum(:,:,:) = 0._r8
 
+ !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code before END NOTE
+   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
+ !END NOTE FOR C++ PORT
+
    ! overall_main_icol_loop
    do icol = 1, ncol
 
@@ -550,10 +554,12 @@ subroutine dropmixnuc( &
             if( lspec == 0 ) then
                num_idx = numptr_amode(imode)
                raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,num_idx))*dtinv
+               qcldbrn_num(icol,top_lev:pver,imode) = qqcw(mm)%fld(icol,top_lev:pver)     
             else
                spc_idx=lmassptr_amode(lspec,imode)
                raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,spc_idx))*dtinv
    ! Extract cloud borne MMRs from qqcw pointer
+               qcldbrn(icol,lspec,top_lev:pver,imode) = qqcw(mm)%fld(icol,top_lev:pver)
             endif
 
             coltend(icol,mm)    = sum( pdel(icol,:)*raertend )/gravit
@@ -573,23 +579,18 @@ subroutine dropmixnuc( &
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
 
- !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+! BJG   ! Extract cloud borne MMRs from qqcw pointer
 
-   ! Extract cloud borne MMRs from qqcw pointer
-
-   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
-   do imode=1,ntot_amode
-      do kk=top_lev,pver
-         do lspec =1, nspec_amode(imode)
-           mm   = mam_idx(imode,lspec)
-           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
-         enddo
-         mm   = mam_idx(imode,0) 
-         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
-      enddo
-   enddo
-
-  !END NOTE FOR C++ PORT
+! BJG   do imode=1,ntot_amode
+! BJG      do kk=top_lev,pver
+! BJG         do lspec =1, nspec_amode(imode)
+! BJG           mm   = mam_idx(imode,lspec)
+! BJG           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
+! BJG         enddo
+! BJG         mm   = mam_idx(imode,0) 
+! BJG         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
+! BJG      enddo
+! BJG   enddo
 
 !  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
@@ -1511,17 +1512,12 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
 
       do kk=top_lev,pver
 
-! BJG         call loadaer( state_q, 1, ncol, kk, &  ! in
-! BJG            imode, nspec_amode(imode), cs, phase, &  ! in
-! BJG            naerosol, vaerosol, hygro, &  ! out
-! BJG            qcldbrn(:,:,kk,imode), qcldbrn_num(:,kk,imode) )  ! optional in
- 
-      do icol = 1, ncol
-         call loadaer_1col( state_q(icol,kk,:), &  ! in
-            imode, nspec_amode(imode), cs(icol,kk), phase, &  ! in
-            naerosol(icol), vaerosol(icol), hygro(icol), &  ! out
-            qcldbrn(icol,:,kk,imode), qcldbrn_num(icol,kk,imode) )  ! optional in
-      enddo
+         do icol = 1, ncol
+            call loadaer_1col( state_q(icol,kk,:), &  ! in
+               imode, nspec_amode(imode), cs(icol,kk), phase, &  ! in
+               naerosol(icol), vaerosol(icol), hygro(icol), &  ! out
+               qcldbrn(icol,:,kk,imode), qcldbrn_num(icol,kk,imode) )  ! optional in
+         enddo
 
          aparam(1:ncol) = surften_coef/tair(1:ncol,kk)
          smcoef(1:ncol)=smcoefcoef*aparam(1:ncol)*sqrt(aparam(1:ncol))
@@ -1547,94 +1543,6 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    ccn(:ncol,:,:)=ccn(:ncol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
 
 end subroutine ccncalc
-
-!===============================================================================
-
-
-subroutine ccncalc_1col(state_q_col, tair_col, qcldbrn, qcldbrn_num, cs_col, ccn_col)
-   ! calculates number concentration of aerosols activated as CCN at
-   ! supersaturation supersat.
-   ! assumes an internal mixture of a multiple externally-mixed aerosol modes
-   ! cgs units
-
-   ! Ghan et al., Atmos. Res., 1993, 198-221.
-
-  ! input arguments
-   real(r8), pointer, intent(in)  :: state_q_col(:,:) ! aerosol mmrs [kg/kg]     
-   real(r8), pointer, intent(in)  :: tair_col(:)     ! air temperature [K]
-   real(r8), intent(in)  :: qcldbrn(:,:,:), qcldbrn_num(:,:) ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
-   real(r8), intent(in)  :: cs_col(pver)       ! air density [kg/m3]
-
-  ! output arguments
-   real(r8), intent(out) :: ccn_col(pver,psat) ! number conc of aerosols activated at supersat [#/m3]
-
-   ! local
-
-   real(r8) :: naerosol ! interstit+activated aerosol number conc [#/m3]
-   real(r8) :: vaerosol ! interstit+activated aerosol volume conc [m3/m3]
-   real(r8) :: amcube  ! [m3]
-   real(r8) :: amcubecoef(ntot_amode) ! [dimensionless]
-   real(r8) :: argfactor(ntot_amode)  ! [dimensionless]
-   real(r8) :: surften_coef  ! [m-K]
-   real(r8) :: aparam ! surface tension parameter  [m]
-   real(r8) :: hygro  ! aerosol hygroscopicity [dimensionless]
-   real(r8) :: sm  ! critical supersaturation at mode radius [fraction]
-   real(r8) :: arg_erf_ccn ! [dimensionless] 
-   real(r8) :: smcoef  ! [m^(3/2)]
-   integer lsat,imode,kk
-   integer phase ! phase of aerosol
-
-   !     mathematical constants
-   real(r8) percent_to_fraction, per_m3_to_per_cm3
-   real(r8) smcoefcoef
-   real(r8) super(psat) ! supersaturation [fraction]
-   !-------------------------------------------------------------------------------
-
-   phase=3 ! interstitial+cloudborne
-
-   percent_to_fraction = 0.01_r8
-   per_m3_to_per_cm3 = 1.e-6_r8
-   super(:)=supersat(:)*percent_to_fraction
-   smcoefcoef=2._r8/sqrt(27._r8)
-
-   surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
-
-   ccn_col(:,:) = 0._r8
-
-   do imode=1,ntot_amode
-
-      amcubecoef(imode)=3._r8/(4._r8*pi*exp45logsig(imode))
-      argfactor(imode)=twothird/(sq2*alogsig(imode))
-
-      do kk=top_lev,pver
-
-         call loadaer_1col( state_q_col(kk,:), &  ! in
-            imode, nspec_amode(imode), cs_col(kk), phase, &  ! in
-            naerosol, vaerosol, hygro, &  ! out
-            qcldbrn(:,kk,imode), qcldbrn_num(kk,imode) )  ! optional in
-
-         aparam = surften_coef/tair_col(kk)
-         smcoef=smcoefcoef*aparam*sqrt(aparam)
-
-         if(naerosol>1.e-3_r8) then
-            amcube=amcubecoef(imode)*vaerosol/naerosol
-            sm=smcoef/sqrt(hygro*amcube) ! critical supersaturation
-         else
-            sm=1._r8 ! value shouldn't matter much since naerosol is small
-         endif
-
-         do lsat=1,psat
-            arg_erf_ccn=argfactor(imode)*log(sm/super(lsat))
-            ccn_col(kk,lsat)=ccn_col(kk,lsat)+naerosol*0.5_r8*(1._r8-erf(arg_erf_ccn))
-         enddo
-
-      enddo
-
-   enddo
-
-   ccn_col(:,:)=ccn_col(:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
-
-end subroutine ccncalc_1col
 
 !===============================================================================
 
