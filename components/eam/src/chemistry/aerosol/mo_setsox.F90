@@ -227,7 +227,7 @@ contains
     real(r8) :: xphlwc(ncol,pver)
 
     integer  :: k, i, iter, file
-    real(r8) :: wrk, delta
+    real(r8) :: delta
     real(r8) :: xph0, aden, xk, xe, x2
     real(r8) :: tz, xl, px, qz, pz, es, qs, patm
     real(r8) :: Eso2, Eso4, Ehno3, Eco2, Eh2o, Enh3
@@ -262,7 +262,7 @@ contains
 
     real(r8) :: patm_x
 
-    real(r8), dimension(ncol)  :: work1
+    real(r8) :: t_factor       ! working variables to convert temperature
     logical :: converged
 
     real(r8), pointer :: xso4c(:,:)
@@ -367,7 +367,7 @@ contains
     !==============================================================
     ver_loop1: do k = 1,pver
        col_loop1: do i = 1,ncol
-          work1(i) = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
+          t_factor = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
           tz = tfld(i,k)
 
           xl = cldconc%xlwc(i,k)
@@ -378,24 +378,23 @@ contains
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = 7.4e4_r8   *EXP( 6621._r8*work1(i) )
-          xe = 2.2e-12_r8 *EXP(-3730._r8*work1(i) )
+          xk = 7.4e4_r8   *EXP( 6621._r8*t_factor )
+          xe = 2.2e-12_r8 *EXP(-3730._r8*t_factor )
           heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-          xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-          x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
+          xk = 1.23_r8  *EXP( 3120._r8*t_factor )
+          xe = 1.7e-2_r8*EXP( 2090._r8*t_factor )
+          x2 = 6.0e-8_r8*EXP( 1120._r8*t_factor )
 
-          wrk = xe/xph(i,k)
-          heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
+          heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          xk = 1.15e-2_r8 *EXP( 2560._r8*work1(i) )
+          xk = 1.15e-2_r8 *EXP( 2560._r8*t_factor )
           heo3(i,k) = xk
 
           !------------------------------------------------------------------------
@@ -441,7 +440,7 @@ contains
           !------------------------------------------------------------------------
           !       ... S(IV) (HSO3) + H2O2
           !------------------------------------------------------------------------
-          rah2o2 = 8.e4_r8 * EXP( -3650._r8*work1(i) )  &
+          rah2o2 = 8.e4_r8 * EXP( -3650._r8*t_factor )  &
                / (.1_r8 + xph(i,k))
 
           !------------------------------------------------------------------------
@@ -471,7 +470,7 @@ contains
 
              call calc_sox_aqueous( modal_aerosols,       &
                 rah2o2, h2o2g, so2g, o3g,      rao3,   &
-                patm, dtime, work1(i), xl, const0, &
+                patm, dtime, t_factor, xl, const0, &
                 xhnm(i,k), heo3(i,k), heso2(i,k),      &
                 xso2(i,k), xso4(i,k), xso4_init(i,k), xh2o2(i,k), &
                 xdelso4hp_ik)
@@ -569,7 +568,7 @@ contains
 
     ! -------------- so2 -------------------
     ! previous code
-    !    heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
+    !    heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
     !    px = heso2(i,k) * Ra * tz * xl
     !    so2g =  xso2(i,k)/(1._r8+ px)
     !    Eso2 = xk*xe*so2g *patm
