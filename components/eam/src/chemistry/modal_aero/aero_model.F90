@@ -1421,7 +1421,7 @@ do_lphase2_conditional: &
     do mm = 1,gas_pcnst
        fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
        if(associated(fldcw)) then
-           fldcw_all(:,:,mm) = fldcw(:,:)
+           fldcw_all(:ncol,:,mm) = fldcw(:ncol,:)
        else
            fldcw_all(:,:,mm) = 0.0_r8
        endif
@@ -1482,7 +1482,7 @@ do_lphase2_conditional: &
     ! assign mass mixing ratio back to pbuf
     do mm = 1,gas_pcnst
        fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
-       if(associated(fldcw))   fldcw = fldcw_all(:,:,mm)
+       if(associated(fldcw))   fldcw(:ncol,:) = fldcw_all(:ncol,:,mm)
     enddo
 
     ! diagnostics for cloud-borne aerosols... 
