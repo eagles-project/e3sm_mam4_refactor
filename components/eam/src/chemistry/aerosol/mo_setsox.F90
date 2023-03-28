@@ -228,7 +228,7 @@ contains
 
     integer  :: k, i, iter, file
     real(r8) :: delta
-    real(r8) :: xph0, aden, xk, xe, x2
+    real(r8) :: aden, xk, xe, x2
     real(r8) :: tz, xl, px, qz, pz, es, qs, patm
     real(r8) :: Eso2, Eso4, Ehno3, Eco2, Eh2o, Enh3
     real(r8) :: so2g, h2o2g, co2g, o3g
@@ -238,46 +238,24 @@ contains
 
     real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
     !
-    !-----------------------------------------------------------------------      
-    !            for Ho2(g) -> H2o2(a) formation 
-    !            schwartz JGR, 1984, 11589
-    !-----------------------------------------------------------------------      
-    real(r8) :: kh4    ! kh2+kh3
-    real(r8) :: xam    ! air density /cm3
-    real(r8) :: ho2s   ! ho2s = ho2(a)+o2-
-    real(r8) :: r1h2o2 ! prod(h2o2) by ho2 in mole/L(w)/s
-    real(r8) :: r2h2o2 ! prod(h2o2) by ho2 in mix/s
-
-    real(r8), dimension(ncol,pver)  ::             &
-         xhno3, xh2o2, xso2, xso4, xno3, &
-         xnh3, xnh4, xo3,         & ! x***: atom concentration [kg/L]
-         cfact, &
-         xph, xho2,         &
-         xh2so4, xmsa, xso4_init, &
-         hehno3, &            ! henry law const for hno3
-         heh2o2, &            ! henry law const for h2o2
-         heso2,  &            ! henry law const for so2
-         henh3,  &            ! henry law const for nh3
-         heo3              !!,   &            ! henry law const for o3
-
-    real(r8) :: patm_x
-
     real(r8) :: t_factor       ! working variables to convert temperature
     logical :: converged
+
+    ! ph value in H+ concentration
+    real(r8) :: xph0,  xph(ncol,pver)
+    real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
+    ! mass concentration for species
+    real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
+                                      xho2, xo3, xh2o2 
+    ! concentrations that are not used and can be removed later
+    real(r8), dimension(ncol,pver) :: xmsa, xnh3,xhno3 
+    ! henry law const for species
+    real(r8), dimension(ncol,pver) :: hehno3,heh2o2,heso2,henh3,heo3
 
     real(r8), pointer :: xso4c(:,:)
     real(r8), pointer :: xnh4c(:,:)
     real(r8), pointer :: xno3c(:,:)
     type(cldaero_conc_t), pointer :: cldconc
-
-    real(r8) :: fact1_hno3, fact2_hno3, fact3_hno3
-    real(r8) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2
-    real(r8) :: fact1_nh3, fact2_nh3, fact3_nh3
-    real(r8) :: tmp_hp, tmp_hso3, tmp_hco3, tmp_nh4, tmp_no3
-    real(r8) :: tmp_oh, tmp_so3, tmp_so4
-    real(r8) :: tmp_neg, tmp_pos
-    real(r8) :: yph, yph_lo, yph_hi
-    real(r8) :: ynetpos, ynetpos_lo, ynetpos_hi
 
 
     !-----------------------------------------------------------------
@@ -373,7 +351,7 @@ contains
           xl = cldconc%xlwc(i,k)
 
           patm = press(i,k)/101300._r8        ! press is in pascal
-          xam  = press(i,k)/(1.38e-23_r8*tz)  ! air density /M3
+!          xam  = press(i,k)/(1.38e-23_r8*tz)  ! air density /M3
 
           !-----------------------------------------------------------------
           !        ... h2o2
@@ -396,18 +374,6 @@ contains
           !-----------------------------------------------------------------
           xk = 1.15e-2_r8 *EXP( 2560._r8*t_factor )
           heo3(i,k) = xk
-
-          !------------------------------------------------------------------------
-          !       ... for Ho2(g) -> H2o2(a) formation 
-          !           schwartz JGR, 1984, 11589
-          !------------------------------------------------------------------------
-          kh4 = (kh2 + kh3*kh1/xph(i,k)) / ((1._r8 + kh1/xph(i,k))**2)
-          ho2s = kh0*xho2(i,k)*patm*(1._r8 + kh1/xph(i,k))  ! ho2s = ho2(a)+o2-
-          r1h2o2 = kh4*ho2s*ho2s                         ! prod(h2o2) in mole/L(w)/s
-
-          r2h2o2 = r1h2o2*xl        &    ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                 / const0*1.e+6_r8  &    ! FIXME: correct a bug here ????
-                 / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
 
           !-----------------------------------------------
           !       ... Partioning 
