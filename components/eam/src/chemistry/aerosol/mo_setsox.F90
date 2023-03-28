@@ -202,22 +202,8 @@ contains
     !
     !           xhno3 ... in mixing ratio
     !-----------------------------------------------------------------------      
-    integer,  parameter :: itermax = 20  ! maximum number of iterations
     real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
     real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
-    real(r8), parameter :: xa0 = 11._r8
-    real(r8), parameter :: xb0 = -.1_r8
-    real(r8), parameter :: xa1 = 1.053_r8
-    real(r8), parameter :: xb1 = -4.368_r8
-    real(r8), parameter :: xa2 = 1.016_r8
-    real(r8), parameter :: xb2 = -2.54_r8
-    real(r8), parameter :: xa3 = .816e-32_r8
-    real(r8), parameter :: xb3 = .259_r8
-
-    real(r8), parameter :: kh0 = 9.e3_r8            ! HO2(g)          -> Ho2(a)
-    real(r8), parameter :: kh1 = 2.05e-5_r8         ! HO2(a)          -> H+ + O2-
-    real(r8), parameter :: kh2 = 8.6e5_r8           ! HO2(a) + ho2(a) -> h2o2(a) + o2
-    real(r8), parameter :: kh3 = 1.e8_r8            ! HO2(a) + o2-    -> h2o2(a) + o2
     real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
     real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
 
@@ -226,17 +212,13 @@ contains
     real(r8) :: xdelso4hp_ik
     real(r8) :: xphlwc(ncol,pver)
 
-    integer  :: k, i, iter, file
-    real(r8) :: delta
-    real(r8) :: aden, xk, xe, x2
-    real(r8) :: tz, xl, px, qz, pz, es, qs, patm
-    real(r8) :: Eso2, Eso4, Ehno3, Eco2, Eh2o, Enh3
-    real(r8) :: so2g, h2o2g, co2g, o3g
-    real(r8) :: hno3a, nh3a, so2a, h2o2a, co2a, o3a
-    real(r8) :: rah2o2, rao3, pso4, ccc
-    real(r8) :: cnh3, chno3, com, com1, com2, xra
+    integer  :: k, i
+    real(r8) :: xk, xe, x2
+    real(r8) :: tz, xl, px
+    real(r8) :: patm
+    real(r8) :: so2g, h2o2g, o3g
+    real(r8) :: rah2o2, rao3
 
-    real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
     !
     real(r8) :: t_factor       ! working variables to convert temperature
     logical :: converged
@@ -248,7 +230,9 @@ contains
     real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
                                       xho2, xo3, xh2o2 
     ! concentrations that are not used and can be removed later
-    real(r8), dimension(ncol,pver) :: xmsa, xnh3,xhno3 
+    real(r8), dimension(ncol,pver) :: xmsa, xnh3,xhno3
+    real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
+ 
     ! henry law const for species
     real(r8), dimension(ncol,pver) :: hehno3,heh2o2,heso2,henh3,heo3
 
