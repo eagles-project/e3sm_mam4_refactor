@@ -335,23 +335,19 @@ contains
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = 7.4e4_r8   *exp( 6621._r8*t_factor )
-          xe = 2.2e-12_r8 *exp(-3730._r8*t_factor )
+          call henry_factor_h2o2(t_factor, xk, xe)
           heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          xk = 1.23_r8  *exp( 3120._r8*t_factor )
-          xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
-          x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
-
+          call henry_factor_so2(t_factor, xk, xe, x2)
           heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          xk = 1.15e-2_r8 *exp( 2560._r8*t_factor )
+          call henry_factor_o3(t_factor, xk)
           heo3(i,k) = xk
 
           !-----------------------------------------------
@@ -526,9 +522,7 @@ contains
     !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
     !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
     !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-    xk = 1.23_r8  *exp( 3120._r8*t_factor )
-    xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
-    x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
+    call henry_factor_so2(t_factor, xk, xe, x2)
     fact1_so2 = xk*xe*patm*xso2
     fact2_so2 = xk*Ra*temperature*xlwc
     fact3_so2 = xe
@@ -538,8 +532,7 @@ contains
     Eh2o = xkw
 
     ! -------------- co2 effects -------------------
-    xk = 3.1e-2_r8*exp( 2423._r8*t_factor )
-    xe = 4.3e-7_r8*exp(-913._r8 *t_factor )
+    call henry_factor_co2(t_factor, xk, xe)
     Eco2 = xk*xe*co2g  *patm
 
     ! -------------- so4 effects -------------------
@@ -708,11 +701,19 @@ contains
     ! local variables
     real(r8) :: pso4    ! production rate of so4
     real(r8) :: delta_s ! so4 production in the time step
+    real(r8) :: xk_so2, xk_h2o2 ! for the use of Henry Law subroutines
+    real(r8) :: xe, x2  ! output of henry law subroutines but not used
 
           !............................
           !       S(IV) + H2O2 = S(VI)
           !............................
 
+! FORTRAN refactor: using henry law subroutines here break the BFB test because
+! it changes the order of calculation. The original code is used now but new
+! code is kept but commented out for future implementation.
+!    call henry_factor_so2(t_factor, xk_so2, xe, x2)
+!    call henry_factor_h2o2(t_factor, xk_h2o2, xe)
+!    pso4 = rah2o2 * xk_h2o2* h2o2g * patm * xk_so2 * so2g * patm
     pso4 = rah2o2 * 7.4e4_r8*exp(6621._r8*t_factor) * h2o2g * patm &
                   * 1.23_r8 *exp(3120._r8*t_factor) * so2g * patm
 
@@ -768,6 +769,78 @@ contains
 
 
   end subroutine calc_sox_aqueous
+
+!===========================================================================
+  subroutine henry_factor_so2(t_factor, xk, xe, x2)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk, xe and x2 for SO2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K) 
+    real(r8), intent(out) :: xk, xe, x2 ! output variables
+
+    ! for so2
+    xk = 1.23_r8  *exp( 3120._r8*t_factor )
+    xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
+    x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
+
+  end subroutine henry_factor_so2
+
+!===========================================================================
+  subroutine henry_factor_co2(t_factor, xk, xe)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for CO2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk, xe     ! output variables
+
+    ! for co2
+    xk = 3.1e-2_r8*exp( 2423._r8*t_factor )
+    xe = 4.3e-7_r8*exp(-913._r8 *t_factor )
+
+  end subroutine henry_factor_co2
+
+!===========================================================================
+  subroutine henry_factor_h2o2(t_factor, xk, xe)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for H2O2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk, xe     ! output variables
+
+    ! for h2o2
+    xk = 7.4e4_r8   *exp( 6621._r8*t_factor )
+    xe = 2.2e-12_r8 *exp(-3730._r8*t_factor )
+
+  end subroutine henry_factor_h2o2
+
+!===========================================================================
+  subroutine henry_factor_o3(t_factor, xk)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for O3
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk         ! output variables
+
+    ! for o3
+    xk = 1.15e-2_r8   *exp( 2560._r8*t_factor )
+
+  end subroutine henry_factor_o3
 
 !===========================================================================
 
