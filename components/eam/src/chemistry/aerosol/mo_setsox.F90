@@ -164,16 +164,11 @@ contains
     !           (d) PREDICTION
     !-----------------------------------------------------------------------      
     !
-    use ppgrid,    only : pcols, pver
-    use chem_mods, only : gas_pcnst, nfs
-    use chem_mods,    only : adv_mass
-    use physconst,    only : mwdry, gravit
-    use mo_constants, only : pi
-    use cam_history,  only : outfld
+    use ppgrid,          only : pver
+    use cam_history,     only : outfld
     use sox_cldaero_mod, only : sox_cldaero_update, sox_cldaero_create_obj, sox_cldaero_destroy_obj
     use cldaero_mod,     only : cldaero_conc_t
-    use phys_control, only : phys_getopts
-    use cam_abortutils,   only: endrun
+    use cam_abortutils,  only : endrun
 
     !
     implicit none
@@ -340,23 +335,23 @@ contains
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = 7.4e4_r8   *EXP( 6621._r8*t_factor )
-          xe = 2.2e-12_r8 *EXP(-3730._r8*t_factor )
+          xk = 7.4e4_r8   *exp( 6621._r8*t_factor )
+          xe = 2.2e-12_r8 *exp(-3730._r8*t_factor )
           heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          xk = 1.23_r8  *EXP( 3120._r8*t_factor )
-          xe = 1.7e-2_r8*EXP( 2090._r8*t_factor )
-          x2 = 6.0e-8_r8*EXP( 1120._r8*t_factor )
+          xk = 1.23_r8  *exp( 3120._r8*t_factor )
+          xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
+          x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
 
           heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          xk = 1.15e-2_r8 *EXP( 2560._r8*t_factor )
+          xk = 1.15e-2_r8 *exp( 2560._r8*t_factor )
           heo3(i,k) = xk
 
           !-----------------------------------------------
@@ -390,14 +385,14 @@ contains
           !------------------------------------------------------------------------
           !       ... S(IV) (HSO3) + H2O2
           !------------------------------------------------------------------------
-          rah2o2 = 8.e4_r8 * EXP( -3650._r8*t_factor )  &
+          rah2o2 = 8.e4_r8 * exp( -3650._r8*t_factor )  &
                / (.1_r8 + xph(i,k))
 
           !------------------------------------------------------------------------
           !        ... S(IV)+ O3
           !------------------------------------------------------------------------
-          rao3   = 4.39e11_r8 * EXP(-4131._r8/tz)  &
-               + 2.56e3_r8  * EXP(-996._r8 /tz) /xph(i,k)
+          rao3   = 4.39e11_r8 * exp(-4131._r8/tz)  &
+               + 2.56e3_r8  * exp(-996._r8 /tz) /xph(i,k)
 
           !-----------------------------------------------------------------
           !       ... Prediction after aqueous phase
@@ -531,9 +526,9 @@ contains
     !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
     !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
     !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-    xk = 1.23_r8  *EXP( 3120._r8*t_factor )
-    xe = 1.7e-2_r8*EXP( 2090._r8*t_factor )
-    x2 = 6.0e-8_r8*EXP( 1120._r8*t_factor )
+    xk = 1.23_r8  *exp( 3120._r8*t_factor )
+    xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
+    x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
     fact1_so2 = xk*xe*patm*xso2
     fact2_so2 = xk*Ra*temperature*xlwc
     fact3_so2 = xe
@@ -543,8 +538,8 @@ contains
     Eh2o = xkw
 
     ! -------------- co2 effects -------------------
-    xk = 3.1e-2_r8*EXP( 2423._r8*t_factor )
-    xe = 4.3e-7_r8*EXP(-913._r8 *t_factor )
+    xk = 3.1e-2_r8*exp( 2423._r8*t_factor )
+    xe = 4.3e-7_r8*exp(-913._r8 *t_factor )
     Eco2 = xk*xe*co2g  *patm
 
     ! -------------- so4 effects -------------------
