@@ -1030,7 +1030,7 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
          else
             overlapp(kk) = 1._r8
          endif
-         if (cldn_col(km1) > cld_thresh) then
+         if (cldn_col(km1) > overlap_cld_thresh) then
             overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
          else
             overlapm(kk) = 1._r8
