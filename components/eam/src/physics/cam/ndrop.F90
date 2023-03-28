@@ -579,19 +579,6 @@ subroutine dropmixnuc( &
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
 
-! BJG   ! Extract cloud borne MMRs from qqcw pointer
-
-! BJG   do imode=1,ntot_amode
-! BJG      do kk=top_lev,pver
-! BJG         do lspec =1, nspec_amode(imode)
-! BJG           mm   = mam_idx(imode,lspec)
-! BJG           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
-! BJG         enddo
-! BJG         mm   = mam_idx(imode,0) 
-! BJG         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
-! BJG      enddo
-! BJG   enddo
-
 !  Use interstitial and cloud-borne aerosol to compute output ccn fields.
 
    call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
@@ -707,6 +694,7 @@ subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
 
 !  local variables
 
+   real(r8), parameter :: grow_cld_thresh = 0.01_r8   !  threshold cloud fraction growth [fraction] 
    real(r8) :: delt_cld        ! new - old cloud fraction [fraction]
    real(r8) :: frac_delt_cld        ! fractional change in cloud fraction [fraction]
    real(r8) :: fm_delt_cld        ! fm change from fractional change in cloud fraction [fraction]
@@ -763,7 +751,7 @@ subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud
 
-         if (cldn_col_in(kk)-cldo_col_in(kk) > 0.01_r8) then
+         if (cldn_col_in(kk)-cldo_col_in(kk) > grow_cld_thresh) then
 
             call get_activate_frac(state_q_col_in(kk,:), cs_col_in(kk), cs_col_in(kk), & ! in
                  wtke_col_in(kk), temp_col_in(kk), & ! in
@@ -830,6 +818,7 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,  &  ! i
    integer  :: imode       ! mode counter variable
    integer  :: lspec       ! species counter variable
    integer  :: mm               ! local array index for MAM number, species
+   real(r8), parameter :: cld_thresh = 0.01_r8   !  threshold cloud fraction [fraction] 
    real(r8) :: delz_cld        ! vertical change in cloud raction [fraction]
    real(r8) :: crdz            ! conversion factor from flux to rate [m^{-1}]
    real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
@@ -856,9 +845,9 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,  &  ! i
 
          kp1 = min0(kk+1, pver)
 
-         if (cldn_col_in(kk) > 0.01_r8) then
+         if (cldn_col_in(kk) > cld_thresh) then
 
-            if (cldn_col_in(kk) - cldn_col_in(kp1) > 0.01_r8 ) then
+            if (cldn_col_in(kk) - cldn_col_in(kp1) > cld_thresh ) then
 
                ! cloud base
 
@@ -991,6 +980,7 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
 
    ! local arguments
 
+   real(r8), parameter :: overlap_cld_thresh = 1.e-10_r8   !  threshold cloud fraction to compute overlap [fraction] 
    real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
    real(r8) :: dtmin      ! time step to determine subloop time step [s]
    real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
@@ -998,11 +988,11 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
    real(r8) :: ekkm(pver)      ! zn*zs*density*diffusivity   [/s]
    real(r8) :: overlapp(pver)  ! cloud overlap involving level kk+1 [fraction]
    real(r8) :: overlapm(pver)  ! cloud overlap involving level kk-1 [fraction]
-   real(r8) :: source(pver)
-   real(r8) :: tinv       ! inverse timescale of droplet diffusivity [s^-1]
+   real(r8) :: source(pver)  !  source rate for activated number or species mass [/s]  
+   real(r8) :: tinv       ! inverse timescale of droplet diffusivity [/s]
    real(r8) :: dtt        ! timescale of droplet diffusivity [s]
    real(r8) :: dtmix    ! timescale for subloop [s] 
-   real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
+   real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
    real(r8) :: srcn(pver)       ! droplet source rate [/s] 
 
    integer :: kk           ! vertical level index
@@ -1031,8 +1021,23 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
 
 
      do kk = top_lev, pver
+         kp1 = min(kk+1, pver)
+         km1 = max(kk-1, top_lev)
+
+         ! maximum overlap assumption
+         if (cldn_col(kp1) > overlap_cld_thresh) then
+            overlapp(kk) = min(cldn_col(kk)/cldn_col(kp1), 1._r8)
+         else
+            overlapp(kk) = 1._r8
+         endif
+         if (cldn_col(km1) > cld_thresh) then
+            overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
+         else
+            overlapm(kk) = 1._r8
+         endif
+
          ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
-         km1     = max0(kk-1, top_lev)
+! BJG         km1     = max0(kk-1, top_lev)
          ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
          tinv   = ekkp(kk) + ekkm(kk)
 
@@ -1061,21 +1066,21 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
       endif
       dtmix = dtmicro/nsubmix
 
-      do kk = top_lev, pver
-         kp1 = min(kk+1, pver)
-         km1 = max(kk-1, top_lev)
+! BJG      do kk = top_lev, pver
+! BJG         kp1 = min(kk+1, pver)
+! BJG         km1 = max(kk-1, top_lev)
          ! maximum overlap assumption
-         if (cldn_col(kp1) > 1.e-10_r8) then
-            overlapp(kk) = min(cldn_col(kk)/cldn_col(kp1), 1._r8)
-         else
-            overlapp(kk) = 1._r8
-         endif
-         if (cldn_col(km1) > 1.e-10_r8) then
-            overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
-         else
-            overlapm(kk) = 1._r8
-         endif
-      enddo
+! BJG         if (cldn_col(kp1) > 1.e-10_r8) then
+! BJG            overlapp(kk) = min(cldn_col(kk)/cldn_col(kp1), 1._r8)
+! BJG         else
+! BJG            overlapp(kk) = 1._r8
+! BJG         endif
+! BJG         if (cldn_col(km1) > 1.e-10_r8) then
+! BJG            overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
+! BJG         else
+! BJG            overlapm(kk) = 1._r8
+! BJG         endif
+! BJG      enddo
 
 
       ! rce-comment
