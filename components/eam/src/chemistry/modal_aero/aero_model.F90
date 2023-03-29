@@ -672,11 +672,14 @@ contains
     use modal_aero_deposition, only: set_srf_wetdep
     use wetdep,                only: wetdepa_v2, wetdep_inputs_set, &
                                      wetdep_inputs_unset, wetdep_inputs_t
-    use modal_aero_data
+    use modal_aero_data,       only: ntot_amode, nspec_amode,modeptr_coarse, &
+                                     lmassptr_amode, lptr_dust_a_amode, lptr_nacl_a_amode, &
+                                     mmtoo_prevap_resusp, maxd_aspectype,qqcw_get_field
     use modal_aero_calcsize,   only: modal_aero_calcsize_sub
     use modal_aero_wateruptake,only: modal_aero_wateruptake_dr
     use modal_aero_convproc,   only: ma_convproc_intr
 
+    implicit none
     ! args
     type(physics_state), intent(in)    :: state       ! Physics state variables
     type(physics_buffer_desc), pointer :: pbuf(:)
