@@ -813,10 +813,10 @@ contains
     call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
     call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
 
-    call calc_sfc_flux(rprdsh,  state%pdel, rprdshsum)
-    call calc_sfc_flux(rprddp,  state%pdel, rprddpsum)
-    call calc_sfc_flux(evapcsh, state%pdel, evapcshsum)
-    call calc_sfc_flux(evapcdp, state%pdel, evapcdpsum)
+    call calc_sfc_flux(rprdsh,  state%pdel, rprdshsum)  ! output the last argument
+    call calc_sfc_flux(rprddp,  state%pdel, rprddpsum)  ! output the last argument
+    call calc_sfc_flux(evapcsh, state%pdel, evapcshsum) ! output the last argument
+    call calc_sfc_flux(evapcdp, state%pdel, evapcdpsum) ! output the last argument
 
     ! initiate variables
     qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8  
@@ -941,29 +941,29 @@ lphase_jnmw_conditional: &
                 call outfld( trim(cnst_name(mm))//'SBC', bcscavt, pcols, lchnk)
                 call outfld( trim(cnst_name(mm))//'SBS', bsscavt, pcols, lchnk)
 
-                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
+                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx) ! output sflx
                 aerdepwetis(:ncol,mm) = sflx(:ncol)
 
-                call calc_sfc_flux(icscavt, state%pdel, sflx)
+                call calc_sfc_flux(icscavt, state%pdel, sflx) ! output sflx
                 sflxic = sflx
 
-                call calc_sfc_flux(isscavt, state%pdel, sflx)
+                call calc_sfc_flux(isscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name(mm))//'SFSIS', sflx, pcols, lchnk)
 
-                call calc_sfc_flux(bcscavt, state%pdel, sflx)
+                call calc_sfc_flux(bcscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name(mm))//'SFSBC', sflx, pcols, lchnk)
                 sflxbc = sflx
 
-                call calc_sfc_flux(bsscavt, state%pdel, sflx)
+                call calc_sfc_flux(bsscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name(mm))//'SFSBS', sflx, pcols, lchnk)
                
                 ! here the prevap resuspension is in rcscavt & rsscavt and column integral is written to history
                 !BSINGH(09/15/2014):Following two nested do-loops are new additions for unified convection 
                 !BSINGH(09/15/2014):After these do-loops, code was added by RCE, the comments by RCE are kept as it is
-                call calc_sfc_flux(rcscavt, state%pdel, sflx)
+                call calc_sfc_flux(rcscavt, state%pdel, sflx) ! output sflx
                 sflxec = sflx
                    
-                call calc_sfc_flux(rsscavt, state%pdel, sflx)
+                call calc_sfc_flux(rsscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name(mm))//'SFSES', sflx, pcols, lchnk)                   
                    
                 ! apportion convective surface fluxes to deep and shallow conv
@@ -1015,26 +1015,26 @@ lphase_jnmw_conditional: &
                    
                 fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx)
+                call calc_sfc_flux(dqdt_tmp, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFWET', sflx, pcols, lchnk)
                 aerdepwetcw(:ncol,mm) = sflx(:ncol)
                    
-                call calc_sfc_flux(icscavt, state%pdel, sflx)
+                call calc_sfc_flux(icscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSIC', sflx, pcols, lchnk)
 
-                call calc_sfc_flux(isscavt, state%pdel, sflx)
+                call calc_sfc_flux(isscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSIS', sflx, pcols, lchnk)
 
-                call calc_sfc_flux(bcscavt, state%pdel, sflx)
+                call calc_sfc_flux(bcscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSBC', sflx, pcols, lchnk)
 
-                call calc_sfc_flux(bsscavt, state%pdel, sflx)
+                call calc_sfc_flux(bsscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSBS', sflx, pcols, lchnk)
 
-                call calc_sfc_flux(rcscavt, state%pdel, sflx)
+                call calc_sfc_flux(rcscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSEC', sflx, pcols, lchnk)
                       
-                call calc_sfc_flux(rsscavt, state%pdel, sflx)
+                call calc_sfc_flux(rsscavt, state%pdel, sflx) ! output sflx
                 call outfld( trim(cnst_name_cw(mm))//'SFSES', sflx, pcols, lchnk)
 
              endif lphase_jnmw_conditional
