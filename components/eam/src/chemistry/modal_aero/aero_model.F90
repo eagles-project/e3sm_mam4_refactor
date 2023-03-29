@@ -722,6 +722,13 @@ contains
     integer :: mm     ! tracer (q-array) index
     integer :: ncol   ! number of atmospheric columns
     integer :: mam_prevap_resusp_optcc
+    integer, parameter :: mam_prevap_resusp_no  =0,     &
+                          mam_prevap_resusp_mass=130,   &
+                          mam_prevap_resusp_num =230
+!     0 = no resuspension
+!   130 = non-linear resuspension of aerosol mass   based on scavenged aerosol mass
+!   230 = non-linear resuspension of aerosol number based on raindrop number
+!   the 130 thru 230 all use the new prevap_resusp code block in subr wetdepa_v2
 
     logical  :: isprx(pcols,pver) ! true if precipation
 
@@ -878,12 +885,12 @@ lspec_loop_aa: &
 !   230 = non-linear resuspension of aerosol number based on raindrop number
 !   the 130 thru 230 all use the new prevap_resusp code block in subr wetdepa_v2
 !
-             mam_prevap_resusp_optcc = 0
+             mam_prevap_resusp_optcc = mam_prevap_resusp_no
 
              if ( jnummaswtr == jaeromass ) then  ! dry mass
-                   mam_prevap_resusp_optcc = 130
+                   mam_prevap_resusp_optcc = mam_prevap_resusp_mass
              elseif ( jnummaswtr == jaeronumb .and. lphase == 1 .and. imode == modeptr_coarse ) then ! number
-                   mam_prevap_resusp_optcc = 230
+                   mam_prevap_resusp_optcc = mam_prevap_resusp_num
              endif
 
              ! set f_act_conv for interstitial (lphase=1) coarse mode species
