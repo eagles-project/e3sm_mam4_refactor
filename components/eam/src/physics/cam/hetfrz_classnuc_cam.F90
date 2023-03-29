@@ -38,8 +38,7 @@ save
 public :: &
    hetfrz_classnuc_cam_readnl,   &
    hetfrz_classnuc_cam_init,     &
-   hetfrz_classnuc_cam_calc,     &
-   hetfrz_classnuc_cam_save_cbaero
+   hetfrz_classnuc_cam_calc
 
 ! Namelist variables
 logical :: hist_hetfrz_classnuc = .false.
@@ -127,9 +126,6 @@ integer :: num_pcarbon   ! number in primary carbon mode
 integer, allocatable :: mode_idx(:)
 integer, allocatable :: spec_idx(:)
 
-! Copy of cloud borne aerosols before modification by droplet nucleation
-! The basis is converted from mass to volume.
-real(r8), allocatable :: aer_cb(:,:,:,:)
 
 ! Copy of interstitial aerosols with basis converted from mass to volume.
 real(r8), allocatable :: aer(:,:,:,:)
@@ -408,10 +404,6 @@ subroutine hetfrz_classnuc_cam_init(mincld_in)
    mode_idx = -1
    spec_idx = -1
 
-   ! Allocate space for copy of cloud borne aerosols before modification by droplet nucleation.
-   !pw: zero-basing the lchunk index to work around PGI bug/feature.
-   allocate(aer_cb(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
-   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    ! Allocate space for copy of interstitial aerosols with modified basis
    !pw: zero-basing the lchunk index to work around PGI bug/feature.
@@ -521,8 +513,8 @@ end subroutine hetfrz_classnuc_cam_init
 
 !================================================================================================
 
-subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, qc, nc, state_q, &
-                                     state, deltatin, factnum, pbuf, &
+subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
+                                     qc, nc, state_q, aer_cb, deltatin, factnum, &
                                      frzimm, frzcnt, frzdep)
 
    use modal_aero_data,   only: modeptr_accum, modeptr_coarse, modeptr_pcarbon, numptr_amode
@@ -541,10 +533,10 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    real(r8), intent(in) :: nc(:,:)
 
    real(r8), intent(in) :: state_q(:,:,:)       ! input mixing ratio for all water and chem species [#/kg,kg/kg]
-   type(physics_state), target, intent(in)    :: state
-   real(r8),                    intent(in)    :: deltatin       ! time step (s)
-   real(r8),                    intent(in)    :: factnum(:,:,:) ! activation fraction for aerosol number
-   type(physics_buffer_desc),   pointer       :: pbuf(:)
+   real(r8), intent(in) :: aer_cb(:,:,:)
+   real(r8), intent(in) :: deltatin       ! time step (s)
+   real(r8), intent(in) :: factnum(:,:,:) ! activation fraction for aerosol number
+
 
    real(r8), intent(out) :: frzimm(:,:)
    real(r8), intent(out) :: frzcnt(:,:)
@@ -554,11 +546,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    integer :: icol, kk, ispec
    integer :: lchnk_zb                  ! zero-based local chunk id
 
-       
-
    real(r8) :: lcldm(pcols,pver)
-
-   real(r8), pointer :: ptr2d(:,:)
 
    real(r8) :: fn(hetfrz_aer_nspec)
    real(r8) :: awcam(pcols,pver,hetfrz_aer_nspec)
@@ -591,7 +579,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    real(r8) :: numice10s(pcols,pver)
    real(r8) :: numice10s_imm_dst(pcols,pver)
    real(r8) :: numice10s_imm_bc(pcols,pver)
-   real(r8) :: tmp_array(state%ncol,pver)
+   real(r8) :: tmp_array(ncol,pver)
 
    real(r8) :: na500(pcols,pver)
    real(r8) :: tot_na500(pcols,pver)
@@ -611,18 +599,6 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
 
    ! Convert interstitial and cloud borne aerosols from a mass to a volume basis before
    ! being used in get_aer_num
-   do ispec = 1, ncnst
-      aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
-
-   enddo
-      ! Check whether constituent is a mass or number mixing ratio
-!      if (spec_idx(ispec) == 0) then
-!         call rad_cnst_get_mode_num(0, mode_idx(ispec), 'a', state, pbuf, ptr2d)
-!      else
-!         call rad_cnst_get_aer_mmr(0, mode_idx(ispec), spec_idx(ispec), 'a', state, pbuf, ptr2d)
-!      endif
-!      aer(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:) * rho(:ncol,:)
-!   enddo
 
    aer(:ncol,:pver,so4_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_so4_a_amode(modeptr_accum)) * rho(:ncol,:)
    aer(:ncol,:pver,bc_accum, lchnk_zb)  = state_q(:ncol,:pver,lptr_bc_a_amode(modeptr_accum)) * rho(:ncol,:)
@@ -685,7 +661,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
          call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:,lchnk_zb), &      ! in 
                                              total_interstitial_aer_num(icol,kk,:)) ! out
 
-         call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:,lchnk_zb), & ! in
+         call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:), & ! in
                                            total_cloudborne_aer_num(icol,kk,:)) ! out 
 
          call calculate_mass_mean_radius(ncnst, aer(icol,kk,:,lchnk_zb), &         ! in
@@ -855,38 +831,6 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, q
    call outfld('NUMIMM10sBC',  numice10s_imm_bc,  pcols, lchnk)
 
 end subroutine hetfrz_classnuc_cam_calc
-
-!====================================================================================================
-
-subroutine hetfrz_classnuc_cam_save_cbaero(state, pbuf)
-
-   ! Save the required cloud borne aerosol constituents.
-   type(physics_state),         intent(in)    :: state
-   type(physics_buffer_desc),   pointer       :: pbuf(:)
-
-   ! local variables
-   integer :: i, lchnk_zb
-   real(r8), pointer :: ptr2d(:,:)
-   !-------------------------------------------------------------------------------
-
-   lchnk_zb = state%lchnk - begchunk
-
-   ! loop over the cloud borne constituents required by this module and save
-   ! a local copy
-
-   do i = 1, ncnst
-
-      ! Check whether constituent is a mass or number mixing ratio
-      if (spec_idx(i) == 0) then
-         call rad_cnst_get_mode_num(0, mode_idx(i), 'c', state, pbuf, ptr2d)
-      else
-         call rad_cnst_get_aer_mmr(0, mode_idx(i), spec_idx(i), 'c', state, pbuf, ptr2d)
-      end if
-      aer_cb(:,:,i,lchnk_zb) = ptr2d
-
-   end do
-
-end subroutine hetfrz_classnuc_cam_save_cbaero
 
 !====================================================================================================
 

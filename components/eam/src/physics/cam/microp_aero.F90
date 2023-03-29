@@ -24,7 +24,7 @@ module microp_aero
 
 use shr_kind_mod,     only: r8=>shr_kind_r8
 use spmd_utils,       only: masterproc
-use ppgrid,           only: pcols, pver, pverp
+use ppgrid,           only: pcols, pver, pverp, begchunk, endchunk
 use ref_pres,         only: top_lev => trop_cloud_top_lev
 use physconst,        only: rair, gravit, pi
 use constituents,     only: cnst_get_ind
@@ -41,12 +41,14 @@ use ndrop,            only: ndrop_init, dropmixnuc
 use ndrop_bam,        only: ndrop_bam_init, ndrop_bam_run, ndrop_bam_ccn
 
 use hetfrz_classnuc_cam, only: hetfrz_classnuc_cam_readnl,  hetfrz_classnuc_cam_init, &
-                               hetfrz_classnuc_cam_save_cbaero, hetfrz_classnuc_cam_calc
+                               hetfrz_classnuc_cam_calc
 
 use cam_history,      only: addfld, add_default, outfld
 use cam_logfile,      only: iulog
 use cam_abortutils,       only: endrun
 use perf_mod,         only: t_startf, t_stopf
+
+use error_messages, only: alloc_err
 
 implicit none
 private
@@ -134,6 +136,14 @@ logical  :: liqcf_fix
 real(r8), parameter :: unset_r8   = huge(1.0_r8)
 real(r8) :: wsubmin = unset_r8 !PMA sets a much lower lower bound
 
+integer, parameter :: ncnst = 20
+integer :: hetfrz_aer_spec_idx(1:ncnst) = -1
+
+character(len=8) :: hetfrz_aer_specname(ncnst)
+
+! Copy of cloud borne aerosols before modification by droplet nucleation
+! The basis is converted from mass to volume.
+real(r8), allocatable :: aer_cb(:,:,:,:)
 
 contains
 !=========================================================================================
@@ -179,7 +189,7 @@ subroutine microp_aero_init
    !-----------------------------------------------------------------------
 
    ! local variables
-   integer  :: iaer, ierr
+   integer  :: iaer, ierr, ispec, istat
    integer  :: m, n, nmodes, nspec
 
    character(len=32) :: str32
@@ -195,6 +205,12 @@ subroutine microp_aero_init
         demott_ice_nuc_out = dem_in      ) 
    
    if(masterproc)write(iulog,*)'DEMOTT is:', dem_in 
+
+   hetfrz_aer_specname(1:ncnst) = (/'so4_c1  ', 'bc_c1   ', 'pom_c1  ', 'soa_c1  ', &
+                                    'dst_c1  ', 'ncl_c1  ', 'mom_c1  ', 'num_c1  ', &
+                                    'dst_c3  ', 'ncl_c3  ', 'so4_c3  ', 'bc_c3   ', &
+                                    'pom_c3  ', 'soa_c3  ', 'mom_c3  ', 'num_c3  ', &
+                                    'bc_c4   ', 'pom_c4  ', 'mom_c4  ', 'num_c4  '/)
 
    ! Access the physical properties of the aerosols that are affecting the climate
    ! by using routines from the rad_constituents module.
@@ -222,6 +238,16 @@ subroutine microp_aero_init
    ast_idx      = pbuf_get_index('AST')
    alst_idx      = pbuf_get_index('ALST')
    aist_idx      = pbuf_get_index('AIST')
+   
+   do ispec = 1, ncnst
+      hetfrz_aer_spec_idx(ispec) = pbuf_get_index(hetfrz_aer_specname(ispec))
+   enddo   
+
+   ! Allocate space for copy of cloud borne aerosols before modification by
+   ! droplet nucleation.
+   !pw: zero-basing the lchunk index to work around PGI bug/feature.
+   allocate(aer_cb(pcols,pver,ncnst,0:(endchunk-begchunk)), stat=istat)
+   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    if (clim_modal_aero) then
 
@@ -391,6 +417,8 @@ subroutine microp_aero_run ( &
    integer :: icol, kk, m
    integer :: itim_old
    integer :: nmodes 
+   integer :: lchnk_zb                  ! zero-based local chunk id
+   integer :: ispec
 
    ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
@@ -418,6 +446,7 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: frzcnt(:,:)
    real(r8), pointer :: frzdep(:,:)
 
+   real(r8), pointer :: ptr2d(:,:)
 
    real(r8)          :: icecldf(pcols,pver)    ! ice cloud fraction   
    real(r8)          :: liqcldf(pcols,pver)    ! liquid cloud fraction
@@ -498,11 +527,16 @@ subroutine microp_aero_run ( &
    ! initialize output
    npccn(1:ncol,1:pver)    = 0._r8  
 
+   lchnk_zb = lchnk - begchunk
 
    ! save copy of cloud borne aerosols for use in heterogeneous freezing
-   call hetfrz_classnuc_cam_save_cbaero(state, pbuf)
-
-
+   !call hetfrz_classnuc_cam_save_cbaero(state, pbuf)
+   do ispec = 1, ncnst
+      call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)
+      
+      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
+   enddo
+  
    ! initialize time-varying parameters
    do kk = top_lev, pver
       do icol = 1, ncol
@@ -510,6 +544,9 @@ subroutine microp_aero_run ( &
       end do
    end do
 
+   do ispec = 1, ncnst
+      aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
+   enddo
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! More refined computation of sub-grid vertical velocity 
@@ -620,9 +657,9 @@ subroutine microp_aero_run ( &
 
    ! heterogeneous freezing
    call t_startf('hetfrz_classnuc_cam_calc')
-   call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, qc, nc, state_q, &
-                                 state, deltatin, factnum, pbuf, & 
-                                 frzimm, frzcnt, frzdep)
+   call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, &   ! in
+                                 qc, nc, state_q, aer_cb(:,:,:,lchnk_zb), deltatin, factnum, & ! in
+                                 frzimm, frzcnt, frzdep)                       ! out
    call t_stopf('hetfrz_classnuc_cam_calc')
 
    deallocate(factnum)
