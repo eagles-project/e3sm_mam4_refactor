@@ -761,6 +761,7 @@ contains
                                            ! for cloud-borne num & vol (0),
                                            ! interstitial num (1), interstitial vol (2)
     real(r8), pointer :: fldcw(:,:)      ! trace species [kg/kg]
+    integer, parameter :: mode_order_change(4) = (/1,2,4,3/) ! change mode order as mmode_loop_aa loops in a different order
     
     ! args for ma_convproc_intr
     integer, parameter:: nsrflx_mzaer2cnvpr = 2   ! last dimension of qsrflx_mzaer2cnvpr
@@ -842,14 +843,10 @@ contains
 
 mmode_loop_aa: &
     do mtmp = 1, ntot_amode ! main loop over aerosol modes
-       imode = mtmp
+
        ! for mam4, do accum, aitken, pcarbon, then coarse 
        ! so change the order of 3 and 4 here
-       if (mtmp == modeptr_coarse) then
-             imode = ntot_amode
-       elseif (mtmp > modeptr_coarse) then
-             imode = mtmp - 1
-       endif
+       imode = mode_order_change(mtmp)
 
 ! loop over interstitial (1) and cloud-borne (2) forms         
 !BSINGH (09/12/2014):Do cloudborne first for unified convection scheme so
