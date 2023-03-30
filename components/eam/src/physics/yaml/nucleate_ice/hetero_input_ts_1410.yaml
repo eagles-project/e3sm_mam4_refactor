@@ -1,0 +1,9 @@
+# Data at [lat=   27.8859484222059      , lon=   83.8815732902265      , k=          44 , time step=        1410 ] 
+mam4xx:
+  function: hetero
+input:
+  fixed:
+    dt:    0.00
+    Temperature: [-0.3575495987E+02]
+    w_vlc: [ 0.2000000000E+00]
+    Ns: [ 0.1542388755E-01]
