@@ -522,69 +522,82 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
                                 lptr_bc_a_amode, lptr_pom_a_amode, lptr_soa_a_amode, &
                                 lptr_mom_a_amode
 
-   ! arguments
+   ! input
    integer, intent(in) :: ncol
    integer, intent(in) :: lchnk
    real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
    real(r8), intent(in) :: pmid(:,:)            ! pressure at layer midpoints [pa]
    real(r8), intent(in) :: rho(:,:)             ! air density [kg/m^3]
-   real(r8), intent(in) :: ast(:,:)             !    
-   real(r8), intent(in) :: qc(:,:)
-   real(r8), intent(in) :: nc(:,:)
-
+   real(r8), intent(in) :: ast(:,:)             ! cloud fraction [unitless]   
+   real(r8), intent(in) :: qc(:,:)              ! cloud droplet mass concentration [kg/kg]
+   real(r8), intent(in) :: nc(:,:)              ! cloud droplet number concentration [#/kg]
    real(r8), intent(in) :: state_q(:,:,:)       ! input mixing ratio for all water and chem species [#/kg,kg/kg]
-   real(r8), intent(in) :: aer_cb(:,:,:)
-   real(r8), intent(in) :: deltatin       ! time step (s)
-   real(r8), intent(in) :: factnum(:,:,:) ! activation fraction for aerosol number
+   real(r8), intent(in) :: aer_cb(:,:,:)        ! cloudborne aerosol mass mixing ratio [kg/kg]
+   real(r8), intent(in) :: deltatin             ! time step (s)
+   real(r8), intent(in) :: factnum(:,:,:)       ! activation fraction for aerosol number [unitless] 
 
-
-   real(r8), intent(out) :: frzimm(:,:)
-   real(r8), intent(out) :: frzcnt(:,:)
-   real(r8), intent(out) :: frzdep(:,:)
+   ! output
+   real(r8), intent(out) :: frzimm(:,:)         ! heterogeous freezing by immersion nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzcnt(:,:)         ! heterogeous freezing by contact nucleation [cm^-3 s^-1]
+   real(r8), intent(out) :: frzdep(:,:)         ! heterogeous freezing by deposition nucleation [cm^-3 s^-1]
  
    ! local workspace
+   real(r8), parameter :: con1 = 1._r8/(1.333_r8*pi)**0.333_r8
+
    integer :: icol, kk, ispec
    integer :: lchnk_zb                  ! zero-based local chunk id
 
-   real(r8) :: lcldm(pcols,pver)
+   real(r8) :: lcldm(pcols,pver)        ! liquid cloud fraction [unitless]
 
-   real(r8) :: fn(hetfrz_aer_nspec)
-   real(r8) :: awcam(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: awfacm(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: hetraer(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: dstcoat(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: total_interstitial_aer_num(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: total_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: total_aer_num(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: coated_aer_num(pcols,pver,hetfrz_aer_nspec)
-   real(r8) :: uncoated_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: fn(hetfrz_aer_nspec)                                    ! fraction activated for cloud borne aerosol number [unitless]
+   real(r8) :: awcam(pcols,pver,hetfrz_aer_nspec)                      ! modal added mass [mug/m^3] 
+   real(r8) :: awfacm(pcols,pver,hetfrz_aer_nspec)                     ! (OC+BC)/(OC+BC+SO4)
+   real(r8) :: hetraer(pcols,pver,hetfrz_aer_nspec)                    ! BC and Dust mass mean radius [m]
+   real(r8) :: dstcoat(pcols,pver,hetfrz_aer_nspec)                    ! coated fraction [unitless] 
+   real(r8) :: total_interstitial_aer_num(pcols,pver,hetfrz_aer_nspec) ! interstitial concentrations of BC and dust [#/cm^3]
+   real(r8) :: total_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)   ! cloudborne concentrations of BC and dust [#/cm^3] 
+   real(r8) :: total_aer_num(pcols,pver,hetfrz_aer_nspec)              ! total bc and dust number concentration(interstitial+cloudborne) [#/cm^3] 
+   real(r8) :: coated_aer_num(pcols,pver,hetfrz_aer_nspec)             ! coated bc and dust number concentration(interstitial) [#/cm^3] 
+   real(r8) :: uncoated_aer_num(pcols,pver,hetfrz_aer_nspec)           ! uncoated bc and dust number concentration(interstitial) [#/cm^3]
+   real(r8) :: fn_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)      ! cloudborne bc and dust number derived from fn [#/cm^3]
 
-   real(r8) :: fn_cloudborne_aer_num(pcols,pver,hetfrz_aer_nspec)
+   real(r8) :: r3lx        ! volume mean drop radius [m]
+   real(r8) :: supersatice ! supersaturation ratio wrt ice at 100%rh over water [unitless]
+   real(r8) :: qcic        ! in-cloud droplet mass concentration [kg/kg]  
+   real(r8) :: ncic        ! in-cloud droplet number concentration [#/kg] 
 
+   real(r8) :: frzbcimm(pcols,pver)   ! heterogeous freezing by BC immersion nucleation [cm^-3 s^-1]
+   real(r8) :: frzduimm(pcols,pver)   ! heterogeous freezing by dust immersion nucleation [cm^-3 s^-1]
+   real(r8) :: frzbccnt(pcols,pver)   ! heterogeous freezing by BC contact nucleation [cm^-3 s^-1]
+   real(r8) :: frzducnt(pcols,pver)   ! heterogeous freezing by dust contact nucleation [cm^-3 s^-1]
+   real(r8) :: frzbcdep(pcols,pver)   ! heterogeous freezing by BC deposition nucleation [cm^-3 s^-1]
+   real(r8) :: frzdudep(pcols,pver)   ! heterogeous freezing by dust deposition nucleation [cm^-3 s^-1]
 
-   real(r8) :: con1, r3lx, supersatice
-
-   real(r8) :: qcic
-   real(r8) :: ncic
-
-   real(r8) :: frzbcimm(pcols,pver), frzduimm(pcols,pver)
-   real(r8) :: frzbccnt(pcols,pver), frzducnt(pcols,pver)
-   real(r8) :: frzbcdep(pcols,pver), frzdudep(pcols,pver)
-
-   real(r8) :: freqimm(pcols,pver), freqcnt(pcols,pver), freqdep(pcols,pver), freqmix(pcols,pver)
-   real(r8) :: nnuccc_bc(pcols,pver), nnucct_bc(pcols,pver), nnudep_bc(pcols,pver)
-   real(r8) :: nnuccc_dst(pcols,pver), nnucct_dst(pcols,pver), nnudep_dst(pcols,pver)
-   real(r8) :: niimm_bc(pcols,pver), nicnt_bc(pcols,pver), nidep_bc(pcols,pver)
-   real(r8) :: niimm_dst(pcols,pver), nicnt_dst(pcols,pver), nidep_dst(pcols,pver)
-   real(r8) :: numice10s(pcols,pver)
-   real(r8) :: numice10s_imm_dst(pcols,pver)
-   real(r8) :: numice10s_imm_bc(pcols,pver)
+   real(r8) :: freqimm(pcols,pver)    ! fractional occurance of immersion freezing [unitless]
+   real(r8) :: freqcnt(pcols,pver)    ! fractional occurance of contact freezing [unitless]
+   real(r8) :: freqdep(pcols,pver)    ! fractional occurance of deposition freezing [unitless]
+   real(r8) :: freqmix(pcols,pver)    ! fractional occurance of mixed-phase clouds [unitless] 
+   real(r8) :: nnuccc_bc(pcols,pver)  ! BC immersion freezing rate [m^-3 s^-1]
+   real(r8) :: nnucct_bc(pcols,pver)  ! BC contact freezing rate [m^-3 s^-1]
+   real(r8) :: nnudep_bc(pcols,pver)  ! BC deposition freezing rate [m^-3 s^-1]
+   real(r8) :: nnuccc_dst(pcols,pver) ! dust immersion freezing rate [m^-3 s^-1]
+   real(r8) :: nnucct_dst(pcols,pver) ! dust contact freezing rate [m^-3 s^-1]
+   real(r8) :: nnudep_dst(pcols,pver) ! dust deposition freezing rate [m^-3 s^-1]
+   real(r8) :: niimm_bc(pcols,pver)   ! activated ice number concentration due to BC immersion freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: nicnt_bc(pcols,pver)   ! activated ice number concentration due to BC contact freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: nidep_bc(pcols,pver)   ! activated ice number concentration due to BC deposition freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: niimm_dst(pcols,pver)  ! activated ice number concentration due to dust immersion freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: nicnt_dst(pcols,pver)  ! activated ice number concentration due to dust contact freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: nidep_dst(pcols,pver)  ! activated ice number concentration due to dust deposition freezing in mixed-phase clouds [#/m^3]
+   real(r8) :: numice10s(pcols,pver)         ! ice number voncentration due to het freezing in mixed-phase clouds during 10s period [#/m^3]
+   real(r8) :: numice10s_imm_dst(pcols,pver) ! ice number voncentration due to imm freezing by dust in mixed-phase clouds during 10s period [#/m^3]
+   real(r8) :: numice10s_imm_bc(pcols,pver)  ! ice number voncentration due to imm freezing by BC in mixed-phase clouds during 10s period [#/m^3]
    real(r8) :: tmp_array(ncol,pver)
 
-   real(r8) :: na500(pcols,pver)
-   real(r8) :: tot_na500(pcols,pver)
+   real(r8) :: na500(pcols,pver)     ! interstitial aerosol number with D>500 nm [#/cm^3]
+   real(r8) :: tot_na500(pcols,pver) ! total aerosol number with D>500 nm [#/cm^3] 
 
-   character(128) :: errstring   ! Error status
+   character(128) :: errstring       ! Error status
    !-------------------------------------------------------------------------------
 
 
@@ -597,7 +610,8 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
       enddo
    enddo
 
-   ! Convert interstitial and cloud borne aerosols from a mass to a volume basis before
+   ! get interstitial aerosols from state_q
+   ! Convert interstitial aerosols from a mass to a volume basis before
    ! being used in get_aer_num
 
    aer(:ncol,:pver,so4_accum,lchnk_zb)  = state_q(:ncol,:pver,lptr_so4_a_amode(modeptr_accum)) * rho(:ncol,:)
@@ -740,7 +754,6 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
             qcic = min(qc(icol,kk)/lcldm(icol,kk), 5.e-3_r8)
             ncic = max(nc(icol,kk)/lcldm(icol,kk), 0._r8)
 
-            con1 = 1._r8/(1.333_r8*pi)**0.333_r8
             r3lx = con1*(rho(icol,kk)*qcic/(rhoh2o*max(ncic*rho(icol,kk), 1.0e6_r8)))**0.333_r8 ! in m
             r3lx = max(4.e-6_r8, r3lx)
             supersatice = svp_water(temperature(icol,kk))/svp_ice(temperature(icol,kk))
