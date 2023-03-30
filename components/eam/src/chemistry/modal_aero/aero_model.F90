@@ -1379,169 +1379,168 @@ lphase_jnmw_conditional: &
   end subroutine calc_sfc_flux
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt, &
-                                    latndx, lonndx, reaction_rates, &
-                                    tfld, pmid, pdel, mbar, relhum, &
-                                    zm,  qh2o, cwat, cldfr, cldnum, &
-                                    airdens, invariants, del_h2so4_gasprod,  &
-                                    vmr0, vmr, pbuf )
+  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt,     & ! in
+                                    latndx, lonndx,                 & ! in
+                                    tfld, pmid, pdel, mbar,         & ! in
+                                    zm,  qh2o, cwat, cldfr, cldnum, & ! in
+                                    airdens, invariants,            & ! in
+                                    vmr0, vmr, pbuf                 ) ! inout
+    !-----------------------------------------------------------------------
+    ! interface to gas-aerosol exchange
+    !-----------------------------------------------------------------------
 
     use time_manager,          only : get_nstep
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
-    use mo_setsox,             only : setsox, has_sox
+    use mo_setsox,             only : setsox
     use modal_aero_data,       only : qqcw_get_field
 
-    !-----------------------------------------------------------------------
-    !      ... dummy arguments
-    !-----------------------------------------------------------------------
-    integer,  intent(in) :: loffset                ! offset applied to modal aero "pointers"
-    integer,  intent(in) :: ncol                   ! number columns in chunk
-    integer,  intent(in) :: lchnk                  ! chunk index
-    integer,  intent(in) :: latndx(pcols)          ! latitude indices
-    integer,  intent(in) :: lonndx(pcols)          ! longitude indices
-    real(r8), intent(in) :: delt                   ! time step size (sec)
-    real(r8), intent(in) :: reaction_rates(:,:,:)  ! reaction rates
-    real(r8), intent(in) :: tfld(:,:)              ! temperature (K)
-    real(r8), intent(in) :: pmid(:,:)              ! pressure at model levels (Pa)
-    real(r8), intent(in) :: pdel(:,:)              ! pressure thickness of levels (Pa)
-    real(r8), intent(in) :: mbar(:,:)              ! mean wet atmospheric mass ( amu )
-    real(r8), intent(in) :: relhum(:,:)            ! relative humidity
-    real(r8), intent(in) :: airdens(:,:)           ! total atms density (molec/cm**3)
-    real(r8), intent(in) :: invariants(:,:,:)
-    real(r8), intent(in) :: del_h2so4_gasprod(:,:) 
-    real(r8), intent(in) :: zm(:,:) 
-    real(r8), intent(in) :: qh2o(:,:) 
-    real(r8), intent(in) :: cwat(:,:)          ! cloud liquid water content (kg/kg)
-    real(r8), intent(in) :: cldfr(:,:) 
-    real(r8), intent(in) :: cldnum(:,:)       ! droplet number concentration (#/kg)
-    real(r8), intent(in) :: vmr0(:,:,:)       ! initial mixing ratios (before gas-phase chem changes)
-    real(r8), intent(inout) :: vmr(:,:,:)         ! mixing ratios ( vmr )
+    !  dummy arguments
+    integer,  intent(in) :: loffset           ! offset applied to modal aero "pointers"
+    integer,  intent(in) :: ncol              ! number columns in chunk
+    integer,  intent(in) :: lchnk             ! chunk index
+    integer,  intent(in) :: latndx(pcols)     ! latitude indices
+    integer,  intent(in) :: lonndx(pcols)     ! longitude indices
+    real(r8), intent(in) :: delt              ! time step size [sec]
+    real(r8), intent(in) :: tfld(:,:)         ! temperature [K]
+    real(r8), intent(in) :: pmid(:,:)         ! pressure at model levels [Pa]
+    real(r8), intent(in) :: pdel(:,:)         ! pressure thickness of levels [Pa]
+    real(r8), intent(in) :: mbar(:,:)         ! mean wet atmospheric mass [amu or g/mol]
+    real(r8), intent(in) :: airdens(:,:)      ! total atms density [molecules/cm**3]
+    real(r8), intent(in) :: invariants(:,:,:) ! invariant density [molecules/cm**3]
+    real(r8), intent(in) :: zm(:,:)           ! midpoint geopotential height above the surface [m]
+    real(r8), intent(in) :: qh2o(:,:)         ! specific humidity [kg/kg]
+    real(r8), intent(in) :: cwat(:,:)         ! cloud liquid water content [kg/kg]
+    real(r8), intent(in) :: cldfr(:,:)        ! cloud fraction [fraction]
+    real(r8), intent(in) :: cldnum(:,:)       ! droplet number concentration [#/kg]
+    real(r8), intent(in) :: vmr0(:,:,:)       ! initial mixing ratios (before gas-phase chem changes) [vmr or mol/mol]
+    real(r8), intent(inout) :: vmr(:,:,:)     ! mixing ratios [vmr or mol/mol]
     type(physics_buffer_desc), pointer :: pbuf(:)
     
     ! local vars 
     
-    integer :: n, m
-    integer :: i,k
+    integer :: imode, mm
+    integer :: icol,kk
     integer :: nstep
 
-    real(r8) :: del_h2so4_aeruptk(ncol,pver)
+    real(r8), pointer :: dgnum(:,:,:)           ! aerosol diameter [m]
+    real(r8), pointer :: dgnumwet(:,:,:)        ! aerosol wet diameter [m]
+    real(r8), pointer :: wetdens(:,:,:)         ! aerosol wet density [kg/m3] 
+    real(r8), pointer :: pblh(:)                ! pbl height [m]
 
-    real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
-    real(r8), pointer :: pblh(:)                    ! pbl height (m)
+    real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/m2/s]
+    character(len=32)         :: out_name       ! output variable name string
+    real(r8) :: dvmrdt(ncol,pver,gas_pcnst)     ! mixing ratio tendency [vmr/s or mol/mol/s]
+    real(r8) :: vmr_pregas(ncol,pver,gas_pcnst) ! mixing ratio before gas chemistry [vmr or mol/mol]
+    real(r8) :: vmr_precld(ncol,pver,gas_pcnst) ! mixing ratio before cloud chemistry [vmr or mol/mol]
+    real(r8) :: vmrcw(ncol,pver,gas_pcnst)      ! cloud-borne aerosol [vmr or mol/mol]
+    real(r8) :: fldcw_all(ncol,pver,gas_pcnst)     ! all gas mass mixing ratio [kg/kg]
 
-    real(r8), dimension(ncol) :: wrk
-    character(len=32)         :: name
-    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
-    real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
-    real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
+    real(r8), pointer :: fldcw(:,:)             ! mass mixing ratio [kg/kg]
 
-    real(r8), pointer :: fldcw(:,:)
+    !-----------------------------------------------------------------------
 
+    ! read additional variables from pbuf
     call pbuf_get_field(pbuf, dgnum_idx,      dgnum,  start=(/1,1,1/), kount=(/pcols,pver,ntot_amode/) )
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgnumwet )
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
     call pbuf_get_field(pbuf, pblh_idx,       pblh)
 
-    do n=1,ntot_amode
-       call outfld(dgnum_name(n),dgnumwet(1:ncol,1:pver,n), ncol, lchnk )
+    do imode=1,ntot_amode
+       call outfld(dgnum_name(imode),dgnumwet(1:ncol,1:pver,imode), ncol, lchnk )
     enddo
-
-! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
 
     nstep = get_nstep()
 
-    ! calculate tendency due to gas phase chemistry and processes
+    ! calculate and output column-integrated tendency due to gas phase chemistry and processes
     dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
-    do m = 1, gas_pcnst
-      wrk(:) = 0._r8
-      do k = 1,pver
-        wrk(:ncol) = wrk(:ncol) + dvmrdt(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+    do mm = 1, gas_pcnst
+      dvmrdt_col(:) = 0._r8
+      do kk = 1,pver
+        dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + dvmrdt(:ncol,kk,mm) * &
+                            adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
       enddo
-      name = 'GS_'//trim(solsym(m))
-      call outfld( name, wrk(:ncol), ncol, lchnk )
+      out_name = 'GS_'//trim(solsym(mm))
+      call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
     enddo
 
 !
 ! Aerosol processes ...
 !
-    call qqcw2vmr( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+    ! get mass mixing ratio from pbuf 
+    do mm = 1,gas_pcnst
+       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       if(associated(fldcw)) then
+           fldcw_all(:ncol,:,mm) = fldcw(:ncol,:)
+       else
+           fldcw_all(:,:,mm) = 0.0_r8
+       endif
+    enddo
+    ! calculate cloudborne aerosol volume mixing ratio
+    call qqcw2vmr( vmrcw, mbar, fldcw_all )
 
-    !------------------------------------------------------
 
-      dvmrdt(:ncol,:,:) = vmr(:ncol,:,:)
-      dvmrcwdt(:ncol,:,:) = vmrcw(:ncol,:,:)
+    ! assign mixing ratios values before gas chemistry and aqueous chemistry
+    vmr_pregas(:ncol,:,:) = vmr(:ncol,:,:)
+    vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
 
-      ! aqueous chemistry ...
+    ! aqueous chemistry ...
+    call setsox( ncol, lchnk, loffset,  & ! in
+              delt, pmid, pdel, tfld,   & ! in
+              mbar, cwat, cldfr,cldnum, & ! in
+              airdens,    invariants,   & ! in
+              vmrcw,      vmr           ) ! inout
 
-      if( has_sox ) then
-         call setsox(   &
-              ncol,     &
-              lchnk,    &
-              loffset,  &
-              delt,     &
-              pmid,     &
-              pdel,     &
-              tfld,     &
-              mbar,     &
-              cwat,     &
-              cldfr,    &
-              cldnum,   &
-              airdens,  &
-              invariants, &
-              vmrcw,    &
-              vmr       &
-              )
-      endif
-
-      ! Tendency due to aqueous chemistry 
-      ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
-      ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
-      !           rather than interstitial here
-      do m = 1, gas_pcnst
-        wrk(:) = 0._r8
-        do k = 1,pver
-            ! here dvmrdt is vmr before aqueous chemistry, so need to calculate (delta vmr)/(delt)
-            wrk(:ncol) = wrk(:ncol) + ((vmr(:ncol,k,m)-dvmrdt(:ncol,k,m))/delt) &
-                                                        * adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+    ! calculate and output column tendency due to aqueous chemistry 
+    ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
+    ! ***Note - should calc & output tendencies for cloud-borne aerosol species 
+    !           rather than interstitial here
+    do mm = 1, gas_pcnst
+        dvmrdt_col(:) = 0._r8
+        do kk = 1,pver
+            dvmrdt_col(:ncol) = dvmrdt_col(:ncol) + ((vmr(:ncol,kk,mm)-vmr_pregas(:ncol,kk,mm))/delt) &
+                                                  * adv_mass(mm)/mbar(:ncol,kk)*pdel(:ncol,kk)/gravit
         enddo
-        name = 'AQ_'//trim(solsym(m))
-        call outfld( name, wrk(:ncol), ncol, lchnk )
-      enddo
+        out_name = 'AQ_'//trim(solsym(mm))
+        call outfld( out_name, dvmrdt_col(:ncol), ncol, lchnk )
+    enddo
 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
 
-       call t_startf('modal_aero_amicphys')
+    call t_startf('modal_aero_amicphys')
+    ! note that:
+    !     vmr0 holds vmr before gas-phase chemistry
+    !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
+    call modal_aero_amicphys_intr(                   &
+            1,                  1,                   & ! in
+            1,                  1,                   & ! in
+            lchnk,     ncol,    nstep,               & ! in
+            loffset,   delt,                         & ! in
+            latndx,    lonndx,                       & ! in
+            tfld,      pmid,    pdel,                & ! in
+            zm,        pblh,                         & ! in
+            qh2o,      cldfr,                        & ! in
+            vmr,                vmrcw,               & ! inout
+            vmr0,                                    & ! in
+            vmr_pregas,         vmr_precld,          & ! in
+            dgnum,              dgnumwet,            & ! inout
+            wetdens                                  ) ! inout
+    call t_stopf('modal_aero_amicphys')
 
-       ! note that:
-       !     vmr0 holds vmr before gas-phase chemistry
-       !     dvmrdt and dvmrcwdt hold vmr and vmrcw before aqueous chemistry
-       call modal_aero_amicphys_intr(                &
-            1,                  1,                   &
-            1,                  1,                   &
-            lchnk,     ncol,    nstep,               &
-            loffset,   delt,                         &
-            latndx,    lonndx,                       &
-            tfld,      pmid,    pdel,                &
-            zm,        pblh,                         &
-            qh2o,      cldfr,                        &
-            vmr,                vmrcw,               &
-            vmr0,                                    &
-            dvmrdt,             dvmrcwdt,            &
-            dgnum,              dgnumwet,            &
-            wetdens                                  )
-
-       call t_stopf('modal_aero_amicphys')
-
-
-    call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+    ! calculate cloudborne aerosols after exchange
+    call vmr2qqcw( vmrcw, mbar, fldcw_all )
+    ! assign mass mixing ratio back to pbuf
+    do mm = 1,gas_pcnst
+       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       if(associated(fldcw))   fldcw(:ncol,:) = fldcw_all(:ncol,:,mm)
+    enddo
 
     ! diagnostics for cloud-borne aerosols... 
-    do n = 1,pcnst
-       fldcw => qqcw_get_field(pbuf,n,lchnk,errorhandle=.true.)
+    do mm = 1,pcnst
+       fldcw => qqcw_get_field(pbuf,mm,lchnk,errorhandle=.true.)
        if(associated(fldcw)) then
-          call outfld( cnst_name_cw(n), fldcw(:,:), pcols, lchnk )
+          call outfld( cnst_name_cw(mm), fldcw(:,:), pcols, lchnk )
        endif
-    end do
+    enddo
 
   end subroutine aero_model_gasaerexch
 
@@ -2130,10 +2129,13 @@ lphase_jnmw_conditional: &
   end subroutine calc_schmidt_number
 
   !=============================================================================
-  subroutine qqcw2vmr(lchnk, vmr, mbar, ncol, im, pbuf)
-    use modal_aero_data, only : qqcw_get_field
+  subroutine qqcw2vmr(vmr, mbar, fldcw_all)
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
+    ! C++ porting: this subroutine is similar to the subroutine mmr2vmr
+    ! in mozart/mo_mass_xforms.F90. Maybe can merge them
+    ! Note that the subroutine needs adv_mass from module chem_mod,
+    ! but the values are assigned from module mo_sim_dat
     !-----------------------------------------------------------------
 
     implicit none
@@ -2141,27 +2143,21 @@ lphase_jnmw_conditional: &
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol, im
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst)
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8), intent(in)    :: mbar(:,:) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: fldcw_all(:,:,:) ! mass mixing ratio [kg/kg]
+    real(r8), intent(out)   :: vmr(:,:,:) ! volume mixing ratios [mol/mol]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
-    real(r8), pointer :: fldcw(:,:)
+    integer  :: kk, mm
 
-    do m=1,gas_pcnst
-       if( adv_mass(m) /= 0._r8 ) then
-          fldcw => qqcw_get_field(pbuf, m+im,lchnk,errorhandle=.true.)
-          if(associated(fldcw)) then
-             do k=1,pver
-                vmr(:ncol,k,m) = mbar(:ncol,k) * fldcw(:ncol,k) / adv_mass(m)
-             enddo
-          else
-             vmr(:,:,m) = 0.0_r8
-          endif
+    vmr(:,:,:) = 0.0_r8
+    do mm=1,gas_pcnst
+       if( adv_mass(mm) /= 0._r8 ) then
+          do kk=1,pver
+             vmr(:,kk,mm) = mbar(:,kk) * fldcw_all(:,kk,mm) / adv_mass(mm)
+          enddo
        endif
     enddo
   end subroutine qqcw2vmr
@@ -2169,37 +2165,36 @@ lphase_jnmw_conditional: &
 
   !=============================================================================
   !=============================================================================
-  subroutine vmr2qqcw( lchnk, vmr, mbar, ncol, im, pbuf )
+  subroutine vmr2qqcw( vmr, mbar, fldcw_all )
     !-----------------------------------------------------------------
     !	... Xfrom from volume to mass mixing ratio
+    ! C++ porting: this subroutine is similar to the subroutine vmr2mmr 
+    ! in mozart/mo_mass_xforms.F90. Maybe can merge them
+    ! Note that the subroutine needs adv_mass from module chem_mod, 
+    ! but the values are assigned from module mo_sim_dat
     !-----------------------------------------------------------------
-
-    use m_spc_id
-    use modal_aero_data, only : qqcw_get_field
 
     implicit none
 
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: lchnk, ncol, im
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8), intent(in)    :: mbar(:,:) ! mean wet atmospheric mass [g/mol]
+    real(r8), intent(in)    :: vmr(:,:,:) ! volume mixing ratios [mol/mol]
+    real(r8), intent(out)   :: fldcw_all(:,:,:) ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
-    real(r8), pointer :: fldcw(:,:)
+    integer  :: kk, mm
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
-    do m = 1,gas_pcnst
-       fldcw => qqcw_get_field(pbuf, m+im,lchnk,errorhandle=.true.)
-       if( adv_mass(m) /= 0._r8 .and. associated(fldcw)) then
-          do k = 1,pver
-             fldcw(:ncol,k) = adv_mass(m) * vmr(:ncol,k,m) / mbar(:ncol,k)
+    fldcw_all(:,:,:) = 0.0_r8
+    do mm = 1,gas_pcnst
+       if( adv_mass(mm) /= 0._r8) then
+          do kk = 1,pver
+             fldcw_all(:,kk,mm) = adv_mass(mm) * vmr(:,kk,mm) / mbar(:,kk)
           enddo
        endif
     enddo

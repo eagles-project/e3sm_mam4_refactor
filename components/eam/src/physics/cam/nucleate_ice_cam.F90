@@ -6,7 +6,7 @@ module nucleate_ice_cam
 !
 !  B. Eaton - Sept 2014
 !---------------------------------------------------------------------------------
-
+#include "../yaml/common_files/common_uses.ymlf90"
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
 use ppgrid,         only: pcols, pver
@@ -399,7 +399,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
    real(r8) :: nimey(pcols,pver) !output number conc of ice nuclei due to meyers deposition [1/m3]
 
    real(r8), parameter :: num_m3_to_cm3 = 1.0e-6_r8
-
+#include "../yaml/nucleate_ice_cam/f90_yaml/nucleate_ice_cam_calc_beg_yml.f90"
    !-------------------------------------------------------------------------------
 
 
@@ -507,7 +507,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
    call outfld('NIIMM', niimm, pcols, lchnk)
    call outfld('NIDEP', nidep, pcols, lchnk)
    call outfld('NIMEY', nimey, pcols, lchnk)
-
+#include "../yaml/nucleate_ice_cam/f90_yaml/nucleate_ice_cam_calc_end_yml.f90"
 end subroutine nucleate_ice_cam_calc
 
 !================================================================================================

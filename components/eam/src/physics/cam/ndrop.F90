@@ -306,171 +306,168 @@ subroutine dropmixnuc( &
    ! doesn't distinguish between warm, cold clouds
 
    use output_aerocom_aie , only: do_aerocom_ind3
-   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype
+   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, qqcw_get_field,maxd_aspectype, &
+      lmassptr_amode, numptr_amode
+   use mam_support, only: min_max_bound
 
-   ! arguments
+   ! input arguments
    type(physics_state), target, intent(in)    :: state
-   type(physics_ptend),         intent(out)   :: ptend
-   real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics (s)
-
+   real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics [s]
    type(physics_buffer_desc), pointer :: pbuf(:)
-
-   ! arguments
-   real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity
-   real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction
-   real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
+   real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity [m/s]
+   real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction [fraction]
+   real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step [fraction]
 
    ! output arguments
-   real(r8), intent(out) :: tendnd(pcols,pver) ! change in droplet number concentration (#/kg/s)
-   real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number
+   type(physics_ptend),         intent(out)   :: ptend
+   real(r8), intent(out) :: tendnd(pcols,pver) ! tendency in droplet number mixing ratio [#/kg/s]
+   real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number [fraction]
    !--------------------Local storage-------------------------------------
 
-   integer  :: lchnk               ! chunk identifier
-   integer  :: ncol                ! number of columns
-   integer  :: loop_up_bnd
-   real(r8), pointer :: ncldwtr(:,:) ! droplet number concentration (#/kg)
-   real(r8), pointer :: temp(:,:)    ! temperature (K)
-   real(r8), pointer :: omega(:,:)   ! vertical velocity (Pa/s)
-   real(r8), pointer :: pmid(:,:)    ! mid-level pressure (Pa)
-   real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces (Pa)
-   real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer (Pa)
-   real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer (/Pa)
-   real(r8), pointer :: zm(:,:)      ! geopotential height of level (m)
-   real(r8), pointer :: state_q(:,:,:)        ! aerosol mmrs [kg/kg]
+   real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8  ! min, max vertical diffusivity [m^2/s]
+   real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
 
-   real(r8), pointer :: kvh(:,:)     ! vertical diffusivity (m2/s)
-
-   type(ptr2d_t), allocatable :: raer(:)     ! aerosol mass, number mixing ratios
-   type(ptr2d_t), allocatable :: qqcw(:)
-   real(r8) :: raertend(pver)  ! tendency of aerosol mass, number mixing ratios
-   real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios
-
-
-   real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8
-   real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity (m/s)
-   real(r8) :: sq2pi
-
-   integer  :: i, k, l, m, mm, n
-   integer  :: km1, kp1
-   integer  :: nnew, nsav, ntemp
-   integer  :: lptr
-   integer  :: nsubmix, nsubmix_bnd
-   integer, save :: count_submix(100)
-   integer  :: phase ! phase of aerosol
-
-   real(r8) :: arg
-   real(r8) :: dtinv
-   real(r8) :: dtmin, tinv, dtt
-
-   real(r8) :: zs(pver) ! inverse of distance between levels (m)
-   real(r8) :: qcld(pver) ! cloud droplet number mixing ratio (#/kg)
-   real(r8) :: qncld(pver)     ! droplet number nucleated on cloud boundaries
-   real(r8) :: srcn(pver)       ! droplet source rate (/s)
-   real(r8) :: cs(pcols,pver)      ! air density (kg/m3)
-   real(r8) :: csbot(pver)       ! air density at bottom (interface) of layer (kg/m3)
-   real(r8) :: csbot_cscen(pver) ! csbot(i)/cs(i,k)
-   real(r8) :: dz(pcols,pver)      ! geometric thickness of layers (m)
-
-   real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k (m/s)
-   real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k (m/s)
-   real(r8) :: wbar, wmix, wmin, wmax
-
-   real(r8) :: zn(pver)   ! g/pdel (m2/g) for layer
-   real(r8) :: flxconv    ! convergence of flux into lowest layer
-
-   real(r8) :: wdiab           ! diabatic vertical velocity
-   real(r8) :: ekd(pver)       ! diffusivity for droplets (m2/s)
-   real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets (kg/m3 m2/s)
-   real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity
-   real(r8) :: ekkm(pver)      ! zn*zs*density*diffusivity
-
-   real(r8) :: dum, dumc
-   real(r8) :: tmpa
-   real(r8) :: dact
-   real(r8) :: fluxntot         ! (#/cm2/s)
-   real(r8) :: dtmix
-   real(r8) :: alogarg
-   real(r8) :: overlapp(pver), overlapm(pver) ! cloud overlap
-
-   real(r8) :: nsource(pcols,pver)            ! droplet number source (#/kg/s)
-   real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing (#/kg/s)
-   real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
-   real(r8) :: cldo_tmp, cldn_tmp
-   real(r8) :: tau_cld_regenerate
-   real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
-
-
-   real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate (/s)
-   real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate (/s)
-
-   real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios
-   real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase
-
-
-   real(r8) :: na(pcols), va(pcols), hy(pcols)
-   real(r8), allocatable :: naermod(:)  ! (1/m3)
-   real(r8), allocatable :: hygro(:)    ! hygroscopicity of aerosol mode
-   real(r8), allocatable :: vaerosol(:) ! interstit+activated aerosol volume conc (cm3/cm3)
-
+   real(r8) :: arg        ! argument for erf test [dimensionless]
+   real(r8) :: dtinv      ! inverse time step for microphysics [s^-1]
+   real(r8) :: dtmin      ! time step to determine subloop time step [s]
+   real(r8) :: tinv       ! inverse timescale of droplet diffusivity [s^-1]
+   real(r8) :: dtt        ! timescale of droplet diffusivity [s]
+   real(r8) :: wmax       ! vertical velocity upper bound [m/s]
+   real(r8) :: tmpa             !  temporary aerosol tendency variable [s^-1]
+   real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
+   real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
+   real(r8) :: dtmix    ! timescale for subloop [s] 
+   real(r8) :: raertend(pver)  ! tendency of interstitial aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
+   real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios [#/kg/s or kg/kg/s]
+   real(r8) :: zs(pver) ! inverse of distance between levels [m^-1]
+   real(r8) :: qcld(pver) ! cloud droplet number mixing ratio [#/kg]
+   real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
+   real(r8) :: srcn(pver)       ! droplet source rate [/s]
+   real(r8) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
+   real(r8) :: csbot_cscen(pver) ! inverse normalized air density csbot(i)/cs(i,k) [dimensionless]
+   real(r8) :: zn(pver)   ! g/pdel for layer [m^2/kg]
+   real(r8) :: ekd(pver)       ! diffusivity for droplets [m^2/s]
+   real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
+   real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity [/s]
+   real(r8) :: ekkm(pver)      ! zn*zs*density*diffusivity   [/s]
+   real(r8) :: overlapp(pver)  ! cloud overlap involving level kk+1 [fraction]
+   real(r8) :: overlapm(pver)  ! cloud overlap involving level kk-1 [fraction]
    real(r8) :: source(pver)
+   real(r8) :: flux_fullact(pver) ! 100%    activation fraction flux [m/s]
+   real(r8) :: ndropcol(pcols)               ! column-integrated droplet number [#/m2]
+   real(r8) :: na(pcols), va(pcols), hy(pcols) ! naermod, vaerosol, hygro at level kk
+   real(r8) :: cs(pcols,pver)      ! air density [kg/m^3]
+   real(r8) :: dz(pver)      ! geometric thickness of layers [m]
+   real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k [m/s]
+   real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source tendency [#/kg/s]
+   real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to mixing [#/kg/s]
 
-   real(r8), allocatable :: fn(:)              ! activation fraction for aerosol number
-   real(r8), allocatable :: fm(:)              ! activation fraction for aerosol mass
+   real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat [#/m^3]
+   real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
+   real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
 
-   real(r8), allocatable :: fluxn(:)           ! number  activation fraction flux (cm/s)
-   real(r8), allocatable :: fluxm(:)           ! mass    activation fraction flux (cm/s)
-   real(r8)              :: flux_fullact(pver) ! 100%    activation fraction flux (cm/s)
+   real(r8), pointer :: ncldwtr(:,:) ! initial droplet number mixing ratio [#/kg]
+   real(r8), pointer :: temp(:,:)    ! temperature [K]
+   real(r8), pointer :: pmid(:,:)    ! mid-level pressure [Pa]
+   real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces [Pa]
+   real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer [Pa]
+   real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer [/Pa]
+   real(r8), pointer :: zm(:,:)      ! geopotential height of level [m]
+   real(r8), pointer :: state_q(:,:,:) ! aerosol mmrs [kg/kg]
+   real(r8), pointer :: kvh(:,:)     ! vertical diffusivity [m^2/s]
+   real(r8), pointer :: ccn3d(:, :)  !  CCN at 0.2% supersat [#/m^3]
+   real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate [/s]
+   real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
+   real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios [#/kg or kg/kg]
+   real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
+
    !     note:  activation fraction fluxes are defined as
-   !     fluxn = [flux of activated aero. number into cloud (#/cm2/s)]
-   !           / [aero. number conc. in updraft, just below cloudbase (#/cm3)]
-
+   !     fluxn = [flux of activated aero. number into cloud [#/m^2/s]]
+   !           / [aero. number conc. in updraft, just below cloudbase [#/m^3]]
 
    real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
-   real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
-   integer :: ccn3d_idx
-   real(r8), pointer :: ccn3d(:, :)
+   type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
-!+++ AeroCOM IND3 output
-   real(r8) :: ccn3col(pcols), ccn4col(pcols)
-   real(r8) :: ccn3bl(pcols), ccn4bl(pcols)
-   real(r8) :: zi2(pver+1), zm2(pver)
-   integer  :: idx1000
-   logical  :: zmflag
-
-  integer :: imode       ! mode index
-  integer :: kk          ! level index
-  integer :: lspec      ! species index for given mode
-  integer :: spc_idx, num_idx
-  real(r8) :: qcldbrn(pcols,maxd_aspectype,pver,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
-  real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
-  real(r8), pointer :: fldcw(:,:)           !specie mmr/num (cloud borne)
+   integer, save :: count_submix(100)
+   integer  :: lchnk               ! chunk identifier
+   integer  :: ncol                ! number of columns
+   integer  :: mm                  ! local array index for MAM number, species
+   integer  :: km1, kp1            ! level index -1, +1
+   integer  :: nnew, nsav, ntemp   ! indices for old, new time levels in substepping
+   integer  :: lptr
+   integer  :: nsubmix, nsubmix_bnd  ! number of substeps and bound
+   integer  :: phase                 ! phase of aerosol
+   integer  :: ccn3d_idx   ! index of ccn3d in pbuf
+   integer  :: icol        ! column index
+   integer  :: imode       ! mode index
+   integer  :: kk          ! level index
+   integer  :: lspec      ! species index for given mode
+   integer  :: lsat       !  level of supersaturation
+   integer  :: isub       ! substep index
+   integer  :: spc_idx, num_idx  ! species, number indices  
 
    !-------------------------------------------------------------------------------
 
-   sq2pi = sqrt(2._r8*pi)
+!  NOTES FOR C++ PORT:  Below code extracts fields from state vector
+!  During port, can move this code upward in subroutine hierarcy, 
+!  and /or replace with appropriate C++ structures.
 
    lchnk = state%lchnk
    ncol  = state%ncol
 
+   state_q  => state%q
    ncldwtr  => state%q(:,:,numliq_idx)
    temp     => state%t
-   omega    => state%omega
    pmid     => state%pmid
    pint     => state%pint
    pdel     => state%pdel
    rpdel    => state%rpdel
    zm       => state%zm
-    
-   state_q  => state%q
+
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our particular test configuration.
+   if (prog_modal_aero) then
+      ! aerosol tendencies
+      call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
+   else
+      ! no aerosol tendencies
+      call physics_ptend_init(ptend, state%psetcols, 'ndrop')
+   endif
+
+!  do_aerocom_ind3 = .false. by default, .true. option not tested.
+
+   if(do_aerocom_ind3) then
+      call endrun('The do_aerocom_ind3 option is no longer supported')
+   endif
+
+!  Allocate / define local variables
+
+   allocate( &
+      nact(pver,ntot_amode),          &
+      mact(pver,ntot_amode),          &
+      qqcw(ncnst_tot),                &
+      raercol(pver,ncnst_tot,2),      &
+      raercol_cw(pver,ncnst_tot,2),   &
+      coltend(pcols,ncnst_tot),       &
+      coltend_cw(pcols,ncnst_tot)          )
+
+!  Extract field from pbuf
 
    call pbuf_get_field(pbuf, kvh_idx, kvh)
 
-   if(do_aerocom_ind3) then
-       ccn3d_idx = pbuf_get_index('ccn3d')
-       call pbuf_get_field(pbuf, ccn3d_idx, ccn3d)
-   end if
+   ! Init pointers to mode number and species mass mixing ratios for
+   ! cloud borne phases.
 
+   do imode = 1, ntot_amode
+      mm = mam_idx(imode, 0)
+      num_idx = numptrcw_amode(imode)
+      qqcw(mm)%fld => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
+      do lspec = 1, nspec_amode(imode)
+         mm = mam_idx(imode, lspec)
+         spc_idx = lmassptrcw_amode(lspec,imode)
+         qqcw(mm)%fld => qqcw_get_field(pbuf,spc_idx,lchnk,.true.)
+      enddo
+   enddo
 
    arg = 1.0_r8
    if (abs(0.8427_r8 - erf(arg))/0.8427_r8 > 0.001_r8) then
@@ -486,225 +483,82 @@ subroutine dropmixnuc( &
 
    dtinv = 1._r8/dtmicro
 
-   allocate( &
-      nact(pver,ntot_amode),          &
-      mact(pver,ntot_amode),          &
-      raer(ncnst_tot),                &
-      qqcw(ncnst_tot),                &
-      raercol(pver,ncnst_tot,2),      &
-      raercol_cw(pver,ncnst_tot,2),   &
-      coltend(pcols,ncnst_tot),       &
-      coltend_cw(pcols,ncnst_tot),    &
-      naermod(ntot_amode),            &
-      hygro(ntot_amode),              &
-      vaerosol(ntot_amode),           &
-      fn(ntot_amode),                 &
-      fm(ntot_amode),                 &
-      fluxn(ntot_amode),              &
-      fluxm(ntot_amode)               )
-
-   ! Init pointers to mode number and specie mass mixing ratios in
-   ! intersitial and cloud borne phases.
-   do m = 1, ntot_amode
-      mm = mam_idx(m, 0)
-      call rad_cnst_get_mode_num(0, m, 'a', state, pbuf, raer(mm)%fld)
-      call rad_cnst_get_mode_num(0, m, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
-      do l = 1, nspec_amode(m)
-         mm = mam_idx(m, l)
-         call rad_cnst_get_aer_mmr(0, m, l, 'a', state, pbuf, raer(mm)%fld)
-         call rad_cnst_get_aer_mmr(0, m, l, 'c', state, pbuf, qqcw(mm)%fld)  ! cloud-borne aerosol
-      end do
-   end do
-
-   factnum = 0._r8
-   wtke    = 0._r8
-
-   if (prog_modal_aero) then
-      ! aerosol tendencies
-      call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
-   else
-      ! no aerosol tendencies
-      call physics_ptend_init(ptend, state%psetcols, 'ndrop')
-   end if
-
    !initialize variables to zero
    ndropmix(:,:) = 0._r8
    nsource(:,:) = 0._r8
+   wtke(:,:)    = 0._r8
+   factnum(:,:,:) = 0._r8
 
-   ! overall_main_i_loop
-   do i = 1, ncol
 
-      do k = top_lev, pver-1
-         zs(k) = 1._r8/(zm(i,k) - zm(i,k+1))
-      end do
-      zs(pver) = zs(pver-1)
+   ! overall_main_icol_loop
+   do icol = 1, ncol
 
-      ! load number nucleated into qcld on cloud boundaries
-
-      do k = top_lev, pver
-
-         qcld(k)  = ncldwtr(i,k)
-         qncld(k) = 0._r8
-         srcn(k)  = 0._r8
-         cs(i,k)  = pmid(i,k)/(rair*temp(i,k))        ! air density (kg/m3)
-         dz(i,k)  = 1._r8/(cs(i,k)*gravit*rpdel(i,k)) ! layer thickness in m
-
-         do m = 1, ntot_amode
-            nact(k,m) = 0._r8
-            mact(k,m) = 0._r8
-         end do
-
-         zn(k) = gravit*rpdel(i,k)
-
-         if (k < pver) then
-            ekd(k)   = kvh(i,k+1)
-            ekd(k)   = max(ekd(k), zkmin)
-            ekd(k)   = min(ekd(k), zkmax)
-            csbot(k) = 2.0_r8*pint(i,k+1)/(rair*(temp(i,k) + temp(i,k+1)))
-            csbot_cscen(k) = csbot(k)/cs(i,k)
-         else
-            ekd(k)   = 0._r8
-            csbot(k) = cs(i,k)
-            csbot_cscen(k) = 1.0_r8
-         end if
+      qncld(:) = 0._r8
+      srcn(:) = 0._r8   
+      nact(:,1:ntot_amode) = 0._r8
+      mact(:,1:ntot_amode) = 0._r8
+      cs(icol,:)  = pmid(icol,:)/(rair*temp(icol,:))        ! air density (kg/m3)
+      dz(:)  = 1._r8/(cs(icol,:)*gravit*rpdel(icol,:)) ! layer thickness in m
+      zn(:) = gravit*rpdel(icol,:)
 
          ! rce-comment - define wtke at layer centers for new-cloud activation
          !    and at layer boundaries for old-cloud activation
          !++ag
-         wtke_cen(i,k) = wsub(i,k)
-         wtke(i,k)     = wsub(i,k)
+!    wtke_cen and wtke are identical here so only need one variable for both
+!          wtke_cen(icol,kk) = wsub(icol,kk)
+      wtke(icol,:)     = max(wsub(icol,:),wmixmin)
          !--ag
-         wtke_cen(i,k) = max(wtke_cen(i,k), wmixmin)
-         wtke(i,k)     = max(wtke(i,k), wmixmin)
 
-         nsource(i,k) = 0._r8
+      ! load number nucleated into qcld on cloud boundaries
 
-      end do
+      qcld(:)  = ncldwtr(icol,:)
+
+      do kk = top_lev, pver-1
+         zs(kk) = 1._r8/(zm(icol,kk) - zm(icol,kk+1))
+         ekd(kk)   = min_max_bound(zkmin,zkmax,kvh(icol,kk+1))
+         csbot(kk) = 2.0_r8*pint(icol,kk+1)/(rair*(temp(icol,kk) + temp(icol,kk+1)))
+         csbot_cscen(kk) = csbot(kk)/cs(icol,kk)
+      enddo
+      zs(pver) = zs(pver-1)
+      ekd(pver)   = 0._r8
+      csbot(pver) = cs(icol,pver)
+      csbot_cscen(pver) = 1.0_r8
+
+!  Initialize 1D (in space) versions of interstitial and airborne aerosol
 
       nsav = 1
       nnew = 2
-      do m = 1, ntot_amode
-         mm = mam_idx(m,0)
+      do imode = 1, ntot_amode
+         mm = mam_idx(imode,0)
          raercol_cw(:,mm,nsav) = 0.0_r8
          raercol(:,mm,nsav)    = 0.0_r8
-         raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(i,top_lev:pver)
-         raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
-         do l = 1, nspec_amode(m)
-            mm = mam_idx(m,l)
-            raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(i,top_lev:pver)
-            raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
-         end do
-      end do
+         raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(icol,top_lev:pver)
+         num_idx = numptr_amode(imode)
+         raercol(top_lev:pver,mm,nsav) = state_q(icol,top_lev:pver,num_idx)
+         do lspec = 1, nspec_amode(imode)
+            mm = mam_idx(imode,lspec)
+            raercol_cw(top_lev:pver,mm,nsav) = qqcw(mm)%fld(icol,top_lev:pver)
+            spc_idx=lmassptr_amode(lspec,imode)
+            raercol(top_lev:pver,mm,nsav)    = state_q(icol,top_lev:pver,spc_idx)
+         enddo
+      enddo
+
+
+!  PART I:  changes of aerosol and cloud water from temporal changes in cloud fraction
 
       ! droplet nucleation/aerosol activation
 
-      ! tau_cld_regenerate = time scale for regeneration of cloudy air
-      !    by (horizontal) exchange with clear air
-      tau_cld_regenerate = 3600.0_r8 * 3.0_r8
-
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
-      do k = top_lev, pver
+      do kk = top_lev, pver
 
-         ! shrinking cloud ......................................................
-         !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
-         !    and also dissipate the portion of the cloud that will be regenerated
-         cldo_tmp = cldo(i,k)
-
-         if(regen_fix) then
-            cldn_tmp = cldn(i,k) !* exp( -dtmicro/tau_cld_regenerate )!HW: there is a bug here; turn off regeneration,01/10/2012
-         else
-            cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
-         endif
-         !    alternate formulation
-         !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
-
-         if (cldn_tmp < cldo_tmp) then
-            !  droplet loss in decaying cloud
-            !++ sungsup
-            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
-            qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
-            !-- sungsup
-
-            ! convert activated aerosol to interstitial in decaying cloud
-
-            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               dact   = raercol_cw(k,mm,nsav)*dumc
-               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-                  dact    = raercol_cw(k,mm,nsav)*dumc
-                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               end do
-            end do
-         end if
-
-         ! growing cloud ......................................................
-         !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
-         !    and also regenerate part of the cloud
-         if(regen_fix) then
-            cldo_tmp = cldo(i,k)! HW turned off the regeneration growing
-         else
-            cldo_tmp = cldn_tmp
-         endif
-         cldn_tmp = cldn(i,k)
-
-         if (cldn_tmp-cldo_tmp > 0.01_r8) then
-
-            ! rce-comment - use wtke at layer centers for new-cloud activation
-            wbar  = wtke_cen(i,k)
-            wmix  = 0._r8
-            wmin  = 0._r8
-            wmax  = 10._r8
-            wdiab = 0
-
-            ! load aerosol properties, assuming external mixtures
-
-
-            phase = 1 ! interstitial
-            do m = 1, ntot_amode
-
-
-               call loadaer( &
-                  state_q, i, i, k, &
-                  m, nspec_amode(m), cs, phase, na, va, &
-                  hy )
-               naermod(m)  = na(i)
-               vaerosol(m) = va(i)
-               hygro(m)    = hy(i)
-            end do
-
-            call activate_modal( &
-               wbar, wmax,                       &
-               temp(i,k), cs(i,k), naermod, ntot_amode, &
-               vaerosol, hygro, fn, fm, fluxn,                      &
-               fluxm,flux_fullact(k))
-
-            factnum(i,k,:) = fn
-
-            dumc = (cldn_tmp - cldo_tmp)
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               dact   = dumc*fn(m)*raer(mm)%fld(i,k) ! interstitial only
-               qcld(k) = qcld(k) + dact
-               nsource(i,k) = nsource(i,k) + dact*dtinv
-               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               dum = dumc*fm(m)
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-                  dact    = dum*raer(mm)%fld(i,k) ! interstitial only
-                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               enddo
-            enddo
-         endif
+         call update_from_newcld(cldn(icol,kk),cldo(icol,kk),dtinv,     &
+                wtke(icol,kk),temp(icol,kk),cs(icol,kk),state_q(icol,kk,:),  &
+                qcld(kk),raercol(kk,:,nsav),raercol_cw(kk,:,nsav), &
+                nsource(icol,kk), factnum(icol,kk,:))
 
       enddo  ! grow_shrink_main_k_loop
+
       ! end of k-loop for growing/shrinking cloud calcs ......................
 
       ! ......................................................................
@@ -718,25 +572,534 @@ subroutine dropmixnuc( &
       !       so they are incorrectly depleted with no replacement
 
       ! old_cloud_main_k_loop
-      if(regen_fix) then
-         loop_up_bnd = pver - 1
+
+!  PART II: changes in aerosol and cloud water from vertical profile of new cloud fraction
+
+      call update_from_cldn_profile(cldn(icol,:),dtinv,wtke(icol,:),zs(:),dz(:),temp(icol,:), &
+           cs(icol,:),csbot_cscen(:),state_q(icol,:,:),raercol(:,:,nsav),raercol_cw(:,:,nsav), &
+           nsource(icol,:),qcld(:),factnum(icol,:,:),ekd(:),nact(:,:),mact(:,:))
+
+      ! switch nsav, nnew so that nnew is the updated aerosol
+! Note -- these fields aren't used until switched again, so can remove this switching statement, 
+!  -- provided the first instance of the next switching statement is also removed.
+!       ntemp = nsav
+!       nsav  = nnew
+!       nnew  = ntemp
+
+!  PART III:  perform explict integration of droplet/aerosol mixing using substepping
+
+      ! load new droplets in layers above, below clouds
+
+      dtmin     = dtmicro
+      ekk(top_lev-1)    = 0.0_r8
+      ekk(pver) = 0.0_r8
+      do kk = top_lev, pver-1
+         ! rce-comment -- ekd(k) is eddy-diffusivity at k/k+1 interface
+         !   want ekk(k) = ekd(k) * (density at k/k+1 interface)
+         !   so use pint(i,k+1) as pint is 1:pverp
+         !           ekk(k)=ekd(k)*2.*pint(i,k)/(rair*(temp(i,k)+temp(i,k+1)))
+         !           ekk(k)=ekd(k)*2.*pint(i,k+1)/(rair*(temp(i,k)+temp(i,k+1)))
+         ekk(kk) = ekd(kk)*csbot(kk)
+      enddo
+
+
+     do kk = top_lev, pver
+         ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
+         km1     = max0(kk-1, top_lev)
+         ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
+         tinv    = ekkp(kk) + ekkm(kk)
+
+         ! rce-comment -- tinv is the sum of all first-order-loss-rates
+         !    for the layer.  for most layers, the activation loss rate
+         !    (for interstitial particles) is accounted for by the loss by
+         !    turb-transfer to the layer above.
+         !    k=pver is special, and the loss rate for activation within
+         !    the layer must be added to tinv.  if not, the time step
+         !    can be too big, and explmix can produce negative values.
+         !    the negative values are reset to zero, resulting in an
+         !    artificial source.
+
+         if (tinv > 1.e-6_r8) then
+            dtt   = 1._r8/tinv
+            dtmin = min(dtmin, dtt)
+         endif
+      enddo
+
+      dtmix   = 0.9_r8*dtmin
+      nsubmix = dtmicro/dtmix + 1
+      if (nsubmix > 100) then
+         nsubmix_bnd = 100
       else
-         loop_up_bnd = pver
+         nsubmix_bnd = nsubmix
       endif
-      do k = top_lev, loop_up_bnd!pver
-         kp1 = min0(k+1, pver)
-         taumix_internal_pver_inv = 0.0_r8
+      count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
+      dtmix = dtmicro/nsubmix
 
-         if (cldn(i,k) > 0.01_r8) then
+      do kk = top_lev, pver
+         kp1 = min(kk+1, pver)
+         km1 = max(kk-1, top_lev)
+         ! maximum overlap assumption
+         if (cldn(icol,kp1) > 1.e-10_r8) then
+            overlapp(kk) = min(cldn(icol,kk)/cldn(icol,kp1), 1._r8)
+         else
+            overlapp(kk) = 1._r8
+         endif
+         if (cldn(icol,km1) > 1.e-10_r8) then
+            overlapm(kk) = min(cldn(icol,kk)/cldn(icol,km1), 1._r8)
+         else
+            overlapm(kk) = 1._r8
+         endif
+      enddo
 
-            wdiab = 0
-            wmix  = 0._r8                       ! single updraft
-            wbar  = wtke(i,k)                   ! single updraft
-            if (k == pver) wbar = wtke_cen(i,k) ! single updraft
-            wmax  = 10._r8
-            wmin  = 0._r8
 
-            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
+      ! rce-comment
+      !    the activation source(k) = mact(k,m)*raercol(kp1,lmass)
+      !       should not exceed the rate of transfer of unactivated particles
+      !       from kp1 to k which = ekkp(k)*raercol(kp1,lmass)
+      !    however it might if things are not "just right" in subr activate
+      !    the following is a safety measure to avoid negatives in explmix
+      do kk = top_lev, pver-1
+         do imode = 1, ntot_amode
+            nact(kk,imode) = min( nact(kk,imode), ekkp(kk) )
+            mact(kk,imode) = min( mact(kk,imode), ekkp(kk) )
+         enddo
+      enddo
+
+
+      ! old_cloud_nsubmix_loop
+      do isub = 1, nsubmix
+         qncld(:) = qcld(:)
+         ! switch nsav, nnew so that nsav is the updated aerosol
+         if( isub > 1 ) then
+            ntemp   = nsav
+            nsav    = nnew
+            nnew    = ntemp
+         endif
+         srcn(:) = 0.0_r8
+
+         do imode = 1, ntot_amode
+            mm = mam_idx(imode,0)
+
+            ! update droplet source
+            ! rce-comment- activation source in layer k involves particles from k+1
+            !	       srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
+            srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+
+            ! rce-comment- new formulation for k=pver
+            !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
+            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+            srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
+         enddo
+         call explmix(  &
+            qcld, srcn, ekkp, ekkm, overlapp,  &
+            overlapm, qncld, pver, &
+            dtmix, .false.)
+
+         ! rce-comment
+         !    the interstitial particle mixratio is different in clear/cloudy portions
+         !    of a layer, and generally higher in the clear portion.  (we have/had
+         !    a method for diagnosing the the clear/cloudy mixratios.)  the activation
+         !    source terms involve clear air (from below) moving into cloudy air (above).
+         !    in theory, the clear-portion mixratio should be used when calculating
+         !    source terms
+         do imode = 1, ntot_amode
+            mm = mam_idx(imode,0)
+            ! rce-comment -   activation source in layer k involves particles from k+1
+            !	              source(:)= nact(:,m)*(raercol(:,mm,nsav))
+            source(top_lev:pver-1) = nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+            ! rce-comment - new formulation for k=pver
+            !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
+            tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+                 + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+            source(pver) = max(0.0_r8, tmpa)
+
+            call explmix( &
+               raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
+               overlapm, raercol_cw(:,mm,nsav), pver,   &
+               dtmix, .false.)
+
+            call explmix( &
+               raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
+               overlapm, raercol(:,mm,nsav), pver, &
+               dtmix, .true., raercol_cw(:,mm,nsav))
+
+            do lspec = 1, nspec_amode(imode)
+               mm = mam_idx(imode,lspec)
+               ! rce-comment -   activation source in layer k involves particles from k+1
+               !	          source(:)= mact(:,m)*(raercol(:,mm,nsav))
+               source(top_lev:pver-1) = mact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+               ! rce-comment- new formulation for k=pver
+               !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
+               tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
+                    + raercol_cw(pver,mm,nsav)*mact(pver,imode)
+               source(pver) = max(0.0_r8, tmpa)
+
+               call explmix( &
+                  raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
+                  overlapm, raercol_cw(:,mm,nsav), pver,   &
+                  dtmix, .false.)
+
+               call explmix( &
+                  raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
+                  overlapm, raercol(:,mm,nsav), pver, &
+                  dtmix, .true., raercol_cw(:,mm,nsav))
+
+            enddo  ! lspec loop
+         enddo  !  imode loop
+
+      enddo ! old_cloud_nsubmix_loop
+
+      ! evaporate particles again if no cloud
+
+      do kk = top_lev, pver
+         if (cldn(icol,kk) == 0._r8) then
+            ! no cloud
+            qcld(kk)=0._r8
+
+            ! convert activated aerosol to interstitial in decaying cloud
+            do imode = 1, ntot_amode
+               mm = mam_idx(imode,0)
+               raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+               raercol_cw(kk,mm,nnew) = 0._r8
+
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
+                  raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+                  raercol_cw(kk,mm,nnew) = 0._r8
+               enddo
+            enddo
+         endif
+      enddo
+
+      ! droplet number
+
+      ndropcol(icol) = 0._r8
+      do kk = top_lev, pver
+         ndropmix(icol,kk) = (qcld(kk) - ncldwtr(icol,kk))*dtinv - nsource(icol,kk)
+         tendnd(icol,kk)   = (max(qcld(kk), 1.e-6_r8) - ncldwtr(icol,kk))*dtinv
+         ndropcol(icol)   = ndropcol(icol) + ncldwtr(icol,kk)*pdel(icol,kk)
+      enddo
+      ndropcol(icol) = ndropcol(icol)/gravit
+
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
+      if (prog_modal_aero) then
+
+         raertend = 0._r8
+         qqcwtend = 0._r8
+
+         do imode = 1, ntot_amode
+            do lspec = 0, nspec_amode(imode)
+
+               mm   = mam_idx(imode,lspec)
+               lptr = mam_cnst_idx(imode,lspec)
+               qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
+
+               if( lspec == 0 ) then
+                  num_idx = numptr_amode(imode)
+                  raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,num_idx))*dtinv
+               else
+                  spc_idx=lmassptr_amode(lspec,imode)
+                  raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - state_q(icol,top_lev:pver,spc_idx))*dtinv
+               endif
+
+               coltend(icol,mm)    = sum( pdel(icol,:)*raertend )/gravit
+               coltend_cw(icol,mm) = sum( pdel(icol,:)*qqcwtend )/gravit
+
+               ptend%q(icol,:,lptr) = 0.0_r8
+               ptend%q(icol,top_lev:pver,lptr) = raertend(top_lev:pver)           ! set tendencies for interstitial aerosol
+               qqcw(mm)%fld(icol,:) = 0.0_r8
+               qqcw(mm)%fld(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
+            enddo  ! lspec loop
+         enddo   ! imode loop
+!  NOTE FOR C++ PORT:  prog_modal_aero is always true in our tests.
+      endif  ! if (prog_modal_aero)
+
+   enddo  ! overall_main_i_loop
+   ! end of main loop over i/longitude ....................................
+
+   call outfld('NDROPCOL', ndropcol, pcols, lchnk)
+   call outfld('NDROPSRC', nsource,  pcols, lchnk)
+   call outfld('NDROPMIX', ndropmix, pcols, lchnk)
+   call outfld('WTKE    ', wtke,     pcols, lchnk)
+
+  !NOTE FOR C++ PORT: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
+
+   ! Extract cloud borne MMRs from qqcw pointer
+
+   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
+   do imode=1,ntot_amode
+      do kk=top_lev,pver
+         do lspec =1, nspec_amode(imode)
+           mm   = mam_idx(imode,lspec)
+           qcldbrn(:,lspec,kk,imode) = qqcw(mm)%fld(:,kk)
+         enddo
+         mm   = mam_idx(imode,0) 
+         qcldbrn_num(:,kk,imode) = qqcw(mm)%fld(:,kk)     
+      enddo
+   enddo
+
+  !END NOTE FOR C++ PORT
+
+!  Use interstitial and cloud-borne aerosol to compute output ccn fields.
+
+   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
+   do lsat = 1, psat
+      call outfld(ccn_name(lsat), ccn(1,1,lsat), pcols, lchnk)
+   enddo
+
+! do column tendencies
+! NOTE FOR C++ PORT:  prog_modal_aero is always true in our particular tests.
+   if (prog_modal_aero) then
+      do imode = 1, ntot_amode
+         do lspec = 0, nspec_amode(imode)
+            mm = mam_idx(imode,lspec)
+            call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
+            call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
+         enddo
+      enddo
+   endif
+
+
+   deallocate( &
+      nact,       &
+      mact,       &
+      qqcw,       &
+      raercol,    &
+      raercol_cw, &
+      coltend,    &
+      coltend_cw       )
+
+
+end subroutine dropmixnuc
+
+!===============================================================================
+
+
+subroutine get_activate_frac(  &
+                 state_q_kload, &
+                 cs_kload, cs_kk,  &
+                 wtke, tair,           &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact)
+
+  ! input arguments
+  real(r8), intent(in) :: state_q_kload(:)        ! aerosol mmrs at level from which to load aerosol [kg/kg]
+  real(r8), intent(in) :: cs_kload    ! air density at level from which to load aerosol [kg/m3]
+  real(r8), intent(in) :: cs_kk       ! air density at actual vertical level [kg/m3]
+  real(r8), intent(in) :: wtke        ! subgrid vertical velocity [m/s]
+  real(r8), intent(in) :: tair        ! air temperature [K]
+
+  ! output arguments
+  real(r8), intent(out) :: fn(:)        ! number fraction of aerosols activated [fraction]
+  real(r8), intent(out) :: fm(:)        ! mass fraction of aerosols activated [fraction]
+  real(r8), intent(out) :: fluxn(:)     ! flux of activated aerosol number fraction into cloud [m/s]
+  real(r8), intent(out) :: fluxm(:)     ! flux of activated aerosol mass fraction into cloud [m/s]
+  real(r8), intent(out) :: flux_fullact ! flux of activated aerosol fraction assuming 100% activation [m/s]
+
+  ! local arguments
+
+  integer  :: phase                 ! phase of aerosol
+  real(r8) :: wmax       ! vertical velocity upper bound [m/s]
+  integer  :: imode       ! mode index
+  real(r8) :: naermod(ntot_amode)  ! aerosol number concentration [#/m^3]
+  real(r8) :: hygro(ntot_amode)    ! hygroscopicity of aerosol mode [dimensionless]
+  real(r8) :: vaerosol(ntot_amode) ! aerosol volume conc [m^3/m^3]
+  real(r8) :: na, va, hy   ! naermod, vaerosol, hygro at level k_act
+
+
+  wmax  = 10._r8
+
+  ! load aerosol properties, assuming external mixtures
+
+  phase = 1 ! interstitial
+      do imode = 1, ntot_amode
+         call loadaer_1col( &
+            state_q_kload(:), &
+            imode, nspec_amode(imode), cs_kload, phase, na, va, &
+            hy )
+         naermod(imode)  = na
+         vaerosol(imode) = va
+         hygro(imode)    = hy
+       enddo
+
+      ! rce-comment - use wtke at layer centers for new-cloud activation
+! NOTE: seems wtke = wtke_cen in current code, comment above may no longer apply
+  
+! Below is to avoid warning about not assigning value to intent(out)
+!  the assignment should have no affect because flux_fullact is intent(out)
+!  in activate_modal (and in that subroutine is initialized to zero anyway).
+
+      flux_fullact=0._r8
+
+      call activate_modal( &
+         wtke, wmax,                       &
+         tair, cs_kk, naermod, ntot_amode, &
+         vaerosol, hygro, fn, fm, fluxn,                      &
+         fluxm,flux_fullact)
+
+
+end subroutine get_activate_frac
+
+!===============================================================================
+
+subroutine update_from_newcld(cldn_in,cldo_in,dtinv,   &
+                wtke_in,temp_in,cs_kk_in,state_q_in,  &
+                qcld_in,raercol_pt,raercol_cw_pt, &
+                nsource_out, factnum_out)
+
+   use modal_aero_data,   only:   lmassptr_amode, numptr_amode
+
+   ! input arguments
+   real(r8), intent(in) :: cldn_in   ! cloud fraction [fraction]
+   real(r8), intent(in) :: cldo_in   ! cloud fraction on previous time step [fraction]
+   real(r8), intent(in) :: dtinv     ! inverse time step for microphysics [s^{-1}]
+   real(r8), intent(in) :: wtke_in   ! subgrid vertical velocity [m/s]
+   real(r8), intent(in) :: temp_in   ! temperature [K]
+   real(r8), intent(in) :: cs_kk_in  ! air density at actual level kk [kg/m^3]
+   real(r8), intent(in) :: state_q_in(:) ! aerosol mmrs [kg/kg]
+
+   real(r8), intent(inout) :: qcld_in
+   real(r8), intent(inout) :: nsource_out
+   real(r8), intent(inout) :: raercol_pt(:)
+   real(r8), intent(inout) :: raercol_cw_pt(:)
+   real(r8), intent(inout) :: factnum_out(:)
+
+!  local variables
+
+   real(r8) :: delt_cld        ! new - old cloud fraction [fraction]
+   real(r8) :: frac_delt_cld        ! fractional change in cloud fraction [fraction]
+   real(r8) :: fm_delt_cld        ! fm change from fractional change in cloud fraction [fraction]
+   integer  :: imode       ! mode counter variable
+   integer  :: lspec       ! species counter variable
+   integer  :: mm                  ! local array index for MAM number, species
+   real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
+   real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
+   real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
+   integer  :: num_idx  ! number index
+   integer  :: spc_idx  ! species index
+   real(r8) :: flux_fullact ! flux of activated aerosol fraction assuming 100% activation [m/s]
+   real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
+   real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
+
+
+         ! shrinking cloud ......................................................
+         !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
+         !    and also dissipate the portion of the cloud that will be regenerated
+
+         if (cldn_in < cldo_in) then
+            !  droplet loss in decaying cloud
+            !++ sungsup
+            nsource_out = nsource_out + qcld_in*(cldn_in - cldo_in)/cldo_in*dtinv
+            qcld_in      = qcld_in*(1._r8 + (cldn_in - cldo_in)/cldo_in)
+            !-- sungsup
+
+            ! convert activated aerosol to interstitial in decaying cloud
+
+            frac_delt_cld = (cldn_in - cldo_in) / cldo_in
+            do imode = 1, ntot_amode
+               mm = mam_idx(imode,0)
+               dact   = raercol_cw_pt(mm)*frac_delt_cld
+               raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact   ! cloud-borne aerosol
+               raercol_pt(mm)    = raercol_pt(mm) - dact
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
+                  dact    = raercol_cw_pt(mm)*frac_delt_cld
+                  raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
+                  raercol_pt(mm)    = raercol_pt(mm) - dact
+               enddo
+            enddo
+         endif   ! cldn(icol,kk) < cldo(icol,kk)
+
+         ! growing cloud ......................................................
+         !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
+         !    and also regenerate part of the cloud
+
+         if (cldn_in-cldo_in > 0.01_r8) then
+
+            call get_activate_frac(  &
+                 state_q_in, &
+                 cs_kk_in, cs_kk_in,    &
+                 wtke_in, temp_in,    &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact)
+
+!  store for output activation fraction of aerosol
+            factnum_out(:) = fn
+            delt_cld = (cldn_in - cldo_in)
+
+            do imode = 1, ntot_amode
+               mm = mam_idx(imode,0)
+               num_idx = numptr_amode(imode)
+               dact = delt_cld*fn(imode)*state_q_in(num_idx) ! interstitial only
+               qcld_in = qcld_in + dact
+               nsource_out = nsource_out + dact*dtinv
+               raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
+               raercol_pt(mm)    = raercol_pt(mm) - dact
+               fm_delt_cld = delt_cld * fm(imode)
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
+                  spc_idx=lmassptr_amode(lspec,imode)
+                  dact    = fm_delt_cld*state_q_in(spc_idx) ! interstitial only
+                  raercol_cw_pt(mm) = raercol_cw_pt(mm) + dact  ! cloud-borne aerosol
+                  raercol_pt(mm)    = raercol_pt(mm) - dact
+               enddo
+            enddo
+         endif    !  cldn(icol,kk)-cldo(icol,kk) > 0.01_r8
+
+end subroutine update_from_newcld
+
+!===============================================================================
+
+subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,temp_col_in, &
+           cs_col_in,csbot_cscen,state_q_col_in,raercol_nsav,raercol_cw_nsav,nsource_col, &
+           qcld,factnum_col,ekd,nact,mact)
+
+   ! input arguments
+   real(r8), intent(in) :: cldn_col_in(:)   ! cloud fraction [fraction]
+   real(r8), intent(in) :: dtinv      ! inverse time step for microphysics [s^{-1}]
+   real(r8), intent(in) :: wtke_col_in(:)   ! subgrid vertical velocity [m/s]
+   real(r8), intent(in) :: zs(:)            ! inverse of distance between levels [m^-1]
+   real(r8), intent(in) :: dz(:)         ! geometric thickness of layers [m]
+   real(r8), intent(in) :: temp_col_in(:)   ! temperature [K]
+   real(r8), intent(in) :: cs_col_in(:)     ! air density [kg/m^3]
+   real(r8), intent(in) :: csbot_cscen(:)   ! inverse normalized air density csbot(i)/cs(i,k) [dimensionless]
+   real(r8), intent(in) :: state_q_col_in(:,:)    ! aerosol mmrs [kg/kg]
+
+   real(r8), intent(inout) :: raercol_nsav(:,:)    ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
+   real(r8), intent(inout) :: raercol_cw_nsav(:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
+   real(r8), intent(inout) :: nsource_col(:)   ! droplet number mixing ratio source tendency [#/kg/s]
+   real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
+   real(r8), intent(inout) :: factnum_col(:,:)  ! activation fraction for aerosol number [fraction]
+   real(r8), intent(inout) :: ekd(:)     ! diffusivity for droplets [m^2/s]
+   real(r8), intent(inout) :: nact(:,:)  ! fractional aero. number  activation rate [/s]
+   real(r8), intent(inout) :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
+
+   ! local arguments
+
+   integer :: kk
+   integer :: kp1
+   integer  :: imode       ! mode counter variable
+   integer  :: lspec       ! species counter variable
+   integer  :: mm               ! local array index for MAM number, species
+   real(r8) :: delz_cld        ! vertical change in cloud raction [fraction]
+   real(r8) :: crdz            ! conversion factor from flux to rate [m^{-1}]
+   real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
+   real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
+   integer  :: num_idx  ! number index
+   integer  :: spc_idx  ! species index
+   real(r8) :: flux_fullact(pver) ! flux of activated aerosol fraction assuming 100% activation [m/s]
+   real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
+   real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
+   real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
+
+      do kk = top_lev, pver - 1
+
+         kp1 = min0(kk+1, pver)
+
+         if (cldn_col_in(kk) > 0.01_r8) then
+
+            if (cldn_col_in(kk) - cldn_col_in(kp1) > 0.01_r8 ) then
 
                ! cloud base
 
@@ -751,42 +1114,19 @@ subroutine dropmixnuc( &
                !      The sq2pi factor assumes a normal draft spectrum.
                !      The fluxn/fluxm from activate must be consistent with the
                !      fluxes calculated in explmix.
-               ekd(k) = wbar/zs(k)
-
-               alogarg = max(1.e-20_r8, 1/cldn(i,k) - 1._r8)
-               wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
-               phase   = 1   ! interstitial
-
-               do m = 1, ntot_amode
+               ekd(kk) = wtke_col_in(kk)/zs(kk)
                   ! rce-comment - use kp1 here as old-cloud activation involves
                   !   aerosol from layer below
-                  call loadaer( &
-                     state_q, i, i, kp1,  &
-                     m, nspec_amode(m), cs, phase, na, va,   &
-                     hy )
-                  naermod(m)  = na(i)
-                  vaerosol(m) = va(i)
-                  hygro(m)    = hy(i)
-               end do
+               call get_activate_frac(  &
+                 state_q_col_in(kp1,:),    &
+                 cs_col_in(kp1), cs_col_in(kk),   &
+                 wtke_col_in(kk), temp_col_in(kk),    &
+                 fn, fm, fluxn,         &
+                 fluxm,flux_fullact(kk) )
 
-               call activate_modal( &
-                  wbar, wmax,                       &
-                  temp(i,k), cs(i,k), naermod, ntot_amode, &
-                  vaerosol, hygro, fn, fm, fluxn,                      &
-                  fluxm, flux_fullact(k))
-
-               factnum(i,k,:) = fn
-
-               if (k < pver) then
-                  dumc = cldn(i,k) - cldn(i,kp1)
-               else
-                  if(regen_fix) then
-                     dumc=0._r8
-                  else
-                     dumc = cldn(i,k)
-                  endif
-               endif
-
+!  store for output activation fraction of aerosol
+               factnum_col(kk,:) = fn
+               delz_cld = cldn_col_in(kk) - cldn_col_in(kp1)
                fluxntot = 0
 
                ! rce-comment 1
@@ -796,8 +1136,7 @@ subroutine dropmixnuc( &
                !       = actmassflux/(cs(i,k)*dz(i,k))
                !    so need factor of csbot_cscen = csbot(k)/cs(i,k)
                !                   dum=1./(dz(i,k))
-               dum=csbot_cscen(k)/(dz(i,k))
-
+               crdz=csbot_cscen(kk)/(dz(kk))
                ! rce-comment 2
                !    code for k=pver was changed to use the following conceptual model
                !    in k=pver, there can be no cloud-base activation unless one considers
@@ -826,379 +1165,51 @@ subroutine dropmixnuc( &
                !    in the cam3_5_37 version, wtke is done differently and is much
                !       larger in k=pver, so the activation is stronger there
                !
-               if (k == pver) then
-                  taumix_internal_pver_inv = flux_fullact(k)/dz(i,k)
-               end if
 
-               do m = 1, ntot_amode
-                  mm = mam_idx(m,0)
-                  fluxn(m) = fluxn(m)*dumc
-                  fluxm(m) = fluxm(m)*dumc
-                  nact(k,m) = nact(k,m) + fluxn(m)*dum
-                  mact(k,m) = mact(k,m) + fluxm(m)*dum
-                  if (k < pver) then
+               do imode = 1, ntot_amode
+                  mm = mam_idx(imode,0)
+                  fluxn(imode) = fluxn(imode)*delz_cld
+                  fluxm(imode) = fluxm(imode)*delz_cld
+                  nact(kk,imode) = nact(kk,imode) + fluxn(imode)*crdz
+                  mact(kk,imode) = mact(kk,imode) + fluxm(imode)*crdz
                      ! note that kp1 is used here
-                     fluxntot = fluxntot &
-                        + fluxn(m)*raercol(kp1,mm,nsav)*cs(i,k)
-                  else
-                     tmpa = raercol(kp1,mm,nsav)*fluxn(m) &
-                          + raercol_cw(kp1,mm,nsav)*(fluxn(m) &
-                          - taumix_internal_pver_inv*dz(i,k))
-                     fluxntot = fluxntot + max(0.0_r8, tmpa)*cs(i,k)
-                  end if
-               end do
-               srcn(k)      = srcn(k) + fluxntot/(cs(i,k)*dz(i,k))
-               nsource(i,k) = nsource(i,k) + fluxntot/(cs(i,k)*dz(i,k))
+                  fluxntot = fluxntot &
+                        + fluxn(imode)*raercol_nsav(kp1,mm)*cs_col_in(kk)
+               enddo
+               nsource_col(kk) = nsource_col(kk) + fluxntot/(cs_col_in(kk)*dz(kk))
 
-            endif  ! (cldn(i,k) - cldn(i,kp1) > 0.01 .or. k == pver)
+            endif  ! (cldn(icol,kk) - cldn(icol,kp1) > 0.01)
 
          else
+!  if cldn < 0.01_r8 at any level except kk=pver, deplete qcld, turn all raercol_cw to raercol, put appropriate tendency
+!  in nsource
+!  Note that if cldn(kk) >= 0.01_r8 but cldn(kk) - cldn(kp1)  <= 0.01, nothing is done.
 
             ! no cloud
 
-            nsource(i,k) = nsource(i,k) - qcld(k)*dtinv
-            qcld(k)      = 0
+            nsource_col(kk) = nsource_col(kk) - qcld(kk)*dtinv
+            qcld(kk)      = 0
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
-               raercol_cw(k,mm,nsav) = 0._r8
+            do imode = 1, ntot_amode
+               mm = mam_idx(imode,0)
+               raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) + raercol_cw_nsav(kk,mm)  ! cloud-borne aerosol
+               raercol_cw_nsav(kk,mm) = 0._r8
 
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
-                  raercol_cw(k,mm,nsav) = 0._r8
-               end do
-            end do
-         end if
+               do lspec = 1, nspec_amode(imode)
+                  mm = mam_idx(imode,lspec)
+                  raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) + raercol_cw_nsav(kk,mm) ! cloud-borne aerosol
+                  raercol_cw_nsav(kk,mm) = 0._r8
+               enddo
+            enddo
 
-      end do  ! old_cloud_main_k_loop
+         endif  ! (cldn(icol,kk) > 0.01_r8) if-else structure
 
-      ! switch nsav, nnew so that nnew is the updated aerosol
-      ntemp = nsav
-      nsav  = nnew
-      nnew  = ntemp
-
-      ! load new droplets in layers above, below clouds
-
-      dtmin     = dtmicro
-      ekk(top_lev-1)    = 0.0_r8
-      ekk(pver) = 0.0_r8
-      do k = top_lev, pver-1
-         ! rce-comment -- ekd(k) is eddy-diffusivity at k/k+1 interface
-         !   want ekk(k) = ekd(k) * (density at k/k+1 interface)
-         !   so use pint(i,k+1) as pint is 1:pverp
-         !           ekk(k)=ekd(k)*2.*pint(i,k)/(rair*(temp(i,k)+temp(i,k+1)))
-         !           ekk(k)=ekd(k)*2.*pint(i,k+1)/(rair*(temp(i,k)+temp(i,k+1)))
-         ekk(k) = ekd(k)*csbot(k)
-      end do
-
-      do k = top_lev, pver
-         km1     = max0(k-1, top_lev)
-         ekkp(k) = zn(k)*ekk(k)*zs(k)
-         ekkm(k) = zn(k)*ekk(k-1)*zs(km1)
-         tinv    = ekkp(k) + ekkm(k)
-
-         ! rce-comment -- tinv is the sum of all first-order-loss-rates
-         !    for the layer.  for most layers, the activation loss rate
-         !    (for interstitial particles) is accounted for by the loss by
-         !    turb-transfer to the layer above.
-         !    k=pver is special, and the loss rate for activation within
-         !    the layer must be added to tinv.  if not, the time step
-         !    can be too big, and explmix can produce negative values.
-         !    the negative values are reset to zero, resulting in an
-         !    artificial source.
-         if (k == pver) tinv = tinv + taumix_internal_pver_inv
-
-         if (tinv .gt. 1.e-6_r8) then
-            dtt   = 1._r8/tinv
-            dtmin = min(dtmin, dtt)
-         end if
-      end do
-
-      dtmix   = 0.9_r8*dtmin
-      nsubmix = dtmicro/dtmix + 1
-      if (nsubmix > 100) then
-         nsubmix_bnd = 100
-      else
-         nsubmix_bnd = nsubmix
-      end if
-      count_submix(nsubmix_bnd) = count_submix(nsubmix_bnd) + 1
-      dtmix = dtmicro/nsubmix
-
-      do k = top_lev, pver
-         kp1 = min(k+1, pver)
-         km1 = max(k-1, top_lev)
-         ! maximum overlap assumption
-         if (cldn(i,kp1) > 1.e-10_r8) then
-            overlapp(k) = min(cldn(i,k)/cldn(i,kp1), 1._r8)
-         else
-            overlapp(k) = 1._r8
-         end if
-         if (cldn(i,km1) > 1.e-10_r8) then
-            overlapm(k) = min(cldn(i,k)/cldn(i,km1), 1._r8)
-         else
-            overlapm(k) = 1._r8
-         end if
-      end do
+      enddo  ! old_cloud_main_k_loop
 
 
-      ! rce-comment
-      !    the activation source(k) = mact(k,m)*raercol(kp1,lmass)
-      !       should not exceed the rate of transfer of unactivated particles
-      !       from kp1 to k which = ekkp(k)*raercol(kp1,lmass)
-      !    however it might if things are not "just right" in subr activate
-      !    the following is a safety measure to avoid negatives in explmix
-      do k = top_lev, pver-1
-         do m = 1, ntot_amode
-            nact(k,m) = min( nact(k,m), ekkp(k) )
-            mact(k,m) = min( mact(k,m), ekkp(k) )
-         end do
-      end do
-
-
-      ! old_cloud_nsubmix_loop
-      do n = 1, nsubmix
-         qncld(:) = qcld(:)
-         ! switch nsav, nnew so that nsav is the updated aerosol
-         ntemp   = nsav
-         nsav    = nnew
-         nnew    = ntemp
-         srcn(:) = 0.0_r8
-
-         do m = 1, ntot_amode
-            mm = mam_idx(m,0)
-
-            ! update droplet source
-            ! rce-comment- activation source in layer k involves particles from k+1
-            !	       srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
-            srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,m)*(raercol(top_lev+1:pver,mm,nsav))
-
-            ! rce-comment- new formulation for k=pver
-            !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
-            tmpa = raercol(pver,mm,nsav)*nact(pver,m) &
-                 + raercol_cw(pver,mm,nsav)*(nact(pver,m) - taumix_internal_pver_inv)
-            srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
-         end do
-         call explmix(  &
-            qcld, srcn, ekkp, ekkm, overlapp,  &
-            overlapm, qncld, pver, &
-            dtmix, .false.)
-
-         ! rce-comment
-         !    the interstitial particle mixratio is different in clear/cloudy portions
-         !    of a layer, and generally higher in the clear portion.  (we have/had
-         !    a method for diagnosing the the clear/cloudy mixratios.)  the activation
-         !    source terms involve clear air (from below) moving into cloudy air (above).
-         !    in theory, the clear-portion mixratio should be used when calculating
-         !    source terms
-         do m = 1, ntot_amode
-            mm = mam_idx(m,0)
-            ! rce-comment -   activation source in layer k involves particles from k+1
-            !	              source(:)= nact(:,m)*(raercol(:,mm,nsav))
-            source(top_lev:pver-1) = nact(top_lev:pver-1,m)*(raercol(top_lev+1:pver,mm,nsav))
-            ! rce-comment - new formulation for k=pver
-            !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
-            tmpa = raercol(pver,mm,nsav)*nact(pver,m) &
-                 + raercol_cw(pver,mm,nsav)*(nact(pver,m) - taumix_internal_pver_inv)
-            source(pver) = max(0.0_r8, tmpa)
-            flxconv = 0._r8
-
-            call explmix( &
-               raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
-               overlapm, raercol_cw(:,mm,nsav), pver,   &
-               dtmix, .false.)
-
-            call explmix( &
-               raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
-               overlapm, raercol(:,mm,nsav), pver, &
-               dtmix, .true., raercol_cw(:,mm,nsav))
-
-            do l = 1, nspec_amode(m)
-               mm = mam_idx(m,l)
-               ! rce-comment -   activation source in layer k involves particles from k+1
-               !	          source(:)= mact(:,m)*(raercol(:,mm,nsav))
-               source(top_lev:pver-1) = mact(top_lev:pver-1,m)*(raercol(top_lev+1:pver,mm,nsav))
-               ! rce-comment- new formulation for k=pver
-               !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
-               tmpa = raercol(pver,mm,nsav)*mact(pver,m) &
-                    + raercol_cw(pver,mm,nsav)*(mact(pver,m) - taumix_internal_pver_inv)
-               source(pver) = max(0.0_r8, tmpa)
-               flxconv = 0._r8
-
-               call explmix( &
-                  raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
-                  overlapm, raercol_cw(:,mm,nsav), pver,   &
-                  dtmix, .false.)
-
-               call explmix( &
-                  raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
-                  overlapm, raercol(:,mm,nsav), pver, &
-                  dtmix, .true., raercol_cw(:,mm,nsav))
-
-            end do
-         end do
-
-      end do ! old_cloud_nsubmix_loop
-
-      ! evaporate particles again if no cloud
-
-      do k = top_lev, pver
-         if (cldn(i,k) == 0._r8) then
-            ! no cloud
-            qcld(k)=0._r8
-
-            ! convert activated aerosol to interstitial in decaying cloud
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
-               raercol_cw(k,mm,nnew) = 0._r8
-
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-                  raercol(k,mm,nnew)    = raercol(k,mm,nnew) + raercol_cw(k,mm,nnew)
-                  raercol_cw(k,mm,nnew) = 0._r8
-               end do
-            end do
-         end if
-      end do
-
-      ! droplet number
-
-      ndropcol(i) = 0._r8
-      do k = top_lev, pver
-         ndropmix(i,k) = (qcld(k) - ncldwtr(i,k))*dtinv - nsource(i,k)
-         tendnd(i,k)   = (max(qcld(k), 1.e-6_r8) - ncldwtr(i,k))*dtinv
-         ndropcol(i)   = ndropcol(i) + ncldwtr(i,k)*pdel(i,k)
-      end do
-      ndropcol(i) = ndropcol(i)/gravit
-
-      if (prog_modal_aero) then
-
-         raertend = 0._r8
-         qqcwtend = 0._r8
-
-         do m = 1, ntot_amode
-            do l = 0, nspec_amode(m)
-
-               mm   = mam_idx(m,l)
-               lptr = mam_cnst_idx(m,l)
-
-               raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(i,top_lev:pver))*dtinv
-               qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(i,top_lev:pver))*dtinv
-
-               coltend(i,mm)    = sum( pdel(i,:)*raertend )/gravit
-               coltend_cw(i,mm) = sum( pdel(i,:)*qqcwtend )/gravit
-
-               ptend%q(i,:,lptr) = 0.0_r8
-               ptend%q(i,top_lev:pver,lptr) = raertend(top_lev:pver)           ! set tendencies for interstitial aerosol
-               qqcw(mm)%fld(i,:) = 0.0_r8
-               qqcw(mm)%fld(i,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
-            end do
-         end do
-
-      end if
-
-   end do  ! overall_main_i_loop
-   ! end of main loop over i/longitude ....................................
-
-   call outfld('NDROPCOL', ndropcol, pcols, lchnk)
-   call outfld('NDROPSRC', nsource,  pcols, lchnk)
-   call outfld('NDROPMIX', ndropmix, pcols, lchnk)
-   call outfld('WTKE    ', wtke,     pcols, lchnk)
-
-  !Note for C++ port: Get the cloud borne MMRs from AD in variable qcldbrn, do not port the code below
-
-   ! Extract cloud borne MMRs from pbuf 
-
-   qcldbrn(:,:,:,:) = huge(qcldbrn) !store invalid values
-   do imode=1,ntot_amode
-      do kk=top_lev,pver
-         do lspec =1, nspec_amode(imode)
-           spc_idx = lmassptrcw_amode(lspec,imode)
-           fldcw => qqcw_get_field(pbuf, spc_idx, lchnk,.true.)
-           qcldbrn(:,lspec,kk,imode) = fldcw(:,kk)
-         enddo
-         num_idx = numptrcw_amode(imode)
-         fldcw => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
-         qcldbrn_num(:,kk,imode) = fldcw(:,kk)      
-      enddo
-   enddo
-
-  !End note for C++ port
-
-   call ccncalc(state_q, temp, qcldbrn, qcldbrn_num, ncol, cs, ccn)
-   do l = 1, psat
-      call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
-   enddo
-
-
-   if(do_aerocom_ind3) then
-      ccn3d(:ncol, :) = ccn(:ncol, :, 4)
-      ccn3col = 0.0_r8; ccn4col = 0.0_r8
-      do i=1, ncol
-        do k=1, pver
-          ccn3col(i) = ccn3col(i) + ccn(i,k,3) * 1.0e6*   &
-             pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair))  !#/cm3 --> #/m2
-          ccn4col(i) = ccn4col(i) + ccn(i,k,4) * 1.0e6*   &
-             pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair))  !#/cm3 --> #/m2
-        enddo
-
-! calculate CCN at 1km
-        zi2 = 0.0
-        zm2 = 0.0
-        zmflag = .true.
-        do k=pver, 1, -1
-          zi2(k) = zi2(k+1) + pdel(i,k)/gravit/(pmid(i,k)/(temp(i,k)*rair)) !
-          zm2(k) = (zi2(k+1)+zi2(k))/2._r8
-          if(zm2(k).gt.1000. .and. zmflag) then
-            idx1000 = min(k, pver-1)
-            zmflag = .false.
-          end if
-        end do
-        ccn3bl(i) = (ccn(i,idx1000,3)*(1000.-zm2(idx1000+1))+ccn(i,idx1000+1,3) * (zm2(idx1000)-1000.)) &
-                     /(zm2(idx1000)-zm2(idx1000+1)) * 1.0e6  ! #/cm3 -->#/m3
-        ccn4bl(i) = (ccn(i,idx1000,4)*(1000.-zm2(idx1000+1))+ccn(i,idx1000+1,4) * (zm2(idx1000)-1000.)) &
-                     /(zm2(idx1000)-zm2(idx1000+1)) *1.0e6   ! #/cm3 -->#/m3
-      enddo
-      call outfld('colccn.1', ccn3col, pcols, lchnk)
-      call outfld('colccn.3', ccn4col, pcols, lchnk)
-      call outfld('ccn.1bl', ccn3bl, pcols, lchnk)
-      call outfld('ccn.3bl', ccn4bl, pcols, lchnk)
-   end if
-
-   ! do column tendencies
-   if (prog_modal_aero) then
-      do m = 1, ntot_amode
-         do l = 0, nspec_amode(m)
-            mm = mam_idx(m,l)
-            call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
-            call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
-         end do
-      end do
-   end if
-
-   deallocate( &
-      nact,       &
-      mact,       &
-      raer,       &
-      qqcw,       &
-      raercol,    &
-      raercol_cw, &
-      coltend,    &
-      coltend_cw, &
-      naermod,    &
-      hygro,      &
-      vaerosol,   &
-      fn,         &
-      fm,         &
-      fluxn,      &
-      fluxm       )
-
-
-end subroutine dropmixnuc
+end subroutine update_from_cldn_profile
 
 !===============================================================================
 
@@ -1251,7 +1262,7 @@ end subroutine explmix
 
 !===============================================================================
 
-subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
+subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &
      na, nmode, volume, hygro, &
      fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed )
 
@@ -1268,7 +1279,7 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
   !---------------------------------------------------------------------------------
 
   !input
-  real(r8), intent(in) :: wbar      ! grid cell mean vertical velocity [m/s]
+  real(r8), intent(in) :: w_in      ! vertical velocity [m/s]
   real(r8), intent(in) :: wmaxf     ! maximum updraft velocity for integration [m/s]
   real(r8), intent(in) :: tair      ! air temperature [K]
   real(r8), intent(in) :: rhoair    ! air density [kg/m3]
@@ -1309,7 +1320,7 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
   real(r8) smc(nmode) ! critical supersaturation for number mode radius [fraction]
   real(r8) :: lnsm(nmode) ! ln(critical supersaturation for activation) [unitless]
 
-  real(r8) wnuc  ! nucleation w, but = wbar if wdiab == 0 [m/s]
+  real(r8) wnuc  ! nucleation w, but = w_in if wdiab == 0 [m/s]
   real(r8) alw ! [/s]
   real(r8) smax ! maximum supersaturation [fraction]
   real(r8) lnsmax ! ln(smax) [unitless]
@@ -1328,13 +1339,13 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
   !return if aerosol number is negligible in the accumulation mode
   if(na(1) < 1.e-20_r8)return
 
-  !return if mean vertical velocity is 0 or negative
-  if(wbar <= 0._r8)return
+  !return if vertical velocity is 0 or negative
+  if(w_in <= 0._r8)return
 
   if ( present( smax_prescribed ) ) then
      !return if max supersaturation is 0 or negative
      if (smax_prescribed <= 0.0_r8) return
-  end if
+  endif
 
   pres=rair*rhoair*tair !pressure
   !Obtain Saturation vapor pressure (es) and saturation specific humidity (qs)
@@ -1350,7 +1361,7 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
   gthermfac=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
        +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8)) !gthermfac is same for all modes
   beta=2._r8*pi*rhoh2o*gthermfac*gamma
-  wnuc = wbar
+  wnuc = w_in
   alw=alpha*wnuc
   etafactor1=alw*sqrt(alw)
   zeta=twothird*sqrt(alw)*aten/sqrt(gthermfac)
@@ -1394,10 +1405,10 @@ subroutine activate_modal(wbar, wmaxf, tair, rhoair,  &
      fn(imode)=0.5_r8*(1._r8-erf(arg_erf_n)) !activated number
      arg_erf_m=arg_erf_n-1.5_r8*sq2*alogsig(imode)
      fm(imode)=0.5_r8*(1._r8-erf(arg_erf_m)) !activated mass
-     fluxn(imode)=fn(imode)*wbar !activated aerosol number flux
-     fluxm(imode)=fm(imode)*wbar !activated aerosol mass flux
+     fluxn(imode)=fn(imode)*w_in !activated aerosol number flux
+     fluxm(imode)=fm(imode)*w_in !activated aerosol mass flux
   enddo
-  flux_fullact = wbar
+  flux_fullact = w_in
 
 end subroutine activate_modal
 
@@ -1544,8 +1555,85 @@ end subroutine ccncalc
 
 !===============================================================================
 
+subroutine loadaer_1col( &
+     state_q, &
+     imode, nspec, cs, phase, naerosol, &
+     vaerosol, hygro, &
+     qcldbrn1d, qcldbrn1d_num) ! optional in
+
+  ! return aerosol number, volume concentrations, and bulk hygroscopicity at one specific column and level
+
+  ! input arguments
+  real(r8), intent(in) :: state_q(:)        ! aerosol mmrs [kg/kg]
+
+  integer,  intent(in) :: imode       ! mode index
+  integer,  intent(in) :: nspec       ! total # of species in mode imode
+  real(r8), intent(in) :: cs          ! air density [kg/m3]
+  integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
+
+  ! output arguments
+  real(r8), intent(out) :: naerosol  ! number conc [#/m3]
+  real(r8), intent(out) :: vaerosol  ! volume conc [m3/m3]
+  real(r8), intent(out) :: hygro     ! bulk hygroscopicity of mode [dimensionless]
+
+  ! optional input arguments
+  real(r8), intent(in), optional  :: qcldbrn1d(:), qcldbrn1d_num ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
+
+  ! internal
+
+  real(r8) :: vaerosolsum  ! sum to find volume conc [m3/kg]
+  real(r8) :: hygrosum     ! sum to bulk hygroscopicity of mode [m3/kg]
+  real(r8) :: qcldbrn_local(nspec)  ! local cloud-borne aerosol mass mixing ratios [kg/kg]
+  real(r8) :: qcldbrn_num_local ! local cloud-borne aerosol number mixing ratios [#/kg]
+
+  integer  :: lspec, spc_idx
+  !-------------------------------------------------------------------------------
+
+  !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
+  if (phase /= 1 .and. phase /=3) then
+     write(iulog,*)'phase=',phase,' in loadaer_1cell'
+     call endrun('phase error in loadaer_1cell')
+  endif
+
+  qcldbrn_local(:) = 0._r8
+  if(present(qcldbrn1d)) qcldbrn_local(:nspec) = qcldbrn1d(:nspec)
+
+  vaerosolsum = 0._r8
+  hygrosum    = 0._r8
+
+  !Sum over all species within imode to get bulk hygroscopicity and volume conc
+     !phase == 1 is interstitial only.
+     !phase == 3 is interstitial + cldborne
+!  Assumes iphase =1 or 3, so interstitial is always summed, added with cldbrn when present
+!  iphase = 2 would require alternate logic from following subroutine
+
+  call get_aer_mmr_sum_1col(imode, nspec, state_q(:), qcldbrn_local(:nspec), & !in
+          vaerosolsum, hygrosum)    !inout
+
+  !  Finalize computation of bulk hygrospopicity and volume conc
+
+     if (vaerosolsum > 1.0e-30_r8) then
+        hygro    = hygrosum/vaerosolsum
+        vaerosol = vaerosolsum*cs
+     else
+        hygro    = 0.0_r8
+        vaerosol = 0.0_r8
+     endif
+
+
+
+  qcldbrn_num_local = 0._r8
+  if(present(qcldbrn1d_num)) qcldbrn_num_local = qcldbrn1d_num
+
+  ! Compute aerosol number concentration
+  call get_aer_num_1col(imode, state_q(:), cs, vaerosol, qcldbrn_num_local, &!in
+          naerosol) !out
+
+end subroutine loadaer_1col
+!===============================================================================
+
 subroutine loadaer( &
-     state_q, istart, istop, kk, &
+     state_q, istart, istop, k_in, &
      imode, nspec, cs, phase, naerosol, &
      vaerosol, hygro, &
      qcldbrn1d, qcldbrn1d_num) ! optional in
@@ -1559,7 +1647,7 @@ subroutine loadaer( &
   integer,  intent(in) :: istop       ! stop column index
   integer,  intent(in) :: imode       ! mode index
   integer,  intent(in) :: nspec       ! total # of species in mode imode
-  integer,  intent(in) :: kk          ! level index
+  integer,  intent(in) :: k_in          ! level index
   real(r8), intent(in) :: cs(:,:)     ! air density [kg/m3]
   integer,  intent(in) :: phase       ! phase of aerosol: 1 for interstitial, 2 for cloud-borne, 3 for sum
 
@@ -1599,14 +1687,14 @@ subroutine loadaer( &
 !  Assumes iphase =1 or 3, so interstitial is always summed, added with cldbrn when present
 !  iphase = 2 would require alternate logic from following subroutine
 
-  call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,kk,:), qcldbrn_local(:,:nspec), & !in
+  call get_aer_mmr_sum(imode, nspec, istart, istop, state_q(:,k_in,:), qcldbrn_local(:,:nspec), & !in
           vaerosolsum, hygrosum)    !inout
 
   !  Finalize computation of bulk hygrospopicity and volume conc
   do icol = istart, istop
      if (vaerosolsum(icol) > 1.0e-30_r8) then
         hygro(icol)    = hygrosum(icol)/(vaerosolsum(icol))
-        vaerosol(icol) = vaerosolsum(icol)*cs(icol,kk)
+        vaerosol(icol) = vaerosolsum(icol)*cs(icol,k_in)
      else
         hygro(icol)    = 0.0_r8
         vaerosol(icol) = 0.0_r8
@@ -1617,10 +1705,48 @@ subroutine loadaer( &
   if(present(qcldbrn1d_num)) qcldbrn_num_local(:) = qcldbrn1d_num(:)
 
   ! Compute aerosol number concentration
-  call get_aer_num(imode, istart, istop, state_q(:,kk,:), cs(:,kk), vaerosol, qcldbrn_num_local, &!in
+  call get_aer_num(imode, istart, istop, state_q(:,k_in,:), cs(:,k_in), vaerosol, qcldbrn_num_local, &!in
           naerosol) !out
 
 end subroutine loadaer
+
+!===============================================================================
+
+subroutine get_aer_mmr_sum_1col(imode, nspec, state_q, qcldbrn1d, & !in
+     vaerosolsum, hygrosum)   !inout
+
+  !add these for direct access to mmr (in state_q array), density and hygroscopicity
+  use modal_aero_data,   only: lspectype_amode, specdens_amode, spechygro, lmassptr_amode
+
+  ! input arguments
+  integer,  intent(in) :: imode       ! mode index
+  integer,  intent(in) :: nspec       ! total # of species in mode imode
+  real(r8), intent(in) :: state_q(:) ! interstitial aerosol mass mixing ratios [kg/kg]
+  real(r8), intent(in) :: qcldbrn1d(:) ! cloud-borne aerosol mass mixing ratios [kg/kg]
+
+  ! in/out arguments
+  real(r8), intent(inout) :: vaerosolsum  ! sum to find volume conc [m3/kg]
+  real(r8), intent(inout) :: hygrosum   ! sum to bulk hygroscopicity of mode [m3/kg]
+
+  ! internal
+  real(r8) :: density_sp ! density at species / mode indices [kg/m3]
+  real(r8) :: hygro_sp   ! hygroscopicity at species / mode indices [dimensionless]
+  real(r8) :: vol     !aerosol volume mixing ratio [m3/kg]
+
+  integer  :: lspec, spc_idx, type_idx
+
+  !Start to compute bulk volume conc / hygroscopicity by summing over species per mode.
+   do lspec = 1, nspec
+      type_idx = lspectype_amode(lspec,imode)
+      density_sp  = specdens_amode(type_idx) !species density
+      hygro_sp    = spechygro(type_idx)      !species hygroscopicity
+      spc_idx   = lmassptr_amode(lspec,imode) !index of species in state_q array
+      vol = max(state_q(spc_idx) + qcldbrn1d(lspec), 0._r8)/density_sp !volume = mmr/density
+      vaerosolsum = vaerosolsum + vol        !bulk volume
+      hygrosum    = hygrosum + vol*hygro_sp !bulk hygroscopicity
+   enddo
+
+end subroutine get_aer_mmr_sum_1col
 
 !===============================================================================
 
@@ -1663,6 +1789,37 @@ subroutine get_aer_mmr_sum(imode, nspec, istart, istop, state_q, qcldbrn1d, & !i
    enddo
 
 end subroutine get_aer_mmr_sum
+
+!===============================================================================
+
+subroutine get_aer_num_1col(imode, state_q, cs, vaerosol, qcldbrn1d_num, &!in
+           naerosol) !out
+
+  use modal_aero_data, only:numptr_amode
+
+  ! input arguments
+  integer,  intent(in) :: imode        ! mode index
+  real(r8), intent(in) :: state_q(:) ! interstitial aerosol number mixing ratios [#/kg]
+  real(r8), intent(in) :: cs           ! air density [kg/m3]
+  real(r8), intent(in) :: vaerosol  ! volume conc [m3/m3]
+  real(r8), intent(in) :: qcldbrn1d_num ! cloud-borne aerosol number mixing ratios [#/kg]
+
+  !output arguments
+  real(r8), intent(out) :: naerosol  ! number conc [#/m3]
+
+  !internal
+  integer  :: num_idx
+
+  !convert number mixing ratios to number concentrations
+  !Use bulk volume conc found previously to bound value
+
+  num_idx = numptr_amode(imode)
+  naerosol = (state_q(num_idx) + qcldbrn1d_num)*cs
+     !adjust number so that dgnumlo < dgnum < dgnumhi
+  naerosol = max(naerosol, vaerosol*voltonumbhi_amode(imode))
+  naerosol = min(naerosol, vaerosol*voltonumblo_amode(imode))
+
+end subroutine get_aer_num_1col
 
 !===============================================================================
 

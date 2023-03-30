@@ -619,9 +619,19 @@ subroutine ma_convproc_sh_intr(                 &
 ! Initialize
 !
 
-   ! md and ed are assumed zero in shallow convection in ma_convproc_tend
+! the original FORTRAN code has code to calculate mass fluxes from shallow
+! convection, but the mass flux from CLUBB is currently set as zero, 
+! (see subroutine convect_shallow_tend in physics/cam/convect_shallow.F90)
+! Therefore, we remove the calculation of the following variables and simply set
+! them in default values for C++ porting.   - Shuaiqi Tang 2023.2.25
+   jt(:) = -1
+   maxg(:) = -1
+   mu(:,:) = 0.0_r8
+   eu(:,:) = 0.0_r8
+   du(:,:) = 0.0_r8
    md(:,:) = 0.0_r8
    ed(:,:) = 0.0_r8
+   lengath = ncol 
 
 ! these dp and dpdry have units of mb
    dpdry(1:ncol,:) = state_pdeldry(1:ncol,:)/100._r8
@@ -631,12 +641,6 @@ subroutine ma_convproc_sh_intr(                 &
    do icol = 1, ncol
       ideep(icol) = icol
    enddo
-
-! mimic variables counterparts as in zm-deep
-   call mimic_deep_counterparts( ncol,                   & ! in
-                        dpdry,  cmfmcsh,  sh_e_ed_ratio, & ! in
-                        jt, maxg, mu, eu, du, lengath    ) ! out
-
 
 ! turn on/off calculations for aerosols and trace gases
    call assign_dotend( species_class, dotend)
@@ -703,216 +707,6 @@ subroutine assign_dotend( species_class,  & ! in
    enddo
 
 end subroutine assign_dotend
-
-!=========================================================================================
-subroutine mimic_deep_counterparts( ncol,                & ! in
-                        dpdry,  cmfmcsh,  sh_e_ed_ratio, & ! in
-                        jt, maxg, mu, eu, du, lengath    ) ! out
-!-----------------------------------------------------------------------------
-! create mass flux, entrainment, detrainment, and delta-p arrays
-! with the same units as the zm-deep
-!-----------------------------------------------------------------------------
-
-   integer,  intent(in)    :: ncol              ! total number of column
-   real(r8), intent(in)    :: dpdry(pcols,pver) ! layer delta-p-dry [mb]
-   real(r8), intent(in)    :: cmfmcsh(pcols,pverp) ! Shallow conv mass flux [kg/m2/s]
-   real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
-
-   integer,  intent(out)   :: jt(pcols)        ! Index of cloud top for each column
-   integer,  intent(out)   :: maxg(pcols)      ! Index of cloud bot for each column
-   integer,  intent(out)   :: lengath          ! min lon indices over which to operate
-   real(r8), intent(out)   :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
-   real(r8), intent(out)   :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
-   real(r8), intent(out)   :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
-
-
-   integer      :: icol                 ! index of column
-   integer      :: tot_conv_layer       ! total layers of convection in this column
-   integer      :: maxg_init            ! initial maxg at icol
-
-
-   lengath = ncol   ! mimic lengath in zm-deep
-
-   do icol = 1, ncol
-        ! load updraft mass flux from cmfmcsh
-        call load_updraft_massflux(             &
-                icol,   cmfmcsh,                & ! in
-                tot_conv_layer,   jt, maxg, mu  ) ! out
-
-        if (tot_conv_layer <= 0) cycle  ! current column has no convection
-
-        ! extend below-cloud source region downwards
-        call extend_belowcloud_downward(           &
-                        icol,     dpdry,           & ! in
-                        maxg,     mu,              & ! inout
-                        maxg_init                  ) ! out
-
-! calc ent / detrainment, using the [ent/(ent+det)] ratio from uw scheme
-!    which is equal to [fer_out/(fer_out+fdr_out)]  (see uwshcu.F90)
-! note that the ratio is set to -1.0 (invalid) when both fer and fdr are very small
-!    and the ratio values are often strange (??) at topmost layer\
-        call calculate_ent_det(                 &
-                icol,   maxg,  maxg_init,  jt,  & ! in
-                dpdry,  mu,    sh_e_ed_ratio,   & ! in
-                eu,     du                      ) ! out
-
-   enddo ! icol
-
-end subroutine mimic_deep_counterparts
-
-
-!=========================================================================================
-subroutine load_updraft_massflux(               &
-                icol,   cmfmcsh,                & ! in
-                tot_conv_layer,   jt, maxg, mu  ) ! out
-!-----------------------------------------------------------------------------
-! load updraft mass flux from cmfmcsh
-!-----------------------------------------------------------------------------
-
-   real(r8), intent(in)    :: cmfmcsh(pcols,pverp) ! Shallow conv mass flux [kg/m2/s]
-   integer,  intent(in)    :: icol             ! index of column
-   integer,  intent(out)   :: tot_conv_layer   ! total layers of convection in this column
-   integer,  intent(out)   :: jt(pcols)        ! Index of cloud top for each column
-   integer,  intent(out)   :: maxg(pcols)      ! Index of cloud bot for each column
-   real(r8), intent(out)   :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
-
-   integer              :: kk
-   real(r8), parameter :: small_massflux = 1.0e-7_r8  ! if mass-flux < 1e-7 kg/m2/s ~= 1e-7 m/s ~= 1 cm/day, treat as zero
-
-
-   ! initiate variables
-   tot_conv_layer = 0 ! total layers of convection in this column
-   mu(:,:) = 0.0_r8
-   jt(:) = -1
-   maxg(:) = -1
-
-   do kk = 2, pver
-       if (cmfmcsh(icol,kk) >= small_massflux) then
-            ! mu has units of mb/s
-            mu(icol,kk) = cmfmcsh(icol,kk) / hund_ovr_g
-            tot_conv_layer = tot_conv_layer + 1
-            if (tot_conv_layer == 1) jt(icol) = kk - 1
-            maxg(icol) = kk
-       endif
-   enddo ! kk
-
-end subroutine load_updraft_massflux
-
-!=========================================================================================
-subroutine extend_belowcloud_downward(             &
-                        icol,     dpdry,           & ! in
-                        maxg,     mu,              & ! inout
-                        maxg_init                  ) ! out
-!-----------------------------------------------------------------------------
-! extend below-cloud source region downwards
-!-----------------------------------------------------------------------------
-   integer,  intent(in)    :: icol              ! index of column
-   real(r8), intent(in)    :: dpdry(pcols,pver) ! layer delta-p-dry [mb]
-   integer,  intent(inout) :: maxg(pcols)       ! Index of cloud bot for each column
-   real(r8), intent(inout) :: mu(pcols,pver)    ! Updraft mass flux (positive) [mb/s]
-   integer,  intent(out)   :: maxg_init         ! initial maxg at icol
-
-   integer              :: kk, k_cldbot, k_4_below_cldbot         ! vertical index
-   real(r8)             :: dp_sum               ! sum of dpdry for weighting purpose
-   integer              :: maxg_minval
-
-   ! initiate variables
-   maxg_minval = pver*2  ! this variable seems not used
-   maxg_minval = min( maxg_minval, maxg(icol) )
-
-   k_cldbot = maxg(icol)          ! cloud bot level
-   k_4_below_cldbot = min( k_cldbot+4, pver )  ! 4 levels below cloud bottom
-
-   if (k_4_below_cldbot > k_cldbot) then  ! make sure cloud bot is not the bottom model level
-
-      dp_sum = sum( dpdry(icol,k_cldbot:k_4_below_cldbot) )
-
-      do kk = k_cldbot+1, k_4_below_cldbot
-         ! extend mass flux below cloud to k_4_below_cldbot
-         mu(icol,kk) = mu(icol,k_cldbot)*sum( dpdry(icol,kk:k_4_below_cldbot) )/dp_sum
-      enddo ! kk
-
-      maxg(icol) = k_4_below_cldbot
-   endif
-
-   ! assign initial maxg value at icol for calculate_ent_det use
-   maxg_init = k_cldbot
-
-end subroutine extend_belowcloud_downward
-
-!=========================================================================================
-subroutine calculate_ent_det(                   &
-                icol,   maxg,  maxg_init,  jt,  & ! in
-                dpdry,  mu,    sh_e_ed_ratio,   & ! in
-                eu,     du                      ) ! out
-!-----------------------------------------------------------------------------
-! calc ent / detrainment, using the [ent/(ent+det)] ratio from uw scheme
-!    which is equal to [fer_out/(fer_out+fdr_out)]  (see uwshcu.F90)
-!
-! note that the ratio is set to -1.0 (invalid) when both fer and fdr are very
-! small and the ratio values are often strange (??) at topmost layer
-!-----------------------------------------------------------------------------
-
-   integer,  intent(in)    :: icol              ! index of column
-   integer,  intent(in)    :: maxg(pcols)       ! Index of cloud bot for each column
-   integer,  intent(in)    :: jt(pcols)         ! Index of cloud top for each column
-   integer,  intent(in)    :: maxg_init         ! initial maxg at icol
-   real(r8), intent(in)    :: dpdry(pcols,pver) ! layer delta-p-dry [mb]
-   real(r8), intent(in)    :: mu(pcols,pver)    ! Updraft mass flux (positive) [mb/s]
-   real(r8), intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio
-   real(r8), intent(out)   :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
-   real(r8), intent(out)   :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
-
-   integer              :: kk
-   real(r8)             :: tmp_ratio            ! sh_e_ed_ratio(icol,kk) [fraction]
-   real(r8)             :: tmp_mu_rate          ! ent/det rate from mu/dpdry [1/s]
-
-   ! initiate variables
-   du(:,:) = 0.0_r8
-   eu(:,:) = 0.0_r8
-
-   do kk = jt(icol), maxg(icol)
-      if (kk < pver) then
-         tmp_mu_rate = (mu(icol,kk) - mu(icol,kk+1))/dpdry(icol,kk)
-      else
-         tmp_mu_rate = mu(icol,kk)/dpdry(icol,kk)
-      endif
-      tmp_ratio = sh_e_ed_ratio(icol,kk)
-
-      if (tmp_ratio < -1.0e-5_r8) then ! do ent only or det only
-         if (tmp_mu_rate >= 0.0_r8) then
-            eu(icol,kk) = tmp_mu_rate  ! net entrainment
-         else
-            du(icol,kk) = -tmp_mu_rate ! net detrainment
-         endif
-
-      else   ! do both ent and det
-         if (tmp_mu_rate >= 0.0_r8) then
-            ! net entrainment
-            if (kk >= maxg_init .or. tmp_ratio < 0.0_r8) then
-               ! layers at/below initial maxg (cloud base), or sh_e_ed_ratio is invalid
-               eu(icol,kk) = tmp_mu_rate
-            else
-               tmp_ratio = max( tmp_ratio, 0.571_r8 ) ! not sure why 0.571 is used
-               eu(icol,kk) = tmp_mu_rate*(tmp_ratio/(2.0_r8*tmp_ratio - 1.0_r8))
-               du(icol,kk) = eu(icol,kk) - tmp_mu_rate
-            endif
-         else
-            ! net detrainment
-            if (kk <= jt(icol) .or. tmp_ratio < 0.0_r8) then
-               ! layers at/above jt (cloud top), or sh_e_ed_ratio is invalid
-               du(icol,kk) = - tmp_mu_rate
-            else
-               tmp_ratio = min( tmp_ratio, 0.429_r8 )
-               du(icol,kk) = - tmp_mu_rate*(1.0_r8 - tmp_ratio)/(1.0_r8 - 2.0_r8*tmp_ratio)
-               eu(icol,kk) = du(icol,kk) + tmp_mu_rate
-            endif
-         endif
-      endif
-
-   enddo ! kk
-
-end subroutine calculate_ent_det
 
 !=========================================================================================
 subroutine ma_convproc_tend(                                         &
