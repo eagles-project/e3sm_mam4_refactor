@@ -1037,7 +1037,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
          endif
 
          ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
-! BJG         km1     = max0(kk-1, top_lev)
          ekkm(kk) = zn(kk)*ekk(kk-1)*zs(km1)
          tinv   = ekkp(kk) + ekkm(kk)
 
@@ -1065,23 +1064,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
          nsubmix_bnd = nsubmix
       endif
       dtmix = dtmicro/nsubmix
-
-! BJG      do kk = top_lev, pver
-! BJG         kp1 = min(kk+1, pver)
-! BJG         km1 = max(kk-1, top_lev)
-         ! maximum overlap assumption
-! BJG         if (cldn_col(kp1) > 1.e-10_r8) then
-! BJG            overlapp(kk) = min(cldn_col(kk)/cldn_col(kp1), 1._r8)
-! BJG         else
-! BJG            overlapp(kk) = 1._r8
-! BJG         endif
-! BJG         if (cldn_col(km1) > 1.e-10_r8) then
-! BJG            overlapm(kk) = min(cldn_col(kk)/cldn_col(km1), 1._r8)
-! BJG         else
-! BJG            overlapm(kk) = 1._r8
-! BJG         endif
-! BJG      enddo
-
 
       ! rce-comment
       !    the activation source(k) = mact(k,m)*raercol(kp1,lmass)
