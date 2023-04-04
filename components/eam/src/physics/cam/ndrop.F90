@@ -110,22 +110,8 @@ subroutine ndrop_init
    character(len=8)    :: unit
    logical :: history_amwg         ! output the variables used by the AMWG diag package
    logical :: history_verbose      ! produce verbose history output
-   real(r8) :: arg        ! argument for erf test [dimensionless]
-
 
    !-------------------------------------------------------------------------------
-
-   arg = 1.0_r8
-   if (abs(0.8427_r8 - erf(arg))/0.8427_r8 > 0.001_r8) then
-      write(iulog,*) 'erf(1.0) = ',ERF(arg)
-      call endrun('ndrop_init: Error function error')
-   endif
-   arg = 0.0_r8
-   if (erf(arg) /= 0.0_r8) then
-      write(iulog,*) 'erf(0.0) = ',erf(arg)
-      write(iulog,*) 'ndrop_init: Error function error'
-      call endrun('ndrop_init: Error function error')
-   endif
 
    ! get indices into state%q and pbuf structures
    call cnst_get_ind('NUMLIQ', numliq_idx)
@@ -631,15 +617,14 @@ subroutine get_activate_frac(state_q_kload, cs_kload, cs_kk, wtke, tair, & !in
   ! local arguments
 
   integer  :: phase                 ! phase of aerosol
-  real(r8) :: wmax       ! vertical velocity upper bound [m/s]
   integer  :: imode       ! mode index
   real(r8) :: naermod(ntot_amode)  ! aerosol number concentration [#/m^3]
   real(r8) :: hygro(ntot_amode)    ! hygroscopicity of aerosol mode [dimensionless]
   real(r8) :: vaerosol(ntot_amode) ! aerosol volume conc [m^3/m^3]
   real(r8) :: na, va, hy   ! naermod, vaerosol, hygro at level k_act
 
+  real(r8), parameter :: wmax = 10._r8    ! vertical velocity upper bound [m/s]
 
-  wmax  = 10._r8
 
   ! load aerosol properties, assuming external mixtures
 
@@ -1282,6 +1267,9 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
 
   !local
   real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure [Pa]
+  real(r8), parameter :: smallest_val = 1.e-39_r8
+  real(r8), parameter :: smaller_val = 1.e-20_r8
+  real(r8), parameter :: small_val = 1.e-10_r8
   real(r8) pres ! pressure [Pa]
   real(r8) diff0 ! vapor diffusivity [m2/s]
   real(r8) conduct0 ! thermal conductivity [J / (m-s-K)]
@@ -1314,7 +1302,7 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
   flux_fullact=0._r8
 
   !return if aerosol number is negligible in the accumulation mode
-  if(na(1) < 1.e-20_r8)return
+  if(na(1) < smaller_val)return
 
   !return if vertical velocity is 0 or negative
   if(w_in <= 0._r8)return
@@ -1345,7 +1333,7 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
 
   !Here compute smc, eta for all modes for maxsat calculation
   do imode=1,nmode
-     if(volume(imode) > 1.e-39_r8 .and. na(imode) > 1.e-39_r8)then
+     if(volume(imode) > smallest_val .and. na(imode) > smallest_val)then
         !number mode radius (m)
         amcube(imode)=(3._r8*volume(imode)/(4._r8*pi*exp45logsig(imode)*na(imode)))  ! only if variable size dist
         !Growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
@@ -1354,7 +1342,7 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
         !for approriate size to use for effective diffusivity.
 
         etafactor2(imode)=1._r8/(na(imode)*beta*sqrt(gthermfac))
-        if(hygro(imode) > 1.e-10_r8)then
+        if(hygro(imode) > small_val)then
            smc(imode)=2._r8*aten*sqrt(aten/(27._r8*hygro(imode)*amcube(imode))) ! only if variable size dist
         else
            smc(imode)=100._r8
@@ -1406,6 +1394,7 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
    integer  :: m  ! mode index
    real(r8) :: sum, g1, g2
+   real(r8), parameter :: smaller_val = 1.e-20_r8
    logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
 
 
@@ -1413,7 +1402,7 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    do m=1, nmode
       if(zeta > 1.e5_r8*eta(m).or.smc(m)*smc(m) > 1.e5_r8*eta(m))then
          !weak forcing. essentially none activated
-         smax=1.e-20_r8
+         smax=smaller_val
       else
          !significant activation of this mode. calc activation of all modes.
          weak_forcing = .false.
@@ -1426,7 +1415,7 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
 
    sum=0
    do m=1,nmode
-      if(eta(m) > 1.e-20_r8)then
+      if(eta(m) > smaller_val)then
          g1 = (zeta/eta(m)) * sqrt(zeta/eta(m))
          g2 = (smc(m)/sqrt(eta(m)+3._r8*zeta)) * sqrt(smc(m)/sqrt(eta(m)+3._r8*zeta))
          sum=sum+(f1(m)*g1+f2(m)*g2)/(smc(m)*smc(m))
@@ -1568,8 +1557,8 @@ subroutine loadaer_1col( &
 
   !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
   if (phase /= 1 .and. phase /=3) then
-     write(iulog,*)'phase=',phase,' in loadaer_1cell'
-     call endrun('phase error in loadaer_1cell')
+     write(iulog,*)'phase=',phase,' in loadaer_1col'
+     call endrun('phase error in loadaer_1col')
   endif
 
   qcldbrn_local(:) = 0._r8
