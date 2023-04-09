@@ -322,6 +322,18 @@ subroutine dropmixnuc( &
    real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number [fraction]
 
    !--------------------Local storage-------------------------------------
+   integer  :: lchnk               ! chunk identifier
+   integer  :: ncol                ! number of columns
+   integer  :: mm                  ! local array index for MAM number, species
+   integer  :: nnew, nsav          ! indices for old, new time levels in substepping
+   integer  :: lptr
+   integer  :: ccn3d_idx   ! index of ccn3d in pbuf
+   integer  :: icol        ! column index
+   integer  :: imode       ! mode index
+   integer  :: kk          ! level index
+   integer  :: lspec      ! species index for given mode
+   integer  :: lsat       !  level of supersaturation
+   integer  :: spc_idx, num_idx  ! species, number indices  
 
    real(r8), parameter :: zkmin = 0.01_r8, zkmax = 100._r8  ! min, max vertical diffusivity [m^2/s]
    real(r8), parameter :: wmixmin = 0.1_r8        ! minimum turbulence vertical velocity [m/s]
@@ -368,19 +380,6 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
-
-   integer  :: lchnk               ! chunk identifier
-   integer  :: ncol                ! number of columns
-   integer  :: mm                  ! local array index for MAM number, species
-   integer  :: nnew, nsav          ! indices for old, new time levels in substepping
-   integer  :: lptr
-   integer  :: ccn3d_idx   ! index of ccn3d in pbuf
-   integer  :: icol        ! column index
-   integer  :: imode       ! mode index
-   integer  :: kk          ! level index
-   integer  :: lspec      ! species index for given mode
-   integer  :: lsat       !  level of supersaturation
-   integer  :: spc_idx, num_idx  ! species, number indices  
 
    !-------------------------------------------------------------------------------
 
@@ -618,19 +617,19 @@ subroutine get_activate_frac(state_q_kload, cs_kload, cs_kk, wtke, tair, & !in
 
   integer  :: phase                 ! phase of aerosol
   integer  :: imode       ! mode index
+
+  real(r8), parameter :: wmax = 10._r8    ! vertical velocity upper bound [m/s]
+
   real(r8) :: naermod(ntot_amode)  ! aerosol number concentration [#/m^3]
   real(r8) :: hygro(ntot_amode)    ! hygroscopicity of aerosol mode [dimensionless]
   real(r8) :: vaerosol(ntot_amode) ! aerosol volume conc [m^3/m^3]
   real(r8) :: na, va, hy   ! naermod, vaerosol, hygro at level k_act
 
-  real(r8), parameter :: wmax = 10._r8    ! vertical velocity upper bound [m/s]
-
-
   ! load aerosol properties, assuming external mixtures
 
   phase = 1 ! interstitial
       do imode = 1, ntot_amode
-         call loadaer_1col( state_q_kload(:), &  ! in
+         call loadaer( state_q_kload(:), &  ! in
             imode, nspec_amode(imode), cs_kload, phase, & ! in
             na, va, hy )   ! out
          naermod(imode)  = na
@@ -638,9 +637,6 @@ subroutine get_activate_frac(state_q_kload, cs_kload, cs_kk, wtke, tair, & !in
          hygro(imode)    = hy
        enddo
 
-      ! rce-comment - use wtke at layer centers for new-cloud activation
-! NOTE: seems wtke = wtke_cen in current code, comment above may no longer apply
-  
 ! Below is to avoid warning about not assigning value to intent(out)
 !  the assignment should have no affect because flux_fullact is intent(out)
 !  in activate_modal (and in that subroutine is initialized to zero anyway).
@@ -677,21 +673,22 @@ subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
    real(r8), intent(inout) :: factnum_col_out(:,:)  ! activation fraction for aerosol number [fraction]
 
 
-!  local variables
+   !  local variables
+   integer  :: imode           ! mode counter variable
+   integer  :: lspec           ! species counter variable
+   integer  :: mm              ! local array index for MAM number, species
+   integer  :: kk              ! vertical level index
+   integer  :: num_idx         ! number index
+   integer  :: spc_idx         ! species index
 
    real(r8), parameter :: grow_cld_thresh = 0.01_r8   !  threshold cloud fraction growth [fraction] 
+
    real(r8) :: delt_cld        ! new - old cloud fraction [fraction]
-   real(r8) :: frac_delt_cld        ! fractional change in cloud fraction [fraction]
-   real(r8) :: fm_delt_cld        ! fm change from fractional change in cloud fraction [fraction]
-   integer  :: imode       ! mode counter variable
-   integer  :: lspec       ! species counter variable
-   integer  :: mm                  ! local array index for MAM number, species
-   integer  :: kk
+   real(r8) :: frac_delt_cld   ! fractional change in cloud fraction [fraction]
+   real(r8) :: fm_delt_cld     ! fm change from fractional change in cloud fraction [fraction]
    real(r8) :: dact             ! cloud-borne aerosol tendency due to cloud frac tendency [#/kg or kg/kg]
    real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
    real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
-   integer  :: num_idx  ! number index
-   integer  :: spc_idx  ! species index
    real(r8) :: flux_fullact ! flux of activated aerosol fraction assuming 100% activation [m/s]
    real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
    real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
@@ -798,18 +795,18 @@ subroutine update_from_cldn_profile(cldn_col_in,dtinv,wtke_col_in,zs,dz,  &  ! i
 
    ! local arguments
 
-   integer :: kk
-   integer :: kp1
-   integer  :: imode       ! mode counter variable
-   integer  :: lspec       ! species counter variable
-   integer  :: mm               ! local array index for MAM number, species
+   integer :: kk         ! vertical level index
+   integer :: kp1        ! bounded vertical level index + 1
+   integer :: imode      ! mode counter variable
+   integer :: lspec      ! species counter variable
+   integer :: mm         ! local array index for MAM number, species
+
    real(r8), parameter :: cld_thresh = 0.01_r8   !  threshold cloud fraction [fraction] 
+
    real(r8) :: delz_cld        ! vertical change in cloud raction [fraction]
    real(r8) :: crdz            ! conversion factor from flux to rate [m^{-1}]
    real(r8) :: fn(ntot_amode)              ! activation fraction for aerosol number [fraction]
    real(r8) :: fm(ntot_amode)              ! activation fraction for aerosol mass [fraction]
-   integer  :: num_idx  ! number index
-   integer  :: spc_idx  ! species index
    real(r8) :: flux_fullact(pver) ! flux of activated aerosol fraction assuming 100% activation [m/s]
    real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
    real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
@@ -947,7 +944,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
          nact,mact,qcld,raercol,raercol_cw,nsav,nnew)   ! inout
 
    ! input arguments
-
    real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
    real(r8), intent(in) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
    real(r8), intent(in) :: cldn_col(:)   ! cloud fraction [fraction]
@@ -955,7 +951,7 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
    real(r8), intent(in) :: zs(:)            ! inverse of distance between levels [m^-1]
    real(r8), intent(in) :: ekd(:)     ! diffusivity for droplets [m^2/s]
 
-
+   ! in/out arguments
    real(r8), intent(inout) :: nact(:,:)  ! fractional aero. number  activation rate [/s]
    real(r8), intent(inout) :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
    real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
@@ -964,8 +960,18 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
    integer, intent(inout) :: nnew, nsav   ! indices for old, new time levels in substepping
 
    ! local arguments
+   integer :: kk           ! vertical level index
+   integer :: kp1          ! kk+1
+   integer :: km1          ! kk-1
+   integer  :: imode       ! mode counter variable
+   integer  :: mm          ! local array index for MAM number, species
+   integer  :: lspec       ! species counter variable
+   integer  :: nsubmix, nsubmix_bnd  ! number of substeps and bound
+   integer  :: ntemp   ! temporary index for substepping
+   integer  :: isub       ! substep index
 
    real(r8), parameter :: overlap_cld_thresh = 1.e-10_r8   !  threshold cloud fraction to compute overlap [fraction] 
+
    real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
    real(r8) :: dtmin      ! time step to determine subloop time step [s]
    real(r8) :: qncld(pver)     ! updated cloud droplet number mixing ratio [#/kg]
@@ -979,16 +985,6 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
    real(r8) :: dtmix    ! timescale for subloop [s] 
    real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
    real(r8) :: srcn(pver)       ! droplet source rate [/s] 
-
-   integer :: kk           ! vertical level index
-   integer :: kp1          ! kk+1
-   integer :: km1          ! kk-1
-   integer  :: imode       ! mode counter variable
-   integer  :: mm          ! local array index for MAM number, species
-   integer  :: lspec       ! species counter variable
-   integer  :: nsubmix, nsubmix_bnd  ! number of substeps and bound
-   integer  :: ntemp   ! temporary index for substepping
-   integer  :: isub       ! substep index
 
       ! load new droplets in layers above, below clouds
 
@@ -1064,6 +1060,14 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
       enddo
 
       ! old_cloud_nsubmix_loop
+   
+      !  Note:  each pass in submix loop stores updated aerosol values at index nnew,
+      !  current values at index nsav.  At the start of each pass, nnew values are
+      !  copied to nsav.  However, this is accomplished by switching the values
+      !  of nsav and nnew rather than a physical copying.  At end of loop nnew stores
+      !  index of most recent updated values (either 1 or 2).
+
+
       do isub = 1, nsubmix
          qncld(:) = qcld(:)
          ! after first pass, switch nsav, nnew so that nsav is the recently updated aerosol
@@ -1078,6 +1082,7 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
             mm = mam_idx(imode,0)
 
             ! update droplet source
+
             ! rce-comment- activation source in layer k involves particles from k+1
             !	       srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
             srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
@@ -1092,6 +1097,8 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
             srcn, ekkp, ekkm, overlapp,  &   ! in
             overlapm, qncld,  &  ! in
             dtmix, .false.)   ! in
+
+         ! update aerosol number 
 
          ! rce-comment
          !    the interstitial particle mixratio is different in clear/cloudy portions
@@ -1121,6 +1128,8 @@ subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
                overlapm, raercol(:,mm,nsav),  &  ! in
                dtmix, .true., &  ! in
                raercol_cw(:,mm,nsav))  ! optional in
+
+         ! update aerosol species mass
 
             do lspec = 1, nspec_amode(imode)
                mm = mam_idx(imode,lspec)
@@ -1182,8 +1191,10 @@ subroutine explmix( q, &  ! out
    !  explicit integration of droplet/aerosol mixing
    !     with source due to activation/nucleation
 
+! output arguments
    real(r8), intent(out) :: q(pver) ! number / mass mixing ratio to be updated [# or kg / kg]
 
+! input arguments
    real(r8), intent(in) :: qold(pver) ! number / mass mixing ratio from previous time step [# or kg / kg]
    real(r8), intent(in) :: src(pver) ! source due to activation/nucleation [# or kg / (kg-s)]
    real(r8), intent(in) :: ekkp(pver) ! zn*zs*density*diffusivity (kg/m3 m2/s) at interface [/s]
@@ -1199,25 +1210,29 @@ subroutine explmix( q, &  ! out
    ! *** this should only be present
    !     if the current species is unactivated number/sfc/mass
 
-   integer k,kp1,km1
+! local arguments
+
+   integer kk   !  vertical level index  
+   integer kp1  !  bounded vertical level index plus 1
+   integer km1  !  bounded vertical level index minus 1
 
       !     the qactold*(1-overlap) terms are resuspension of activated material
-      do k=top_lev,pver
-         kp1=min(k+1,pver)
-         km1=max(k-1,top_lev)
+      do kk=top_lev,pver
+         kp1=min(kk+1,pver)
+         km1=max(kk-1,top_lev)
 
          if ( is_unact ) then
-            q(k) = qold(k) + dt*( - src(k) + ekkp(k)*(qold(kp1) - qold(k) +       &
-               qactold(kp1)*(1.0_r8-overlapp(k)))               &
-               + ekkm(k)*(qold(km1) - qold(k) +     &
-               qactold(km1)*(1.0_r8-overlapm(k))) )
+            q(kk) = qold(kk) + dt*( - src(kk) + ekkp(kk)*(qold(kp1) - qold(kk) +       &
+               qactold(kp1)*(1.0_r8-overlapp(kk)))               &
+               + ekkm(kk)*(qold(km1) - qold(kk) +     &
+               qactold(km1)*(1.0_r8-overlapm(kk))) )
          else
-            q(k) = qold(k) + dt*(src(k) + ekkp(k)*(overlapp(k)*qold(kp1)-qold(k)) +      &
-               ekkm(k)*(overlapm(k)*qold(km1)-qold(k)) )
+            q(kk) = qold(kk) + dt*(src(kk) + ekkp(kk)*(overlapp(kk)*qold(kp1)-qold(kk)) +      &
+               ekkm(kk)*(overlapm(kk)*qold(km1)-qold(kk)) )
          endif
 
          !        force to non-negative
-         q(k)=max(q(k),0._r8)
+         q(kk)=max(q(kk),0._r8)
       enddo
 
 end subroutine explmix
@@ -1266,6 +1281,8 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
   real(r8), optional :: smax_prescribed  ! prescribed max. supersaturation for secondary activation [fraction]
 
   !local
+  integer imode  !  mode index
+
   real(r8), parameter :: p0 = 1013.25e2_r8    ! reference pressure [Pa]
   real(r8), parameter :: smallest_val = 1.e-39_r8
   real(r8), parameter :: smaller_val = 1.e-20_r8
@@ -1292,7 +1309,7 @@ subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
   real(r8) arg_erf_n,arg_erf_m  ! [unitless]
   real(r8) etafactor1  ! [/ s^(3/2)]
   real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
-  integer imode
+
 
   !initialize activated aerosols and their fluxes to zero for all the modes
   fn(:)=0._r8
@@ -1387,16 +1404,23 @@ subroutine maxsat(zeta,eta,nmode,smc,smax)
    !      Abdul-Razzak and Ghan, A parameterization of aerosol activation.
    !      2. Multiple aerosol types. J. Geophys. Res., 105, 6837-6844.
 
+! input arguments
    integer,  intent(in)  :: nmode ! number of modes
    real(r8), intent(in)  :: smc(nmode) ! critical supersaturation for number mode radius [fraction]
    real(r8), intent(in)  :: zeta ! [dimensionless]
    real(r8), intent(in)  :: eta(nmode) ! [dimensionless]
-   real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
-   integer  :: m  ! mode index
-   real(r8) :: sum, g1, g2
-   real(r8), parameter :: smaller_val = 1.e-20_r8
-   logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
 
+! output arguments
+   real(r8), intent(out) :: smax ! maximum supersaturation [fraction]
+
+! local arguments
+   integer  :: m  ! mode index
+
+   real(r8), parameter :: smaller_val = 1.e-20_r8
+
+   real(r8) :: sum, g1, g2
+
+   logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
 
    weak_forcing = .true.
    do m=1, nmode
@@ -1448,8 +1472,6 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat [#/m3]
 
    ! local
-
-
    real(r8) :: naerosol(pcols) ! interstit+activated aerosol number conc [#/m3]
    real(r8) :: vaerosol(pcols) ! interstit+activated aerosol volume conc [m3/m3]
    real(r8) :: amcube(pcols)  ! [m3]
@@ -1465,17 +1487,16 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
    integer phase ! phase of aerosol
 
    !     mathematical constants
-   real(r8) percent_to_fraction, per_m3_to_per_cm3
-   real(r8) smcoefcoef
+   real(r8), parameter ::  percent_to_fraction = 0.01_r8
+   real(r8), parameter ::  per_m3_to_per_cm3 = 1.e-6_r8
+   real(r8), parameter ::  smcoefcoef=2._r8/sqrt(27._r8)
+
    real(r8) super(psat) ! supersaturation [fraction]
    !-------------------------------------------------------------------------------
 
    phase=3 ! interstitial+cloudborne
 
-   percent_to_fraction = 0.01_r8
-   per_m3_to_per_cm3 = 1.e-6_r8
    super(:)=supersat(:)*percent_to_fraction
-   smcoefcoef=2._r8/sqrt(27._r8)
 
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
 
@@ -1489,7 +1510,7 @@ subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
       do kk=top_lev,pver
 
          do icol = 1, ncol
-            call loadaer_1col( state_q(icol,kk,:), &  ! in
+            call loadaer( state_q(icol,kk,:), &  ! in
                imode, nspec_amode(imode), cs(icol,kk), phase, &  ! in
                naerosol(icol), vaerosol(icol), hygro(icol), &  ! out
                qcldbrn(icol,:,kk,imode), qcldbrn_num(icol,kk,imode) )  ! optional in
@@ -1522,7 +1543,7 @@ end subroutine ccncalc
 
 !===============================================================================
 
-subroutine loadaer_1col( &
+subroutine loadaer( &
      state_q, imode, nspec, cs, phase, &   ! in
      naerosol, vaerosol, hygro, &  ! out
      qcldbrn1d, qcldbrn1d_num) ! optional in
@@ -1531,7 +1552,6 @@ subroutine loadaer_1col( &
 
   ! input arguments
   real(r8), intent(in) :: state_q(:)        ! aerosol mmrs [kg/kg]
-
   integer,  intent(in) :: imode       ! mode index
   integer,  intent(in) :: nspec       ! total # of species in mode imode
   real(r8), intent(in) :: cs          ! air density [kg/m3]
@@ -1546,19 +1566,18 @@ subroutine loadaer_1col( &
   real(r8), intent(in), optional  :: qcldbrn1d(:), qcldbrn1d_num ! ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
 
   ! internal
-
   real(r8) :: vaerosolsum  ! sum to find volume conc [m3/kg]
   real(r8) :: hygrosum     ! sum to bulk hygroscopicity of mode [m3/kg]
   real(r8) :: qcldbrn_local(nspec)  ! local cloud-borne aerosol mass mixing ratios [kg/kg]
   real(r8) :: qcldbrn_num_local ! local cloud-borne aerosol number mixing ratios [#/kg]
 
-  integer  :: lspec, spc_idx
+
   !-------------------------------------------------------------------------------
 
   !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
   if (phase /= 1 .and. phase /=3) then
-     write(iulog,*)'phase=',phase,' in loadaer_1col'
-     call endrun('phase error in loadaer_1col')
+     write(iulog,*)'phase=',phase,' in loadaer'
+     call endrun('phase error in loadaer')
   endif
 
   qcldbrn_local(:) = 0._r8
@@ -1573,7 +1592,7 @@ subroutine loadaer_1col( &
 !  Assumes iphase =1 or 3, so interstitial is always summed, added with cldbrn when present
 !  iphase = 2 would require alternate logic from following subroutine
 
-  call get_aer_mmr_sum_1col(imode, nspec, state_q(:), qcldbrn_local(:nspec), & !in
+  call get_aer_mmr_sum(imode, nspec, state_q(:), qcldbrn_local(:nspec), & !in
           vaerosolsum, hygrosum)    !inout
 
   !  Finalize computation of bulk hygrospopicity and volume conc
@@ -1586,19 +1605,17 @@ subroutine loadaer_1col( &
         vaerosol = 0.0_r8
      endif
 
-
-
   qcldbrn_num_local = 0._r8
   if(present(qcldbrn1d_num)) qcldbrn_num_local = qcldbrn1d_num
 
   ! Compute aerosol number concentration
-  call get_aer_num_1col(imode, state_q(:), cs, vaerosol, qcldbrn_num_local, &!in
+  call get_aer_num(imode, state_q(:), cs, vaerosol, qcldbrn_num_local, &!in
           naerosol) !out
 
-end subroutine loadaer_1col
+end subroutine loadaer
 !===============================================================================
 
-subroutine get_aer_mmr_sum_1col(imode, nspec, state_q, qcldbrn1d, & !in
+subroutine get_aer_mmr_sum(imode, nspec, state_q, qcldbrn1d, & !in
      vaerosolsum, hygrosum)   !inout
 
   ! input arguments
@@ -1629,11 +1646,11 @@ subroutine get_aer_mmr_sum_1col(imode, nspec, state_q, qcldbrn1d, & !in
       hygrosum    = hygrosum + vol*hygro_sp !bulk hygroscopicity
    enddo
 
-end subroutine get_aer_mmr_sum_1col
+end subroutine get_aer_mmr_sum
 
 !===============================================================================
 
-subroutine get_aer_num_1col(imode, state_q, cs, vaerosol, qcldbrn1d_num, &!in
+subroutine get_aer_num(imode, state_q, cs, vaerosol, qcldbrn1d_num, &!in
            naerosol) !out
 
   use mam_support, only: min_max_bound
@@ -1659,7 +1676,7 @@ subroutine get_aer_num_1col(imode, state_q, cs, vaerosol, qcldbrn1d_num, &!in
      !adjust number so that dgnumlo < dgnum < dgnumhi
   naerosol = min_max_bound(vaerosol*voltonumbhi_amode(imode),vaerosol*voltonumblo_amode(imode),naerosol)
 
-end subroutine get_aer_num_1col
+end subroutine get_aer_num
 
 !===============================================================================
 
