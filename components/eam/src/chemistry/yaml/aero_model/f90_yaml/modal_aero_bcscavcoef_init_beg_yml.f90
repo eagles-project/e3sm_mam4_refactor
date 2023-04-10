@@ -64,7 +64,7 @@
         !< add code for writing data here>
         call write_1d_var(unit_input, unit_output, 'dgnum_amode',ntot_amode, dgnum_amode)!write a single variable
         call write_1d_var(unit_input, unit_output, 'sigmag_amode',ntot_amode,sigmag_amode)
-        call write_1d_var(unit_input, unit_output, 'specdens_amode',ntot_amode, specdens_amode)
+        call write_1d_var(unit_input, unit_output, 'specdens_amode',size(specdens_amode,1), specdens_amode)
         call write_2d_var(unit_input, unit_output, 'lspectype_amode', size(lspectype_amode,1),ntot_amode, lspectype_amode)
         !call write_1d_var(unit_input, unit_output, fld_name,dim,field) ! writes 1D variables of any dimension
         !call write_2d_var(unit_input, unit_output, fld_name, dim1, dim2, field) ! writes 2D variables of any dimension: field(dim1,dim2)
