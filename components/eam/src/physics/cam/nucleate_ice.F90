@@ -1,5 +1,5 @@
 module nucleate_ice
-
+#include "../yaml/common_files/common_uses.ymlf90"
 !-------------------------------------------------------------------------------
 ! Purpose:
 !  A parameterization of ice nucleation.
@@ -133,6 +133,7 @@ subroutine nucleati(  &
    real(r8) :: regm                      ! air temperature [C]              
 
    real(r8), parameter :: num_threshold = 1.0e-10_r8
+#include "../yaml/nucleate_ice/f90_yaml/nucleati_beg_yml.f90"
    !-------------------------------------------------------------------------------
 
    ni = 0._r8
@@ -222,7 +223,7 @@ subroutine nucleati(  &
    onidep = nidep*1.e+6_r8/rhoair
    oniimm = niimm*1.e+6_r8/rhoair
    onihf  = nihf*1.e+6_r8/rhoair
-
+#include "../yaml/nucleate_ice/f90_yaml/nucleati_end_yml.f90"
 end subroutine nucleati
 
 !===============================================================================
@@ -258,6 +259,7 @@ subroutine hetero(Temperature,w_vlc,Ns,Nis,Nid)
 !---------------------------------------------------------------------
    
    real(r8) lnNs, lnw, B_coef, C_coef
+#include "../yaml/nucleate_ice/f90_yaml/hetero_beg_yml.f90"
 
    lnNs = log(Ns)
    lnw  = log(w_vlc)
@@ -271,7 +273,7 @@ subroutine hetero(Temperature,w_vlc,Ns,Nis,Nid)
    Nis = min(Nis,Ns)
 
    Nid = 0.0_r8    ! don't include deposition nucleation for cirrus clouds when T<-37C
-
+#include "../yaml/nucleate_ice/f90_yaml/hetero_end_yml.f90"
 end subroutine hetero
 
 !===============================================================================
@@ -315,6 +317,7 @@ subroutine hf(Temperature, w_vlc, RH, Na, Ni)
 !---------------------------------------------------------------------
       real(r8) A2_fast, B2_fast, B4_slow
       real(r8) lnw, regm, RHw 
+#include "../yaml/nucleate_ice/f90_yaml/hf_beg_yml.f90"
 
       lnw = log(w_vlc)
       Ni = 0.0_r8
@@ -346,7 +349,7 @@ subroutine hf(Temperature, w_vlc, RH, Na, Ni)
         endif
 
       endif
-
+#include "../yaml/nucleate_ice/f90_yaml/hf_end_yml.f90"
 end subroutine hf
 
 !===============================================================================

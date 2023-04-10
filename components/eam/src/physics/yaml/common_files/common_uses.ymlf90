@@ -1,0 +1,25 @@
+!uncomment "#define YAML_*" line below to invoke test generation for a module
+use spmd_utils,   only : masterproc
+!module_aer_calcsize
+!#define YAML_CALC
+
+!module_aero_amicphys.F90
+!#define YAML_AMIC
+
+!module_aero_rename.F90
+!#define YAML_RENAME
+
+! module_wetdep.F90
+!#define YAML_WETDEP
+
+! modal_aero_wateruptake.F90
+! #define YAML_WUPTAKE
+
+! module_aero_coag.F90
+!#define YAML_COAG
+
+! nucleate_ice_cam.F90, nucleate_ice.F90
+!#define YAML_NUCICE
+
+use yaml_input_file_io
+
