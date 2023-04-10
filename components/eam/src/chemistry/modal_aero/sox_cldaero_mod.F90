@@ -360,7 +360,7 @@ contains
   !=============================================================================
   subroutine update_tmr ( tmr, dqdt, dtime )
     !-----------------------------------------------------------------------
-    ! basically it just makes sure the value is greater than zero
+    ! update tracer mixing ratio by adding tendencies
     !-----------------------------------------------------------------------
     real(r8), intent(inout) :: tmr   ! tracer mixing ratio [vmr]
     real(r8), intent(in)    :: dqdt  ! tmr tendency [vmr/s]
