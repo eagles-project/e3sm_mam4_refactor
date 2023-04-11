@@ -2641,7 +2641,7 @@ end if
 
          ! Aerosol wet removal (including aerosol water uptake)
          call aero_model_wetdep( ztodt, dlf, dlf2, cmfmc2, state,  & ! inputs
-                sh_e_ed_ratio, mu, md, du, eu, ed, dp, dsubcld,    &
+                sh_e_ed_ratio, mu, md, du, eu, ed, dp,             &
                 jt, maxg, ideep, lengath, species_class,           &
                 cam_out, pbuf, ptend )                               ! outputs
          call physics_update(state, ptend, ztodt, tend)
