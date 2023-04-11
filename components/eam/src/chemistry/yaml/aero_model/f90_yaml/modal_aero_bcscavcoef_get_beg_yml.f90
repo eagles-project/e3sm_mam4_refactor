@@ -64,14 +64,14 @@
         !< add code for writing data here>
         call write_var(unit_input, unit_output, 'imode', imode) !write a single variable
         call write_var(unit_input, unit_output, 'ncol', ncol)
-        if (isprx(yaml%col_print, yaml%lev_print)) then
-                logic_int = 1
-        else
-                logic_int = 0
-        endif
-        call write_var(unit_input, unit_output, 'isprx', logic_int)
-!        call write_var(unit_input, unit_output, 'isprx', isprx(yaml%col_print, yaml%lev_print))
-        call write_1d_var(unit_input, unit_output, 'dgn_awet', ntot_amode, dgn_awet(yaml%col_print, yaml%lev_print,:))
+!        if (isprx(yaml%col_print, yaml%lev_print)) then
+!                logic_int = 1
+!        else
+!                logic_int = 0
+!        endif
+!        call write_var(unit_input, unit_output, 'isprx', logic_int)
+        call write_1d_var(unit_input, unit_output, 'isprx', pcols, isprx(:, yaml%lev_print))
+        call write_2d_var(unit_input, unit_output, 'dgn_awet', pcols, ntot_amode, dgn_awet(:, yaml%lev_print,:))
         call write_1d_var(unit_input, unit_output, 'dgnum_amode', ntot_amode, dgnum_amode)
         call write_2d_var(unit_input, unit_output, 'scavimptblnum', size(scavimptblnum,1), ntot_amode, scavimptblnum)
         call write_2d_var(unit_input, unit_output, 'scavimptblvol', size(scavimptblvol,1), ntot_amode, scavimptblvol)

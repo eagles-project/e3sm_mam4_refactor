@@ -7,8 +7,8 @@
 
      !start writing data
      !<add code for writing data here>
-     call write_output_var(unit_output, 'scavcoefnum', scavcoefnum(yaml%col_print, yaml%lev_print))
-     call write_output_var(unit_output, 'scavcoefvol', scavcoefvol(yaml%col_print, yaml%lev_print))  !write a single output variable
+     call write_1d_output_var(unit_output, 'scavcoefnum',pcols, scavcoefnum(:, yaml%lev_print))
+     call write_1d_output_var(unit_output, 'scavcoefvol',pcols, scavcoefvol(:, yaml%lev_print))  !write a single output variable
      !call write_1d_output_var(unit_output, fld_name, dim, field, inp_out_str) !writes 1D variables of any dimension in the output python module
      !call write_2d_output_var(unit_output, fld_name, dim1, dim2, field, inp_out_str) !writes 2D variables of any dimension in the output python module
 

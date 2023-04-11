@@ -390,6 +390,7 @@ contains
   subroutine write_aerosol_mmr_from_stateq_logical(unit_input, unit_output, fld_name,field,aer_num_only)
     !------------------------------------------------------------------
     !Purpose: write interstitial aerosols mmr from state%q or q vector
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -406,8 +407,8 @@ contains
 
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,L10)
+10  format(I10)
+11  format(A,I10)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
     !In MAM4,first 15 species are non-aerosols, so we start with 16th species
@@ -415,7 +416,7 @@ contains
     !in the output array
     aer_spec = 16
     if(present(aer_num_only) .and. aer_num_only)aer_spec = 23 !23rd index is the first num aerosol
-    write(unit_input,10,advance="no")field(aer_spec)
+    write(unit_input,10,advance="no") merge(1,0,field(aer_spec))
     aer_spec = aer_spec + 1
 
     do ispec = aer_spec, pcnst
@@ -424,7 +425,7 @@ contains
        if(present(aer_num_only) .and. aer_num_only) mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
 
        if(mass_or_num) then !ignore the aerosol number
-          write(unit_input,11,advance="no")',',field(ispec)
+          write(unit_input,11,advance="no")',', merge(1,0,field(ispec))
        endif
 
     enddo
@@ -439,6 +440,7 @@ contains
   subroutine write_output_aerosol_mmr_from_stateq_logical(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes aerosol mmr for the input and the output yaml file
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -459,7 +461,7 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(L10,A)
+12  format(I10,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -481,7 +483,7 @@ contains
             mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
 
        if(mass_or_num) then !ignore the aerosol number
-          write(unit_output,12,advance="no")field(ispec),','
+          write(unit_output,12,advance="no")merge(1,0,field(ispec)),','
        endif
 
     enddo
@@ -550,6 +552,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a input and output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -561,7 +564,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    write(unit_input,'(3A,L10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
+    write(unit_input,'(3A,I10,A)')'    ',trim(adjustl(fld_name)),': [', merge(1,0,field),']'
 
     call write_output_var_logical(unit_output, fld_name, field, "input")
 
@@ -573,6 +576,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -594,7 +598,7 @@ contains
        object = trim(adjustl(inp_out_str))
     endif
 
-    write(unit_output,'(4A,L10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+    write(unit_output,'(4A,I10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', merge(1,0,field),'],]'
 
   end subroutine write_output_var_logical
 
@@ -924,6 +928,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a 1D input and output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -939,15 +944,15 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,L10)
+10  format(I10)
+11  format(A,I10)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")  merge(1,0,field(1))
 
     do k = 2, dim
-       write(unit_input,11,advance="no")',',field(k)
+       write(unit_input,11,advance="no")',', merge(1,0,field(k))
     enddo
 
     write(unit_input,'(A)')']'
@@ -962,6 +967,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a 1D output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -985,7 +991,7 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(L10,A)
+12  format(I10,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -995,7 +1001,7 @@ contains
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
     do k = 1, dim
-       write(unit_output,12,advance="no"),field(k),','
+       write(unit_output,12,advance="no"), merge(1,0,field(k)),','
     enddo
 
     write(unit_output,'(A)')'],]'
