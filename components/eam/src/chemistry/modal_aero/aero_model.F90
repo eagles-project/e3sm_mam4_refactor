@@ -1691,7 +1691,7 @@ lphase_jnmw_conditional: &
           ! note that the subroutine calc_1_impact_rate uses CGS units
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
-          call calc_1_impact_rate( lunerr, &
+          call calc_1_impact_rate(  &
                dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
                scavratenum, scavratevol )
 
