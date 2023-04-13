@@ -3,6 +3,7 @@
 ! JUly 2015 B.Singh Added unified convection code
 !===============================================================================
 module aero_model
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use constituents,   only: pcnst, cnst_name, cnst_get_ind
   use ppgrid,         only: pcols, pver, pverp
@@ -1661,6 +1662,7 @@ lphase_jnmw_conditional: &
     ! set up temperature-pressure pair to compute impaction scavenging rates
     real(r8), parameter :: temp_0C = 273.16_r8        ! K
     real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
+#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_beg_yml.f90"
     
     modeloop: do imode = 1, ntot_amode
 
@@ -1689,7 +1691,7 @@ lphase_jnmw_conditional: &
           ! note that the subroutine calc_1_impact_rate uses CGS units
           dg0_cgs = dg0*1.0e2_r8   ! m to cm
           rhowetaero_cgs = rhowetaero*1.0e-3_r8   ! kg/m3 to g/cm3
-          call calc_1_impact_rate( &
+          call calc_1_impact_rate( lunerr, &
                dg0_cgs, sigmag, rhowetaero_cgs, temp_0C, press_750hPa, &
                scavratenum, scavratevol )
 
@@ -1698,6 +1700,7 @@ lphase_jnmw_conditional: &
 
        enddo growloop
     enddo modeloop
+#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_end_yml.f90"
     return
 
   end subroutine modal_aero_bcscavcoef_init
@@ -1724,6 +1727,7 @@ lphase_jnmw_conditional: &
     real(r8) :: wetdiaratio             ! ratio of wet and dry aerosol diameter [fraction]
     real(r8) :: xgrow, dumfhi, dumflo   ! working variables
     real(r8) :: scavimpvol, scavimpnum  ! log of scavenging rates for volume and number
+#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_beg_yml.f90"
 
 
     do kk = 1, pver
@@ -1772,6 +1776,7 @@ lphase_jnmw_conditional: &
        enddo
     enddo
 
+#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_end_yml.f90"
     return
   end subroutine modal_aero_bcscavcoef_get
 
@@ -1827,6 +1832,7 @@ lphase_jnmw_conditional: &
    real(r8) :: vfall                    ! rain droplet fall speed [cm/s]
    real(r8) :: ag0, xg0, xg3, xhi, xlo,dx    ! aerosol bin information
    !-----------------------------------------------------------------
+#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_beg_yml.f90"
 
    ! this subroutine is calculated for a fix rainrate of 1 mm/hr
    precip = 1.0_r8/36000._r8        ! 1 mm/hr in cm/s
@@ -1914,6 +1920,7 @@ lphase_jnmw_conditional: &
    scavratenum = scavsumnum*3600._r8
    scavratevol = scavsumvol*3600._r8
 
+#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_end_yml.f90"
    return
   end subroutine calc_1_impact_rate
  
