@@ -683,16 +683,16 @@ contains
 
     ! real part
     write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
-    write(unit_input,10,advance="no") real(field(1))
-    do k = 2, dim
+    write(unit_input,10,advance="no") real(field(lbound(field,1)))
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")', ', real(field(k))
     enddo
     write(unit_input,'(A)')']'
 
     ! imaginary part
     write(unit_input,'(3A)',advance="no")'    imag_',trim(adjustl(fld_name)),': ['
-    write(unit_input,10,advance="no") aimag(field(1))
-    do k = 2, dim
+    write(unit_input,10,advance="no") aimag(field(lbound(field,1)))
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")', ', aimag(field(k))
     enddo
     write(unit_input,'(A)')']'
@@ -726,9 +726,9 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")field(lbound(field,1))
 
-    do k = 2, dim
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")',',field(k)
     enddo
 
@@ -778,14 +778,14 @@ contains
 
     ! real part
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.real_',trim(adjustl(fld_name)),'=[['
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),real(field(k)),', '
     enddo
     write(unit_output,'(A)')'],]'
 
     ! imaginary part
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.imag_',trim(adjustl(fld_name)),'=[['
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),aimag(field(k)),', '
     enddo
     write(unit_output,'(A)')'],]'
@@ -830,7 +830,7 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),field(k),','
     enddo
 
@@ -864,9 +864,9 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")field(lbound(field,1))
 
-    do k = 2, dim
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")',',field(k)
     enddo
 
@@ -914,7 +914,7 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),field(k),','
     enddo
 
@@ -949,9 +949,9 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")  merge(1,0,field(1))
+    write(unit_input,10,advance="no")  merge(1,0,field(lbound(field,1)))
 
-    do k = 2, dim
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")',', merge(1,0,field(k))
     enddo
 
@@ -1000,7 +1000,7 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"), merge(1,0,field(k)),','
     enddo
 
@@ -1037,16 +1037,16 @@ contains
 
     ! For maintaining format in the YAML inout file we have to  print first
     ! element of the array first
-    write(unit_input,10,advance="no")field(1,1)
+    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
 
     !print rest of the column for d2=1
-    d2 = 1
-    do d1 = 2, dim1 !first element is already printed, start from the 2nd
+    d2 = lbound(field,2)
+    do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
        write(unit_input,11,advance="no")',',field(d1,d2)
     enddo
 
-    do d2 = 2, dim2 !First column is already printed, start from the 2nd
-       do d1 = 1, dim1
+    do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_input,11,advance="no")',',field(d1,d2)
        enddo
     enddo
@@ -1096,8 +1096,8 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do d2 = 1, dim2
-       do d1 = 1, dim1
+    do d2 = lbound(field,2), ubound(field,2)
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_output,12,advance="no"),field(d1,d2),','
        enddo
     enddo
@@ -1134,16 +1134,16 @@ contains
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     ! For maintaining format in the YAML inout file we have to  print first element of the array first
-    write(unit_input,10,advance="no")field(1,1)
+    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
 
     !print rest of the column for d2=1
-    d2 = 1
-    do d1 = 2, dim1 !first element is already printed, start from the 2nd
+    d2 = lbound(field,2)
+    do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
        write(unit_input,11,advance="no")',',field(d1,d2)
     enddo
 
-    do d2 = 2, dim2 !First column is already printed, start from the 2nd
-       do d1 = 1, dim1
+    do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_input,11,advance="no")',',field(d1,d2)
        enddo
     enddo
@@ -1192,8 +1192,8 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do d2 = 1, dim2
-       do d1 = 1, dim1
+    do d2 = lbound(field,2), ubound(field,2)
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_output,12,advance="no"),field(d1,d2),','
        enddo
     enddo
