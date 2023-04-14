@@ -59,8 +59,6 @@ integer :: &
    ast_idx = -1
 
 ! modal aerosols
-integer, parameter :: MAM3_nmodes = 3
-integer, parameter :: MAM7_nmodes = 7
 integer, parameter :: MAM4_nmodes = 4
 integer :: nmodes = -1             ! number of aerosol modes
 integer, parameter :: hetfrz_aer_nspec = 3
@@ -428,15 +426,11 @@ subroutine hetfrz_classnuc_cam_init(mincld_in)
    mode_idx(soa_accum) = mode_accum_idx
    spec_idx(ncl_accum) = rad_cnst_get_spec_idx(0, mode_accum_idx, 'seasalt')
    mode_idx(ncl_accum) = mode_accum_idx
-   if (nmodes == MAM3_nmodes .or. nmodes == MAM4_nmodes) then
-      spec_idx(dst_accum) = rad_cnst_get_spec_idx(0, mode_accum_idx, 'dust')
-      mode_idx(dst_accum) = mode_accum_idx
-   end if
-
-#if (defined MODAL_AERO_4MODE_MOM)
+   spec_idx(dst_accum) = rad_cnst_get_spec_idx(0, mode_accum_idx, 'dust')
+   mode_idx(dst_accum) = mode_accum_idx
    spec_idx(mom_accum) = rad_cnst_get_spec_idx(0, mode_accum_idx, 'm-organic')
    mode_idx(mom_accum) = mode_accum_idx
-#endif
+
 
    ! Indices for species in coarse mode (dust, nacl, so4)
    if (mode_coarse_idx > 0) then
@@ -513,9 +507,9 @@ end subroutine hetfrz_classnuc_cam_init
 
 !================================================================================================
 
-subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
-                                     qc, nc, state_q, aer_cb, deltatin, factnum, &
-                                     frzimm, frzcnt, frzdep)
+subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &   !in
+                                     qc, nc, state_q, aer_cb, deltatin, factnum, & !in
+                                     frzimm, frzcnt, frzdep)                       !out
 
    use modal_aero_data,   only: modeptr_accum, modeptr_coarse, modeptr_pcarbon, numptr_amode
    use modal_aero_data,   only: lptr_dust_a_amode, lptr_nacl_a_amode, lptr_so4_a_amode, &

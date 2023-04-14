@@ -116,15 +116,15 @@ end subroutine hetfrz_classnuc_init
 
 !===================================================================================================
 
-subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &
-                                 fn, r3lx, icnlx, &
-                                 hetraer, awcam, awfacm, dstcoat, &
-                                 total_aer_num, coated_aer_num, uncoated_aer_num, &
-                                 total_interstitial_aer_num, total_cloudborne_aer_num, &
-                                 frzbcimm, frzduimm, &
-                                 frzbccnt, frzducnt, &
-                                 frzbcdep, frzdudep, &
-                                 errstring)
+subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &           !in
+                                 fn, r3lx, icnlx, &                                      !in
+                                 hetraer, awcam, awfacm, dstcoat, &                      !in
+                                 total_aer_num, coated_aer_num, uncoated_aer_num, &      !in
+                                 total_interstitial_aer_num, total_cloudborne_aer_num, & !in
+                                 frzbcimm, frzduimm, &                                   !out
+                                 frzbccnt, frzducnt, &                                   !out
+                                 frzbcdep, frzdudep, &                                   !out
+                                 errstring)                                              !out
 
    ! input
    real(r8), intent(in) :: deltat            ! timestep [s]
