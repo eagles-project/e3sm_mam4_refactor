@@ -506,8 +506,7 @@ contains
        nnew = 2
 
        call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
-            nact,mact,qcld,raercol,raercol_cw,nsav,nnew,    &   ! inout
-         lchnk,icol ) ! BJG yaml in           
+            nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
        ! droplet number
 
        ndropcol(icol) = 0._r8
@@ -930,8 +929,8 @@ contains
   !===============================================================================
 
   subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
-       nact,mact,qcld,raercol,raercol_cw,nsav,nnew,  &   ! inout
-         y_lchnk, y_i )  ! BJG yaml in
+       nact,mact,qcld,raercol,raercol_cw,nsav,nnew)  ! inout
+
     ! input arguments
     real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
     real(r8), intent(in) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
@@ -947,7 +946,6 @@ contains
     real(r8), intent(inout) :: raercol(:,:,:)    ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
     real(r8), intent(inout) :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
     integer, intent(inout) :: nnew, nsav   ! indices for old, new time levels in substepping
-    integer, intent(in) :: y_lchnk, y_i  ! BJG yaml in
 
     ! local arguments
     integer :: kk           ! vertical level index
@@ -1086,8 +1084,7 @@ contains
        call explmix(  qcld, &   ! out
             srcn, ekkp, ekkm, overlapp,  &   ! in
             overlapm, qncld,  &  ! in
-            dtmix, .false., &   ! in
-           y_lchnk, y_i,-1)    ! BJG yaml in
+            dtmix, .false. )   ! in
        ! update aerosol number
 
        ! rce-comment
@@ -1111,13 +1108,11 @@ contains
           call explmix( raercol_cw(:,mm,nnew), &  ! out
                source, ekkp, ekkm, overlapp, &   ! in
                overlapm, raercol_cw(:,mm,nsav),   &  ! in
-               dtmix, .false.,  &  ! in
-               y_lchnk, y_i, mm )    ! BJG yaml in
+               dtmix, .false. )  ! in
           call explmix( raercol(:,mm,nnew), &   ! out
                source, ekkp, ekkm, overlapp,  &    ! in
                overlapm, raercol(:,mm,nsav),  &  ! in
                dtmix, .true., &  ! in
-               y_lchnk, y_i, mm, &  ! BJG yaml in
                raercol_cw(:,mm,nsav))  ! optional in
 
           ! update aerosol species mass
@@ -1136,13 +1131,11 @@ contains
              call explmix( raercol_cw(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp, &  ! in
                   overlapm, raercol_cw(:,mm,nsav),    &  ! in
-                  dtmix, .false., &  ! in
-                 y_lchnk, y_i, mm)    ! BJG yaml in
+                  dtmix, .false. )  ! in
              call explmix( raercol(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp,  &  ! in
                   overlapm, raercol(:,mm,nsav),  &   ! in
                   dtmix, .true., & ! in
-                  y_lchnk, y_i, mm, &  ! BJG yaml in
                   raercol_cw(:,mm,nsav))  ! optional in
 
           enddo  ! lspec loop
@@ -1178,7 +1171,6 @@ contains
 
   subroutine explmix( qnew, &  ! out
        src, ekkp, ekkm, overlapp, overlapm, qold, dtmix, is_unact, &  ! in
-       y_lchnk,y_i, y_mm,                                         &  ! BJG yaml in
        qactold )  ! optional in
 
     !  explicit integration of droplet/aerosol mixing
@@ -1208,7 +1200,6 @@ contains
     integer kk   !  vertical level index
     integer kp1  !  bounded vertical level index plus 1
     integer km1  !  bounded vertical level index minus 1
-!BJG for yaml print we need to print vertical column for input, looped below
 
 #include "../../chemistry/yaml/cam_ndrop/f90_yaml/explmix_beg_yml.f90"
 
