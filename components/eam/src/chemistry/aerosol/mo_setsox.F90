@@ -201,6 +201,8 @@ contains
     real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
     real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
     real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
+    real(r8), parameter :: small_value_lwc = 1.e-8_r8 ! small value of LWC [kg/kg]
+    real(r8), parameter :: small_value_cf = 1.e-5_r8  ! small value of cloud fraction [fraction]
 
     !
     real(r8) :: xdelso4hp(ncol,pver)
@@ -209,7 +211,9 @@ contains
 
     integer  :: k, i
     real(r8) :: xk, xe, x2
-    real(r8) :: tz, xl, px
+    real(r8) :: tz      ! temperature at (i,k) [K]
+    real(r8) :: xl      ! LWP at (i,k) [kg/kg]
+    real(r8) :: px      ! temporary variable [unitless] 
     real(r8) :: patm
     real(r8) :: so2g, h2o2g, o3g
     real(r8) :: rah2o2, rao3
@@ -302,7 +306,7 @@ contains
 
           ! cloud liquid water content
           xl = cldconc%xlwc(i,k)
-          if( xl >= 1.e-8_r8 ) then
+          if( xl >= small_value_lwc ) then
  
              call calc_ph_values(               &
                 tfld(i,k), press(i,k), xl,      & ! in
@@ -407,7 +411,7 @@ contains
           !       S(IV) + H2O2 = S(VI)
           !............................
           
-          if (xl >= 1.e-8_r8) then    !! WHEN CLOUD IS PRESENTED          
+          if (xl >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
 
              call calc_sox_aqueous( modal_aerosols,       &
                 rah2o2, h2o2g, so2g, o3g,      rao3,   &
@@ -429,7 +433,7 @@ contains
     xphlwc(:,:) = 0._r8
     do k = 1, pver
        do i = 1, ncol
-          if (cldfrc(i,k)>=1.e-5_r8 .and. lwc(i,k)>=1.e-8_r8) then
+          if (cldfrc(i,k)>=small_value_cf .and. lwc(i,k)>=small_value_lwc) then
              xphlwc(i,k) = -1._r8*log10(xph(i,k)) * lwc(i,k)
           endif
        enddo
