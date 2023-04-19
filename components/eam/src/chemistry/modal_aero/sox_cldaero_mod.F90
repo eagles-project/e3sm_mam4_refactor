@@ -217,7 +217,8 @@ contains
             ! thus we are assuming the cloud drop size is independent of the
             ! associated aerosol mode properties (i.e., drops associated with
             ! Aitken and coarse sea-salt particles are same size)
-            call  compute_aer_factor(qcw(icol,kk,:), loffset, faqgain_so4)
+            call  compute_aer_factor(qcw(icol,kk,:), loffset,   & ! in
+                                     faqgain_so4                ) ! out
 
             uptkrate = cldaero_uptakerate(xlwc(icol,kk), cldnum(icol,kk), &
                         cfact(icol,kk), cldfrc(icol,kk), tfld(icol,kk),  press(icol,kk))
@@ -309,7 +310,8 @@ contains
   end subroutine sox_cldaero_update
 
   !=============================================================================
-  subroutine compute_aer_factor(tmr, loffset, faqgain_so4)
+  subroutine compute_aer_factor(tmr, loffset,   & ! in
+                                faqgain_so4     ) ! out
     !-------------------------------------------------------------------------
     ! compute factors for partitioning aerosol mass gains among modes
     ! the factors are proportional to the activated particle MR for each
