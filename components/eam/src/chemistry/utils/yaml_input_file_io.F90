@@ -76,6 +76,16 @@ module yaml_input_file_io
      module procedure write_1d_output_var_logical
   end interface write_1d_output_var
 
+  interface write_2d_var
+     module procedure write_2d_var_real
+     module procedure write_2d_var_int
+  end interface write_2d_var
+
+  interface write_2d_output_var
+     module procedure write_2d_output_var_real
+     module procedure write_2d_output_var_int
+  end interface write_2d_output_var
+
   interface write_aerosol_mmr_from_stateq
      module procedure write_aerosol_mmr_from_stateq_real
      module procedure write_aerosol_mmr_from_stateq_logical
@@ -380,6 +390,7 @@ contains
   subroutine write_aerosol_mmr_from_stateq_logical(unit_input, unit_output, fld_name,field,aer_num_only)
     !------------------------------------------------------------------
     !Purpose: write interstitial aerosols mmr from state%q or q vector
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -396,8 +407,8 @@ contains
 
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,L10)
+10  format(I10)
+11  format(A,I10)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
     !In MAM4,first 15 species are non-aerosols, so we start with 16th species
@@ -405,7 +416,7 @@ contains
     !in the output array
     aer_spec = 16
     if(present(aer_num_only) .and. aer_num_only)aer_spec = 23 !23rd index is the first num aerosol
-    write(unit_input,10,advance="no")field(aer_spec)
+    write(unit_input,10,advance="no") merge(1,0,field(aer_spec))
     aer_spec = aer_spec + 1
 
     do ispec = aer_spec, pcnst
@@ -414,7 +425,7 @@ contains
        if(present(aer_num_only) .and. aer_num_only) mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
 
        if(mass_or_num) then !ignore the aerosol number
-          write(unit_input,11,advance="no")',',field(ispec)
+          write(unit_input,11,advance="no")',', merge(1,0,field(ispec))
        endif
 
     enddo
@@ -429,6 +440,7 @@ contains
   subroutine write_output_aerosol_mmr_from_stateq_logical(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes aerosol mmr for the input and the output yaml file
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -449,7 +461,7 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(L10,A)
+12  format(I10,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -471,7 +483,7 @@ contains
             mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
 
        if(mass_or_num) then !ignore the aerosol number
-          write(unit_output,12,advance="no")field(ispec),','
+          write(unit_output,12,advance="no")merge(1,0,field(ispec)),','
        endif
 
     enddo
@@ -540,6 +552,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a input and output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -551,7 +564,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    write(unit_input,'(3A,L10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
+    write(unit_input,'(3A,I10,A)')'    ',trim(adjustl(fld_name)),': [', merge(1,0,field),']'
 
     call write_output_var_logical(unit_output, fld_name, field, "input")
 
@@ -563,6 +576,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -584,7 +598,7 @@ contains
        object = trim(adjustl(inp_out_str))
     endif
 
-    write(unit_output,'(4A,L10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+    write(unit_output,'(4A,I10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', merge(1,0,field),'],]'
 
   end subroutine write_output_var_logical
 
@@ -669,16 +683,16 @@ contains
 
     ! real part
     write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
-    write(unit_input,10,advance="no") real(field(1))
-    do k = 2, dim
+    write(unit_input,10,advance="no") real(field(lbound(field,1)))
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")', ', real(field(k))
     enddo
     write(unit_input,'(A)')']'
 
     ! imaginary part
     write(unit_input,'(3A)',advance="no")'    imag_',trim(adjustl(fld_name)),': ['
-    write(unit_input,10,advance="no") aimag(field(1))
-    do k = 2, dim
+    write(unit_input,10,advance="no") aimag(field(lbound(field,1)))
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")', ', aimag(field(k))
     enddo
     write(unit_input,'(A)')']'
@@ -712,9 +726,9 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")field(lbound(field,1))
 
-    do k = 2, dim
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")',',field(k)
     enddo
 
@@ -764,14 +778,14 @@ contains
 
     ! real part
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.real_',trim(adjustl(fld_name)),'=[['
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),real(field(k)),', '
     enddo
     write(unit_output,'(A)')'],]'
 
     ! imaginary part
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.imag_',trim(adjustl(fld_name)),'=[['
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),aimag(field(k)),', '
     enddo
     write(unit_output,'(A)')'],]'
@@ -816,7 +830,7 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),field(k),','
     enddo
 
@@ -850,9 +864,9 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")field(lbound(field,1))
 
-    do k = 2, dim
+    do k = lbound(field,1)+1, ubound(field,1)
        write(unit_input,11,advance="no")',',field(k)
     enddo
 
@@ -900,7 +914,7 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
+    do k = lbound(field,1), ubound(field,1)
        write(unit_output,12,advance="no"),field(k),','
     enddo
 
@@ -914,6 +928,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a 1D input and output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -929,15 +944,15 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,L10)
+10  format(I10)
+11  format(A,I10)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(1)
+    write(unit_input,10,advance="no")  merge(1,0,field(lbound(field,1)))
 
-    do k = 2, dim
-       write(unit_input,11,advance="no")',',field(k)
+    do k = lbound(field,1)+1, ubound(field,1)
+       write(unit_input,11,advance="no")',', merge(1,0,field(k))
     enddo
 
     write(unit_input,'(A)')']'
@@ -952,6 +967,7 @@ contains
     !------------------------------------------------------------------
     !Purpose: Writes a 1D output field in a YAML file format
     !for a given column
+    ! output int format: 1 for True; 0 for False
     !------------------------------------------------------------------
     implicit none
 
@@ -975,7 +991,7 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(L10,A)
+12  format(I10,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -984,8 +1000,8 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do k = 1, dim
-       write(unit_output,12,advance="no"),field(k),','
+    do k = lbound(field,1), ubound(field,1)
+       write(unit_output,12,advance="no"), merge(1,0,field(k)),','
     enddo
 
     write(unit_output,'(A)')'],]'
@@ -994,7 +1010,105 @@ contains
 
   !================================================================================
 
-  subroutine write_2d_var(unit_input, unit_output, fld_name, dim1, dim2, field)
+  subroutine write_2d_var_int(unit_input, unit_output, fld_name, dim1, dim2, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 2D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    integer, intent(in)   :: dim1, dim2      ! dimensions of the field
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)  :: field(:,:)        ! field values in integer
+
+    !local
+    integer :: d1, d2
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+10  format(I10)
+11  format(A,I10)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    ! For maintaining format in the YAML inout file we have to  print first
+    ! element of the array first
+    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
+
+    !print rest of the column for d2=1
+    d2 = lbound(field,2)
+    do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
+       write(unit_input,11,advance="no")',',field(d1,d2)
+    enddo
+
+    do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
+       do d1 = lbound(field,1), ubound(field,1)
+          write(unit_input,11,advance="no")',',field(d1,d2)
+       enddo
+    enddo
+
+    write(unit_input,'(A)')']'
+
+    call write_2d_output_var(unit_output, fld_name, dim1, dim2, field, "input")
+
+  end subroutine write_2d_var_int
+
+  !================================================================================
+
+  subroutine write_2d_output_var_int(unit_output, fld_name, dim1, dim2, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 2D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim1, dim2      ! dimensions of the field
+    integer, intent(in)  :: field(:,:)        ! field values in integer
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format,
+    !this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: d1, d2
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+12  format(I10,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do d2 = lbound(field,2), ubound(field,2)
+       do d1 = lbound(field,1), ubound(field,1)
+          write(unit_output,12,advance="no"),field(d1,d2),','
+       enddo
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_2d_output_var_int
+
+  !================================================================================
+
+  subroutine write_2d_var_real(unit_input, unit_output, fld_name, dim1, dim2, field)
     !------------------------------------------------------------------
     !Purpose: Writes a 2D input and output field in a YAML file format
     !for a given column
@@ -1020,16 +1134,16 @@ contains
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     ! For maintaining format in the YAML inout file we have to  print first element of the array first
-    write(unit_input,10,advance="no")field(1,1)
+    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
 
     !print rest of the column for d2=1
-    d2 = 1
-    do d1 = 2, dim1 !first element is already printed, start from the 2nd
+    d2 = lbound(field,2)
+    do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
        write(unit_input,11,advance="no")',',field(d1,d2)
     enddo
 
-    do d2 = 2, dim2 !First column is already printed, start from the 2nd
-       do d1 = 1, dim1
+    do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_input,11,advance="no")',',field(d1,d2)
        enddo
     enddo
@@ -1038,11 +1152,11 @@ contains
 
     call write_2d_output_var(unit_output, fld_name, dim1, dim2, field, "input")
 
-  end subroutine write_2d_var
+  end subroutine write_2d_var_real
 
   !================================================================================
 
-  subroutine write_2d_output_var(unit_output, fld_name, dim1, dim2, field, inp_out_str)
+  subroutine write_2d_output_var_real(unit_output, fld_name, dim1, dim2, field, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes a 2D output field in a YAML file format
     !for a given column
@@ -1078,14 +1192,15 @@ contains
 
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
-    do d2 = 1, dim2
-       do d1 = 1, dim1
+    do d2 = lbound(field,2), ubound(field,2)
+       do d1 = lbound(field,1), ubound(field,1)
           write(unit_output,12,advance="no"),field(d1,d2),','
        enddo
     enddo
 
     write(unit_output,'(A)')'],]'
 
-  end subroutine write_2d_output_var
+  end subroutine write_2d_output_var_real
 
+  !================================================================================
 end module yaml_input_file_io
