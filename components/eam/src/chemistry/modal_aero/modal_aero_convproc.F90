@@ -1,5 +1,6 @@
 
-module modal_aero_convproc
+module modal_aero_convproc                     
+#include "../yaml/common_files/common_uses.ymlf90"
 !---------------------------------------------------------------------------------
 ! Purpose:
 !
@@ -400,7 +401,7 @@ subroutine update_qnew_ptend(                                         &
    ! Local variables
    integer  :: ll                         ! index
    real(r8) :: qtmp(pcols,pver,pcnst)     ! temporary q [kg/kg]
-
+#include "../yaml/modal_aero_convproc/f90_yaml/update_qnew_ptend_beg_yml.f90"
 
    do ll = 1, pcnst
      if ( .not. dotend(ll) ) cycle
@@ -416,6 +417,7 @@ subroutine update_qnew_ptend(                                         &
      endif
 
    enddo ! ll
+#include "../yaml/modal_aero_convproc/f90_yaml/update_qnew_ptend_end_yml.f90"
 end subroutine update_qnew_ptend
 
 !=========================================================================================
@@ -490,6 +492,7 @@ subroutine ma_convproc_dp_intr(                &
    ! xx_kcldbase is filled with index kk. maybe better define as integer
    ! keep it in C++ refactoring for BFB comparison (by Shuaiqi Tang, 2022)
    real(r8) :: xx_mfup_max(pcols), xx_wcldbase(pcols), xx_kcldbase(pcols)
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_dp_intr_beg_yml.f90"
 
 !
 ! Initialize
@@ -541,6 +544,7 @@ subroutine ma_convproc_dp_intr(                &
     call outfld( 'DP_WCLDBASE', xx_wcldbase, pcols, lchnk )
     call outfld( 'DP_KCLDBASE', xx_kcldbase, pcols, lchnk )
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_dp_intr_end_yml.f90"
 end subroutine ma_convproc_dp_intr
 
 !=========================================================================================
@@ -614,6 +618,7 @@ subroutine ma_convproc_sh_intr(                 &
    integer   :: ideep(pcols)      ! Gathering array [index]
    integer   :: lengath           ! Gathered min lon indices over which to operate
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_sh_intr_beg_yml.f90"
 
 !
 ! Initialize
@@ -680,6 +685,7 @@ subroutine ma_convproc_sh_intr(                 &
     call outfld( 'SH_WCLDBASE', xx_wcldbase, pcols, lchnk )
     call outfld( 'SH_KCLDBASE', xx_kcldbase, pcols, lchnk )
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_sh_intr_end_yml.f90"
 end subroutine ma_convproc_sh_intr
 
 !=========================================================================================
@@ -883,6 +889,7 @@ subroutine ma_convproc_tend(                                         &
    real(r8) rhoair_i(pver)       ! air density at current i [kg/m3]
    real(r8) zmagl(pver)          ! working height above surface [m]
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_tend_beg_yml.f90"
 
 !-----------------------------------------------------------------------
    lun = iulog
@@ -1068,6 +1075,7 @@ jtsub_loop_main_aa: &
       enddo jtsub_loop_main_aa  ! of the main "do jtsub = 1, ntsub" loop
    enddo i_loop_main_aa  ! of the main "do i = il1g, il2g" loop
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_convproc_tend_end_yml.f90"
    return
    end subroutine ma_convproc_tend
 
@@ -1139,6 +1147,7 @@ jtsub_loop_main_aa: &
    integer  :: kk            ! index
    real(r8) :: mu_x(pverp)   ! updraft mass flux calculated for all interface layers [mb/s]
    real(r8) :: md_x(pverp)   ! downdraft mass flux calculated for all interface layers [mb/s]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_massflux_beg_yml.f90"
 
 ! first calculate updraft and downdraft mass fluxes for all layers
    mu_x(:) = 0.0
@@ -1165,6 +1174,7 @@ jtsub_loop_main_aa: &
       if (mu_i(kk) <= mbsth) mu_i(kk) = 0.0
       if (md_i(kk) >= -mbsth) md_i(kk) = 0.0
    enddo
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_massflux_end_yml.f90"
 
    end subroutine compute_massflux
 
@@ -1201,6 +1211,7 @@ jtsub_loop_main_aa: &
    integer  :: kk            ! index
    real(r8) :: courantmax    ! maximum value of courant number [unitless]
 
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_ent_det_dp_beg_yml.f90"
 
    ! initiate variables
    eudp(:) = 0.0
@@ -1242,6 +1253,7 @@ jtsub_loop_main_aa: &
    if (courantmax > (1.0_r8 + 1.0e-6_r8)) then
        ntsub = 1 + int( courantmax )
    endif
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_ent_det_dp_end_yml.f90"
 
    end subroutine compute_ent_det_dp
 
@@ -1259,6 +1271,7 @@ jtsub_loop_main_aa: &
    ! local variables
    integer  :: kk            ! index
    real(r8) :: dz            ! layer thickness [m]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_midlev_height_beg_yml.f90"
 
    ! at surface (level pver)
    dz = dpdry_i(pver)*hund_ovr_g/rhoair_i(pver)
@@ -1269,6 +1282,7 @@ jtsub_loop_main_aa: &
        dz = dpdry_i(kk)*hund_ovr_g/rhoair_i(kk) ! update layer thickness at level kk
        zmagl(kk) = zmagl(kk) + 0.5*dz           ! add half layer in this level
    enddo
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_midlev_height_end_yml.f90"
 
    end subroutine compute_midlev_height
 
@@ -1308,6 +1322,7 @@ jtsub_loop_main_aa: &
    real(r8), parameter :: small_con = 1.e-36        ! threshold of constitute as zero [kg/kg]
    real(r8), parameter :: small_rel = 1.0e-6_r8         ! small value for relative comparison
 
+#include "../yaml/modal_aero_convproc/f90_yaml/initialize_tmr_array_beg_yml.f90"
 
    ! initiate variables
     const(:,:) = 0.0
@@ -1360,6 +1375,7 @@ jtsub_loop_main_aa: &
 
         endif ! doconvproc_extd(icnst)
    enddo ! icnst
+#include "../yaml/modal_aero_convproc/f90_yaml/initialize_tmr_array_end_yml.f90"
 
    end subroutine initialize_tmr_array
 
@@ -1424,6 +1440,7 @@ jtsub_loop_main_aa: &
    real(r8)     :: f_ent                ! fraction of updraft massflux that was entrained across this layer == eudp/mu_p_eudp [fraction]
 
    real(r8), parameter :: cldfrac_cut = 0.005_r8        ! cutoff value of cloud fraction to remove zero cloud [fraction]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_updraft_mixing_ratio_beg_yml.f90"
 
     ! initiate variables
     kactcnt = 0 ; kactfirst = 1
@@ -1503,6 +1520,7 @@ jtsub_loop_main_aa: &
 
        endif    ! "(mu_p_eudp(k) > mbsth)"
    enddo  ! "kk = kbot, ktop, -1"
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_updraft_mixing_ratio_end_yml.f90"
 
    end subroutine compute_updraft_mixing_ratio
 
@@ -1528,6 +1546,7 @@ jtsub_loop_main_aa: &
    real(r8)     :: zkm                  ! height above surface [km]
    real(r8), parameter  :: w_peak = 4.0_r8      ! pre-defined peak updraft [m/s]
    real(r8), parameter  :: w_min = 0.1_r8       ! pre-defined minimum updraft [m/s]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_wup_beg_yml.f90"
 
 ! shallow - wup = (mup in kg/m2/s) / [rhoair * (updraft area)]
     if (iconvtype /= 1) then
@@ -1549,6 +1568,7 @@ jtsub_loop_main_aa: &
        endif
        wup(kk) = min_max_bound(w_min, w_peak, wup(kk))
    endif
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_wup_end_yml.f90"
 
    end subroutine compute_wup
 
@@ -1592,6 +1612,7 @@ jtsub_loop_main_aa: &
 
    logical      :: do_act_this_lev      ! flag for doing activation at current level
    integer      :: kp1                  ! kk + 1
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_activation_tend_beg_yml.f90"
 
    ! initiate variables
    do_act_this_lev = .false.
@@ -1620,6 +1641,7 @@ jtsub_loop_main_aa: &
                      temperature(icol,kk),            rhoair_i(kk),& ! in
                      pcnst_extd, kk,                  kactfirst    ) ! in
    endif
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_activation_tend_end_yml.f90"
 
    end subroutine compute_activation_tend
 
@@ -1706,6 +1728,7 @@ jtsub_loop_main_aa: &
 !  activate_smaxmax = the uniform or peak supersat value (as 0-1 fraction =
 !  percent*0.01)
    real(r8), parameter :: activate_smaxmax = 0.003_r8
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_activate_convproc_beg_yml.f90"
 
 !-----------------------------------------------------------------------
 
@@ -1757,6 +1780,7 @@ jtsub_loop_main_aa: &
                    pcnst_extd,  la,    lc,   act_frac,    dt_u_inv        ) ! in
         enddo  ! ispec
    enddo   ! imode
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_activate_convproc_end_yml.f90"
 
    return
    end subroutine ma_activate_convproc
@@ -1789,6 +1813,7 @@ jtsub_loop_main_aa: &
    real(r8) :: n_min, n_max          ! min and max bound of naerosol
 
    real(r8), parameter :: small_vol = 1.0e-35_r8   ! a small value that variables smaller than it are considered as zero for aerosol volume [m3/kg]
+#include "../yaml/modal_aero_convproc/f90_yaml/aer_vol_num_hygro_beg_yml.f90"
 
 !-----------------------------------------------------------------------
 
@@ -1816,6 +1841,7 @@ jtsub_loop_main_aa: &
       naerosol(imode) = min_max_bound(n_min, n_max, tmp_num*rhoair)
 
    enddo  ! imode
+#include "../yaml/modal_aero_convproc/f90_yaml/aer_vol_num_hygro_end_yml.f90"
 
    return
    end subroutine aer_vol_num_hygro
@@ -1904,6 +1930,7 @@ jtsub_loop_main_aa: &
    real(r8)     :: cdt          ! (in-updraft first order wet removal rate) * dt [unitless]
    real(r8)     :: expcdtm1     ! exp(cdt) - 1 [unitless]
    real(r8)     :: half_cld     ! 0.5 * cldfrac [fraction]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_wetdep_tend_beg_yml.f90"
 
 
    cdt = 0.0_r8
@@ -1923,6 +1950,7 @@ jtsub_loop_main_aa: &
          endif
       enddo
    endif
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_wetdep_tend_end_yml.f90"
 
    end subroutine compute_wetdep_tend
 
@@ -1951,6 +1979,7 @@ jtsub_loop_main_aa: &
    integer      :: kp1          ! index of kk+1
    integer      :: icnst        ! index of pcnst_extd
    real(r8)     :: md_m_eddp    ! downdraft massflux at kp1 [mb/s]
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_downdraft_mixing_ratio_beg_yml.f90"
 
       do kk = ktop, kbot
          kp1 = kk + 1
@@ -1965,6 +1994,7 @@ jtsub_loop_main_aa: &
             enddo
          endif
       enddo ! kk
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_downdraft_mixing_ratio_end_yml.f90"
 
    end subroutine compute_downdraft_mixing_ratio
 
@@ -2013,6 +2043,7 @@ jtsub_loop_main_aa: &
    real(r8)     :: fluxin, fluxout, netflux   ! in, out and net flux [kg/kg/s * mb]
    real(r8)     :: tmpa         ! working variable of mass flux [mb/s]
    real(r8)     :: netsrce      ! working variable of flux source [kg/kg/s * mb]
+#include "../yaml/modal_aero_convproc/f90_yaml/initialize_dcondt_beg_yml.f90"
 
    ! initialize variables
    dcondt(:,:) = 0.0
@@ -2070,6 +2101,7 @@ jtsub_loop_main_aa: &
          endif   ! "doconvproc_extd"
       enddo      ! "icnst = 2,pcnst_extd"
    enddo ! "kk = ktop, kbot"
+#include "../yaml/modal_aero_convproc/f90_yaml/initialize_dcondt_end_yml.f90"
 
    end subroutine initialize_dcondt
 
@@ -2148,6 +2180,7 @@ jtsub_loop_main_aa: &
    real(r8) :: x_ratio               ! ratio of adjusted and old fraction of precipitation-borne aerosol flux that is NOT resuspended, calculated in step 1 and used in step 2 (see below)
 
 !-----------------------------------------------------------------------
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpevap_convproc_beg_yml.f90"
 
 !
 ! *** note use of non-standard units
@@ -2195,6 +2228,7 @@ jtsub_loop_main_aa: &
               )
 
    enddo ! kk
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpevap_convproc_end_yml.f90"
 
    return
    end subroutine ma_precpevap_convproc
@@ -2225,6 +2259,7 @@ jtsub_loop_main_aa: &
 
    real(r8), parameter :: small_value = 1.0e-30_r8   ! a small value that variables smaller than it are considered as zero
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpevap_beg_yml.f90"
 
    ! adjust pr_flux due to local evaporation
    ev_flux_local = max( 0.0_r8, evapc(icol,kk)*dpdry_i(kk) )
@@ -2256,6 +2291,7 @@ jtsub_loop_main_aa: &
           pr_flux_base = 0.0_r8
           pr_flux_tmp  = 0.0_r8
    endif
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpevap_end_yml.f90"
 
    return
    end subroutine ma_precpevap
@@ -2298,6 +2334,7 @@ jtsub_loop_main_aa: &
    real(r8) :: dcondt_wdflux            ! dcondt due to wet deposition flux change [kg/kg/s]
    integer  :: icnst, icnst2, mmtoo
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpprod_beg_yml.f90"
 
       pr_flux_local = max( 0.0_r8, rprd(icol,kk)*dpdry_i(kk) )
       pr_flux_base = max( 0.0_r8, pr_flux_base + pr_flux_local )
@@ -2340,6 +2377,7 @@ jtsub_loop_main_aa: &
          endif
 
       enddo ! m = 2, pcnst_extd
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_precpprod_end_yml.f90"
 
     end subroutine ma_precpprod
 
@@ -2399,6 +2437,7 @@ jtsub_loop_main_aa: &
 ! local variables
    integer  :: imode, ispec, la, lc      ! indices
 !-----------------------------------------------------------------------
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_resuspend_convproc_beg_yml.f90"
 
    dcondt_resusp(:,:) = 0.0
 
@@ -2410,6 +2449,7 @@ jtsub_loop_main_aa: &
       enddo   ! "ll = -1, nspec_amode(n)"
    enddo      ! "n = 1, ntot_amode"
 
+#include "../yaml/modal_aero_convproc/f90_yaml/ma_resuspend_convproc_end_yml.f90"
 
    return
    end subroutine ma_resuspend_convproc
@@ -2484,6 +2524,7 @@ jtsub_loop_main_aa: &
    integer      :: icnst        ! index of pcnst_extd
    real(r8)     :: dconudt_aqchem(pcnst_extd,pverp)  ! d(conu)/dt by aqueous chem [kg/kg/s]
 
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_column_tendency_beg_yml.f90"
 
    ! initialize variables
    sumactiva(:) = 0.0
@@ -2508,6 +2549,8 @@ jtsub_loop_main_aa: &
          enddo
       endif
    enddo
+#include "../yaml/modal_aero_convproc/f90_yaml/compute_column_tendency_end_yml.f90"
+
    end subroutine compute_column_tendency
 
 !====================================================================================
@@ -2575,6 +2618,7 @@ jtsub_loop_main_aa: &
    real(r8) :: xinv_ntsub                       ! inverse of ntsub (1.0/ntsub)
    real(r8) :: dqdt_i(pver,pcnst)               ! dqdt(icol,kk,icnst) at current icol
    real(r8) :: qsrflx_i(pcnst,nsrflx)           ! qsrflx(i,m,n) at current i
+#include "../yaml/modal_aero_convproc/f90_yaml/update_tendency_final_beg_yml.f90"
 
    ! initiate variables
    qsrflx_i(:,:) = 0.0
@@ -2620,6 +2664,7 @@ jtsub_loop_main_aa: &
             qsrflx(icol,icnst,1:6) = qsrflx(icol,icnst,1:6) + qsrflx_i(icnst,1:6)*xinv_ntsub
        endif
    enddo ! icnst
+#include "../yaml/modal_aero_convproc/f90_yaml/update_tendency_final_end_yml.f90"
 
    end subroutine update_tendency_final
 
