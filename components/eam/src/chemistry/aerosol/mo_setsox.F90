@@ -195,7 +195,13 @@ contains
     !-----------------------------------------------------------------------      
     !      ... Local variables
     !
-    !           xhno3 ... in mixing ratio
+    !      FORTRAN refactoring: the units are a little messy here
+    !      my understanding (may not be right) is that, the PH value xph, shown in [H+] concentration, 
+    !      is (mol H+)/(L water), which can be transfered to kg/L or kg/kg
+    !      the variables xso2, xso4, xo3 etc have units of [mol/mol]
+    !      the variable xhnm has unit of [#/cm3]. Some units may lose track
+    !      across modules
+    !      Shuaiqi Tang  4/18/2023
     !-----------------------------------------------------------------------      
     real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
     real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
@@ -205,9 +211,9 @@ contains
     real(r8), parameter :: small_value_cf = 1.e-5_r8  ! small value of cloud fraction [fraction]
 
     !
-    real(r8) :: xdelso4hp(ncol,pver)
-    real(r8) :: xdelso4hp_ik
-    real(r8) :: xphlwc(ncol,pver)
+    real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
+    real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
+    real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
 
     integer  :: k, i
     real(r8) :: xk, xe, x2
@@ -223,17 +229,17 @@ contains
     logical :: converged
 
     ! ph value in H+ concentration
-    real(r8) :: xph0,  xph(ncol,pver)
+    real(r8) :: xph0,  xph(ncol,pver)   ! H+ concentration [mol/L, or kg/L, or kg/kg(w)]
     real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
     ! mass concentration for species
     real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
-                                      xho2, xo3, xh2o2 
+                                      xho2, xo3, xh2o2  ! concentrations, should be in the unit of [mol/mol]
     ! concentrations that are not used and can be removed later
     real(r8), dimension(ncol,pver) :: xmsa, xnh3,xhno3
     real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
  
     ! henry law const for species
-    real(r8), dimension(ncol,pver) :: hehno3,heh2o2,heso2,henh3,heo3
+    real(r8), dimension(ncol,pver) :: heh2o2,heso2,henh3,heo3
 
     real(r8), pointer :: xso4c(:,:)
     real(r8), pointer :: xnh4c(:,:)
@@ -313,6 +319,7 @@ contains
                 xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact, & ! in
                 Ra, xkw, const0,                & ! in
                 converged, xph(i,k)             ) ! out
+
              if( .not. converged ) then
                 write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,').'
              endif
@@ -320,6 +327,7 @@ contains
           else
              xph(i,k) =  1.e-7_r8
           endif
+
        enddo col_loop0
     enddo ver_loop0 ! end pver loop for STEP 0
 
@@ -464,17 +472,17 @@ contains
 
     real(r8),  intent(in) :: temperature        ! temperature [K]
     real(r8),  intent(in) :: pressure           ! pressure [Pa]
-    real(r8),  intent(in) :: xso2               ! SO2 [kg/L]
-    real(r8),  intent(in) :: xso4               ! SO4 [kg/L]
-    real(r8),  intent(in) :: xhnm               ! [kg/L]
-    real(r8),  intent(in) :: xlwc               ! cloud LWC [kg/L]
+    real(r8),  intent(in) :: xso2               ! SO2 [mol/mol]
+    real(r8),  intent(in) :: xso4               ! SO4 [mol/mol]
+    real(r8),  intent(in) :: xhnm               ! [#/cm3]
+    real(r8),  intent(in) :: xlwc               ! cloud LWC [kg/kg]
     real(r8),  intent(in) :: so4_fact           ! factor for SO4
     real(r8),  intent(in) :: Ra                 ! constant parameter
     real(r8),  intent(in) :: xkw                ! constant parameter
     real(r8),  intent(in) :: const0             ! constant parameter
 
     logical,  intent(out) :: converged          ! if the method converge
-    real(r8), intent(out) :: xph                ! H+ ions concentration [kg/L]
+    real(r8), intent(out) :: xph                ! H+ ions concentration [mol/L]
 
 
     ! local variables
@@ -635,7 +643,7 @@ contains
     real(r8), intent(in) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2 ! factors for SO2
     real(r8), intent(in) :: Eco2, Eh2o, Eso4, so4_fact          ! effects from species [1/cm3]
 
-    real(r8), intent(out) :: xph        ! H+ concentration from pH value [kg/L]
+    real(r8), intent(out) :: xph        ! H+ concentration from pH value [#/cm3]
     real(r8), intent(out) :: ynetpos    ! net positive ions
 
     ! local variables
