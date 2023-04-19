@@ -175,9 +175,9 @@ contains
     use gas_wetdep_opts, only: gas_wetdep_cnt, gas_wetdep_list, gas_wetdep_method ! REASTER 08/04/2015
 
     ! args
-    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-    integer, intent(inout) :: species_class(:)  
-    integer, intent(in) :: iflagaa
+    type(physics_buffer_desc), pointer  :: pbuf2d(:,:)
+    integer, intent(inout)              :: species_class(:)  
+    integer, intent(in)                 :: iflagaa
 
     ! local vars
     integer :: id, l, m, n, nspc
@@ -186,11 +186,11 @@ contains
     logical  :: history_verbose ! produce verbose history output
 
     character(len=*), parameter :: subrname = 'aero_model_init'
-    character(len=20) :: dummy
+    character(len=20)           :: dummy
     character(len=fieldname_len) :: wetdep_name, depflx_name
-    character(len=6) :: test_name
-    character(len=100) :: errmes
-    character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
+    character(len=2)            :: unit_basename  ! Units 'kg' or '1' 
+
+    ! --------------------------------------------------------------
 
     if ( masterproc ) write(iulog,'(a,i5)') 'aero_model_init iflagaa=', iflagaa ! REASTER 08/04/2015
 
@@ -492,7 +492,7 @@ contains
           unit_basename = ' 1'  ! Units 'kg' or '1' 
        else
           unit_basename = 'kg'  ! Units 'kg' or '1' 
-       end if
+       endif
 
        call addfld( 'GS_'//trim(solsym(m)),horiz_only,  'A', unit_basename//'/m2/s ', &
                     trim(solsym(m))//' gas chemistry/wet removal (for gas species)')
