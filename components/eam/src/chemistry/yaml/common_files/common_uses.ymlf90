@@ -21,5 +21,8 @@ use spmd_utils,   only : masterproc
 ! aero_model.F90 
 !#define YAML_AERO_MODEL
 
+! hetrozenous freezing
+#define YAML_HETFRZ_CLASSNUC
+
 use yaml_input_file_io
 

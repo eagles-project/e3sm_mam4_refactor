@@ -458,6 +458,7 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8), intent(out) :: frzduimm           ! het. frz by dust immersion nucleation [cm^-3 s^-1]
 
    ! local variables
+   integer  :: ibin
    real(r8) :: rgimm_bc                           ! critical germ radius for bc immersion freezing [m]
    real(r8) :: rgimm_dust_a1, rgimm_dust_a3       ! critical germ radius for dust immersion freezing [m]
    real(r8) :: dg0imm_bc                          ! homogeneous energy for germ formation [J]
@@ -468,7 +469,6 @@ subroutine calculate_hetfrz_immersion_nucleation(deltat, temperature, uncoated_a
    real(r8) :: f_imm_dust_a1, f_imm_dust_a3       ! form factor for dust
    real(r8) :: Jimm_bc                            ! immersion nucleation rate for bc [/s]
    real(r8) :: Jimm_dust_a1, Jimm_dust_a3         ! immersion nucleation rate for dust [/s]
-   real(r8) :: ibin
 
    real(r8) :: dim_f_imm_dust_a1(pdf_n_theta), dim_f_imm_dust_a3(pdf_n_theta)
    real(r8) :: dim_Jimm_dust_a1(pdf_n_theta), dim_Jimm_dust_a3(pdf_n_theta)

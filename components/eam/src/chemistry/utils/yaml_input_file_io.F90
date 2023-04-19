@@ -54,6 +54,24 @@ module yaml_input_file_io
      module procedure write_var_int
      module procedure write_var_real
      module procedure write_var_logical
+     module procedure write_1d_var_int
+     module procedure write_1d_var_real
+     module procedure write_1d_var_real_drv
+     module procedure write_1d_var_logical
+     module procedure write_1d_var_complex
+     module procedure write_2d_var_real
+     module procedure write_2d_var_int
+
+     !output calls
+     module procedure write_output_var_int
+     module procedure write_output_var_real
+     module procedure write_output_var_logical
+     module procedure write_1d_output_var_complex
+     module procedure write_1d_output_var_real
+     module procedure write_1d_output_var_int
+     module procedure write_1d_output_var_logical
+     module procedure write_2d_output_var_real
+     module procedure write_2d_output_var_int
   end interface write_var
 
   interface write_output_var
@@ -700,6 +718,24 @@ contains
     call write_1d_output_var_complex(unit_output, fld_name, dim, field, "input")
 
   end subroutine write_1d_var_complex
+
+  !================================================================================
+  subroutine write_1d_var_real_drv(unit_input,unit_output,fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:)        ! field values in r8
+
+    call write_1d_var_real(unit_input, unit_output, fld_name,size(field),field)
+
+  end subroutine write_1d_var_real_drv
+
   !================================================================================
 
   subroutine write_1d_var_real(unit_input, unit_output, fld_name,dim,field)

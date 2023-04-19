@@ -5,6 +5,7 @@ module hetfrz_classnuc_cam
 !  CAM Interfaces for hetfrz_classnuc module.
 !
 !---------------------------------------------------------------------------------
+#include  "../../chemistry/yaml/common_files/common_uses.ymlf90"
 
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
@@ -593,7 +594,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
 
    character(128) :: errstring       ! Error status
    !-------------------------------------------------------------------------------
-
+#include  "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/hetfrz_classnuc_calc_beg_yml.f90"
 
    lchnk_zb = lchnk - begchunk
 
@@ -667,7 +668,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
    do kk = top_lev, pver
       do icol = 1, ncol
          call calculate_interstitial_aer_num(ncnst, aer(icol,kk,:,lchnk_zb), &      ! in 
-                                             total_interstitial_aer_num(icol,kk,:)) ! out
+                                             total_interstitial_aer_num(icol,kk,:), yaml) ! out
 
          call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:), & ! in
                                            total_cloudborne_aer_num(icol,kk,:)) ! out 
@@ -836,13 +837,13 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
    call outfld('NUMICE10s',    numice10s,         pcols, lchnk)
    call outfld('NUMIMM10sDST', numice10s_imm_dst, pcols, lchnk)
    call outfld('NUMIMM10sBC',  numice10s_imm_bc,  pcols, lchnk)
-
+#include  "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/hetfrz_classnuc_calc_end_yml.f90"
 end subroutine hetfrz_classnuc_cam_calc
 
 !====================================================================================================
 
 subroutine calculate_interstitial_aer_num(ncnst, aer, &
-                                          total_interstitial_aer_num)
+                                          total_interstitial_aer_num, yaml)
 
    !***************************************************
    ! calculate interstial aerosol concentrations for
@@ -862,7 +863,7 @@ subroutine calculate_interstitial_aer_num(ncnst, aer, &
 
    real(r8) :: dmc,ssmc                  ! dust mass concentration [kg/m^3]
    real(r8) :: bcmc, pommc, soamc, mommc
-
+#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_beg_yml.f90"
    total_interstitial_aer_num = 0.0_r8
 
    total_interstitial_aer_num(1) = aer(bc_accum) * bc_kg_to_num * num_m3_to_cm3 ! #/cm^3
@@ -881,7 +882,7 @@ subroutine calculate_interstitial_aer_num(ncnst, aer, &
    if (dmc > 0._r8 ) then
       total_interstitial_aer_num(3) = dmc/(ssmc+dmc+bcmc+pommc+soamc+mommc) * aer(num_coarse) * num_m3_to_cm3 ! #/cm^3
    endif
-
+#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_end_yml.f90"
 end subroutine calculate_interstitial_aer_num 
 
 !====================================================================================================

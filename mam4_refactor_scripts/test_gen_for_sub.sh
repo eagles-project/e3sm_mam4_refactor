@@ -6,17 +6,36 @@ main() {
     #User input Starts
     #-------------------------
 
+hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &           !in
+                                 fn, r3lx, icnlx, &                                      !in
+                                 hetraer, awcam, awfacm, dstcoat, &                      !in
+                                 total_aer_num, coated_aer_num, uncoated_aer_num, &      !in
+                                 total_interstitial_aer_num, total_cloudborne_aer_num, & !in
+                                 frzbcimm, frzduimm, &                                   !out
+                                 frzbccnt, frzducnt, &                                   !out
+                                 frzbcdep, frzdudep, &                                   !out
+                                 errstring)                                              !out
+
+
     #subroutine name
-    sub_name=calc_1_impact_rate
+    sub_name=hetfrz_classnuc_calc
+
+    #ins and in-outs variables
+    #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
+    ins=''
+
+    #outs and in-outs variables
+    #(a comma seprated string, same as above)
+    outs='total_interstitial_aer_num'
 
     #module name
-    module_name=aero_model
+    module_name=hetfrz_classnuc_cam
 
     #file path
-    dir_path=components/eam/src/chemistry/modal_aero/
+    dir_path=components/eam/src/physics/cam/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_AERO_MODEL
+    cpp_directive=YAML_HETFRZ_CLASSNUC
 
     #-------------------------
     #USER INPUT ENDS
@@ -50,9 +69,9 @@ main() {
     /bin/mkdir -p $yaml_dir_path/$module_name/f90_yaml
 
     #code to add
-    echo '-------------'
-    echo 'Code to add:'
-    echo '-------------'
+    echo '----------------------------'
+    echo 'Code to add to the F90 file:'
+    echo '----------------------------'
 
     echo '(If not already added, add the following line at module level at the top)'
     echo "#include \"$relative_path/common_files/common_uses.ymlf90\""
@@ -64,6 +83,16 @@ main() {
     #subroutine end file
     newline
     create_file $module_name $sub_name $yaml_dir_path $relative_path "end"
+
+    newline
+    newline
+    echo '---------------------------------'
+    echo 'Code to add to the include file:'
+    echo '---------------------------------'
+    #call python script to generate code for the calls
+    MY_PATH="$(dirname -- "${BASH_SOURCE[0]}")" # relative path
+    MY_PATH="$(cd -- "$MY_PATH" && pwd)"        # absolute and normalized path
+    /bin/python3 $MY_PATH/gen_input_write_vars.py -i "$ins" -o "$outs"
 }
 
 #---------------------
