@@ -49,8 +49,6 @@ module aero_model
   integer :: qaerwat_idx         = 0
 
   integer :: fracis_idx          = 0
-  integer :: prain_idx           = 0
-  integer :: nevapr_idx          = 0
   integer :: rprddp_idx          = 0 
   integer :: rprdsh_idx          = 0 
   integer :: nevapr_shcu_idx     = 0
@@ -167,9 +165,7 @@ contains
   !=============================================================================
   subroutine aero_model_init( pbuf2d, species_class, iflagaa )
 
-    use mo_chem_utls,    only: get_inv_ndx
     use cam_history,     only: addfld, horiz_only, add_default
-    use mo_chem_utls,    only: get_rxt_ndx, get_spc_ndx
     use modal_aero_initialize_data, only: modal_aero_initialize
     use rad_constituents,           only: rad_cnst_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
@@ -180,9 +176,9 @@ contains
     use gas_wetdep_opts, only: gas_wetdep_cnt, gas_wetdep_list, gas_wetdep_method ! REASTER 08/04/2015
 
     ! args
-    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-    integer, intent(inout) :: species_class(:)  
-    integer, intent(in) :: iflagaa
+    type(physics_buffer_desc), pointer  :: pbuf2d(:,:)
+    integer, intent(inout)              :: species_class(:)  
+    integer, intent(in)                 :: iflagaa
 
     ! local vars
     integer :: id, l, m, n, nspc
@@ -191,11 +187,11 @@ contains
     logical  :: history_verbose ! produce verbose history output
 
     character(len=*), parameter :: subrname = 'aero_model_init'
-    character(len=20) :: dummy
+    character(len=20)           :: dummy
     character(len=fieldname_len) :: wetdep_name, depflx_name
-    character(len=6) :: test_name
-    character(len=100) :: errmes
-    character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
+    character(len=2)            :: unit_basename  ! Units 'kg' or '1' 
+
+    ! --------------------------------------------------------------
 
     if ( masterproc ) write(iulog,'(a,i5)') 'aero_model_init iflagaa=', iflagaa ! REASTER 08/04/2015
 
@@ -203,6 +199,19 @@ contains
          history_verbose_out=history_verbose, &
          convproc_do_aer_out = convproc_do_aer, & 
          resus_fix_out       = resus_fix    ) 
+    ! The unified convective transport/removal for aerosols does not
+    ! do gases yet, and convproc_do_gas is just a place holder.  For that reason,
+    !    (1) All of the "if ( convproc_do_aer .or. convproc_do_gas ) then" statements
+    !        in aero_model.F90 have been changed to "if ( convproc_do_aer ) then"
+    !    (2) convproc_do_aer=.false. and convproc_do_gas=.true. is no longer allowed.
+    !
+    ! for C++ porting: namelist [history_aerosol, history_verbose, convproc_do_aer, resus_fix]
+    ! are [T, F, T, T] in default. 
+    ! history_aerosol and history_verbose are kept 
+    ! convproc_do_aer and resus_fix are removed
+    if (.not. convproc_do_aer) call endrun('convproc_do_aer=.false. is removed')
+    if (.not. resus_fix) call endrun('resus_fix=.false. is removed')
+
 
     ! This section cannot execute until chemini, ..., chm_diags_inti have been called
     if ( iflagaa == 2 ) then
@@ -229,20 +238,6 @@ contains
        return
     endif ! ( iflagaa == 2 )
 
-
-    ! The unified convective transport/removal for aerosols does not 
-    ! do gases yet, and convproc_do_gas is just a place holder.  For that reason, 
-    !    (1) All of the "if ( convproc_do_aer .or. convproc_do_gas ) then" statements 
-    !        in aero_model.F90 have been changed to "if ( convproc_do_aer ) then"
-    !    (2) convproc_do_aer=.false. and convproc_do_gas=.true. is no longer allowed.
-    ! for C++ porting: All convproc_do_aer=.false. and resus_fix=.false. conditions
-    ! are removed as not been used/tested. These conditions are then not allowed.
-    ! convproc_do_gas is not used
-    if ( ( .not. convproc_do_aer ) .or. ( .not. resus_fix ) ) then
-       errmes = 'aero_model_init - convproc_do_aer and resus_fix MUST BE .true.' 
-       call endrun( errmes )
-    endif
-
     dgnum_idx      = pbuf_get_index('DGNUM')
     dgnumwet_idx   = pbuf_get_index('DGNUMWET')
     
@@ -257,8 +252,6 @@ contains
     call wetdep_init()
 
     fracis_idx      = pbuf_get_index('FRACIS') 
-    prain_idx       = pbuf_get_index('PRAIN')  
-    nevapr_idx      = pbuf_get_index('NEVAPR') 
     rprddp_idx      = pbuf_get_index('RPRDDP')  
     rprdsh_idx      = pbuf_get_index('RPRDSH')  
     
@@ -500,7 +493,7 @@ contains
           unit_basename = ' 1'  ! Units 'kg' or '1' 
        else
           unit_basename = 'kg'  ! Units 'kg' or '1' 
-       end if
+       endif
 
        call addfld( 'GS_'//trim(solsym(m)),horiz_only,  'A', unit_basename//'/m2/s ', &
                     trim(solsym(m))//' gas chemistry/wet removal (for gas species)')
@@ -515,7 +508,7 @@ contains
              case ('O3','H2O2','H2SO4','SO2','DMS','SOAG')
                   call add_default( 'AQ_'//trim(solsym(m)), 1, ' ')
              end select
-          end if
+          endif
        endif
        
        call cnst_get_ind(trim(solsym(m)), nspc, abrtf=.false. ) ! REASTER 08/04/2015
@@ -594,7 +587,7 @@ contains
     subroutine mam_prevap_resusp_init( )
 
     use modal_aero_data, only: &
-       lmassptr_amode, lspectype_amode, modeptr_coarse, &
+       lmassptr_amode, modeptr_coarse, &
        nspec_amode, ntot_amode, numptr_amode, &
        mmtoo_prevap_resusp, ntoo_prevap_resusp
 
