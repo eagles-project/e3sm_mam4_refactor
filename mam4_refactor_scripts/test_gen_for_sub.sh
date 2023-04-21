@@ -112,13 +112,12 @@ create_code_for_in_outs () {
 
 create_file () {
 
-    #create_file $module_name $sub_name $yaml_dir_path $relative_path "end"
+    #create_file $module_name $sub_name $yaml_dir_path $relative_path $ftmp_ins/$ftmp_outs "beginning"/"end"
     echo "(Add the following line at the $6 of the subroutine)"
 
     #find beginning or end sub string
     if [ $6 == "beginning" ]; then
         sub_str=beg
-        fwcode = 
     elif [ $6 == "end" ]; then
         sub_str=end
     else

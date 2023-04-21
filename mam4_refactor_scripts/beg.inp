@@ -42,16 +42,16 @@
 
   if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
 
-     !-----------------------------------------------------------------------------------------
-     !In the case of y_i or y_k are not passed as arguments, use the following if condition:
-     !if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
-     !-----------------------------------------------------------------------------------------
+  !-----------------------------------------------------------------------------------------
+  !In the case of y_i or y_k are not passed as arguments, use the following if condition:
+  !if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
+  !-----------------------------------------------------------------------------------------
 
-     !-----------------------------------------------------------------------------------------
-     !For generating data for a dependent subroutines where "yaml" derived type is already
-     !initialized, use the following if condition
-     !if(yaml%flag_print) then
-     !-----------------------------------------------------------------------------------------
+  !-----------------------------------------------------------------------------------------
+  !For generating data for a dependent subroutines where "yaml" derived type is already
+  !initialized, use the following if condition
+  !if(yaml%flag_print) then
+  !-----------------------------------------------------------------------------------------
 
      !-----------------------------------------------------------------------------------------
      ! Set "ext_str" if there are multiple sets of yaml output to be written out
