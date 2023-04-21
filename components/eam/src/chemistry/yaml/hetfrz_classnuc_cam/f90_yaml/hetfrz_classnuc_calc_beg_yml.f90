@@ -1,4 +1,4 @@
-#ifdef YAML_HETFRZ_CLASSNUC
+#ifdef YAML_HETFRZ_CLASSNUC_CAM
 
   !Following code was used to get lat-lon and time step where
   !there are max non-zero values in factnum array.

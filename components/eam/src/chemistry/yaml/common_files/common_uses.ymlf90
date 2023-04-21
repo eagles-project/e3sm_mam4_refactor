@@ -21,6 +21,9 @@ use spmd_utils,   only : masterproc
 ! aero_model.F90 
 !#define YAML_AERO_MODEL
 
+! hetrozenous freezing cam
+#define YAML_HETFRZ_CLASSNUC_CAM
+
 ! hetrozenous freezing
 #define YAML_HETFRZ_CLASSNUC
 

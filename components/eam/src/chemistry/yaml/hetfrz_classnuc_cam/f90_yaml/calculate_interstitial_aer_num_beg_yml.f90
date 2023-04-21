@@ -1,4 +1,4 @@
-#ifdef YAML_HETFRZ_CLASSNUC
+#ifdef YAML_HETFRZ_CLASSNUC_CAM
   !<"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
@@ -12,12 +12,13 @@
 
   !>
 
-  ! character(len=200) :: ext_str  ! this is used when multiple sets of yaml output is needed to cover different options (e.g., true and false)
+  character(len=200) :: ext_str  ! this is used when multiple sets of yaml output is needed to cover different options (e.g., true and false)
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
 
   if(yaml%flag_print) then
 
+     !write(ext_str,*)
         !open I/O yaml files (it can have an extra optional argument to pass a unique string to differentiate file names)
         call open_files('calculate_interstitial_aer_num', &  !intent-in
              unit_input, unit_output) !intent-out

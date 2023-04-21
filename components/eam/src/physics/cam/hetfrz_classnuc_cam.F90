@@ -758,7 +758,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
             fn(3) = factnum(icol,kk,mode_coarse_idx) ! dust_a3 coarse mode
             
 
-            call hetfrz_classnuc_calc( deltatin,  temperature(icol,kk),  pmid(icol,kk),  supersatice, &                      ! in
+            call hetfrz_classnuc_calc( yaml,kk,deltatin,  temperature(icol,kk),  pmid(icol,kk),  supersatice, &                      ! in
                                        fn,  r3lx,  ncic*rho(icol,kk)*1.0e-6_r8,  &                                           ! in
                                        hetraer(icol,kk,:), awcam(icol,kk,:), awfacm(icol,kk,:), dstcoat(icol,kk,:), &        ! in
                                        total_aer_num(icol,kk,:), coated_aer_num(icol,kk,:), uncoated_aer_num(icol,kk,:), &   ! in
@@ -863,7 +863,7 @@ subroutine calculate_interstitial_aer_num(ncnst, aer, &
 
    real(r8) :: dmc,ssmc                  ! dust mass concentration [kg/m^3]
    real(r8) :: bcmc, pommc, soamc, mommc
-#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_beg_yml.f90"
+!#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_beg_yml.f90"
    total_interstitial_aer_num = 0.0_r8
 
    total_interstitial_aer_num(1) = aer(bc_accum) * bc_kg_to_num * num_m3_to_cm3 ! #/cm^3
@@ -882,7 +882,7 @@ subroutine calculate_interstitial_aer_num(ncnst, aer, &
    if (dmc > 0._r8 ) then
       total_interstitial_aer_num(3) = dmc/(ssmc+dmc+bcmc+pommc+soamc+mommc) * aer(num_coarse) * num_m3_to_cm3 ! #/cm^3
    endif
-#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_end_yml.f90"
+!#include "../../chemistry/yaml/hetfrz_classnuc_cam/f90_yaml/calculate_interstitial_aer_num_end_yml.f90"
 end subroutine calculate_interstitial_aer_num 
 
 !====================================================================================================

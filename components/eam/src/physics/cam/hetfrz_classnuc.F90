@@ -19,7 +19,7 @@ module hetfrz_classnuc
 !   Jack Chen, NCAR, 09/2015, modify calculation of dust activation fraction.
 !
 !-----------------------------------------------------------------------
-
+#include "../../chemistry/yaml/common_files/common_uses.ymlf90"
 use shr_kind_mod,  only: r8 => shr_kind_r8
 use wv_saturation, only: svp_water, svp_ice
 #ifndef HAVE_ERF_INTRINSICS
@@ -116,7 +116,7 @@ end subroutine hetfrz_classnuc_init
 
 !===================================================================================================
 
-subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &           !in
+subroutine hetfrz_classnuc_calc( yaml, y_k, deltat, temperature, pressure, supersatice, &           !in
                                  fn, r3lx, icnlx, &                                      !in
                                  hetraer, awcam, awfacm, dstcoat, &                      !in
                                  total_aer_num, coated_aer_num, uncoated_aer_num, &      !in
@@ -180,7 +180,6 @@ subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &  
    real(r8) :: Kcoll_dust_a1                   ! collision kernel [cm^3/s]
    real(r8) :: Kcoll_dust_a3                   ! collision kernel [cm^3/s]
 
-
    !*****************************************************************************
    !                PDF theta model 
    !*****************************************************************************
@@ -198,7 +197,7 @@ subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &  
    real(r8) :: dim_theta(pdf_n_theta)
    real(r8) :: pdf_imm_theta(pdf_n_theta)
    !------------------------------------------------------------------------------------------------
-
+#include "../../chemistry/yaml/hetfrz_classnuc/f90_yaml/hetfrz_classnuc_calc_beg_yml.f90"
    errstring = ' '
    
 
@@ -305,6 +304,7 @@ subroutine hetfrz_classnuc_calc( deltat, temperature, pressure, supersatice, &  
                                             do_bc, do_dst1, do_dst3, &                      ! in
                                             frzbccnt, frzducnt, errstring)                  ! out
 
+#include "../../chemistry/yaml/hetfrz_classnuc/f90_yaml/hetfrz_classnuc_calc_end_yml.f90"
 end subroutine  hetfrz_classnuc_calc
 
 

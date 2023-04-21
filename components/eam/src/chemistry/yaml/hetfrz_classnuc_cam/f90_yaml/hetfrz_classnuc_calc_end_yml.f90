@@ -1,4 +1,4 @@
-#ifdef YAML_HETFRZ_CLASSNUC
+#ifdef YAML_HETFRZ_CLASSNUC_CAM
   ! YAML file output generation code- DO NOT PORT to C++
 
   !do icol = 1, ncol
