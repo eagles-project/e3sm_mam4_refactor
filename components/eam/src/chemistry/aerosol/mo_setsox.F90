@@ -198,9 +198,10 @@ contains
     !      FORTRAN refactoring: the units are a little messy here
     !      my understanding (may not be right) is that, the PH value xph, shown in [H+] concentration, 
     !      is (mol H+)/(L water), which can be transfered to kg/L or kg/kg
-    !      the variables xso2, xso4, xo3 etc have units of [mol/mol]
-    !      the variable xhnm has unit of [#/cm3]. Some units may lose track
-    !      across modules
+    !      the variables xso2, xso4, xo3 etc have units of [mol/mol] (maybe
+    !      corresponding to kg/kg above?)
+    !      the variable xhnm has unit of [#/cm3]. Some units may changes to
+    !      different formats across modules
     !      Shuaiqi Tang  4/18/2023
     !-----------------------------------------------------------------------      
     real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
@@ -220,7 +221,7 @@ contains
     integer  :: icol,kk
     real(r8) :: xk, xe, x2
     real(r8) :: tz      ! temperature at (i,k) [K]
-    real(r8) :: xl      ! LWC at (i,k) [kg/kg]
+    real(r8) :: xl      ! in-cloud LWC at (i,k) [kg/L]
     real(r8) :: px      ! temporary variable [unitless] 
     real(r8) :: patm
     real(r8) :: so2g, h2o2g, o3g
@@ -294,7 +295,7 @@ contains
           patm = press(icol,kk)/p0        ! calculate press in atm
           t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
 
-          ! cloud liquid water content
+          ! in-cloud liquid water content
           xl = cldconc%xlwc(icol,kk)
           if( xl >= small_value_lwc ) then
  
@@ -460,7 +461,7 @@ contains
     real(r8),  intent(in) :: xso2               ! SO2 [mol/mol]
     real(r8),  intent(in) :: xso4               ! SO4 [mol/mol]
     real(r8),  intent(in) :: xhnm               ! [#/cm3]
-    real(r8),  intent(in) :: xlwc               ! cloud LWC [kg/kg]
+    real(r8),  intent(in) :: xlwc               ! in-cloud LWC [kg/L]
     real(r8),  intent(in) :: so4_fact           ! factor for SO4
     real(r8),  intent(in) :: Ra                 ! constant parameter
     real(r8),  intent(in) :: xkw                ! constant parameter
@@ -677,7 +678,7 @@ contains
     real(r8), intent(in) :: patm        ! pressure [atm]
     real(r8), intent(in) :: dtime       ! time step [s]
     real(r8), intent(in) :: t_factor    ! working variables to convert temperature 
-    real(r8), intent(in) :: xlwc
+    real(r8), intent(in) :: xlwc        ! in-cloud LWC [kg/L]
     real(r8), intent(in) :: const0
     real(r8), intent(in) :: xhnm
     real(r8), intent(in) :: heo3, heso2 ! henry law constant
