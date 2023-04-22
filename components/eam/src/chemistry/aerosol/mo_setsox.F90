@@ -205,7 +205,7 @@ contains
     !      Shuaiqi Tang  4/18/2023
     !-----------------------------------------------------------------------      
     real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
-    real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
+    real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8 ! [cm3/L * mol/mole]
     real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
     real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
     real(r8), parameter :: p0 = 101300._r8          ! sea-level pressure [Pa]
@@ -213,35 +213,29 @@ contains
     real(r8), parameter :: small_value_lwc = 1.e-8_r8 ! small value of LWC [kg/kg]
     real(r8), parameter :: small_value_cf = 1.e-5_r8  ! small value of cloud fraction [fraction]
 
-    !
-    real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
-    real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
-    real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
-
     integer  :: icol,kk
-    real(r8) :: xk, xe, x2      ! output parameters in Henry's law
+    logical  :: converged
+    real(r8) :: t_factor       ! working variables to convert temperature
+    real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
+    real(r8) :: xk, xe, x2     ! output parameters in Henry's law
     real(r8) :: tz      ! temperature at (i,k) [K]
     real(r8) :: xl      ! in-cloud LWC at (i,k) [kg/L]
     real(r8) :: px      ! temporary variable [unitless] 
     real(r8) :: patm    ! pressure [atm]
+
+    ! the concentration values can vary in different forms 
+    real(r8) :: xph0,  xph(ncol,pver)   ! pH value in H+ concentration [mol/L, or kg/L, or kg/kg(w)]
     real(r8) :: so2g, h2o2g, o3g        ! concentration in gas phase [mol/mol]
     real(r8) :: rah2o2, rao3            ! reaction rate
-
-    !
-    real(r8) :: t_factor       ! working variables to convert temperature
-    logical :: converged
-
-    ! ph value in H+ concentration
-    real(r8) :: xph0,  xph(ncol,pver)   ! H+ concentration [mol/L, or kg/L, or kg/kg(w)]
-    real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
     ! mass concentration for species
     real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
                                       xo3, xh2o2  ! species concentrations [mol/mol]
- 
-    ! henry law const for species
-    real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3
-
     real(r8), pointer :: xso4c(:,:)
+    real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
+    real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
+    real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
+ 
+    real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3 ! henry law const for species
     type(cldaero_conc_t), pointer :: cldconc
 
 
@@ -295,11 +289,12 @@ contains
           xl = cldconc%xlwc(icol,kk)
           if( xl >= small_value_lwc ) then
  
-             call calc_ph_values(               &
+             call calc_ph_values(                      &
                 tfld(icol,kk), patm, xl,  t_factor,    & ! in
-                xso2(icol,kk), xso4(icol,kk), xhnm(icol,kk),  cldconc%so4_fact, & ! in
-                Ra, xkw, const0,                & ! in
-                converged, xph(icol,kk)             ) ! out
+                xso2(icol,kk), xso4(icol,kk),          & ! in
+                xhnm(icol,kk), cldconc%so4_fact,       & ! in
+                Ra,            xkw,  const0,           & ! in
+                converged,     xph(icol,kk)            ) ! out
 
              if( .not. converged ) then
                 write(iulog,*) 'setsox: pH failed to converge @ (',icol,',',kk,').'
@@ -403,13 +398,14 @@ contains
           
           if (xl >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
 
-             call calc_sox_aqueous( modal_aerosols,       &
-                rah2o2, h2o2g, so2g, o3g,      rao3,   &
-                patm, dtime, t_factor, xl, const0, &
-                xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      &
-                xso2(icol,kk), xso4(icol,kk), xso4_init(icol,kk), xh2o2(icol,kk), &
-                xdelso4hp_ik)
-             xdelso4hp(icol,kk) = xdelso4hp_ik
+             call calc_sox_aqueous( modal_aerosols,     & ! in
+                rah2o2, h2o2g, so2g, o3g,      rao3,    & ! in
+                patm, dtime, t_factor, xl, const0,      & ! in
+                xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      & ! in
+                xso2(icol,kk), xso4(icol,kk),           & ! inout
+                xso4_init(icol,kk), xh2o2(icol,kk),     & ! inout
+                xdelso4hp(icol,kk)                      ) ! out
+!             xdelso4hp(icol,kk) = xdelso4hp_ik
 
           endif !! WHEN CLOUD IS PRESENTED
 
@@ -652,12 +648,12 @@ contains
   end subroutine calc_ynetpos
 
 !===========================================================================
-  subroutine calc_sox_aqueous( modal_aerosols,         &
-                rah2o2, h2o2g, so2g, o3g,      rao3,   &
-                patm, dtime, t_factor, xlwc, const0, &
-                xhnm, heo3, heso2,      &
-                xso2, xso4, xso4_init, xh2o2, &
-                xdelso4hp_ik)
+  subroutine calc_sox_aqueous( modal_aerosols,         & ! in
+                rah2o2, h2o2g, so2g, o3g,      rao3,   & ! in
+                patm, dtime, t_factor, xlwc, const0,   & ! in
+                xhnm, heo3,  heso2,                    & ! in
+                xso2, xso4,  xso4_init, xh2o2,         & ! inout
+                xdelso4hp_ik                           ) ! out
     !-----------------------------------------------------------------
     !       ... Prediction after aqueous phase
     !       so4
