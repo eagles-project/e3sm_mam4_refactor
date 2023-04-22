@@ -18,5 +18,11 @@ use spmd_utils,   only : masterproc
 ! module_aero_coag.F90
 !#define YAML_COAG
 
+! modal_aero_convproc.F90
+!#define YAML_CONV
+
+! aero_model.F90 
+!#define YAML_AERO_MODEL
+
 use yaml_input_file_io
 
