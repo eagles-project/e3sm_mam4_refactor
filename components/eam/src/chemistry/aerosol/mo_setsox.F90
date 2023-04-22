@@ -219,13 +219,13 @@ contains
     real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
 
     integer  :: icol,kk
-    real(r8) :: xk, xe, x2
+    real(r8) :: xk, xe, x2      ! output parameters in Henry's law
     real(r8) :: tz      ! temperature at (i,k) [K]
     real(r8) :: xl      ! in-cloud LWC at (i,k) [kg/L]
     real(r8) :: px      ! temporary variable [unitless] 
-    real(r8) :: patm
-    real(r8) :: so2g, h2o2g, o3g
-    real(r8) :: rah2o2, rao3
+    real(r8) :: patm    ! pressure [atm]
+    real(r8) :: so2g, h2o2g, o3g        ! concentration in gas phase [mol/mol]
+    real(r8) :: rah2o2, rao3            ! reaction rate
 
     !
     real(r8) :: t_factor       ! working variables to convert temperature
@@ -236,7 +236,7 @@ contains
     real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
     ! mass concentration for species
     real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
-                                      xo3, xh2o2  ! concentrations, should be in the unit of [mol/mol]
+                                      xo3, xh2o2  ! species concentrations [mol/mol]
  
     ! henry law const for species
     real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3
@@ -245,10 +245,6 @@ contains
     type(cldaero_conc_t), pointer :: cldconc
 
 
-    !-----------------------------------------------------------------
-    !       ... NOTE: The press array is in pascals and must be
-    !                 mutiplied by 10 to yield dynes/cm**2.
-    !-----------------------------------------------------------------
     !==================================================================
     !       ... First set the PH
     !==================================================================
@@ -330,19 +326,22 @@ contains
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          call henry_factor_h2o2(t_factor, xk, xe)
+          call henry_factor_h2o2(t_factor,      & ! in
+                                xk, xe          ) ! out
           heh2o2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          call henry_factor_so2(t_factor, xk, xe, x2)
+          call henry_factor_so2(t_factor,       & ! in
+                                xk, xe, x2      ) ! out
           heso2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk)*(1._r8 + x2/xph(icol,kk)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          call henry_factor_o3(t_factor, xk)
+          call henry_factor_o3(t_factor,        & ! in
+                                xk              ) ! out
           heo3(icol,kk) = xk
 
           !-----------------------------------------------
@@ -475,7 +474,7 @@ contains
     integer   :: iter  ! iteration number
     real(r8)  :: yph_lo, yph_hi, yph    ! pH values, lower and upper bounds
     real(r8)  :: ynetpos_lo, ynetpos_hi ! lower and upper bounds of ynetpos
-    real(r8)  :: xk, xe, x2     ! working variables
+    real(r8)  :: xk, xe, x2     ! output parameters in Henry's law
     real(r8)  :: fact1_so2, fact2_so2, fact3_so2, fact4_so2  ! SO2 factors
     real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species [1/cm3]
     real(r8)  :: ynetpos        ! net positive ions
@@ -509,7 +508,8 @@ contains
     !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
     !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
     !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-    call henry_factor_so2(t_factor, xk, xe, x2)
+    call henry_factor_so2(t_factor,     & ! in
+                        xk, xe, x2      ) ! out
     fact1_so2 = xk*xe*patm*xso2
     fact2_so2 = xk*Ra*temperature*xlwc
     fact3_so2 = xe
@@ -519,7 +519,8 @@ contains
     Eh2o = xkw
 
     ! -------------- co2 effects -------------------
-    call henry_factor_co2(t_factor, xk, xe)
+    call henry_factor_co2(t_factor,     & ! in
+                        xk, xe          ) ! out
     Eco2 = xk*xe*co2g  *patm
 
     ! -------------- so4 effects -------------------
