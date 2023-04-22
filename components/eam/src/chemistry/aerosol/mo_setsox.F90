@@ -258,12 +258,10 @@ contains
     xph0 = 10._r8**(-ph0) 
 
     ! calculate total atms density [kg/L]
-    do k = 1,pver
-       cfact(:,k) = xhnm(:,k)     &          ! /cm3(a)  
+    cfact(:,:) = xhnm(:,:)        &          ! /cm3(a)  
             * 1.e6_r8             &          ! /m3(a)
             * 1.38e-23_r8/287._r8 &          ! Kg(a)/m3(a)
             * 1.e-3_r8                       ! Kg(a)/L(a)
-    enddo
 
     if ( inv_so2 .or. id_hno3>0 .or. inv_h2o2 .or. id_nh3>0 .or. inv_o3 &
                  .or. (.not. inv_ho2) .or. (.not. cloud_borne) .or. id_msa>0) then
@@ -276,14 +274,12 @@ contains
     cldconc => sox_cldaero_create_obj( cldfrc,qcw,lwc, cfact, ncol, loffset )
     xso4c => cldconc%so4c
 
-    xso4(:,:) = 0._r8
-    do k = 1,pver
-       xph(:,k) = xph0                                ! initial PH value
-       xso2 (:,k) = qin(:,k,id_so2)                 
-       xh2o2 (:,k) = qin(:,k,id_h2o2)               
-       xo3  (:,k) = qin(:,k,id_o3)                  
-       xh2so4(:,k) = qin(:,k,id_h2so4)
-    enddo
+    xso4(:,:)   = 0._r8
+    xph(:,:)    = xph0          ! initial PH value
+    xso2(:,:)   = qin(:,:,id_so2)                 
+    xh2o2(:,:)  = qin(:,:,id_h2o2)               
+    xo3 (:,:)   = qin(:,:,id_o3)                  
+    xh2so4(:,:) = qin(:,:,id_h2so4)
     
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
