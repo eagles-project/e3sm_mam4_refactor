@@ -217,10 +217,10 @@ contains
     real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
     real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
 
-    integer  :: k, i
+    integer  :: icol,kk
     real(r8) :: xk, xe, x2
     real(r8) :: tz      ! temperature at (i,k) [K]
-    real(r8) :: xl      ! LWP at (i,k) [kg/kg]
+    real(r8) :: xl      ! LWC at (i,k) [kg/kg]
     real(r8) :: px      ! temporary variable [unitless] 
     real(r8) :: patm
     real(r8) :: so2g, h2o2g, o3g
@@ -284,32 +284,32 @@ contains
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
     !-----------------------------------------------------------------
-    ver_loop0: do k = 1,pver                               !! pver loop for STEP 0
-       col_loop0: do i = 1,ncol
+    ver_loop0: do kk = 1,pver          !! pver loop for STEP 0
+       col_loop0: do icol = 1,ncol
           
-          if (cloud_borne .and. cldfrc(i,k)>0._r8) then
-             xso4(i,k) = xso4c(i,k) / cldfrc(i,k)
+          if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
+             xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
           endif
 
-          patm = press(i,k)/p0        ! calculate press in atm
-          t_factor = (1._r8 / tfld(i,k)) - (1._r8 / t298K)
+          patm = press(icol,kk)/p0        ! calculate press in atm
+          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
 
           ! cloud liquid water content
-          xl = cldconc%xlwc(i,k)
+          xl = cldconc%xlwc(icol,kk)
           if( xl >= small_value_lwc ) then
  
              call calc_ph_values(               &
-                tfld(i,k), patm, xl,  t_factor,    & ! in
-                xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact, & ! in
+                tfld(icol,kk), patm, xl,  t_factor,    & ! in
+                xso2(icol,kk), xso4(icol,kk), xhnm(icol,kk),  cldconc%so4_fact, & ! in
                 Ra, xkw, const0,                & ! in
-                converged, xph(i,k)             ) ! out
+                converged, xph(icol,kk)             ) ! out
 
              if( .not. converged ) then
-                write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,').'
+                write(iulog,*) 'setsox: pH failed to converge @ (',icol,',',kk,').'
              endif
 
           else
-             xph(i,k) =  1.e-7_r8
+             xph(icol,kk) =  1.e-7_r8
           endif
 
        enddo col_loop0
@@ -318,31 +318,31 @@ contains
     !==============================================================
     !          ... Now use the actual PH
     !==============================================================
-    ver_loop1: do k = 1,pver
-       col_loop1: do i = 1,ncol
+    ver_loop1: do kk = 1,pver
+       col_loop1: do icol = 1,ncol
 
-          t_factor = (1._r8 / tfld(i,k)) - (1._r8 / t298K)
-          tz = tfld(i,k)
-          xl = cldconc%xlwc(i,k)
-          patm = press(i,k)/p0        ! calculate press in atm
+          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
+          tz = tfld(icol,kk)
+          xl = cldconc%xlwc(icol,kk)
+          patm = press(icol,kk)/p0        ! calculate press in atm
 
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
           call henry_factor_h2o2(t_factor, xk, xe)
-          heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
+          heh2o2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
           call henry_factor_so2(t_factor, xk, xe, x2)
-          heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
+          heso2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk)*(1._r8 + x2/xph(icol,kk)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
           call henry_factor_o3(t_factor, xk)
-          heo3(i,k) = xk
+          heo3(icol,kk) = xk
 
           !-----------------------------------------------
           !       ... Partioning 
@@ -351,20 +351,20 @@ contains
           !------------------------------------------------------------------------
           !        ... h2o2
           !------------------------------------------------------------------------
-          px = heh2o2(i,k) * Ra * tz * xl
-          h2o2g =  xh2o2(i,k)/(1._r8+ px)
+          px = heh2o2(icol,kk) * Ra * tz * xl
+          h2o2g =  xh2o2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... so2
           !------------------------------------------------------------------------
-          px = heso2(i,k) * Ra * tz * xl
-          so2g =  xso2(i,k)/(1._r8+ px)
+          px = heso2(icol,kk) * Ra * tz * xl
+          so2g =  xso2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... o3
           !------------------------------------------------------------------------
-          px = heo3(i,k) * Ra * tz * xl
-          o3g =  xo3(i,k)/(1._r8+ px)
+          px = heo3(icol,kk) * Ra * tz * xl
+          o3g =  xo3(icol,kk)/(1._r8+ px)
 
           !-----------------------------------------------
           !       ... Aqueous phase reaction rates
@@ -376,13 +376,13 @@ contains
           !       ... S(IV) (HSO3) + H2O2
           !------------------------------------------------------------------------
           rah2o2 = 8.e4_r8 * exp( -3650._r8*t_factor )  &
-               / (.1_r8 + xph(i,k))
+               / (.1_r8 + xph(icol,kk))
 
           !------------------------------------------------------------------------
           !        ... S(IV)+ O3
           !------------------------------------------------------------------------
           rao3   = 4.39e11_r8 * exp(-4131._r8/tz)  &
-               + 2.56e3_r8  * exp(-996._r8 /tz) /xph(i,k)
+               + 2.56e3_r8  * exp(-996._r8 /tz) /xph(icol,kk)
 
           !-----------------------------------------------------------------
           !       ... Prediction after aqueous phase
@@ -406,10 +406,10 @@ contains
              call calc_sox_aqueous( modal_aerosols,       &
                 rah2o2, h2o2g, so2g, o3g,      rao3,   &
                 patm, dtime, t_factor, xl, const0, &
-                xhnm(i,k), heo3(i,k), heso2(i,k),      &
-                xso2(i,k), xso4(i,k), xso4_init(i,k), xh2o2(i,k), &
+                xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      &
+                xso2(icol,kk), xso4(icol,kk), xso4_init(icol,kk), xh2o2(icol,kk), &
                 xdelso4hp_ik)
-             xdelso4hp(i,k) = xdelso4hp_ik
+             xdelso4hp(icol,kk) = xdelso4hp_ik
 
           endif !! WHEN CLOUD IS PRESENTED
 
@@ -423,10 +423,10 @@ contains
          qcw, qin  ) ! inout
     
     xphlwc(:,:) = 0._r8
-    do k = 1, pver
-       do i = 1, ncol
-          if (cldfrc(i,k)>=small_value_cf .and. lwc(i,k)>=small_value_lwc) then
-             xphlwc(i,k) = -1._r8*log10(xph(i,k)) * lwc(i,k)
+    do kk = 1, pver
+       do icol = 1, ncol
+          if (cldfrc(icol,kk)>=small_value_cf .and. lwc(icol,kk)>=small_value_lwc) then
+             xphlwc(icol,kk) = -1._r8*log10(xph(icol,kk)) * lwc(icol,kk)
           endif
        enddo
     enddo
