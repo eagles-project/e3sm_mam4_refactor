@@ -233,17 +233,12 @@ contains
     real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
     ! mass concentration for species
     real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
-                                      xho2, xo3, xh2o2  ! concentrations, should be in the unit of [mol/mol]
-    ! concentrations that are not used and can be removed later
-    real(r8), dimension(ncol,pver) :: xmsa, xnh3,xhno3
-    real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
+                                      xo3, xh2o2  ! concentrations, should be in the unit of [mol/mol]
  
     ! henry law const for species
-    real(r8), dimension(ncol,pver) :: heh2o2,heso2,henh3,heo3
+    real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3
 
     real(r8), pointer :: xso4c(:,:)
-    real(r8), pointer :: xnh4c(:,:)
-    real(r8), pointer :: xno3c(:,:)
     type(cldaero_conc_t), pointer :: cldconc
 
 
@@ -278,8 +273,6 @@ contains
     ! initialize species concentrations
     cldconc => sox_cldaero_create_obj( cldfrc,qcw,lwc, cfact, ncol, loffset )
     xso4c => cldconc%so4c
-    xnh4c => cldconc%nh4c
-    xno3c => cldconc%no3c
 
     xso4(:,:) = 0._r8
     do k = 1,pver
@@ -287,19 +280,9 @@ contains
        xso2 (:,k) = qin(:,k,id_so2)                 
        xh2o2 (:,k) = qin(:,k,id_h2o2)               
        xo3  (:,k) = qin(:,k,id_o3)                  
-       xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)
        xh2so4(:,k) = qin(:,k,id_h2so4)
     enddo
     
-    ! NO3 NH3 and MSA  are not incorporated in MAM4, remove the related code
-    ! assign 0 to input variables needed for subroutine sox_cldaero_update
-    ! this assignment can be removed when incorporating refaction of
-    ! sox_cldaero_update
-    hno3g(:,:) = 0._r8
-    xmsa(:,:)  = 0._r8
-    xnh3(:,:)  = 0._r8
-    xhno3(:,:) = 0._r8    
-
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
     !-----------------------------------------------------------------
