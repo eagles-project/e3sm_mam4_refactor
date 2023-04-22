@@ -695,6 +695,8 @@ contains
     real(r8) :: delta_s ! so4 production in the time step
     real(r8) :: xk_so2, xk_h2o2 ! for the use of Henry Law subroutines
     real(r8) :: xe, x2  ! output of henry law subroutines but not used
+    real(r8), parameter :: small_value_20 = 1.e-20_r8 ! small value 
+    real(r8), parameter :: small_value_30 = 1.e-30_r8 ! small value
 
           !............................
           !       S(IV) + H2O2 = S(VI)
@@ -715,7 +717,7 @@ contains
          / xhnm
 
 
-    delta_s = max(pso4*dtime, 1.e-30_r8)
+    delta_s = max(pso4*dtime, small_value_30)
 
     xso4_init=xso4
 
@@ -726,11 +728,11 @@ contains
     elseif (xh2o2 > xso2) then
         xso4=xso4+xso2
         xh2o2=xh2o2-xso2
-        xso2=1.e-20_r8
+        xso2=small_value_20
     else
         xso4=xso4+xh2o2
         xso2=xso2-xh2o2
-        xh2o2=1.e-20_r8
+        xh2o2=small_value_20
     endif
 
     if (modal_aerosols) then
@@ -747,13 +749,13 @@ contains
          / const0      &                                ! [/L(a)/s]
          / xhnm                                    ! [mixing ratio/s]
 
-    delta_s = max(pso4*dtime, 1.e-30_r8)
+    delta_s = max(pso4*dtime, small_value_30)
 
     xso4_init=xso4
 
     if (delta_s > xso2) then
        xso4 = xso4 + xso2
-       xso2 = 1.e-20_r8
+       xso2 = small_value_20
     else
        xso4 = xso4 + delta_s
        xso2 = xso2 - delta_s
