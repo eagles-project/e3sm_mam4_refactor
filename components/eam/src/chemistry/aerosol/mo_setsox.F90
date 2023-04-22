@@ -208,6 +208,7 @@ contains
     real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
     real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
     real(r8), parameter :: p0 = 101300._r8          ! sea-level pressure [Pa]
+    real(r8), parameter :: t298K = 298._r8          ! temperature of 25degC [K]
     real(r8), parameter :: small_value_lwc = 1.e-8_r8 ! small value of LWC [kg/kg]
     real(r8), parameter :: small_value_cf = 1.e-5_r8  ! small value of cloud fraction [fraction]
 
@@ -295,13 +296,14 @@ contains
           endif
 
           patm = press(i,k)/p0        ! calculate press in atm
+          t_factor = (1._r8 / tfld(i,k)) - (1._r8 / t298K)
 
           ! cloud liquid water content
           xl = cldconc%xlwc(i,k)
           if( xl >= small_value_lwc ) then
  
              call calc_ph_values(               &
-                tfld(i,k), patm, xl,      & ! in
+                tfld(i,k), patm, xl,  t_factor,    & ! in
                 xso2(i,k), xso4(i,k), xhnm(i,k),  cldconc%so4_fact, & ! in
                 Ra, xkw, const0,                & ! in
                 converged, xph(i,k)             ) ! out
@@ -322,11 +324,10 @@ contains
     !==============================================================
     ver_loop1: do k = 1,pver
        col_loop1: do i = 1,ncol
-          t_factor = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
+
+          t_factor = (1._r8 / tfld(i,k)) - (1._r8 / t298K)
           tz = tfld(i,k)
-
           xl = cldconc%xlwc(i,k)
-
           patm = press(i,k)/p0        ! calculate press in atm
 
           !-----------------------------------------------------------------
@@ -441,7 +442,7 @@ contains
 
 !===========================================================================
   subroutine calc_ph_values(                    &
-                temperature, patm, xlwc,    & ! in
+                temperature, patm, xlwc, t_factor,   & ! in
                 xso2, xso4, xhnm,  so4_fact,    & ! in
                 Ra,   xkw,  const0,             & ! in
                 converged, xph                  ) ! out
@@ -459,6 +460,7 @@ contains
 
     real(r8),  intent(in) :: temperature        ! temperature [K]
     real(r8),  intent(in) :: patm               ! pressure [atm]
+    real(r8),  intent(in) :: t_factor           ! working variable to convert to 25 degC (1/T - 1/[298K])
     real(r8),  intent(in) :: xso2               ! SO2 [mol/mol]
     real(r8),  intent(in) :: xso4               ! SO4 [mol/mol]
     real(r8),  intent(in) :: xhnm               ! [#/cm3]
@@ -476,7 +478,6 @@ contains
     integer   :: iter  ! iteration number
     real(r8)  :: yph_lo, yph_hi, yph    ! pH values, lower and upper bounds
     real(r8)  :: ynetpos_lo, ynetpos_hi ! lower and upper bounds of ynetpos
-    real(r8)  :: t_factor       ! working variables to convert temperature
     real(r8)  :: xk, xe, x2     ! working variables
     real(r8)  :: fact1_so2, fact2_so2, fact3_so2, fact4_so2  ! SO2 factors
     real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species [1/cm3]
@@ -485,9 +486,6 @@ contains
     integer,  parameter :: itermax = 20  ! maximum number of iterations
     real(r8), parameter :: co2g = 330.e-6_r8    !330 ppm = 330.e-6 atm
 
-
-    ! calculate working variable to convert to 25 degC (1/T - 1/[298K])
-    t_factor = 1._r8 / temperature - 1._r8 / 298._r8
 
     !----------------------------------------
     ! effect of chemical species
