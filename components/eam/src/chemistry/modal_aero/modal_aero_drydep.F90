@@ -640,9 +640,9 @@ contains
     ! Local Variables
 
     integer  :: ii, kk        ! grid column and layer indices
-    real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
-    real(r8) :: slp_crc       ! [frc] Slip correction factor
-    real(r8) :: radius_moment ! median radius [m] for moment
+    real(r8) :: vsc_dyn_atm   ! Dynamic viscosity of air [kg m-1 s-1]
+    real(r8) :: slp_crc       ! Slip correction factor [unitless]
+    real(r8) :: radius_moment ! median radius for moment [m]
 
     !-----------
     do kk=1,nver
@@ -701,15 +701,15 @@ contains
     ! Local Variables
 
     integer  :: ii            ! grid column index
-    real(r8) :: vsc_dyn_atm   ! [kg m-1 s-1] Dynamic viscosity of air
-    real(r8) :: vsc_knm_atm   ! [m2 s-1] Kinematic viscosity of atmosphere
-    real(r8) :: slp_crc       ! [frc] Slip correction factor
-    real(r8) :: radius_moment ! median radius [m] for moment
+    real(r8) :: vsc_dyn_atm   ! Dynamic viscosity of air [kg m-1 s-1]
+    real(r8) :: vsc_knm_atm   ! Kinematic viscosity of atmosphere [m2 s-1]
+    real(r8) :: slp_crc       ! Slip correction factor [unitless]
+    real(r8) :: radius_moment ! median radius for moment [m]
 
-    real(r8) :: shm_nbr       ! [frc] Schmidt number
-    real(r8) :: stk_nbr       ! [frc] Stokes number
-    real(r8) :: rss_trb       ! [s m-1] Resistance to turbulent deposition
-    real(r8) :: rss_lmn       ! [s m-1] Quasi-laminar layer resistance
+    real(r8) :: shm_nbr       ! Schmidt number [unitless]
+    real(r8) :: stk_nbr       ! Stokes number [unitless]
+    real(r8) :: rss_trb       ! Resistance to turbulent deposition [s m-1]
+    real(r8) :: rss_lmn       ! Quasi-laminar layer resistance [s m-1]
     real(r8) :: brownian      ! collection efficiency for Browning diffusion
     real(r8) :: impaction     ! collection efficiency for impaction
     real(r8) :: interception  ! collection efficiency for interception
@@ -799,7 +799,7 @@ contains
              if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
                 stk_nbr = vlc_grv(ii) * fricvel(ii) / (gravit*radius_collector(lt))
              else ! non-vegetated surface
-                stk_nbr = vlc_grv(ii) * fricvel(ii) * fricvel(ii) / (gravit*vsc_knm_atm)  ![frc] SeP97 p.965
+                stk_nbr = vlc_grv(ii) * fricvel(ii) * fricvel(ii) / (gravit*vsc_knm_atm)  ! SeP97 p.965
              endif
 
              impaction = (stk_nbr/(alpha(lt)+stk_nbr))**beta   ! Eq. (7c) of Zhang L. et al.  (2001)
@@ -881,7 +881,7 @@ contains
     real(r8),intent(in) :: pres   ! air pressure [Pa]
     real(r8),intent(in) :: rair   ! gas constant of air [J/K/kg]
 
-    real(r8) :: vsc_dyn_atm  ! kinematic viscosity of air [m2 s-1]
+    real(r8) :: vsc_dyn_atm  ! dynamic viscosity of air [kg m-1 s-1]
     real(r8) :: rho          ! density of air [kg/m3]
 
     vsc_dyn_atm = air_dynamic_viscosity( temp)
