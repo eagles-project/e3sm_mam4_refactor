@@ -62,16 +62,16 @@ contains
     real(r8), pointer :: landfrac(:) ! land fraction [unitless]
     real(r8), pointer :: icefrac(:)  ! ice fraction [unitless]
     real(r8), pointer :: ocnfrac(:)  ! ocean fraction [unitless]
-    real(r8), pointer :: fricvelin(:)! friction velocity [m/s] from land model
-    real(r8), pointer :: ram1in(:)   ! aerodynamical resistance [s/m] from land model 
+    real(r8), pointer :: fricvelin(:)! friction velocity from land model [m/s]
+    real(r8), pointer :: ram1in(:)   ! aerodynamical resistance from land model [s/m]
 
     real(r8), pointer :: tair(:,:)   ! air temperture [k]
     real(r8), pointer :: pmid(:,:)   ! air pressure at layer midpoint [Pa]
     real(r8), pointer :: pint(:,:)   ! air pressure at layer interface [Pa]
     real(r8), pointer :: pdel(:,:)   ! layer thickness [Pa]
 
-    real(r8) :: fricvel(pcols)     ! friction velocity [m/s] used in the calculaiton of turbulent dry deposition velocity 
-    real(r8) ::    ram1(pcols)     ! aerodynamical resistance [s/m] used in the calculaiton of turbulent dry deposition velocity 
+    real(r8) :: fricvel(pcols)     ! friction velocity used in the calculaiton of turbulent dry deposition velocity [m/s]
+    real(r8) ::    ram1(pcols)     ! aerodynamical resistance used in the calculaiton of turbulent dry deposition velocity [s/m]
 
     integer :: lchnk   ! chunk identifier
     integer :: ncol    ! number of active atmospheric columns
@@ -89,7 +89,7 @@ contains
     real(r8) :: dens_drop(pcols,pver)  ! cloud droplet density [kg/m3]
     real(r8) ::   sg_drop(pcols,pver)  ! assumed geometric standard deviation of droplet size distribution
 
-    real(r8) ::   rad_aer(pcols,pver)  ! volume mean wet radius [m] of interstitial aerosols
+    real(r8) ::   rad_aer(pcols,pver)  ! volume mean wet radius of interstitial aerosols [m]
     real(r8) ::  dens_aer(pcols,pver)  ! wet density of interstitial aerosols [kg/m3]
     real(r8) ::    sg_aer(pcols,pver)  ! assumed geometric standard deviation of particle size distribution
 
