@@ -195,7 +195,7 @@ contains
 
        qq => qqcw_get_field(pbuf,icnst,lchnk)
        call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
-                                               gravit, rho, tair, pint, pmid, pdel,&! in
+                                               rho, tair, pint, pmid, pdel,        &! in
                                                dqdt_tmp, sflx                      )! out
 
        aerdepdrycw(:ncol,icnst) = sflx(:ncol)
@@ -257,7 +257,7 @@ contains
 
           qq => state%q(:,:,icnst)
           call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
-                                                  gravit, rho, tair, pint, pmid, pdel,&! in
+                                                  rho, tair, pint, pmid, pdel,        &! in
                                                   dqdt_tmp, sflx                      )! out
 
           aerdepdryis(:ncol,icnst) = sflx(:ncol)
@@ -291,7 +291,7 @@ contains
   ! Numerically solve the sedimentation equation for 1 tracer
   !-----------------------------------------------------------------------
   subroutine sedimentation_solver_for_1_tracer( ncol, dt, sed_vel, qq_in,            &! in
-                                                gravit, rho, tair, pint, pmid, pdel, &! in
+                                                rho, tair, pint, pmid, pdel,         &! in
                                                 dqdt_sed, sflx                       )! out
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
@@ -300,7 +300,6 @@ contains
 
     integer , intent(in) :: ncol
     real(r8), intent(in) :: dt
-    real(r8), intent(in) :: gravit                    ! gravitational acceleration [m/s2]
     real(r8), intent(in) :: rho(pcols,pver)           ! air density [kg/m3]
     real(r8), intent(in) :: tair(pcols,pver)          ! air temperature [K]
     real(r8), intent(in) :: pint(pcols,pverp)         ! air pressure at layer interfaces [Pa]
@@ -654,8 +653,8 @@ contains
 
        slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
 
-       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk),      &
-                                                  gravit, slp_crc, vsc_dyn_atm, sig_part(ii,kk) )
+       vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk),   &
+                                                  slp_crc, vsc_dyn_atm, sig_part(ii,kk) )
     enddo
     enddo
     !----
@@ -940,18 +939,17 @@ contains
   end function schmidt_number
 
   !=======================================================================================
-  ! Calculate the bulk gravitational settling velocity [m/s-1] 
+  ! Calculate the bulk gravitational settling velocity [m s-1] 
   !  - using the terminal velocity of sphere falling in a fluid based on Stokes's law and 
   !  - taking into account the influces of size distribution.
   !=======================================================================================
-  real(r8) function gravit_settling_velocity( particle_radius, particle_density, gravit,       &
+  real(r8) function gravit_settling_velocity( particle_radius, particle_density,               &
                                               slip_correction, dynamic_viscosity, particle_sig )
 
     real(r8),intent(in) :: particle_radius   ! [m]
     real(r8),intent(in) :: particle_density  ! [kg/m3]
-    real(r8),intent(in) :: gravit            ! [kg/m2/s], gravitational acceleration
     real(r8),intent(in) :: slip_correction   ! [unitless]
-    real(r8),intent(in) :: dynamic_viscosity ! [kg/m/s], dynamic viscosity of air
+    real(r8),intent(in) :: dynamic_viscosity ! [kg/m/s]
     real(r8),intent(in) :: particle_sig      ! geometric standard deviation of particle size distribution
 
     real(r8) :: lnsig         ! ln(particle_sig)
