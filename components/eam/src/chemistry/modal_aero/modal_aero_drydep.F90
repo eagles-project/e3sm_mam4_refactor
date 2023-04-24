@@ -651,7 +651,7 @@ contains
 
        radius_moment = radius_for_moment( moment,sig_part(ii,kk),radius_part(ii,kk),radius_max )
 
-       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), rair, pi, radius_moment ) 
+       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), radius_moment ) 
 
        vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk),   &
                                                   slp_crc, vsc_dyn_atm, sig_part(ii,kk) )
@@ -756,12 +756,12 @@ contains
        ! Calculate size-INdependent thermokinetic properties of the air
 
        vsc_dyn_atm = air_dynamic_viscosity( tair(ii) )
-       vsc_knm_atm = air_kinematic_viscosity( tair(ii), pmid(ii), rair )
+       vsc_knm_atm = air_kinematic_viscosity( tair(ii), pmid(ii) )
 
        ! Calculate the mean radius and Schmidt number of the moment
 
        radius_moment = radius_for_moment( moment,sig_part(ii),radius_part(ii),radius_max )
-       shm_nbr = schmidt_number( tair(ii), pmid(ii), radius_moment, rair, pi, boltz, vsc_dyn_atm, vsc_knm_atm )
+       shm_nbr = schmidt_number( tair(ii), pmid(ii), radius_moment, vsc_dyn_atm, vsc_knm_atm )
 
        ! Initialize deposition velocities averages over different land surface types
 
@@ -874,11 +874,10 @@ contains
   !==========================================================================
   ! Calculate kinematic viscosity of air, unit [m2 s-1]
   !==========================================================================
-  real(r8) function air_kinematic_viscosity( temp, pres, rair )
+  real(r8) function air_kinematic_viscosity( temp, pres )
 
     real(r8),intent(in) :: temp   ! air temperature [K]
     real(r8),intent(in) :: pres   ! air pressure [Pa]
-    real(r8),intent(in) :: rair   ! gas constant of air [J/K/kg]
 
     real(r8) :: vsc_dyn_atm  ! dynamic viscosity of air [kg m-1 s-1]
     real(r8) :: rho          ! density of air [kg/m3]
@@ -895,13 +894,11 @@ contains
   ! See, e.g., SeP97 p. 464 and Zhang L. et al. (2001),
   ! DOI: 10.1016/S1352-2310(00)00326-5, Eq. (3).
   !======================================================
-  real(r8) function slip_correction_factor( dyn_visc, pres, temp, rair, pi, particle_radius ) 
+  real(r8) function slip_correction_factor( dyn_visc, pres, temp, particle_radius ) 
 
     real(r8),intent(in) :: dyn_visc         ! dynamic viscosity of air [kg m-1 s-1]
     real(r8),intent(in) :: pres             ! air pressure [Pa]
     real(r8),intent(in) :: temp             ! air temperature [K]
-    real(r8),intent(in) :: rair             ! gas constant of air [J/K/kg]
-    real(r8),intent(in) :: pi               ! constant pi = 3.14159....
     real(r8),intent(in) :: particle_radius  ! particle radius [m]
 
     real(r8) :: mean_free_path  ! [m]
@@ -917,21 +914,18 @@ contains
   !====================================================================
   ! Calculate the Schmidt number of air [unitless], see SeP97 p.972
   !====================================================================
-  real(r8) function schmidt_number( temp, pres, radius, rair, pi, boltz, vsc_dyn_atm, vsc_knm_atm )
+  real(r8) function schmidt_number( temp, pres, radius, vsc_dyn_atm, vsc_knm_atm )
 
     real(r8),intent(in) :: temp             ! air temperature [K]
     real(r8),intent(in) :: pres             ! air pressure [Pa]
     real(r8),intent(in) :: radius           ! particle radius [m]
-    real(r8),intent(in) :: rair             ! gas constant of air [J/K/kg]
-    real(r8),intent(in) :: pi               ! constant pi = 3.14159....
-    real(r8),intent(in) :: boltz            ! Boltzman's constant [J/K/molecule] 
     real(r8),intent(in) :: vsc_dyn_atm      ! dynamic viscosity of air [kg m-1 s-1]
     real(r8),intent(in) :: vsc_knm_atm      ! kinematic viscosity of air [m2 s-1]
 
     real(r8) :: slp_crc   ! slip correction factor [unitless]
     real(r8) :: dff_aer   ! Brownian diffusivity of particle [m2/s], see SeP97 p.474
 
-    slp_crc = slip_correction_factor( vsc_dyn_atm, pres, temp, rair, pi, radius )
+    slp_crc = slip_correction_factor( vsc_dyn_atm, pres, temp, radius )
     dff_aer = boltz * temp * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius) 
 
     schmidt_number = vsc_knm_atm / dff_aer
