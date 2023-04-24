@@ -12,7 +12,6 @@ module modal_aero_drydep
   use modal_aero_data,only: cnst_name_cw
   use ppgrid,         only: pcols, pver, pverp
   use modal_aero_data,only: ntot_amode
-  use aerodep_flx,    only: aerodep_flx_prescribed
   use physconst,      only: gravit, rair, rhoh2o, pi, boltz
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
@@ -284,13 +283,10 @@ contains
     enddo    ! imode = 1, ntot_amode
 
     !=====================================================================
-    ! Unless the user has specified prescribed aerosol dep fluxes,
-    ! copy the fluxes calculated here to cam_out to be passed to other 
+    ! Copy the fluxes calculated here to cam_out to be passed to other
     ! components of the Earth System Model.
     !=====================================================================
-    if (.not.aerodep_flx_prescribed()) then
-       call set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
-    endif
+    call set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
 
   end subroutine aero_model_drydep
 
