@@ -13,7 +13,7 @@ module modal_aero_drydep
   use ppgrid,         only: pcols, pver, pverp
   use modal_aero_data,only: ntot_amode
   use aerodep_flx,    only: aerodep_flx_prescribed
-  use physconst,      only: gravit, rair, rhoh2o
+  use physconst,      only: gravit, rair, rhoh2o, pi, boltz
   use camsrfexch,     only: cam_in_t, cam_out_t
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
   use physics_buffer, only: physics_buffer_desc
@@ -440,7 +440,6 @@ contains
                                      radius_part, density_part, sig_part, moment,  &! in
                                      vlc_dry, vlc_trb, vlc_grv                     )! out
 
-    use physconst,     only: pi,boltz, gravit, rair
 
     integer,  intent(in) :: moment       ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
     integer,  intent(in) :: ncol         ! # of grid columns to do calculations for
@@ -467,8 +466,7 @@ contains
     !------------------------------------------------------------------------------------
     ! Calculate deposition velocity of gravitational settling in all grid layers
     !------------------------------------------------------------------------------------
-    call modal_aero_gravit_settling_velocity( moment, ncol, pcols, pver,                       &! in
-                                              gravit, rair, pi, radius_max,                    &! in
+    call modal_aero_gravit_settling_velocity( moment, ncol, pcols, pver, radius_max,           &! in
                                               tair, pmid, radius_part, density_part, sig_part, &! in
                                               vlc_grv                                          )! out
 
@@ -480,8 +478,7 @@ contains
     !  - Calculate turbulent dry deposition velocity, vlc_trb.
     !  - Add vlc_trb to vlc_grv to give the total deposition velocity, vlc_dry.
     !------------------------------------------------------------------------------------
-    call modal_aero_turb_drydep_velocity( moment, ncol, pcols, lchnk,                &! in
-                                          gravit, rair, pi, boltz, radius_max,       &! in
+    call modal_aero_turb_drydep_velocity( moment, ncol, pcols, lchnk, radius_max,    &! in
                                           tair(:,pver), pmid(:,pver),                &! in
                                           radius_part(:,pver), density_part(:,pver), &! in
                                           sig_part(:,pver),                          &! in
@@ -618,11 +615,9 @@ contains
   !==========================================================================
   ! Calculate particle velocity of gravitational settling
   !==========================================================================
-  subroutine modal_aero_gravit_settling_velocity( moment, ncol, pcols, nver,           &! in
-                                                  gravit, rair, pi, radius_max,        &! in
-                                                  tair, pmid,                          &! in
-                                                  radius_part, density_part, sig_part, &! in
-                                                  vlc_grv                              )! out
+  subroutine modal_aero_gravit_settling_velocity( moment, ncol, pcols, nver, radius_max,           &! in
+                                                  tair, pmid, radius_part, density_part, sig_part, &! in
+                                                  vlc_grv                                          )! out
 
     ! Arguments
 
@@ -631,9 +626,6 @@ contains
     integer,  intent(in) :: pcols        ! dimension size (# of columns) 
     integer,  intent(in) :: nver         ! dimension size (# of model layers) 
 
-    real(r8), intent(in) :: gravit            ! gravitational acceleration, [kg/m2/s]
-    real(r8), intent(in) :: rair              ! gas constant of air [J/K/kg]
-    real(r8), intent(in) :: pi                ! constant pi = 3.14159....
     real(r8), intent(in) :: radius_max        ! upper bound of radius used for the calculation of deposition velocity [m]
 
     real(r8), intent(in) :: tair(pcols,nver)    ! air temperature [K]
@@ -674,12 +666,11 @@ contains
   ! Calculate particle velocity of turbulent dry deposition.
   ! This process is assumed to only occur in the lowest model layer.
   !------------------------------------------------------------------------------------
-  subroutine modal_aero_turb_drydep_velocity( moment, ncol, pcols, lchnk,           &! in
-                                              gravit, rair, pi, boltz, radius_max,  &! in
-                                              tair, pmid,                           &! in
-                                              radius_part, density_part, sig_part,  &! in
-                                              fricvel, ram1, vlc_grv,               &! in
-                                              vlc_trb, vlc_dry                      )! out
+  subroutine modal_aero_turb_drydep_velocity( moment, ncol, pcols, lchnk, radius_max,  &! in
+                                              tair, pmid,                              &! in
+                                              radius_part, density_part, sig_part,     &! in
+                                              fricvel, ram1, vlc_grv,                  &! in
+                                              vlc_trb, vlc_dry                         )! out
 
     use mo_drydep,     only: n_land_type, fraction_landuse
 
@@ -690,10 +681,6 @@ contains
     integer,  intent(in) :: pcols            ! dimension size (# of grid columns)
     integer,  intent(in) :: lchnk            ! index of grid chunk
 
-    real(r8), intent(in) :: gravit           ! gravitational acceleration, [kg/m2/s]
-    real(r8), intent(in) :: rair             ! gas constant of air [J/K/kg]
-    real(r8), intent(in) :: pi               ! constant pi = 3.14159....
-    real(r8), intent(in) :: boltz            ! Boltzman's constant [J/K/molecule] 
     real(r8), intent(in) :: radius_max       ! upper bound of radius used for the calculation of deposition velocity [m]
 
     real(r8), intent(in) :: tair(pcols)      ! air temperature [K]
