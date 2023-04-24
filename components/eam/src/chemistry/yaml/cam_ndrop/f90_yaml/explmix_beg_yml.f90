@@ -11,6 +11,10 @@
   ! integer, intent(in) :: y_i, y_k, y_lchnk
 
   ! Fields are output for all vertical levels, so just need column
+  ! y_mm = -1 when explmix is called for droplet number mixing ratio
+  ! otherwise, y_mm = the local (compressed) index of the aerosol mode and species combinations in the raercol arrays,
+  ! which is given by mm in the dropmixnuc subroutine, and the mam_idx array in the ndrop_init subroutine
+
   integer, intent(in) :: y_i, y_lchnk, y_mm
 
   !>
