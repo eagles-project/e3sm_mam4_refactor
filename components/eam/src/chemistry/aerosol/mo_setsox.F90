@@ -228,8 +228,8 @@ contains
     real(r8) :: so2g, h2o2g, o3g        ! concentration in gas phase [mol/mol]
     real(r8) :: rah2o2, rao3            ! reaction rate
     ! mass concentration for species
-    real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, &
-                                      xo3, xh2o2  ! species concentrations [mol/mol]
+    real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, xo3, xh2o2
+                                      ! species concentrations [mol/mol]
     real(r8), pointer :: xso4c(:,:)
     real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
     real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
@@ -277,13 +277,13 @@ contains
     !-----------------------------------------------------------------
     ver_loop0: do kk = 1,pver          !! pver loop for STEP 0
        col_loop0: do icol = 1,ncol
-          
+         
+          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
+          patm = press(icol,kk)/p0        ! calculate press in atm
+ 
           if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
              xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
           endif
-
-          patm = press(icol,kk)/p0        ! calculate press in atm
-          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
 
           ! in-cloud liquid water content
           xlwc = cldconc%xlwc(icol,kk)
@@ -399,7 +399,7 @@ contains
           if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
 
              call calc_sox_aqueous( modal_aerosols,     & ! in
-                rah2o2, h2o2g, so2g, o3g,      rao3,    & ! in
+                rah2o2, h2o2g, so2g,   o3g,   rao3,     & ! in
                 patm, dtime, t_factor, xlwc,  const0,   & ! in
                 xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      & ! in
                 xso2(icol,kk), xso4(icol,kk),           & ! inout
@@ -417,7 +417,8 @@ contains
          cldnum, cldfrc, cfact, cldconc%xlwc, & ! in
          xdelso4hp, xh2so4, xso4, xso4_init,  & ! in
          qcw, qin  ) ! inout
-    
+   
+    ! diagnose variable 
     xphlwc(:,:) = 0._r8
     do kk = 1, pver
        do icol = 1, ncol
