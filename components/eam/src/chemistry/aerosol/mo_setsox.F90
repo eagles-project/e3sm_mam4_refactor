@@ -231,7 +231,6 @@ contains
                                       ! species concentrations [mol/mol]
     real(r8), pointer :: xso4c(:,:)
     real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
-    real(r8) :: xdelso4hp_ik            ! change of so4 at (i,k) [mol/mol]
     real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
  
     real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3 ! henry law const for species
@@ -277,16 +276,16 @@ contains
     ver_loop0: do kk = 1,pver          !! pver loop for STEP 0
        col_loop0: do icol = 1,ncol
          
-          if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
-             xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
-          endif
-
           ! in-cloud liquid water content
           xlwc = cldconc%xlwc(icol,kk)
           if( xlwc >= small_value_lwc ) then
 
              t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
              patm = press(icol,kk)/p0        ! calculate press in atm
+
+             if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
+                xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
+             endif
  
              call calc_ph_values(                      &
                 tfld(icol,kk), patm, xlwc,  t_factor,  & ! in
@@ -404,7 +403,6 @@ contains
                 xso2(icol,kk), xso4(icol,kk),           & ! inout
                 xso4_init(icol,kk), xh2o2(icol,kk),     & ! inout
                 xdelso4hp(icol,kk)                      ) ! out
-!             xdelso4hp(icol,kk) = xdelso4hp_ik
 
           endif !! WHEN CLOUD IS PRESENTED
 
