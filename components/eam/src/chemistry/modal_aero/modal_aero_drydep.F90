@@ -344,14 +344,14 @@ contains
 
     do kk = 2,pver
        dtmassflux(:ncol,kk) = max(0._r8, dtmassflux(:ncol,kk))
-    end do
+    enddo
 
     ! Set values for the upper and lower boundaries
 
     do ii = 1,ncol
        dtmassflux(ii,1)     = 0                                         ! no flux at model top 
        dtmassflux(ii,pverp) = qq_in(ii,pver) * pvmzaer(ii,pverp) * dt   ! surface flux by upwind scheme
-    end do
+    enddo
 
     ! Limit the flux out of the bottom of each column:
     ! apply mxsedfac to prevent generating very small negative mixing ratio.
@@ -360,8 +360,8 @@ contains
     do kk = 1,pver
        do ii = 1,ncol
           dtmassflux(ii,kk+1) = min( dtmassflux(ii,kk+1), mxsedfac * qq_in(ii,kk) * pdel(ii,kk))
-       end do
-    end do
+       enddo
+    enddo
 
     !-----------------------------------------------------------------------
     ! Calculate the mixing ratio tendencies resulting from flux divergence
@@ -369,8 +369,8 @@ contains
     do kk = 1,pver
        do ii = 1,ncol
           dqdt_sed(ii,kk)  = (dtmassflux(ii,kk) - dtmassflux(ii,kk+1)) / (dt * pdel(ii,kk))
-       end do
-    end do
+       enddo
+    enddo
 
     !-----------------------------------------------------------------------
     ! Convert flux out the bottom to mass units [kg/m2/s]
