@@ -3,7 +3,6 @@ module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
-    use spmd_utils,   only : masterproc
 
   private
   public :: sox_inti, setsox
@@ -278,9 +277,6 @@ contains
     ver_loop0: do kk = 1,pver          !! pver loop for STEP 0
        col_loop0: do icol = 1,ncol
          
-          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
-          patm = press(icol,kk)/p0        ! calculate press in atm
- 
           if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
              xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
           endif
@@ -288,6 +284,9 @@ contains
           ! in-cloud liquid water content
           xlwc = cldconc%xlwc(icol,kk)
           if( xlwc >= small_value_lwc ) then
+
+             t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
+             patm = press(icol,kk)/p0        ! calculate press in atm
  
              call calc_ph_values(                      &
                 tfld(icol,kk), patm, xlwc,  t_factor,  & ! in
@@ -314,7 +313,6 @@ contains
        col_loop1: do icol = 1,ncol
 
           t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
-          tz = tfld(icol,kk)
           xlwc = cldconc%xlwc(icol,kk)
           patm = press(icol,kk)/p0        ! calculate press in atm
 
@@ -342,6 +340,7 @@ contains
           !-----------------------------------------------
           !       ... Partioning 
           !-----------------------------------------------
+          tz = tfld(icol,kk)
 
           !------------------------------------------------------------------------
           !        ... h2o2
