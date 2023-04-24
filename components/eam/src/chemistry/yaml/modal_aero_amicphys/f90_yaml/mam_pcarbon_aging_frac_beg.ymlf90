@@ -21,6 +21,11 @@
      !< add code for writing data here>
      call write_var(unit_input, unit_output, 'nsrc',nsrc)
      call write_var(unit_input, unit_output, 'ipair',ipair)
+     call write_var(unit_input, unit_output, 'dr_so4_monolayers_pcage', dr_so4_monolayers_pcage)
+     call write_1d_var(unit_input, unit_output, 'mass_2_vol', max_aer, mass_2_vol)
+     call write_1d_var(unit_input, unit_output, 'alnsg_aer', max_mode, alnsg_aer)
+     call write_1d_var(unit_input, unit_output, 'fac_m2v_eqvhyg_aer', naer, fac_m2v_eqvhyg_aer)
+
      call write_1d_var(unit_input, unit_output, 'dgn_a', max_mode, dgn_a)
 
      call write_2d_var(unit_input, unit_output, 'qaer_cur', max_aer, max_mode, qaer_cur)

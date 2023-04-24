@@ -41,7 +41,9 @@
      call write_1d_var(unit_input, unit_output, 'qnum_cur', max_mode, qnum_cur)
      call write_1d_var(unit_input, unit_output, 'qnum_del_cond', max_mode, qnum_del_cond)
      call write_1d_var(unit_input, unit_output, 'qnum_del_coag', max_mode, qnum_del_coag)
+     call write_1d_var(unit_input, unit_output, 'modefrm_agepair', n_agepair, modefrm_agepair)
 
+     call write_2d_var(unit_input, unit_output, 'lmap_aer', max_aer,max_mode, lmap_aer)
      call write_2d_var(unit_input, unit_output, 'qaer_cur', max_aer, max_mode, qaer_cur)
      call write_2d_var(unit_input, unit_output, 'qaer_del_cond', max_aer, max_mode, qaer_del_cond)
      call write_2d_var(unit_input, unit_output, 'qaer_del_coag', max_aer, max_mode, qaer_del_coag)

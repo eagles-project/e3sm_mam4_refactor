@@ -435,7 +435,7 @@ contains
     logical :: mass_or_num
 
 
-    !format statement to write in double precision
+    !format statement to write as int
 10  format(I10)
 11  format(A,I10)
 
@@ -489,7 +489,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_output)
 
-    !format statement to write in double precision
+    !format statement to write in int
 12  format(I10,A)
 
     object = "output"
@@ -725,7 +725,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    !format statement to write in double precision
+    !format statement to write as int
 10  format(I10)
 11  format(A,I10)
 
@@ -790,7 +790,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_output)
 
-    !format statement to write in double precision
+    !format statement to write as int
 12  format(I10,A)
 
     object = "output"
@@ -845,7 +845,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    !format statement to write in double precision
+    !format statement to write as int
 10  format(I10)
 11  format(A,I10)
 
@@ -908,7 +908,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_output)
 
-    !format statement to write in double precision
+    !format statement to write as int
 12  format(I10,A)
 
     object = "output"
@@ -1214,7 +1214,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    !format statement to write in double precision
+    !format statement to write as int
 10  format(I10)
 11  format(A,I10)
 
@@ -1288,7 +1288,7 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_output)
 
-    !format statement to write in double precision
+    !format statement to write as int
 12  format(I10,A)
 
     object = "output"
