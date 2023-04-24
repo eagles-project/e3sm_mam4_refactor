@@ -93,12 +93,19 @@ contains
     real(r8) ::  dens_aer(pcols,pver)  ! wet density of interstitial aerosols [kg/m3]
     real(r8) ::    sg_aer(pcols,pver)  ! assumed geometric standard deviation of particle size distribution
 
-    real(r8) :: vlc_dry(pcols,pver,4)     ! dep velocity [m/s]
-    real(r8) :: vlc_grv(pcols,pver,4)     ! dep velocity [m/s]
-    real(r8)::  vlc_trb(pcols,4)          ! dep velocity [m/s]
-
     real(r8) :: aerdepdryis(pcols,pcnst)  ! surface deposition flux of interstitial aerosols, [kg/m2/s] or [1/m2/s]
     real(r8) :: aerdepdrycw(pcols,pcnst)  ! surface deposition flux of cloud-borne  aerosols, [kg/m2/s] or [1/m2/s]
+
+    ! Deposition velocities. The last dimension (size = 4) corresponds to the
+    ! two attachment states and two moments:
+    !   1 - interstitial aerosol, 0th moment (i.e., number)
+    !   2 - interstitial aerosol, 3rd moment (i.e., volume/mass)
+    !   3 - cloud-borne aerosol,  0th moment (i.e., number)
+    !   4 - cloud-borne aerosol,  3rd moment (i.e., volume/mass)
+
+    real(r8) :: vlc_grv(pcols,pver,4)     ! dep velocity of gravitational settling [m/s]
+    real(r8)::  vlc_trb(pcols,4)          ! dep velocity of turbulent dry deposition [m/s]
+    real(r8) :: vlc_dry(pcols,pver,4)     ! dep velocity, sum of vlc_grv and vlc_trb [m/s]
 
     ! The pointers below are used for retrieving information from pbuf
 
