@@ -219,7 +219,7 @@ contains
     real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
     real(r8) :: xk, xe, x2     ! output parameters in Henry's law
     real(r8) :: tz      ! temperature at (i,k) [K]
-    real(r8) :: xl      ! in-cloud LWC at (i,k) [kg/L]
+    real(r8) :: xlwc    ! in-cloud LWC at (i,k) [kg/L]
     real(r8) :: px      ! temporary variable [unitless] 
     real(r8) :: patm    ! pressure [atm]
 
@@ -286,11 +286,11 @@ contains
           t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
 
           ! in-cloud liquid water content
-          xl = cldconc%xlwc(icol,kk)
-          if( xl >= small_value_lwc ) then
+          xlwc = cldconc%xlwc(icol,kk)
+          if( xlwc >= small_value_lwc ) then
  
              call calc_ph_values(                      &
-                tfld(icol,kk), patm, xl,  t_factor,    & ! in
+                tfld(icol,kk), patm, xlwc,  t_factor,  & ! in
                 xso2(icol,kk), xso4(icol,kk),          & ! in
                 xhnm(icol,kk), cldconc%so4_fact,       & ! in
                 Ra,            xkw,  const0,           & ! in
@@ -315,7 +315,7 @@ contains
 
           t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
           tz = tfld(icol,kk)
-          xl = cldconc%xlwc(icol,kk)
+          xlwc = cldconc%xlwc(icol,kk)
           patm = press(icol,kk)/p0        ! calculate press in atm
 
           !-----------------------------------------------------------------
@@ -346,19 +346,19 @@ contains
           !------------------------------------------------------------------------
           !        ... h2o2
           !------------------------------------------------------------------------
-          px = heh2o2(icol,kk) * Ra * tz * xl
+          px = heh2o2(icol,kk) * Ra * tz * xlwc
           h2o2g =  xh2o2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... so2
           !------------------------------------------------------------------------
-          px = heso2(icol,kk) * Ra * tz * xl
+          px = heso2(icol,kk) * Ra * tz * xlwc
           so2g =  xso2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... o3
           !------------------------------------------------------------------------
-          px = heo3(icol,kk) * Ra * tz * xl
+          px = heo3(icol,kk) * Ra * tz * xlwc
           o3g =  xo3(icol,kk)/(1._r8+ px)
 
           !-----------------------------------------------
@@ -396,11 +396,11 @@ contains
           !       S(IV) + H2O2 = S(VI)
           !............................
           
-          if (xl >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
+          if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
 
              call calc_sox_aqueous( modal_aerosols,     & ! in
                 rah2o2, h2o2g, so2g, o3g,      rao3,    & ! in
-                patm, dtime, t_factor, xl, const0,      & ! in
+                patm, dtime, t_factor, xlwc,  const0,   & ! in
                 xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      & ! in
                 xso2(icol,kk), xso4(icol,kk),           & ! inout
                 xso4_init(icol,kk), xh2o2(icol,kk),     & ! inout
