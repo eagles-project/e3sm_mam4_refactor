@@ -1,5 +1,5 @@
 
-module MO_SETSOX
+module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
@@ -141,23 +141,12 @@ contains
   
 !-----------------------------------------------------------------------      
 !-----------------------------------------------------------------------      
-  subroutine SETSOX( &
-       ncol,   &
-       lchnk,  &
-       loffset,&
-       dtime,  &
-       press,  &
-       pdel,   &
-       tfld,   &
-       mbar,   &
-       lwc,    &
-       cldfrc, &
-       cldnum, &
-       xhnm,   &
-       invariants, &
-       qcw,    &
-       qin     &
-       )
+  subroutine setsox(   &
+       ncol,   lchnk,  loffset,   dtime,  & ! in
+       press,  pdel,   tfld,      mbar,   & ! in
+       lwc,    cldfrc, cldnum,            & ! in
+       xhnm,   invariants,                & ! in
+       qcw,    qin                        ) ! inout
 
     !-----------------------------------------------------------------------      
     !          ... Compute heterogeneous reactions of SOX
@@ -174,15 +163,11 @@ contains
     !           (d) PREDICTION
     !-----------------------------------------------------------------------      
     !
-    use ppgrid,    only : pcols, pver
-    use chem_mods, only : gas_pcnst, nfs
-    use chem_mods,    only : adv_mass
-    use physconst,    only : mwdry, gravit
-    use mo_constants, only : pi
-    use cam_history,  only : outfld
+    use ppgrid,          only : pver
+    use cam_history,     only : outfld
     use sox_cldaero_mod, only : sox_cldaero_update, sox_cldaero_create_obj, sox_cldaero_destroy_obj
     use cldaero_mod,     only : cldaero_conc_t
-    use phys_control, only : phys_getopts
+    use cam_abortutils,  only : endrun
 
     !
     implicit none
@@ -193,546 +178,186 @@ contains
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
-    real(r8),         intent(in)    :: dtime             ! time step (sec)
-    real(r8),         intent(in)    :: press(:,:)        ! midpoint pressure ( Pa )
-    real(r8),         intent(in)    :: pdel(:,:)         ! pressure thickness of levels (Pa)
-    real(r8),         intent(in)    :: tfld(:,:)         ! temperature
-    real(r8),         intent(in)    :: mbar(:,:)         ! mean wet atmospheric mass ( amu )
-    real(r8), target, intent(in)    :: lwc(:,:)          ! cloud liquid water content (kg/kg)
-    real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction
-    real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration (#/kg)
-    real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density ( /cm**3)
-    real(r8),         intent(in)    :: invariants(:,:,:)
-    real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol (vmr)
-    real(r8),         intent(inout) :: qin(:,:,:)        ! transported species ( vmr )
+    real(r8),         intent(in)    :: dtime             ! time step [sec]
+    real(r8),         intent(in)    :: press(:,:)        ! midpoint pressure [Pa]
+    real(r8),         intent(in)    :: pdel(:,:)         ! pressure thickness of levels [Pa]
+    real(r8),         intent(in)    :: tfld(:,:)         ! temperature [K]
+    real(r8),         intent(in)    :: mbar(:,:)         ! mean wet atmospheric mass [amu or g/mol]
+    real(r8), target, intent(in)    :: lwc(:,:)          ! cloud liquid water content [kg/kg]
+    real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction [fraction]
+    real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration [#/kg]
+    real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density [#/cm**3]
+    real(r8),         intent(in)    :: invariants(:,:,:) ! invariant density [molecules/cm**3]
+    real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol [vmr]
+    real(r8),         intent(inout) :: qin(:,:,:)        ! transported species [vmr]
 
     !-----------------------------------------------------------------------      
     !      ... Local variables
     !
-    !           xhno3 ... in mixing ratio
+    !      FORTRAN refactoring: the units are a little messy here
+    !      my understanding (may not be right) is that, the PH value xph, shown in [H+] concentration, 
+    !      is (mol H+)/(L water), which can be transfered to kg/L or kg/kg
+    !      the variables xso2, xso4, xo3 etc have units of [mol/mol] (maybe
+    !      corresponding to kg/kg above?)
+    !      the variable xhnm has unit of [#/cm3]. Some units may changes to
+    !      different formats across modules
+    !      Shuaiqi Tang  4/18/2023
     !-----------------------------------------------------------------------      
-    integer,  parameter :: itermax = 20
-    real(r8), parameter :: ph0 = 5.0_r8  ! INITIAL PH VALUES
-    real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
-    real(r8), parameter :: xa0 = 11._r8
-    real(r8), parameter :: xb0 = -.1_r8
-    real(r8), parameter :: xa1 = 1.053_r8
-    real(r8), parameter :: xb1 = -4.368_r8
-    real(r8), parameter :: xa2 = 1.016_r8
-    real(r8), parameter :: xb2 = -2.54_r8
-    real(r8), parameter :: xa3 = .816e-32_r8
-    real(r8), parameter :: xb3 = .259_r8
-
-    real(r8), parameter :: kh0 = 9.e3_r8            ! HO2(g)          -> Ho2(a)
-    real(r8), parameter :: kh1 = 2.05e-5_r8         ! HO2(a)          -> H+ + O2-
-    real(r8), parameter :: kh2 = 8.6e5_r8           ! HO2(a) + ho2(a) -> h2o2(a) + o2
-    real(r8), parameter :: kh3 = 1.e8_r8            ! HO2(a) + o2-    -> h2o2(a) + o2
+    real(r8), parameter :: ph0 = 5.0_r8  ! Initial PH values
+    real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8 ! [cm3/L * mol/mole]
     real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
     real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
+    real(r8), parameter :: p0 = 101300._r8          ! sea-level pressure [Pa]
+    real(r8), parameter :: t298K = 298._r8          ! temperature of 25degC [K]
+    real(r8), parameter :: small_value_lwc = 1.e-8_r8 ! small value of LWC [kg/kg]
+    real(r8), parameter :: small_value_cf = 1.e-5_r8  ! small value of cloud fraction [fraction]
 
-    !
-    real(r8) :: xdelso4hp(ncol,pver)
-    real(r8) :: xphlwc(ncol,pver)
+    integer  :: icol,kk
+    logical  :: converged
+    real(r8) :: t_factor       ! working variables to convert temperature
+    real(r8) :: cfact(ncol,pver)        ! total atms density [kg/L]
+    real(r8) :: xk, xe, x2     ! output parameters in Henry's law
+    real(r8) :: tz      ! temperature at (i,k) [K]
+    real(r8) :: xlwc    ! in-cloud LWC at (i,k) [kg/L]
+    real(r8) :: px      ! temporary variable [unitless] 
+    real(r8) :: patm    ! pressure [atm]
 
-    integer  :: k, i, iter, file
-    real(r8) :: wrk, delta
-    real(r8) :: xph0, aden, xk, xe, x2
-    real(r8) :: tz, xl, px, qz, pz, es, qs, patm
-    real(r8) :: Eso2, Eso4, Ehno3, Eco2, Eh2o, Enh3
-    real(r8) :: so2g, h2o2g, co2g, o3g
-    real(r8) :: hno3a, nh3a, so2a, h2o2a, co2a, o3a
-    real(r8) :: rah2o2, rao3, pso4, ccc
-    real(r8) :: cnh3, chno3, com, com1, com2, xra
-
-    real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
-    !
-    !-----------------------------------------------------------------------      
-    !            for Ho2(g) -> H2o2(a) formation 
-    !            schwartz JGR, 1984, 11589
-    !-----------------------------------------------------------------------      
-    real(r8) :: kh4    ! kh2+kh3
-    real(r8) :: xam    ! air density /cm3
-    real(r8) :: ho2s   ! ho2s = ho2(a)+o2-
-    real(r8) :: r1h2o2 ! prod(h2o2) by ho2 in mole/L(w)/s
-    real(r8) :: r2h2o2 ! prod(h2o2) by ho2 in mix/s
-
-    real(r8), dimension(ncol,pver)  ::             &
-         xhno3, xh2o2, xso2, xso4, xno3, &
-         xnh3, xnh4, xo3,         &
-         cfact, &
-         xph, xho2,         &
-         xh2so4, xmsa, xso4_init, &
-         hehno3, &            ! henry law const for hno3
-         heh2o2, &            ! henry law const for h2o2
-         heso2,  &            ! henry law const for so2
-         henh3,  &            ! henry law const for nh3
-         heo3              !!,   &            ! henry law const for o3
-
-    real(r8) :: patm_x
-
-    real(r8), dimension(ncol)  :: work1
-    logical :: converged
-
+    ! the concentration values can vary in different forms 
+    real(r8) :: xph0,  xph(ncol,pver)   ! pH value in H+ concentration [mol/L, or kg/L, or kg/kg(w)]
+    real(r8) :: so2g, h2o2g, o3g        ! concentration in gas phase [mol/mol]
+    real(r8) :: rah2o2, rao3            ! reaction rate
+    ! mass concentration for species
+    real(r8), dimension(ncol,pver) :: xso2, xso4, xso4_init, xh2so4, xo3, xh2o2
+                                      ! species concentrations [mol/mol]
     real(r8), pointer :: xso4c(:,:)
-    real(r8), pointer :: xnh4c(:,:)
-    real(r8), pointer :: xno3c(:,:)
+    real(r8) :: xdelso4hp(ncol,pver)    ! change of so4 [mol/mol]
+    real(r8) :: xphlwc(ncol,pver)       ! pH value multiplied by lwc [kg/kg]
+ 
+    real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3 ! henry law const for species
     type(cldaero_conc_t), pointer :: cldconc
 
-    real(r8) :: fact1_hno3, fact2_hno3, fact3_hno3
-    real(r8) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2
-    real(r8) :: fact1_nh3, fact2_nh3, fact3_nh3
-    real(r8) :: tmp_hp, tmp_hso3, tmp_hco3, tmp_nh4, tmp_no3
-    real(r8) :: tmp_oh, tmp_so3, tmp_so4
-    real(r8) :: tmp_neg, tmp_pos
-    real(r8) :: yph, yph_lo, yph_hi
-    real(r8) :: ynetpos, ynetpos_lo, ynetpos_hi
 
-    logical :: use_MMF, use_ECPP
-
-    call phys_getopts( use_MMF_out=use_MMF, use_ECPP_out=use_ECPP )
-
-    !-----------------------------------------------------------------
-    !       ... NOTE: The press array is in pascals and must be
-    !                 mutiplied by 10 to yield dynes/cm**2.
-    !-----------------------------------------------------------------
     !==================================================================
     !       ... First set the PH
     !==================================================================
     !      ... Initial values
     !           The values of so2, so4 are after (1) SLT, and CHEM
     !-----------------------------------------------------------------
-    xph0 = 10._r8**(-ph0)                      ! initial PH value
+    ! initial PH value, in H+ concentration
+    xph0 = 10._r8**(-ph0) 
 
-    do k = 1,pver
-       cfact(:,k) = xhnm(:,k)     &          ! /cm3(a)  
+    ! calculate total atms density [kg/L]
+    cfact(:,:) = xhnm(:,:)        &          ! /cm3(a)  
             * 1.e6_r8             &          ! /m3(a)
             * 1.38e-23_r8/287._r8 &          ! Kg(a)/m3(a)
             * 1.e-3_r8                       ! Kg(a)/L(a)
-    end do
 
+    if ( inv_so2 .or. id_hno3>0 .or. inv_h2o2 .or. id_nh3>0 .or. inv_o3 &
+                 .or. (.not. inv_ho2) .or. (.not. cloud_borne) .or. id_msa>0) then
+        call endrun('FORTRAN refactoring: Only keep the code for default MAM4. &
+             The following options are removed:  id_nh3>0  id_hno3>0  id_msa>0 &
+             inv_h2o2=.T. inv_so2=.T.  inv_o3=.T. inv_ho2=.F. cloud_borne=.F. ')
+    endif
+
+    ! initialize species concentrations
     cldconc => sox_cldaero_create_obj( cldfrc,qcw,lwc, cfact, ncol, loffset )
     xso4c => cldconc%so4c
-    xnh4c => cldconc%nh4c
-    xno3c => cldconc%no3c
 
-    xso4(:,:) = 0._r8
-    xno3(:,:) = 0._r8
-    xnh4(:,:) = 0._r8
-
-    do k = 1,pver
-       xph(:,k) = xph0                                ! initial PH value
-
-       if ( inv_so2 ) then
-          xso2 (:,k) = invariants(:,k,id_so2)/xhnm(:,k)  ! mixing ratio
-       else
-          xso2 (:,k) = qin(:,k,id_so2)                   ! mixing ratio
-       endif
-
-       if (id_hno3 > 0) then
-          xhno3(:,k) = qin(:,k,id_hno3)
-       else
-          xhno3(:,k) = 0.0_r8
-       endif
-
-       if ( inv_h2o2 ) then
-          xh2o2 (:,k) = invariants(:,k,id_h2o2)/xhnm(:,k)  ! mixing ratio
-       else
-          xh2o2 (:,k) = qin(:,k,id_h2o2)                   ! mixing ratio
-       endif
-
-       if (id_nh3  > 0) then
-          xnh3 (:,k) = qin(:,k,id_nh3)
-       else
-          xnh3 (:,k) = 0.0_r8
-       endif
-
-       if ( inv_o3 ) then
-          xo3  (:,k) = invariants(:,k,id_o3)/xhnm(:,k) ! mixing ratio
-       else
-          xo3  (:,k) = qin(:,k,id_o3)                  ! mixing ratio
-       endif
-       if ( inv_ho2 ) then
-          xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)! mixing ratio
-       else
-          xho2 (:,k) = qin(:,k,id_ho2)                 ! mixing ratio
-       endif
-
-       if (cloud_borne) then
-          xh2so4(:,k) = qin(:,k,id_h2so4)
-       else
-          xso4  (:,k) = qin(:,k,id_so4) ! mixing ratio
-       endif
-       if (id_msa > 0) xmsa (:,k) = qin(:,k,id_msa)
-
-    end do
+    xso4(:,:)   = 0._r8
+    xph(:,:)    = xph0          ! initial PH value
+    xso2(:,:)   = qin(:,:,id_so2)                 
+    xh2o2(:,:)  = qin(:,:,id_h2o2)               
+    xo3 (:,:)   = qin(:,:,id_o3)                  
+    xh2so4(:,:) = qin(:,:,id_h2so4)
     
     !-----------------------------------------------------------------
     !       ... Temperature dependent Henry constants
     !-----------------------------------------------------------------
-    ver_loop0: do k = 1,pver                               !! pver loop for STEP 0
-       col_loop0: do i = 1,ncol
-          
-          if (cloud_borne .and. cldfrc(i,k)>0._r8) then
-             xso4(i,k) = xso4c(i,k) / cldfrc(i,k)
-             xnh4(i,k) = xnh4c(i,k) / cldfrc(i,k)
-             xno3(i,k) = xno3c(i,k) / cldfrc(i,k)
-          endif
-          xl = cldconc%xlwc(i,k)
+    ver_loop0: do kk = 1,pver          !! pver loop for STEP 0
+       col_loop0: do icol = 1,ncol
+         
+          ! in-cloud liquid water content
+          xlwc = cldconc%xlwc(icol,kk)
+          if( xlwc >= small_value_lwc ) then
 
-          if( xl >= 1.e-8_r8 ) then
-             work1(i) = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
+             t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
+             patm = press(icol,kk)/p0        ! calculate press in atm
 
-             !-----------------------------------------------------------------
-             ! 21-mar-2011 changes by rce
-             ! ph calculation now uses bisection method to solve the electro-neutrality equation
-             ! 3-mode aerosols (where so4 is assumed to be nh4hso4)
-             !    old code set xnh4c = so4c
-             !    new code sets xnh4c = 0, then uses a -1 charge (instead of -2)
-             !       for so4 when solving the electro-neutrality equation
-             !-----------------------------------------------------------------
-
-             !-----------------------------------------------------------------
-             !  calculations done before iterating
-             !-----------------------------------------------------------------
-
-             !-----------------------------------------------------------------
-             pz = .01_r8*press(i,k)       !! pressure in mb
-             tz = tfld(i,k)
-             patm = pz/1013._r8
-             xam  = press(i,k)/(1.38e-23_r8*tz)  !air density /M3
-
-             !-----------------------------------------------------------------
-             !        ... hno3
-             !-----------------------------------------------------------------
-             ! previous code
-             !    hehno3(i,k)  = xk*(1._r8 + xe/xph(i,k))
-             !    px = hehno3(i,k) * Ra * tz * xl
-             !    hno3g = xhno3(i,k)/(1._r8 + px)
-             !    Ehno3 = xk*xe*hno3g *patm
-             ! equivalent new code
-             !    hehno3 = xk + xk*xe/hplus
-             !    hno3g = xhno3/(1 + px)
-             !          = xhno3/(1 + hehno3*ra*tz*xl)
-             !          = xhno3/(1 + xk*ra*tz*xl*(1 + xe/hplus)
-             !    ehno3 = hno3g*xk*xe*patm
-             !          = xk*xe*patm*xhno3/(1 + xk*ra*tz*xl*(1 + xe/hplus)
-             !          = ( fact1_hno3    )/(1 + fact2_hno3 *(1 + fact3_hno3/hplus)
-             !    [hno3-] = ehno3/hplus
-             xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-             xe = 15.4_r8
-             fact1_hno3 = xk*xe*patm*xhno3(i,k)
-             fact2_hno3 = xk*ra*tz*xl
-             fact3_hno3 = xe
-
-             !-----------------------------------------------------------------
-             !          ... so2
-             !-----------------------------------------------------------------
-             ! previous code
-             !    heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
-             !    px = heso2(i,k) * Ra * tz * xl
-             !    so2g =  xso2(i,k)/(1._r8+ px)
-             !    Eso2 = xk*xe*so2g *patm
-             ! equivalent new code
-             !    heso2 = xk + xk*xe/hplus * xk*xe*x2/hplus**2
-             !    so2g = xso2/(1 + px)
-             !         = xso2/(1 + heso2*ra*tz*xl)
-             !         = xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
-             !    eso2 = so2g*xk*xe*patm
-             !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
-             !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
-             !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-             xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-             xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-             x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
-             fact1_so2 = xk*xe*patm*xso2(i,k)
-             fact2_so2 = xk*ra*tz*xl
-             fact3_so2 = xe
-             fact4_so2 = x2
-
-             !-----------------------------------------------------------------
-             !          ... nh3
-             !-----------------------------------------------------------------
-             ! previous code
-             !    henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/xkw)
-             !    px = henh3(i,k) * Ra * tz * xl
-             !    nh3g = (xnh3(i,k)+xnh4(i,k))/(1._r8+ px)
-             !    Enh3 = xk*xe*nh3g/xkw *patm
-             ! equivalent new code
-             !    henh3 = xk + xk*xe*hplus/xkw
-             !    nh3g = xnh34/(1 + px)
-             !         = xnh34/(1 + henh3*ra*tz*xl)
-             !         = xnh34/(1 + xk*ra*tz*xl*(1 + xe*hplus/xkw)
-             !    enh3 = nh3g*xk*xe*patm/xkw
-             !          = ((xk*xe*patm/xkw)*xnh34)/(1 + xk*ra*tz*xl*(1 + xe*hplus/xkw)
-             !          = ( fact1_nh3            )/(1 + fact2_nh3  *(1 + fact3_nh3*hplus)
-             !    [nh4+] = enh3*hplus
-             xk = 58._r8   *EXP( 4085._r8*work1(i) )
-             xe = 1.7e-5_r8*EXP( -4325._r8*work1(i) )
-
-             fact1_nh3 = (xk*xe*patm/xkw)*(xnh3(i,k)+xnh4(i,k))
-             fact2_nh3 = xk*ra*tz*xl
-             fact3_nh3 = xe/xkw
-
-             !-----------------------------------------------------------------
-             !        ... h2o effects
-             !-----------------------------------------------------------------
-             Eh2o = xkw
-
-             !-----------------------------------------------------------------
-             !        ... co2 effects
-             !-----------------------------------------------------------------
-             co2g = 330.e-6_r8                            !330 ppm = 330.e-6 atm
-             xk = 3.1e-2_r8*EXP( 2423._r8*work1(i) )
-             xe = 4.3e-7_r8*EXP(-913._r8 *work1(i) )
-             Eco2 = xk*xe*co2g  *patm
-
-             !-----------------------------------------------------------------
-             !         ... so4 effect
-             !-----------------------------------------------------------------
-             Eso4 = xso4(i,k)*xhnm(i,k)   &         ! /cm3(a)
-                  *const0/xl
-
-
-             !-----------------------------------------------------------------
-             ! now use bisection method to solve electro-neutrality equation
-             !
-             ! during the iteration loop,
-             !    yph_lo = lower ph value that brackets the root (i.e., correct ph)
-             !    yph_hi = upper ph value that brackets the root (i.e., correct ph)
-             !    yph    = current ph value
-             !    yposnet_lo and yposnet_hi = net positive ions for
-             !       yph_lo and yph_hi
-             !-----------------------------------------------------------------
-             do iter = 1,itermax
-
-                if (iter == 1) then
-                   ! 1st iteration ph = lower bound value
-                   yph_lo = 2.0_r8
-                   yph_hi = yph_lo
-                   yph = yph_lo
-                else if (iter == 2) then
-                   ! 2nd iteration ph = upper bound value
-                   yph_hi = 7.0_r8
-                   yph = yph_hi
-                else
-                   ! later iteration ph = mean of the two bracketing values
-                   yph = 0.5_r8*(yph_lo + yph_hi)
-                end if
-                ! calc current [H+] from ph
-                xph(i,k) = 10.0_r8**(-yph)
-
-                if(use_MMF .and. use_ECPP) then
-                   ! in the MMF model w/ ECPP, ph value is fixed at 4.5
-                   xph(i,k) = 10.0_r8**(-4.5_r8)
-                end if
-
-                !-----------------------------------------------------------------
-                !        ... hno3
-                !-----------------------------------------------------------------
-                Ehno3 = fact1_hno3/(1.0_r8 + fact2_hno3*(1.0_r8 + fact3_hno3/xph(i,k)))
-
-                !-----------------------------------------------------------------
-                !          ... so2
-                !-----------------------------------------------------------------
-                Eso2 = fact1_so2/(1.0_r8 + fact2_so2*(1.0_r8 + (fact3_so2/xph(i,k)) &
-                     *(1.0_r8 +  fact4_so2/xph(i,k))))
-
-                !-----------------------------------------------------------------
-                !          ... nh3
-                !-----------------------------------------------------------------
-                Enh3 = fact1_nh3/(1.0_r8 + fact2_nh3*(1.0_r8 + fact3_nh3*xph(i,k)))
-
-                tmp_nh4  = Enh3 * xph(i,k)
-                tmp_hso3 = Eso2 / xph(i,k)
-                tmp_so3  = tmp_hso3 * 2.0_r8*fact4_so2/xph(i,k)
-                tmp_hco3 = Eco2 / xph(i,k)
-                tmp_oh   = Eh2o / xph(i,k)
-                tmp_no3  = Ehno3 / xph(i,k)
-                tmp_so4 = cldconc%so4_fact*Eso4
-                tmp_pos = xph(i,k) + tmp_nh4
-                tmp_neg = tmp_oh + tmp_hco3 + tmp_no3 + tmp_hso3 + tmp_so3 + tmp_so4
-
-                ynetpos = tmp_pos - tmp_neg
-
-
-                ! yposnet = net positive ions/charge
-                ! if the correct ph is bracketed by yph_lo and yph_hi (with yph_lo < yph_hi),
-                !    then you will have yposnet_lo > 0 and yposnet_hi < 0
-                converged = .false.
-                if (iter > 2) then
-                   if (ynetpos == 0.0_r8) then
-                      ! the exact solution was found (very unlikely)
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   else if (ynetpos >= 0.0_r8) then
-                      ! net positive ions are >= 0 for both yph and yph_lo
-                      !    so replace yph_lo with yph
-                      yph_lo = yph
-                      ynetpos_lo = ynetpos
-                   else
-                      ! net positive ions are <= 0 for both yph and yph_hi
-                      !    so replace yph_hi with yph
-                      yph_hi = yph
-                      ynetpos_hi = ynetpos
-                   end if
-
-                   if (abs(yph_hi - yph_lo) .le. 0.005_r8) then
-                      ! |yph_hi - yph_lo| <= convergence criterion, so set
-                      !    final ph to their midpoint and exit
-                      ! (.005 absolute error in pH gives .01 relative error in H+)
-                      tmp_hp = xph(i,k)
-                      yph = 0.5_r8*(yph_hi + yph_lo)
-                      xph(i,k) = 10.0_r8**(-yph)
-                      converged = .true.
-                      exit
-                   else 
-                      ! do another iteration
-                      converged = .false.
-                   end if
-
-                else if (iter == 1) then
-                   if (ynetpos <= 0.0_r8) then
-                      ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
-                      !    the correct ph, so use the lower bound
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   end if
-                   ynetpos_lo = ynetpos
-
-                else ! (iter == 2)
-                   if (ynetpos >= 0.0_r8) then
-                      ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
-                      !    the correct ph, so use they upper bound
-                      tmp_hp = xph(i,k)
-                      converged = .true.
-                      exit
-                   end if
-                   ynetpos_hi = ynetpos
-                end if
-
-             end do ! iter
+             if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
+                xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
+             endif
+ 
+             call calc_ph_values(                      &
+                tfld(icol,kk), patm, xlwc,  t_factor,  & ! in
+                xso2(icol,kk), xso4(icol,kk),          & ! in
+                xhnm(icol,kk), cldconc%so4_fact,       & ! in
+                Ra,            xkw,  const0,           & ! in
+                converged,     xph(icol,kk)            ) ! out
 
              if( .not. converged ) then
-                write(iulog,*) 'SETSOX: pH failed to converge @ (',i,',',k,'), % change=', &
-                     100._r8*delta
-             end if
+                write(iulog,*) 'setsox: pH failed to converge @ (',icol,',',kk,').'
+             endif
+
           else
-             xph(i,k) =  1.e-7_r8
-          end if
-       end do col_loop0
-    end do ver_loop0 ! end pver loop for STEP 0
+             xph(icol,kk) =  1.e-7_r8
+          endif
+
+       enddo col_loop0
+    enddo ver_loop0 ! end pver loop for STEP 0
 
     !==============================================================
     !          ... Now use the actual PH
     !==============================================================
-    ver_loop1: do k = 1,pver
-       col_loop1: do i = 1,ncol
-          work1(i) = 1._r8 / tfld(i,k) - 1._r8 / 298._r8
-          tz = tfld(i,k)
+    ver_loop1: do kk = 1,pver
+       col_loop1: do icol = 1,ncol
 
-          xl = cldconc%xlwc(i,k)
-
-          patm = press(i,k)/101300._r8        ! press is in pascal
-          xam  = press(i,k)/(1.38e-23_r8*tz)  ! air density /M3
-
-          !-----------------------------------------------------------------------      
-          !        ... hno3
-          !-----------------------------------------------------------------------      
-          xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-          xe = 15.4_r8
-          hehno3(i,k)  = xk*(1._r8 + xe/xph(i,k))
+          t_factor = (1._r8 / tfld(icol,kk)) - (1._r8 / t298K)
+          xlwc = cldconc%xlwc(icol,kk)
+          patm = press(icol,kk)/p0        ! calculate press in atm
 
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = 7.4e4_r8   *EXP( 6621._r8*work1(i) )
-          xe = 2.2e-12_r8 *EXP(-3730._r8*work1(i) )
-          heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
+          call henry_factor_h2o2(t_factor,      & ! in
+                                xk, xe          ) ! out
+          heh2o2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-          xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-          x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
-
-          wrk = xe/xph(i,k)
-          heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
-
-          !-----------------------------------------------------------------
-          !          ... nh3
-          !-----------------------------------------------------------------
-          xk = 58._r8   *EXP( 4085._r8*work1(i) )
-          xe = 1.7e-5_r8*EXP(-4325._r8*work1(i) )
-          henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/xkw)
+          call henry_factor_so2(t_factor,       & ! in
+                                xk, xe, x2      ) ! out
+          heso2(icol,kk)  = xk*(1._r8 + xe/xph(icol,kk)*(1._r8 + x2/xph(icol,kk)))
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          xk = 1.15e-2_r8 *EXP( 2560._r8*work1(i) )
-          heo3(i,k) = xk
-
-          !------------------------------------------------------------------------
-          !       ... for Ho2(g) -> H2o2(a) formation 
-          !           schwartz JGR, 1984, 11589
-          !------------------------------------------------------------------------
-          kh4 = (kh2 + kh3*kh1/xph(i,k)) / ((1._r8 + kh1/xph(i,k))**2)
-          ho2s = kh0*xho2(i,k)*patm*(1._r8 + kh1/xph(i,k))  ! ho2s = ho2(a)+o2-
-          r1h2o2 = kh4*ho2s*ho2s                         ! prod(h2o2) in mole/L(w)/s
-
-          if ( cloud_borne ) then
-             r2h2o2 = r1h2o2*xl        &    ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  / const0*1.e+6_r8  &    ! correct a bug here ????
-                  / xam
-          else
-             r2h2o2 = r1h2o2*xl  &          ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  * const0     &          ! mole/fm3(a)/s * 1.e-3       = mole/cm3(a)/s
-                  / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
-          endif
-
-          if ( .not. modal_aerosols ) then
-             xh2o2(i,k) = xh2o2(i,k) + r2h2o2*dtime         ! updated h2o2 by het production
-          endif
+          call henry_factor_o3(t_factor,        & ! in
+                                xk              ) ! out
+          heo3(icol,kk) = xk
 
           !-----------------------------------------------
           !       ... Partioning 
           !-----------------------------------------------
-
-          !-----------------------------------------------------------------
-          !        ... hno3
-          !-----------------------------------------------------------------
-          px = hehno3(i,k) * Ra * tz * xl
-          hno3g(i,k) = (xhno3(i,k)+xno3(i,k))/(1._r8 + px)
+          tz = tfld(icol,kk)
 
           !------------------------------------------------------------------------
           !        ... h2o2
           !------------------------------------------------------------------------
-          px = heh2o2(i,k) * Ra * tz * xl
-          h2o2g =  xh2o2(i,k)/(1._r8+ px)
+          px = heh2o2(icol,kk) * Ra * tz * xlwc
+          h2o2g =  xh2o2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... so2
           !------------------------------------------------------------------------
-          px = heso2(i,k) * Ra * tz * xl
-          so2g =  xso2(i,k)/(1._r8+ px)
+          px = heso2(icol,kk) * Ra * tz * xlwc
+          so2g =  xso2(icol,kk)/(1._r8+ px)
 
           !------------------------------------------------------------------------
           !         ... o3
           !------------------------------------------------------------------------
-          px = heo3(i,k) * Ra * tz * xl
-          o3g =  xo3(i,k)/(1._r8+ px)
-
-          !------------------------------------------------------------------------
-          !         ... nh3
-          !------------------------------------------------------------------------
-          px = henh3(i,k) * Ra * tz * xl
-          if (id_nh3>0) then
-             nh3g(i,k) = (xnh3(i,k)+xnh4(i,k))/(1._r8+ px)
-          else
-             nh3g(i,k) = 0._r8
-          endif
+          px = heo3(icol,kk) * Ra * tz * xlwc
+          o3g =  xo3(icol,kk)/(1._r8+ px)
 
           !-----------------------------------------------
           !       ... Aqueous phase reaction rates
@@ -743,14 +368,14 @@ contains
           !------------------------------------------------------------------------
           !       ... S(IV) (HSO3) + H2O2
           !------------------------------------------------------------------------
-          rah2o2 = 8.e4_r8 * EXP( -3650._r8*work1(i) )  &
-               / (.1_r8 + xph(i,k))
+          rah2o2 = 8.e4_r8 * exp( -3650._r8*t_factor )  &
+               / (.1_r8 + xph(icol,kk))
 
           !------------------------------------------------------------------------
           !        ... S(IV)+ O3
           !------------------------------------------------------------------------
-          rao3   = 4.39e11_r8 * EXP(-4131._r8/tz)  &
-               + 2.56e3_r8  * EXP(-996._r8 /tz) /xph(i,k)
+          rao3   = 4.39e11_r8 * exp(-4131._r8/tz)  &
+               + 2.56e3_r8  * exp(-996._r8 /tz) /xph(icol,kk)
 
           !-----------------------------------------------------------------
           !       ... Prediction after aqueous phase
@@ -769,113 +394,438 @@ contains
           !       S(IV) + H2O2 = S(VI)
           !............................
           
-          IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED          
+          if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
 
-             if (cloud_borne) then
-                patm_x = patm
-             else
-                patm_x = 1._r8
-             endif
+             call calc_sox_aqueous( modal_aerosols,     & ! in
+                rah2o2, h2o2g, so2g,   o3g,   rao3,     & ! in
+                patm, dtime, t_factor, xlwc,  const0,   & ! in
+                xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      & ! in
+                xso2(icol,kk), xso4(icol,kk),           & ! inout
+                xso4_init(icol,kk), xh2o2(icol,kk),     & ! inout
+                xdelso4hp(icol,kk)                      ) ! out
 
-             if (modal_aerosols) then
+          endif !! WHEN CLOUD IS PRESENTED
 
-                pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
-                     * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
-             else
-                pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm_x  &
-                     * heso2(i,k)  * so2g  * patm_x    ! [M/s]
-
-             endif
-
-             pso4 = pso4 & ! [M/s] = [mole/L(w)/s]
-                  * xl & ! [mole/L(a)/s]
-                  / const0 & ! [/L(a)/s]
-                  / xhnm(i,k)
-
-
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             IF (xh2o2(i,k) .gt. xso2(i,k)) THEN
-                if (ccc .gt. xso2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xso2(i,k)
-                   if (cloud_borne) then
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                      xso2(i,k)=1.e-20_r8
-                   else       ! ???? bug ????
-                      xso2(i,k)=1.e-20_r8
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                   endif
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-
-             ELSE
-                if (ccc  .gt. xh2o2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xh2o2(i,k)
-                   xso2(i,k)=xso2(i,k)-xh2o2(i,k)
-                   xh2o2(i,k)=1.e-20_r8
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-             END IF
-             
-             if (modal_aerosols) then
-                xdelso4hp(i,k)  =  xso4(i,k) - xso4_init(i,k)
-             endif
-             !...........................
-             !       S(IV) + O3 = S(VI)
-             !...........................
-
-             pso4 = rao3 * heo3(i,k)*o3g*patm_x * heso2(i,k)*so2g*patm_x  ! [M/s]
-
-             pso4 = pso4        &                                ! [M/s] =  [mole/L(w)/s]
-                  * xl          &                                ! [mole/L(a)/s]
-                  / const0      &                                ! [/L(a)/s]
-                  / xhnm(i,k)                                    ! [mixing ratio/s]
-             
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             if (ccc .gt. xso2(i,k)) then
-                xso4(i,k) = xso4(i,k) + xso2(i,k)
-                xso2(i,k) = 1.e-20_r8
-             else
-                xso4(i,k) = xso4(i,k) + ccc
-                xso2(i,k) = xso2(i,k) - ccc
-             end if
-
-          END IF !! WHEN CLOUD IS PRESENTED
-
-       end do col_loop1
-    end do ver_loop1
+       enddo col_loop1
+    enddo ver_loop1
 
     call sox_cldaero_update( &
          ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, & ! in
          cldnum, cldfrc, cfact, cldconc%xlwc, & ! in
          xdelso4hp, xh2so4, xso4, xso4_init,  & ! in
          qcw, qin  ) ! inout
-    
+   
+    ! diagnose variable 
     xphlwc(:,:) = 0._r8
-    do k = 1, pver
-       do i = 1, ncol
-          if (cldfrc(i,k)>=1.e-5_r8 .and. lwc(i,k)>=1.e-8_r8) then
-             xphlwc(i,k) = -1._r8*log10(xph(i,k)) * lwc(i,k)
+    do kk = 1, pver
+       do icol = 1, ncol
+          if (cldfrc(icol,kk)>=small_value_cf .and. lwc(icol,kk)>=small_value_lwc) then
+             xphlwc(icol,kk) = -1._r8*log10(xph(icol,kk)) * lwc(icol,kk)
           endif
-       end do
-    end do
+       enddo
+    enddo
     call outfld( 'XPH_LWC', xphlwc(:ncol,:), ncol , lchnk )
 
     call sox_cldaero_destroy_obj(cldconc)
 
-  end subroutine SETSOX
+  end subroutine setsox 
 
-end module MO_SETSOX
+!===========================================================================
+  subroutine calc_ph_values(                    &
+                temperature, patm, xlwc, t_factor,   & ! in
+                xso2, xso4, xhnm,  so4_fact,    & ! in
+                Ra,   xkw,  const0,             & ! in
+                converged, xph                  ) ! out
+!---------------------------------------------------------------------------
+! calculate PH value and H+ concentration
+!
+! 21-mar-2011 changes by rce
+! now uses bisection method to solve the electro-neutrality equation
+! 3-mode aerosols (where so4 is assumed to be nh4hso4)
+!       old code set xnh4c = so4c
+!       new code sets xnh4c = 0, then uses a -1 charge (instead of -2)
+ !      for so4 when solving the electro-neutrality equation
+!---------------------------------------------------------------------------
+    implicit none
+
+    real(r8),  intent(in) :: temperature        ! temperature [K]
+    real(r8),  intent(in) :: patm               ! pressure [atm]
+    real(r8),  intent(in) :: t_factor           ! working variable to convert to 25 degC (1/T - 1/[298K])
+    real(r8),  intent(in) :: xso2               ! SO2 [mol/mol]
+    real(r8),  intent(in) :: xso4               ! SO4 [mol/mol]
+    real(r8),  intent(in) :: xhnm               ! [#/cm3]
+    real(r8),  intent(in) :: xlwc               ! in-cloud LWC [kg/L]
+    real(r8),  intent(in) :: so4_fact           ! factor for SO4
+    real(r8),  intent(in) :: Ra                 ! constant parameter
+    real(r8),  intent(in) :: xkw                ! constant parameter
+    real(r8),  intent(in) :: const0             ! constant parameter
+
+    logical,  intent(out) :: converged          ! if the method converge
+    real(r8), intent(out) :: xph                ! H+ ions concentration [mol/L]
+
+
+    ! local variables
+    integer   :: iter  ! iteration number
+    real(r8)  :: yph_lo, yph_hi, yph    ! pH values, lower and upper bounds
+    real(r8)  :: ynetpos_lo, ynetpos_hi ! lower and upper bounds of ynetpos
+    real(r8)  :: xk, xe, x2     ! output parameters in Henry's law
+    real(r8)  :: fact1_so2, fact2_so2, fact3_so2, fact4_so2  ! SO2 factors
+    real(r8)  :: Eh2o, Eco2, Eso4 ! effects of species [1/cm3]
+    real(r8)  :: ynetpos        ! net positive ions
+
+    integer,  parameter :: itermax = 20  ! maximum number of iterations
+    real(r8), parameter :: co2g = 330.e-6_r8    !330 ppm = 330.e-6 atm
+
+
+    !----------------------------------------
+    ! effect of chemical species
+    !----------------------------------------
+
+    ! -------------- hno3 -------------------
+    ! FORTRAN refactoring: not incorporated in MAM4
+
+    ! -------------- nh3 -------------------
+    ! FORTRAN refactoring: not incorporated in MAM4
+
+    ! -------------- so2 -------------------
+    ! previous code
+    !    heso2(i,k)  = xk*(1._r8 + xe/xph(i,k)*(1._r8 + x2/xph(i,k)))
+    !    px = heso2(i,k) * Ra * tz * xl
+    !    so2g =  xso2(i,k)/(1._r8+ px)
+    !    Eso2 = xk*xe*so2g *patm
+    ! equivalent new code
+    !    heso2 = xk + xk*xe/hplus * xk*xe*x2/hplus**2
+    !    so2g = xso2/(1 + px)
+    !         = xso2/(1 + heso2*ra*tz*xl)
+    !         = xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
+    !    eso2 = so2g*xk*xe*patm
+    !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
+    !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
+    !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
+    call henry_factor_so2(t_factor,     & ! in
+                        xk, xe, x2      ) ! out
+    fact1_so2 = xk*xe*patm*xso2
+    fact2_so2 = xk*Ra*temperature*xlwc
+    fact3_so2 = xe
+    fact4_so2 = x2
+
+    ! -------------- h2o effects -------------------
+    Eh2o = xkw
+
+    ! -------------- co2 effects -------------------
+    call henry_factor_co2(t_factor,     & ! in
+                        xk, xe          ) ! out
+    Eco2 = xk*xe*co2g  *patm
+
+    ! -------------- so4 effects -------------------
+    Eso4 = xso4*xhnm   &         ! /cm3(a)
+               *const0/xlwc
+
+    !-----------------------------------------------------------------
+    ! now use bisection method to solve electro-neutrality equation
+    ! to calculate PH value and H+ concentration
+    !
+    ! during the iteration loop,
+    !    yph_lo = lower ph value that brackets the root (i.e., correct ph)
+    !    yph_hi = upper ph value that brackets the root (i.e., correct ph)
+    !    yph    = current ph value
+    !    yposnet_lo and yposnet_hi = net positive ions for
+    !       yph_lo and yph_hi
+    !-----------------------------------------------------------------
+
+    converged = .false.
+    ! ---------  1st iteration: set lower bound ph value ----------
+    yph_lo = 2.0_r8
+    yph_hi = yph_lo
+    yph = yph_lo
+    call calc_ynetpos (          yph,                   & ! in
+         fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+         Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+         xph,   ynetpos                                 ) ! out
+    if (ynetpos <= 0.0_r8) then
+    ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
+    !    the correct ph, so use the lower bound
+          converged = .true.
+          return
+    endif
+    ynetpos_lo = ynetpos
+
+    ! ---------  2nd iteration: set upper bound ph value ----------
+    yph_hi = 7.0_r8
+    yph = yph_hi
+    call calc_ynetpos (          yph,                   & ! in
+         fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+         Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+         xph,   ynetpos                                 ) ! out
+    if (ynetpos >= 0.0_r8) then
+    ! the lower and upper bound ph values (2.0 and 7.0) do not bracket
+    !    the correct ph, so use the lower bound
+          converged = .true.
+          return
+    endif
+    ynetpos_hi = ynetpos
+
+    ! --------- 3rd iteration and more ------------
+    do iter = 3, itermax
+        yph = 0.5_r8*(yph_lo + yph_hi)
+        call calc_ynetpos (          yph,                   & ! in
+             fact1_so2,   fact2_so2, fact3_so2, fact4_so2,  & ! in
+             Eco2,  Eh2o, Eso4,      so4_fact,              & ! in
+             xph,   ynetpos                                 ) ! out
+        if (ynetpos >= 0.0_r8) then
+           ! net positive ions are >= 0 for both yph and yph_lo
+           !    so replace yph_lo with yph
+           yph_lo = yph
+           ynetpos_lo = ynetpos
+        else
+           ! net positive ions are <= 0 for both yph and yph_hi
+           !    so replace yph_hi with yph
+           yph_hi = yph
+           ynetpos_hi = ynetpos
+        endif
+
+        if (abs(yph_hi - yph_lo) .le. 0.005_r8) then
+           ! |yph_hi - yph_lo| <= convergence criterion, so set
+           !    final ph to their midpoint and exit
+           ! (.005 absolute error in pH gives .01 relative error in H+)
+           yph = 0.5_r8*(yph_hi + yph_lo)
+           xph = 10.0_r8**(-yph)
+           converged = .true.
+           return
+        endif
+    enddo
+
+  end subroutine calc_ph_values
+
+
+!===========================================================================
+  subroutine calc_ynetpos(   yph,                               & ! in
+                fact1_so2, fact2_so2, fact3_so2, fact4_so2,     & ! in
+                Eco2,      Eh2o,      Eso4,      so4_fact,      & ! in
+                xph,       ynetpos                              ) ! out
+    !-----------------------------------------------------------------
+    ! calculate net positive ions (ynetpos) for iterations in calc_ph_values
+    ! also calculate H+ concentration (xph) from ph value
+    !-----------------------------------------------------------------
+    implicit none
+
+    real(r8), intent(in) :: yph         ! pH value
+    real(r8), intent(in) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2 ! factors for SO2
+    real(r8), intent(in) :: Eco2, Eh2o, Eso4, so4_fact          ! effects from species [1/cm3]
+
+    real(r8), intent(out) :: xph        ! H+ concentration from pH value [#/cm3]
+    real(r8), intent(out) :: ynetpos    ! net positive ions
+
+    ! local variables
+    real(r8) :: Eso2    ! effect of so2, which is related to pH value
+    real(r8) :: tmp_hso3, tmp_so3, tmp_hco3, tmp_oh, tmp_so4  ! temporary variables
+    real(r8) :: tmp_pos, tmp_neg        ! positive and negative values to calculate ynetpos
+
+    ! calc current [H+] from ph
+    xph = 10.0_r8**(-yph)
+
+    !-----------------------------------------------------------------
+    !          ... so2
+    !-----------------------------------------------------------------
+    Eso2 = fact1_so2/(1.0_r8 + fact2_so2*(1.0_r8 +(fact3_so2/xph) &
+                    *(1.0_r8 + fact4_so2/xph)))
+
+    tmp_hso3 = Eso2 / xph
+    tmp_so3  = tmp_hso3 * 2.0_r8*fact4_so2/xph
+    tmp_hco3 = Eco2 / xph
+    tmp_oh   = Eh2o / xph
+    tmp_so4 = so4_fact*Eso4
+
+    ! positive ions are H+ only
+    tmp_pos = xph
+    ! all negative ions
+    tmp_neg = tmp_oh + tmp_hco3 + tmp_hso3 + tmp_so3 + tmp_so4
+
+    ynetpos = tmp_pos - tmp_neg
+
+  end subroutine calc_ynetpos
+
+!===========================================================================
+  subroutine calc_sox_aqueous( modal_aerosols,         & ! in
+                rah2o2, h2o2g, so2g, o3g,      rao3,   & ! in
+                patm, dtime, t_factor, xlwc, const0,   & ! in
+                xhnm, heo3,  heso2,                    & ! in
+                xso2, xso4,  xso4_init, xh2o2,         & ! inout
+                xdelso4hp_ik                           ) ! out
+    !-----------------------------------------------------------------
+    !       ... Prediction after aqueous phase
+    !       so4
+    !       When Cloud is present
+    !
+    !       S(IV) + H2O2 = S(VI)
+    !       S(IV) + O3   = S(VI)
+    !
+    !       reference:
+    !           (1) Seinfeld
+    !           (2) Benkovitz
+    !-----------------------------------------------------------------
+    implicit none
+
+    logical,  intent(in) :: modal_aerosols      ! if using MAM
+    real(r8), intent(in) :: rah2o2      ! reaction rate with h2o2
+    real(r8), intent(in) :: rao3        ! reaction rate with o3
+    real(r8), intent(in) :: h2o2g, so2g, o3g    
+    real(r8), intent(in) :: patm        ! pressure [atm]
+    real(r8), intent(in) :: dtime       ! time step [s]
+    real(r8), intent(in) :: t_factor    ! working variables to convert temperature 
+    real(r8), intent(in) :: xlwc        ! in-cloud LWC [kg/L]
+    real(r8), intent(in) :: const0
+    real(r8), intent(in) :: xhnm
+    real(r8), intent(in) :: heo3, heso2 ! henry law constant
+    real(r8), intent(inout) :: xso2, xso4, xso4_init, xh2o2 ! mixing ratios
+    real(r8), intent(out) :: xdelso4hp_ik ! change of so4 in (i,k)
+
+    ! local variables
+    real(r8) :: pso4    ! production rate of so4
+    real(r8) :: delta_s ! so4 production in the time step
+    real(r8) :: xk_so2, xk_h2o2 ! for the use of Henry Law subroutines
+    real(r8) :: xe, x2  ! output of henry law subroutines but not used
+    real(r8), parameter :: small_value_20 = 1.e-20_r8 ! small value 
+    real(r8), parameter :: small_value_30 = 1.e-30_r8 ! small value
+
+          !............................
+          !       S(IV) + H2O2 = S(VI)
+          !............................
+
+! FORTRAN refactor: using henry law subroutines here break the BFB test because
+! it changes the order of calculation. The original code is used now but new
+! code is kept but commented out for future implementation.
+!    call henry_factor_so2(t_factor, xk_so2, xe, x2)
+!    call henry_factor_h2o2(t_factor, xk_h2o2, xe)
+!    pso4 = rah2o2 * xk_h2o2* h2o2g * patm * xk_so2 * so2g * patm
+    pso4 = rah2o2 * 7.4e4_r8*exp(6621._r8*t_factor) * h2o2g * patm &
+                  * 1.23_r8 *exp(3120._r8*t_factor) * so2g * patm
+
+    pso4 = pso4   & ! [M/s] = [mole/L(w)/s]
+         * xlwc   & ! [mole/L(a)/s]
+         / const0 & ! [/L(a)/s]
+         / xhnm
+
+
+    delta_s = max(pso4*dtime, small_value_30)
+
+    xso4_init=xso4
+
+    if (delta_s<=xso2 .and. delta_s<=xh2o2) then
+        xso4  = xso4  + delta_s
+        xh2o2 = xh2o2 - delta_s
+        xso2  = xso2  - delta_s
+    elseif (xh2o2 > xso2) then
+        xso4=xso4+xso2
+        xh2o2=xh2o2-xso2
+        xso2=small_value_20
+    else
+        xso4=xso4+xh2o2
+        xso2=xso2-xh2o2
+        xh2o2=small_value_20
+    endif
+
+    if (modal_aerosols) then
+       xdelso4hp_ik  =  xso4 - xso4_init
+    endif
+             !...........................
+             !       S(IV) + O3 = S(VI)
+             !...........................
+
+    pso4 = rao3 * heo3*o3g*patm * heso2*so2g*patm  ! [M/s]
+
+    pso4 = pso4        &                                ! [M/s] =[mole/L(w)/s]
+         * xlwc        &                                ! [mole/L(a)/s]
+         / const0      &                                ! [/L(a)/s]
+         / xhnm                                    ! [mixing ratio/s]
+
+    delta_s = max(pso4*dtime, small_value_30)
+
+    xso4_init=xso4
+
+    if (delta_s > xso2) then
+       xso4 = xso4 + xso2
+       xso2 = small_value_20
+    else
+       xso4 = xso4 + delta_s
+       xso2 = xso2 - delta_s
+    endif
+
+
+  end subroutine calc_sox_aqueous
+
+!===========================================================================
+  subroutine henry_factor_so2(t_factor, xk, xe, x2)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk, xe and x2 for SO2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K) 
+    real(r8), intent(out) :: xk, xe, x2 ! output variables
+
+    ! for so2
+    xk = 1.23_r8  *exp( 3120._r8*t_factor )
+    xe = 1.7e-2_r8*exp( 2090._r8*t_factor )
+    x2 = 6.0e-8_r8*exp( 1120._r8*t_factor )
+
+  end subroutine henry_factor_so2
+
+!===========================================================================
+  subroutine henry_factor_co2(t_factor, xk, xe)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for CO2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk, xe     ! output variables
+
+    ! for co2
+    xk = 3.1e-2_r8*exp( 2423._r8*t_factor )
+    xe = 4.3e-7_r8*exp(-913._r8 *t_factor )
+
+  end subroutine henry_factor_co2
+
+!===========================================================================
+  subroutine henry_factor_h2o2(t_factor, xk, xe)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for H2O2
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk, xe     ! output variables
+
+    ! for h2o2
+    xk = 7.4e4_r8   *exp( 6621._r8*t_factor )
+    xe = 2.2e-12_r8 *exp(-3730._r8*t_factor )
+
+  end subroutine henry_factor_h2o2
+
+!===========================================================================
+  subroutine henry_factor_o3(t_factor, xk)
+    !-----------------------------------------------------------------
+    ! get Henry Law parameters xk and xe for O3
+    !-----------------------------------------------------------------
+
+    implicit none
+
+    real(r8), intent(in) :: t_factor    ! temperature conversion factor
+                                        ! t_factor = (1/T - 1/298K)
+    real(r8), intent(out) :: xk         ! output variables
+
+    ! for o3
+    xk = 1.15e-2_r8   *exp( 2560._r8*t_factor )
+
+  end subroutine henry_factor_o3
+
+!===========================================================================
+
+end module mo_setsox

@@ -111,6 +111,7 @@ contains
 
     do kk = 1,pver
        do icol = 1,ncol
+          ! conc_obj%xlwc is in-cloud LWC with the unit of [kg/L]
           if( cldfrc(icol,kk) >0._r8) then
              ! cloud water L(water)/L(air)
              conc_obj%xlwc(icol,kk) = lwc(icol,kk) *cfact(icol,kk)
