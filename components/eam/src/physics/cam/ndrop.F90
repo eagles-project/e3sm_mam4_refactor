@@ -1,5 +1,6 @@
 
 module ndrop
+#include "../../chemistry/yaml/common_files/common_uses.ymlf90"
 
   !---------------------------------------------------------------------------------
   ! Purpose:
@@ -505,8 +506,7 @@ contains
        nnew = 2
 
        call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
-            nact,mact,qcld,raercol,raercol_cw,nsav,nnew)   ! inout
-
+            nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
        ! droplet number
 
        ndropcol(icol) = 0._r8
@@ -929,7 +929,7 @@ contains
   !===============================================================================
 
   subroutine update_from_explmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
-       nact,mact,qcld,raercol,raercol_cw,nsav,nnew)   ! inout
+       nact,mact,qcld,raercol,raercol_cw,nsav,nnew)  ! inout
 
     ! input arguments
     real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
@@ -1084,8 +1084,7 @@ contains
        call explmix(  qcld, &   ! out
             srcn, ekkp, ekkm, overlapp,  &   ! in
             overlapm, qncld,  &  ! in
-            dtmix, .false.)   ! in
-
+            dtmix, .false. )   ! in
        ! update aerosol number
 
        ! rce-comment
@@ -1109,8 +1108,7 @@ contains
           call explmix( raercol_cw(:,mm,nnew), &  ! out
                source, ekkp, ekkm, overlapp, &   ! in
                overlapm, raercol_cw(:,mm,nsav),   &  ! in
-               dtmix, .false.)  ! in
-
+               dtmix, .false. )  ! in
           call explmix( raercol(:,mm,nnew), &   ! out
                source, ekkp, ekkm, overlapp,  &    ! in
                overlapm, raercol(:,mm,nsav),  &  ! in
@@ -1133,8 +1131,7 @@ contains
              call explmix( raercol_cw(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp, &  ! in
                   overlapm, raercol_cw(:,mm,nsav),    &  ! in
-                  dtmix, .false.)  ! in
-
+                  dtmix, .false. )  ! in
              call explmix( raercol(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp,  &  ! in
                   overlapm, raercol(:,mm,nsav),  &   ! in
@@ -1172,15 +1169,15 @@ contains
 
   !===============================================================================
 
-  subroutine explmix( q, &  ! out
-       src, ekkp, ekkm, overlapp, overlapm, qold, dt, is_unact, &  ! in
+  subroutine explmix( qnew, &  ! out
+       src, ekkp, ekkm, overlapp, overlapm, qold, dtmix, is_unact, &  ! in
        qactold )  ! optional in
 
     !  explicit integration of droplet/aerosol mixing
     !     with source due to activation/nucleation
 
     ! output arguments
-    real(r8), intent(out) :: q(pver) ! number / mass mixing ratio to be updated [# or kg / kg]
+    real(r8), intent(out) :: qnew(pver) ! number / mass mixing ratio to be updated [# or kg / kg]
 
     ! input arguments
     real(r8), intent(in) :: qold(pver) ! number / mass mixing ratio from previous time step [# or kg / kg]
@@ -1191,7 +1188,7 @@ contains
     ! above layer k  (k,k+1 interface)
     real(r8), intent(in) :: overlapp(pver) ! cloud overlap below [fraction]
     real(r8), intent(in) :: overlapm(pver) ! cloud overlap above [fraction]
-    real(r8), intent(in) :: dt ! time step [s]
+    real(r8), intent(in) :: dtmix ! time step [s]
     logical, intent(in) :: is_unact ! true if this is an unactivated species
     real(r8), intent(in),optional :: qactold(pver) ! [# or kg / kg]
     ! number / mass mixing ratio of ACTIVATED species from previous step
@@ -1204,24 +1201,28 @@ contains
     integer kp1  !  bounded vertical level index plus 1
     integer km1  !  bounded vertical level index minus 1
 
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/explmix_beg_yml.f90"
+
     !     the qactold*(1-overlap) terms are resuspension of activated material
     do kk=top_lev,pver
        kp1=min(kk+1,pver)
        km1=max(kk-1,top_lev)
 
        if ( is_unact ) then
-          q(kk) = qold(kk) + dt*( - src(kk) + ekkp(kk)*(qold(kp1) - qold(kk) +       &
+          qnew(kk) = qold(kk) + dtmix*( - src(kk) + ekkp(kk)*(qold(kp1) - qold(kk) +       &
                qactold(kp1)*(1.0_r8-overlapp(kk)))               &
                + ekkm(kk)*(qold(km1) - qold(kk) +     &
                qactold(km1)*(1.0_r8-overlapm(kk))) )
        else
-          q(kk) = qold(kk) + dt*(src(kk) + ekkp(kk)*(overlapp(kk)*qold(kp1)-qold(kk)) +      &
+          qnew(kk) = qold(kk) + dtmix*(src(kk) + ekkp(kk)*(overlapp(kk)*qold(kp1)-qold(kk)) +      &
                ekkm(kk)*(overlapm(kk)*qold(km1)-qold(kk)) )
        endif
 
        !        force to non-negative
-       q(kk)=max(q(kk),0._r8)
+       qnew(kk)=max(qnew(kk),0._r8)
     enddo
+
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/explmix_end_yml.f90"
 
   end subroutine explmix
 
