@@ -1,5 +1,6 @@
 
 module mo_setsox
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
@@ -145,7 +146,7 @@ contains
        ncol,   lchnk,  loffset,   dtime,  & ! in
        press,  pdel,   tfld,      mbar,   & ! in
        lwc,    cldfrc, cldnum,            & ! in
-       xhnm,   invariants,                & ! in
+       xhnm,                              & ! in
        qcw,    qin                        ) ! inout
 
     !-----------------------------------------------------------------------      
@@ -187,7 +188,6 @@ contains
     real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction [fraction]
     real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration [#/kg]
     real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density [#/cm**3]
-    real(r8),         intent(in)    :: invariants(:,:,:) ! invariant density [molecules/cm**3]
     real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol [vmr]
     real(r8),         intent(inout) :: qin(:,:,:)        ! transported species [vmr]
 
@@ -235,6 +235,7 @@ contains
  
     real(r8), dimension(ncol,pver) :: heh2o2,heso2,heo3 ! henry law const for species
     type(cldaero_conc_t), pointer :: cldconc
+#include "../yaml/mo_setsox/f90_yaml/setsox_beg_yml.f90"
 
 
     !==================================================================
@@ -428,6 +429,7 @@ contains
 
     call sox_cldaero_destroy_obj(cldconc)
 
+#include "../yaml/mo_setsox/f90_yaml/setsox_end_yml.f90"
   end subroutine setsox 
 
 !===========================================================================
@@ -475,6 +477,7 @@ contains
 
     integer,  parameter :: itermax = 20  ! maximum number of iterations
     real(r8), parameter :: co2g = 330.e-6_r8    !330 ppm = 330.e-6 atm
+#include "../yaml/mo_setsox/f90_yaml/calc_ph_values_beg_yml.f90"
 
 
     !----------------------------------------
@@ -591,6 +594,7 @@ contains
            yph = 0.5_r8*(yph_hi + yph_lo)
            xph = 10.0_r8**(-yph)
            converged = .true.
+#include "../yaml/mo_setsox/f90_yaml/calc_ph_values_end_yml.f90"
            return
         endif
     enddo
@@ -620,6 +624,7 @@ contains
     real(r8) :: Eso2    ! effect of so2, which is related to pH value
     real(r8) :: tmp_hso3, tmp_so3, tmp_hco3, tmp_oh, tmp_so4  ! temporary variables
     real(r8) :: tmp_pos, tmp_neg        ! positive and negative values to calculate ynetpos
+#include "../yaml/mo_setsox/f90_yaml/calc_ynetpos_beg_yml.f90"
 
     ! calc current [H+] from ph
     xph = 10.0_r8**(-yph)
@@ -643,6 +648,7 @@ contains
 
     ynetpos = tmp_pos - tmp_neg
 
+#include "../yaml/mo_setsox/f90_yaml/calc_ynetpos_end_yml.f90"
   end subroutine calc_ynetpos
 
 !===========================================================================
@@ -687,6 +693,7 @@ contains
     real(r8) :: xe, x2  ! output of henry law subroutines but not used
     real(r8), parameter :: small_value_20 = 1.e-20_r8 ! small value 
     real(r8), parameter :: small_value_30 = 1.e-30_r8 ! small value
+#include "../yaml/mo_setsox/f90_yaml/calc_sox_aqueous_beg_yml.f90"
 
           !............................
           !       S(IV) + H2O2 = S(VI)
@@ -751,6 +758,7 @@ contains
        xso2 = xso2 - delta_s
     endif
 
+#include "../yaml/mo_setsox/f90_yaml/calc_sox_aqueous_end_yml.f90"
 
   end subroutine calc_sox_aqueous
 

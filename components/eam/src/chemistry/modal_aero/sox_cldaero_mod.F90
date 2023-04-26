@@ -2,6 +2,7 @@
 ! Modal aerosol implementation
 !----------------------------------------------------------------------------------
 module sox_cldaero_mod
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod,    only : r8 => shr_kind_r8
   use cam_abortutils,      only : endrun
@@ -106,6 +107,7 @@ contains
     ! local variable indexes
     integer :: id_so4_1a, id_so4_2a, id_so4_3a
     integer :: icol,kk
+#include "../yaml/sox_cldaero_mod/f90_yaml/sox_cldaero_create_obj_beg_yml.f90"
 
     conc_obj => cldaero_allocate()
 
@@ -139,6 +141,7 @@ contains
     ! with 3-mode, assume so4 is nh4hso4, and so half-neutralized
     conc_obj%so4_fact = 1._r8
 
+#include "../yaml/sox_cldaero_mod/f90_yaml/sox_cldaero_create_obj_end_yml.f90"
 
   end function sox_cldaero_create_obj
 
@@ -200,6 +203,7 @@ contains
 
     real(r8), parameter :: small_value_8  = 1.e-8_r8
     real(r8), parameter :: small_value_5  = 1.e-5_r8
+#include "../yaml/sox_cldaero_mod/f90_yaml/sox_cldaero_update_beg_yml.f90"
 
     ! make sure dqdt is zero initially, for budgets
     dqdt_aqso4(:,:,:)   = 0.0_r8
@@ -308,6 +312,7 @@ contains
     call calc_sfc_flux( dqdt_aqo3rxn*specmw_so4_amode/mbar, pdel, sflx)
     call outfld( 'AQSO4_O3', sflx(:ncol), ncol, lchnk)
 
+#include "../yaml/sox_cldaero_mod/f90_yaml/sox_cldaero_update_end_yml.f90"
   end subroutine sox_cldaero_update
 
   !=============================================================================
@@ -332,6 +337,7 @@ contains
     real(r8) :: sumf                    ! total TMR for all modes [vmr]
     real(r8) :: qnum_c(ntot_amode)      ! tracer mixing ratio [vmr]
     real(r8), parameter :: small_value_10 = 1.e-10_r8
+#include "../yaml/sox_cldaero_mod/f90_yaml/compute_aer_factor_beg_yml.f90"
 
     !-------------------------------------------------------------------------
     sumf  = 0.0_r8
@@ -357,6 +363,7 @@ contains
 
     ! at this point (sumf <= 0.0) only when all the faqgain_so4 are zero
     if (sumf > 0.0_r8) faqgain_so4(:) = faqgain_so4(:)/sumf
+#include "../yaml/sox_cldaero_mod/f90_yaml/compute_aer_factor_end_yml.f90"
 
   end subroutine compute_aer_factor
 
@@ -368,9 +375,11 @@ contains
     real(r8), intent(inout) :: tmr   ! tracer mixing ratio [vmr]
     real(r8), intent(in)    :: dqdt  ! tmr tendency [vmr/s]
     real(r8), intent(in)    :: dtime ! time step [s]
+#include "../yaml/sox_cldaero_mod/f90_yaml/update_tmr_beg_yml.f90"
 
     tmr = tmr + dqdt * dtime
 
+#include "../yaml/sox_cldaero_mod/f90_yaml/update_tmr_end_yml.f90"
   end subroutine update_tmr
   !=============================================================================
   subroutine update_tmr_nonzero ( tmr, idx )
@@ -398,12 +407,14 @@ contains
     real(r8), intent(out):: sflx(:)        ! integrated surface fluxes [kg/m2/s]
 
     integer :: kk
+#include "../yaml/sox_cldaero_mod/f90_yaml/calc_sfc_flux_beg_yml.f90"
 
      sflx(:)=0.0_r8
      do kk=1,pver
         sflx(:) = sflx(:) + layer_tend(:,kk)*pdel(:,kk)/gravit
      enddo
 
+#include "../yaml/sox_cldaero_mod/f90_yaml/calc_sfc_flux_end_yml.f90"
   end subroutine calc_sfc_flux
 
   !=============================================================================

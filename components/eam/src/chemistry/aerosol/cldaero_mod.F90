@@ -4,6 +4,7 @@
 ! Created by Francis Vitt
 !----------------------------------------------------------------------------------
 module cldaero_mod
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use ppgrid,       only : pcols, pver
@@ -118,6 +119,7 @@ contains
     ! and (radxnum_cd/volx34pi_cd > max) as unphysical
     real(r8),parameter :: min_factor_volx34pi_radxnum = 4.0e4_r8
     real(r8),parameter :: max_factor_volx34pi_radxnum = 4.0e8_r8
+#include "../yaml/cldaero_mod/f90_yaml/cldaero_uptakerate_beg_yml.f90"
 
 
 ! change drop number conc from #/kg to #/cm^3
@@ -162,6 +164,7 @@ contains
 ! instantaneous uptake rate
         uptkrate = pi4*radxnum_cd*gasdiffus*fuchs_sutugin
 
+#include "../yaml/cldaero_mod/f90_yaml/cldaero_uptakerate_end_yml.f90"
   end function cldaero_uptakerate
 !==================================================================================
 
