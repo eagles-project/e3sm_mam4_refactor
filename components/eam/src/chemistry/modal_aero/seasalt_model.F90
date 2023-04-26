@@ -706,67 +706,6 @@ subroutine omfrac_accu_aitk(om_ssa_in, om_ssa)
 
 end subroutine omfrac_accu_aitk
 
-subroutine gantt_omfrac_size(om_ssa_max, om_ssa)
-
-   !----------------------------------------------------------------------- 
-   ! Purpose:
-   ! For a given value of om_ssa_max, compute the dependence of the organic
-   ! mass fraction on particle size, following Gantt et al. (2011).
-   !
-   ! OM_SSA (D_p,RH=80%) =             OM_SSA,max
-   !                       -------------------------------   + OM_SSA,min
-   !                       1 + 0.03 exp(6.18 * D_p(RH=80%))
-   !
-   ! Mace Head: OM_SSA,min=0.03, OM_SSA,max=0.82
-   !
-   ! Here, substitute calculated value for OM_SSA,max.
-   ! D_p is RH=80% diameter in micrometers
-   ! Dg is dry diameter in meters
-   ! rdry is dry radius in meters
-   ! rm is RH=80% radius in micrometers
-   !
-   ! Original paper uses RH=80% diameter, but inserting dry diameter gives
-   !  a better match to observations.  Is it possible that Gantt et al. did
-   !  not consider mass-weighting of the diameter within each bin, leading
-   !  to a bias?
-   !
-   ! Note: D_p(RH=80%):D_p(dry) is approx. 2:1 (Lewis and Schwartz, 2004, p. 54)
-   !
-   ! Note: It is a reasonable approximation to use average diameter of each section
-   !  to calculate fraction of both number and mass in that section.
-   ! Errors are on the order of a few percent.
-   !
-   ! Author:
-   ! Susannah Burrows, 2015
-   !----------------------------------------------------------------------- 
-   use sslt_sections, only: nsections, Dg
-   implicit none
-   !-----------------------------------------------------------------------
-   ! Arguments:
-   !
-   real(r8), intent(in)    :: om_ssa_max(:)
-   real(r8), intent(inout) :: om_ssa(:,:)
-   !
-   ! Local variables
-   !
-   real(r8), parameter :: om_ssa_min = 0.03
-   integer  :: m
-   !
-   !-----------------------------------------------------------------------
-
-
-   ! calculate OM fraction!
-   do m=1,nsections
-      ! update only in Aitken and accu. modes
-      if (Dg(m) >= sst_sz_range_lo(2) .and. Dg(m) < sst_sz_range_hi(1)) then
-         om_ssa(:, m) = om_ssa_max(:) / (1._r8 + 0.03_r8 * exp(6.18_r8 * Dg(m) * 1.e-6_r8)) &
-                      + om_ssa_min
-      else
-         om_ssa(:, m) = 0.0_r8 ! Set to zero for "fine sea salt" and "coarse sea salt" modes
-      endif
-   enddo
-    
-end subroutine gantt_omfrac_size
 
 !-------------------------------------------------------------------
 !! READ INPUT FILES, CREATE FIELDS, and horizontally interpolate ocean data
