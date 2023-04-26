@@ -49,35 +49,40 @@ contains
     bm(:)=(0.380_r8-log10(rm(:)))/0.65_r8  ! use in Manahan
 
     ! calculate constants form emission polynomials
-    do m=1,nsections
-       if ((m).le.9)then
-          consta(1,m) = (-2.576_r8)*10._r8**35*Dg(m)**4+5.932_r8*10._r8**28  &
+    do m = 1, 9
+       consta(1,m) = (-2.576_r8)*10._r8**35*Dg(m)**4+5.932_r8*10._r8**28  &
                * Dg(m)**3+(-2.867_r8)*10._r8**21*Dg(m)**2+(-3.003_r8)  &
                * 10._r8**13*Dg(m) + (-2.881_r8)*10._r8**6
-          constb(1,m) = 7.188_r8*10._r8**37  &
+       constb(1,m) = 7.188_r8*10._r8**37  &
                * Dg(m)**4+(-1.616_r8)*10._r8**31*Dg(m)**3+6.791_r8*10._r8**23  &
                * Dg(m)**2+1.829_r8*10._r8**16*Dg(m)+7.609_r8*10._r8**8
-       elseif ((m).ge.10.and.(m).le.13)then
-          consta(2,m) = (-2.452_r8)*10._r8**33*Dg(m)**4+2.404_r8*10._r8**27  &
-               * Dg(m)**3+(-8.148_r8)*10._r8**20*Dg(m)**2+(1.183_r8)*10._r8**14  &
+    enddo
+
+    do m = 10, 13
+       consta(2,m) = (-2.452_r8)*10._r8**33*Dg(m)**4+2.404_r8*10._r8**27  &
+               * Dg(m)**3+(-8.148_r8)*10._r8**20*Dg(m)**2+(1.183_r8)*10._r8**14 &
                * Dg(m)+(-6.743_r8)*10._r8**6
-          constb(2,m) = 7.368_r8*10._r8**35  &
-               * Dg(m)**4+(-7.310_r8)*10._r8**29*Dg(m)**3+ 2.528_r8*10._r8**23  &
+       constb(2,m) = 7.368_r8*10._r8**35  &
+               * Dg(m)**4+(-7.310_r8)*10._r8**29*Dg(m)**3+ 2.528_r8*10._r8**23 &
                * Dg(m)**2+(-3.787_r8)*10._r8**16*Dg(m)+ 2.279_r8*10._r8**9
-       elseif ((m).ge.14.and.(m).lt.22)then
-          consta(3,m) = (1.085_r8)*10._r8**29*Dg(m)**4+(-9.841_r8)*10._r8**23  &
-               * Dg(m)**3+(3.132_r8)*10._r8**18*Dg(m)**2+(-4.165_r8)*10._r8**12  &
+    enddo
+
+    do m = 14, 21
+       consta(3,m) = (1.085_r8)*10._r8**29*Dg(m)**4+(-9.841_r8)*10._r8**23  &
+               * Dg(m)**3+(3.132_r8)*10._r8**18*Dg(m)**2+(-4.165_r8)*10._r8**12 &
                * Dg(m)+(2.181_r8)*10._r8**6
-          constb(3,m) = (-2.859_r8)*10._r8**31  &
-               * Dg(m)**4+(2.601_r8)*10._r8**26*Dg(m)**3+(-8.297_r8)*10._r8**20  &
+       constb(3,m) = (-2.859_r8)*10._r8**31  &
+               * Dg(m)**4+(2.601_r8)*10._r8**26*Dg(m)**3+(-8.297_r8)*10._r8**20 &
                * Dg(m)**2+(1.105_r8)*10._r8**15*Dg(m)+(-5.800_r8)*10._r8**8
-       elseif (m.ge.22.and.m.le.40)then
-          ! use monahan
+    enddo
+
+    do m = 22, nsections
+       ! use monahan
           consta(4,m) = (1.373_r8*rm(m)**(-3)*(1+0.057_r8*rm(m)**1.05_r8)  &
                * 10**(1.19_r8*exp(-bm(m)**2)))  &
                * (rm(m)-rm(m-1))
-       endif
     enddo
+
   end subroutine sslt_sections_init
 
   !===========================================================================
@@ -102,17 +107,20 @@ contains
 
     ! calculate number flux fi (#/m2/s)
     fi(:,:)=0._r8
-    do m=1,nsections
-       if (m.le.9)then
-          fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(1,m)+constb(1,m))
-       elseif (m.ge.10.and.m.le.13)then
-          fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(2,m)+constb(2,m))
-       elseif (m.ge.14.and.m.lt.22)then
-          fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(3,m)+constb(3,m))
-       elseif (m.ge.22.and.m.le.40)then
-          ! use Monahan
-          fi(:ncol,m)=consta(4,m)*u10cubed(:ncol)
-       endif
+    do m=1, 9
+       fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(1,m)+constb(1,m))
+    enddo
+
+    do m=10, 13
+       fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(2,m)+constb(2,m))
+    enddo
+
+    do m=14, 21
+       fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(3,m)+constb(3,m))
+    enddo
+
+    do m=22, nsections
+       fi(:ncol,m)=consta(4,m)*u10cubed(:ncol)
     enddo
 
   end function fluxes
