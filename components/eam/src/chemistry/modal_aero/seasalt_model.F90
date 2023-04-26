@@ -19,6 +19,7 @@ module seasalt_model
   public :: seasalt_init
   public :: seasalt_emis
   public :: seasalt_active
+  public :: marine_organic_emis
 
   public :: n_ocean_data
   public :: nslt_om
@@ -354,23 +355,87 @@ subroutine ocean_data_readnl(nlfile)
 end subroutine ocean_data_readnl
 
   !=============================================================================
-subroutine seasalt_emis(u10, u10cubed, lchnk, srf_temp, ocnfrc, ncol, cflx, emis_scale, F_eff)
+subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx)
+
+    use sslt_sections, only: nsections, fluxes, Dg, rdry
+    use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
+    use cam_history,   only: outfld
+    use spmd_utils,    only: masterproc    
+
+    ! input
+    integer, intent(in)  :: lchnk
+    integer, intent(in)  :: ncol
+    real(r8), intent(in) :: u10cubed(pcols)
+    real(r8), intent(in) :: srf_temp(pcols)
+    real(r8), intent(in) :: ocnfrc(pcols)
+    real(r8), intent(in) :: emis_scale   
+
+    ! output
+    real(r8), intent(inout) :: cflx(:,:)
+
+    ! local vars
+    integer  :: mn, mm, ibin, i
+    real(r8) :: fi(pcols,nsections)
+    integer :: m, n
+    real(r8):: cflx_help2(pcols)
+
+    fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
+
+   tracer_loop: do ibin = 1,nslt
+      ! Index of mass mode
+      mm = seasalt_indices(ibin)
+      ! Index of number mode
+      mn = seasalt_indices(nslt+nslt_om+ibin)
+
+      if (mn>0) then
+         ! Total number flux per mode
+         section_loop_ssa_num: do i=1, nsections
+            cflx_help2(:ncol) = 0.0_r8
+            if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
+               cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
+
+               ! Mixing state 1: external mixture, add OM to mass and number
+               ! Mixing state 3: internal mixture, add OM to mass and number
+               cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)
+            endif
+         enddo section_loop_ssa_num
+      endif
+
+      cflx(:ncol,mm)=0.0_r8
+      section_loop_sslt_mass: do i=1, nsections
+         if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
+            cflx_help2(:ncol) = 0.0_r8
+            cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
+                  *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
+
+            ! Mixing state 1: external mixture, add OM to mass and number
+            ! Mixing state 3: internal mixture, add OM to mass and number
+            cflx(:ncol,mm)      = cflx(:ncol,mm)      +cflx_help2(:ncol)
+         endif
+      enddo section_loop_sslt_mass
+   enddo tracer_loop    
+
+end subroutine seasalt_emis
+
+
+subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx, F_eff)
 
     use sslt_sections, only: nsections, fluxes, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
     use cam_history,   only: outfld
     use spmd_utils,    only: masterproc
 
-    ! dummy arguments
+    ! input
+    integer, intent(in)  :: lchnk
+    integer, intent(in)  :: ncol
     real(r8), intent(in) :: u10cubed(pcols)
     real(r8), intent(in) :: srf_temp(pcols)
     real(r8), intent(in) :: ocnfrc(pcols)
     real(r8), intent(in) :: emis_scale
-    integer,  intent(in) :: ncol
-    real(r8), intent(inout) :: cflx(:,:)
-    ! Needed in Gantt et al. calculation of organic mass fraction
-    real(r8), intent(in) :: u10(pcols)
-    integer, intent(in)  :: lchnk
+    
+    ! output
+    real(r8), intent(inout) :: cflx(:,:)   
+    real(r8), intent(out) :: F_eff(pcols)   ! optional diagnostic output
 
     ! local vars
     integer  :: mn, mm, ibin, i
@@ -387,7 +452,6 @@ subroutine seasalt_emis(u10, u10cubed, lchnk, srf_temp, ocnfrc, ncol, cflx, emis
 
    real(r8) :: mass_frac_bub_section(pcols, n_org_max, nsections)
    real(r8) :: om_ssa(pcols, nsections)
-   real(r8) :: F_eff(pcols) ! optional diagnostic output
 
    integer  :: m_om ! integer for iteration
 
@@ -423,41 +487,6 @@ subroutine seasalt_emis(u10, u10cubed, lchnk, srf_temp, ocnfrc, ncol, cflx, emis
    n_org = n_org_burrows
    call calc_om_ssa_burrows(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &
                             mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :), F_eff(:ncol), lchnk)
-
-
-   tracer_loop: do ibin = 1,nslt
-      ! Index of mass mode
-      mm = seasalt_indices(ibin)
-      ! Index of number mode
-      mn = seasalt_indices(nslt+nslt_om+ibin)
-
-      if (mn>0) then
-         ! Total number flux per mode
-         section_loop_ssa_num: do i=1, nsections
-            cflx_help2(:ncol) = 0.0_r8
-            if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
-               cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
-
-               ! Mixing state 1: external mixture, add OM to mass and number
-               ! Mixing state 3: internal mixture, add OM to mass and number
-               cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)
-            endif
-         enddo section_loop_ssa_num
-      endif
-
-      cflx(:ncol,mm)=0.0_r8
-      section_loop_sslt_mass: do i=1, nsections
-         if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
-            cflx_help2(:ncol) = 0.0_r8
-            cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
-                  *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
-
-            ! Mixing state 1: external mixture, add OM to mass and number
-            ! Mixing state 3: internal mixture, add OM to mass and number
-            cflx(:ncol,mm)      = cflx(:ncol,mm)      +cflx_help2(:ncol)
-         endif
-      enddo section_loop_sslt_mass
-   enddo tracer_loop
 
 
 ! Calculate emission of MOM mass.
@@ -532,7 +561,7 @@ subroutine seasalt_emis(u10, u10cubed, lchnk, srf_temp, ocnfrc, ncol, cflx, emis
       endif
    enddo om_mode_loop
 
-end subroutine seasalt_emis
+end subroutine marine_organic_emis
 
 
 subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &

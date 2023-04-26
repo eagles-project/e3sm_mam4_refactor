@@ -1541,7 +1541,7 @@ lphase_jnmw_conditional: &
   !=============================================================================
   !=============================================================================
   subroutine aero_model_emissions( state, cam_in )
-    use seasalt_model, only: seasalt_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
+    use seasalt_model, only: seasalt_emis, marine_organic_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
          has_mam_mom, nslt_om
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
 
@@ -1593,7 +1593,9 @@ lphase_jnmw_conditional: &
        sflx(:)=0._r8
        F_eff(:)=0._r8
 
-       call seasalt_emis(u10, u10cubed, lchnk, cam_in%sst, cam_in%ocnfrac, ncol, cam_in%cflx, seasalt_emis_scale, F_eff)
+       call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, cam_in%cflx)
+
+       call marine_organic_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, cam_in%cflx, F_eff)
 
        ! Write out salt mass fluxes to history files
        do m=1,seasalt_nbin-nslt_om
