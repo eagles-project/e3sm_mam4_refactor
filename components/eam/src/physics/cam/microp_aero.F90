@@ -495,8 +495,6 @@ subroutine microp_aero_run ( &
       qc    => state%q(:pcols,:pver,cldliq_idx), &
       qi    => state%q(:pcols,:pver,cldice_idx), &
       nc    => state%q(:pcols,:pver,numliq_idx), &
-! BJG below might be equal to above but not sure about indices
-      ncldwtr => state%q(:,:,numliq_idx),   &
       omega => state%omega,             &
       pmid     => state%pmid,           &
       pint     => state%pint,           &
@@ -660,10 +658,8 @@ subroutine microp_aero_run ( &
     
    call outfld('LCLOUD', lcldn, pcols, lchnk)
 
-! BJG below could be moved to top, but safest to include here for now.
-
    ! Init qqcw (a flat 1d pointer array) to mode number and species mass mixing ratios for
-   ! cloud borne phases.
+   ! cloud borne phases
 
    allocate(qqcw(ncnst_tot)) 
    do imode = 1, ntot_amode
@@ -688,7 +684,7 @@ subroutine microp_aero_run ( &
    call t_startf('dropmixnuc')
    call dropmixnuc( &
          lchnk,ncol,psetcols,deltatin,temperature,pmid,pint,pdel,rpdel,zm, &  ! in
-         state_q,ncldwtr,kvh,wsub,lcldn, lcldo, &  ! in
+         state_q,nc,kvh,wsub,lcldn, lcldo, &  ! in
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum)  !out
    call t_stopf('dropmixnuc')
