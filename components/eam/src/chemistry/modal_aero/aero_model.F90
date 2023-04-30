@@ -1377,7 +1377,7 @@ lphase_jnmw_conditional: &
                                     latndx, lonndx,                 & ! in
                                     tfld, pmid, pdel, mbar,         & ! in
                                     zm,  qh2o, cwat, cldfr, cldnum, & ! in
-                                    airdens, invariants,            & ! in
+                                    airdens,            & ! in
                                     vmr0, vmr, pbuf                 ) ! inout
     !-----------------------------------------------------------------------
     ! interface to gas-aerosol exchange
@@ -1400,7 +1400,6 @@ lphase_jnmw_conditional: &
     real(r8), intent(in) :: pdel(:,:)         ! pressure thickness of levels [Pa]
     real(r8), intent(in) :: mbar(:,:)         ! mean wet atmospheric mass [amu or g/mol]
     real(r8), intent(in) :: airdens(:,:)      ! total atms density [molecules/cm**3]
-    real(r8), intent(in) :: invariants(:,:,:) ! invariant density [molecules/cm**3]
     real(r8), intent(in) :: zm(:,:)           ! midpoint geopotential height above the surface [m]
     real(r8), intent(in) :: qh2o(:,:)         ! specific humidity [kg/kg]
     real(r8), intent(in) :: cwat(:,:)         ! cloud liquid water content [kg/kg]
@@ -1481,7 +1480,7 @@ lphase_jnmw_conditional: &
     call setsox( ncol, lchnk, loffset,  & ! in
               delt, pmid, pdel, tfld,   & ! in
               mbar, cwat, cldfr,cldnum, & ! in
-              airdens,    invariants,   & ! in
+              airdens,      & ! in
               vmrcw,      vmr           ) ! inout
 
     ! calculate and output column tendency due to aqueous chemistry 

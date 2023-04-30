@@ -794,7 +794,7 @@ contains
     call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, &
                                 tfld, pmid, pdel, mbar, &
                                 zm,  qh2o, cwat, cldfr, ncldwtr, &
-                                invariants(:,:,indexm), invariants,&
+                                invariants(:,:,indexm), &
                                 vmr0, vmr, pbuf )
     call t_stopf('aero_model_gasaerexch')
 

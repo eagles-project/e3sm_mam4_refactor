@@ -27,6 +27,11 @@ use spmd_utils,   only : masterproc
 ! ndrop.F90
 !#define YAML_NDROP
 
+! mo_setsox.F90
+!#define YAML_SETSOX
+
+! sox_cldaero_mod
+!#define YAML_SOXMOD
 
 use yaml_input_file_io
 

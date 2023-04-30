@@ -1,0 +1,9 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          47 , time step=         355 ] 
+mam4xx:
+  function: update_tmr
+input:
+  fixed:
+    dt:    0.00
+    tmr: [ 0.7580693633E-13]
+    dqdt: [ 0.1165423949E-16]
+    dtime: [ 0.3600000000E+04]

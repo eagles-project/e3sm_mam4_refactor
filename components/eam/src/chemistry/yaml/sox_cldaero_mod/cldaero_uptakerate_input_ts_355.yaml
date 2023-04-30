@@ -1,0 +1,12 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          47 , time step=         355 ] 
+mam4xx:
+  function: cldaero_uptakerate
+input:
+  fixed:
+    dt:    0.00
+    xl: [ 0.2045167481E-07]
+    cldnum: [ 0.2145049148E+08]
+    cfact: [ 0.6799056796E-03]
+    cldfrc: [ 0.7653835562E+00]
+    tfld: [ 0.2704710575E+03]
+    press: [ 0.5280266906E+05]
