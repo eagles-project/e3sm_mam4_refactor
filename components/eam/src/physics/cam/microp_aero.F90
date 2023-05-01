@@ -103,6 +103,9 @@ integer :: frzimm_idx
 integer :: frzcnt_idx
 integer :: frzdep_idx
 
+! pbuf index needed in this module for droplet activation input fields
+integer :: kvh_idx_dropmixnuc ! pbuf index of kvh
+
 ! Bulk aerosols
 character(len=20), allocatable :: aername(:)
 real(r8), allocatable :: num_to_mass_aer(:)
@@ -255,6 +258,14 @@ subroutine microp_aero_init
       dgnum_idx    = pbuf_get_index('DGNUM' )      
 
       call ndrop_init()
+
+   ! kvh_idx is not necessarily activated in this module at this point, but
+   ! it needs to be extracted from pbuf as an input field to dropmixnuc.
+   ! It is defined in ndrop_init, but locally.
+   ! Solution is to create a separate kvh index for this module that is
+   ! defined if this section of the code is reached.
+
+      kvh_idx_dropmixnuc      = pbuf_get_index('kvh')
 
       ! Init indices for specific modes/species
 
@@ -423,7 +434,6 @@ subroutine microp_aero_run ( &
    integer :: lspec   ! index for aerosol number / chem-mass / water-mass
    integer :: imode   ! aerosol mode index
    integer :: icnst   ! tracer index
-   integer :: kvh_idx_dropmixnuc ! pbuf index of kvh needed for dropmixnuc input
 
    ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
@@ -674,11 +684,9 @@ subroutine microp_aero_run ( &
       enddo
    enddo
 
-   ! NOTE FOR C++ porting, the following variable obtained using pbuf is used
+   ! The following variable obtained using pbuf is used
    ! for vertical mixing in the activation subroutine dropmixnuc
-   ! Do not use 'kvh_idx' since that index is not necessarily set in this module
 
-   kvh_idx_dropmixnuc      = pbuf_get_index('kvh')
    call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
 
    call t_startf('dropmixnuc')
@@ -688,6 +696,7 @@ subroutine microp_aero_run ( &
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum)  !out
    call t_stopf('dropmixnuc')
+   deallocate(qqcw) 
 
    npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 
