@@ -36,7 +36,6 @@ use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_ge
 
 use nucleate_ice_cam, only: use_preexisting_ice, nucleate_ice_cam_readnl, nucleate_ice_cam_register, &
                             nucleate_ice_cam_init, nucleate_ice_cam_calc
-
 use ndrop,            only: ndrop_init, dropmixnuc
 use ndrop_bam,        only: ndrop_bam_init, ndrop_bam_run, ndrop_bam_ccn
 
@@ -103,6 +102,9 @@ integer :: naai_hom_idx
 integer :: frzimm_idx
 integer :: frzcnt_idx
 integer :: frzdep_idx
+
+! pbuf index needed in this module for droplet activation input fields
+integer :: kvh_idx_dropmixnuc ! pbuf index of kvh
 
 ! Bulk aerosols
 character(len=20), allocatable :: aername(:)
@@ -257,6 +259,14 @@ subroutine microp_aero_init
 
       call ndrop_init()
 
+   ! kvh_idx is not necessarily activated in this module at this point, but
+   ! it needs to be extracted from pbuf as an input field to dropmixnuc.
+   ! It is defined in ndrop_init, but locally.
+   ! Solution is to create a separate kvh index for this module that is
+   ! defined if this section of the code is reached.
+
+      kvh_idx_dropmixnuc      = pbuf_get_index('kvh')
+
       ! Init indices for specific modes/species
 
       ! mode index for specified mode types
@@ -403,7 +413,9 @@ subroutine microp_aero_run ( &
    state, ptend, deltatin, pbuf, liqcldfo )
    
    use mam_support, only: min_max_bound
-
+   use modal_aero_data,   only: qqcw_get_field, nspec_amode, numptrcw_amode, lmassptrcw_amode, maxd_aspectype, ntot_amode
+   use ndrop,             only: ptr2d_t, mam_idx, ncnst_tot
+  
    ! input arguments
    type(physics_state), target, intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
@@ -414,11 +426,14 @@ subroutine microp_aero_run ( &
    ! local workspace
    ! all units mks unless otherwise stated
 
-   integer :: icol, kk, m
+   integer :: icol, kk, mm
    integer :: itim_old
    integer :: nmodes 
    integer :: lchnk_zb                  ! zero-based local chunk id
    integer :: ispec
+   integer :: lspec   ! index for aerosol number / chem-mass / water-mass
+   integer :: imode   ! aerosol mode index
+   integer :: icnst   ! tracer index
 
    ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
@@ -441,6 +456,8 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: naai(:,:)       ! number of activated aerosol for ice nucleation [#/kg]
    real(r8), pointer :: naai_hom(:,:)   ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
 
+   ! the following is used in droplet nucleation
+   type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
    real(r8), pointer :: frzimm(:,:)
    real(r8), pointer :: frzcnt(:,:)
@@ -482,13 +499,18 @@ subroutine microp_aero_run ( &
    associate( &
       lchnk => state%lchnk,             &
       ncol  => state%ncol,              &
+      psetcols  => state%psetcols,      &
       temperature     => state%t,       &
       state_q         => state%q,       &
       qc    => state%q(:pcols,:pver,cldliq_idx), &
       qi    => state%q(:pcols,:pver,cldice_idx), &
       nc    => state%q(:pcols,:pver,numliq_idx), &
       omega => state%omega,             &
-      pmid  => state%pmid               )
+      pmid     => state%pmid,           &
+      pint     => state%pint,           &
+      pdel     => state%pdel,           &
+      rpdel    => state%rpdel,          &
+      zm       => state%zm             )
 
 
    call t_startf('microp_aero_run_init')
@@ -646,11 +668,35 @@ subroutine microp_aero_run ( &
     
    call outfld('LCLOUD', lcldn, pcols, lchnk)
 
+   ! Init qqcw (a flat 1d pointer array) to mode number and species mass mixing ratios for
+   ! cloud borne phases
+
+   allocate(qqcw(ncnst_tot)) 
+   do imode = 1, ntot_amode
+      do lspec = 0, nspec_amode(imode)  ! loop through all species for mode 'imode'
+          mm = mam_idx(imode,lspec)
+          if (lspec == 0) then   ! number
+             icnst = numptrcw_amode(imode)
+          else ! aerosol mass
+             icnst = lmassptrcw_amode(lspec,imode)
+          endif
+          qqcw(mm)%fld => qqcw_get_field(pbuf,icnst,lchnk,.true.) 
+      enddo
+   enddo
+
+   ! The following variable obtained using pbuf is used
+   ! for vertical mixing in the activation subroutine dropmixnuc
+
+   call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
+
    call t_startf('dropmixnuc')
    call dropmixnuc( &
-         state, ptend, deltatin, pbuf, wsub, &
-         lcldn, lcldo, nctend_mixnuc, factnum)
+         lchnk,ncol,psetcols,deltatin,temperature,pmid,pint,pdel,rpdel,zm, &  ! in
+         state_q,nc,kvh,wsub,lcldn, lcldo, &  ! in
+         qqcw, &  ! inout
+         ptend, nctend_mixnuc, factnum)  !out
    call t_stopf('dropmixnuc')
+   deallocate(qqcw) 
 
    npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 

@@ -40,6 +40,7 @@ module ndrop
   save
 
   public ndrop_init, dropmixnuc, activate_modal
+  public ptr2d_t, mam_idx, ncnst_tot  !needed by microp_aero to extract dropmixnuc input fields from pbuf
 
   real(r8), allocatable :: alogsig(:)     ! natl log of geometric standard dev of aerosol
   real(r8), allocatable :: exp45logsig(:)
@@ -296,8 +297,10 @@ contains
   !===============================================================================
 
   subroutine dropmixnuc( &
-       state, ptend, dtmicro, pbuf, wsub, &
-       cldn, cldo, tendnd, factnum)
+       lchnk,ncol,psetcols,dtmicro,temp,pmid,pint,pdel,rpdel,zm,   &  ! in
+       state_q,ncldwtr,kvh,wsub,cldn,cldo, &  ! in
+       qqcw, & ! inout
+       ptend, tendnd, factnum)  !out
 
     ! vertical diffusion and nucleation of cloud droplets
     ! assume cloud presence controlled by cloud fraction
@@ -307,21 +310,33 @@ contains
     use mam_support, only: min_max_bound
 
     ! input arguments
-    type(physics_state), target, intent(in)    :: state
-    real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics [s]
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    integer, intent(in)  :: lchnk               ! chunk identifier
+    integer, intent(in)  :: ncol                ! number of columns
+    integer, intent(in)  :: psetcols            ! maximum number of columns
+    real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
+    real(r8), intent(in) :: temp(:,:)    ! temperature [K]
+    real(r8), intent(in) :: pmid(:,:)    ! mid-level pressure [Pa]
+    real(r8), intent(in) :: pint(:,:)    ! pressure at layer interfaces [Pa]
+    real(r8), intent(in) :: pdel(:,:)    ! pressure thickess of layer [Pa]
+    real(r8), intent(in) :: rpdel(:,:)   ! inverse of pressure thickess of layer [/Pa]
+    real(r8), intent(in) :: zm(:,:)      ! geopotential height of level [m]
+    real(r8), intent(in) :: state_q(:,:,:) ! aerosol mmrs [kg/kg]
+    real(r8), intent(in) :: ncldwtr(:,:) ! initial droplet number mixing ratio [#/kg]
+    real(r8), intent(in) :: kvh(:,:)     ! vertical diffusivity [m^2/s]
     real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity [m/s]
     real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction [fraction]
     real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step [fraction]
 
+    ! inout arguments
+    type(ptr2d_t), intent(inout) :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
+
     ! output arguments
-    type(physics_ptend),         intent(out)   :: ptend
+    type(physics_ptend), intent(out)   :: ptend
     real(r8), intent(out) :: tendnd(pcols,pver) ! tendency in droplet number mixing ratio [#/kg/s]
     real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number [fraction]
 
     !--------------------Local storage-------------------------------------
-    integer  :: lchnk               ! chunk identifier
-    integer  :: ncol                ! number of columns
+
     integer  :: mm                  ! local array index for MAM number, species
     integer  :: nnew, nsav          ! indices for old, new time levels in substepping
     integer  :: lptr
@@ -351,20 +366,11 @@ contains
     real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k [m/s]
     real(r8) :: nsource(pcols,pver)            ! droplet number mixing ratio source tendency [#/kg/s]
     real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing ratio tendency due to mixing [#/kg/s]
-
     real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat [#/m^3]
     real(r8) :: qcldbrn(pcols,pver,maxd_aspectype,ntot_amode) ! ! cloud-borne aerosol mass mixing ratios [kg/kg]
     real(r8) :: qcldbrn_num(pcols,pver,ntot_amode) ! ! cloud-borne aerosol number mixing ratios [#/kg]
 
-    real(r8), pointer :: ncldwtr(:,:) ! initial droplet number mixing ratio [#/kg]
-    real(r8), pointer :: temp(:,:)    ! temperature [K]
-    real(r8), pointer :: pmid(:,:)    ! mid-level pressure [Pa]
-    real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces [Pa]
-    real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer [Pa]
-    real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer [/Pa]
-    real(r8), pointer :: zm(:,:)      ! geopotential height of level [m]
-    real(r8), pointer :: state_q(:,:,:) ! aerosol mmrs [kg/kg]
-    real(r8), pointer :: kvh(:,:)     ! vertical diffusivity [m^2/s]
+
     real(r8), pointer :: ccn3d(:, :)  !  CCN at 0.2% supersat [#/m^3]
     real(r8), allocatable :: nact(:,:)  ! fractional aero. number  activation rate [/s]
     real(r8), allocatable :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
@@ -377,57 +383,21 @@ contains
 
     real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
     real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
-    type(ptr2d_t), allocatable :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
     !-------------------------------------------------------------------------------
 
-    !  NOTES FOR C++ PORT:  Below code extracts fields from state vector
-    !  During port, can move this code upward in subroutine hierarcy,
-    !  and /or replace with appropriate C++ structures.
-
-    lchnk = state%lchnk
-    ncol  = state%ncol
-
-    state_q  => state%q
-    ncldwtr  => state%q(:,:,numliq_idx)
-    temp     => state%t
-    pmid     => state%pmid
-    pint     => state%pint
-    pdel     => state%pdel
-    rpdel    => state%rpdel
-    zm       => state%zm
-
     ! aerosol tendencies
-    call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
+    call physics_ptend_init(ptend, psetcols, 'ndrop_aero', lq=lq)
 
     !  Allocate / define local variables
 
     allocate( &
          nact(pver,ntot_amode),          &
          mact(pver,ntot_amode),          &
-         qqcw(ncnst_tot),                &
          raercol(pver,ncnst_tot,2),      &
          raercol_cw(pver,ncnst_tot,2),   &
          coltend(pcols,ncnst_tot),       &
          coltend_cw(pcols,ncnst_tot)          )
-
-    !  Extract field from pbuf
-
-    call pbuf_get_field(pbuf, kvh_idx, kvh)
-
-    ! Init qqcw (a flat 1d pointer array) to mode number and species mass mixing ratios for
-    ! cloud borne phases.
-
-    do imode = 1, ntot_amode
-       mm = mam_idx(imode, 0)  !  extract number index, stored at 2nd index = 0 for mode 'imode'
-       num_idx = numptrcw_amode(imode)  !  number index for pbuf
-       qqcw(mm)%fld => qqcw_get_field(pbuf,num_idx,lchnk,.true.)
-       do lspec = 1, nspec_amode(imode)  ! loop through all species for mode 'imode'
-          mm = mam_idx(imode, lspec)  !  2nd index > 0 gives each species for mode 'imode'
-          spc_idx = lmassptrcw_amode(lspec,imode)  !  index for each species mass in pbuf
-          qqcw(mm)%fld => qqcw_get_field(pbuf,spc_idx,lchnk,.true.)
-       enddo
-    enddo
 
     dtinv = 1._r8/dtmicro
 
@@ -579,7 +549,6 @@ contains
     deallocate( &
          nact,       &
          mact,       &
-         qqcw,       &
          raercol,    &
          raercol_cw, &
          coltend,    &
@@ -1451,8 +1420,8 @@ contains
     ! Ghan et al., Atmos. Res., 1993, 198-221.
 
     ! input arguments
-    real(r8), pointer, intent(in)  :: state_q(:,:,:) ! aerosol mmrs [kg/kg]
-    real(r8), pointer, intent(in)  :: tair(:,:)     ! air temperature [K]
+    real(r8), intent(in)  :: state_q(:,:,:) ! aerosol mmrs [kg/kg]
+    real(r8), intent(in)  :: tair(:,:)     ! air temperature [K]
     real(r8), intent(in)  :: qcldbrn(:,:,:,:), qcldbrn_num(:,:,:) ! cloud-borne aerosol mass / number  mixing ratios [kg/kg or #/kg]
     integer, intent(in)   :: ncol  ! number of columns
     real(r8), intent(in)  :: cs(pcols,pver)       ! air density [kg/m3]
