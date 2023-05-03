@@ -1,0 +1,12 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          51 , time step=         355 ] 
+mam4xx:
+  function: index_ordering
+input:
+  fixed:
+    dt:    0.00
+    lspec: [         1]
+    imode: [         1]
+    lphase: [         1]
+    jaeronumb: [         0]
+    jaeromass: [         1]
+    jaerowater: [         2]

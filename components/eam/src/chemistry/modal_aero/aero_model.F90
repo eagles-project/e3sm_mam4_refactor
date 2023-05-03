@@ -1085,6 +1085,7 @@ lphase_jnmw_conditional: &
      integer  :: kk
      real(r8) :: prec(pcols)    ! precipitation falling from layers above [kg/m2/s]
      real(r8), parameter :: small_value_7=1.0e-7_r8
+#include "../yaml/aero_model/f90_yaml/examine_prec_exist_beg_yml.f90"
 
      ! initiate precipitation at the top level
      prec(:ncol)=0._r8
@@ -1099,6 +1100,7 @@ lphase_jnmw_conditional: &
            (prain(:ncol,kk)+cmfdqr(:ncol,kk)-evapr(:ncol,kk)) * pdel(:ncol,kk)/gravit
      enddo
 
+#include "../yaml/aero_model/f90_yaml/examine_prec_exist_end_yml.f90"
    end subroutine examine_prec_exist
 
 !=============================================================================
@@ -1126,6 +1128,7 @@ lphase_jnmw_conditional: &
      integer  :: kk,icol
      real(r8) :: tmpdust, tmpnacl    ! dust and seasalt mass concentration [kg/kg] 
      real(r8), parameter :: small_value_30 = 1.0e-30_r8
+#include "../yaml/aero_model/f90_yaml/set_f_act_coarse_beg_yml.f90"
 
      ! initial value
      f_act_conv_coarse(:,:) = 0.60_r8
@@ -1149,6 +1152,7 @@ lphase_jnmw_conditional: &
        endif
      endif
 
+#include "../yaml/aero_model/f90_yaml/set_f_act_coarse_end_yml.f90"
    end subroutine set_f_act_coarse
 !=============================================================================
    subroutine define_act_frac ( lphase, imode,          & ! in
@@ -1188,6 +1192,7 @@ lphase_jnmw_conditional: &
      real(r8), intent(out) :: sol_factb  ! below-cloud scavenging fraction
      real(r8), intent(out) :: sol_factic(pcols,pver) ! in-cloud convective scavenging fraction
      real(r8), intent(out) :: f_act_conv(pcols,pver) ! convection activation fraction
+#include "../yaml/aero_model/f90_yaml/define_act_frac_beg_yml.f90"
 
      if (lphase == 1) then ! interstial aerosol
         sol_facti = 0.0_r8 ! strat in-cloud scav totally OFF for institial
@@ -1212,6 +1217,7 @@ lphase_jnmw_conditional: &
         f_act_conv(:,:) = 0.0_r8   ! conv   in-cloud scav OFF (having this on would mean
      endif
 
+#include "../yaml/aero_model/f90_yaml/define_act_frac_end_yml.f90"
    end subroutine define_act_frac
 
 !=============================================================================
@@ -1233,6 +1239,7 @@ lphase_jnmw_conditional: &
      integer, intent(out) :: mm         ! index of the tracers
      integer, intent(out) :: jnv        ! index for scavcoefnv 3rd dimension
      integer, intent(out) :: jnummaswtr ! indicates current aerosol species type (0 = number, 1 = dry mass, 2 = water) 
+#include "../yaml/aero_model/f90_yaml/index_ordering_beg_yml.f90"
 
      if (lspec <= nspec_amode(imode)) then ! non-water mass
           jnummaswtr = jaeromass
@@ -1256,6 +1263,7 @@ lphase_jnmw_conditional: &
           jnummaswtr = jaerowater
      endif
 
+#include "../yaml/aero_model/f90_yaml/index_ordering_end_yml.f90"
    end subroutine index_ordering
 
 !=============================================================================
@@ -1290,6 +1298,7 @@ lphase_jnmw_conditional: &
      real(r8) :: tmpa, tmpb   ! working variables of deep fraction
      real(r8), parameter :: small_value_35 = 1.0e-35_r8
      real(r8), parameter :: small_value_36 = 1.0e-36_r8
+#include "../yaml/aero_model/f90_yaml/apportion_sfc_flux_deep_beg_yml.f90"
 
      do ii = 1, ncol
           tmp_precdp = max( rprddpsum(ii),  small_value_35 )
@@ -1314,6 +1323,7 @@ lphase_jnmw_conditional: &
           sflxecdp(ii) = sflxec(ii)*tmpb
       enddo
 
+#include "../yaml/aero_model/f90_yaml/apportion_sfc_flux_deep_end_yml.f90"
    end subroutine apportion_sfc_flux_deep
 
 !=============================================================================
@@ -1334,6 +1344,7 @@ lphase_jnmw_conditional: &
      real(r8), intent(inout) :: rtscavt_sv(:,:,:) ! resuspension that goes to coarse mode [kg/kg/s]
 
      integer :: mmtoo
+#include "../yaml/aero_model/f90_yaml/calc_resusp_to_coarse_beg_yml.f90"
 
      mmtoo = mmtoo_prevap_resusp(mm)
 
@@ -1351,6 +1362,7 @@ lphase_jnmw_conditional: &
      if (update_dqdt) then
         dqdt_tmp(1:ncol,:) = dqdt_tmp(1:ncol,:) + rtscavt_sv(1:ncol,:,mm)
      endif
+#include "../yaml/aero_model/f90_yaml/calc_resusp_to_coarse_end_yml.f90"
 
   end subroutine calc_resusp_to_coarse
 
@@ -1654,7 +1666,7 @@ lphase_jnmw_conditional: &
     ! set up temperature-pressure pair to compute impaction scavenging rates
     real(r8), parameter :: temp_0C = 273.16_r8        ! K
     real(r8), parameter :: press_750hPa = 0.75e6_r8   ! dynes/cm2
-#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_beg_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_beg_yml.f90"
     
     modeloop: do imode = 1, ntot_amode
 
@@ -1692,7 +1704,7 @@ lphase_jnmw_conditional: &
 
        enddo growloop
     enddo modeloop
-#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_end_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_init_end_yml.f90"
     return
 
   end subroutine modal_aero_bcscavcoef_init
@@ -1719,7 +1731,7 @@ lphase_jnmw_conditional: &
     real(r8) :: wetdiaratio             ! ratio of wet and dry aerosol diameter [fraction]
     real(r8) :: xgrow, dumfhi, dumflo   ! working variables
     real(r8) :: scavimpvol, scavimpnum  ! log of scavenging rates for volume and number
-#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_beg_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_beg_yml.f90"
 
 
     do kk = 1, pver
@@ -1768,7 +1780,7 @@ lphase_jnmw_conditional: &
        enddo
     enddo
 
-#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_end_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/modal_aero_bcscavcoef_get_end_yml.f90"
     return
   end subroutine modal_aero_bcscavcoef_get
 
@@ -1824,7 +1836,7 @@ lphase_jnmw_conditional: &
    real(r8) :: vfall                    ! rain droplet fall speed [cm/s]
    real(r8) :: ag0, xg0, xg3, xhi, xlo,dx    ! aerosol bin information
    !-----------------------------------------------------------------
-#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_beg_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_beg_yml.f90"
 
    ! this subroutine is calculated for a fix rainrate of 1 mm/hr
    precip = 1.0_r8/36000._r8        ! 1 mm/hr in cm/s
@@ -1912,7 +1924,7 @@ lphase_jnmw_conditional: &
    scavratenum = scavsumnum*3600._r8
    scavratevol = scavsumvol*3600._r8
 
-#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_end_yml.f90"
+!#include "../yaml/aero_model/f90_yaml/calc_1_impact_rate_end_yml.f90"
    return
   end subroutine calc_1_impact_rate
  

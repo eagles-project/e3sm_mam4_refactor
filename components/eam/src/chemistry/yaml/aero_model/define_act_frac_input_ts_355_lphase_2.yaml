@@ -1,0 +1,8 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          51 , time step=         355 ] 
+mam4xx:
+  function: define_act_frac
+input:
+  fixed:
+    dt:    0.00
+    lphase: [         2]
+    imode: [         1]

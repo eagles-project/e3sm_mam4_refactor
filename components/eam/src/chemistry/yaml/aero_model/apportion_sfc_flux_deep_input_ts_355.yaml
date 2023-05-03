@@ -1,0 +1,13 @@
+# Data at [lat=  -13.2292708024991      , lon=   139.817062054960      , k=          51 , time step=         355 ] 
+mam4xx:
+  function: apportion_sfc_flux_deep
+input:
+  fixed:
+    dt:    0.00
+    ncol: [         4]
+    rprddpsum: [ 0.1176313812E-03]
+    rprdshsum: [ 0.0000000000E+00]
+    evapcdpsum: [ 0.3030048337E-04]
+    evapcshsum: [ 0.0000000000E+00]
+    sflxbc: [-0.7840839471E-14]
+    sflxec: [ 0.8032127231E-16]
