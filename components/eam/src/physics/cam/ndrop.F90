@@ -384,6 +384,8 @@ contains
     real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
     real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
 
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/dropmixnuc_beg_yml.f90"
+
     !-------------------------------------------------------------------------------
 
     ! aerosol tendencies
@@ -554,6 +556,7 @@ contains
          coltend,    &
          coltend_cw       )
 
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/dropmixnuc_end_yml.f90"
 
   end subroutine dropmixnuc
 
@@ -1053,7 +1056,7 @@ contains
        call explmix(  qcld, &   ! out
             srcn, ekkp, ekkm, overlapp,  &   ! in
             overlapm, qncld,  &  ! in
-            dtmix, .false. )   ! in
+            dtmix, .false. )     ! in
        ! update aerosol number
 
        ! rce-comment
@@ -1100,7 +1103,7 @@ contains
              call explmix( raercol_cw(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp, &  ! in
                   overlapm, raercol_cw(:,mm,nsav),    &  ! in
-                  dtmix, .false. )  ! in
+                  dtmix, .false. ) ! in
              call explmix( raercol(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp,  &  ! in
                   overlapm, raercol(:,mm,nsav),  &   ! in
