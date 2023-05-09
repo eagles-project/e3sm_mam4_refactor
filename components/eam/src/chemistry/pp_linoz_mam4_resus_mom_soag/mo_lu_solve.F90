@@ -1,19 +1,13 @@
 
+module mo_lu_solve
 
+   private
+   public :: lu_slv
 
+   contains
 
-
-
-
-      module mo_lu_solve
-
-      private
-      public :: lu_slv
-
-      contains
-
-      subroutine lu_slv01( lu, b )
-
+!=========================================================
+   subroutine lu_slv( lu, b )
 
       use shr_kind_mod, only : r8 => shr_kind_r8
 
@@ -67,15 +61,7 @@
          b(2) = b(2) - lu(3) * b(3)
          b(2) = b(2) * lu(2)
          b(1) = b(1) * lu(1)
-      end subroutine lu_slv01
-      subroutine lu_slv( lu, b )
-      use shr_kind_mod, only : r8 => shr_kind_r8
-      implicit none
-!-----------------------------------------------------------------------
-! ... Dummy args
-!-----------------------------------------------------------------------
-      real(r8), intent(in) :: lu(:)
-      real(r8), intent(inout) :: b(:)
-      call lu_slv01( lu, b )
-      end subroutine lu_slv
-      end module mo_lu_solve
+
+   end subroutine lu_slv
+!===================================================
+end module mo_lu_solve
