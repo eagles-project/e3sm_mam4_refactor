@@ -77,7 +77,8 @@ contains
     !-----------------------------------------------------------------------      
     !      	... Form F(y)
     !-----------------------------------------------------------------------      
-    call exp_prod_loss( prod, loss, base_sol, reaction_rates, het_rates )
+    call exp_prod_loss( prod, loss,     & ! out
+                base_sol, reaction_rates, het_rates ) ! in
 
     !-----------------------------------------------------------------------      
     !    	... Solve for the mixing ratio at t(n+1)

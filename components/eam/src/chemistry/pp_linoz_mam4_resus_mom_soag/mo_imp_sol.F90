@@ -447,7 +447,8 @@ contains
                 !-----------------------------------------------------------------------
                 ! ... form f(y)
                 !-----------------------------------------------------------------------
-                call imp_prod_loss( prod, loss, lsol, lrxt, lhet )
+                call imp_prod_loss( prod, loss,  & ! out
+                                lsol, lrxt, lhet ) ! in
                 do m = 1,clscnt4
                    forcing(m) = solution(m)*dti - (iter_invariant(m) + prod(m) - loss(m))
                 end do
