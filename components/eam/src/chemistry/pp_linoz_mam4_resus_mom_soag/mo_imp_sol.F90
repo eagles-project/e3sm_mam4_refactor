@@ -438,7 +438,8 @@ contains
                 ! ... the non-linear component
                 !-----------------------------------------------------------------------
                 if( factor(nr_iter) ) then
-                   call nlnmat( sys_jac, lsol, lrxt, lin_jac, dti )
+                   call nlnmat( sys_jac,         & ! out
+                        lsol, lrxt, lin_jac, dti ) ! in
                    !-----------------------------------------------------------------------
                    ! ... factor the "system" matrix
                    !-----------------------------------------------------------------------
