@@ -428,7 +428,8 @@ contains
              ! ... the linear component
              !-----------------------------------------------------------------------
              !if( cls_rxt_cnt(2,4) > 0 ) then
-                call linmat( lin_jac, lsol, lrxt, lhet )
+                call linmat( lin_jac,           & ! out
+                             lsol, lrxt, lhet   ) ! in
              !end if
              !=======================================================================
              ! the newton-raphson iteration for f(y) = 0
