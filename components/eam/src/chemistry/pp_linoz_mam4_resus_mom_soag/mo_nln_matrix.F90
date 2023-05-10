@@ -9,29 +9,10 @@ module mo_nln_matrix
    contains
 
 !=========================================================
-   subroutine nlnmat( mat,              & ! out
-                      y, rxt, lmat, dti ) ! in
+   subroutine nlnmat( mat,      & ! out
+                      lmat, dti ) ! in
 
-      use chem_mods, only : gas_pcnst, rxntot, nzcnt
-
-      implicit none
-
-!----------------------------------------------
-! ... dummy arguments
-!----------------------------------------------
-      real(r8), intent(in) :: dti
-      real(r8), intent(in) :: lmat(nzcnt)
-      real(r8), intent(in) :: y(gas_pcnst)
-      real(r8), intent(in) :: rxt(rxntot)
-      real(r8), intent(out) :: mat(nzcnt)
-
-      call nlnmat_finit( mat, lmat, dti )
-   end subroutine nlnmat
-
-!=========================================================
-   subroutine nlnmat_finit( mat,        & ! out
-                        lmat, dti       ) ! in
-      use chem_mods, only : gas_pcnst, rxntot, nzcnt
+      use chem_mods, only : nzcnt
       implicit none
 !----------------------------------------------
 ! ... dummy arguments
@@ -107,6 +88,6 @@ module mo_nln_matrix
          mat( 30) = mat( 30) - dti
          mat( 31) = mat( 31) - dti
          mat( 32) = mat( 32) - dti
-   end subroutine nlnmat_finit
+   end subroutine nlnmat
 !=========================================================
 end module mo_nln_matrix
