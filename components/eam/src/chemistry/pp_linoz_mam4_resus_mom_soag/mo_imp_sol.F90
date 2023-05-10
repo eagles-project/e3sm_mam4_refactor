@@ -2,6 +2,9 @@ module mo_imp_sol
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods, only : clscnt4, gas_pcnst, clsmap
   use cam_logfile, only : iulog
+
+!==================================================================================
+! module variables
   implicit none
   private
   public :: imp_slv_inti, imp_sol
@@ -38,6 +41,8 @@ module mo_imp_sol
   integer :: o3a_ndx, xno2_ndx, no2xno3_ndx, xno2no3_ndx, xno3_ndx, o1da_ndx, xno_ndx
   integer :: usr4a_ndx, usr16a_ndx, usr16b_ndx, usr17b_ndx
 contains
+
+!==================================================================================
   subroutine imp_slv_inti
     !-----------------------------------------------------------------------
     ! ... Initialize the implict solver
@@ -298,8 +303,10 @@ contains
        call addfld( trim(solsym(j))//'_CHML', (/ 'lev' /), 'I', '/cm3/s', 'chemical loss rate' )
     enddo
   end subroutine imp_slv_inti
-  subroutine imp_sol( base_sol, reaction_rates, het_rates, extfrc, delt, &
-       xhnm, ncol, lchnk, ltrop )
+!==================================================================================
+  subroutine imp_sol( base_sol,                 & ! inout
+                      reaction_rates, het_rates, extfrc, delt, & ! in
+                      xhnm, ncol, lchnk, ltrop ) ! in
     !-----------------------------------------------------------------------
     ! ... imp_sol advances the volumetric mixing ratio
     ! forward one time step via the fully implicit euler scheme.
@@ -321,24 +328,23 @@ contains
     !-----------------------------------------------------------------------
     ! ... dummy args
     !-----------------------------------------------------------------------
-    integer, intent(in) :: ncol ! columns in chunck
-    integer, intent(in) :: lchnk ! chunk id
+    integer,  intent(in) :: ncol ! columns in chunck
+    integer,  intent(in) :: lchnk ! chunk id
     real(r8), intent(in) :: delt ! time step (s)
     real(r8), intent(in) :: reaction_rates(ncol,pver,max(1,rxntot)), & ! rxt rates (1/cm^3/s)
-         extfrc(ncol,pver,max(1,extcnt)), & ! external in-situ forcing (1/cm^3/s)
-         het_rates(ncol,pver,max(1,gas_pcnst)) ! washout rates (1/s)
-    real(r8), intent(inout) :: base_sol(ncol,pver,gas_pcnst) ! species mixing ratios (vmr)
+                            extfrc(ncol,pver,max(1,extcnt)), & ! external in-situ forcing (1/cm^3/s)
+                            het_rates(ncol,pver,max(1,gas_pcnst)) ! washout rates (1/s)
     real(r8), intent(in) :: xhnm(ncol,pver)
-    integer, intent(in) :: ltrop(ncol) ! chemistry troposphere boundary (index)
+    integer,  intent(in) :: ltrop(ncol) ! chemistry troposphere boundary (index)
+    real(r8), intent(inout) :: base_sol(ncol,pver,gas_pcnst) ! species mixing ratios (vmr)
+
     !-----------------------------------------------------------------------
     ! ... local variables
     !-----------------------------------------------------------------------
     integer :: nr_iter, &
-         lev, &
-         i, &
-         j, &
-         k, l, &
-         m
+               lev, &
+               i, j, &
+               k, l, m
     integer :: fail_cnt, cut_cnt, stp_con_cnt
     integer :: nstep
     real(r8) :: interval_done, dt, dti, wrk
@@ -354,12 +360,13 @@ contains
     real(r8) :: lrxt(max(1,rxntot))
     real(r8) :: lsol(max(1,gas_pcnst))
     real(r8) :: lhet(max(1,gas_pcnst))
-    real(r8), dimension(ncol,pver,max(1,clscnt4)) :: &
-         ind_prd
+    real(r8), dimension(ncol,pver,max(1,clscnt4)) :: ind_prd
     logical :: convergence
     logical :: frc_mask, iter_conv
     logical :: converged(max(1,clscnt4))
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: prod_out, loss_out
+
+    ! initiate variables
     prod_out(:,:,:) = 0._r8
     loss_out(:,:,:) = 0._r8
     solution(:) = 0._r8
@@ -372,22 +379,22 @@ contains
     else
        do m = 1,max(1,clscnt4)
           ind_prd(:,:,m) = 0._r8
-       end do
-    end if
+       enddo
+    endif
     level_loop : do lev = 1,pver
        column_loop : do i = 1,ncol
-          IF (lev <= ltrop(i)) CYCLE column_loop
+          if (lev <= ltrop(i)) cycle column_loop
           !-----------------------------------------------------------------------
           ! ... transfer from base to local work arrays
           !-----------------------------------------------------------------------
           do m = 1,rxntot
              lrxt(m) = reaction_rates(i,lev,m)
-          end do
+          enddo
           if( gas_pcnst > 0 ) then
              do m = 1,gas_pcnst
                 lhet(m) = het_rates(i,lev,m)
-             end do
-          end if
+             enddo
+          endif
           !-----------------------------------------------------------------------
           ! ... time step loop
           !-----------------------------------------------------------------------
@@ -403,7 +410,7 @@ contains
              !-----------------------------------------------------------------------
              do m = 1,gas_pcnst
                 lsol(m) = base_sol(i,lev,m)
-             end do
+             enddo
              !-----------------------------------------------------------------------
              ! ... transfer from base to class array
              !-----------------------------------------------------------------------
@@ -411,19 +418,19 @@ contains
                 j = clsmap(k,4)
                 m = permute(k,4)
                 solution(m) = lsol(j)
-             end do
+             enddo
              !-----------------------------------------------------------------------
              ! ... set the iteration invariant part of the function f(y)
              !-----------------------------------------------------------------------
              if( cls_rxt_cnt(1,4) > 0 .or. extcnt > 0 ) then
                 do m = 1,clscnt4
                    iter_invariant(m) = dti * solution(m) + ind_prd(i,lev,m)
-                end do
+                enddo
              else
                 do m = 1,clscnt4
                    iter_invariant(m) = dti * solution(m)
-                end do
-             end if
+                enddo
+             endif
              !-----------------------------------------------------------------------
              ! ... the linear component
              !-----------------------------------------------------------------------
@@ -445,7 +452,7 @@ contains
                    ! ... factor the "system" matrix
                    !-----------------------------------------------------------------------
                    call lu_fac( sys_jac )
-                end if
+                endif
                 !-----------------------------------------------------------------------
                 ! ... form f(y)
                 !-----------------------------------------------------------------------
@@ -453,14 +460,14 @@ contains
                                 lsol, lrxt, lhet ) ! in
                 do m = 1,clscnt4
                    forcing(m) = solution(m)*dti - (iter_invariant(m) + prod(m) - loss(m))
-                end do
+                enddo
                 !-----------------------------------------------------------------------
                 ! ... solve for the mixing ratio at t(n+1)
                 !-----------------------------------------------------------------------
                 call lu_slv( sys_jac, forcing )
                 do m = 1,clscnt4
                    solution(m) = solution(m) + forcing(m)
-                end do
+                enddo
                 !-----------------------------------------------------------------------
                 ! ... convergence measures
                 !-----------------------------------------------------------------------
@@ -471,9 +478,9 @@ contains
                          max_delta(k) = abs( forcing(m)/solution(m) )
                       else
                          max_delta(k) = 0._r8
-                      end if
-                   end do
-                end if
+                      endif
+                   enddo
+                endif
                 !-----------------------------------------------------------------------
                 ! ... limit iterate
                 !-----------------------------------------------------------------------
@@ -487,7 +494,7 @@ contains
                    j = clsmap(k,4)
                    m = permute(k,4)
                    lsol(j) = solution(m)
-                end do
+                enddo
                 !-----------------------------------------------------------------------
                 ! ... check for convergence
                 !-----------------------------------------------------------------------
@@ -500,14 +507,14 @@ contains
                          converged(k) = abs(forcing(m)) <= epsilon(k)*abs(solution(m))
                       else
                          converged(k) = .true.
-                      end if
-                   end do
+                      endif
+                   enddo
                    convergence = all( converged(:) )
                    if( convergence ) then
                       exit
-                   end if
-                end if
-             end do iter_loop
+                   endif
+                endif
+             enddo iter_loop
              !-----------------------------------------------------------------------
              ! ... check for newton-raphson convergence
              !-----------------------------------------------------------------------
@@ -526,7 +533,7 @@ contains
                       dt = .5_r8 * dt
                    else
                       dt = .1_r8 * dt
-                   end if
+                   endif
                    cycle time_step_loop
                 else
                    write(iulog,'('' imp_sol: Failed to converge @ (lchnk,lev,col,nstep,dt,time) = '',4i6,1p,2e21.13)') &
@@ -534,10 +541,10 @@ contains
                    do m = 1,clscnt4
                       if( .not. converged(m) ) then
                          write(iulog,'(1x,a8,1x,1pe10.3)') solsym(clsmap(m,4)), max_delta(m)
-                      end if
-                   end do
-                end if
-             end if
+                      endif
+                   enddo
+                endif
+             endif
              !-----------------------------------------------------------------------
              ! ... check for interval done
              !-----------------------------------------------------------------------
@@ -545,7 +552,7 @@ contains
              if( abs( delt - interval_done ) <= .0001_r8 ) then
                 if( fail_cnt > 0 ) then
                    write(iulog,*) 'imp_sol : @ (lchnk,lev,col) = ',lchnk,lev,i,' failed ',fail_cnt,' times'
-                end if
+                endif
                 exit time_step_loop
              else
                 !-----------------------------------------------------------------------
@@ -553,18 +560,17 @@ contains
                 !-----------------------------------------------------------------------
                 if( convergence ) then
                    stp_con_cnt = stp_con_cnt + 1
-                end if
+                endif
                 do m = 1,gas_pcnst
                    base_sol(i,lev,m) = lsol(m)
-                end do
+                enddo
                 if( stp_con_cnt >= 2 ) then
                    dt = 2._r8*dt
                    stp_con_cnt = 0
-                end if
+                endif
                 dt = min( dt,delt-interval_done )
-                ! write(iulog,'('' imp_sol: New time step '',1p,e21.13)') dt
-             end if
-          end do time_step_loop
+             endif
+          enddo time_step_loop
           !-----------------------------------------------------------------------
           ! ... Transfer latest solution back to base array
           !-----------------------------------------------------------------------
@@ -572,7 +578,7 @@ contains
              j = clsmap(k,4)
              m = permute(k,4)
              base_sol(i,lev,j) = solution(m)
-          end do cls_loop
+          enddo cls_loop
           !-----------------------------------------------------------------------
           ! ... Prod/Loss history buffers...
           !-----------------------------------------------------------------------
@@ -589,7 +595,7 @@ contains
                       loss_out(i,lev,k) = reaction_rates(i,lev,ox_l1_ndx) * base_sol(i,lev,o1da_ndx)/base_sol(i,lev,o3a_ndx)
                    if ( h2o_ndx > 0 ) &
                       loss_out(i,lev,k) = loss_out(i,lev,k) * base_sol(i,lev,h2o_ndx)
-                end if
+                endif
                 if ( full_ozone_chem ) then
                    prod_out(i,lev,k) = reaction_rates(i,lev,ox_p1_ndx) * base_sol(i,lev,ho2_ndx) &
                         + reaction_rates(i,lev,ox_p2_ndx) * base_sol(i,lev,ch3o2_ndx) &
@@ -617,7 +623,7 @@ contains
                         + .8_r8*( reaction_rates(i,lev,ox_l7_ndx) * base_sol(i,lev,mvk_ndx) &
                         + reaction_rates(i,lev,ox_l8_ndx) * base_sol(i,lev,macro2_ndx)) &
                         + .235_r8*reaction_rates(i,lev,ox_l9_ndx) * base_sol(i,lev,c10h16_ndx)
-                else if ( reduced_ozone_chem ) then
+                elseif ( reduced_ozone_chem ) then
                    prod_out(i,lev,k) = reaction_rates(i,lev,ox_p1_ndx ) * base_sol(i,lev,ho2_ndx) &
                         + reaction_rates(i,lev,ox_p2_ndx ) * base_sol(i,lev,ch3o2_ndx) &
                         + reaction_rates(i,lev,ox_p3_ndx ) * base_sol(i,lev,c2o3_ndx) &
@@ -637,7 +643,7 @@ contains
                         / max( base_sol(i,lev,ox_ndx),1.e-20_r8 )
                    loss_out(i,lev,k) = loss_out(i,lev,k) * base_sol(i,lev,ox_ndx)
                    prod_out(i,lev,k) = prod_out(i,lev,k) * base_sol(i,lev,no_ndx)
-                else if (j == o3a_ndx) then
+                elseif (j == o3a_ndx) then
                    loss_out(i,lev,k) = loss_out(i,lev,k) &
                         + ( reaction_rates(i,lev,usr4a_ndx) * base_sol(i,lev,xno2_ndx) * base_sol(i,lev,oh_ndx) &
                         + 1._r8 * reaction_rates(i,lev,usr16a_ndx) * base_sol(i,lev,xno2no3_ndx) &
@@ -651,9 +657,9 @@ contains
                 prod_out(i,lev,k) = prod(m) + ind_prd(i,lev,m)
                 loss_out(i,lev,k) = loss(m)
              endif has_o3_chem
-          end do cls_loop2
-       end do column_loop
-    end do level_loop
+          enddo cls_loop2
+       enddo column_loop
+    enddo level_loop
     do i = 1,clscnt4
        j = clsmap(i,4)
        prod_out(:,:,i) = prod_out(:,:,i)*xhnm
@@ -662,4 +668,5 @@ contains
        call outfld( trim(solsym(j))//'_CHML', loss_out(:,:,i), ncol, lchnk )
     enddo
   end subroutine imp_sol
+!==================================================================================
 end module mo_imp_sol
