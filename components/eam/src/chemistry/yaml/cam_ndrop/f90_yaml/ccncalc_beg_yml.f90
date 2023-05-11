@@ -118,6 +118,13 @@
 
         call write_var(unit_input,unit_output,'top_lev',top_lev)
 
+        call write_var(unit_input,unit_output,'lmassptr_amode',lmassptr_amode)
+        call write_var(unit_input,unit_output,'numptr_amode',numptr_amode)
+        call write_var(unit_input,unit_output,'lspectype_amode',lspectype_amode)
+        call write_var(unit_input,unit_output,'specdens_amode',specdens_amode)
+        call write_var(unit_input,unit_output,'spechygro',spechygro)
+
+
         ! below are ndrop module variable inputs to ccncalc
 
         call write_var(unit_input,unit_output,'surften',surften)
@@ -128,6 +135,10 @@
         call write_var(unit_input,unit_output,'supersat',supersat)
 
         call write_var(unit_input,unit_output,'ntot_amode',ntot_amode)
+        call write_var(unit_input,unit_output,'nspec_amode',nspec_amode)
+        call write_var(unit_input,unit_output,'voltonumblo_amode',voltonumblo_amode)
+        call write_var(unit_input,unit_output,'voltonumbhi_amode',voltonumbhi_amode)
+
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
