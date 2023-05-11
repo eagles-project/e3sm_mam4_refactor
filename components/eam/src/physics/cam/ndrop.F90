@@ -1415,6 +1415,7 @@ contains
   !===============================================================================
 
   subroutine ccncalc(state_q, tair, qcldbrn, qcldbrn_num, ncol, cs, ccn)
+
     ! calculates number concentration of aerosols activated as CCN at
     ! supersaturation supersat.
     ! assumes an internal mixture of a multiple externally-mixed aerosol modes
@@ -1458,6 +1459,8 @@ contains
 
     real(r8) super(psat) ! supersaturation [fraction]
     !-------------------------------------------------------------------------------
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/ccncalc_beg_yml.f90"
+
 
     phase=3 ! interstitial+cloudborne
 
@@ -1505,6 +1508,8 @@ contains
     enddo
 
     ccn(:ncol,:,:)=ccn(:ncol,:,:)*per_m3_to_per_cm3 ! convert from #/m3 to #/cm3
+
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/ccncalc_end_yml.f90"
 
   end subroutine ccncalc
 
