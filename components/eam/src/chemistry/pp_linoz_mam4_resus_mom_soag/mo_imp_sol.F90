@@ -313,17 +313,18 @@ contains
     ! this source is meant for small l1 cache machines such as
     ! the intel pentium and itanium cpus
     !-----------------------------------------------------------------------
-    use chem_mods, only : rxntot, extcnt, nzcnt, permute, cls_rxt_cnt
-    use mo_tracname, only : solsym
-    use ppgrid, only : pver
-    use mo_lin_matrix, only : linmat
-    use mo_nln_matrix, only : nlnmat
-    use mo_lu_factor, only : lu_fac
-    use mo_lu_solve, only : lu_slv
-    use mo_prod_loss, only : imp_prod_loss
-    use mo_indprd, only : indprd
-    use time_manager, only : get_nstep
-    use cam_history, only : outfld
+    use chem_mods,      only : rxntot, extcnt, nzcnt, permute, cls_rxt_cnt
+    use mo_tracname,    only : solsym
+    use ppgrid,         only : pver
+    use mo_lin_matrix,  only : linmat
+    use mo_nln_matrix,  only : nlnmat
+    use mo_lu_factor,   only : lu_fac
+    use mo_lu_solve,    only : lu_slv
+    use mo_prod_loss,   only : imp_prod_loss
+    use mo_indprd,      only : indprd
+    use time_manager,   only : get_nstep
+    use cam_history,    only : outfld
+
     implicit none
     !-----------------------------------------------------------------------
     ! ... dummy args
@@ -347,24 +348,23 @@ contains
                k, l, m
     integer :: fail_cnt, cut_cnt, stp_con_cnt
     integer :: nstep
-    real(r8) :: interval_done, dt, dti, wrk
+    real(r8) :: interval_done, dt, dti
     real(r8) :: max_delta(max(1,clscnt4))
     real(r8) :: sys_jac(max(1,nzcnt))
     real(r8) :: lin_jac(max(1,nzcnt))
     real(r8), dimension(max(1,clscnt4)) :: &
-         solution, &
-         forcing, &
-         iter_invariant, &
-         prod, &
-         loss
+                         solution, &
+                         forcing, &
+                         iter_invariant, &
+                         prod, loss
     real(r8) :: lrxt(max(1,rxntot))
     real(r8) :: lsol(max(1,gas_pcnst))
     real(r8) :: lhet(max(1,gas_pcnst))
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: ind_prd
-    logical :: convergence
-    logical :: frc_mask, iter_conv
-    logical :: converged(max(1,clscnt4))
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: prod_out, loss_out
+    logical :: frc_mask
+    logical :: converged(max(1,clscnt4))
+    logical :: convergence      ! all converged(:) are true
 
     ! initiate variables
     prod_out(:,:,:) = 0._r8
@@ -434,10 +434,8 @@ contains
              !-----------------------------------------------------------------------
              ! ... the linear component
              !-----------------------------------------------------------------------
-             !if( cls_rxt_cnt(2,4) > 0 ) then
-                call linmat( lin_jac,           & ! out
-                             lsol, lrxt, lhet   ) ! in
-             !end if
+             call linmat( lin_jac,           & ! out
+                          lsol, lrxt, lhet   ) ! in
              !=======================================================================
              ! the newton-raphson iteration for f(y) = 0
              !=======================================================================
@@ -515,6 +513,7 @@ contains
                    endif
                 endif
              enddo iter_loop
+
              !-----------------------------------------------------------------------
              ! ... check for newton-raphson convergence
              !-----------------------------------------------------------------------
@@ -660,6 +659,8 @@ contains
           enddo cls_loop2
        enddo column_loop
     enddo level_loop
+
+    ! diagnose variables
     do i = 1,clscnt4
        j = clsmap(i,4)
        prod_out(:,:,i) = prod_out(:,:,i)*xhnm
