@@ -3,7 +3,7 @@
   !"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
-  ! integer, intent(in) :: y_lchnk
+  integer, intent(in) :: y_lchnk
   !-----------------------------------------------------------------------------------------
 
   !-----------------------------------------------------------------------------------------
@@ -22,46 +22,40 @@
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
-!  print output from timestep nstep_print_lo to yaml%nstep_print
+  !  print output from timestep nstep_print_lo to yaml%nstep_print
   integer  :: nstep_print_lo
-  integer  :: imm
-  real(r8), allocatable :: qqcw_in(:,:)
 
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
   integer,save :: y_nstep_old = 0
 
-
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
-  ! Below used with phys_debug_lat = 39.0553303768561, phys_debug_lon = 262.904774388088
-  yaml%lev_print = 54     !level
-  yaml%nstep_print = 1417 !time step(**remove these if generating data for a dependent subroutines**)
+  ! used with phys_debug_lat = 39.0553303768561, phys_debug_lon = 262.904774388088
+
+  yaml%lev_print = 54       !level
+  yaml%nstep_print = 1417 !time step
   nstep_print_lo = 1400
-  yaml%col_print = icolprnt(lchnk)                !column to write data
+  yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
   !current_time step
   y_nstep = get_nstep()
-
+  
   !Flag to decide to write or not to write data
   yaml%flag_print = .false. !(**remove these if generating data for a dependent subroutines**)
 
-  ! Write input / output for the whole column at the indicated timestep (and for only the first 
-  ! call of dropmixnuc within a timestep.
-
-!  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  !!if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
 
   !-----------------------------------------------------------------------------------------
   !In the case of y_i or y_k are not passed as arguments, use the following if condition:
-!  if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
-!  print output for timesteps between nstep_print_lo and yaml%nstep_print
+  !  if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
+  !  print output for timesteps between nstep_print_lo and yaml%nstep_print
   if(yaml%col_print >0 .and. y_nstep<=yaml%nstep_print .and. y_nstep>=nstep_print_lo) then
   !-----------------------------------------------------------------------------------------
-
   !-----------------------------------------------------------------------------------------
   !For generating data for a dependent subroutines where "yaml" derived type is already
   !initialized, use the following if condition
-  !if(yaml%flag_print) then
+!  if(yaml%flag_print) then
   !-----------------------------------------------------------------------------------------
 
      !-----------------------------------------------------------------------------------------
@@ -71,7 +65,7 @@
      ! ext_str = 'flag_'//adjustl(ext_str)
      !-----------------------------------------------------------------------------------------
 
-
+     
      !Record number of calls that can output yaml file if you only need to write one set of input/output
      !Increment n_calls if current timestep, y_nstep, is same as for previous pass through this code.
      !Otherwise, we are at a new timestep, can reset n_calls to 1.
@@ -87,55 +81,32 @@
      !if ((n_calls==1 .and. flag==0) .or. (n_calls==3 .and. flag==1) .or. (n_calls==5 .and. flag==2)) then
 
         !(**remove these yaml% variables if generating data for a dependent subroutines**)
-        yaml%lchnk_print = lchnk
+        yaml%lchnk_print = y_lchnk
         yaml%flag_print  = .true.
 
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('dropmixnuc', &  !intent-in
+        call open_files('ccncalc', &  !intent-in
              unit_input, unit_output) !intent-out
         !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
 
-       !start by adding an input string
-       !Use current timestep, given by y_nstep, to form name of input / output files
-
+        !start by adding an input string
+        !Use current timestep, given by y_nstep, to form name of input / output files
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'dropmixnuc',y_nstep, yaml%lev_print)
+             'ccncalc',y_nstep, yaml%lev_print)
 
         ! add code for writing data here
-        ! below are explicit input arguments to dropmixnuc
+        ! below are explicit input arguments to ccncalc
         
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
+        call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'tair',tair(yaml%col_print,yaml%lev_print))
+        call write_var(unit_input,unit_output,'qcldbrn_num',qcldbrn_num(yaml%col_print,yaml%lev_print,:))
         call write_var(unit_input,unit_output,'ncol',ncol)
-        call write_var(unit_input,unit_output,'psetcols',psetcols)
-        call write_var(unit_input,unit_output,'dtmicro',dtmicro)
-        call write_var(unit_input,unit_output,'temp',temp(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'pint',pint(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'rpdel',rpdel(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'zm',zm(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,:,:))
-        call write_var(unit_input,unit_output,'ncldwtr',ncldwtr(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'kvh',kvh(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'wsub',wsub(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'cldn',cldn(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'cldo',cldo(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'cs',cs(yaml%col_print,yaml%lev_print))
 
-        ! qqcw is an array of pointers that hold references
-        ! to 2D arrays (column,vertical level) of number / species mass.
-        ! Convert qqcw for a given column to a 2D array (number/mass index, vertical level)
-        ! and then write that 2D array to the yaml / python files.
- 
-        allocate(qqcw_in(size(qqcw),pver))
-        do imm=1,size(qqcw)
-           qqcw_in(imm,:) = qqcw(imm)%fld(yaml%col_print,:)
-        enddo
-        call write_var(unit_input,unit_output,'qqcw',qqcw_in(:,:))
-
-        ! below are external module variable inputs to dropmixnuc
+        ! below are external module variable inputs to ccncalc
 
         call write_var(unit_input,unit_output,'pcols',pcols)
         call write_var(unit_input,unit_output,'pver',pver)
@@ -144,16 +115,9 @@
         call write_var(unit_input,unit_output,'rhoh2o',rhoh2o)
         call write_var(unit_input,unit_output,'mwh2o',mwh2o)
         call write_var(unit_input,unit_output,'r_universal',r_universal)
-        call write_var(unit_input,unit_output,'rh2o',rh2o)
-        call write_var(unit_input,unit_output,'gravit',gravit)
-        call write_var(unit_input,unit_output,'latvap',latvap)
-        call write_var(unit_input,unit_output,'cpair',cpair)
-        call write_var(unit_input,unit_output,'rair',rair)
 
         call write_var(unit_input,unit_output,'top_lev',top_lev)
-        
-        call write_var(unit_input,unit_output,'lmassptrcw_amode',lmassptrcw_amode)
-        call write_var(unit_input,unit_output,'numptrcw_amode',numptrcw_amode)
+
         call write_var(unit_input,unit_output,'lmassptr_amode',lmassptr_amode)
         call write_var(unit_input,unit_output,'numptr_amode',numptr_amode)
         call write_var(unit_input,unit_output,'lspectype_amode',lspectype_amode)
@@ -161,32 +125,19 @@
         call write_var(unit_input,unit_output,'spechygro',spechygro)
 
 
-        ! below are ndrop module variable inputs to dropmixnuc
+        ! below are ndrop module variable inputs to ccncalc
 
-        call write_var(unit_input,unit_output,'exp45logsig',exp45logsig)
-        call write_var(unit_input,unit_output,'f1',f1)
-        call write_var(unit_input,unit_output,'f2',f2)
-        call write_var(unit_input,unit_output,'t0',t0)
-        call write_var(unit_input,unit_output,'aten',aten)
         call write_var(unit_input,unit_output,'surften',surften)
-        call write_var(unit_input,unit_output,'alog2',alog2)
-        call write_var(unit_input,unit_output,'alog3',alog3)
-        call write_var(unit_input,unit_output,'alogaten',alogaten)
-        call write_var(unit_input,unit_output,'third',third)
         call write_var(unit_input,unit_output,'twothird',twothird)
-        call write_var(unit_input,unit_output,'sixth',sixth)
         call write_var(unit_input,unit_output,'sq2',sq2)
+        call write_var(unit_input,unit_output,'exp45logsig',exp45logsig)
         call write_var(unit_input,unit_output,'psat',psat)
         call write_var(unit_input,unit_output,'supersat',supersat)
-
 
         call write_var(unit_input,unit_output,'ntot_amode',ntot_amode)
         call write_var(unit_input,unit_output,'nspec_amode',nspec_amode)
         call write_var(unit_input,unit_output,'voltonumblo_amode',voltonumblo_amode)
         call write_var(unit_input,unit_output,'voltonumbhi_amode',voltonumbhi_amode)
-        call write_var(unit_input,unit_output,'mam_idx',mam_idx)
-        call write_var(unit_input,unit_output,'ncnst_tot',ncnst_tot)
-        call write_var(unit_input,unit_output,'mam_cnst_idx',mam_cnst_idx)
 
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
