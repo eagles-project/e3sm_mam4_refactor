@@ -35,8 +35,6 @@ module mo_imp_sol
   integer :: tolo2_ndx, terpo2_ndx, alko2_ndx, eneo2_ndx, eo2_ndx, meko2_ndx
   integer :: ox_p17_ndx,ox_p12_ndx,ox_p13_ndx,ox_p14_ndx,ox_p15_ndx,ox_p16_ndx
   integer :: lt_cnt
-  logical :: full_ozone_chem = .false.
-  logical :: reduced_ozone_chem = .false.
   ! for xnox ozone chemistry diagnostics
   integer :: o3a_ndx, xno2_ndx, no2xno3_ndx, xno2no3_ndx, xno3_ndx, o1da_ndx, xno_ndx
   integer :: usr4a_ndx, usr16a_ndx, usr16b_ndx, usr17b_ndx
@@ -98,10 +96,8 @@ contains
        wrk(1:17) = (/ ox_p1_ndx, ox_p2_ndx, ox_p3_ndx, ox_p4_ndx, ox_p5_ndx, &
             ox_p6_ndx, ox_p7_ndx, ox_p8_ndx, ox_p9_ndx, ox_p10_ndx, ox_p11_ndx, &
             ox_p12_ndx, ox_p13_ndx, ox_p14_ndx, ox_p15_ndx, ox_p16_ndx, ox_p17_ndx /)
-       if ( .not. full_ozone_chem ) then
-          r63_ndx = get_rxt_ndx( 'r63' )
-          wrk(1:4) = (/ ox_p1_ndx, ox_p2_ndx, ox_p3_ndx, r63_ndx/)
-       endif
+       r63_ndx = get_rxt_ndx( 'r63' )
+       wrk(1:4) = (/ ox_p1_ndx, ox_p2_ndx, ox_p3_ndx, r63_ndx/)
     endif has_o3_chem
     do i = 1,clscnt4
        j = clsmap(i,4)
@@ -179,14 +175,8 @@ contains
     !-----------------------------------------------------------------------
     ! ... class independent forcing
     !-----------------------------------------------------------------------
-    if( cls_rxt_cnt(1,4) > 0 .or. extcnt > 0 ) then
-       call indprd( 4, ind_prd, clscnt4, base_sol, extfrc, &
+    call indprd( 4, ind_prd, clscnt4, base_sol, extfrc, &
             reaction_rates, ncol )
-    else
-       do m = 1,max(1,clscnt4)
-          ind_prd(:,:,m) = 0._r8
-       enddo
-    endif
     level_loop : do lev = 1,pver
        column_loop : do i = 1,ncol
           if (lev <= ltrop(i)) cycle column_loop
@@ -228,15 +218,9 @@ contains
              !-----------------------------------------------------------------------
              ! ... set the iteration invariant part of the function f(y)
              !-----------------------------------------------------------------------
-             if( cls_rxt_cnt(1,4) > 0 .or. extcnt > 0 ) then
-                do m = 1,clscnt4
+             do m = 1,clscnt4
                    iter_invariant(m) = dti * solution(m) + ind_prd(i,lev,m)
-                enddo
-             else
-                do m = 1,clscnt4
-                   iter_invariant(m) = dti * solution(m)
-                enddo
-             endif
+             enddo
              !-----------------------------------------------------------------------
              ! ... the linear component
              !-----------------------------------------------------------------------
@@ -390,78 +374,8 @@ contains
           cls_loop2: do k = 1,clscnt4
              j = clsmap(k,4)
              m = permute(k,4)
-             has_o3_chem: if( ( full_ozone_chem .or. reduced_ozone_chem ) .and. (j == ox_ndx .or. j == o3a_ndx )) then
-                if( o1d_ndx < 1 ) then
-                   loss_out(i,lev,k) = reaction_rates(i,lev,ox_l1_ndx)
-                else
-                   if (j == ox_ndx) &
-                      loss_out(i,lev,k) = reaction_rates(i,lev,ox_l1_ndx) * base_sol(i,lev,o1d_ndx)/base_sol(i,lev,ox_ndx)
-                   if (j == o3a_ndx) &
-                      loss_out(i,lev,k) = reaction_rates(i,lev,ox_l1_ndx) * base_sol(i,lev,o1da_ndx)/base_sol(i,lev,o3a_ndx)
-                   if ( h2o_ndx > 0 ) &
-                      loss_out(i,lev,k) = loss_out(i,lev,k) * base_sol(i,lev,h2o_ndx)
-                endif
-                if ( full_ozone_chem ) then
-                   prod_out(i,lev,k) = reaction_rates(i,lev,ox_p1_ndx) * base_sol(i,lev,ho2_ndx) &
-                        + reaction_rates(i,lev,ox_p2_ndx) * base_sol(i,lev,ch3o2_ndx) &
-                        + reaction_rates(i,lev,ox_p3_ndx) * base_sol(i,lev,po2_ndx) &
-                        + reaction_rates(i,lev,ox_p4_ndx) * base_sol(i,lev,ch3co3_ndx) &
-                        + reaction_rates(i,lev,ox_p5_ndx) * base_sol(i,lev,c2h5o2_ndx) &
-                        + .92_r8* reaction_rates(i,lev,ox_p6_ndx) * base_sol(i,lev,isopo2_ndx) &
-                        + reaction_rates(i,lev,ox_p7_ndx) * base_sol(i,lev,macro2_ndx) &
-                        + reaction_rates(i,lev,ox_p8_ndx) * base_sol(i,lev,mco3_ndx) &
-                        + reaction_rates(i,lev,ox_p9_ndx) * base_sol(i,lev,c3h7o2_ndx) &
-                        + reaction_rates(i,lev,ox_p10_ndx)* base_sol(i,lev,ro2_ndx) &
-                        + reaction_rates(i,lev,ox_p11_ndx)* base_sol(i,lev,xo2_ndx) &
-                        + .9_r8*reaction_rates(i,lev,ox_p12_ndx)*base_sol(i,lev,tolo2_ndx) &
-                        + reaction_rates(i,lev,ox_p13_ndx)*base_sol(i,lev,terpo2_ndx)&
-                        + .9_r8*reaction_rates(i,lev,ox_p14_ndx)*base_sol(i,lev,alko2_ndx) &
-                        + reaction_rates(i,lev,ox_p15_ndx)*base_sol(i,lev,eneo2_ndx) &
-                        + reaction_rates(i,lev,ox_p16_ndx)*base_sol(i,lev,eo2_ndx) &
-                        + reaction_rates(i,lev,ox_p17_ndx)*base_sol(i,lev,meko2_ndx)
-                   loss_out(i,lev,k) = loss_out(i,lev,k) &
-                        + reaction_rates(i,lev,ox_l2_ndx) * base_sol(i,lev,oh_ndx) &
-                        + reaction_rates(i,lev,ox_l3_ndx) * base_sol(i,lev,ho2_ndx) &
-                        + reaction_rates(i,lev,ox_l6_ndx) * base_sol(i,lev,c2h4_ndx) &
-                        + reaction_rates(i,lev,ox_l4_ndx) * base_sol(i,lev,c3h6_ndx) &
-                        + .9_r8* reaction_rates(i,lev,ox_l5_ndx) * base_sol(i,lev,isop_ndx) &
-                        + .8_r8*( reaction_rates(i,lev,ox_l7_ndx) * base_sol(i,lev,mvk_ndx) &
-                        + reaction_rates(i,lev,ox_l8_ndx) * base_sol(i,lev,macro2_ndx)) &
-                        + .235_r8*reaction_rates(i,lev,ox_l9_ndx) * base_sol(i,lev,c10h16_ndx)
-                elseif ( reduced_ozone_chem ) then
-                   prod_out(i,lev,k) = reaction_rates(i,lev,ox_p1_ndx ) * base_sol(i,lev,ho2_ndx) &
-                        + reaction_rates(i,lev,ox_p2_ndx ) * base_sol(i,lev,ch3o2_ndx) &
-                        + reaction_rates(i,lev,ox_p3_ndx ) * base_sol(i,lev,c2o3_ndx) &
-                        + reaction_rates(i,lev,r63_ndx ) * base_sol(i,lev,xo2_ndx)
-                   loss_out(i,lev,k) = loss_out(i,lev,k) &
-                        + reaction_rates(i,lev,ox_l2_ndx) * base_sol(i,lev,oh_ndx) &
-                        + reaction_rates(i,lev,ox_l3_ndx) * base_sol(i,lev,ho2_ndx) &
-                        + .9_r8* reaction_rates(i,lev,ox_l5_ndx) * base_sol(i,lev,isop_ndx) &
-                        + reaction_rates(i,lev,ox_l6_ndx) * base_sol(i,lev,c2h4_ndx) &
-                        + reaction_rates(i,lev,ox_l7_ndx) * base_sol(i,lev,ole_ndx)
-                endif
-                if (j == ox_ndx) then
-                   loss_out(i,lev,k) = loss_out(i,lev,k) &
-                        + ( reaction_rates(i,lev,usr4_ndx) * base_sol(i,lev,no2_ndx) * base_sol(i,lev,oh_ndx) &
-                        + 3._r8 * reaction_rates(i,lev,usr16_ndx) * base_sol(i,lev,n2o5_ndx) &
-                        + 2._r8 * reaction_rates(i,lev,usr17_ndx) * base_sol(i,lev,no3_ndx) ) &
-                        / max( base_sol(i,lev,ox_ndx),1.e-20_r8 )
-                   loss_out(i,lev,k) = loss_out(i,lev,k) * base_sol(i,lev,ox_ndx)
-                   prod_out(i,lev,k) = prod_out(i,lev,k) * base_sol(i,lev,no_ndx)
-                elseif (j == o3a_ndx) then
-                   loss_out(i,lev,k) = loss_out(i,lev,k) &
-                        + ( reaction_rates(i,lev,usr4a_ndx) * base_sol(i,lev,xno2_ndx) * base_sol(i,lev,oh_ndx) &
-                        + 1._r8 * reaction_rates(i,lev,usr16a_ndx) * base_sol(i,lev,xno2no3_ndx) &
-                        + 2._r8 * reaction_rates(i,lev,usr16b_ndx) * base_sol(i,lev,no2xno3_ndx) &
-                        + 2._r8 * reaction_rates(i,lev,usr17b_ndx) * base_sol(i,lev,xno3_ndx) ) &
-                        / max( base_sol(i,lev,o3a_ndx),1.e-20_r8 )
-                   loss_out(i,lev,k) = loss_out(i,lev,k) * base_sol(i,lev,o3a_ndx)
-                   prod_out(i,lev,k) = prod_out(i,lev,k) * base_sol(i,lev,xno_ndx)
-                endif
-             else
-                prod_out(i,lev,k) = prod(m) + ind_prd(i,lev,m)
-                loss_out(i,lev,k) = loss(m)
-             endif has_o3_chem
+             prod_out(i,lev,k) = prod(m) + ind_prd(i,lev,m)
+             loss_out(i,lev,k) = loss(m)
           enddo cls_loop2
        enddo column_loop
     enddo level_loop
