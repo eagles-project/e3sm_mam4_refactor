@@ -1593,9 +1593,11 @@ lphase_jnmw_conditional: &
        sflx(:)=0._r8
        F_eff(:)=0._r8
 
-       call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, cam_in%cflx)
+       call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, &  ! in 
+                         cam_in%cflx)                                                              ! inout
 
-       call marine_organic_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, cam_in%cflx, F_eff)
+       call marine_organic_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, & ! in
+                                cam_in%cflx)                                                             ! inout
 
        ! Write out salt mass fluxes to history files
        do m=1,seasalt_nbin-nslt_om
@@ -1607,17 +1609,16 @@ lphase_jnmw_conditional: &
        call outfld('SSTSFMBL',sflx(:),pcols,lchnk)
 
        ! Write out marine organic mass fluxes to history files
-       if ( has_mam_mom ) then
-          sflx(:)=0._r8
-          do m=seasalt_nbin-nslt_om+1,seasalt_nbin
-             mm = seasalt_indices(m)
-             sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-             call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
-          enddo
-          ! accumulated flux
-          call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
+        sflx(:)=0._r8
+        do m=seasalt_nbin-nslt_om+1,seasalt_nbin
+           mm = seasalt_indices(m)
+           sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
+           call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
+        enddo
+        
+        ! accumulated flux
+        call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
 
-       endif
 
     endif
 

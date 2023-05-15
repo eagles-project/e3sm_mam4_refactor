@@ -365,52 +365,52 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cfl
     ! input
     integer, intent(in)  :: lchnk
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: u10cubed(pcols)
-    real(r8), intent(in) :: srf_temp(pcols)
-    real(r8), intent(in) :: ocnfrc(pcols)
-    real(r8), intent(in) :: emis_scale   
+    real(r8), intent(in) :: u10cubed(pcols)   ! 3.41 power of 10m wind 
+    real(r8), intent(in) :: srf_temp(pcols)   ! sea surface temperature [K]
+    real(r8), intent(in) :: ocnfrc(pcols)     ! ocean fraction [unitless]
+    real(r8), intent(in) :: emis_scale        ! sea salt emission tuning factor
 
     ! output
-    real(r8), intent(inout) :: cflx(:,:)
+    real(r8), intent(inout) :: cflx(:,:)      ! mass and number emission fluxes for aerosols [Kg/m2/s or #/m2/s]
 
     ! local vars
-    integer  :: mn, mm, ibin, i
-    real(r8) :: fi(pcols,nsections)
-    integer :: m, n
-    real(r8):: cflx_help2(pcols)
+    integer  :: ispec, ibin
+    integer  :: mass_mode_idx, num_mode_idx
+    real(r8) :: fi(pcols,nsections)           ! sea salt number fluxes in each size bin [#/m2/s]
+    real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes
 
     fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
-   tracer_loop: do ibin = 1,nslt
+   tracer_loop: do ispec = 1,nslt
       ! Index of mass mode
-      mm = seasalt_indices(ibin)
+      mass_mode_idx = seasalt_indices(ispec)
       ! Index of number mode
-      mn = seasalt_indices(nslt+nslt_om+ibin)
+      num_mode_idx  = seasalt_indices(nslt+nslt_om+ispec)
 
-      if (mn>0) then
+      if (num_mode_idx>0) then
          ! Total number flux per mode
-         section_loop_ssa_num: do i=1, nsections
-            cflx_help2(:ncol) = 0.0_r8
-            if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
-               cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
+         section_loop_ssa_num: do ibin=1, nsections
+            cflx_tmp1(:ncol) = 0.0_r8
+            if (Dg(ibin) >= sst_sz_range_lo(ispec) .and. Dg(ibin) < sst_sz_range_hi(ispec)) then
+               cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
 
                ! Mixing state 1: external mixture, add OM to mass and number
                ! Mixing state 3: internal mixture, add OM to mass and number
-               cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol)
+               cflx(:ncol,num_mode_idx) = cflx(:ncol,num_mode_idx) + cflx_tmp1(:ncol)
             endif
          enddo section_loop_ssa_num
       endif
 
-      cflx(:ncol,mm)=0.0_r8
-      section_loop_sslt_mass: do i=1, nsections
-         if (Dg(i) >= sst_sz_range_lo(ibin) .and. Dg(i) < sst_sz_range_hi(ibin)) then
-            cflx_help2(:ncol) = 0.0_r8
-            cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
-                  *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
+      cflx(:ncol,mass_mode_idx)=0.0_r8
+      section_loop_sslt_mass: do ibin=1, nsections
+         if (Dg(ibin) >= sst_sz_range_lo(ispec) .and. Dg(ibin) < sst_sz_range_hi(ispec)) then
+            cflx_tmp1(:ncol) = 0.0_r8
+            cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
+                               *4._r8/3._r8*pi*rdry(ibin)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
 
             ! Mixing state 1: external mixture, add OM to mass and number
             ! Mixing state 3: internal mixture, add OM to mass and number
-            cflx(:ncol,mm)      = cflx(:ncol,mm)      +cflx_help2(:ncol)
+            cflx(:ncol,mass_mode_idx) = cflx(:ncol,mass_mode_idx) + cflx_tmp1(:ncol)
          endif
       enddo section_loop_sslt_mass
    enddo tracer_loop    
@@ -418,7 +418,7 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cfl
 end subroutine seasalt_emis
 
 
-subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx, F_eff)
+subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx)
 
     use sslt_sections, only: nsections, fluxes, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
@@ -435,20 +435,20 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
     
     ! output
     real(r8), intent(inout) :: cflx(:,:)   
-    real(r8), intent(out) :: F_eff(pcols)   ! optional diagnostic output
 
     ! local vars
-    integer  :: mn, mm, ibin, i
+    integer  :: ispec, ibin, iorg, ifld
+    integer  :: mass_mode_idx, num_mode_idx
     real(r8) :: fi(pcols,nsections)
-    integer :: m, n
-    real(r8):: cflx_help2(pcols)
+    integer  :: m
+    real(r8) :: cflx_tmp1(pcols)
 
    real(r8), pointer :: chla(:)          ! for Gantt et al. (2011) organic mass fraction
    real(r8), pointer :: mpoly(:)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), pointer :: mprot(:)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), pointer :: mlip(:)          ! for Burrows et al. (2014) organic mass fraction
 
-   logical :: emit_this_mode(om_num_modes)
+   logical, parameter :: emit_this_mode(om_num_modes) = (/ .true., .true., .false. /)
 
    real(r8) :: mass_frac_bub_section(pcols, n_org_max, nsections)
    real(r8) :: om_ssa(pcols, nsections)
@@ -462,16 +462,16 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
    nullify(mprot)
    nullify(mlip)
 
-   fldloop: do i=1,n_ocean_data
-      select case (trim(fields(i)%fldnam))
+   fldloop: do ifld = 1, n_ocean_data
+      select case (trim(fields(ifld)%fldnam))
          case ("chla")
-             chla   => fields(i)%data(:ncol,1,lchnk)
+             chla   => fields(ifld)%data(:ncol,1,lchnk)
          case ("mpoly")
-             mpoly  => fields(i)%data(:ncol,1,lchnk)
+             mpoly  => fields(ifld)%data(:ncol,1,lchnk)
          case ("mprot")
-             mprot  => fields(i)%data(:ncol,1,lchnk)
+             mprot  => fields(ifld)%data(:ncol,1,lchnk)
          case ("mlip")
-             mlip   => fields(i)%data(:ncol,1,lchnk)
+             mlip   => fields(ifld)%data(:ncol,1,lchnk)
          case default
              if ( masterproc ) then
                 write(iulog,*) 'Unknown field name '//fields%fldnam//' in ocean_data fields ...'
@@ -481,12 +481,11 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
 
    mass_frac_bub_section(:ncol,:,:) = 0.0_r8
    om_ssa(:ncol,:) = 0.0_r8
-   F_eff(:ncol) = 0.0_r8
 
    !if (fmoa==1) then ! Burrows et al. organic sea spray
    n_org = n_org_burrows
-   call calc_om_ssa_burrows(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &
-                            mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :), F_eff(:ncol), lchnk)
+   call calc_om_ssa_burrows(lchnk, ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &  ! in
+                            mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :))    ! inout
 
 
 ! Calculate emission of MOM mass.
@@ -504,56 +503,55 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
     !                 of mode with mass and number in MOM modes
     ! Mixing state 1: external mixture, add OM to mass and number
 
-   emit_this_mode = (/ .true., .true., .false. /)
 
    ! Loop over OM modes
-   om_num_mode_loop: do m_om=1,om_num_modes ! modes in which to emit OM
+   om_num_mode_loop: do ispec = 1, om_num_modes ! modes in which to emit OM
       if (size(om_num_ind) .eq. 1) then
          call endrun(&
          "Error: om_num_ind is a scalar, but attempting to calculate MOM.  Something bad happened!!  We should never get here!")
       endif
       
-      m = om_num_ind(m_om)
-      mn=seasalt_indices(nslt+nslt_om+m)
+      m = om_num_ind(ispec)
+      num_mode_idx=seasalt_indices(nslt+nslt_om+m)
 
       ! add number tracers for organics-only modes
-      if (emit_this_mode(m_om)) then
-         section_loop_OM_num: do i=1, nsections
-            cflx_help2(:ncol) = 0.0_r8
-            if (Dg(i) >= sst_sz_range_lo(nslt+m_om) .and. Dg(i) < sst_sz_range_hi(nslt+m_om)) then
-               cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale
+      if (emit_this_mode(ispec)) then
+         section_loop_OM_num: do ibin=1, nsections
+            cflx_tmp1(:ncol) = 0.0_r8
+            if (Dg(ibin) >= sst_sz_range_lo(nslt+ispec) .and. Dg(ibin) < sst_sz_range_hi(nslt+ispec)) then
+               cflx_tmp1(:ncol)=fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale
 
                ! Mixing state 3: internal mixture, add OM to mass and number
-               cflx(:ncol,mn) = cflx(:ncol,mn) + cflx_help2(:ncol) * &
-                               (1._r8 / (1._r8 - om_ssa(:ncol, i)) - 1._r8)
+               cflx(:ncol,num_mode_idx) = cflx(:ncol,num_mode_idx) + cflx_tmp1(:ncol) * &
+                                          (1._r8 / (1._r8 - om_ssa(:ncol, ibin)) - 1._r8)
             endif
          enddo section_loop_OM_num
       endif
    enddo om_num_mode_loop
 
-   om_mode_loop: do m_om=1,nslt_om
-      mm = seasalt_indices(nslt+m_om)
+   om_mode_loop: do ispec=1,nslt_om
+      mass_mode_idx = seasalt_indices(nslt+ispec)
 
-      cflx(:ncol,mm)=0.0_r8
+      cflx(:ncol,mass_mode_idx)=0.0_r8
       
-      if (emit_this_mode(m_om)) then
+      if (emit_this_mode(ispec)) then
          ! write(iulog,"(A30,A10,I3)") "Constituent name and number: ", trim(seasalt_names(nslt+m_om)), mm ! for debugging
          ! add mass tracers
-         om_type_loop: do n=1,n_org
-            section_loop_OM_mass: do i=1, nsections
-               if (Dg(i)>=sst_sz_range_lo(nslt+m_om) .and. Dg(i)<sst_sz_range_hi(nslt+m_om)) then
-                  cflx_help2(:ncol)=fi(:ncol,i)*ocnfrc(:ncol)*emis_scale &
-                                    *4._r8/3._r8*pi*rdry(i)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
+         om_type_loop: do iorg = 1, n_org
+            section_loop_OM_mass: do ibin = 1, nsections
+               if (Dg(ibin)>=sst_sz_range_lo(nslt+ispec) .and. Dg(ibin)<sst_sz_range_hi(nslt+ispec)) then
+                  cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale &
+                                     *4._r8/3._r8*pi*rdry(ibin)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
                   !  mass_frac_bub_section(pcols, n_org_max, nsections) -- org classes in dim 2, size nsections in dim 3
              
                   ! Mixing state 1: external mixture, add OM to mass and number
                   ! Mixing state 3: internal mixture, add OM to mass and number
-                  where (om_ssa(:ncol, i) > 0.0_r8) ! avoid division by zero
-                     cflx(:ncol,mm) = cflx(:ncol,mm) + cflx_help2(:ncol) &
-                                    * mass_frac_bub_section(:ncol, n, i) / om_ssa(:ncol, i) * &
-                                      (1._r8 / (1._r8 - om_ssa(:ncol, i)) - 1._r8)
+                  where (om_ssa(:ncol,ibin) > 0.0_r8) ! avoid division by zero
+                     cflx(:ncol,mass_mode_idx) = cflx(:ncol,mass_mode_idx) + cflx_tmp1(:ncol) &
+                                                 * mass_frac_bub_section(:ncol, iorg, ibin) / om_ssa(:ncol, ibin) * &
+                                                 (1._r8 / (1._r8 - om_ssa(:ncol, ibin)) - 1._r8)
                   elsewhere
-                     cflx(:ncol,mm) = cflx(:ncol,mm)
+                     cflx(:ncol,mass_mode_idx) = cflx(:ncol,mass_mode_idx)
                   endwhere
                endif
             enddo section_loop_OM_mass
@@ -564,8 +562,8 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
 end subroutine marine_organic_emis
 
 
-subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
-                                mass_frac_bub_section, om_ssa, F_eff, lchnk)
+subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
+                               mass_frac_bub_section, om_ssa)
 
    !----------------------------------------------------------------------- 
    ! Purpose:
@@ -580,6 +578,7 @@ subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
    implicit none
    !-----------------------------------------------------------------------
    ! Input variables:
+   integer,  intent(in) :: lchnk
    integer,  intent(in) :: ncol
    real(r8), intent(in) :: mpoly_in(ncol)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), intent(in) :: mprot_in(ncol)         ! for Burrows et al. (2014) organic mass fraction
@@ -588,7 +587,7 @@ subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
    ! Output variables
    real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)
    real(r8), intent(inout) :: om_ssa(:,:)
-   real(r8), intent(inout) :: F_eff(:) ! optional diagnostic output
+
    !
    ! Local variables
    real(r8) :: g_per_m3(ncol, n_org_burrows), mol_per_m3(ncol, n_org_burrows)
@@ -601,7 +600,6 @@ subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
    real(r8), parameter :: omfrac_max = 0.78
    !
    integer  :: i
-   integer  :: lchnk
    !
    !-----------------------------------------------------------------------
 
@@ -613,7 +611,6 @@ subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
    mass_frac_bub_help(:,:) = 0.0_r8
    mol_per_m3(:,:) = 0.0_r8
    g_per_m3(:,:) = 0.0_r8
-   F_eff(:) = 0.0_r8
 
    ! Convert input fields from [(mol C) L-1] to [(g OM) m-3]
    ! and store in single array
@@ -670,16 +667,6 @@ subroutine calc_om_ssa_burrows(ncol, mpoly_in, mprot_in, mlip_in, &
    ! F_eff_mass = organic mass per area (film) [g m-2] / salt mass per area (film) [g m-2] *
    !                 bulk salt concentration [g m-3] / bulk OM concentration [g m-3]
 
-   if ( F_eff_out ) then
-      F_eff(:) = sum(g_per_m3(:, :), dim=2)
-      ! avoid division by zero
-      where( (mass_frac_bub_tot(:) > small_oceanorg) .and. (F_eff(:) > small_oceanorg) )
-         F_eff(:) = 2.0_r8*sum(mass_frac_bub(:, :), dim=2) / g_per_m2_NaCl_bub * &
-                 g_per_m3_NaCl_bulk / F_eff(:)
-      elsewhere
-         F_eff(:) = 0.0_r8
-      endwhere
-   endif
 
    ! Distribute mass fraction evenly into Aitken and accumulation modes
    call omfrac_accu_aitk(mass_frac_bub_tot(:), om_ssa(:,:))
@@ -714,6 +701,7 @@ subroutine omfrac_accu_aitk(om_ssa_in, om_ssa)
    real(r8), parameter :: om_ssa_max = 1.0_r8
    !
    !-----------------------------------------------------------------------
+ 
 
    ! distribute OM fraction!
    do m=1,nsections
