@@ -174,8 +174,11 @@ contains
     !-----------------------------------------------------------------------
     ! ... class independent forcing
     !-----------------------------------------------------------------------
-    call indprd( 4, ind_prd, clscnt4, base_sol, extfrc, &
-            reaction_rates, ncol )
+    call indprd( 4,                         & ! in
+                 ind_prd,                   & ! inout
+                 clscnt4, base_sol, extfrc, & ! in
+                 reaction_rates, ncol       ) ! in
+
     level_loop : do lev = 1,pver
        column_loop : do icol = 1,ncol
           if (lev <= ltrop(icol)) cycle column_loop
