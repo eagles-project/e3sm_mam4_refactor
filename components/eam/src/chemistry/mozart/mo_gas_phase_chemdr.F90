@@ -760,7 +760,9 @@ contains
     !	... Solve for "Explicit" species
     !-----------------------------------------------------------------------
     call t_startf('exp_sol')
-    call exp_sol( vmr, reaction_rates, het_rates, extfrc, delt, invariants(1,1,indexm), ncol, lchnk, ltrop_sol )
+    call exp_sol( vmr,          & ! inout
+                  reaction_rates, het_rates, extfrc, delt,       & ! in
+                  invariants(1,1,indexm), ncol, lchnk, ltrop_sol ) ! in
     call t_stopf('exp_sol')
 
     !-----------------------------------------------------------------------

@@ -29,7 +29,9 @@ contains
   end subroutine exp_sol_inti
 
 !==================================================================================
-  subroutine exp_sol( base_sol, reaction_rates, het_rates, extfrc, delt, xhnm, ncol, lchnk, ltrop )
+  subroutine exp_sol( base_sol,   & ! inout
+                      reaction_rates, het_rates, extfrc,& ! in 
+                      delt, xhnm, ncol, lchnk, ltrop    ) ! in
     !-----------------------------------------------------------------------
     !      	... Exp_sol advances the volumetric mixing ratio
     !           forward one time step via the fully explicit
@@ -72,13 +74,16 @@ contains
     !-----------------------------------------------------------------------      
     !        ... Put "independent" production in the forcing
     !-----------------------------------------------------------------------      
-    call indprd( 1, ind_prd, clscnt1, base_sol, extfrc, &
-         reaction_rates, ncol )
+    call indprd( 1,             & ! in
+                ind_prd,        & ! inout
+                clscnt1, base_sol, extfrc, & ! in
+                reaction_rates, ncol       ) ! in
 
     !-----------------------------------------------------------------------      
     !      	... Form F(y)
     !-----------------------------------------------------------------------      
-    call exp_prod_loss( prod, loss, base_sol, reaction_rates, het_rates )
+    call exp_prod_loss( prod, loss,     & ! out
+                base_sol, reaction_rates, het_rates ) ! in
 
     !-----------------------------------------------------------------------      
     !    	... Solve for the mixing ratio at t(n+1)
