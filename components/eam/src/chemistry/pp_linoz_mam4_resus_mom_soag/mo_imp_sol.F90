@@ -294,21 +294,18 @@ contains
           enddo time_step_loop
           !-----------------------------------------------------------------------
           ! ... Transfer latest solution back to base array
+          !     and calculate Prod/Loss history buffers
           !-----------------------------------------------------------------------
           cls_loop: do k = 1,clscnt4
              j = clsmap(k,4)
              m = permute(k,4)
+             ! ... Transfer latest solution back to base array
              base_sol(i,lev,j) = solution(m)
-          enddo cls_loop
-          !-----------------------------------------------------------------------
-          ! ... Prod/Loss history buffers...
-          !-----------------------------------------------------------------------
-          cls_loop2: do k = 1,clscnt4
-             j = clsmap(k,4)
-             m = permute(k,4)
+             ! ... Prod/Loss history buffers...
              prod_out(i,lev,k) = prod(m) + ind_prd(i,lev,m)
              loss_out(i,lev,k) = loss(m)
-          enddo cls_loop2
+          enddo cls_loop
+
        enddo column_loop
     enddo level_loop
 
