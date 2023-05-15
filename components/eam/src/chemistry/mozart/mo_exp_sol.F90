@@ -52,24 +52,20 @@ contains
     !-----------------------------------------------------------------------
     integer,  intent(in)    ::  ncol                                ! columns in chunck
     integer,  intent(in)    ::  lchnk                               ! chunk id
-    real(r8), intent(in)    ::  delt                                ! time step (s)
-    real(r8), intent(in)    ::  het_rates(ncol,pver,max(1,gas_pcnst))  ! het rates (1/cm^3/s)
-    real(r8), intent(in)    ::  reaction_rates(ncol,pver,rxntot)    ! rxt rates (1/cm^3/s)
-    real(r8), intent(in)    ::  extfrc(ncol,pver,extcnt)            ! "external insitu forcing" (1/cm^3/s)
+    real(r8), intent(in)    ::  delt                                ! time step [s]
+    real(r8), intent(in)    ::  het_rates(ncol,pver,max(1,gas_pcnst))  ! het rates [1/cm^3/s]
+    real(r8), intent(in)    ::  reaction_rates(ncol,pver,rxntot)    ! rxt rates [1/cm^3/s]
+    real(r8), intent(in)    ::  extfrc(ncol,pver,extcnt)            ! "external insitu forcing" [1/cm^3/s]
     real(r8), intent(in)    ::  xhnm(ncol,pver)
-    integer,  intent(in)    ::  ltrop(pcols)                        ! chemistry troposphere boundary (index)
-    real(r8), intent(inout) ::  base_sol(ncol,pver,gas_pcnst)       ! working mixing ratios (vmr)
+    integer,  intent(in)    ::  ltrop(pcols)                        ! chemistry troposphere boundary [index]
+    real(r8), intent(inout) ::  base_sol(ncol,pver,gas_pcnst)       ! working mixing ratios [vmr]
 
     !-----------------------------------------------------------------------
     !     	... Local variables
     !-----------------------------------------------------------------------
     integer  ::  icol, kk, ll, mm
-    real(r8), dimension(ncol,pver,clscnt1) :: &
-         prod, &
-         loss, &
-         ind_prd
-
-    real(r8), dimension(ncol,pver) :: wrk
+    real(r8), dimension(ncol,pver,clscnt1) :: prod, loss, ind_prd
+    real(r8), dimension(ncol,pver) :: wrk    ! diagnostic variables
 
     !-----------------------------------------------------------------------      
     !        ... Put "independent" production in the forcing
