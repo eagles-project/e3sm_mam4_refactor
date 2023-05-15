@@ -119,10 +119,10 @@ contains
     use mo_tracname,    only : solsym
     use ppgrid,         only : pver
     use mo_lin_matrix,  only : linmat
-    use mo_nln_matrix,  only : nlnmat
-    use mo_lu_factor,   only : lu_fac
-    use mo_lu_solve,    only : lu_slv
-    use mo_prod_loss,   only : imp_prod_loss
+!    use mo_nln_matrix,  only : nlnmat
+!    use mo_lu_factor,   only : lu_fac
+!    use mo_lu_solve,    only : lu_slv
+!    use mo_prod_loss,   only : imp_prod_loss
     use mo_indprd,      only : indprd
     use time_manager,   only : get_nstep
     use cam_history,    only : outfld
@@ -229,80 +229,12 @@ contains
              !=======================================================================
              ! the newton-raphson iteration for f(y) = 0
              !=======================================================================
-             iter_loop : do nr_iter = 1,itermax
-                !-----------------------------------------------------------------------
-                ! ... the non-linear component
-                !-----------------------------------------------------------------------
-                if( factor(nr_iter) ) then
-                   call nlnmat( sys_jac,     & ! out
-                                lin_jac, dti ) ! in
-                   !-----------------------------------------------------------------------
-                   ! ... factor the "system" matrix
-                   !-----------------------------------------------------------------------
-                   call lu_fac( sys_jac )
-                endif
-                !-----------------------------------------------------------------------
-                ! ... form f(y)
-                !-----------------------------------------------------------------------
-                call imp_prod_loss( prod, loss,  & ! out
-                                lsol, lrxt, lhet ) ! in
-                do m = 1,clscnt4
-                   forcing(m) = solution(m)*dti - (iter_invariant(m) + prod(m) - loss(m))
-                enddo
-                !-----------------------------------------------------------------------
-                ! ... solve for the mixing ratio at t(n+1)
-                !-----------------------------------------------------------------------
-                call lu_slv( sys_jac, forcing )
-                do m = 1,clscnt4
-                   solution(m) = solution(m) + forcing(m)
-                enddo
-                !-----------------------------------------------------------------------
-                ! ... convergence measures
-                !-----------------------------------------------------------------------
-                if( nr_iter > 1 ) then
-                   do k = 1,clscnt4
-                      m = permute(k,4)
-                      if( abs(solution(m)) > 1.e-20_r8 ) then
-                         max_delta(k) = abs( forcing(m)/solution(m) )
-                      else
-                         max_delta(k) = 0._r8
-                      endif
-                   enddo
-                endif
-                !-----------------------------------------------------------------------
-                ! ... limit iterate
-                !-----------------------------------------------------------------------
-                where( solution(:) < 0._r8 )
-                   solution(:) = 0._r8
-                endwhere
-                !-----------------------------------------------------------------------
-                ! ... transfer latest solution back to work array
-                !-----------------------------------------------------------------------
-                do k = 1,clscnt4
-                   j = clsmap(k,4)
-                   m = permute(k,4)
-                   lsol(j) = solution(m)
-                enddo
-                !-----------------------------------------------------------------------
-                ! ... check for convergence
-                !-----------------------------------------------------------------------
-                converged(:) = .true.
-                if( nr_iter > 1 ) then
-                   do k = 1,clscnt4
-                      m = permute(k,4)
-                      frc_mask = abs( forcing(m) ) > small
-                      if( frc_mask ) then
-                         converged(k) = abs(forcing(m)) <= epsilon(k)*abs(solution(m))
-                      else
-                         converged(k) = .true.
-                      endif
-                   enddo
-                   convergence = all( converged(:) )
-                   if( convergence ) then
-                      exit
-                   endif
-                endif
-             enddo iter_loop
+
+             call newton_raphson_iter( dti, lin_jac, lrxt, lhet, & ! in
+                                  iter_invariant,                & ! in
+                                  lsol,   solution,              & ! inout
+                                  converged, convergence,        & ! out
+                                  prod, loss, max_delta          ) ! out
 
              !-----------------------------------------------------------------------
              ! ... check for newton-raphson convergence
@@ -389,5 +321,122 @@ contains
        call outfld( trim(solsym(j))//'_CHML', loss_out(:,:,i), ncol, lchnk )
     enddo
   end subroutine imp_sol
+
+!==================================================================================
+  subroutine newton_raphson_iter( dti, lin_jac, lrxt, lhet, & ! in
+                        iter_invariant,                & ! in
+                        lsol,   solution,               & ! inout
+                        converged, convergence,         & ! out
+                        prod, loss, max_delta           ) ! out
+!-----------------------------------------------------
+! the newton-raphson iteration for f(y) = 0
+!-----------------------------------------------------
+    use chem_mods,      only : rxntot, nzcnt, permute
+    use mo_nln_matrix,  only : nlnmat
+    use mo_lu_factor,   only : lu_fac
+    use mo_lu_solve,    only : lu_slv
+    use mo_prod_loss,   only : imp_prod_loss
+
+    real(r8),intent(in) :: lin_jac(:)
+    real(r8),intent(in) :: dti
+    real(r8),intent(in) :: lrxt(max(1,rxntot))
+    real(r8),intent(in) :: lhet(max(1,gas_pcnst))
+    real(r8),intent(in) :: iter_invariant(max(1,clscnt4))
+
+    real(r8),intent(inout) :: solution(max(1,clscnt4))
+    real(r8),intent(inout) :: lsol(max(1,gas_pcnst))
+
+    logical, intent(out) :: converged(max(1,clscnt4))
+    logical, intent(out) :: convergence      ! all converged(:) are true
+    real(r8),intent(out) :: prod(max(1,clscnt4))
+    real(r8),intent(out) :: loss(max(1,clscnt4))
+    real(r8),intent(out) :: max_delta(max(1,clscnt4))
+
+    ! ... local variables
+    integer :: nr_iter
+    integer :: j,k,m
+    logical :: frc_mask
+
+    real(r8) :: sys_jac(max(1,nzcnt))
+    real(r8) :: forcing(max(1,clscnt4))
+
+
+
+    iter_loop : do nr_iter = 1,itermax
+         !-----------------------------------------------------------------------
+         ! ... the non-linear component
+         !-----------------------------------------------------------------------
+         if( factor(nr_iter) ) then
+            call nlnmat( sys_jac,     & ! out
+                         lin_jac, dti ) ! in
+            !-----------------------------------------------------------------------
+            ! ... factor the "system" matrix
+            !-----------------------------------------------------------------------
+            call lu_fac( sys_jac )
+         endif
+         !-----------------------------------------------------------------------
+         ! ... form f(y)
+         !-----------------------------------------------------------------------
+         call imp_prod_loss( prod, loss,  & ! out
+                         lsol, lrxt, lhet ) ! in
+         do m = 1,clscnt4
+            forcing(m) = solution(m)*dti - (iter_invariant(m) + prod(m) - loss(m))
+         enddo
+         !-----------------------------------------------------------------------
+         ! ... solve for the mixing ratio at t(n+1)
+         !-----------------------------------------------------------------------
+         call lu_slv( sys_jac, forcing )
+         do m = 1,clscnt4
+            solution(m) = solution(m) + forcing(m)
+         enddo
+         !-----------------------------------------------------------------------
+         ! ... convergence measures
+         !-----------------------------------------------------------------------
+         if( nr_iter > 1 ) then
+            do k = 1,clscnt4
+               m = permute(k,4)
+               if( abs(solution(m)) > 1.e-20_r8 ) then
+                  max_delta(k) = abs( forcing(m)/solution(m) )
+               else
+                  max_delta(k) = 0._r8
+               endif
+            enddo
+         endif
+         !-----------------------------------------------------------------------
+         ! ... limit iterate
+         !-----------------------------------------------------------------------
+         where( solution(:) < 0._r8 )
+            solution(:) = 0._r8
+         endwhere
+         !-----------------------------------------------------------------------
+         ! ... transfer latest solution back to work array
+         !-----------------------------------------------------------------------
+         do k = 1,clscnt4
+            j = clsmap(k,4)
+            m = permute(k,4)
+            lsol(j) = solution(m)
+         enddo
+         !-----------------------------------------------------------------------
+         ! ... check for convergence
+         !-----------------------------------------------------------------------
+         converged(:) = .true.
+         if( nr_iter > 1 ) then
+            do k = 1,clscnt4
+               m = permute(k,4)
+               frc_mask = abs( forcing(m) ) > small
+               if( frc_mask ) then
+                  converged(k) = abs(forcing(m)) <= epsilon(k)*abs(solution(m))
+               else
+                  converged(k) = .true.
+               endif
+            enddo
+            convergence = all( converged(:) )
+            if( convergence ) then
+               exit
+            endif
+         endif
+      enddo iter_loop
+
+  end subroutine newton_raphson_iter
 !==================================================================================
 end module mo_imp_sol
