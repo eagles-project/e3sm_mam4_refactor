@@ -7,6 +7,7 @@ module mo_exp_sol
 
 contains
 
+!==================================================================================
   subroutine exp_sol_inti
 
     use mo_tracname, only : solsym
@@ -16,18 +17,18 @@ contains
 
     implicit none
 
-    integer :: i,j
+    integer :: ii,jj
 
-    do i = 1,clscnt1
+    do ii = 1,clscnt1
 
-       j = clsmap(i,1)
-       call addfld( trim(solsym(j))//'_CHMP', (/ 'lev' /), 'I', '/cm3/s', 'chemical production rate' )
-       call addfld( trim(solsym(j))//'_CHML', (/ 'lev' /), 'I', '/cm3/s', 'chemical loss rate' )
+       jj = clsmap(ii,1)
+       call addfld( trim(solsym(jj))//'_CHMP', (/ 'lev' /), 'I', '/cm3/s', 'chemical production rate' )
+       call addfld( trim(solsym(jj))//'_CHML', (/ 'lev' /), 'I', '/cm3/s', 'chemical loss rate' )
 
     enddo
   end subroutine exp_sol_inti
 
-
+!==================================================================================
   subroutine exp_sol( base_sol, reaction_rates, het_rates, extfrc, delt, xhnm, ncol, lchnk, ltrop )
     !-----------------------------------------------------------------------
     !      	... Exp_sol advances the volumetric mixing ratio
@@ -60,7 +61,7 @@ contains
     !-----------------------------------------------------------------------
     !     	... Local variables
     !-----------------------------------------------------------------------
-    integer  ::  i, k, l, m
+    integer  ::  icol, kk, ll, mm
     real(r8), dimension(ncol,pver,clscnt1) :: &
          prod, &
          loss, &
@@ -82,21 +83,23 @@ contains
     !-----------------------------------------------------------------------      
     !    	... Solve for the mixing ratio at t(n+1)
     !-----------------------------------------------------------------------      
-    do m = 1,clscnt1
-       l = clsmap(m,1)
-       do i = 1,ncol
-          do k = ltrop(i)+1,pver
-             base_sol(i,k,l)  = base_sol(i,k,l) + delt * (prod(i,k,m) + ind_prd(i,k,m) - loss(i,k,m))
-          end do
-       end do
+    do mm = 1,clscnt1
+       ll = clsmap(mm,1)
+       do icol = 1,ncol
+          do kk = ltrop(icol)+1,pver
+             base_sol(icol,kk,ll)  = base_sol(icol,kk,ll) + delt * \
+                         (prod(icol,kk,mm) + ind_prd(icol,kk,mm) - loss(icol,kk,mm))
+          enddo
+       enddo
 
-       wrk(:,:) = (prod(:,:,m) + ind_prd(:,:,m))*xhnm
-       call outfld( trim(solsym(l))//'_CHMP', wrk(:,:), ncol, lchnk )
-       wrk(:,:) = (loss(:,:,m))*xhnm
-       call outfld( trim(solsym(l))//'_CHML', wrk(:,:), ncol, lchnk )
+       wrk(:,:) = (prod(:,:,mm) + ind_prd(:,:,mm))*xhnm
+       call outfld( trim(solsym(ll))//'_CHMP', wrk(:,:), ncol, lchnk )
+       wrk(:,:) = (loss(:,:,mm))*xhnm
+       call outfld( trim(solsym(ll))//'_CHML', wrk(:,:), ncol, lchnk )
        
-    end do
+    enddo
 
   end subroutine exp_sol
+!==================================================================================
 
 end module mo_exp_sol
