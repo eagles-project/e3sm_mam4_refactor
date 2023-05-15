@@ -119,10 +119,6 @@ contains
     use mo_tracname,    only : solsym
     use ppgrid,         only : pver
     use mo_lin_matrix,  only : linmat
-!    use mo_nln_matrix,  only : nlnmat
-!    use mo_lu_factor,   only : lu_fac
-!    use mo_lu_solve,    only : lu_slv
-!    use mo_prod_loss,   only : imp_prod_loss
     use mo_indprd,      only : indprd
     use time_manager,   only : get_nstep
     use cam_history,    only : outfld
@@ -133,37 +129,31 @@ contains
     !-----------------------------------------------------------------------
     integer,  intent(in) :: ncol ! columns in chunck
     integer,  intent(in) :: lchnk ! chunk id
-    real(r8), intent(in) :: delt ! time step (s)
-    real(r8), intent(in) :: reaction_rates(ncol,pver,max(1,rxntot)), & ! rxt rates (1/cm^3/s)
-                            extfrc(ncol,pver,max(1,extcnt)), & ! external in-situ forcing (1/cm^3/s)
-                            het_rates(ncol,pver,max(1,gas_pcnst)) ! washout rates (1/s)
+    real(r8), intent(in) :: delt ! time step [s]
+    real(r8), intent(in) :: reaction_rates(ncol,pver,max(1,rxntot)), & ! rxt rates [1/cm^3/s]
+                            extfrc(ncol,pver,max(1,extcnt)), & ! external in-situ forcing [1/cm^3/s]
+                            het_rates(ncol,pver,max(1,gas_pcnst)) ! washout rates [1/s]
     real(r8), intent(in) :: xhnm(ncol,pver)
-    integer,  intent(in) :: ltrop(ncol) ! chemistry troposphere boundary (index)
-    real(r8), intent(inout) :: base_sol(ncol,pver,gas_pcnst) ! species mixing ratios (vmr)
+    integer,  intent(in) :: ltrop(ncol) ! chemistry troposphere boundary [index]
+    real(r8), intent(inout) :: base_sol(ncol,pver,gas_pcnst) ! species mixing ratios [vmr]
 
     !-----------------------------------------------------------------------
     ! ... local variables
     !-----------------------------------------------------------------------
-    integer :: nr_iter, &
-               lev, icol, &
+    integer :: lev, icol, &
                jj, kk, mm 
     integer :: fail_cnt, cut_cnt, stp_con_cnt
     integer :: nstep
     real(r8) :: interval_done, dt, dti
     real(r8) :: max_delta(max(1,clscnt4))
-    real(r8) :: sys_jac(max(1,nzcnt))
     real(r8) :: lin_jac(max(1,nzcnt))
-    real(r8), dimension(max(1,clscnt4)) :: &
-                         solution, &
-                         forcing, &
-                         iter_invariant, &
-                         prod, loss
     real(r8) :: lrxt(max(1,rxntot))
     real(r8) :: lsol(max(1,gas_pcnst))
     real(r8) :: lhet(max(1,gas_pcnst))
+    real(r8), dimension(max(1,clscnt4)) :: solution, iter_invariant
+    real(r8), dimension(max(1,clscnt4)) :: prod, loss
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: ind_prd
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: prod_out, loss_out
-    logical :: frc_mask
     logical :: converged(max(1,clscnt4))
     logical :: convergence      ! all converged(:) are true
 
