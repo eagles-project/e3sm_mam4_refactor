@@ -145,9 +145,8 @@ contains
     ! ... local variables
     !-----------------------------------------------------------------------
     integer :: nr_iter, &
-               lev, &
-               i, j, &
-               k, l, m
+               lev, icol, &
+               jj, kk, mm 
     integer :: fail_cnt, cut_cnt, stp_con_cnt
     integer :: nstep
     real(r8) :: interval_done, dt, dti
@@ -178,17 +177,17 @@ contains
     call indprd( 4, ind_prd, clscnt4, base_sol, extfrc, &
             reaction_rates, ncol )
     level_loop : do lev = 1,pver
-       column_loop : do i = 1,ncol
-          if (lev <= ltrop(i)) cycle column_loop
+       column_loop : do icol = 1,ncol
+          if (lev <= ltrop(icol)) cycle column_loop
           !-----------------------------------------------------------------------
           ! ... transfer from base to local work arrays
           !-----------------------------------------------------------------------
-          do m = 1,rxntot
-             lrxt(m) = reaction_rates(i,lev,m)
+          do mm = 1,rxntot
+             lrxt(mm) = reaction_rates(icol,lev,mm)
           enddo
           if( gas_pcnst > 0 ) then
-             do m = 1,gas_pcnst
-                lhet(m) = het_rates(i,lev,m)
+             do mm = 1,gas_pcnst
+                lhet(mm) = het_rates(icol,lev,mm)
              enddo
           endif
           !-----------------------------------------------------------------------
@@ -204,22 +203,22 @@ contains
              !-----------------------------------------------------------------------
              ! ... transfer from base to local work arrays
              !-----------------------------------------------------------------------
-             do m = 1,gas_pcnst
-                lsol(m) = base_sol(i,lev,m)
+             do mm = 1,gas_pcnst
+                lsol(mm) = base_sol(icol,lev,mm)
              enddo
              !-----------------------------------------------------------------------
              ! ... transfer from base to class array
              !-----------------------------------------------------------------------
-             do k = 1,clscnt4
-                j = clsmap(k,4)
-                m = permute(k,4)
-                solution(m) = lsol(j)
+             do kk = 1,clscnt4
+                jj = clsmap(kk,4)
+                mm = permute(kk,4)
+                solution(mm) = lsol(jj)
              enddo
              !-----------------------------------------------------------------------
              ! ... set the iteration invariant part of the function f(y)
              !-----------------------------------------------------------------------
-             do m = 1,clscnt4
-                   iter_invariant(m) = dti * solution(m) + ind_prd(i,lev,m)
+             do mm = 1,clscnt4
+                   iter_invariant(mm) = dti * solution(mm) + ind_prd(icol,lev,mm)
              enddo
              !-----------------------------------------------------------------------
              ! ... the linear component
@@ -246,7 +245,7 @@ contains
                 fail_cnt = fail_cnt + 1
                 nstep = get_nstep()
                 write(iulog,'('' imp_sol: Time step '',1p,e21.13,'' failed to converge @ (lchnk,lev,col,nstep) = '',4i6)') &
-                     dt,lchnk,lev,i,nstep
+                     dt,lchnk,lev,icol,nstep
                 stp_con_cnt = 0
                 if( cut_cnt < cut_limit ) then
                    cut_cnt = cut_cnt + 1
@@ -258,21 +257,21 @@ contains
                    cycle time_step_loop
                 else
                    write(iulog,'('' imp_sol: Failed to converge @ (lchnk,lev,col,nstep,dt,time) = '',4i6,1p,2e21.13)') &
-                        lchnk,lev,i,nstep,dt,interval_done+dt
-                   do m = 1,clscnt4
-                      if( .not. converged(m) ) then
-                         write(iulog,'(1x,a8,1x,1pe10.3)') solsym(clsmap(m,4)), max_delta(m)
+                        lchnk,lev,icol,nstep,dt,interval_done+dt
+                   do mm = 1,clscnt4
+                      if( .not. converged(mm) ) then
+                         write(iulog,'(1x,a8,1x,1pe10.3)') solsym(clsmap(mm,4)), max_delta(mm)
                       endif
                    enddo
                 endif
-             endif
+             endif ! if( .not. convergence )
              !-----------------------------------------------------------------------
              ! ... check for interval done
              !-----------------------------------------------------------------------
              interval_done = interval_done + dt
              if( abs( delt - interval_done ) <= .0001_r8 ) then
                 if( fail_cnt > 0 ) then
-                   write(iulog,*) 'imp_sol : @ (lchnk,lev,col) = ',lchnk,lev,i,' failed ',fail_cnt,' times'
+                   write(iulog,*) 'imp_sol : @ (lchnk,lev,col) = ',lchnk,lev,icol,' failed ',fail_cnt,' times'
                 endif
                 exit time_step_loop
              else
@@ -282,8 +281,8 @@ contains
                 if( convergence ) then
                    stp_con_cnt = stp_con_cnt + 1
                 endif
-                do m = 1,gas_pcnst
-                   base_sol(i,lev,m) = lsol(m)
+                do mm = 1,gas_pcnst
+                   base_sol(icol,lev,mm) = lsol(mm)
                 enddo
                 if( stp_con_cnt >= 2 ) then
                    dt = 2._r8*dt
@@ -296,26 +295,26 @@ contains
           ! ... Transfer latest solution back to base array
           !     and calculate Prod/Loss history buffers
           !-----------------------------------------------------------------------
-          cls_loop: do k = 1,clscnt4
-             j = clsmap(k,4)
-             m = permute(k,4)
+          cls_loop: do kk = 1,clscnt4
+             jj = clsmap(kk,4)
+             mm = permute(kk,4)
              ! ... Transfer latest solution back to base array
-             base_sol(i,lev,j) = solution(m)
+             base_sol(icol,lev,jj) = solution(mm)
              ! ... Prod/Loss history buffers...
-             prod_out(i,lev,k) = prod(m) + ind_prd(i,lev,m)
-             loss_out(i,lev,k) = loss(m)
+             prod_out(icol,lev,kk) = prod(mm) + ind_prd(icol,lev,mm)
+             loss_out(icol,lev,kk) = loss(mm)
           enddo cls_loop
 
        enddo column_loop
     enddo level_loop
 
     ! diagnose variables
-    do i = 1,clscnt4
-       j = clsmap(i,4)
-       prod_out(:,:,i) = prod_out(:,:,i)*xhnm
-       loss_out(:,:,i) = loss_out(:,:,i)*xhnm
-       call outfld( trim(solsym(j))//'_CHMP', prod_out(:,:,i), ncol, lchnk )
-       call outfld( trim(solsym(j))//'_CHML', loss_out(:,:,i), ncol, lchnk )
+    do icol = 1,clscnt4
+       jj = clsmap(icol,4)
+       prod_out(:,:,icol) = prod_out(:,:,icol)*xhnm
+       loss_out(:,:,icol) = loss_out(:,:,icol)*xhnm
+       call outfld( trim(solsym(jj))//'_CHMP', prod_out(:,:,icol), ncol, lchnk )
+       call outfld( trim(solsym(jj))//'_CHML', loss_out(:,:,icol), ncol, lchnk )
     enddo
   end subroutine imp_sol
 
@@ -351,7 +350,7 @@ contains
 
     ! ... local variables
     integer :: nr_iter
-    integer :: j,k,m
+    integer :: jj,kk,mm
     logical :: frc_mask
 
     real(r8) :: sys_jac(max(1,nzcnt))
@@ -376,26 +375,26 @@ contains
          !-----------------------------------------------------------------------
          call imp_prod_loss( prod, loss,  & ! out
                          lsol, lrxt, lhet ) ! in
-         do m = 1,clscnt4
-            forcing(m) = solution(m)*dti - (iter_invariant(m) + prod(m) - loss(m))
+         do mm = 1,clscnt4
+            forcing(mm) = solution(mm)*dti - (iter_invariant(mm) + prod(mm) - loss(mm))
          enddo
          !-----------------------------------------------------------------------
          ! ... solve for the mixing ratio at t(n+1)
          !-----------------------------------------------------------------------
          call lu_slv( sys_jac, forcing )
-         do m = 1,clscnt4
-            solution(m) = solution(m) + forcing(m)
+         do mm = 1,clscnt4
+            solution(mm) = solution(mm) + forcing(mm)
          enddo
          !-----------------------------------------------------------------------
          ! ... convergence measures
          !-----------------------------------------------------------------------
          if( nr_iter > 1 ) then
-            do k = 1,clscnt4
-               m = permute(k,4)
-               if( abs(solution(m)) > 1.e-20_r8 ) then
-                  max_delta(k) = abs( forcing(m)/solution(m) )
+            do kk = 1,clscnt4
+               mm = permute(kk,4)
+               if( abs(solution(mm)) > 1.e-20_r8 ) then
+                  max_delta(kk) = abs( forcing(mm)/solution(mm) )
                else
-                  max_delta(k) = 0._r8
+                  max_delta(kk) = 0._r8
                endif
             enddo
          endif
@@ -408,23 +407,23 @@ contains
          !-----------------------------------------------------------------------
          ! ... transfer latest solution back to work array
          !-----------------------------------------------------------------------
-         do k = 1,clscnt4
-            j = clsmap(k,4)
-            m = permute(k,4)
-            lsol(j) = solution(m)
+         do kk = 1,clscnt4
+            jj = clsmap(kk,4)
+            mm = permute(kk,4)
+            lsol(jj) = solution(mm)
          enddo
          !-----------------------------------------------------------------------
          ! ... check for convergence
          !-----------------------------------------------------------------------
          converged(:) = .true.
          if( nr_iter > 1 ) then
-            do k = 1,clscnt4
-               m = permute(k,4)
-               frc_mask = abs( forcing(m) ) > small
+            do kk = 1,clscnt4
+               mm = permute(kk,4)
+               frc_mask = abs( forcing(mm) ) > small
                if( frc_mask ) then
-                  converged(k) = abs(forcing(m)) <= epsilon(k)*abs(solution(m))
+                  converged(kk) = abs(forcing(mm)) <= epsilon(kk)*abs(solution(mm))
                else
-                  converged(k) = .true.
+                  converged(kk) = .true.
                endif
             enddo
             convergence = all( converged(:) )
