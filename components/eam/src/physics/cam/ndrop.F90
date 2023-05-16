@@ -479,6 +479,7 @@ contains
 
        call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
             nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
+
        ! droplet number
 
        ndropcol(icol) = 0._r8
@@ -625,7 +626,7 @@ contains
     real(r8), intent(in) :: temp_col_in(:)   ! temperature [K]
     real(r8), intent(in) :: cs_col_in(:)     ! air density at actual level kk [kg/m^3]
     real(r8), intent(in) :: state_q_col_in(:,:) ! aerosol mmrs [kg/kg]
-
+    
     real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
     real(r8), intent(inout) :: nsource_col_out(:)   ! droplet number mixing ratio source tendency [#/kg/s]
     real(r8), intent(inout) :: raercol_nsav(:,:)   ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
@@ -698,7 +699,7 @@ contains
           call get_activate_frac(state_q_col_in(kk,:), cs_col_in(kk), cs_col_in(kk), & ! in
                wtke_col_in(kk), temp_col_in(kk), & ! in
                fn, fm, fluxn, fluxm, flux_fullact) ! out
-
+ 
           !  store for output activation fraction of aerosol
           factnum_col_out(kk,:) = fn
 
@@ -809,7 +810,7 @@ contains
 
              call get_activate_frac(state_q_col_in(kp1,:),cs_col_in(kp1),  &   ! in
                   cs_col_in(kk), wtke_col_in(kk), temp_col_in(kk),  &   ! in
-                  fn, fm, fluxn, fluxm, flux_fullact(kk) )  ! out
+                  fn, fm, fluxn, fluxm, flux_fullact(kk))  ! out
 
              !  store for output activation fraction of aerosol
              factnum_col(kk,:) = fn
@@ -1057,6 +1058,7 @@ contains
             srcn, ekkp, ekkm, overlapp,  &   ! in
             overlapm, qncld,  &  ! in
             dtmix, .false. )     ! in
+
        ! update aerosol number
 
        ! rce-comment
@@ -1080,7 +1082,8 @@ contains
           call explmix( raercol_cw(:,mm,nnew), &  ! out
                source, ekkp, ekkm, overlapp, &   ! in
                overlapm, raercol_cw(:,mm,nsav),   &  ! in
-               dtmix, .false. )  ! in
+               dtmix, .false. ) ! in
+
           call explmix( raercol(:,mm,nnew), &   ! out
                source, ekkp, ekkm, overlapp,  &    ! in
                overlapm, raercol(:,mm,nsav),  &  ! in
@@ -1104,6 +1107,7 @@ contains
                   source, ekkp, ekkm, overlapp, &  ! in
                   overlapm, raercol_cw(:,mm,nsav),    &  ! in
                   dtmix, .false. ) ! in
+
              call explmix( raercol(:,mm,nnew), &  ! out
                   source, ekkp, ekkm, overlapp,  &  ! in
                   overlapm, raercol(:,mm,nsav),  &   ! in
@@ -1202,7 +1206,8 @@ contains
 
   subroutine activate_modal(w_in, wmaxf, tair, rhoair,  &  ! in
        na, nmode, volume, hygro, &  ! in
-       fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed )  ! out
+       fn, fm, fluxn, fluxm, flux_fullact, &  ! out
+       smax_prescribed )  ! optional in
 
     !---------------------------------------------------------------------------------
     !Calculates number, surface, and mass fraction of aerosols activated as CCN
@@ -1270,6 +1275,7 @@ contains
     real(r8) arg_erf_n,arg_erf_m  ! [unitless]
     real(r8) etafactor1  ! [/ s^(3/2)]
     real(r8) etafactor2(nmode),etafactor2max ! [s^(3/2)]
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/activate_modal_beg_yml.f90"
 
 
     !initialize activated aerosols and their fluxes to zero for all the modes
@@ -1352,7 +1358,7 @@ contains
        fluxm(imode)=fm(imode)*w_in !activated aerosol mass flux
     enddo
     flux_fullact = w_in
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/activate_modal_end_yml.f90"
   end subroutine activate_modal
 
   !===============================================================================
@@ -1546,6 +1552,7 @@ contains
     real(r8) :: qcldbrn_num_local(ntot_amode) ! local cloud-borne aerosol number mixing ratios [#/kg]
 
     integer :: imode       ! mode index
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/loadaer_beg_yml.f90"
     !-------------------------------------------------------------------------------
 
     !Currenly supports only phase 1 (interstitial) and 3 (interstitial+cldbrn)
@@ -1589,7 +1596,7 @@ contains
        call get_aer_num(imode, state_q(:), cs, vaerosol(imode), qcldbrn_num_local(imode), &!in
             naerosol(imode)) !out
     enddo
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/loadaer_end_yml.f90"
   end subroutine loadaer
   !===============================================================================
 
