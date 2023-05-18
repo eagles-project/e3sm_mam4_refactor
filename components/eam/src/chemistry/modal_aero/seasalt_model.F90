@@ -65,9 +65,9 @@ module seasalt_model
   logical :: debug_mam_mom = .false.
 
 ! Parameters for organic sea salt emissions
-    real(r8), parameter :: Aw_carbon = 12.0107_r8       ! Atomic weight oc carbon
-    real(r8), parameter :: g_per_m3_NaCl_bulk = 35875._r8 ! approx volume density of salt in seawater
-    real(r8) :: g_per_m2_NaCl_bub                       ! g salt per area bubble surface
+    real(r8), parameter :: mw_carbon = 12.0107_r8              ! molecular weight for carbon element [g/mol]
+    real(r8), parameter :: dens_vol_NaCl_in_seawat = 35875._r8 ! approx volume density of salt in seawater [g/m^3]
+    real(r8) :: dens_srf_NaCl_in_bubsrf                        ! salt per area bubble surface [g/m^2]
     integer, parameter  :: n_org_max = 3                ! max number of organic compound classes
     integer  :: n_org                ! actual number of organic compound classes (scheme dependent)
     integer, parameter  :: n_org_burrows = 3        ! actual number of organic compound classes (scheme dependent)
@@ -89,8 +89,8 @@ module seasalt_model
    integer             :: fixed_tod = 0
 
 ! Namelist variables for parameterization specification
-  ! Bubble film thickness
-   real(r8)            :: l_bub = 0.1e-6_r8
+  real(r8) :: l_bub = 0.1e-6_r8 ! Bubble film thickness [m]
+
   ! Determine mixing state for MOM emissions.
   ! Currently implemented options:
   ! mixing_state = 0 : total external mixture, replace mass
@@ -116,9 +116,9 @@ module seasalt_model
          alpha_org = (/ 90.58_r8, 25175._r8, 18205._r8 /)
 ! Molecular weights needed for output of optional diagnostic variable F_eff
     real(r8), dimension(n_org_burrows), parameter :: & ! Molecular weights [g mol-1]
-         Mw_org   = (/ 250000._r8, 66463._r8, 284._r8 /)
+         mw_org   = (/ 250000._r8, 66463._r8, 284._r8 /)
     real(r8), dimension(n_org_burrows), parameter :: & ! mass per sq. m at saturation
-         g_per_m2_org = (/ 0.1376_r8, 0.00219_r8, 0.002593_r8 /) ! Mw_org / a_org
+         dens_srf_org = (/ 0.1376_r8, 0.00219_r8, 0.002593_r8 /) ! Mw_org / a_org
 
     real(r8), parameter :: sst_sz_range_lo (nslt+nslt_om) = &
          (/ 0.08e-6_r8,  0.02e-6_r8,  1.0e-6_r8, &  ! accu, aitken, coarse
@@ -368,16 +368,16 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cfl
     real(r8), intent(in) :: u10cubed(pcols)   ! 3.41 power of 10m wind 
     real(r8), intent(in) :: srf_temp(pcols)   ! sea surface temperature [K]
     real(r8), intent(in) :: ocnfrc(pcols)     ! ocean fraction [unitless]
-    real(r8), intent(in) :: emis_scale        ! sea salt emission tuning factor
+    real(r8), intent(in) :: emis_scale        ! sea salt emission tuning factor [unitless]
 
     ! output
-    real(r8), intent(inout) :: cflx(:,:)      ! mass and number emission fluxes for aerosols [Kg/m2/s or #/m2/s]
+    real(r8), intent(inout) :: cflx(:,:)      ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
 
     ! local vars
     integer  :: ispec, ibin
     integer  :: mass_mode_idx, num_mode_idx
     real(r8) :: fi(pcols,nsections)           ! sea salt number fluxes in each size bin [#/m2/s]
-    real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes
+    real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
 
     fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
@@ -428,20 +428,20 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
     ! input
     integer, intent(in)  :: lchnk
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: u10cubed(pcols)
-    real(r8), intent(in) :: srf_temp(pcols)
-    real(r8), intent(in) :: ocnfrc(pcols)
-    real(r8), intent(in) :: emis_scale
+    real(r8), intent(in) :: u10cubed(pcols)    ! 3.41 power of 10m wind
+    real(r8), intent(in) :: srf_temp(pcols)    ! sea surface temperature [K]
+    real(r8), intent(in) :: ocnfrc(pcols)      ! ocean fraction [unitless] 
+    real(r8), intent(in) :: emis_scale         ! sea salt emission tuning factor [unitless]
     
     ! output
-    real(r8), intent(inout) :: cflx(:,:)   
+    real(r8), intent(inout) :: cflx(:,:)       ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
 
     ! local vars
     integer  :: ispec, ibin, iorg, ifld
     integer  :: mass_mode_idx, num_mode_idx
-    real(r8) :: fi(pcols,nsections)
-    integer  :: m
-    real(r8) :: cflx_tmp1(pcols)
+    real(r8) :: fi(pcols,nsections)            ! sea salt number fluxes in each size bin [#/m2/s]
+    integer  :: om_num_idx
+    real(r8) :: cflx_tmp1(pcols)               ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
 
    real(r8), pointer :: chla(:)          ! for Gantt et al. (2011) organic mass fraction
    real(r8), pointer :: mpoly(:)         ! for Burrows et al. (2014) organic mass fraction
@@ -453,7 +453,7 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
    real(r8) :: mass_frac_bub_section(pcols, n_org_max, nsections)
    real(r8) :: om_ssa(pcols, nsections)
 
-   integer  :: m_om ! integer for iteration
+
 
    fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
@@ -511,8 +511,8 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
          "Error: om_num_ind is a scalar, but attempting to calculate MOM.  Something bad happened!!  We should never get here!")
       endif
       
-      m = om_num_ind(ispec)
-      num_mode_idx=seasalt_indices(nslt+nslt_om+m)
+      om_num_idx = om_num_ind(ispec)
+      num_mode_idx=seasalt_indices(nslt+nslt_om+om_num_idx)
 
       ! add number tracers for organics-only modes
       if (emit_this_mode(ispec)) then
@@ -590,67 +590,69 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
 
    !
    ! Local variables
-   real(r8) :: g_per_m3(ncol, n_org_burrows), mol_per_m3(ncol, n_org_burrows)
-   real(r8) :: theta(ncol, n_org_burrows), alpha_help(ncol)
-   real(r8) :: mass_frac_bub(ncol, n_org_burrows), mass_frac_bub_tot(ncol)
-   real(r8) :: theta_help(ncol, n_org_burrows), mass_frac_bub_help(ncol, n_org_burrows)
+   real(r8) :: alpha_help(ncol)
+   real(r8) :: mass_frac_bub_tot(ncol)
+   real(r8) :: om_conc(ncol, n_org_burrows)             ! mole concentration of organic [mol/m^3]
+   real(r8) :: theta(ncol, n_org_burrows)               ! fractional surface coverage [unitless]
+   real(r8) :: mass_frac_bub(ncol, n_org_burrows)
+   real(r8) :: theta_help(ncol, n_org_burrows)
+   real(r8) :: mass_frac_bub_help(ncol, n_org_burrows)
+
    real(r8), parameter :: particle_size_for_OMF_param = 0.5_r8 ! in microns
-   !
-   ! OMF maximum and minimum values -- max from Rinaldi et al. (2013)
-   real(r8), parameter :: omfrac_max = 0.78
-   !
-   integer  :: i
+   real(r8), parameter :: omfrac_max = 0.78  ! OMF maximum and minimum values -- max from Rinaldi et al. (2013)
+   real(r8), parameter :: liter_to_m3 = 1.0e-3_r8  
+
+   integer  :: iorg
    !
    !-----------------------------------------------------------------------
 
    ! Initialize arrays to zero for safety.
-   theta(:,:) = 0.0_r8
-   theta_help(:,:) = 0.0_r8
-   mass_frac_bub_tot(:) = 0.0_r8
-   mass_frac_bub(:,:) = 0.0_r8
+   theta(:,:)              = 0.0_r8
+   theta_help(:,:)         = 0.0_r8
+   mass_frac_bub_tot(:)    = 0.0_r8
+   mass_frac_bub(:,:)      = 0.0_r8
    mass_frac_bub_help(:,:) = 0.0_r8
-   mol_per_m3(:,:) = 0.0_r8
-   g_per_m3(:,:) = 0.0_r8
+   om_conc(:,:)            = 0.0_r8
+   
 
-   ! Convert input fields from [(mol C) L-1] to [(g OM) m-3]
-   ! and store in single array
-   g_per_m3(:, 1) = mpoly_in(:)  * 1.0e-3_r8 * OM_to_OC_in(1) * Aw_carbon
-   g_per_m3(:, 2) = mprot_in(:)  * 1.0e-3_r8 * OM_to_OC_in(2) * Aw_carbon
-   g_per_m3(:, 3) = mlip_in(:)   * 1.0e-3_r8 * OM_to_OC_in(3) * Aw_carbon
+   ! Convert input fields from [(mol C) L-1] to [(g OM) m-3] and store in single array
+   om_conc(:, 1) = mpoly_in(:)  * liter_to_m3 * OM_to_OC_in(1) * mw_carbon
+   om_conc(:, 2) = mprot_in(:)  * liter_to_m3 * OM_to_OC_in(2) * mw_carbon
+   om_conc(:, 3) = mlip_in(:)   * liter_to_m3 * OM_to_OC_in(3) * mw_carbon
 
 
    ! Calculate the surface coverage by class
-   do i=1,n_org_burrows
+   do iorg = 1, n_org_burrows
       ! Bulk mass concentration [mol m-3] = [g m-3] / [g mol-1]
-      mol_per_m3(:, i)     = g_per_m3(:, i) / Mw_org(i)
+      om_conc(:, iorg)     = om_conc(:, iorg) / mw_org(iorg)
       ! use theta_help as work array -- theta_help = alpha(i) * x(i)
-      theta_help(:, i)         = alpha_org(i)*mol_per_m3(:, i)
+      theta_help(:, iorg)  = alpha_org(iorg) * om_conc(:, iorg)
    enddo
    alpha_help(:) = sum(theta, dim=2)
    
-   do i=1,n_org_burrows
+   do iorg = 1, n_org_burrows
       ! complete calculation -- theta = alpha(i) * x(i) / (1 + sum( alpha(i) * x(i) ))
-      theta(:, i)         = theta_help(:, i) / (1.0_r8 + alpha_help(:))
+      theta(:, iorg)         = theta_help(:, iorg) / (1.0_r8 + alpha_help(:))
       ! Calculate the organic mass per area (by class) [g m-2]
       !  (use mass_frac_bub_help as local work array -- organic mass per area in g per m2)
-      mass_frac_bub_help(:, i) = theta(:, i) * g_per_m2_org(i)
+      mass_frac_bub_help(:, iorg) = theta(:, iorg) * dens_srf_org(iorg)
    enddo
 
    ! Calculate g NaCl per m2
-   g_per_m2_NaCl_bub = g_per_m3_NaCl_bulk*l_bub ! Redundant, but allows for easier adjustment to l_bub
+   dens_srf_NaCl_in_bubsrf = dens_vol_NaCl_in_seawat*l_bub ! Redundant, but allows for easier adjustment to l_bub
 
    ! mass_frac_bub = 2*[g OM m-2] / (2*[g OM m-2] * [g NaCl m-2])
    ! Factor 2 for bubble bilayer (coated on both surfaces of film)
-   do i=1,n_org_burrows
-      mass_frac_bub(:, i) = 2.0_r8*mass_frac_bub_help(:, i) / &
-           (2.0_r8*sum(mass_frac_bub_help(:, :), dim=2) + g_per_m2_NaCl_bub)
+   do iorg = 1, n_org_burrows
+      mass_frac_bub(:, iorg) = 2.0_r8*mass_frac_bub_help(:, iorg) / &
+           (2.0_r8*sum(mass_frac_bub_help(:, :), dim=2) + dens_srf_NaCl_in_bubsrf)
    enddo
 
    mass_frac_bub_tot(:) = sum(mass_frac_bub, dim=2)
 
-   do i=1,n_org_burrows
+   do iorg = 1, n_org_burrows
       where (mass_frac_bub_tot(:) > omfrac_max)
-         mass_frac_bub(:, i) = mass_frac_bub(:, i) / mass_frac_bub_tot(:) * omfrac_max
+         mass_frac_bub(:, iorg) = mass_frac_bub(:, iorg) / mass_frac_bub_tot(:) * omfrac_max
       endwhere
    enddo
 
@@ -674,8 +676,8 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    ! mass_frac_bub_section(pcols, n_org_max, nsections) -- org classes in dim 2, size nsections in dim 3
    mass_frac_bub_section(:, :, :)   = 0.0_r8
 
-   do i=1,n_org_burrows
-      call omfrac_accu_aitk(mass_frac_bub(:, i), mass_frac_bub_section(:, i, :))
+   do iorg = 1, n_org_burrows
+      call omfrac_accu_aitk(mass_frac_bub(:, iorg), mass_frac_bub_section(:, iorg, :))
    enddo
 
 end subroutine calc_om_ssa_burrows
@@ -692,24 +694,24 @@ subroutine omfrac_accu_aitk(om_ssa_in, om_ssa)
    !-----------------------------------------------------------------------
    ! Arguments:
    !
-   real(r8), intent(in)    :: om_ssa_in(:)
-   real(r8), intent(inout) :: om_ssa(:,:)
+   real(r8), intent(in)    :: om_ssa_in(:)     ! fraction
+   real(r8), intent(inout) :: om_ssa(:,:)      ! 
    !
    ! Local variables
    !
-   integer  :: m
+   integer  :: ibin
    real(r8), parameter :: om_ssa_max = 1.0_r8
    !
    !-----------------------------------------------------------------------
- 
+
+   ! Initialize array and set to zero for "fine sea salt" and "coarse sea salt" modes
+   om_ssa(:, :) = 0.0_r8
 
    ! distribute OM fraction!
-   do m=1,nsections
+   do ibin = 1, nsections
       ! update only in Aitken and accu. modes
-      if ((Dg(m) >= sst_sz_range_lo(2)) .and. (Dg(m) < sst_sz_range_hi(1))) then
-             om_ssa(:, m) = om_ssa_in(:)
-      else
-          om_ssa(:, m) = 0.0_r8 ! Set to zero for "fine sea salt" and "coarse sea salt" modes
+      if ((Dg(ibin) >= sst_sz_range_lo(2)) .and. (Dg(ibin) < sst_sz_range_hi(1))) then
+             om_ssa(:, ibin) = om_ssa_in(:)
       endif
    enddo
 
