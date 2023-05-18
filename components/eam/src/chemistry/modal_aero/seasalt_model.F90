@@ -585,8 +585,8 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    real(r8), intent(in) :: mlip_in(ncol)          ! for Burrows et al. (2014) organic mass fraction
    !
    ! Output variables
-   real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)
-   real(r8), intent(inout) :: om_ssa(:,:)
+   real(r8), intent(inout) :: mass_frac_bub_section(:,:,:)          ! mass fraction per organic class per size bin [unitless]
+   real(r8), intent(inout) :: om_ssa(:,:)                           ! mass fraction per size bin [unitless]
 
    !
    ! Local variables
@@ -664,20 +664,16 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    mass_frac_bub_tot(:) = sum(mass_frac_bub, dim=2)
 
 
-   ! Effective mass enrichment ratio (for bulk OM) -- diagnostic variable
-   !
-   ! F_eff_mass = organic mass per area (film) [g m-2] / salt mass per area (film) [g m-2] *
-   !                 bulk salt concentration [g m-3] / bulk OM concentration [g m-3]
-
-
    ! Distribute mass fraction evenly into Aitken and accumulation modes
-   call omfrac_accu_aitk(mass_frac_bub_tot(:), om_ssa(:,:))
+   call omfrac_accu_aitk(mass_frac_bub_tot(:), & ! in
+                         om_ssa(:,:))            ! inout
 
    ! mass_frac_bub_section(pcols, n_org_max, nsections) -- org classes in dim 2, size nsections in dim 3
    mass_frac_bub_section(:, :, :)   = 0.0_r8
 
    do iorg = 1, n_org_burrows
-      call omfrac_accu_aitk(mass_frac_bub(:, iorg), mass_frac_bub_section(:, iorg, :))
+      call omfrac_accu_aitk(mass_frac_bub(:, iorg), & ! in
+                            mass_frac_bub_section(:, iorg, :)) ! inout
    enddo
 
 end subroutine calc_om_ssa_burrows
@@ -694,8 +690,8 @@ subroutine omfrac_accu_aitk(om_ssa_in, om_ssa)
    !-----------------------------------------------------------------------
    ! Arguments:
    !
-   real(r8), intent(in)    :: om_ssa_in(:)     ! fraction
-   real(r8), intent(inout) :: om_ssa(:,:)      ! 
+   real(r8), intent(in)    :: om_ssa_in(:)     ! mass fraction [unitless]
+   real(r8), intent(inout) :: om_ssa(:,:)      ! mass fraction for each size bin [unitless]
    !
    ! Local variables
    !
