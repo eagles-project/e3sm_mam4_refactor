@@ -330,8 +330,9 @@ contains
 
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,E17.10)
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E17.10E3)
+11  format(A,E17.10E3)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
     !In MAM4,first 15 species are non-aerosols, so we start with 16th species
@@ -383,7 +384,8 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(E17.10,A)
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E17.10E3,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -648,7 +650,8 @@ contains
     !check if file is open to write or not
     call is_file_open(unit_input)
 
-    write(unit_input,'(3A,E17.10,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
+    ! ensure that scientific notation has at least three digits in exponent
+    write(unit_input,'(3A,E17.10E3,A)')'    ',trim(adjustl(fld_name)),': [', field,']'
 
     call write_output_var_real(unit_output, fld_name, field, "input")
 
@@ -681,7 +684,8 @@ contains
        object = trim(adjustl(inp_out_str))
     endif
 
-    write(unit_output,'(4A,E17.10,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
+    !ensure that scientific notation has at least three digits in exponent
+    write(unit_output,'(4A,E17.10E3,A)')trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[', field,'],]'
 
   end subroutine write_output_var_real
 
@@ -964,8 +968,9 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,E17.10)
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E17.10E3)
+11  format(A,E17.10E3)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
@@ -1026,7 +1031,8 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(E17.10,A)
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E17.10E3,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -1082,8 +1088,9 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A, E17.10)
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E17.10E3)
+11  format(A, E17.10E3)
 
     ! real part
     write(unit_input,'(3A)',advance="no")'    real_',trim(adjustl(fld_name)),': ['
@@ -1152,7 +1159,8 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(E17.10,A)
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E17.10E3,A)
 
     object = "output"
     if (present(inp_out_str)) then
@@ -1348,8 +1356,9 @@ contains
     call is_file_open(unit_input)
 
     !format statement to write in double precision
-10  format(E17.10)
-11  format(A,E17.10)
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E17.10E3)
+11  format(A,E17.10E3)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
@@ -1420,7 +1429,8 @@ contains
     call is_file_open(unit_output)
 
     !format statement to write in double precision
-12  format(E17.10,A)
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E17.10E3,A)
 
     object = "output"
     if (present(inp_out_str)) then

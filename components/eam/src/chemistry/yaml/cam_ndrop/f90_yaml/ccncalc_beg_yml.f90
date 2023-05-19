@@ -103,6 +103,7 @@
         call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,yaml%lev_print,:))
         call write_var(unit_input,unit_output,'tair',tair(yaml%col_print,yaml%lev_print))
         call write_var(unit_input,unit_output,'qcldbrn_num',qcldbrn_num(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'qcldbrn',qcldbrn(yaml%col_print,yaml%lev_print,:,:))
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'cs',cs(yaml%col_print,yaml%lev_print))
 
