@@ -1,19 +1,13 @@
 
+module mo_lu_factor
 
+   private
+   public :: lu_fac
 
+   contains
 
-
-
-
-      module mo_lu_factor
-
-      private
-      public :: lu_fac
-
-      contains
-
-      subroutine lu_fac01( lu )
-
+!====================================================================
+   subroutine lu_fac( lu )
 
       use shr_kind_mod, only : r8 => shr_kind_r8
 
@@ -85,22 +79,6 @@
          lu(32) = 1._r8 / lu(32)
 
 
-      end subroutine lu_fac01
-
-      subroutine lu_fac( lu )
-
-
-      use shr_kind_mod, only : r8 => shr_kind_r8
-
-      implicit none
-
-!-----------------------------------------------------------------------
-! ... dummy args
-!-----------------------------------------------------------------------
-      real(r8), intent(inout) :: lu(:)
-
-      call lu_fac01( lu )
-
       end subroutine lu_fac
 
-      end module mo_lu_factor
+end module mo_lu_factor
