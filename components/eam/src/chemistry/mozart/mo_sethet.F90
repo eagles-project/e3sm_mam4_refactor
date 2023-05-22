@@ -382,43 +382,16 @@ contains
        level_loop1  : do kk = ktop(i),pver
           stay = 1._r8
           if( rain(i,kk) /= 0._r8 ) then            ! finding rain cloud           
-             all2 = 0._r8 
-             all3 = 0._r8 
              stay = ((zmid(i,kk) - zsurf(i))*km2cm)/(xum*delt)
              stay = min( stay,1._r8 )
-             !-----------------------------------------------------------------
-             !       ... calculate the saturation concentration eqca
-             !-----------------------------------------------------------------
-             do k = kk,pver                      ! cal washout below cloud
-                xeqca2 =  xgas2(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_h2o2(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-                xeqca3 =  xgas3(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_so2( i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-
-                !-----------------------------------------------------------------
-                !       ... calculate ca; inside cloud concentration in #/cm3(air)
-                !-----------------------------------------------------------------
-                xca2 = geo_fac*xkgm*xgas2(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca3 = geo_fac*xkgm*xgas3(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-
-                !-----------------------------------------------------------------
-                !       ... if is not saturated
-                !               hno3(gas)_new = hno3(gas)_old - hno3(h2o)
-                !           otherwise
-                !               hno3(gas)_new = hno3(gas)_old
-                !-----------------------------------------------------------------
-                all2 = all2 + xca2
-                if( all2 < xeqca2 ) then
-                   xgas2(k) = max( xgas2(k) - xca2,0._r8 )
-                end if
-                all3 = all3 + xca3
-                if( all3 < xeqca3 ) then
-                   xgas3(k) = max( xgas3(k) - xca3,0._r8 )
-                end if
-             end do
-          end if
+             ! calculate gas washout by cloud
+             call gas_washout( kk,  xkgm,   xliq(i,kk),       & ! in
+                        xhen_h2o2(i,:), tfld(i,:), delz(i,:), & ! in
+                        xgas2                                 ) ! inout
+             call gas_washout( kk,  xkgm,   xliq(i,kk),       & ! in
+                         xhen_so2(i,:), tfld(i,:), delz(i,:), & ! in
+                        xgas3                                 ) ! inout
+          endif
           !-----------------------------------------------------------------
           !       ... calculate the lifetime of washout (second)
           !             after all layers washout 
@@ -586,6 +559,64 @@ contains
     enddo
 
   end subroutine calc_precip_rescale
+
+!=================================================================================
+  subroutine gas_washout ( plev,  xkgm,   xliq_ik,      & ! in
+                           xhen_i, tfld_i, delz_i,      & ! in
+                           xgas                         ) ! inout
+   !------------------------------------------------------------------------
+   ! calculate gas washout by cloud if not saturated
+   !------------------------------------------------------------------------
+    use ppgrid,       only : pver
+    use mo_constants, only : avo => avogadro, boltz_cgs
+
+    implicit none
+    integer,  intent(in) :: plev   ! calculate from this level below
+    real(r8), intent(in) :: xliq_ik ! liquid rain water content [gm/m^3]
+    real(r8), intent(in) :: xhen_i(pver) ! henry's law constant 
+    real(r8), intent(in) :: tfld_i(pver) ! temperature [K]
+    real(r8), intent(in) :: delz_i(pver) ! layer depth about interfaces [cm]
+    real(r8), intent(in) :: xkgm
+    real(r8), intent(inout) :: xgas(pver)   ! gas concentration
+
+    integer  :: kk
+    real(r8) :: allca   ! total of ca between level plev and kk [#/cm3]
+    real(r8) :: xca, xeqca
+    real(r8), parameter ::  const0   = boltz_cgs * 1.e-6_r8 ! [atmospheres/deg k/cm^3]
+    real(r8), parameter ::  geo_fac  = 6._r8            ! geometry factor (surf area/volume = geo_fac/diameter)
+    real(r8), parameter ::  xrm   = .189_r8             ! mean diameter of rain drop [cm]
+    real(r8), parameter ::  xum   = 748._r8             ! mean rain drop terminal velocity [cm/s]
+    real(r8), parameter ::  cm3_2_m3 = 1.e-6_r8         ! convert cm^3 to m^3
+    real(r8), parameter ::  liter_per_gram = 1.e-3_r8
+    real(r8), parameter ::  avo2  = avo * liter_per_gram * cm3_2_m3 ! [L/gm/mol*(m/cm)^3]
+
+     allca = 0._r8
+     !-----------------------------------------------------------------
+     !       ... calculate the saturation concentration eqca
+     !-----------------------------------------------------------------
+     do kk = plev,pver                      ! cal washout below cloud
+        xeqca =  xgas(kk) &
+               / (xliq_ik*avo2 + 1._r8/(xhen_i(kk)*const0*tfld_i(kk))) &
+               *  xliq_ik*avo2
+
+        !-----------------------------------------------------------------
+        !       ... calculate ca; inside cloud concentration in  #/cm3(air)
+        !-----------------------------------------------------------------
+        xca = geo_fac*xkgm*xgas(kk)/(xrm*xum)*delz_i(kk) * xliq_ik * cm3_2_m3
+
+        !-----------------------------------------------------------------
+        !       ... if is not saturated (take hno3 as an example)
+        !               hno3(gas)_new = hno3(gas)_old - hno3(h2o)
+        !           otherwise
+        !               hno3(gas)_new = hno3(gas)_old
+        !-----------------------------------------------------------------
+        allca = allca + xca
+        if( allca < xeqca ) then
+           xgas(kk) = max( xgas(kk) - xca, 0._r8 )
+        endif
+     enddo
+
+  end subroutine gas_washout
 
 !=================================================================================
 end module mo_sethet
