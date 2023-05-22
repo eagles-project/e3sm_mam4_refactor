@@ -219,7 +219,7 @@ contains
     real(r8) ::      stay                        ! fraction of layer traversed by falling drop in timestep delt
     real(r8) ::      xeqca1, xeqca2, xca1, xca2, xdtm
     real(r8) ::      xxx1, xxx2, yhno3, yh2o2
-    real(r8) ::      all3, xeqca3, xca3, xxx3, yso2, so2_diss
+    real(r8) ::      all3, xeqca3, xca3, xxx3, yso2, so2_diss(ncol)
     real(r8) ::      all4, xeqca4, xca4, xxx4
     real(r8) ::      all5, xeqca5, xca5, xxx5
     real(r8) ::      all6, xeqca6, xca6, xxx6
@@ -227,6 +227,7 @@ contains
     real(r8) ::      all8, xeqca8, xca8, xxx8
     real(r8) ::      ysogm,ysogi,ysogt,ysogb,ysogx
 
+    real(r8) :: t_factor(ncol)   ! temperature factor to calculate henry's law parameters
     real(r8), dimension(ncol)  :: &
          xk0, work1, work2, work3, zsurf
     real(r8), dimension(pver)  :: &
@@ -353,27 +354,24 @@ contains
     !             heff = h * (1 + k/[h+]) (in general)
     !-----------------------------------------------------------------
     do k = ktop_all,pver
-       work1(:ncol) = (t0 - tfld(:ncol,k))/(t0*tfld(:ncol,k))
        !-----------------------------------------------------------------
        ! 	... effective henry''s law constants:
-       !	hno3, h2o2, ch2o, ch3ooh, ch3coooh (brasseur et al., 1999)
-       !       xooh, onitr, macrooh (j.-f. muller; brocheton, 1999)
-       !       isopooh (equal to hno3, as for macrooh)
-       !       ho2no2 (mozart-1)
-       !       ch3cocho, hoch2cho (betterton and hoffman, environ. sci. technol., 1988)
-       !       ch3cho (staudinger and roberts, crit. rev. sci. technol., 1996)
-       !       mvk, macr (allen et al., environ. toxicol. chem., 1998)
+       !	hno3, h2o2  (brasseur et al., 1999)
        !-----------------------------------------------------------------
-       xk0(:)             = 2.1e5_r8 *exp( 8700._r8*work1(:) )
+       ! temperature factor
+       t_factor(:ncol) = (t0 - tfld(:ncol,k))/(t0*tfld(:ncol,k))
+       xhen_h2o2(:,k)     = 7.45e4_r8 * exp( 6620._r8 * t_factor(:) )
+       ! HNO3, for calculation of H2SO4 het rate use
+       xk0(:)             = 2.1e5_r8 *exp( 8700._r8*t_factor(:) )
        xhen_hno3(:,k)     = xk0(:) * ( 1._r8 + hno3_diss / xph0 )
-       xhen_h2o2(:,k)     = 7.45e4_r8 * exp( 6620._r8 * work1(:) )
-       do i = 1, ncol
-          so2_diss        = 1.23e-2_r8 * exp( 1960._r8 * work1(i) )
-          xhen_so2(i,k)   = 1.23_r8 * exp( 3120._r8 * work1(i) ) * ( 1._r8 + so2_diss / xph0 )
-       end do
-       !
+       ! SO2
+       xk0(:)             = 1.23_r8 * exp( 3120._r8 * t_factor(:) )
+       so2_diss(:)        = 1.23e-2_r8 * exp( 1960._r8 * t_factor(:) )
+       xhen_so2(:,k)   = xk0(:) * ( 1._r8 + so2_diss(:) / xph0 )
+
+       ! initiate temporary array
        tmp_hetrates(:,k,:) = 0._r8
-    end do
+    enddo
 
     !-----------------------------------------------------------------
     !       ... part 1, solve for high henry constant ( hno3, h2o2)
