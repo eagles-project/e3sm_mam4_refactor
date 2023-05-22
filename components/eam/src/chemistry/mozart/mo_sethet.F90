@@ -40,6 +40,7 @@ module mo_sethet
 
 contains
 
+!=================================================================================
   subroutine sethet_inti
     !-----------------------------------------------------------------------      
     !       ... intialize the wet removal rate constants routine
@@ -152,6 +153,7 @@ contains
 
   end subroutine sethet_inti
 
+!=================================================================================
   subroutine sethet( het_rates, press, zmid,  phis, tfld, &
                      cmfdqr, nrain, nevapr, delt, xhnm, &
                      qin, ncol, lchnk )
@@ -288,6 +290,10 @@ contains
     !          23. hyac        24. hydrald
     !          25. ch3cho      26. isopno3
     !-----------------------------------------------------------------
+    ! FORTRAN refactor note: current MAM4 only have three species in default:
+    ! 'H2O2','H2SO4','SO2'.  Options for other species are then removed
+    !-----------------------------------------------------------------
+
 
     het_rates(:,:,:) = 0._r8
 
@@ -350,49 +356,10 @@ contains
     end do
 
     do k = 1,pver
-       !jfl       precip(:ncol,k) = cmfdqr(:ncol,k) + nrain(:ncol,k) - nevapr(:ncol,k)
        rain(:ncol,k)   = mass_air*precip(:ncol,k)*xhnm(:ncol,k) / mass_h2o
        xliq(:ncol,k)   = precip(:ncol,k) * delt * xhnm(:ncol,k) / avo*mass_air * m3_2_cm3
-       if( spc_hno3_ndx > 0 ) then
-          xhno3(:ncol,k)  = qin(:ncol,k,spc_hno3_ndx) * xhnm(:ncol,k)
-       else
-          xhno3(:ncol,k)  = 0._r8
-       end if
-       if( spc_h2o2_ndx > 0 ) then
-          xh2o2(:ncol,k)  = qin(:ncol,k,spc_h2o2_ndx) * xhnm(:ncol,k)
-       else
-          xh2o2(:ncol,k)  = 0._r8
-       end if
-       if( spc_sogm_ndx > 0 ) then
-          xsogm(:ncol,k)  = qin(:ncol,k,spc_sogm_ndx) * xhnm(:ncol,k)
-       else
-          xsogm(:ncol,k)  = 0._r8
-       end if
-       if( spc_sogi_ndx > 0 ) then
-          xsogi(:ncol,k)  = qin(:ncol,k,spc_sogi_ndx) * xhnm(:ncol,k)
-       else
-          xsogi(:ncol,k)  = 0._r8
-       end if
-       if( spc_sogt_ndx > 0 ) then
-          xsogt(:ncol,k)  = qin(:ncol,k,spc_sogt_ndx) * xhnm(:ncol,k)
-       else
-          xsogt(:ncol,k)  = 0._r8
-       end if
-       if( spc_sogb_ndx > 0 ) then
-          xsogb(:ncol,k)  = qin(:ncol,k,spc_sogb_ndx) * xhnm(:ncol,k)
-       else
-          xsogb(:ncol,k)  = 0._r8
-       end if
-       if( spc_sogx_ndx > 0 ) then
-          xsogx(:ncol,k)  = qin(:ncol,k,spc_sogx_ndx) * xhnm(:ncol,k)
-       else
-          xsogx(:ncol,k)  = 0._r8
-       end if
-       if( spc_so2_ndx > 0 ) then
-          xso2(:ncol,k)  = qin(:ncol,k,spc_so2_ndx) * xhnm(:ncol,k)
-       else
-          xso2(:ncol,k)  = 0._r8
-       end if
+       xh2o2(:ncol,k)  = qin(:ncol,k,spc_h2o2_ndx) * xhnm(:ncol,k)
+       xso2(:ncol,k)  = qin(:ncol,k,spc_so2_ndx) * xhnm(:ncol,k)
     end do
 
     zsurf(:ncol) = m2km * phis(:ncol) * rga
@@ -429,25 +396,6 @@ contains
        xk0(:)             = 2.1e5_r8 *exp( 8700._r8*work1(:) )
        xhen_hno3(:,k)     = xk0(:) * ( 1._r8 + hno3_diss / xph0 )
        xhen_h2o2(:,k)     = 7.45e4_r8 * exp( 6620._r8 * work1(:) )
-       xhen_ch2o(:,k)     = 6.3e3_r8 * exp( 6460._r8 * work1(:) )
-       xhen_ch3ooh(:,k)   = 2.27e2_r8 * exp( 5610._r8 * work1(:) )
-       xhen_ch3co3h(:,k)  = 4.73e2_r8 * exp( 6170._r8 * work1(:) )
-       xhen_ch3cocho(:,k) = 3.70e3_r8 * exp( 7275._r8 * work1(:) )
-       xhen_xooh(:,k)     = 90.5_r8 * exp( 5607._r8 * work1(:) )
-       xhen_onitr(:,k)    = 7.51e3_r8 * exp( 6485._r8 * work1(:) )
-       xhen_ho2no2(:,k)   = 2.e4_r8
-       xhen_glyald(:,k)   = 4.1e4_r8 * exp( 4600._r8 * work1(:) )
-       xhen_ch3cho(:,k)   = 1.4e1_r8 * exp( 5600._r8 * work1(:) )
-       xhen_mvk(:,k)      = 21._r8 * exp( 7800._r8 * work1(:) )
-       xhen_macr(:,k)     = 4.3_r8 * exp( 5300._r8 * work1(:) )
-       xhen_ch3cooh(:,k)  = 4.1e3_r8 * exp( 6300._r8 * work1(:) )
-       xhen_sog(:,k)      = 5.e5_r8 * exp (12._r8 * work1(:) )
-       !
-       ! calculation for NH3 using the parameters in drydep_tables.F90
-       !
-       xhen_nh3 (:,k)     = 1.e6_r8
-       xhen_ch3cn(:,k)     = 50._r8 * exp( 4000._r8 * work1(:) )
-       xhen_hcn(:,k)       = 12._r8 * exp( 5000._r8 * work1(:) )
        do i = 1, ncol
           so2_diss        = 1.23e-2_r8 * exp( 1960._r8 * work1(i) )
           xhen_so2(i,k)   = 1.23_r8 * exp( 3120._r8 * work1(i) ) * ( 1._r8 + so2_diss / xph0 )
@@ -460,67 +408,31 @@ contains
     !       ... part 1, solve for high henry constant ( hno3, h2o2)
     !-----------------------------------------------------------------
     col_loop :  do i = 1,ncol
-       xgas1(:) = xhno3(i,:)                     ! xgas will change during 
        xgas2(:) = xh2o2(i,:)                     ! different levels wash 
        xgas3(:) = xso2 (i,:)
-       xgas4(:) = xsogm(i,:)
-       xgas5(:) = xsogi(i,:)
-       xgas6(:) = xsogt(i,:)
-       xgas7(:) = xsogb(i,:)
-       xgas8(:) = xsogx(i,:)
        level_loop1  : do kk = ktop(i),pver
           stay = 1._r8
           if( rain(i,kk) /= 0._r8 ) then            ! finding rain cloud           
-             all1 = 0._r8                           ! accumulation to justisfy saturation
              all2 = 0._r8 
              all3 = 0._r8 
-             all4 = 0._r8 
-             all5 = 0._r8 
-             all6 = 0._r8 
-             all7 = 0._r8 
-             all8 = 0._r8 
              stay = ((zmid(i,kk) - zsurf(i))*km2cm)/(xum*delt)
              stay = min( stay,1._r8 )
              !-----------------------------------------------------------------
              !       ... calculate the saturation concentration eqca
              !-----------------------------------------------------------------
              do k = kk,pver                      ! cal washout below cloud
-                xeqca1 =  xgas1(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_hno3(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
                 xeqca2 =  xgas2(k) &
                      / (xliq(i,kk)*avo2 + 1._r8/(xhen_h2o2(i,k)*const0*tfld(i,k))) &
                      *  xliq(i,kk)*avo2
                 xeqca3 =  xgas3(k) &
                      / (xliq(i,kk)*avo2 + 1._r8/(xhen_so2( i,k)*const0*tfld(i,k))) &
                      *  xliq(i,kk)*avo2
-                xeqca4 =  xgas4(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_sog(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-                xeqca5 =  xgas5(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_sog(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-                xeqca6 =  xgas6(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_sog(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-                xeqca7 =  xgas7(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_sog(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
-                xeqca8 =  xgas8(k) &
-                     / (xliq(i,kk)*avo2 + 1._r8/(xhen_sog(i,k)*const0*tfld(i,k))) &
-                     *  xliq(i,kk)*avo2
 
                 !-----------------------------------------------------------------
                 !       ... calculate ca; inside cloud concentration in #/cm3(air)
                 !-----------------------------------------------------------------
-                xca1 = geo_fac*xkgm*xgas1(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
                 xca2 = geo_fac*xkgm*xgas2(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
                 xca3 = geo_fac*xkgm*xgas3(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca4 = geo_fac*xkgm*xgas4(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca5 = geo_fac*xkgm*xgas5(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca6 = geo_fac*xkgm*xgas6(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca7 = geo_fac*xkgm*xgas7(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
-                xca8 = geo_fac*xkgm*xgas8(k)/(xrm*xum)*delz(i,k) * xliq(i,kk) * cm3_2_m3
 
                 !-----------------------------------------------------------------
                 !       ... if is not saturated
@@ -528,37 +440,13 @@ contains
                 !           otherwise
                 !               hno3(gas)_new = hno3(gas)_old
                 !-----------------------------------------------------------------
-                all1 = all1 + xca1
                 all2 = all2 + xca2
-                if( all1 < xeqca1 ) then
-                   xgas1(k) = max( xgas1(k) - xca1,0._r8 )
-                end if
                 if( all2 < xeqca2 ) then
                    xgas2(k) = max( xgas2(k) - xca2,0._r8 )
                 end if
                 all3 = all3 + xca3
                 if( all3 < xeqca3 ) then
                    xgas3(k) = max( xgas3(k) - xca3,0._r8 )
-                end if
-                all4 = all4 + xca4
-                all5 = all5 + xca5
-                all6 = all6 + xca6
-                all7 = all7 + xca7
-                all8 = all8 + xca8
-                if( all4 < xeqca4 ) then
-                   xgas4(k) = max( xgas4(k) - xca4,0._r8 )
-                end if
-                if( all5 < xeqca5 ) then
-                   xgas5(k) = max( xgas5(k) - xca5,0._r8 )
-                end if
-                if( all6 < xeqca6 ) then
-                   xgas6(k) = max( xgas6(k) - xca6,0._r8 )
-                end if
-                if( all7 < xeqca7 ) then
-                   xgas7(k) = max( xgas7(k) - xca7,0._r8 )
-                end if
-                if( all8 < xeqca8 ) then
-                   xgas8(k) = max( xgas8(k) - xca8,0._r8 )
                 end if
              end do
           end if
@@ -574,20 +462,13 @@ contains
           !                        dt = dz(cm)/um(cm/s)
           !-----------------------------------------------------------------
           xdtm = delz(i,kk) / xum                     ! the traveling time in each dz
-          xxx1 = (xhno3(i,kk) - xgas1(kk))
           xxx2 = (xh2o2(i,kk) - xgas2(kk))
-          if( xxx1 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             yhno3  = xhno3(i,kk)/xxx1 * xdtm    
-          else
-             yhno3  = 1.e29_r8
-          end if
           if( xxx2 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
              yh2o2  = xh2o2(i,kk)/xxx2 * xdtm     
           else
              yh2o2  = 1.e29_r8
           end if
           tmp_hetrates(i,kk,1) = max( 1._r8 / yh2o2,0._r8 ) * stay
-          tmp_hetrates(i,kk,2) = max( 1._r8 / yhno3,0._r8 ) * stay
           xxx3 = (xso2( i,kk) - xgas3(kk))
           if( xxx3 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
              yso2  = xso2( i,kk)/xxx3 * xdtm     
@@ -595,41 +476,6 @@ contains
              yso2  = 1.e29_r8
           end if
           tmp_hetrates(i,kk,3) = max( 1._r8 / yso2, 0._r8 ) * stay
-          xxx4 = (xsogm(i,kk) - xgas4(kk))
-          xxx5 = (xsogi(i,kk) - xgas5(kk))
-          xxx6 = (xsogt(i,kk) - xgas6(kk))
-          xxx7 = (xsogb(i,kk) - xgas7(kk))
-          xxx8 = (xsogx(i,kk) - xgas8(kk))
-          if( xxx4 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             ysogm  = xsogm(i,kk)/xxx4 * xdtm
-          else
-             ysogm  = 1.e29_r8
-          end if
-          if( xxx5 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             ysogi  = xsogi(i,kk)/xxx5 * xdtm
-          else
-             ysogi  = 1.e29_r8
-          end if
-          if( xxx6 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             ysogt  = xsogt(i,kk)/xxx6 * xdtm
-          else
-             ysogt  = 1.e29_r8
-          end if
-          if( xxx7 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             ysogb  = xsogb(i,kk)/xxx7 * xdtm
-          else
-             ysogb  = 1.e29_r8
-          end if
-          if( xxx8 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             ysogx  = xsogx(i,kk)/xxx8 * xdtm
-          else
-             ysogx  = 1.e29_r8
-          end if
-          tmp_hetrates(i,kk,4) = max( 1._r8 / ysogm,0._r8 ) * stay
-          tmp_hetrates(i,kk,5) = max( 1._r8 / ysogi,0._r8 ) * stay
-          tmp_hetrates(i,kk,6) = max( 1._r8 / ysogt,0._r8 ) * stay
-          tmp_hetrates(i,kk,7) = max( 1._r8 / ysogb,0._r8 ) * stay
-          tmp_hetrates(i,kk,8) = max( 1._r8 / ysogx,0._r8 ) * stay
        end do level_loop1
     end do col_loop
 
@@ -646,92 +492,7 @@ contains
 
           work1(i) = avo2 * xliq(i,k)
           work2(i) = const0 * tfld(i,k)
-          work3(i) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch2o(i,k)*work2(i)))),0._r8 ) &
-               * satf_ch2o
-          if( ch2o_ndx > 0 ) then
-             het_rates(i,k,ch2o_ndx)  = work3(i)
-          end if
-          if( isopno3_ndx > 0 ) then
-             het_rates(i,k,isopno3_ndx) = work3(i)
-          end if
-          if( xisopno3_ndx > 0 ) then
-             het_rates(i,k,xisopno3_ndx) = work3(i)
-          end if
-          if( hyac_ndx > 0 ) then
-             het_rates(i,k,hyac_ndx) = work3(i)
-          end if
-          if( hydrald_ndx > 0 ) then
-             het_rates(i,k,hydrald_ndx) = work3(i)
-          end if
 
-          work3(i) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3ooh(i,k)*work2(i)))),0._r8 )
-          if( ch3ooh_ndx > 0 ) then
-             het_rates(i,k,ch3ooh_ndx)  = work3(i)
-          end if
-          if( pooh_ndx > 0 ) then
-             het_rates(i,k,pooh_ndx)  = work3(i)
-          end if
-          if( c2h5ooh_ndx > 0 ) then
-             het_rates(i,k,c2h5ooh_ndx) = work3(i)
-          end if
-          if( c3h7ooh_ndx > 0 ) then
-             het_rates(i,k,c3h7ooh_ndx) = work3(i)
-          end if
-          if( rooh_ndx > 0 ) then
-             het_rates(i,k,rooh_ndx) = work3(i)
-          end if
-          if( ch3oh_ndx > 0 ) then
-             het_rates(i,k,ch3oh_ndx) = work3(i)
-          end if
-          if( c2h5oh_ndx > 0 ) then
-             het_rates(i,k,c2h5oh_ndx) = work3(i)
-          end if
-          if( alkooh_ndx  > 0 ) then
-             het_rates(i,k,alkooh_ndx) = work3(i)
-          end if
-          if( mekooh_ndx  > 0 ) then
-             het_rates(i,k,mekooh_ndx) = work3(i)
-          end if
-          if( tolooh_ndx  > 0 ) then
-             het_rates(i,k,tolooh_ndx) = work3(i)
-          end if
-          if( terpooh_ndx > 0 ) then
-             het_rates(i,k,terpooh_ndx) = work3(i)
-          end if
-
-          if( ch3coooh_ndx > 0 ) then
-             het_rates(i,k,ch3coooh_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3co3h(i,k)*work2(i)))),0._r8 )
-          end if
-          if( ho2no2_ndx > 0 ) then
-             het_rates(i,k,ho2no2_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ho2no2(i,k)*work2(i)))),0._r8 )
-          end if
-          if( xho2no2_ndx > 0 ) then
-             het_rates(i,k,xho2no2_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ho2no2(i,k)*work2(i)))),0._r8 )
-          end if
-          if( ch3cocho_ndx > 0 ) then
-             het_rates(i,k,ch3cocho_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3cocho(i,k)*work2(i)))),0._r8 )
-          end if
-          if( xooh_ndx > 0 ) then
-             het_rates(i,k,xooh_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_xooh(i,k)*work2(i)))),0._r8 )
-          end if
-          if( onitr_ndx > 0 ) then
-             het_rates(i,k,onitr_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_onitr(i,k)*work2(i)))),0._r8 )
-          end if
-          if( xonitr_ndx > 0 ) then
-             het_rates(i,k,xonitr_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_onitr(i,k)*work2(i)))),0._r8 )
-          end if
-          if( glyald_ndx > 0 ) then
-             het_rates(i,k,glyald_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_glyald(i,k)*work2(i)))),0._r8 )
-          end if
-          if( ch3cho_ndx > 0 ) then
-             het_rates(i,k,ch3cho_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3cho(i,k)*work2(i)))),0._r8 )
-          end if
-          if( mvk_ndx > 0 ) then
-             het_rates(i,k,mvk_ndx)  = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_mvk(i,k)*work2(i)))),0._r8 )
-          end if
-          if( macr_ndx > 0 ) then
-             het_rates(i,k,macr_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_macr(i,k)*work2(i)))),0._r8 )
-          end if
           if( h2o2_ndx > 0 ) then
              work3(i) = satf_h2o2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_h2o2(i,k)*work2(i)))),0._r8 )    
              het_rates(i,k,h2o2_ndx) =  work3(i) + tmp_hetrates(i,k,1)
@@ -743,122 +504,14 @@ contains
              het_rates(i,k,so2_ndx ) =  work3(i) + tmp_hetrates(i,k,3)
           endif
 !
-          work3(i) = satf_sog * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_sog(i,k)*work2(i)))),0._r8 )
-          if( sogm_ndx > 0 ) then
-             het_rates(i,k,sogm_ndx) =  work3(i) + tmp_hetrates(i,k,4)
-          end if
-          if( sogi_ndx > 0 ) then
-             het_rates(i,k,sogi_ndx) =  work3(i) + tmp_hetrates(i,k,5)
-          end if
-          if( sogt_ndx > 0 ) then
-             het_rates(i,k,sogt_ndx) =  work3(i) + tmp_hetrates(i,k,6)
-          end if
-          if( sogb_ndx > 0 ) then
-             het_rates(i,k,sogb_ndx) =  work3(i) + tmp_hetrates(i,k,7)
-          end if
-          if( sogx_ndx > 0 ) then
-             het_rates(i,k,sogx_ndx) =  work3(i) + tmp_hetrates(i,k,8)
-          end if
 !
           work3(i) = tmp_hetrates(i,k,2) + satf_hno3 * &
                max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hno3(i,k)*work2(i)))),0._r8 )    
           tmp0_rates(i)   = work3(i)
-          tmp1_rates(i)   = .2_r8*work3(i)
-          if( hno3_ndx > 0 ) then
-             het_rates(i,k,hno3_ndx) = work3(i)
-          end if
-          if( xhno3_ndx > 0 ) then
-             het_rates(i,k,xhno3_ndx) = work3(i)
-          end if
-          if( onit_ndx > 0 ) then
-             het_rates(i,k,onit_ndx) = work3(i)
-          end if
-          if( xonit_ndx > 0 ) then
-             het_rates(i,k,xonit_ndx) = work3(i)
-          end if
-          if( Pb_ndx > 0 ) then
-             het_rates(i,k,Pb_ndx) = work3(i)
-          end if
-          if( macrooh_ndx > 0 ) then
-             het_rates(i,k,macrooh_ndx) = work3(i)
-          end if
-          if( isopooh_ndx > 0 ) then
-             het_rates(i,k,isopooh_ndx) = work3(i)
-          end if
-
-          if( clono2_ndx > 0 ) then
-             het_rates(i,k, clono2_ndx) = work3(i)
-          end if
-          if( brono2_ndx > 0 ) then
-             het_rates(i,k, brono2_ndx) = work3(i)
-          end if
-          if( hcl_ndx > 0 ) then
-             het_rates(i,k, hcl_ndx) = work3(i)
-          end if
-          if( n2o5_ndx > 0 ) then
-             het_rates(i,k, n2o5_ndx) = work3(i)
-          end if
-          if( hocl_ndx > 0 ) then
-             het_rates(i,k, hocl_ndx) = work3(i)
-          end if
-          if( hobr_ndx > 0 ) then
-             het_rates(i,k, hobr_ndx) = work3(i)
-          end if
-          if( hbr_ndx > 0 ) then
-             het_rates(i,k, hbr_ndx) = work3(i)
-          end if
-
-          if( soa_ndx > 0 ) then
-             het_rates(i,k,soa_ndx) = tmp1_rates(i)
-          end if
-          if( oc2_ndx > 0 ) then
-             het_rates(i,k,oc2_ndx) = tmp1_rates(i)
-          end if
-          if( cb2_ndx > 0 ) then
-             het_rates(i,k,cb2_ndx) = tmp1_rates(i)
-          end if
-          if( so4_ndx > 0 ) then
-             het_rates(i,k,so4_ndx) = tmp1_rates(i)
-          end if
-          if( sa1_ndx > 0 ) then
-             het_rates(i,k,sa1_ndx) = tmp1_rates(i)
-          end if
-          if( sa2_ndx > 0 ) then
-             het_rates(i,k,sa2_ndx) = tmp1_rates(i)
-          end if
-          if( sa3_ndx > 0 ) then
-             het_rates(i,k,sa3_ndx) = tmp1_rates(i)
-          end if
-          if( sa4_ndx > 0 ) then
-             het_rates(i,k,sa4_ndx) = tmp1_rates(i)
-          end if
 
           if( h2so4_ndx > 0 ) then
-             het_rates(i,k,h2so4_ndx) = tmp0_rates(i)
+             het_rates(i,k,h2so4_ndx) = tmp0_rates(i) 
           end if
-          if( nh4_ndx > 0 ) then
-             het_rates(i,k,nh4_ndx) = tmp0_rates(i)
-          end if
-          if( nh4no3_ndx > 0 ) then
-             het_rates(i,k,nh4no3_ndx ) = tmp0_rates(i)
-          end if
-          if( nh3_ndx > 0 ) then
-             het_rates(i,k,nh3_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_nh3(i,k)*work2(i)))),0._r8 )
-          end if
-
-          if( ch3cooh_ndx > 0 ) then
-             het_rates(i,k,ch3cooh_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3cooh(i,k)*work2(i)))),0._r8 )
-          end if
-          if( hcooh_ndx > 0 ) then
-             het_rates(i,k,hcooh_ndx) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3cooh(i,k)*work2(i)))),0._r8 )
-          endif
-          if ( hcn_ndx > 0 ) then
-             het_rates(i,k,hcn_ndx     ) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hcn(i,k)*work2(i)))),0._r8 )
-          endif
-          if ( ch3cn_ndx > 0 ) then
-             het_rates(i,k,ch3cn_ndx   ) = max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_ch3cn(i,k)*work2(i)))),0._r8 )
-          endif
-
        end do Column_loop2
     end do level_loop2
 
@@ -880,4 +533,5 @@ contains
 
   end subroutine sethet
 
+!=================================================================================
 end module mo_sethet
