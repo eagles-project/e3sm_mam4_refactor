@@ -1388,6 +1388,7 @@ contains
     real(r8) :: sum, g1, g2
 
     logical  :: weak_forcing  !  whether forcing is sufficiently weak or not
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/maxsat_beg_yml.f90"
 
     weak_forcing = .true.
     do m=1, nmode
@@ -1415,7 +1416,7 @@ contains
        endif
     enddo
     smax=1._r8/sqrt(sum)
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/maxsat_end_yml.f90"
   end subroutine maxsat
 
   !===============================================================================

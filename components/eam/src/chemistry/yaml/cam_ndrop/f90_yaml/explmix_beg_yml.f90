@@ -85,7 +85,7 @@
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'compute_tendencies',yaml%nstep_print, yaml%lev_print)
+             'explmix',yaml%nstep_print, yaml%lev_print)
 
         !< add code for writing data here>
         !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
