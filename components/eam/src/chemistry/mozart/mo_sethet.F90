@@ -410,7 +410,7 @@ contains
           else
              yh2o2  = 1.e29_r8
           end if
-          tmp_hetrates(i,kk,1) = max( 1._r8 / yh2o2,0._r8 ) * stay
+          tmp_hetrates(i,kk,2) = max( 1._r8 / yh2o2,0._r8 ) * stay
           xxx3 = (xso2( i,kk) - xgas3(kk))
           if( xxx3 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
              yso2  = xso2( i,kk)/xxx3 * xdtm     
@@ -437,23 +437,21 @@ contains
 
           if( h2o2_ndx > 0 ) then
              work3(i) = satf_h2o2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_h2o2(i,k)*work2(i)))),0._r8 )    
-             het_rates(i,k,h2o2_ndx) =  work3(i) + tmp_hetrates(i,k,1)
+             het_rates(i,k,h2o2_ndx) =  work3(i) + tmp_hetrates(i,k,2)
           end if
+
           if ( prog_modal_aero .and. so2_ndx>0 .and. h2o2_ndx>0 ) then
              het_rates(i,k,so2_ndx) = het_rates(i,k,h2o2_ndx)
           elseif( so2_ndx > 0 ) then
              work3(i) = satf_so2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_so2( i,k)*work2(i)))),0._r8 )    
              het_rates(i,k,so2_ndx ) =  work3(i) + tmp_hetrates(i,k,3)
           endif
-!
-!
-          work3(i) = tmp_hetrates(i,k,2) + satf_hno3 * &
-               max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hno3(i,k)*work2(i)))),0._r8 )    
-          tmp0_rates(i)   = work3(i)
 
           if( h2so4_ndx > 0 ) then
-             het_rates(i,k,h2so4_ndx) = tmp0_rates(i) 
+             work3(i) = satf_hno3 *  max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hno3(i,k)*work2(i)))),0._r8 )
+             het_rates(i,k,h2so4_ndx) =  work3(i) + tmp_hetrates(i,k,1)
           end if
+
        end do Column_loop2
     end do level_loop2
 
