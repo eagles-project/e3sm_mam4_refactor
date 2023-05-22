@@ -314,25 +314,12 @@ contains
     xkgm = xdg/xrm * 2._r8 + xdg/xrm * .6_r8 * sqrt( xrm*xum/xvv ) * (xvv/xdg)**(1._r8/3._r8) 
 
     !-----------------------------------------------------------------
-    !	... Find 100 mb level
+    !	... Find the level index that only calculate het_rates below
     !-----------------------------------------------------------------
-    do i = 1,ncol
-       if ( abs(rlat(i)) > 60._r8*d2r ) then
-          p_limit = 300.e2_r8
-       else
-          p_limit = 100.e2_r8 
-       endif
-       k_loop: do k = pver,1,-1
-          if( press(i,k) < p_limit ) then
-             ktop(i) = k
-             exit k_loop
-          end if
-       end do k_loop
-    end do
+    call find_ktop( ncol,  rlat,  press,  & ! in
+                    ktop                  ) ! out
     ktop_all = minval( ktop(:) )
-!
-! jfl
-!
+
 ! this is added to rescale the variable precip (which can only be positive)
 ! to the actual vertical integral of positive and negative values.  This
 ! removes point storms
@@ -532,6 +519,46 @@ contains
     end do
 
   end subroutine sethet
+
+!=================================================================================
+  subroutine find_ktop( ncol,  rlat,  press,  & ! in
+                        ktop                  ) ! out 
+  !---------------------------------------------------------------------------
+  ! -------- find the top level that het_rates are set as 0 above it ---------
+  !--------------------------------------------------------------------------- 
+
+    use ppgrid,       only : pver, pcols
+    use physconst,    only : pi
+
+    implicit none
+    integer,  intent(in) :: ncol
+    real(r8), intent(in) :: rlat(pcols)          ! latitude in radians for columns
+    real(r8), intent(in) :: press(pcols,pver)    ! pressure [Pa]
+    integer, intent(out) :: ktop(ncol)           ! index that only calculate het_rates above this level
+
+    integer  :: icol, kk
+    real(r8) :: p_limit     ! pressure limit [Pa]
+    real(r8), parameter :: d2r = pi/180._r8   ! degree to radian
+
+
+    do icol = 1,ncol
+
+       if ( abs(rlat(icol)) > 60._r8*d2r ) then
+          p_limit = 300.e2_r8   ! 300hPa for high latitudes
+       else
+          p_limit = 100.e2_r8   ! 100hPa for low latitudes
+       endif
+
+       k_loop: do kk = pver,1,-1
+          if( press(icol,kk) < p_limit ) then
+             ktop(icol) = kk
+             exit k_loop
+          endif
+       enddo k_loop
+
+    enddo
+
+  end subroutine find_ktop
 
 !=================================================================================
 end module mo_sethet
