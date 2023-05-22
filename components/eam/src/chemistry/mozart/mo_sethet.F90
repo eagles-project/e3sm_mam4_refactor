@@ -320,27 +320,11 @@ contains
                     ktop                  ) ! out
     ktop_all = minval( ktop(:) )
 
-! this is added to rescale the variable precip (which can only be positive)
-! to the actual vertical integral of positive and negative values.  This
-! removes point storms
-!
-    do i = 1,ncol
-       total_rain = 0._r8
-       total_pos  = 0._r8
-       do k = 1,pver
-          precip(i,k) = cmfdqr(i,k) + nrain(i,k) - nevapr(i,k)
-          total_rain = total_rain + precip(i,k)
-          if ( precip(i,k) < 0._r8 ) precip(i,k) = 0._r8
-          total_pos  = total_pos  + precip(i,k)
-       end do
-       if ( total_rain <= 0._r8 ) then
-          precip(i,:) = 0._r8
-       else
-          do k = 1,pver
-             precip(i,k) = precip(i,k) * total_rain/total_pos
-          end do
-       end if
-    end do
+    ! this is added to rescale the variable precip (which can only be positive)
+    ! to the actual vertical integral of positive and negative values.  This
+    ! removes point storms
+    call calc_precip_rescale( ncol, cmfdqr, nrain, nevapr,  & ! in
+                              precip                        ) ! out
 
     do k = 1,pver
        rain(:ncol,k)   = mass_air*precip(:ncol,k)*xhnm(:ncol,k) / mass_h2o
@@ -559,6 +543,51 @@ contains
     enddo
 
   end subroutine find_ktop
+
+!=================================================================================
+  subroutine calc_precip_rescale( ncol, cmfdqr, nrain, nevapr,  & ! in
+                                  precip                        ) ! out
+  ! -----------------------------------------------------------------------
+  ! calculate precipitation rate at each grid
+  ! this is added to rescale the variable precip (which can only be positive)
+  ! to the actual vertical integral of positive and negative values. 
+  ! This removes point storms
+  ! -----------------------------------------------------------------------
+    use ppgrid,       only : pver, pcols
+    implicit none
+    integer,  intent(in) :: ncol
+    real(r8), intent(in) :: cmfdqr(ncol,pver)           ! dq/dt for convection [kg/kg/s]
+    real(r8), intent(in) :: nrain(ncol,pver)            ! stratoform precip [kg/kg/s]
+    real(r8), intent(in) :: nevapr(ncol,pver)           ! evaporation [kg/kg/s]
+    real(r8),intent(out) :: precip(ncol,pver)           ! precipitation [kg/kg/s]
+
+    integer  :: icol, kk
+    real(r8) :: total_rain      ! total rain rate (both pos and neg) in the column
+    real(r8) :: total_pos       ! total positive rain rate in the column
+
+    do icol = 1,ncol
+
+       total_rain = 0._r8
+       total_pos  = 0._r8
+       do kk = 1,pver
+          precip(icol,kk) = cmfdqr(icol,kk) + nrain(icol,kk) - nevapr(icol,kk)
+          total_rain = total_rain + precip(icol,kk)
+          if ( precip(icol,kk) < 0._r8 ) then
+                 precip(icol,kk) = 0._r8
+          endif
+          total_pos  = total_pos  + precip(icol,kk)
+       enddo
+
+       if ( total_rain <= 0._r8 ) then
+          precip(icol,:) = 0._r8        ! set all levels to zero
+       else
+          do kk = 1,pver
+             precip(icol,kk) = precip(icol,kk) * total_rain/total_pos
+          enddo
+       endif
+    enddo
+
+  end subroutine calc_precip_rescale
 
 !=================================================================================
 end module mo_sethet
