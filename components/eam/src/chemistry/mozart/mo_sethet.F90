@@ -198,11 +198,8 @@ contains
     real(r8), parameter ::  satf_hno3  = .016_r8        ! saturation factor for hno3 in clouds 
     real(r8), parameter ::  satf_h2o2  = .016_r8        ! saturation factor for h2o2 in clouds 
     real(r8), parameter ::  satf_so2   = .016_r8        ! saturation factor for so2 in clouds 
-    real(r8), parameter ::  satf_ch2o  = .1_r8          ! saturation factor for ch2o in clouds 
-    real(r8), parameter ::  satf_sog  =  .016_r8        ! saturation factor for sog in clouds
     real(r8), parameter ::  const0   = boltz_cgs * 1.e-6_r8 ! (atmospheres/deg k/cm^3)
     real(r8), parameter ::  hno3_diss = 15.4_r8         ! hno3 dissociation constant
-    real(r8), parameter ::  geo_fac  = 6._r8            ! geometry factor (surf area/volume = geo_fac/diameter)
     real(r8), parameter ::  mass_air = 29._r8           ! mass of background atmosphere (amu)
     real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor (amu)
     real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! (gm/mol water)
@@ -215,58 +212,30 @@ contains
 
     integer  ::      i, m, k, kk                 ! indicies
     real(r8) ::      xkgm                        ! mass flux on rain drop
-    real(r8) ::      all1, all2                  ! work variables
     real(r8) ::      stay                        ! fraction of layer traversed by falling drop in timestep delt
-    real(r8) ::      xeqca1, xeqca2, xca1, xca2, xdtm
-    real(r8) ::      xxx1, xxx2, yhno3, yh2o2
-    real(r8) ::      all3, xeqca3, xca3, xxx3, yso2, so2_diss(ncol)
-    real(r8) ::      all4, xeqca4, xca4, xxx4
-    real(r8) ::      all5, xeqca5, xca5, xxx5
-    real(r8) ::      all6, xeqca6, xca6, xxx6
-    real(r8) ::      all7, xeqca7, xca7, xxx7
-    real(r8) ::      all8, xeqca8, xca8, xxx8
-    real(r8) ::      ysogm,ysogi,ysogt,ysogb,ysogx
+    real(r8) ::      xdtm
+    real(r8) ::      xxx2, xxx3 
+    real(r8) ::      yso2, yh2o2
 
     real(r8) :: t_factor(ncol)   ! temperature factor to calculate henry's law parameters
-    real(r8), dimension(ncol)  :: &
-         xk0, work1, work2, work3, zsurf
-    real(r8), dimension(pver)  :: &
-         xgas1, xgas2
-    real(r8), dimension(pver)  :: xgas3, xgas4, xgas5, xgas6, xgas7, xgas8
-    real(r8), dimension(ncol)  :: &
-         tmp0_rates, tmp1_rates
+    real(r8), dimension(ncol)  :: work1, work2, work3
+    real(r8), dimension(ncol)  :: xk0, zsurf, so2_diss
+    real(r8), dimension(pver)  :: xgas2, xgas3
     real(r8), dimension(ncol,pver)  :: &
          delz, &              ! layer depth about interfaces (cm)
-         xhno3, &             ! hno3 concentration (molecules/cm^3)
          xh2o2, &             ! h2o2 concentration (molecules/cm^3)
          xso2, &              ! so2 concentration (molecules/cm^3)
-         xsogm, &             ! sogm concentration (molecules/cm^3)
-         xsogi, &             ! sogi concentration (molecules/cm^3)
-         xsogt, &             ! sogt concentration (molecules/cm^3)
-         xsogb, &             ! sogb concentration (molecules/cm^3)
-         xsogx, &             ! sogx concentration (molecules/cm^3)
          xliq, &              ! liquid rain water content in a grid cell (gm/m^3)
          rain                 ! conversion rate of water vapor into rain water (molecules/cm^3/s)
-    real(r8), dimension(ncol,pver)  :: &
-         xhen_hno3, xhen_h2o2, xhen_ch2o, xhen_ch3ooh, xhen_ch3co3h, &
-         xhen_ch3cocho, xhen_xooh, xhen_onitr, xhen_ho2no2, xhen_glyald, &
-         xhen_ch3cho, xhen_mvk, xhen_macr,xhen_sog
-    real(r8), dimension(ncol,pver)  :: &
-         xhen_nh3, xhen_ch3cooh
     real(r8), dimension(ncol,pver,8) :: tmp_hetrates
     real(r8), dimension(ncol,pver)  :: precip
-    real(r8), dimension(ncol,pver)  :: xhen_hcn, xhen_ch3cn, xhen_so2
+    real(r8), dimension(ncol,pver)  :: xhen_h2o2, xhen_hno3, xhen_so2
 
     integer    ::      ktop_all       
-    integer    ::      ktop(ncol)                  ! 100 mb level
+    integer    ::      ktop(ncol)                  ! tropopause level, 100mb for lat < 60 and 300mb for lat > 60
 
     real(r8) :: rlat(pcols)                       ! latitude in radians for columns
-    real(r8) :: p_limit
-    real(r8), parameter :: d2r = pi/180._r8
 !
-! jfl : new variables for rescaling sum of positive values to actual amount
-!
-    real(r8) :: total_rain,total_pos
     character(len=3) :: hetratestrg
     real(r8), parameter :: MISSING = -999999._r8
     real(r8), parameter :: large_value_lifetime = 1.e29_r8  ! a large lifetime value if no washout
@@ -308,7 +277,7 @@ contains
        if ( m>0 ) then
           het_rates(:,:,m) = MISSING
        endif
-    end do
+    enddo
 
     !-----------------------------------------------------------------
     !	... the 2 and .6 multipliers are from a formula by frossling (1938)
@@ -333,12 +302,12 @@ contains
        xliq(:ncol,k)   = precip(:ncol,k) * delt * xhnm(:ncol,k) / avo*mass_air * m3_2_cm3
        xh2o2(:ncol,k)  = qin(:ncol,k,spc_h2o2_ndx) * xhnm(:ncol,k)
        xso2(:ncol,k)  = qin(:ncol,k,spc_so2_ndx) * xhnm(:ncol,k)
-    end do
+    enddo
 
     zsurf(:ncol) = m2km * phis(:ncol) * rga
     do k = ktop_all,pver-1
        delz(:ncol,k) = abs( (zmid(:ncol,k) - zmid(:ncol,k+1))*km2cm ) 
-    end do
+    enddo
     delz(:ncol,pver) = abs( (zmid(:ncol,pver) - zsurf(:ncol) )*km2cm ) 
 
     !-----------------------------------------------------------------
@@ -411,7 +380,7 @@ contains
              yh2o2  = xh2o2(i,kk)/xxx2 * xdtm     
           else
              yh2o2  = large_value_lifetime
-          end if
+          endif
           tmp_hetrates(i,kk,2) = max( 1._r8 / yh2o2,0._r8 ) * stay
 
           xxx3 = (xso2( i,kk) - xgas3(kk))
@@ -419,11 +388,11 @@ contains
              yso2  = xso2( i,kk)/xxx3 * xdtm     
           else
              yso2  = large_value_lifetime
-          end if
+          endif
           tmp_hetrates(i,kk,3) = max( 1._r8 / yso2, 0._r8 ) * stay
 
-       end do level_loop1
-    end do col_loop
+       enddo level_loop1
+    enddo col_loop
 
     !-----------------------------------------------------------------
     !       ... part 2, in-cloud solve for low henry constant
@@ -442,7 +411,7 @@ contains
           if( h2o2_ndx > 0 ) then
              work3(i) = satf_h2o2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_h2o2(i,k)*work2(i)))),0._r8 )    
              het_rates(i,k,h2o2_ndx) =  work3(i) + tmp_hetrates(i,k,2)
-          end if
+          endif
 
           if ( prog_modal_aero .and. so2_ndx>0 .and. h2o2_ndx>0 ) then
              het_rates(i,k,so2_ndx) = het_rates(i,k,h2o2_ndx)
@@ -454,10 +423,10 @@ contains
           if( h2so4_ndx > 0 ) then
              work3(i) = satf_hno3 *  max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hno3(i,k)*work2(i)))),0._r8 )
              het_rates(i,k,h2so4_ndx) =  work3(i) + tmp_hetrates(i,k,1)
-          end if
+          endif
 
-       end do Column_loop2
-    end do level_loop2
+       enddo Column_loop2
+    enddo level_loop2
 
     !-----------------------------------------------------------------
     !	... Set rates above tropopause = 0.
@@ -467,13 +436,13 @@ contains
        do i = 1,ncol
           do k = 1,ktop(i)
              het_rates(i,k,m) = 0._r8
-          end do
-       end do
+          enddo
+       enddo
        if ( any( het_rates(:ncol,:,m) == MISSING) ) then
           write(hetratestrg,'(I3)') m
           call endrun('sethet: het_rates (wet dep) not set for het reaction number : '//hetratestrg)
        endif
-    end do
+    enddo
 
   end subroutine sethet
 
