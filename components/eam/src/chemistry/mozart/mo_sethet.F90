@@ -154,9 +154,10 @@ contains
   end subroutine sethet_inti
 
 !=================================================================================
-  subroutine sethet( het_rates, press, zmid,  phis, tfld, &
-                     cmfdqr, nrain, nevapr, delt, xhnm, &
-                     qin, ncol, lchnk )
+  subroutine sethet( het_rates,                         & ! out
+                     press,  zmid,  phis,   tfld,       & ! in
+                     cmfdqr, nrain, nevapr, delt, xhnm, & ! in
+                     qin,    ncol,  lchnk               ) ! in
     !-----------------------------------------------------------------------      
     !       ... compute rainout loss rates (1/s)
     !-----------------------------------------------------------------------      
@@ -174,74 +175,72 @@ contains
     !-----------------------------------------------------------------------      
     integer, intent(in)   ::    ncol                        ! columns in chunk
     integer, intent(in)   ::    lchnk                       ! chunk index
-    real(r8), intent(in)  ::    delt                        ! time step ( s )
-    real(r8), intent(in)  ::    press(pcols,pver)           ! pressure in pascals
-    real(r8), intent(in)  ::    cmfdqr(ncol,pver)           ! dq/dt for convection
-    real(r8), intent(in)  ::    nrain(ncol,pver)            ! stratoform precip
-    real(r8), intent(in)  ::    nevapr(ncol,pver)           ! evaporation
-    real(r8), intent(in)  ::    qin(ncol,pver,gas_pcnst)    ! xported species ( vmr )
-    real(r8), intent(in)  ::    zmid(ncol,pver)             ! midpoint geopot (km)
-    real(r8), intent(in)  ::    phis(pcols)                 ! surf geopot
-    real(r8), intent(in)  ::    tfld(pcols,pver)            ! temperature (k)
-    real(r8), intent(in)  ::    xhnm(ncol,pver)             ! total atms density ( /cm^3)
-    real(r8), intent(out) ::    het_rates(ncol,pver,gas_pcnst) ! rainout loss rates
+    real(r8), intent(in)  ::    delt                        ! time step [s]
+    real(r8), intent(in)  ::    press(pcols,pver)           ! pressure [pascals]
+    real(r8), intent(in)  ::    cmfdqr(ncol,pver)           ! dq/dt for convection [kg/kg/s]
+    real(r8), intent(in)  ::    nrain(ncol,pver)            ! stratoform precip [kg/kg/s]
+    real(r8), intent(in)  ::    nevapr(ncol,pver)           ! evaporation [kg/kg/s]
+    real(r8), intent(in)  ::    qin(ncol,pver,gas_pcnst)    ! xported species [vmr]
+    real(r8), intent(in)  ::    zmid(ncol,pver)             ! midpoint geopot [km]
+    real(r8), intent(in)  ::    phis(pcols)                 ! surf geopotential
+    real(r8), intent(in)  ::    tfld(pcols,pver)            ! temperature [K]
+    real(r8), intent(in)  ::    xhnm(ncol,pver)             ! total atms density [cm^-3]
+    real(r8), intent(out) ::    het_rates(ncol,pver,gas_pcnst) ! rainout loss rates [1/s]
 
     !-----------------------------------------------------------------------      
     !       ... local variables
     !-----------------------------------------------------------------------      
-    real(r8), parameter ::  xrm   = .189_r8             ! mean diameter of rain drop (cm)
-    real(r8), parameter ::  xum   = 748._r8             ! mean rain drop terminal velocity (cm/s)
-    real(r8), parameter ::  xvv   = 6.18e-2_r8          ! kinetic viscosity (cm^2/s)
-    real(r8), parameter ::  xdg   = .112_r8             ! mass transport coefficient (cm/s)
-    real(r8), parameter ::  t0    = 298._r8             ! reference temperature (k)
+    real(r8), parameter ::  xrm   = .189_r8             ! mean diameter of rain drop [cm]
+    real(r8), parameter ::  xum   = 748._r8             ! mean rain drop terminal velocity [cm/s]
+    real(r8), parameter ::  xvv   = 6.18e-2_r8          ! kinetic viscosity [cm^2/s]
+    real(r8), parameter ::  xdg   = .112_r8             ! mass transport coefficient [cm/s]
+    real(r8), parameter ::  t0    = 298._r8             ! reference temperature [K]
     real(r8), parameter ::  xph0  = 1.e-5_r8            ! cloud [h+]
     real(r8), parameter ::  satf_hno3  = .016_r8        ! saturation factor for hno3 in clouds 
     real(r8), parameter ::  satf_h2o2  = .016_r8        ! saturation factor for h2o2 in clouds 
     real(r8), parameter ::  satf_so2   = .016_r8        ! saturation factor for so2 in clouds 
-    real(r8), parameter ::  const0   = boltz_cgs * 1.e-6_r8 ! (atmospheres/deg k/cm^3)
+    real(r8), parameter ::  const0   = boltz_cgs * 1.e-6_r8 ! [atmospheres/deg k/cm^3]
     real(r8), parameter ::  hno3_diss = 15.4_r8         ! hno3 dissociation constant
-    real(r8), parameter ::  mass_air = 29._r8           ! mass of background atmosphere (amu)
-    real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor (amu)
-    real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! (gm/mol water)
+    real(r8), parameter ::  mass_air = 29._r8           ! mass of background atmosphere [amu]
+    real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor [amu]
+    real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! [gm/mol water]
     real(r8), parameter ::  km2cm    = 1.e5_r8          ! convert km to cm
     real(r8), parameter ::  m2km     = 1.e-3_r8         ! convert m to km
     real(r8), parameter ::  cm3_2_m3 = 1.e-6_r8         ! convert cm^3 to m^3
     real(r8), parameter ::  m3_2_cm3 = 1.e6_r8          ! convert m^3 to cm^3
     real(r8), parameter ::  liter_per_gram = 1.e-3_r8
-    real(r8), parameter ::  avo2  = avo * liter_per_gram * cm3_2_m3 ! (liter/gm/mol*(m/cm)^3)
-
-    integer  ::  icol, kk, kk2                 ! indicies
-    integer  ::  mm, mm2
-    real(r8) ::  xkgm                        ! mass flux on rain drop
-    real(r8) ::  stay                        ! fraction of layer traversed by falling drop in timestep delt
-    real(r8) ::  xdtm
-    real(r8) ::  xxx2, xxx3 
-    real(r8) ::  yso2, yh2o2
-
-    real(r8) :: t_factor(ncol)   ! temperature factor to calculate henry's law parameters
-    real(r8), dimension(ncol)  :: work1, work2, work3
-    real(r8), dimension(ncol)  :: xk0, zsurf, so2_diss
-    real(r8), dimension(pver)  :: xgas2, xgas3
-    real(r8), dimension(ncol,pver)  :: &
-         delz, &              ! layer depth about interfaces (cm)
-         xh2o2, &             ! h2o2 concentration (molecules/cm^3)
-         xso2, &              ! so2 concentration (molecules/cm^3)
-         xliq, &              ! liquid rain water content in a grid cell (gm/m^3)
-         rain                 ! conversion rate of water vapor into rain water (molecules/cm^3/s)
-    real(r8), dimension(ncol,pver,8) :: tmp_hetrates
-    real(r8), dimension(ncol,pver)  :: precip
-    real(r8), dimension(ncol,pver)  :: xhen_h2o2, xhen_hno3, xhen_so2
-
-    integer    ::      ktop_all       
-    integer    ::      ktop(ncol)                  ! tropopause level, 100mb for lat < 60 and 300mb for lat > 60
-
-    real(r8) :: rlat(pcols)                       ! latitude in radians for columns
-!
-    character(len=3) :: hetratestrg
+    real(r8), parameter ::  avo2  = avo * liter_per_gram * cm3_2_m3 ! [liter/gm/mol*(m/cm)^3]
     real(r8), parameter :: MISSING = -999999._r8
     real(r8), parameter :: large_value_lifetime = 1.e29_r8  ! a large lifetime value if no washout
 
-!
+    character(len=3) :: hetratestrg
+    integer  ::  icol, kk, kk2  ! indicies
+    integer  ::  mm, mm2        ! indicies
+    integer  ::  ktop_all
+    integer  ::  ktop(ncol)     ! tropopause level, 100mb for lat < 60 and 300mb for lat > 60
+    real(r8) ::  xkgm           ! mass flux on rain drop
+    real(r8) ::  stay           ! fraction of layer traversed by falling drop in timestep delt
+    real(r8) ::  xdtm
+    real(r8) ::  xxx2, xxx3     ! working variables for h2o2 (2) and so2 (3)
+    real(r8) ::  yso2, yh2o2    ! washout lifetime [s]     
+    real(r8) ::  rlat(pcols)    ! latitude in radians for columns
+    real(r8), dimension(ncol)  :: work1, work2, work3,  & ! working variables
+                                  t_factor,     & ! temperature factor to calculate henry's law parameters
+                                  xk0,          & ! working variable
+                                  zsurf,        & ! surface height [km]
+                                  so2_diss      ! so2 dissociation constant
+    real(r8), dimension(pver)  :: xgas2, xgas3  ! gas phase species for h2o2 (2) and so2 (3) [molecules/cm^3]
+    real(r8), dimension(ncol,pver)  :: &
+              delz, &              ! layer depth about interfaces [cm]
+              xh2o2, &             ! h2o2 concentration [molecules/cm^3]
+              xso2, &              ! so2 concentration [molecules/cm^3]
+              xliq, &              ! liquid rain water content in a grid cell [gm/m^3]
+              rain, &              ! conversion rate of water vapor into rain water [molecules/cm^3/s]
+              precip, &            ! precipitation [kg/kg/s]
+              xhen_h2o2, xhen_hno3, xhen_so2    ! henry law constants
+    real(r8), dimension(ncol,pver,8) :: tmp_hetrates
+
+
     !-----------------------------------------------------------------
     !        note: the press array is in pascals and must be
     !              mutiplied by 10 to yield dynes/cm**2.
