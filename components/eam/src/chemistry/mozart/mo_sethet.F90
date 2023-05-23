@@ -210,12 +210,13 @@ contains
     real(r8), parameter ::  liter_per_gram = 1.e-3_r8
     real(r8), parameter ::  avo2  = avo * liter_per_gram * cm3_2_m3 ! (liter/gm/mol*(m/cm)^3)
 
-    integer  ::      i, m, k, kk                 ! indicies
-    real(r8) ::      xkgm                        ! mass flux on rain drop
-    real(r8) ::      stay                        ! fraction of layer traversed by falling drop in timestep delt
-    real(r8) ::      xdtm
-    real(r8) ::      xxx2, xxx3 
-    real(r8) ::      yso2, yh2o2
+    integer  ::  icol, kk, kk2                 ! indicies
+    integer  ::  mm, mm2
+    real(r8) ::  xkgm                        ! mass flux on rain drop
+    real(r8) ::  stay                        ! fraction of layer traversed by falling drop in timestep delt
+    real(r8) ::  xdtm
+    real(r8) ::  xxx2, xxx3 
+    real(r8) ::  yso2, yh2o2
 
     real(r8) :: t_factor(ncol)   ! temperature factor to calculate henry's law parameters
     real(r8), dimension(ncol)  :: work1, work2, work3
@@ -239,7 +240,6 @@ contains
     character(len=3) :: hetratestrg
     real(r8), parameter :: MISSING = -999999._r8
     real(r8), parameter :: large_value_lifetime = 1.e29_r8  ! a large lifetime value if no washout
-    integer ::  mm
 
 !
     !-----------------------------------------------------------------
@@ -273,9 +273,9 @@ contains
     call get_rlat_all_p(lchnk, ncol, rlat)
 
     do mm = 1,gas_wetdep_cnt
-       m = wetdep_map(mm)
-       if ( m>0 ) then
-          het_rates(:,:,m) = MISSING
+       mm2 = wetdep_map(mm)
+       if ( mm2>0 ) then
+          het_rates(:,:,mm2) = MISSING
        endif
     enddo
 
@@ -297,16 +297,16 @@ contains
     call calc_precip_rescale( ncol, cmfdqr, nrain, nevapr,  & ! in
                               precip                        ) ! out
 
-    do k = 1,pver
-       rain(:ncol,k)   = mass_air*precip(:ncol,k)*xhnm(:ncol,k) / mass_h2o
-       xliq(:ncol,k)   = precip(:ncol,k) * delt * xhnm(:ncol,k) / avo*mass_air * m3_2_cm3
-       xh2o2(:ncol,k)  = qin(:ncol,k,spc_h2o2_ndx) * xhnm(:ncol,k)
-       xso2(:ncol,k)  = qin(:ncol,k,spc_so2_ndx) * xhnm(:ncol,k)
+    do kk = 1,pver
+       rain(:ncol,kk)   = mass_air*precip(:ncol,kk)*xhnm(:ncol,kk) / mass_h2o
+       xliq(:ncol,kk)   = precip(:ncol,kk) * delt * xhnm(:ncol,kk) / avo*mass_air * m3_2_cm3
+       xh2o2(:ncol,kk)  = qin(:ncol,kk,spc_h2o2_ndx) * xhnm(:ncol,kk)
+       xso2(:ncol,kk)  = qin(:ncol,kk,spc_so2_ndx) * xhnm(:ncol,kk)
     enddo
 
     zsurf(:ncol) = m2km * phis(:ncol) * rga
-    do k = ktop_all,pver-1
-       delz(:ncol,k) = abs( (zmid(:ncol,k) - zmid(:ncol,k+1))*km2cm ) 
+    do kk = ktop_all,pver-1
+       delz(:ncol,kk) = abs( (zmid(:ncol,kk) - zmid(:ncol,kk+1))*km2cm ) 
     enddo
     delz(:ncol,pver) = abs( (zmid(:ncol,pver) - zsurf(:ncol) )*km2cm ) 
 
@@ -323,43 +323,43 @@ contains
     !             heff = h for h2o2 (no dissociation)
     !             heff = h * (1 + k/[h+]) (in general)
     !-----------------------------------------------------------------
-    do k = ktop_all,pver
+    do kk = ktop_all,pver
        !-----------------------------------------------------------------
        ! 	... effective henry''s law constants:
        !	hno3, h2o2  (brasseur et al., 1999)
        !-----------------------------------------------------------------
        ! temperature factor
-       t_factor(:ncol) = (t0 - tfld(:ncol,k))/(t0*tfld(:ncol,k))
-       xhen_h2o2(:,k)     = 7.45e4_r8 * exp( 6620._r8 * t_factor(:) )
+       t_factor(:ncol) = (t0 - tfld(:ncol,kk))/(t0*tfld(:ncol,kk))
+       xhen_h2o2(:,kk)     = 7.45e4_r8 * exp( 6620._r8 * t_factor(:) )
        ! HNO3, for calculation of H2SO4 het rate use
        xk0(:)             = 2.1e5_r8 *exp( 8700._r8*t_factor(:) )
-       xhen_hno3(:,k)     = xk0(:) * ( 1._r8 + hno3_diss / xph0 )
+       xhen_hno3(:,kk)     = xk0(:) * ( 1._r8 + hno3_diss / xph0 )
        ! SO2
        xk0(:)             = 1.23_r8 * exp( 3120._r8 * t_factor(:) )
        so2_diss(:)        = 1.23e-2_r8 * exp( 1960._r8 * t_factor(:) )
-       xhen_so2(:,k)   = xk0(:) * ( 1._r8 + so2_diss(:) / xph0 )
+       xhen_so2(:,kk)   = xk0(:) * ( 1._r8 + so2_diss(:) / xph0 )
 
        ! initiate temporary array
-       tmp_hetrates(:,k,:) = 0._r8
+       tmp_hetrates(:,kk,:) = 0._r8
     enddo
 
     !-----------------------------------------------------------------
     !       ... part 1, solve for high henry constant ( hno3, h2o2)
     !-----------------------------------------------------------------
-    col_loop :  do i = 1,ncol
-       xgas2(:) = xh2o2(i,:)                     ! different levels wash 
-       xgas3(:) = xso2 (i,:)
-       level_loop1  : do kk = ktop(i),pver
+    col_loop :  do icol = 1,ncol
+       xgas2(:) = xh2o2(icol,:)                     ! different levels wash 
+       xgas3(:) = xso2 (icol,:)
+       level_loop1  : do kk = ktop(icol),pver
           stay = 1._r8
-          if( rain(i,kk) /= 0._r8 ) then            ! finding rain cloud           
-             stay = ((zmid(i,kk) - zsurf(i))*km2cm)/(xum*delt)
+          if( rain(icol,kk) /= 0._r8 ) then            ! finding rain cloud           
+             stay = ((zmid(icol,kk) - zsurf(icol))*km2cm)/(xum*delt)
              stay = min( stay,1._r8 )
              ! calculate gas washout by cloud
-             call gas_washout( kk,  xkgm,   xliq(i,kk),       & ! in
-                        xhen_h2o2(i,:), tfld(i,:), delz(i,:), & ! in
+             call gas_washout( kk,  xkgm,   xliq(icol,kk),       & ! in
+                        xhen_h2o2(icol,:), tfld(icol,:), delz(icol,:), & ! in
                         xgas2                                 ) ! inout
-             call gas_washout( kk,  xkgm,   xliq(i,kk),       & ! in
-                         xhen_so2(i,:), tfld(i,:), delz(i,:), & ! in
+             call gas_washout( kk,  xkgm,   xliq(icol,kk),       & ! in
+                         xhen_so2(icol,:), tfld(icol,:), delz(icol,:), & ! in
                         xgas3                                 ) ! inout
           endif
           !-----------------------------------------------------------------
@@ -373,23 +373,23 @@ contains
           !                             path below the cloud
           !                        dt = dz(cm)/um(cm/s)
           !-----------------------------------------------------------------
-          xdtm = delz(i,kk) / xum                     ! the traveling time in each dz
+          xdtm = delz(icol,kk) / xum                     ! the traveling time in each dz
 
-          xxx2 = (xh2o2(i,kk) - xgas2(kk))
+          xxx2 = (xh2o2(icol,kk) - xgas2(kk))
           if( xxx2 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             yh2o2  = xh2o2(i,kk)/xxx2 * xdtm     
+             yh2o2  = xh2o2(icol,kk)/xxx2 * xdtm     
           else
              yh2o2  = large_value_lifetime
           endif
-          tmp_hetrates(i,kk,2) = max( 1._r8 / yh2o2,0._r8 ) * stay
+          tmp_hetrates(icol,kk,2) = max( 1._r8 / yh2o2,0._r8 ) * stay
 
-          xxx3 = (xso2( i,kk) - xgas3(kk))
+          xxx3 = (xso2( icol,kk) - xgas3(kk))
           if( xxx3 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
-             yso2  = xso2( i,kk)/xxx3 * xdtm     
+             yso2  = xso2( icol,kk)/xxx3 * xdtm     
           else
              yso2  = large_value_lifetime
           endif
-          tmp_hetrates(i,kk,3) = max( 1._r8 / yso2, 0._r8 ) * stay
+          tmp_hetrates(icol,kk,3) = max( 1._r8 / yso2, 0._r8 ) * stay
 
        enddo level_loop1
     enddo col_loop
@@ -398,31 +398,34 @@ contains
     !       ... part 2, in-cloud solve for low henry constant
     !                   hno3 and h2o2 have both in and under cloud
     !-----------------------------------------------------------------
-    level_loop2 : do k = ktop_all,pver
-       Column_loop2 : do i=1,ncol
-          if ( rain(i,k) <= 0._r8 ) then
-             het_rates(i,k,:) =  0._r8 
+    level_loop2 : do kk = ktop_all,pver
+       Column_loop2 : do icol=1,ncol
+          if ( rain(icol,kk) <= 0._r8 ) then
+             het_rates(icol,kk,:) =  0._r8 
              cycle
           endif
 
-          work1(i) = avo2 * xliq(i,k)
-          work2(i) = const0 * tfld(i,k)
+          work1(icol) = avo2 * xliq(icol,kk)
+          work2(icol) = const0 * tfld(icol,kk)
 
           if( h2o2_ndx > 0 ) then
-             work3(i) = satf_h2o2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_h2o2(i,k)*work2(i)))),0._r8 )    
-             het_rates(i,k,h2o2_ndx) =  work3(i) + tmp_hetrates(i,k,2)
+             work3(icol) = satf_h2o2 * max( rain(icol,kk) / &
+                           (h2o_mol*(work1(icol) + 1._r8/(xhen_h2o2(icol,kk)*work2(icol)))), 0._r8 )
+             het_rates(icol,kk,h2o2_ndx) =  work3(icol) + tmp_hetrates(icol,kk,2)
           endif
 
           if ( prog_modal_aero .and. so2_ndx>0 .and. h2o2_ndx>0 ) then
-             het_rates(i,k,so2_ndx) = het_rates(i,k,h2o2_ndx)
+             het_rates(icol,kk,so2_ndx) = het_rates(icol,kk,h2o2_ndx)
           elseif( so2_ndx > 0 ) then
-             work3(i) = satf_so2 * max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_so2( i,k)*work2(i)))),0._r8 )    
-             het_rates(i,k,so2_ndx ) =  work3(i) + tmp_hetrates(i,k,3)
+             work3(icol) = satf_so2 * max( rain(icol,kk) / &
+                           (h2o_mol*(work1(icol) + 1._r8/(xhen_so2( icol,kk)*work2(icol)))), 0._r8 )
+             het_rates(icol,kk,so2_ndx ) =  work3(icol) + tmp_hetrates(icol,kk,3)
           endif
 
           if( h2so4_ndx > 0 ) then
-             work3(i) = satf_hno3 *  max( rain(i,k) / (h2o_mol*(work1(i) + 1._r8/(xhen_hno3(i,k)*work2(i)))),0._r8 )
-             het_rates(i,k,h2so4_ndx) =  work3(i) + tmp_hetrates(i,k,1)
+             work3(icol) = satf_hno3 *  max( rain(icol,kk) / &
+                           (h2o_mol*(work1(icol) + 1._r8/(xhen_hno3(icol,kk)*work2(icol)))), 0._r8 )
+             het_rates(icol,kk,h2so4_ndx) =  work3(icol) + tmp_hetrates(icol,kk,1)
           endif
 
        enddo Column_loop2
@@ -432,14 +435,14 @@ contains
     !	... Set rates above tropopause = 0.
     !-----------------------------------------------------------------
     do mm = 1,gas_wetdep_cnt
-       m = wetdep_map(mm)
-       do i = 1,ncol
-          do k = 1,ktop(i)
-             het_rates(i,k,m) = 0._r8
+       mm2 = wetdep_map(mm)
+       do icol = 1,ncol
+          do kk = 1,ktop(icol)
+             het_rates(icol,kk,mm2) = 0._r8
           enddo
        enddo
-       if ( any( het_rates(:ncol,:,m) == MISSING) ) then
-          write(hetratestrg,'(I3)') m
+       if ( any( het_rates(:ncol,:,mm2) == MISSING) ) then
+          write(hetratestrg,'(I3)') mm2
           call endrun('sethet: het_rates (wet dep) not set for het reaction number : '//hetratestrg)
        endif
     enddo
