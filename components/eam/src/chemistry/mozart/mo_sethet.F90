@@ -269,6 +269,7 @@ contains
     real(r8) :: total_rain,total_pos
     character(len=3) :: hetratestrg
     real(r8), parameter :: MISSING = -999999._r8
+    real(r8), parameter :: large_value_lifetime = 1.e29_r8  ! a large lifetime value if no washout
     integer ::  mm
 
 !
@@ -404,20 +405,23 @@ contains
           !                        dt = dz(cm)/um(cm/s)
           !-----------------------------------------------------------------
           xdtm = delz(i,kk) / xum                     ! the traveling time in each dz
+
           xxx2 = (xh2o2(i,kk) - xgas2(kk))
           if( xxx2 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
              yh2o2  = xh2o2(i,kk)/xxx2 * xdtm     
           else
-             yh2o2  = 1.e29_r8
+             yh2o2  = large_value_lifetime
           end if
           tmp_hetrates(i,kk,2) = max( 1._r8 / yh2o2,0._r8 ) * stay
+
           xxx3 = (xso2( i,kk) - xgas3(kk))
           if( xxx3 /= 0._r8 ) then                       ! if no washout lifetime = 1.e29
              yso2  = xso2( i,kk)/xxx3 * xdtm     
           else
-             yso2  = 1.e29_r8
+             yso2  = large_value_lifetime
           end if
           tmp_hetrates(i,kk,3) = max( 1._r8 / yso2, 0._r8 ) * stay
+
        end do level_loop1
     end do col_loop
 
