@@ -216,11 +216,11 @@ contains
     character(len=3) :: hetratestrg
     integer  ::  icol, kk, kk2  ! indicies
     integer  ::  mm, mm2        ! indicies
-    integer  ::  ktop_all
     integer  ::  ktop(ncol)     ! tropopause level, 100mb for lat < 60 and 300mb for lat > 60
+    integer  ::  ktop_all
     real(r8) ::  xkgm           ! mass flux on rain drop
     real(r8) ::  stay           ! fraction of layer traversed by falling drop in timestep delt
-    real(r8) ::  xdtm
+    real(r8) ::  xdtm           ! the traveling time in each dz [s]
     real(r8) ::  xxx2, xxx3     ! working variables for h2o2 (2) and so2 (3)
     real(r8) ::  yso2, yh2o2    ! washout lifetime [s]     
     real(r8) ::  rlat(pcols)    ! latitude in radians for columns
@@ -355,11 +355,11 @@ contains
              stay = min( stay,1._r8 )
              ! calculate gas washout by cloud
              call gas_washout( kk,  xkgm,   xliq(icol,kk),       & ! in
-                        xhen_h2o2(icol,:), tfld(icol,:), delz(icol,:), & ! in
-                        xgas2                                 ) ! inout
+                  xhen_h2o2(icol,:), tfld(icol,:), delz(icol,:), & ! in
+                  xgas2                                          ) ! inout
              call gas_washout( kk,  xkgm,   xliq(icol,kk),       & ! in
-                         xhen_so2(icol,:), tfld(icol,:), delz(icol,:), & ! in
-                        xgas3                                 ) ! inout
+                  xhen_so2(icol,:), tfld(icol,:), delz(icol,:),  & ! in
+                  xgas3                                          ) ! inout
           endif
           !-----------------------------------------------------------------
           !       ... calculate the lifetime of washout (second)
@@ -549,7 +549,7 @@ contains
     real(r8), intent(in) :: xhen_i(pver) ! henry's law constant 
     real(r8), intent(in) :: tfld_i(pver) ! temperature [K]
     real(r8), intent(in) :: delz_i(pver) ! layer depth about interfaces [cm]
-    real(r8), intent(in) :: xkgm
+    real(r8), intent(in) :: xkgm         ! mass flux on rain drop
     real(r8), intent(inout) :: xgas(pver)   ! gas concentration
 
     integer  :: kk
