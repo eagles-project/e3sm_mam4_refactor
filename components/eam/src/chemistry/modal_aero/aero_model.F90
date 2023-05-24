@@ -1558,7 +1558,6 @@ lphase_jnmw_conditional: &
     real(r8) :: sflx(pcols)   ! accumulate over all bins for output
     real(r8) :: u10cubed(pcols)
     real(r8) :: u10(pcols)               ! Needed in Gantt et al. calculation of organic mass fraction
-    real(r8) :: F_eff(pcols) ! optional diagnostic output -- organic enrichment ratio
 
     real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
 
@@ -1591,7 +1590,6 @@ lphase_jnmw_conditional: &
        u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
 
        sflx(:)=0._r8
-       F_eff(:)=0._r8
 
        call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, &  ! in 
                          cam_in%cflx)                                                              ! inout

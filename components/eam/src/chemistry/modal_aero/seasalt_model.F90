@@ -62,18 +62,12 @@ module seasalt_model
 
   logical :: seasalt_active = .false.
 
-  logical :: debug_mam_mom = .false.
-
 ! Parameters for organic sea salt emissions
     real(r8), parameter :: mw_carbon = 12.0107_r8              ! molecular weight for carbon element [g/mol]
     real(r8), parameter :: dens_vol_NaCl_in_seawat = 35875._r8 ! approx volume density of salt in seawater [g/m^3]
     real(r8) :: dens_srf_NaCl_in_bubsrf                        ! salt per area bubble surface [g/m^2]
-    integer, parameter  :: n_org_max = 3                ! max number of organic compound classes
-    integer  :: n_org                ! actual number of organic compound classes (scheme dependent)
-    integer, parameter  :: n_org_burrows = 3        ! actual number of organic compound classes (scheme dependent)
-    integer, parameter  :: n_org_gantt   = 1        ! actual number of organic compound classes (scheme dependent)
-    integer, parameter  :: n_org_rinaldi = 1        ! actual number of organic compound classes (scheme dependent)
-    integer, parameter  :: n_org_quinn   = 1        ! actual number of organic compound classes (scheme dependent)
+    integer, parameter  :: n_org_max = 3                       ! max number of organic compound classes
+    integer, parameter  :: n_org  = 3                          ! actual number of organic compound classes (scheme dependent)
 
 ! Marine organics namelist variables
 
@@ -110,14 +104,14 @@ module seasalt_model
    logical :: has_mam_mom = .true.
 
 ! Order: mpoly, mprot, mlip
-    real(r8), dimension(n_org_burrows), parameter :: & ! OM:OC mass ratios for input fields (mpoly, mprot, mlip)
+    real(r8), dimension(n_org), parameter :: & ! OM:OC mass ratios for input fields (mpoly, mprot, mlip)
          OM_to_OC_in = (/ 2.3_r8, 2.2_r8, 1.3_r8 /)
-    real(r8), dimension(n_org_burrows), parameter :: & ! Langmuir parameters (inverse C_1/2)  [m3 mol-1]
+    real(r8), dimension(n_org), parameter :: & ! Langmuir parameters (inverse C_1/2)  [m3 mol-1]
          alpha_org = (/ 90.58_r8, 25175._r8, 18205._r8 /)
 ! Molecular weights needed for output of optional diagnostic variable F_eff
-    real(r8), dimension(n_org_burrows), parameter :: & ! Molecular weights [g mol-1]
+    real(r8), dimension(n_org), parameter :: & ! Molecular weights [g mol-1]
          mw_org   = (/ 250000._r8, 66463._r8, 284._r8 /)
-    real(r8), dimension(n_org_burrows), parameter :: & ! mass per sq. m at saturation
+    real(r8), dimension(n_org), parameter :: & ! mass per sq. m at saturation
          dens_srf_org = (/ 0.1376_r8, 0.00219_r8, 0.002593_r8 /) ! Mw_org / a_org
 
     real(r8), parameter :: sst_sz_range_lo (nslt+nslt_om) = &
@@ -355,7 +349,8 @@ subroutine ocean_data_readnl(nlfile)
 end subroutine ocean_data_readnl
 
   !=============================================================================
-subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx)
+subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, & ! in
+                        cflx)                                                  ! inout
 
     use sslt_sections, only: nsections, fluxes, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
@@ -418,7 +413,8 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cfl
 end subroutine seasalt_emis
 
 
-subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, cflx)
+subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, &  ! in
+                               cflx)                                                   ! inout
 
     use sslt_sections, only: nsections, fluxes, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
@@ -482,10 +478,9 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
    mass_frac_bub_section(:ncol,:,:) = 0.0_r8
    om_ssa(:ncol,:) = 0.0_r8
 
-   !if (fmoa==1) then ! Burrows et al. organic sea spray
-   n_org = n_org_burrows
-   call calc_om_ssa_burrows(lchnk, ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &  ! in
-                            mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :))    ! inout
+   ! Calculate marine organic aerosol mass fraction based on Burrows et al., ACP (2013)
+   call calc_om_ssa(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &      ! in
+                    mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :)) ! inout
 
 
 ! Calculate emission of MOM mass.
@@ -562,8 +557,8 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
 end subroutine marine_organic_emis
 
 
-subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
-                               mass_frac_bub_section, om_ssa)
+subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
+                       mass_frac_bub_section, om_ssa)       ! inout
 
    !----------------------------------------------------------------------- 
    ! Purpose:
@@ -578,7 +573,6 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    implicit none
    !-----------------------------------------------------------------------
    ! Input variables:
-   integer,  intent(in) :: lchnk
    integer,  intent(in) :: ncol
    real(r8), intent(in) :: mpoly_in(ncol)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), intent(in) :: mprot_in(ncol)         ! for Burrows et al. (2014) organic mass fraction
@@ -592,11 +586,11 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    ! Local variables
    real(r8) :: alpha_help(ncol)
    real(r8) :: mass_frac_bub_tot(ncol)
-   real(r8) :: om_conc(ncol, n_org_burrows)             ! mole concentration of organic [mol/m^3]
-   real(r8) :: theta(ncol, n_org_burrows)               ! fractional surface coverage [unitless]
-   real(r8) :: mass_frac_bub(ncol, n_org_burrows)
-   real(r8) :: theta_help(ncol, n_org_burrows)
-   real(r8) :: mass_frac_bub_help(ncol, n_org_burrows)
+   real(r8) :: om_conc(ncol, n_org)             ! mole concentration of organic [mol/m^3]
+   real(r8) :: theta(ncol, n_org)               ! fractional surface coverage [unitless]
+   real(r8) :: mass_frac_bub(ncol, n_org)
+   real(r8) :: theta_help(ncol, n_org)
+   real(r8) :: mass_frac_bub_help(ncol, n_org)
 
    real(r8), parameter :: particle_size_for_OMF_param = 0.5_r8 ! in microns
    real(r8), parameter :: omfrac_max = 0.78  ! OMF maximum and minimum values -- max from Rinaldi et al. (2013)
@@ -622,7 +616,7 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
 
 
    ! Calculate the surface coverage by class
-   do iorg = 1, n_org_burrows
+   do iorg = 1, n_org
       ! Bulk mass concentration [mol m-3] = [g m-3] / [g mol-1]
       om_conc(:, iorg)     = om_conc(:, iorg) / mw_org(iorg)
       ! use theta_help as work array -- theta_help = alpha(i) * x(i)
@@ -630,7 +624,7 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    enddo
    alpha_help(:) = sum(theta, dim=2)
    
-   do iorg = 1, n_org_burrows
+   do iorg = 1, n_org
       ! complete calculation -- theta = alpha(i) * x(i) / (1 + sum( alpha(i) * x(i) ))
       theta(:, iorg)         = theta_help(:, iorg) / (1.0_r8 + alpha_help(:))
       ! Calculate the organic mass per area (by class) [g m-2]
@@ -643,14 +637,14 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
 
    ! mass_frac_bub = 2*[g OM m-2] / (2*[g OM m-2] * [g NaCl m-2])
    ! Factor 2 for bubble bilayer (coated on both surfaces of film)
-   do iorg = 1, n_org_burrows
+   do iorg = 1, n_org
       mass_frac_bub(:, iorg) = 2.0_r8*mass_frac_bub_help(:, iorg) / &
            (2.0_r8*sum(mass_frac_bub_help(:, :), dim=2) + dens_srf_NaCl_in_bubsrf)
    enddo
 
    mass_frac_bub_tot(:) = sum(mass_frac_bub, dim=2)
 
-   do iorg = 1, n_org_burrows
+   do iorg = 1, n_org
       where (mass_frac_bub_tot(:) > omfrac_max)
          mass_frac_bub(:, iorg) = mass_frac_bub(:, iorg) / mass_frac_bub_tot(:) * omfrac_max
       endwhere
@@ -671,15 +665,16 @@ subroutine calc_om_ssa_burrows(lchnk, ncol, mpoly_in, mprot_in, mlip_in, &
    ! mass_frac_bub_section(pcols, n_org_max, nsections) -- org classes in dim 2, size nsections in dim 3
    mass_frac_bub_section(:, :, :)   = 0.0_r8
 
-   do iorg = 1, n_org_burrows
+   do iorg = 1, n_org
       call omfrac_accu_aitk(mass_frac_bub(:, iorg), & ! in
                             mass_frac_bub_section(:, iorg, :)) ! inout
    enddo
 
-end subroutine calc_om_ssa_burrows
+end subroutine calc_om_ssa
 
 
-subroutine omfrac_accu_aitk(om_ssa_in, om_ssa)
+subroutine omfrac_accu_aitk(om_ssa_in, & ! in
+                            om_ssa)      ! inout
 
    !----------------------------------------------------------------------- 
    ! Purpose:
