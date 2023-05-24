@@ -14,7 +14,15 @@ module sslt_sections
   public :: Dg
   public :: rdry
 
-  integer,parameter :: nsections = 31
+  integer, parameter :: nsections = 31
+  integer, parameter :: sec1_beg = 1
+  integer, parameter :: sec1_end = 9
+  integer, parameter :: sec2_beg = 10
+  integer, parameter :: sec2_end = 13
+  integer, parameter :: sec3_beg = 14
+  integer, parameter :: sec3_end = 21
+  integer, parameter :: sec4_beg = 22
+  integer, parameter :: sec4_end = nsections
 
   ! only use up to ~20um
   real(r8),parameter :: Dg(nsections) = (/  &
@@ -49,7 +57,7 @@ contains
     bm(:)=(0.380_r8-log10(rm(:)))/0.65_r8  ! use in Manahan
 
     ! calculate constants form emission polynomials
-    do m = 1, 9
+    do m = sec1_beg, sec1_end
        consta(1,m) = (-2.576_r8)*10._r8**35*Dg(m)**4+5.932_r8*10._r8**28  &
                * Dg(m)**3+(-2.867_r8)*10._r8**21*Dg(m)**2+(-3.003_r8)  &
                * 10._r8**13*Dg(m) + (-2.881_r8)*10._r8**6
@@ -58,7 +66,7 @@ contains
                * Dg(m)**2+1.829_r8*10._r8**16*Dg(m)+7.609_r8*10._r8**8
     enddo
 
-    do m = 10, 13
+    do m = sec2_beg, sec2_end
        consta(2,m) = (-2.452_r8)*10._r8**33*Dg(m)**4+2.404_r8*10._r8**27  &
                * Dg(m)**3+(-8.148_r8)*10._r8**20*Dg(m)**2+(1.183_r8)*10._r8**14 &
                * Dg(m)+(-6.743_r8)*10._r8**6
@@ -67,7 +75,7 @@ contains
                * Dg(m)**2+(-3.787_r8)*10._r8**16*Dg(m)+ 2.279_r8*10._r8**9
     enddo
 
-    do m = 14, 21
+    do m = sec3_beg, sec3_end
        consta(3,m) = (1.085_r8)*10._r8**29*Dg(m)**4+(-9.841_r8)*10._r8**23  &
                * Dg(m)**3+(3.132_r8)*10._r8**18*Dg(m)**2+(-4.165_r8)*10._r8**12 &
                * Dg(m)+(2.181_r8)*10._r8**6
@@ -76,7 +84,7 @@ contains
                * Dg(m)**2+(1.105_r8)*10._r8**15*Dg(m)+(-5.800_r8)*10._r8**8
     enddo
 
-    do m = 22, nsections
+    do m = sec4_beg, sec4_end
        ! use monahan
           consta(4,m) = (1.373_r8*rm(m)**(-3)*(1+0.057_r8*rm(m)**1.05_r8)  &
                * 10**(1.19_r8*exp(-bm(m)**2)))  &
@@ -107,19 +115,19 @@ contains
 
     ! calculate number flux fi (#/m2/s)
     fi(:,:)=0._r8
-    do m=1, 9
+    do m = sec1_beg, sec1_end
        fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(1,m)+constb(1,m))
     enddo
 
-    do m=10, 13
+    do m = sec2_beg, sec2_end
        fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(2,m)+constb(2,m))
     enddo
 
-    do m=14, 21
+    do m = sec3_beg, sec3_end
        fi(:ncol,m)=W(:ncol)*((sst(:ncol))*consta(3,m)+constb(3,m))
     enddo
 
-    do m=22, nsections
+    do m = sec4_beg, sec4_end
        fi(:ncol,m)=consta(4,m)*u10cubed(:ncol)
     enddo
 
