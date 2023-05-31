@@ -102,6 +102,7 @@
      y_nstep_old = y_nstep
 
      if(.not.(hadact(iact))) then
+        hadact(iact) = .true.
 
         !(**remove these yaml% variables if generating data for a dependent subroutines**)
         yaml%lchnk_print = y_lchnk
