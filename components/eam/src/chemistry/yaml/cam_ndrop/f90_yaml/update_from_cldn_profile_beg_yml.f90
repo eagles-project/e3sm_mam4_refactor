@@ -124,15 +124,12 @@
         ! add code for writing data here
         ! below are explicit input arguments to update_from_cldn_profile
         
-        call write_var(unit_input,unit_output,'cldn_col_in',cldn_col_in(yaml%lev_print))
         call write_var(unit_input,unit_output,'dtinv',dtinv)
         call write_var(unit_input,unit_output,'wtke_col_in',wtke_col_in(yaml%lev_print))
         call write_var(unit_input,unit_output,'zs',zs(yaml%lev_print))
         call write_var(unit_input,unit_output,'dz',dz(yaml%lev_print))
         call write_var(unit_input,unit_output,'temp_col_in',temp_col_in(yaml%lev_print))
         call write_var(unit_input,unit_output,'csbot_cscen',csbot_cscen(yaml%lev_print))
-
-        call write_var(unit_input,unit_output,'raercol_nsav',raercol_nsav(yaml%lev_print,:))
         call write_var(unit_input,unit_output,'raercol_cw_nsav',raercol_cw_nsav(yaml%lev_print,:))
         call write_var(unit_input,unit_output,'nsource_col',nsource_col(yaml%lev_print))
         call write_var(unit_input,unit_output,'qcld',qcld(yaml%lev_print))
@@ -143,12 +140,17 @@
 
         ! the input value of state_q_col_in used is actually at level kp1 = min0(kk+1,pver),
         ! where kk is the level of the output level-dependent fields.
-        ! for cs_col_in, values at both kk and kp1 are used for output at kk.
+        ! for cs_col_in, cldn_col_in, and raercol_nsav, values at both kk and kp1 are used for output at kk.
         ! therefore, use these particular levels for the input fields, and indicate in 
         ! the field name within the files
-        call write_var(unit_input,unit_output,'cs_col_in(kk)',cs_col_in(yaml%lev_print))
-        call write_var(unit_input,unit_output,'cs_col_in(kp1)',cs_col_in(kp1_yaml))
-        call write_var(unit_input,unit_output,'state_q_col_in(kp1)',state_q_col_in(kp1_yaml,:))
+
+        call write_var(unit_input,unit_output,'cs_col_in_kk',cs_col_in(yaml%lev_print))
+        call write_var(unit_input,unit_output,'cs_col_in_kp1',cs_col_in(kp1_yaml))
+        call write_var(unit_input,unit_output,'cldn_col_in_kk',cldn_col_in(yaml%lev_print))
+        call write_var(unit_input,unit_output,'cldn_col_in_kp1',cldn_col_in(kp1_yaml))
+        call write_var(unit_input,unit_output,'raercol_nsav_kk',raercol_nsav(yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'raercol_nsav_kp1',raercol_nsav(kp1_yaml,:))
+        call write_var(unit_input,unit_output,'state_q_col_in_kp1',state_q_col_in(kp1_yaml,:))
 
         ! below are external module variable inputs to update_from_cldn_profile
 

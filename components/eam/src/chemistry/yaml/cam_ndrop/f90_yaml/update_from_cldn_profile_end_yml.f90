@@ -6,14 +6,14 @@
 
      !start writing data
      
-        call write_var(unit_output,'raercol_nsav(yaml%lev_print,:)',raercol_nsav)
-        call write_var(unit_output,'raercol_cw_nsav(yaml%lev_print,:)',raercol_cw_nsav)
-        call write_var(unit_output,'nsource_col(yaml%lev_print)',nsource_col)
-        call write_var(unit_output,'qcld(yaml%lev_print)',qcld)
-        call write_var(unit_output,'factnum_col(yaml%lev_print,:)',factnum_col)
-        call write_var(unit_output,'ekd(yaml%lev_print)',ekd)
-        call write_var(unit_output,'nact(yaml%lev_print,:)',nact)
-        call write_var(unit_output,'mact(yaml%lev_print,:)',mact)
+        call write_var(unit_output,'raercol_nsav',raercol_nsav(yaml%lev_print,:))
+        call write_var(unit_output,'raercol_cw_nsav',raercol_cw_nsav(yaml%lev_print,:))
+        call write_var(unit_output,'nsource_col',nsource_col(yaml%lev_print))
+        call write_var(unit_output,'qcld',qcld(yaml%lev_print))
+        call write_var(unit_output,'factnum_col',factnum_col(yaml%lev_print,:))
+        call write_var(unit_output,'ekd',ekd(yaml%lev_print))
+        call write_var(unit_output,'nact',nact(yaml%lev_print,:))
+        call write_var(unit_output,'mact',mact(yaml%lev_print,:))
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only

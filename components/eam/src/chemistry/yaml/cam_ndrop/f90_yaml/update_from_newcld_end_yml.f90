@@ -6,11 +6,11 @@
 
      !start writing data
      
-        call write_var(unit_output,'qcld',qcld)
-        call write_var(unit_output,'nsource_col_out',nsource_col_out)
-        call write_var(unit_output,'raercol_nsav',raercol_nsav)
-        call write_var(unit_output,'raercol_cw_nsav',raercol_cw_nsav)
-        call write_var(unit_output,'factnum_col_out',factnum_col_out)
+        call write_var(unit_output,'qcld',qcld(yaml%lev_print))
+        call write_var(unit_output,'nsource_col_out',nsource_col_out(yaml%lev_print))
+        call write_var(unit_output,'raercol_nsav',raercol_nsav(yaml%lev_print,:))
+        call write_var(unit_output,'raercol_cw_nsav',raercol_cw_nsav(yaml%lev_print,:))
+        call write_var(unit_output,'factnum_col_out',factnum_col_out(yaml%lev_print,:))
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
