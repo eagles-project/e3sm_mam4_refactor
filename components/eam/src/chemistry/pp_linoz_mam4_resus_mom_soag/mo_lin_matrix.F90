@@ -1,5 +1,6 @@
 
 module mo_lin_matrix
+#include "../yaml/common_files/common_uses.ymlf90"
 
    private
    public :: linmat
@@ -25,6 +26,7 @@ module mo_lin_matrix
       real(r8), intent(in) :: rxt(rxntot)
       real(r8), intent(in) :: het_rates(max(1,gas_pcnst))
       real(r8), intent(out) :: mat(nzcnt)
+#include "../yaml/mo_lin_matrix/f90_yaml/linmat_beg_yml.f90"
 
          mat(1) = -( rxt(1) + rxt(3) + het_rates(2) )
 
@@ -89,6 +91,7 @@ module mo_lin_matrix
          mat(32) = -( het_rates(31) )
 
 
+#include "../yaml/mo_lin_matrix/f90_yaml/linmat_end_yml.f90"
       end subroutine linmat
 
 !===================================================================

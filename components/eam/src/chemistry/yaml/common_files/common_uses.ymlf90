@@ -33,5 +33,16 @@ use spmd_utils,   only : masterproc
 ! sox_cldaero_mod
 !#define YAML_SOXMOD
 
+! mo_imp_sol
+!#define YAML_IMP_SOL
+! mo_indprd
+!#define YAML_INDPRD
+! mo_lin_matrix
+!#define YAML_LINMAT
+! mo_nln_matrix
+!#define YAML_NLNMAT
+! mo_prod_loss
+!#define YAML_PROD_LOSS
+
 use yaml_input_file_io
 

@@ -1,4 +1,5 @@
 module mo_indprd
+#include "../yaml/common_files/common_uses.ymlf90"
 
    use shr_kind_mod, only : r8 => shr_kind_r8
 
@@ -27,11 +28,12 @@ module mo_indprd
       real(r8), intent(in) :: rxt(ncol,pver,rxntot)
       real(r8), intent(in) :: extfrc(ncol,pver,extcnt)
       real(r8), intent(inout) :: prod(ncol,pver,nprod)
+#include "../yaml/mo_indprd/f90_yaml/indprd_beg_yml.f90"
 
 !--------------------------------------------------------------------
 ! ... "independent" production for Explicit species
 !--------------------------------------------------------------------
-      if( class == 1 ) then
+      if( class == 1 ) then     ! FORTRAN refactor: this if condition is never reached as the explicit solver is removed
          prod(:,:,1) = 0._r8
 !--------------------------------------------------------------------
 ! ... "independent" production for Implicit species
@@ -70,6 +72,7 @@ module mo_indprd
 
       endif
 
+#include "../yaml/mo_indprd/f90_yaml/indprd_end_yml.f90"
    end subroutine indprd
 !==========================================================================
 

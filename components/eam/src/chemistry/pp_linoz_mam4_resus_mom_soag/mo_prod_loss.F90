@@ -1,38 +1,12 @@
 module mo_prod_loss
+#include "../yaml/common_files/common_uses.ymlf90"
 
    use shr_kind_mod, only : r8 => shr_kind_r8
 
    private
-   public :: exp_prod_loss
    public :: imp_prod_loss
 
    contains
-
-!=================================================================
-   subroutine exp_prod_loss( prod, loss,        & ! out
-                             y, rxt, het_rates  ) ! in
-
-      use ppgrid, only : pver
-
-      implicit none
-
-!--------------------------------------------------------------------
-! ... dummy args
-!--------------------------------------------------------------------
-      real(r8), dimension(:,:,:), intent(out) :: &
-                              prod, loss
-      real(r8), intent(in) :: y(:,:,:)
-      real(r8), intent(in) :: rxt(:,:,:)
-      real(r8), intent(in) :: het_rates(:,:,:)
-
-!--------------------------------------------------------------------
-! ... loss and production for Explicit method
-!--------------------------------------------------------------------
-
-         loss(:,:,1) = ( + het_rates(:,:,1))* y(:,:,1)
-         prod(:,:,1) = 0._r8
-
-   end subroutine exp_prod_loss
 
 !=================================================================
    subroutine imp_prod_loss( prod, loss,        & ! out
@@ -50,6 +24,7 @@ module mo_prod_loss
       real(r8), intent(in) :: y(:)
       real(r8), intent(in) :: rxt(:)
       real(r8), intent(in) :: het_rates(:)
+#include "../yaml/mo_prod_loss/f90_yaml/imp_prod_loss_beg_yml.f90"
 
 !--------------------------------------------------------------------
 ! ... loss and production for Implicit method
@@ -116,6 +91,7 @@ module mo_prod_loss
          loss(30) = ( + het_rates(31))* y(31)
          prod(30) = 0._r8
 
+#include "../yaml/mo_prod_loss/f90_yaml/imp_prod_loss_end_yml.f90"
       end subroutine imp_prod_loss
 
 !=================================================================
