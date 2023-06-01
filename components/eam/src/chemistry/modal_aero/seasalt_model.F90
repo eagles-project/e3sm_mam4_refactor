@@ -343,8 +343,6 @@ subroutine ocean_data_readnl(nlfile)
    fmoa          = mam_mom_parameterization
 
 
-!   ! Turn on mam_mom aerosols if user has specified an input dataset.
-!   has_mam_mom = len_trim(filename) > 0
 
 end subroutine ocean_data_readnl
 
@@ -386,7 +384,7 @@ end subroutine seasalt_emis
 
 
 subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
-                                cflx)                                          ! inout
+                                cflx)                                     ! inout
    
     use sslt_sections, only: nsections, fluxes, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
@@ -396,7 +394,7 @@ subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
     real(r8), intent(in) :: fi(pcols, nsections)        ! sea salt number fluxes in each size bin [#/m2/s]
     real(r8), intent(in) :: ocnfrc(pcols)               ! ocean fraction [unitless]
     real(r8), intent(in) :: emis_scale                  ! sea salt emission tuning factor [unitless]
-    integer, intent(in)  :: flx_type
+    integer, intent(in)  :: flx_type                    ! number ==0 or mass ==1 flux to be calculated
 
     ! output
     real(r8), intent(inout) :: cflx(:,:)      ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
@@ -531,13 +529,13 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
 
     ! Total external mixture: emit only in modes 4, 5
    
-    call marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &
-                                    om_ssa, emit_this_mode, &       
-                                    cflx)
+    call marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in 
+                                    om_ssa, emit_this_mode, &        ! in
+                                    cflx)                            ! inout
 
     call marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                      mass_frac_bub_section, emit_this_mode, & ! in
-                                     cflx)
+                                     cflx)                                    ! inout
 
 end subroutine marine_organic_emis
 
@@ -550,11 +548,11 @@ subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
 
     ! input
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: fi(pcols, nsections)   ! sea salt number fluxes in each size bin [#/m2/s]    
-    real(r8), intent(in) :: ocnfrc(pcols)          ! ocean fraction [unitless] 
-    real(r8), intent(in) :: emis_scale             ! sea salt emission tuning factor [unitless]
-    real(r8), intent(in) :: om_ssa(pcols, nsections)
-    logical, intent(in)  :: emit_this_mode(om_num_modes)
+    real(r8), intent(in) :: fi(pcols, nsections)          ! sea salt number fluxes in each size bin [#/m2/s]    
+    real(r8), intent(in) :: ocnfrc(pcols)                 ! ocean fraction [unitless] 
+    real(r8), intent(in) :: emis_scale                    ! sea salt emission tuning factor [unitless]
+    real(r8), intent(in) :: om_ssa(pcols, nsections)      ! marine organic aerosol fraction per size bin [unitless]
+    logical, intent(in)  :: emit_this_mode(om_num_modes)  ! logical flags turn on/off marine organic emission in aerosol modes 
 
     ! output
     real(r8), intent(inout) :: cflx(:,:)       ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
@@ -603,12 +601,12 @@ subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  
 
     ! input
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: fi(pcols, nsections)   ! sea salt number fluxes in each size bin [#/m2/s]
-    real(r8), intent(in) :: ocnfrc(pcols)          ! ocean fraction [unitless] 
-    real(r8), intent(in) :: emis_scale             ! sea salt emission tuning factor [unitless]
-    real(r8), intent(in) :: om_ssa(pcols, nsections)
-    real(r8), intent(in) :: mass_frac_bub_section(pcols, n_org_max, nsections)
-    logical, intent(in)  :: emit_this_mode(om_num_modes)
+    real(r8), intent(in) :: fi(pcols, nsections)             ! sea salt number fluxes in each size bin [#/m2/s]
+    real(r8), intent(in) :: ocnfrc(pcols)                    ! ocean fraction [unitless] 
+    real(r8), intent(in) :: emis_scale                       ! sea salt emission tuning factor [unitless]
+    real(r8), intent(in) :: om_ssa(pcols, nsections)         ! marine organic aerosol fraction per size bin [unitless]
+    real(r8), intent(in) :: mass_frac_bub_section(pcols, n_org_max, nsections) ! marine organic aerosol fraction per organic species per size bin [unitless]
+    logical, intent(in)  :: emit_this_mode(om_num_modes)     ! logical flags turn on/off marine organic emission in aerosol modes
 
     ! output
     real(r8), intent(inout) :: cflx(:,:)       ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
