@@ -653,7 +653,7 @@ contains
     real(r8) :: flux_fullact ! flux of activated aerosol fraction assuming 100% activation [m/s]
     real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
     real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_newcld_beg_yml.f90"
 
     ! k-loop for growing/shrinking cloud calcs .............................
     do kk = top_lev, pver
@@ -723,7 +723,7 @@ contains
        endif    !  cldn(icol,kk)-cldo(icol,kk) > 0.01_r8
     enddo  ! end of k-loop for growing/shrinking cloud calcs ......................
 
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_newcld_end_yml.f90"
 
   end subroutine update_from_newcld
 
@@ -772,7 +772,7 @@ contains
     real(r8) :: fluxn(ntot_amode)     ! flux of activated aerosol number fraction into cloud [m/s]
     real(r8) :: fluxm(ntot_amode)     ! flux of activated aerosol mass fraction into cloud [m/s]
     real(r8) :: fluxntot         ! flux of activated aerosol number into cloud [#/m^2/s]
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_cldn_profile_beg_yml.f90"
 
     ! ......................................................................
     ! start of k-loop for calc of old cloud activation tendencies ..........
@@ -896,7 +896,7 @@ contains
 
     enddo
 
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_cldn_profile_end_yml.f90"
   end subroutine update_from_cldn_profile
 
   !===============================================================================
@@ -946,7 +946,7 @@ contains
     real(r8) :: dtmix    ! timescale for subloop [s]
     real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
     real(r8) :: srcn(pver)       ! droplet source rate [/s]
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_explmix_beg_yml.f90"
     ! load new droplets in layers above, below clouds
 
     dtmin     = dtmicro
@@ -1140,7 +1140,7 @@ contains
           enddo
        endif
     enddo
-
+#include "../../chemistry/yaml/cam_ndrop/f90_yaml/update_from_explmix_end_yml.f90"
   end subroutine update_from_explmix
 
   !===============================================================================
