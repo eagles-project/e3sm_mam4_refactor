@@ -42,23 +42,23 @@ contains
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: mmr(pcols,pver,gas_pcnst)
-    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst)
+    integer, intent(in)     :: ncol ! number of columns
+    real(r8), intent(in)    :: mbar(ncol,pver)  ! atmos mean atomic mass [g/mol or amu]
+    real(r8), intent(in)    :: mmr(pcols,pver,gas_pcnst)  ! mass mixing ratio [kg/kg air]
+    real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratio [mol/mol air]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
+    integer :: kk, mm   ! indices for vertical level and  gas constituent
 
-    do m = 1,gas_pcnst
-       if( adv_mass(m) /= 0._r8 ) then
-          do k = 1,pver
-             vmr(:ncol,k,m) = mbar(:ncol,k) * mmr(:ncol,k,m) / adv_mass(m)
-          end do
-       end if
-    end do
+    do mm = 1,gas_pcnst
+       if( adv_mass(mm) /= 0._r8 ) then
+          do kk = 1,pver
+             vmr(:ncol,kk,mm) = mbar(:ncol,kk) * mmr(:ncol,kk,mm) / adv_mass(mm)
+          enddo
+       endif
+    enddo
 
   end subroutine mmr2vmr
 
@@ -169,22 +169,22 @@ contains
     !-----------------------------------------------------------------------
     !	... Dummy arguments
     !-----------------------------------------------------------------------
-    integer, intent(in) ::    ncol
+    integer, intent(in) ::    ncol  !  number of columns
     real(r8), dimension(pcols,pver), intent(in) :: &
-         h2o_mmr                ! specific humidity ( mmr )
+         h2o_mmr                ! specific humidity [kg h2o / kg air]
     real(r8), dimension(ncol,pver), intent(in)  :: &
-         mbar                   ! atmos mean mass
+         mbar                   ! atmos mean atomic mass [g/mol or amu]
     real(r8), dimension(ncol,pver), intent(out) :: &
-         h2o_vmr                ! water vapor vmr
+         h2o_vmr                ! water vapor vmr [mol h2o/ mol air]
 
     !-----------------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------------
-    integer ::   k
+    integer ::   kk  ! vertical level index
 
-    do k = 1,pver
-       h2o_vmr(:ncol,k) = mbar(:ncol,k) * h2o_mmr(:ncol,k) / adv_mass_h2o
-    end do
+    do kk = 1,pver
+       h2o_vmr(:ncol,kk) = mbar(:ncol,kk) * h2o_mmr(:ncol,kk) / adv_mass_h2o
+    enddo
 
   end subroutine h2o_to_vmr
 
