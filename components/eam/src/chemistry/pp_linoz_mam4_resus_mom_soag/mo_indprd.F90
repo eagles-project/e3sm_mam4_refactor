@@ -11,7 +11,7 @@ module mo_indprd
 !==========================================================================
    subroutine indprd( class, & ! in
                        prod, & ! inout
-                nprod, y, extfrc, rxt, ncol ) ! in
+                nprod, extfrc, rxt, ncol ) ! in
 
       use chem_mods, only : gas_pcnst, extcnt, rxntot
       use ppgrid, only : pver
@@ -24,7 +24,6 @@ module mo_indprd
       integer, intent(in) :: class  ! 1 for explicit, 4 for implicit
       integer, intent(in) :: ncol
       integer, intent(in) :: nprod
-      real(r8), intent(in) :: y(ncol,pver,gas_pcnst)
       real(r8), intent(in) :: rxt(ncol,pver,rxntot)
       real(r8), intent(in) :: extfrc(ncol,pver,extcnt)
       real(r8), intent(inout) :: prod(ncol,pver,nprod)

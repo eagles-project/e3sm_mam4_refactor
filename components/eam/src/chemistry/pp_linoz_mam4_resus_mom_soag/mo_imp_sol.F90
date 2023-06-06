@@ -168,7 +168,7 @@ contains
     !-----------------------------------------------------------------------
     call indprd( 4,                         & ! in
                  ind_prd,                   & ! inout
-                 clscnt4, base_sol, extfrc, & ! in
+                 clscnt4,        extfrc,    & ! in
                  reaction_rates, ncol       ) ! in
 
     level_loop : do lev = 1,pver
