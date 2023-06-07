@@ -2,6 +2,7 @@ module mo_imp_sol
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods, only : clscnt4, gas_pcnst, clsmap
   use cam_logfile, only : iulog
+#include "../yaml/common_files/common_uses.ymlf90"
 
 !==================================================================================
 ! module variables
@@ -156,6 +157,7 @@ contains
     real(r8), dimension(ncol,pver,max(1,clscnt4)) :: prod_out, loss_out
     logical :: converged(max(1,clscnt4))
     logical :: convergence      ! all converged(:) are true
+#include "../yaml/mo_imp_sol/f90_yaml/imp_sol_beg_yml.f90"
 
     ! initiate variables
     prod_out(:,:,:) = 0._r8
@@ -166,7 +168,7 @@ contains
     !-----------------------------------------------------------------------
     call indprd( 4,                         & ! in
                  ind_prd,                   & ! inout
-                 clscnt4, base_sol, extfrc, & ! in
+                 clscnt4,        extfrc,    & ! in
                  reaction_rates, ncol       ) ! in
 
     level_loop : do lev = 1,pver
@@ -309,6 +311,7 @@ contains
        call outfld( trim(solsym(jj))//'_CHMP', prod_out(:,:,icol), ncol, lchnk )
        call outfld( trim(solsym(jj))//'_CHML', loss_out(:,:,icol), ncol, lchnk )
     enddo
+#include "../yaml/mo_imp_sol/f90_yaml/imp_sol_end_yml.f90"
   end subroutine imp_sol
 
 !==================================================================================
@@ -349,6 +352,7 @@ contains
     real(r8) :: sys_jac(max(1,nzcnt))
     real(r8) :: forcing(max(1,clscnt4))
 
+#include "../yaml/mo_imp_sol/f90_yaml/newton_raphson_iter_beg_yml.f90"
 
 
     iter_loop : do nr_iter = 1,itermax
@@ -426,6 +430,7 @@ contains
          endif
       enddo iter_loop
 
+#include "../yaml/mo_imp_sol/f90_yaml/newton_raphson_iter_end_yml.f90"
   end subroutine newton_raphson_iter
 !==================================================================================
 end module mo_imp_sol

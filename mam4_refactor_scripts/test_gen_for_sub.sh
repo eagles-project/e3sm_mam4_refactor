@@ -7,24 +7,24 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=hetfrz_classnuc_calc
+    sub_name=imp_prod_loss
 
     #ins and in-outs variables
     #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
-    ins='deltat, temperature, pressure, supersatice, fn, r3lx, icnlx, hetraer, awcam, awfacm, dstcoat, total_aer_num, coated_aer_num, uncoated_aer_num, total_interstitial_aer_num, total_cloudborne_aer_num'
+    ins='y, rxt, het_rates'
 
     #outs and in-outs variables
     #(a comma seprated string, same as above)
-    outs='frzbcimm, frzduimm, frzbccnt, frzducnt, frzbcdep, frzdudep, errstring'
+    outs='prod,loss'
 
     #module name
-    module_name=hetfrz_classnuc
+    module_name=mo_prod_loss
 
     #file path
-    dir_path=components/eam/src/physics/cam/
+    dir_path=components/eam/src/chemistry/pp_linoz_mam4_resus_mom_soag/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_HETFRZ_CLASSNUC
+    cpp_directive=YAML_PROD_LOSS
 
     #-------------------------
     #USER INPUT ENDS

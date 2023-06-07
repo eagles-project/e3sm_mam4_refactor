@@ -1,5 +1,6 @@
 
 module mo_nln_matrix
+#include "../yaml/common_files/common_uses.ymlf90"
 
    use shr_kind_mod, only : r8 => shr_kind_r8
 
@@ -20,6 +21,7 @@ module mo_nln_matrix
       real(r8), intent(in) :: dti
       real(r8), intent(in) :: lmat(nzcnt)
       real(r8), intent(out) :: mat(nzcnt)
+#include "../yaml/mo_nln_matrix/f90_yaml/nlnmat_beg_yml.f90"
 !----------------------------------------------
 ! ... local variables
 !----------------------------------------------
@@ -88,6 +90,7 @@ module mo_nln_matrix
          mat( 30) = mat( 30) - dti
          mat( 31) = mat( 31) - dti
          mat( 32) = mat( 32) - dti
+#include "../yaml/mo_nln_matrix/f90_yaml/nlnmat_end_yml.f90"
    end subroutine nlnmat
 !=========================================================
 end module mo_nln_matrix

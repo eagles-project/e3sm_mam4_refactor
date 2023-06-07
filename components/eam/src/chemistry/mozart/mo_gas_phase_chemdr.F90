@@ -189,7 +189,6 @@ contains
     use chem_mods,         only : nabscol, nfs, indexm
     use physconst,         only : rga
     use mo_photo,          only : set_ub_col, setcol, table_photo, xactive_photo
-    use mo_exp_sol,        only : exp_sol
     use mo_imp_sol,        only : imp_sol
     use mo_setrxt,         only : setrxt
     use mo_adjrxt,         only : adjrxt
@@ -759,11 +758,7 @@ contains
     !-----------------------------------------------------------------------
     !	... Solve for "Explicit" species
     !-----------------------------------------------------------------------
-    call t_startf('exp_sol')
-    call exp_sol( vmr,          & ! inout
-                  reaction_rates, het_rates, extfrc, delt,       & ! in
-                  invariants(1,1,indexm), ncol, lchnk, ltrop_sol ) ! in
-    call t_stopf('exp_sol')
+    ! FORTRAN refactor: the explicit solver does nothing, remove the code
 
     !-----------------------------------------------------------------------
     !	... Solve for "Implicit" species

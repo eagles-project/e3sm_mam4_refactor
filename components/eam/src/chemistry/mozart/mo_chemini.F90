@@ -63,7 +63,6 @@ contains
     use mo_drydep,         only : drydep_inti
     use seq_drydep_mod,    only : DD_XLND, DD_XATM, drydep_method
     use mo_imp_sol,        only : imp_slv_inti
-    use mo_exp_sol,        only : exp_sol_inti
     use spmd_utils,        only : iam
     use mo_fstrat,         only : fstrat_inti
     use m_types,           only : time_ramp
@@ -268,7 +267,6 @@ contains
     !	... initialize the implicit solver
     !-----------------------------------------------------------------------
     call imp_slv_inti()
-    call exp_sol_inti()
 
     !-----------------------------------------------------------------------
     !       ... initialize the stratospheric ozone source
