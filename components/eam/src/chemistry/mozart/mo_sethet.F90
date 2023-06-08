@@ -223,8 +223,8 @@ contains
     real(r8) ::  xxx2, xxx3     ! working variables for h2o2 (2) and so2 (3)
     real(r8) ::  yso2, yh2o2    ! washout lifetime [s]     
     real(r8) ::  rlat(pcols)    ! latitude in radians for columns
-    real(r8), dimension(ncol)  :: work1, work2, work3,  & ! working variables
-                                  t_factor,     & ! temperature factor to calculate henry's law parameters
+    real(r8) ::  work1, work2   ! working variables
+    real(r8), dimension(ncol)  :: t_factor,     & ! temperature factor to calculate henry's law parameters
                                   xk0,          & ! working variable
                                   zsurf,        & ! surface height [km]
                                   so2_diss      ! so2 dissociation constant
@@ -403,12 +403,12 @@ contains
              cycle
           endif
 
-          work1(icol) = avo2 * xliq(icol,kk)
-          work2(icol) = const0 * tfld(icol,kk)
+          work1 = avo2 * xliq(icol,kk)
+          work2 = const0 * tfld(icol,kk)
 
           if( h2o2_ndx > 0 ) then
              call calc_het_rates(satf_h2o2, rain(icol,kk), xhen_h2o2(icol,kk),& ! in
-                        tmp_hetrates(icol,kk,2), work1(icol), work2(icol),& ! in
+                        tmp_hetrates(icol,kk,2), work1, work2,& ! in
                         het_rates(icol,kk,h2o2_ndx)) ! out
           endif
 
@@ -416,14 +416,14 @@ contains
              het_rates(icol,kk,so2_ndx) = het_rates(icol,kk,h2o2_ndx)
           elseif( so2_ndx > 0 ) then
              call calc_het_rates(satf_so2, rain(icol,kk), xhen_so2(icol,kk),  & ! in
-                        tmp_hetrates(icol,kk,3), work1(icol), work2(icol),& ! in
+                        tmp_hetrates(icol,kk,3), work1, work2,& ! in
                         het_rates(icol,kk,so2_ndx)) ! out
           endif
 
           if( h2so4_ndx > 0 ) then
              call calc_het_rates(satf_hno3, rain(icol,kk), xhen_hno3(icol,kk), & ! in
-                        tmp_hetrates(icol,kk,1), work1(icol), work2(icol), & ! in
-                        het_rates(icol,kk,h2so4_ndx)                    ) ! out
+                        tmp_hetrates(icol,kk,1), work1, work2, & ! in
+                        het_rates(icol,kk,h2so4_ndx)) ! out
           endif
 
        enddo Column_loop2
