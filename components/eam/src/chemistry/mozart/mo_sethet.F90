@@ -203,7 +203,6 @@ contains
     real(r8), parameter ::  hno3_diss = 15.4_r8         ! hno3 dissociation constant
     real(r8), parameter ::  mass_air = 29._r8           ! mass of background atmosphere [amu]
     real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor [amu]
-    real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! [gm/mol water]
     real(r8), parameter ::  km2cm    = 1.e5_r8          ! convert km to cm
     real(r8), parameter ::  m2km     = 1.e-3_r8         ! convert m to km
     real(r8), parameter ::  cm3_2_m3 = 1.e-6_r8         ! convert cm^3 to m^3
@@ -235,8 +234,8 @@ contains
               xh2o2, &             ! h2o2 concentration [molecules/cm^3]
               xso2, &              ! so2 concentration [molecules/cm^3]
               xliq, &              ! liquid rain water content in a grid cell [gm/m^3]
-              rain, &              ! conversion rate of water vapor into rain water [molecules/cm^3/s]
-              precip, &            ! precipitation [kg/kg/s]
+              rain, &              ! precipitation (rain) rate [molecules/cm^3/s]
+              precip, &            ! precipitation rate [kg/kg/s]
               xhen_h2o2, xhen_hno3, xhen_so2    ! henry law constants
     real(r8), dimension(ncol,pver,8) :: tmp_hetrates
 
@@ -408,23 +407,23 @@ contains
           work2(icol) = const0 * tfld(icol,kk)
 
           if( h2o2_ndx > 0 ) then
-             work3(icol) = satf_h2o2 * max( rain(icol,kk) / &
-                           (h2o_mol*(work1(icol) + 1._r8/(xhen_h2o2(icol,kk)*work2(icol)))), 0._r8 )
-             het_rates(icol,kk,h2o2_ndx) =  work3(icol) + tmp_hetrates(icol,kk,2)
+             call calc_het_rates(satf_h2o2, rain(icol,kk), xhen_h2o2(icol,kk),& ! in
+                        tmp_hetrates(icol,kk,2), work1(icol), work2(icol),& ! in
+                        het_rates(icol,kk,h2o2_ndx)) ! out
           endif
 
           if ( prog_modal_aero .and. so2_ndx>0 .and. h2o2_ndx>0 ) then
              het_rates(icol,kk,so2_ndx) = het_rates(icol,kk,h2o2_ndx)
           elseif( so2_ndx > 0 ) then
-             work3(icol) = satf_so2 * max( rain(icol,kk) / &
-                           (h2o_mol*(work1(icol) + 1._r8/(xhen_so2( icol,kk)*work2(icol)))), 0._r8 )
-             het_rates(icol,kk,so2_ndx ) =  work3(icol) + tmp_hetrates(icol,kk,3)
+             call calc_het_rates(satf_so2, rain(icol,kk), xhen_so2(icol,kk),  & ! in
+                        tmp_hetrates(icol,kk,3), work1(icol), work2(icol),& ! in
+                        het_rates(icol,kk,so2_ndx)) ! out
           endif
 
           if( h2so4_ndx > 0 ) then
-             work3(icol) = satf_hno3 *  max( rain(icol,kk) / &
-                           (h2o_mol*(work1(icol) + 1._r8/(xhen_hno3(icol,kk)*work2(icol)))), 0._r8 )
-             het_rates(icol,kk,h2so4_ndx) =  work3(icol) + tmp_hetrates(icol,kk,1)
+             call calc_het_rates(satf_hno3, rain(icol,kk), xhen_hno3(icol,kk), & ! in
+                        tmp_hetrates(icol,kk,1), work1(icol), work2(icol), & ! in
+                        het_rates(icol,kk,h2so4_ndx)                    ) ! out
           endif
 
        enddo Column_loop2
@@ -591,5 +590,32 @@ contains
 
   end subroutine gas_washout
 
+!=================================================================================
+  subroutine calc_het_rates(satf,     rain,  xhen,      & ! in
+                        tmp_hetrates, work1, work2,     & ! in
+                        het_rates                       ) ! out
+  !-----------------------------------------------------------------
+  ! calculate het_rates
+  ! input arguments are different for different species
+  !-----------------------------------------------------------------
+
+    implicit none
+    real(r8),intent(in) :: satf    ! saturation fraction in cloud
+    real(r8),intent(in) :: rain    ! rain rate [molecules/cm^3/s]
+    real(r8),intent(in) :: xhen    ! henry's law constant
+    real(r8),intent(in) :: tmp_hetrates
+    real(r8),intent(in) :: work1, work2
+
+    real(r8),intent(out) :: het_rates   ! rainout loss rates [1/s]
+
+    real(r8) :: work3
+    real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor [amu]
+    real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! [gm/mol water]
+
+
+    work3 = satf *  max( rain / (h2o_mol*(work1 + 1._r8/(xhen*work2))), 0._r8 )
+    het_rates =  work3 + tmp_hetrates
+
+  end subroutine calc_het_rates
 !=================================================================================
 end module mo_sethet
