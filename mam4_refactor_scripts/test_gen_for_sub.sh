@@ -7,24 +7,24 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=imp_prod_loss
+    sub_name=calc_het_rates
 
     #ins and in-outs variables
     #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
-    ins='y, rxt, het_rates'
+    ins='satf,     rain,  xhen,   tmp_hetrates, work1, work2'
 
     #outs and in-outs variables
     #(a comma seprated string, same as above)
-    outs='prod,loss'
+    outs='het_rates'
 
     #module name
-    module_name=mo_prod_loss
+    module_name=mo_sethet
 
     #file path
-    dir_path=components/eam/src/chemistry/pp_linoz_mam4_resus_mom_soag/
+    dir_path=components/eam/src/chemistry/mozart/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_PROD_LOSS
+    cpp_directive=YAML_SETHET
 
     #-------------------------
     #USER INPUT ENDS
