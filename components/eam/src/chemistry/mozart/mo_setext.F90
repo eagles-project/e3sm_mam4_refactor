@@ -67,9 +67,8 @@ contains
   end subroutine setext_inti
 
 !==============================================================================
-  subroutine setext( extfrc, zint_abs, zint_rel, cldtop, &
-       zmid, lchnk, tfld, o2mmr, ommr, &
-       pmid, mbar, rlats, calday, ncol, rlons, pbuf )
+  subroutine setext( extfrc,              & ! out
+                     lchnk, ncol, zint    ) ! in
     !--------------------------------------------------------
     !     ... for this latitude slice:
     !         - form the production from datasets
@@ -81,19 +80,8 @@ contains
     use cam_history,  only : outfld
     use shr_kind_mod, only : r8 => shr_kind_r8
     use ppgrid,       only : pver, pcols
-    use mo_airplane,  only : airpl_set
     use chem_mods,    only : extcnt
-    use mo_lightning, only : prod_no
-
     use mo_extfrc,    only : extfrc_set
-    use chem_mods,    only : extcnt
-    use tracer_srcs,  only : num_tracer_srcs, tracer_src_flds, get_srcs_data
-    use mo_chem_utls, only : get_extfrc_ndx
-    use mo_synoz,     only : po3
-
-    use mo_aurora,      only : aurora
-    use mo_solarproton, only : spe_prod 
-    use physics_buffer, only : physics_buffer_desc
 
     implicit none
 
@@ -103,39 +91,19 @@ contains
     !--------------------------------------------------------
     integer,  intent(in)  ::   lchnk                       ! chunk id
     integer,  intent(in)  ::   ncol                        ! columns in chunk
-    real(r8), intent(in)  ::   zint_abs(ncol,pver+1)           ! interface geopot height ( km )
-    real(r8), intent(in)  ::   zint_rel(ncol,pver+1)           ! interface geopot height ( km )
-    real(r8), intent(in)  ::   cldtop(ncol)                ! cloud top index
+    real(r8), intent(in)  ::   zint(ncol,pver+1)           ! interface geopot height [km]
     real(r8), intent(out) ::   extfrc(ncol,pver,extcnt)    ! the "extraneous" forcing
-
-    real(r8), intent(in)  ::   calday                      ! calendar day of year
-    real(r8), intent(in)  ::   rlats(ncol)                 ! column latitudes (radians)
-    real(r8), intent(in)  ::   rlons(ncol)                 ! column longitudes (radians)
-    real(r8), intent(in)  ::   zmid(ncol,pver)             ! midpoint geopot height ( km )
-    real(r8), intent(in)  ::   pmid(pcols,pver)            ! midpoint pressure (Pa)
-    real(r8), intent(in)  ::   tfld(pcols,pver)            ! midpoint temperature (K)
-    real(r8), intent(in)  ::   mbar(ncol,pver)             ! mean molecular mass (g/mole)
-    real(r8), intent(in)  ::   o2mmr(ncol,pver)            ! o2 concentration (kg/kg)
-    real(r8), intent(in)  ::   ommr(ncol,pver)             ! o concentration (kg/kg)
-
-    type(physics_buffer_desc),pointer :: pbuf(:)
 
     !--------------------------------------------------------
     !     ... local variables
     !--------------------------------------------------------
-    integer :: i, k, k1, kk, cldind, ii, jj, nlev
-    real(r8) :: srcs_offline( ncol, pver )
-    integer :: ndx
-
+    ! variables for output. in current MAM4 they are not calculated and are assigned zero
     real(r8), dimension(ncol,pver) :: no_lgt, no_air, co_air
-
-    real(r8)    :: spe_nox(ncol,pver)        ! Solar Proton Event NO production
-    real(r8)    :: spe_hox(ncol,pver)        ! Solar Proton Event HOx production
 
     !--------------------------------------------------------
     !     ... set frcing from datasets
     !--------------------------------------------------------
-    call extfrc_set( lchnk, zint_rel, ncol, & ! in
+    call extfrc_set( lchnk, zint, ncol, & ! in
                      extfrc ) ! out
     
     !--------------------------------------------------------
