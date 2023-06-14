@@ -127,7 +127,7 @@ contains
     real(r8) :: srcs_offline( ncol, pver )
     integer :: ndx
 
-    real(r8), dimension(ncol,pver) :: no_lgt
+    real(r8), dimension(ncol,pver) :: no_lgt, no_air, co_air
 
     real(r8)    :: spe_nox(ncol,pver)        ! Solar Proton Event NO production
     real(r8)    :: spe_hox(ncol,pver)        ! Solar Proton Event HOx production
@@ -148,8 +148,13 @@ contains
     no_lgt(:,:) = 0._r8
     call outfld( 'NO_Lightning', no_lgt(:ncol,:), ncol, lchnk )
 
-    call airpl_set( lchnk, ncol, no_ndx, co_ndx, xno_ndx, cldtop, zint_abs, extfrc)
-
+    ! FORTRAN refactor: in the subroutine airpl_set, has_airpl_src is false,
+    ! the subroutine only has two outfld calls that output zero
+    ! remove the subroutine call and move out the zero outfld
+    no_air(:,:) = 0._r8
+    co_air(:,:) = 0._r8
+    call outfld( 'NO_Aircraft',  no_air(:ncol,:), ncol, lchnk )
+    call outfld( 'CO_Aircraft',  co_air(:ncol,:), ncol, lchnk )
 
   end subroutine setext
 
