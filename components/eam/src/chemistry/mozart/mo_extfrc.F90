@@ -293,7 +293,7 @@ contains
   end subroutine extfrc_timestep_init
 
 !==========================================================================
-  subroutine extfrc_set( lchnk, zint, frcing, ncol )
+  subroutine extfrc_set( lchnk, zint, ncol, frcing )
 
     !--------------------------------------------------------
     !	... form the external forcing
@@ -307,7 +307,7 @@ contains
     integer,  intent(in)    :: ncol                  ! columns in chunk
     integer,  intent(in)    :: lchnk                 ! chunk index
     real(r8), intent(in)    :: zint(ncol, pverp)     ! interface geopot above surface [km]
-    real(r8), intent(inout) :: frcing(ncol,pver,extcnt)   ! insitu forcings [molec/cm^3/s]
+    real(r8), intent(out)   :: frcing(ncol,pver,extcnt)   ! insitu forcings [molec/cm^3/s]
 
     !--------------------------------------------------------
     !	... local variables
@@ -317,6 +317,8 @@ contains
     real(r8) :: frcing_col(1:ncol)
     integer  :: kk, isec
     real(r8),parameter :: km_to_cm = 1.e5_r8
+
+    frcing(:,:,:) = 0._r8
 
     if( extfrc_cnt < 1 .or. extcnt < 1 ) then
        return

@@ -132,12 +132,11 @@ contains
     real(r8)    :: spe_nox(ncol,pver)        ! Solar Proton Event NO production
     real(r8)    :: spe_hox(ncol,pver)        ! Solar Proton Event HOx production
 
-    extfrc(:,:,:) = 0._r8
-
     !--------------------------------------------------------
     !     ... set frcing from datasets
     !--------------------------------------------------------
-    call extfrc_set( lchnk, zint_rel, extfrc, ncol )
+    call extfrc_set( lchnk, zint_rel, ncol, & ! in
+                     extfrc ) ! out
     
     !--------------------------------------------------------
     !     ... set nox production from lighting
