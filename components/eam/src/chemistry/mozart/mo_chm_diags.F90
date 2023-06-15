@@ -394,6 +394,8 @@ contains
     integer     :: plat
     real(r8)    :: ozone_layer(ncol,pver)   ! ozone concentration [DU]
     real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
+    real(r8)    :: ozone_trop(ncol)         ! vertical integration of ozone in troposphere [DU]
+    real(r8)    :: ozone_strat(ncol)        ! vertical integration of ozone in stratosphere [DU]
     
     real(r8), dimension(ncol,pver) :: vmr_nox, vmr_noy, vmr_clox, vmr_cloy, vmr_tcly, vmr_brox, vmr_broy, vmr_toth
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
@@ -468,34 +470,23 @@ contains
     ozone_layer(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
     ! total column ozone
     ozone_col(:) = 0._r8
-    do kk = 1,pver ! loop from top of atmosphere to surface
-       ozone_col(:) = ozone_col(:) + ozone_layer(:ncol,kk)
+    ozone_trop(:) = 0._r8
+    ozone_strat(:) = 0._r8
+    do icol = 1,ncol
+       do kk = 1,pver
+          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
+          if (kk <= ltrop(icol)) then
+             ozone_strat(icol) = ozone_strat(icol) + ozone_layer(icol,kk)
+          else
+             ozone_trop(icol) = ozone_trop(icol) + ozone_layer(icol,kk)
+          endif
+       enddo
     enddo
     call outfld( 'TOZ', ozone_col, ncol, lchnk )
-
     ! stratospheric column ozone
-    ozone_col(:) = 0._r8
-    do icol = 1,ncol
-       do kk = 1,pver
-          if (kk > ltrop(icol)) then
-            exit
-          endif
-          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
-       enddo
-    enddo
-    call outfld( 'SCO', ozone_col, ncol, lchnk )
-
+    call outfld( 'SCO', ozone_strat, ncol, lchnk )
     ! tropospheric column ozone
-    ozone_col(:) = 0._r8
-    do icol = 1,ncol
-       do kk = 1,pver
-          if (kk <= ltrop(icol)) then
-            cycle
-          endif
-          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
-       enddo
-    enddo
-    call outfld( 'TCO', ozone_col, ncol, lchnk )
+    call outfld( 'TCO', ozone_trop, ncol, lchnk )
 
     do mm = 1,gas_pcnst
 
