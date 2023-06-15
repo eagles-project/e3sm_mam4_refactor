@@ -52,6 +52,7 @@ module mo_chm_diags
 
 contains
 
+!========================================================================
   subroutine chm_diags_inti
     !--------------------------------------------------------------------
     !	... initialize utility routine
@@ -345,6 +346,7 @@ contains
 
   end subroutine chm_diags_inti
 
+!========================================================================
   subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
@@ -498,52 +500,11 @@ contains
 
     do m = 1,gas_pcnst
 
-       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2) then
-          wgt = 2._r8
-       elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 ) then
-          wgt = 3._r8
-       elseif ( m == id_ccl4 ) then
-          wgt = 4._r8
-       else
-          wgt = 1._r8
-       endif
+      ! other options of species are not used, only use weight=1
+       wgt = 1._r8
 
-       if ( any( nox_species == m ) ) then
-          vmr_nox(:ncol,:) = vmr_nox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( noy_species == m ) ) then
-          vmr_noy(:ncol,:) = vmr_noy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any( noy_species == m ) ) then
-          mmr_noy(:ncol,:) = mmr_noy(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
        if ( any( sox_species == m ) ) then
           mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-       if ( any( nhx_species == m ) ) then
-          mmr_nhx(:ncol,:) = mmr_nhx(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-
-       if ( any( clox_species == m ) ) then
-          vmr_clox(:ncol,:) = vmr_clox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( cloy_species == m ) ) then
-          vmr_cloy(:ncol,:) = vmr_cloy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( tcly_species == m ) ) then
-          vmr_tcly(:ncol,:) = vmr_tcly(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any( brox_species == m ) ) then
-          vmr_brox(:ncol,:) = vmr_brox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( broy_species == m ) ) then
-          vmr_broy(:ncol,:) = vmr_broy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any ( toth_species == m ) ) then
-          vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        
        if ( any( aer_species == m ) ) then
@@ -577,14 +538,8 @@ contains
        call outfld( depvel_name(m), depvel(:ncol,m), ncol ,lchnk )
        call outfld( depflx_name(m), depflx(:ncol,m), ncol ,lchnk )
 
-       if ( any( noy_species == m ) ) then
-          df_noy(:ncol) = df_noy(:ncol) +  wgt * depflx(:ncol,m)*N_molwgt/adv_mass(m)
-       endif
        if ( any( sox_species == m ) ) then
           df_sox(:ncol) = df_sox(:ncol) +  wgt * depflx(:ncol,m)*S_molwgt/adv_mass(m)
-       endif
-       if ( any( nhx_species == m ) ) then
-          df_nhx(:ncol) = df_nhx(:ncol) +  wgt * depflx(:ncol,m)*N_molwgt/adv_mass(m)
        endif
 
        do k=1,pver
@@ -646,100 +601,10 @@ contains
     call outfld( 'DF_SOX', df_sox(:ncol), ncol ,lchnk )
     call outfld( 'DF_NHX', df_nhx(:ncol), ncol ,lchnk )
 
-    !--------------------------------------------------------------------
-    !	... euv ion production
-    !--------------------------------------------------------------------
-
-    jeuvs: if ( has_jeuvs ) then
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(1)) + rxt_rates(:,k,rid_jeuv(2)) &
-               + rxt_rates(:,k,rid_jeuv(3)) + rxt_rates(:,k,rid_jeuv(14)) &
-               + rxt_rates(:,k,rid_jeuv(15)) + rxt_rates(:,k,rid_jeuv(16))) &
-               + vmr(:,k,id_n)*rxt_rates(:,k,rid_jeuv(4)) &
-               + vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(5)) + rxt_rates(:,k,rid_jeuv(7)) &
-               + rxt_rates(:,k,rid_jeuv(8)) + rxt_rates(:,k,rid_jeuv(9)) &
-               + rxt_rates(:,k,rid_jeuv(17)) + rxt_rates(:,k,rid_jeuv(19)) &
-               + rxt_rates(:,k,rid_jeuv(20)) + rxt_rates(:,k,rid_jeuv(21))) &
-               + un2(:)*(rxt_rates(:,k,rid_jeuv(6)) + rxt_rates(:,k,rid_jeuv(10)) &
-               + rxt_rates(:,k,rid_jeuv(11)) + rxt_rates(:,k,rid_jeuv(18)) &
-               + rxt_rates(:,k,rid_jeuv(22)) + rxt_rates(:,k,rid_jeuv(23)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PION_EUV', wrk, ncol, lchnk )
-
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(1)) + rxt_rates(:,k,rid_jeuv(2)) &
-               + rxt_rates(:,k,rid_jeuv(3)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV1', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(14)) + rxt_rates(:,k,rid_jeuv(15)) &
-               + rxt_rates(:,k,rid_jeuv(16)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV1e', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_n)*rxt_rates(:,k,rid_jeuv(4))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV2', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(5)) + rxt_rates(:,k,rid_jeuv(7)) &
-               + rxt_rates(:,k,rid_jeuv(8)) + rxt_rates(:,k,rid_jeuv(9)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV3', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(17)) + rxt_rates(:,k,rid_jeuv(19)) &
-               + rxt_rates(:,k,rid_jeuv(20)) + rxt_rates(:,k,rid_jeuv(21)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV3e', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(6)) + rxt_rates(:,k,rid_jeuv(10)) + rxt_rates(:,k,rid_jeuv(11)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV4', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(18)) + rxt_rates(:,k,rid_jeuv(22)) + rxt_rates(:,k,rid_jeuv(23)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV4e', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(11)) + rxt_rates(:,k,rid_jeuv(13)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUVN2D', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(23)) + rxt_rates(:,k,rid_jeuv(25)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUVN2De', wrk, ncol, lchnk )
-    endif jeuvs
-
-    if ( has_jno_i ) then
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_no)*rxt_rates(:,k,rid_jno_i)
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PJNO_I', wrk, ncol, lchnk )
-    endif
-    if ( has_jno ) then
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_no)*rxt_rates(:,k,rid_jno)
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PJNO', wrk, ncol, lchnk )
-    endif
 
   end subroutine chm_diags
 
+!========================================================================
   subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol )
 
     use cam_history,  only : outfld
@@ -780,17 +645,8 @@ contains
        call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
        call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
-       if ( any(noy_species == m ) ) then
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-       if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
        if ( any(sox_species == m ) ) then
           sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
-       endif
-       if ( any(nhx_species == m ) ) then
-          nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
        endif
 
     end do
@@ -801,4 +657,5 @@ contains
 
   end subroutine het_diags
 
+!========================================================================
 end module mo_chm_diags
