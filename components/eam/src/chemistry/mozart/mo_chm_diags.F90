@@ -391,16 +391,15 @@ contains
     !	... local variables
     !--------------------------------------------------------------------
     integer     :: i,j,k, m, n
-    integer :: plat
-    real(r8)    :: wrk(ncol,pver)
-    real(r8)    :: un2(ncol)
+    integer     :: plat
+    real(r8)    :: ozone_layer(ncol,pver)   ! ozone concentration [DU]
+    real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
     
     real(r8), dimension(ncol,pver) :: vmr_nox, vmr_noy, vmr_clox, vmr_cloy, vmr_tcly, vmr_brox, vmr_broy, vmr_toth
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
     real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx
 
     real(r8) :: area(ncol), mass(ncol,pver), drymass(ncol,pver)
-    real(r8) :: wrk1d(ncol)
     real(r8) :: wgt
     character(len=16) :: spc_name
     real(r8), pointer :: fldcw(:,:)  !working pointer to extract data from pbuf for sum of mass for aerosol classes
@@ -466,37 +465,37 @@ contains
     call outfld( 'DRYMASS', drymass(:ncol,:), ncol, lchnk )
 
     ! convert ozone from mol/mol (w.r.t. dry air mass) to DU
-    wrk(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
+    ozone_layer(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
     ! total column ozone
-    wrk1d(:) = 0._r8
+    ozone_col(:) = 0._r8
     do k = 1,pver ! loop from top of atmosphere to surface
-       wrk1d(:) = wrk1d(:) + wrk(:ncol,k)
+       ozone_col(:) = ozone_col(:) + ozone_layer(:ncol,k)
     enddo
-    call outfld( 'TOZ', wrk1d,   ncol, lchnk )
+    call outfld( 'TOZ', ozone_col, ncol, lchnk )
 
     ! stratospheric column ozone
-    wrk1d(:) = 0._r8
+    ozone_col(:) = 0._r8
     do i = 1,ncol
        do k = 1,pver
           if (k > ltrop(i)) then
             exit
           endif
-          wrk1d(i) = wrk1d(i) + wrk(i,k)
+          ozone_col(i) = ozone_col(i) + ozone_layer(i,k)
        enddo
     enddo
-    call outfld( 'SCO', wrk1d,   ncol, lchnk )
+    call outfld( 'SCO', ozone_col, ncol, lchnk )
 
     ! tropospheric column ozone
-    wrk1d(:) = 0._r8
+    ozone_col(:) = 0._r8
     do i = 1,ncol
        do k = 1,pver
           if (k <= ltrop(i)) then
             cycle
           endif
-          wrk1d(i) = wrk1d(i) + wrk(i,k)
+          ozone_col(i) = ozone_col(i) + ozone_layer(i,k)
        enddo
     enddo
-    call outfld( 'TCO', wrk1d,   ncol, lchnk )
+    call outfld( 'TCO', ozone_col, ncol, lchnk )
 
     do m = 1,gas_pcnst
 
