@@ -390,7 +390,7 @@ contains
     !--------------------------------------------------------------------
     !	... local variables
     !--------------------------------------------------------------------
-    integer     :: i,j,k, m, n
+    integer     :: icol,kk, mm, nn
     integer     :: plat
     real(r8)    :: ozone_layer(ncol,pver)   ! ozone concentration [DU]
     real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
@@ -455,9 +455,9 @@ contains
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
 
-    do k = 1,pver
-       mass(:ncol,k) = pdel(:ncol,k) * area(:ncol) * rgrav
-       drymass(:ncol,k) = pdeldry(:ncol,k) * area(:ncol) * rgrav
+    do kk = 1,pver
+       mass(:ncol,kk) = pdel(:ncol,kk) * area(:ncol) * rgrav
+       drymass(:ncol,kk) = pdeldry(:ncol,kk) * area(:ncol) * rgrav
     enddo
 
     call outfld( 'AREA', area(:ncol),   ncol, lchnk )
@@ -468,85 +468,85 @@ contains
     ozone_layer(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
     ! total column ozone
     ozone_col(:) = 0._r8
-    do k = 1,pver ! loop from top of atmosphere to surface
-       ozone_col(:) = ozone_col(:) + ozone_layer(:ncol,k)
+    do kk = 1,pver ! loop from top of atmosphere to surface
+       ozone_col(:) = ozone_col(:) + ozone_layer(:ncol,kk)
     enddo
     call outfld( 'TOZ', ozone_col, ncol, lchnk )
 
     ! stratospheric column ozone
     ozone_col(:) = 0._r8
-    do i = 1,ncol
-       do k = 1,pver
-          if (k > ltrop(i)) then
+    do icol = 1,ncol
+       do kk = 1,pver
+          if (kk > ltrop(icol)) then
             exit
           endif
-          ozone_col(i) = ozone_col(i) + ozone_layer(i,k)
+          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
        enddo
     enddo
     call outfld( 'SCO', ozone_col, ncol, lchnk )
 
     ! tropospheric column ozone
     ozone_col(:) = 0._r8
-    do i = 1,ncol
-       do k = 1,pver
-          if (k <= ltrop(i)) then
+    do icol = 1,ncol
+       do kk = 1,pver
+          if (kk <= ltrop(icol)) then
             cycle
           endif
-          ozone_col(i) = ozone_col(i) + ozone_layer(i,k)
+          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
        enddo
     enddo
     call outfld( 'TCO', ozone_col, ncol, lchnk )
 
-    do m = 1,gas_pcnst
+    do mm = 1,gas_pcnst
 
       ! other options of species are not used, only use weight=1
        wgt = 1._r8
 
-       if ( any( sox_species == m ) ) then
-          mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,m)
+       if ( any( sox_species == mm ) ) then
+          mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,mm)
        endif
        
-       if ( any( aer_species == m ) ) then
-          call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
-          call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
+       if ( any( aer_species == mm ) ) then
+          call outfld( solsym(mm), mmr(:ncol,:,mm), ncol ,lchnk )
+          call outfld( trim(solsym(mm))//'_SRF', mmr(:ncol,pver,mm), ncol ,lchnk )
 #ifdef MODAL_AERO
           if (history_aerosol .and. .not. history_verbose) then
-             select case (trim(solsym(m)))
+             select case (trim(solsym(mm)))
              case ('bc_a1','bc_a3','bc_a4')
-                  mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,m)
+                  mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,mm)
              case ('dst_a1','dst_a3')
-                  mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,m)
+                  mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,mm)
              case ('mom_a1','mom_a2','mom_a3','mom_a4')
-                  mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,m)
+                  mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,mm)
              case ('ncl_a1','ncl_a2','ncl_a3')
-                  mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,m)
+                  mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,mm)
              case ('pom_a1','pom_a3','pom_a4')
-                  mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,m)
+                  mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,mm)
              case ('so4_a1','so4_a2','so4_a3')
-                  mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,m)
+                  mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,mm)
              case ('soa_a1','soa_a2','soa_a3')
-                  mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,m)
+                  mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,mm)
              endselect
           endif
 #endif
        else
-          call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
-          call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
+          call outfld( solsym(mm), vmr(:ncol,:,mm), ncol ,lchnk )
+          call outfld( trim(solsym(mm))//'_SRF', vmr(:ncol,pver,mm), ncol ,lchnk )
        endif
 
-       call outfld( depvel_name(m), depvel(:ncol,m), ncol ,lchnk )
-       call outfld( depflx_name(m), depflx(:ncol,m), ncol ,lchnk )
+       call outfld( depvel_name(mm), depvel(:ncol,mm), ncol ,lchnk )
+       call outfld( depflx_name(mm), depflx(:ncol,mm), ncol ,lchnk )
 
-       if ( any( sox_species == m ) ) then
-          df_sox(:ncol) = df_sox(:ncol) +  wgt * depflx(:ncol,m)*S_molwgt/adv_mass(m)
+       if ( any( sox_species == mm ) ) then
+          df_sox(:ncol) = df_sox(:ncol) +  wgt * depflx(:ncol,mm)*S_molwgt/adv_mass(mm)
        endif
 
-       do k=1,pver
-          do i=1,ncol
-             net_chem(i,k) = mmr_tend(i,k,m) * mass(i,k) 
+       do kk=1,pver
+          do icol=1,ncol
+             net_chem(icol,kk) = mmr_tend(icol,kk,mm) * mass(icol,kk) 
           enddo
        enddo
-       call outfld( dtchem_name(m), net_chem(:ncol,:), ncol, lchnk )
+       call outfld( dtchem_name(mm), net_chem(:ncol,:), ncol, lchnk )
 
     enddo
 
@@ -554,11 +554,10 @@ contains
     ! diagnostics for cloud-borne aerosols, then add to corresponding mass accumulators
     if (history_aerosol .and. .not. history_verbose) then
 
-
-       do n = 1,pcnst
-          fldcw => qqcw_get_field(pbuf,n,lchnk,errorhandle=.true.)
+       do nn = 1,pcnst
+          fldcw => qqcw_get_field(pbuf,nn,lchnk,errorhandle=.true.)
           if(associated(fldcw)) then
-             select case (trim(cnst_name_cw(n)))
+             select case (trim(cnst_name_cw(nn)))
                 case ('bc_c1','bc_c3','bc_c4')
                      mass_bc(:ncol,:) = mass_bc(:ncol,:) + fldcw(:ncol,:)
                 case ('dst_c1','dst_c3')
@@ -617,8 +616,8 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
 
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
-    integer :: m, k, j
-    integer :: plat
+    integer  :: mm, kk
+    integer  :: plat
     real(r8) :: wght(ncol)
     !
     ! output integrated wet deposition field
@@ -629,23 +628,23 @@ contains
 
     call get_wght_all_p(lchnk, ncol, wght)
 
-    do m = 1,gas_pcnst
+    do mm = 1,gas_pcnst
        !
        ! compute vertical integral
        !
        wrk_wd(:ncol) = 0._r8
-       do k = 1,pver
-          wrk_wd(:ncol) = wrk_wd(:ncol) + het_rates(:ncol,k,m) * mmr(:ncol,k,m) * pdel(:ncol,k) 
+       do kk = 1,pver
+          wrk_wd(:ncol) = wrk_wd(:ncol) + het_rates(:ncol,kk,mm) * mmr(:ncol,kk,mm) * pdel(:ncol,kk) 
        enddo
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
 
-       call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
-       call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
+       call outfld( wetdep_name(mm), wrk_wd(:ncol),         ncol, lchnk )
+       call outfld( wtrate_name(mm), het_rates(:ncol,:,mm), ncol, lchnk )
 
-       if ( any(sox_species == m ) ) then
-          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
+       if ( any(sox_species == mm ) ) then
+          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(mm)
        endif
 
     enddo
