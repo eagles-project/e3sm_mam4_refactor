@@ -568,7 +568,8 @@ contains
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
     !-----------------------------------------------------------------------      
-    call setrxt( reaction_rates, tfld, invariants(1,1,indexm), ncol )
+!BJG    call setrxt( reaction_rates, tfld, invariants(1,1,indexm), ncol )
+    call setrxt( reaction_rates, tfld, ncol )
 
     sulfate(:,:) = 0._r8
     if( so4_ndx < 1 ) then ! get offline so4 field if not prognostic
@@ -602,9 +603,8 @@ contains
     
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
-    call usrrxt( reaction_rates, tfld, tfld, tfld, invariants, h2ovmr, ps, &
-                 pmid, invariants(:,:,indexm), sulfate, mmr, relhum, strato_sad, &
-                 troplev, ncol, sad_total, cwat, mbar, pbuf )
+    call usrrxt( reaction_rates, tfld, invariants, &
+                 invariants(:,:,indexm), ncol )
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 
