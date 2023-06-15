@@ -453,7 +453,7 @@ contains
           call comp_exp( exp_fac, 430._r8*tinv, ncol )
           ko(:)   = 3.5e-13_r8 * exp_fac(:)
           call comp_exp( exp_fac, 1000._r8*tinv, ncol )
-          kinf(:) = 1.7e-33_r8 * m(:,kk) * exp_fac(:)
+          kinf(:) = 1.7e-33_r8 * mtot(:,kk) * exp_fac(:)
           call comp_exp( exp_fac, 2200._r8*tinv, ncol )
 
 !BJG          if( h2o_ndx > 0 ) then
@@ -483,6 +483,8 @@ contains
           ko(:) = fc(:)*mtot(:,kk)/(1._r8 + fc(:)*mtot(:,kk)/1.5e-12_r8) 
           rxt(:,kk,usr_SO2_OH_ndx) = ko(:)*.6_r8**(1._r8 + (log10(fc(:)*mtot(:,kk)/1.5e-12_r8))**2._r8)**(-1._r8)
        endif
+
+    enddo level_loop
 
 !BJG      deallocate( sfc_array, dm_array )
 
