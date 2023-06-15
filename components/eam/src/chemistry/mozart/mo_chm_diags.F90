@@ -471,7 +471,7 @@ contains
     wrk1d(:) = 0._r8
     do k = 1,pver ! loop from top of atmosphere to surface
        wrk1d(:) = wrk1d(:) + wrk(:ncol,k)
-    end do
+    enddo
     call outfld( 'TOZ', wrk1d,   ncol, lchnk )
 
     ! stratospheric column ozone
@@ -480,10 +480,10 @@ contains
        do k = 1,pver
           if (k > ltrop(i)) then
             exit
-          end if
+          endif
           wrk1d(i) = wrk1d(i) + wrk(i,k)
-       end do
-    end do
+       enddo
+    enddo
     call outfld( 'SCO', wrk1d,   ncol, lchnk )
 
     ! tropospheric column ozone
@@ -492,10 +492,10 @@ contains
        do k = 1,pver
           if (k <= ltrop(i)) then
             cycle
-          end if
+          endif
           wrk1d(i) = wrk1d(i) + wrk(i,k)
-       end do
-    end do
+       enddo
+    enddo
     call outfld( 'TCO', wrk1d,   ncol, lchnk )
 
     do m = 1,gas_pcnst
@@ -527,7 +527,7 @@ contains
                   mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,m)
              case ('soa_a1','soa_a2','soa_a3')
                   mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,m)
-             end select
+             endselect
           endif
 #endif
        else
@@ -545,8 +545,8 @@ contains
        do k=1,pver
           do i=1,ncol
              net_chem(i,k) = mmr_tend(i,k,m) * mass(i,k) 
-          end do
-       end do
+          enddo
+       enddo
        call outfld( dtchem_name(m), net_chem(:ncol,:), ncol, lchnk )
 
     enddo
@@ -574,9 +574,9 @@ contains
                      mass_so4(:ncol,:) = mass_so4(:ncol,:) + fldcw(:ncol,:)
                 case ('soa_c1','soa_c2','soa_c3')
                      mass_soa(:ncol,:) = mass_soa(:ncol,:) + fldcw(:ncol,:)
-             end select
+             endselect
           endif
-       end do
+       enddo
        call outfld( 'Mass_bc', mass_bc(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_dst', mass_dst(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_mom', mass_mom(:ncol,:),ncol,lchnk)
@@ -637,7 +637,7 @@ contains
        wrk_wd(:ncol) = 0._r8
        do k = 1,pver
           wrk_wd(:ncol) = wrk_wd(:ncol) + het_rates(:ncol,k,m) * mmr(:ncol,k,m) * pdel(:ncol,k) 
-       end do
+       enddo
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
@@ -649,7 +649,7 @@ contains
           sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
        endif
 
-    end do
+    enddo
     
     call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
