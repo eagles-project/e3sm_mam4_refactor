@@ -568,7 +568,6 @@ contains
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
     !-----------------------------------------------------------------------      
-!BJG    call setrxt( reaction_rates, tfld, invariants(1,1,indexm), ncol )
     call setrxt( reaction_rates, tfld, ncol )
 
     sulfate(:,:) = 0._r8

@@ -9,13 +9,11 @@
 
       contains
 
-!BJG      subroutine setrxt( rate, temp, m, ncol )
       subroutine setrxt( rate, temp, ncol )
 
       use ppgrid,       only : pver, pcols
       use shr_kind_mod, only : r8 => shr_kind_r8
       use chem_mods, only : rxntot
-!BJG      use mo_jpl,    only : jpl
 
       implicit none
 
@@ -24,14 +22,12 @@
 !-------------------------------------------------------
       integer, intent(in) :: ncol    ! number of columns
       real(r8), intent(in)    :: temp(pcols,pver)  ! midpoint temperature [K]
-!BJG      real(r8), intent(in)    :: m(ncol,pver)
-      real(r8), intent(inout) :: rate(ncol,pver,rxntot) ! reaction rate [1/s for photolysis, /cm^3/s otherwise]
+      real(r8), intent(inout) :: rate(ncol,pver,rxntot) ! reaction rate 
 
 !-------------------------------------------------------
 !       ... local variables
 !-------------------------------------------------------
       real(r8)  ::  itemp(ncol,pver)  ! inverse midpoint temperature [K^-1]
-! BJG      real(r8)  ::  exp_fac(ncol,pver)
 
       itemp(:ncol,:) = 1._r8 / temp(:ncol,:)
       rate(:,:,3) = 2.9e-12_r8 * exp( -160._r8 * itemp(:,:) )

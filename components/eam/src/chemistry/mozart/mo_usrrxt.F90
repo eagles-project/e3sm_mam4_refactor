@@ -298,145 +298,40 @@ contains
 
   end subroutine usrrxt_inti
 
-! BJG  subroutine usrrxt( rxt, temp, tempi, tempe, invariants, h2ovmr,  ps, &
-  subroutine usrrxt( rxt, temp, invariants, &
-! BJG                     pmid, m, sulfate, mmr, relhum, strato_sad, &
-! BJG                     m, sulfate, relhum, &
-                     mtot,  &
-! BJG                     ltrop, ncol, sad_total, cwat, mbar, pbuf )
-                     ncol )
+  subroutine usrrxt( rxt, temp, invariants, mtot, ncol )
 
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
 !-----------------------------------------------------------------
     
-    use mo_constants,  only : pi, avo => avogadro, boltz_cgs, rgas
-    use chem_mods,     only : nfs, rxntot, gas_pcnst, inv_m_ndx=>indexm
-!BJG    use mo_chem_utls,  only : get_rxt_ndx, get_spc_ndx
-    use mo_setinv,     only : inv_o2_ndx=>o2_ndx, inv_h2o_ndx=>h2o_ndx
-!BJG    use physics_buffer,only : physics_buffer_desc
-!BJG    use rad_constituents,only : rad_cnst_get_info
+    use chem_mods,     only : nfs, rxntot
+    use mo_setinv,     only : inv_h2o_ndx=>h2o_ndx
     use modal_aero_data,   only: ntot_amode
     implicit none
 
 !-----------------------------------------------------------------
 !        ... dummy arguments
 !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol
-!BJG    integer, intent(in)     :: ltrop(pcols)               ! tropopause vertical index
-    real(r8), intent(in)    :: temp(pcols,pver)           ! temperature (K); neutral temperature
-!BJG    real(r8), intent(in)    :: tempi(pcols,pver)          ! ionic temperature (K); only used if ion chemistry
-!BJG    real(r8), intent(in)    :: tempe(pcols,pver)          ! electronic temperature (K); only used if ion chemistry
-    real(r8), intent(in)    :: mtot(ncol,pver)               ! total atm density (/cm^3)
-!BJG    real(r8), intent(in)    :: sulfate(ncol,pver)         ! sulfate aerosol (mol/mol)
-!BJG    real(r8), intent(in)    :: strato_sad(pcols,pver)     ! stratospheric aerosol sad (1/cm)
-!BJG    real(r8), intent(in)    :: h2ovmr(ncol,pver)          ! water vapor (mol/mol)
-!BJG    real(r8), intent(in)    :: relhum(ncol,pver)          ! relative humidity
-!BJG    real(r8), intent(in)    :: pmid(pcols,pver)           ! midpoint pressure (Pa)
-!BJG    real(r8), intent(in)    :: ps(pcols)                  ! surface pressure (Pa)
-    real(r8), intent(in)    :: invariants(ncol,pver,nfs)  ! invariants density (/cm^3)
-!BJG    real(r8), intent(in)    :: mmr(pcols,pver,gas_pcnst)  ! species concentrations (kg/kg)
-!BJG    real(r8), intent(in)    :: cwat(ncol,pver) !PJC Condensed Water (liquid+ice) (kg/kg)
-!BJG    real(r8), intent(in)    :: mbar(ncol,pver) !PJC Molar mass of air (g/mol)
+    integer, intent(in)     :: ncol                       ! number of columns
+    real(r8), intent(in)    :: temp(pcols,pver)           ! neutral temperature [K]
+    real(r8), intent(in)    :: mtot(ncol,pver)            ! total atm density [/cm^3]
+    real(r8), intent(in)    :: invariants(ncol,pver,nfs)  ! invariants density [/cm^3]
     real(r8), intent(inout) :: rxt(ncol,pver,rxntot)      ! gas phase rates
-!BJG    real(r8), intent(out)   :: sad_total(pcols,pver)      ! total surface area density (cm2/cm3)
-!BJG    type(physics_buffer_desc), pointer :: pbuf(:)
       
 !-----------------------------------------------------------------
 !        ... local variables
 !-----------------------------------------------------------------
     
-!BJG    real(r8), parameter :: dg = 0.1_r8            ! mole diffusion =0.1 cm2/s (Dentener, 1993)
-
-!-----------------------------------------------------------------
-! 	... reaction probabilities for heterogeneous reactions
-!-----------------------------------------------------------------
-!BJG    real(r8), parameter :: gamma_n2o5 = 0.10_r8         ! from Jacob, Atm Env, 34, 2131, 2000
-!BJG    real(r8), parameter :: gamma_ho2  = 0.20_r8         ! 
-!BJG    real(r8), parameter :: gamma_no2  = 0.0001_r8       ! 
-!BJG    real(r8), parameter :: gamma_no3  = 0.001_r8        ! 
-
-!BJG    integer  ::  icol, kk
-    integer  ::  kk
-    real(r8) ::  tp(ncol)                       ! 300/t
-    real(r8) ::  tinv(ncol)                     ! 1/t
+    integer  ::  kk                             ! vertical level index
+    real(r8) ::  tp(ncol)                       ! 300/t [dimensionless]
+    real(r8) ::  tinv(ncol)                     ! 1/t [K^{-1}]
     real(r8) ::  ko(ncol)   
-!BJG    real(r8) ::  term1(ncol)
-!BJG    real(r8) ::  term2(ncol)
     real(r8) ::  kinf(ncol)   
     real(r8) ::  fc(ncol)   
-!BJG    real(r8) ::  xr(ncol)   
-!BJG    real(r8) ::  sur(ncol)   
     real(r8) ::  sqrt_t(ncol)                   ! sqrt( temp )
     real(r8) ::  exp_fac(ncol)                  ! vector exponential
-!BJG    real(r8) ::  lwc(ncol)   
-!BJG    real(r8) ::  ko_m(ncol)   
-!BJG    real(r8) ::  k0(ncol)   
-!BJG    real(r8) ::  kinf_m(ncol)   
-!BJG    real(r8) ::  o2(ncol)
-!BJG    real(r8) ::  c_n2o5, c_ho2, c_no2, c_no3
-!BJG    real(r8) ::  amas
-    !-----------------------------------------------------------------
-    !	... density of sulfate aerosol
-    !-----------------------------------------------------------------
-!BJG    real(r8), parameter :: gam1 = 0.04_r8                 ! N2O5+SUL ->2HNO3
-!BJG    real(r8), parameter :: wso4 = 98._r8
-!BJG    real(r8), parameter :: den  = 1.15_r8                 ! each molecule of SO4(aer) density g/cm3
-    !-------------------------------------------------
-    ! 	... volume of sulfate particles
-    !           assuming mean rm 
-    !           continient 0.05um  0.07um  0.09um
-    !           ocean      0.09um  0.25um  0.37um
-    !                      0.16um                  Blake JGR,7195, 1995
-    !-------------------------------------------------
-!BJG    real(r8), parameter :: rm1  = 0.16_r8*1.e-4_r8             ! mean radii in cm
-!BJG    real(r8), parameter :: fare = 4._r8*pi*rm1*rm1             ! each mean particle(r=0.1u) area   cm2/cm3
 
-    !-----------------------------------------------------------------------
-    !        ... Aqueous phase sulfur quantities for SO2 + H2O2 and SO2 + O3
-    !-----------------------------------------------------------------------
-!BJG    real(r8), parameter  :: HENRY298_H2O2 =  7.45e+04_r8
-!BJG    real(r8), parameter  :: H298_H2O2     = -1.45e+04_r8
-!BJG    real(r8), parameter  :: HENRY298_SO2  =  1.23e+00_r8
-!BJG    real(r8), parameter  :: H298_SO2      = -6.25e+03_r8
-!BJG    real(r8), parameter  :: K298_SO2_HSO3 =  1.3e-02_r8
-!BJG    real(r8), parameter  :: H298_SO2_HSO3 = -4.16e+03_r8
-!BJG    real(r8), parameter  :: R_CONC        =  82.05e+00_r8 / avo
-!BJG    real(r8), parameter  :: R_CAL         =  rgas * 0.239006e+00_r8
-!BJG    real(r8), parameter  :: K_AQ          =  7.57e+07_r8
-!BJG    real(r8), parameter  :: ER_AQ         =  4.43e+03_r8
 
-!BJG    real(r8), parameter  :: HENRY298_O3   =  1.13e-02_r8
-!BJG    real(r8), parameter  :: H298_O3       = -5.04e+03_r8
-!BJG    real(r8), parameter  :: K298_HSO3_SO3 =  6.6e-08_r8
-!BJG    real(r8), parameter  :: H298_HSO3_SO3 = -2.23e+03_r8
-!BJG    real(r8), parameter  :: K0_AQ         =  2.4e+04_r8
-!BJG    real(r8), parameter  :: ER0_AQ        =  0.0e+00_r8
-!BJG    real(r8), parameter  :: K1_AQ         =  3.7e+05_r8
-!BJG    real(r8), parameter  :: ER1_AQ        =  5.53e+03_r8
-!BJG    real(r8), parameter  :: K2_AQ         =  1.5e+09_r8
-!BJG    real(r8), parameter  :: ER2_AQ        =  5.28e+03_r8
-
-!BJG    real(r8), parameter  :: pH            =  4.5e+00_r8
-    
-!BJG    real(r8), pointer :: sfc(:), dm_aer(:)
-!BJG    integer :: ntot_amode
-
-!BJG    real(r8), pointer :: sfc_array(:,:,:), dm_array(:,:,:)
-    
-    ! get info about the modal aerosols
-    ! get ntot_amode
-!BJG    call rad_cnst_get_info(0, nmodes=ntot_amode)
-
-!BJG    if (ntot_amode>0) then
-!BJG       allocate(sfc_array(pcols,pver,ntot_amode), dm_array(pcols,pver,ntot_amode) )
-!BJG    else
-!BJG       allocate(sfc_array(pcols,pver,5), dm_array(pcols,pver,5) )
-!BJG    endif
-
-!BJG    sfc_array(:,:,:) = 0._r8
-!BJG    dm_array(:,:,:) = 0._r8
-! BJG    sad_total(:,:) = 0._r8
 
 
     level_loop : do kk = 1,pver
@@ -455,12 +350,8 @@ contains
           call comp_exp( exp_fac, 1000._r8*tinv, ncol )
           kinf(:) = 1.7e-33_r8 * mtot(:,kk) * exp_fac(:)
           call comp_exp( exp_fac, 2200._r8*tinv, ncol )
+          fc(:) = 1._r8 + 1.4e-21_r8 * invariants(:,kk,inv_h2o_ndx) * exp_fac(:)
 
-!BJG          if( h2o_ndx > 0 ) then
-!BJG             fc(:) = 1._r8 + 1.4e-21_r8 * m(:,kk) * h2ovmr(:,kk) * exp_fac(:)
-!BJG          else
-             fc(:) = 1._r8 + 1.4e-21_r8 * invariants(:,kk,inv_h2o_ndx) * exp_fac(:)
-!BJG          endif
           rxt(:,kk,usr_HO2_HO2_ndx) = (ko(:) + kinf(:)) * fc(:)
 
        endif
@@ -485,8 +376,6 @@ contains
        endif
 
     enddo level_loop
-
-!BJG      deallocate( sfc_array, dm_array )
 
   end subroutine usrrxt
 
