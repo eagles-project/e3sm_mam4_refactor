@@ -26,7 +26,7 @@
       integer, intent(in) :: ncol  ! number of columns
       real(r8), intent(in) :: inv(ncol,pver,nfs) ! invariant molec. density [molecules/cm^3]
       real(r8), intent(in) :: mtot(ncol,pver) ! total atm molec. density [molecules/cm^3]
-      real(r8), intent(inout) :: rate(ncol,pver,rxntot)  ! reaction rate [1/s for photolysis, 1/cm^3/s otherwise]
+      real(r8), intent(inout) :: rate(ncol,pver,rxntot)  ! reaction rate
 
 !--------------------------------------------------------------------
 ! ... local variables
