@@ -45,6 +45,7 @@ module mo_extfrc
 
 contains
 
+!==========================================================================
   subroutine extfrc_inti( extfrc_specifier, extfrc_type, extfrc_cycle_yr, extfrc_fixed_ymd, extfrc_fixed_tod)
 
     !-----------------------------------------------------------------------
@@ -264,6 +265,7 @@ contains
 
   end subroutine extfrc_inti
 
+!==========================================================================
   subroutine extfrc_timestep_init( pbuf2d, state )
     !-----------------------------------------------------------------------
     !       ... check serial case for time span
@@ -290,7 +292,8 @@ contains
 
   end subroutine extfrc_timestep_init
 
-  subroutine extfrc_set( lchnk, zint, frcing, ncol )
+!==========================================================================
+  subroutine extfrc_set( lchnk, zint, ncol, frcing )
 
     !--------------------------------------------------------
     !	... form the external forcing
@@ -303,51 +306,55 @@ contains
     !--------------------------------------------------------
     integer,  intent(in)    :: ncol                  ! columns in chunk
     integer,  intent(in)    :: lchnk                 ! chunk index
-    real(r8), intent(in)    :: zint(ncol, pverp)                  ! interface geopot above surface (km)
-    real(r8), intent(inout) :: frcing(ncol,pver,extcnt)   ! insitu forcings (molec/cm^3/s)
+    real(r8), intent(in)    :: zint(ncol, pverp)     ! interface geopot above surface [km]
+    real(r8), intent(out)   :: frcing(ncol,pver,extcnt)   ! insitu forcings [molec/cm^3/s]
 
     !--------------------------------------------------------
     !	... local variables
     !--------------------------------------------------------
-    integer  ::  i, m, n
+    integer  ::  mm, nn
     character(len=16) :: xfcname
     real(r8) :: frcing_col(1:ncol)
-    integer  :: k, isec
+    integer  :: kk, isec
     real(r8),parameter :: km_to_cm = 1.e5_r8
+
+    frcing(:,:,:) = 0._r8
 
     if( extfrc_cnt < 1 .or. extcnt < 1 ) then
        return
-    end if
+    endif
 
     !--------------------------------------------------------
     !	... set non-zero forcings
     !--------------------------------------------------------
-    src_loop : do m = 1,extfrc_cnt
+    src_loop : do mm = 1,extfrc_cnt
 
-      n = forcings(m)%frc_ndx
+      nn = forcings(mm)%frc_ndx
 
-       frcing(:ncol,:,n) = 0._r8
-       do isec = 1,forcings(m)%nsectors
-          if (forcings(m)%file%alt_data) then
-             frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,pver:1:-1,lchnk)
+       frcing(:ncol,:,nn) = 0._r8
+       do isec = 1,forcings(mm)%nsectors
+          if (forcings(mm)%file%alt_data) then
+             frcing(:ncol,:,nn) = frcing(:ncol,:,nn) + &
+                                forcings(mm)%fields(isec)%data(:ncol,pver:1:-1,lchnk)
           else
-             frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,:,lchnk)
+             frcing(:ncol,:,nn) = frcing(:ncol,:,nn) + &
+                                forcings(mm)%fields(isec)%data(:ncol,:,lchnk)
           endif
        enddo
-
-       xfcname = trim(forcings(m)%species)//'_XFRC'
-       call outfld( xfcname, frcing(:ncol,:,n), ncol, lchnk )
+       xfcname = trim(forcings(mm)%species)//'_XFRC'
+       call outfld( xfcname, frcing(:ncol,:,nn), ncol, lchnk )
 
        frcing_col(:ncol) = 0._r8
-       do k = 1,pver
-          frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
+       do kk = 1,pver
+          frcing_col(:ncol) = frcing_col(:ncol) + &
+                        frcing(:ncol,kk,nn)*(zint(:ncol,kk)-zint(:ncol,kk+1))*km_to_cm
        enddo
-       xfcname = trim(forcings(m)%species)//'_CLXF'
+       xfcname = trim(forcings(mm)%species)//'_CLXF'
        call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
 
-    end do src_loop
+    enddo src_loop
 
   end subroutine extfrc_set
 
-
+!==========================================================================
 end module mo_extfrc

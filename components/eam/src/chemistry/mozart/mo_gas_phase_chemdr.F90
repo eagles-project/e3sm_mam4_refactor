@@ -696,9 +696,8 @@ contains
     !-----------------------------------------------------------------------
     !        ... Compute the extraneous frcing at time = t(n+1)
     !-----------------------------------------------------------------------      
-    call setext( extfrc, zint, zintr, cldtop, &
-                 zmid, lchnk, tfld, o2mmr, ommr, &
-                 pmid, mbar, rlats, calday, ncol, rlons, pbuf )
+    call setext( extfrc,            & ! out
+                 lchnk, ncol, zintr ) ! in
 
     do m = 1,extcnt
        if( m /= synoz_ndx ) then
