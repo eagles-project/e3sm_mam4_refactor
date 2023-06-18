@@ -30,6 +30,9 @@ use spmd_utils,   only : masterproc
 ! mo_setsox.F90
 !#define YAML_SETSOX
 
+! mo_sethet.F90
+!#define YAML_SETHET
+
 ! sox_cldaero_mod
 !#define YAML_SOXMOD
 

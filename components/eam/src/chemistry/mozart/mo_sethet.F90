@@ -1,5 +1,6 @@
 
 module mo_sethet
+#include "../yaml/common_files/common_uses.ymlf90"
 
 !
 ! LKE (10/11/2010): added HCN, CH3CN, HCOOH  to cesm1_0_beta07_offline version
@@ -238,6 +239,7 @@ contains
               precip, &            ! precipitation rate [kg/kg/s]
               xhen_h2o2, xhen_hno3, xhen_so2    ! henry law constants
     real(r8), dimension(ncol,pver,8) :: tmp_hetrates
+#include "../yaml/mo_sethet/f90_yaml/sethet_beg_yml.f90"
 
 
     !-----------------------------------------------------------------
@@ -444,6 +446,7 @@ contains
           call endrun('sethet: het_rates (wet dep) not set for het reaction number : '//hetratestrg)
        endif
     enddo
+#include "../yaml/mo_sethet/f90_yaml/sethet_end_yml.f90"
 
   end subroutine sethet
 
@@ -466,6 +469,7 @@ contains
     integer  :: icol, kk
     real(r8) :: p_limit     ! pressure limit [Pa]
     real(r8), parameter :: d2r = pi/180._r8   ! degree to radian
+#include "../yaml/mo_sethet/f90_yaml/find_ktop_beg_yml.f90"
 
 
     do icol = 1,ncol
@@ -484,6 +488,7 @@ contains
        enddo k_loop
 
     enddo
+#include "../yaml/mo_sethet/f90_yaml/find_ktop_end_yml.f90"
 
   end subroutine find_ktop
 
@@ -507,6 +512,7 @@ contains
     integer  :: icol, kk
     real(r8) :: total_rain      ! total rain rate (both pos and neg) in the column
     real(r8) :: total_pos       ! total positive rain rate in the column
+#include "../yaml/mo_sethet/f90_yaml/calc_precip_rescale_beg_yml.f90"
 
     do icol = 1,ncol
 
@@ -529,6 +535,7 @@ contains
           enddo
        endif
     enddo
+#include "../yaml/mo_sethet/f90_yaml/calc_precip_rescale_end_yml.f90"
 
   end subroutine calc_precip_rescale
 
@@ -561,6 +568,7 @@ contains
     real(r8), parameter ::  cm3_2_m3 = 1.e-6_r8         ! convert cm^3 to m^3
     real(r8), parameter ::  liter_per_gram = 1.e-3_r8
     real(r8), parameter ::  avo2  = avo * liter_per_gram * cm3_2_m3 ! [L/gm/mol*(m/cm)^3]
+#include "../yaml/mo_sethet/f90_yaml/gas_washout_beg_yml.f90"
 
      allca = 0._r8
      !-----------------------------------------------------------------
@@ -587,6 +595,7 @@ contains
            xgas(kk) = max( xgas(kk) - xca, 0._r8 )
         endif
      enddo
+#include "../yaml/mo_sethet/f90_yaml/gas_washout_end_yml.f90"
 
   end subroutine gas_washout
 
@@ -611,10 +620,12 @@ contains
     real(r8) :: work3
     real(r8), parameter ::  mass_h2o = 18._r8           ! mass of water vapor [amu]
     real(r8), parameter ::  h2o_mol  = 1.e3_r8/mass_h2o ! [gm/mol water]
+#include "../yaml/mo_sethet/f90_yaml/calc_het_rates_beg_yml.f90"
 
 
     work3 = satf *  max( rain / (h2o_mol*(work1 + 1._r8/(xhen*work2))), 0._r8 )
     het_rates =  work3 + tmp_hetrates
+#include "../yaml/mo_sethet/f90_yaml/calc_het_rates_end_yml.f90"
 
   end subroutine calc_het_rates
 !=================================================================================
