@@ -5,13 +5,19 @@
      call write_output_header(unit_output)
 
      !start writing data
-     
-     ! qqcw_in is an allocated 2D array (number/species index, vertical column) created to store the aerosol in qqcw
-     ! at a given column, since qqcw itself is a 1D pointer array.  So write this to the output file.
-        call write_var(unit_output,'qqcw',qqcw_in(:,:))
+        ! qqcw is an array of pointers that hold references
+        ! to 2D arrays (column,vertical level) of number / species mass.
+        ! Convert qqcw for a given column to a 2D array (number/mass index, vertical level)
+        ! and then write that 2D array to the yaml / python files.
+ 
+        allocate(qqcw_out(size(qqcw),pver))
+        do imm=1,size(qqcw)
+           qqcw_out(imm,:) = qqcw(imm)%fld(yaml%col_print,:)
+        enddo
+        call write_var(unit_output,'qqcw',qqcw_out(:,:))
      ! ptend is an intent(out) data structure, but only the element 'q' is actually assigned in dropmixnuc.
      ! So only print the value of that element at the indicated column.
-        call write_var(unit_output,'ptend%q',ptend%q(yaml%col_print,:,:))
+        call write_var(unit_output,'ptend_q',ptend%q(yaml%col_print,:,:))
         call write_var(unit_output,'tendnd',tendnd(yaml%col_print,:))
         call write_var(unit_output,'factnum',factnum(yaml%col_print,:,:))
 
@@ -19,6 +25,7 @@
      !"aer_num_only" is .ture. if printing aerosol num only
      !call write_output_aerosol_mmr_from_stateq(unit_output, fld_name, field, aer_num_only, inp_out_str)
      deallocate(qqcw_in)
+     deallocate(qqcw_out)
      !close the output file
      close(unit_output)
      call freeunit(unit_output)

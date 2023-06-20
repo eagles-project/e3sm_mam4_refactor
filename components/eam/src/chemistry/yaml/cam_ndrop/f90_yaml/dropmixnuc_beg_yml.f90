@@ -26,6 +26,7 @@
   integer  :: nstep_print_lo
   integer  :: imm
   real(r8), allocatable :: qqcw_in(:,:)
+  real(r8), allocatable :: qqcw_out(:,:)
 
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0

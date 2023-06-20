@@ -33,7 +33,7 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
 !  integer,save :: n_calls=0
   integer,save :: y_nstep_old = 0  
-  integer,save :: hadact(3) = .false.
+  logical,save :: hadact(0:2) = .false.
   integer :: kp1_yaml
 
   !populate YAML structure
