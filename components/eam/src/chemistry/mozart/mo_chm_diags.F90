@@ -3,7 +3,7 @@ module mo_chm_diags
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods,    only : gas_pcnst
   use mo_tracname,  only : solsym
-  use chem_mods,    only : rxntot, nfs, gas_pcnst, indexm, adv_mass
+  use chem_mods,    only : gas_pcnst, indexm, adv_mass
   use ppgrid,       only : pcols, pver
   use mo_constants, only : pi, rgrav, rearth, avogadro
   use mo_chem_utls, only : get_rxt_ndx, get_spc_ndx
@@ -347,7 +347,7 @@ contains
   end subroutine chm_diags_inti
 
 !========================================================================
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
@@ -358,14 +358,7 @@ contains
     use phys_grid,    only : get_area_all_p, pcols
     use physconst,    only : mwdry                   ! molecular weight of dry air
     use physics_buffer, only : physics_buffer_desc
-
-! here and below for the calculations of total aerosol mass mixing ratios for each aerosol class
-! are only enabled when MODAL aerosol is used (i.e., -DMODAL_AERO is set in macro)
-
-#ifdef MODAL_AERO
     use modal_aero_data,  only : cnst_name_cw, qqcw_get_field ! for calculate sum of aerosol masses
-#endif
-
     use phys_control, only: phys_getopts
     
     implicit none
@@ -377,8 +370,6 @@ contains
     integer,  intent(in)  :: ncol
     real(r8), intent(in)  :: vmr(ncol,pver,gas_pcnst)
     real(r8), intent(in)  :: mmr(ncol,pver,gas_pcnst)
-    real(r8), intent(in)  :: rxt_rates(ncol,pver,rxntot)
-    real(r8), intent(in)  :: invariants(ncol,pver,max(1,nfs))
     real(r8), intent(in)  :: depvel(ncol, gas_pcnst)
     real(r8), intent(in)  :: depflx(ncol, gas_pcnst)
     real(r8), intent(in)  :: mmr_tend(ncol,pver,gas_pcnst)
@@ -391,7 +382,6 @@ contains
     !	... local variables
     !--------------------------------------------------------------------
     integer     :: icol,kk, mm, nn
-    integer     :: plat
     real(r8)    :: ozone_layer(ncol,pver)   ! ozone concentration [DU]
     real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
     real(r8)    :: ozone_trop(ncol)         ! vertical integration of ozone in troposphere [DU]
@@ -500,7 +490,6 @@ contains
        if ( any( aer_species == mm ) ) then
           call outfld( solsym(mm), mmr(:ncol,:,mm), ncol ,lchnk )
           call outfld( trim(solsym(mm))//'_SRF', mmr(:ncol,pver,mm), ncol ,lchnk )
-#ifdef MODAL_AERO
           if (history_aerosol .and. .not. history_verbose) then
              select case (trim(solsym(mm)))
              case ('bc_a1','bc_a3','bc_a4')
@@ -519,7 +508,6 @@ contains
                   mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,mm)
              endselect
           endif
-#endif
        else
           call outfld( solsym(mm), vmr(:ncol,:,mm), ncol ,lchnk )
           call outfld( trim(solsym(mm))//'_SRF', vmr(:ncol,pver,mm), ncol ,lchnk )
@@ -541,7 +529,6 @@ contains
 
     enddo
 
-#ifdef MODAL_AERO
     ! diagnostics for cloud-borne aerosols, then add to corresponding mass accumulators
     if (history_aerosol .and. .not. history_verbose) then
 
@@ -574,7 +561,6 @@ contains
        call outfld( 'Mass_so4', mass_so4(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_soa', mass_soa(:ncol,:),ncol,lchnk)
     endif
-#endif
 
     call outfld( 'NOX',  vmr_nox(:ncol,:),  ncol, lchnk )
     call outfld( 'NOY',  vmr_noy(:ncol,:),  ncol, lchnk )
@@ -608,7 +594,6 @@ contains
 
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
     integer  :: mm, kk
-    integer  :: plat
     real(r8) :: wght(ncol)
     !
     ! output integrated wet deposition field
