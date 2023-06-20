@@ -31,7 +31,7 @@
    !  print output from timestep nstep_print_lo to yaml%nstep_print
   integer  :: nstep_print_lo
   ! some subroutines are called multiple times in one timestep, record the number of calls
-  integer,save :: n_calls=0
+!  integer,save :: n_calls=0
   integer,save :: y_nstep_old = 0  
   logical,save :: hadact(0:2) = .false.
 
@@ -82,7 +82,7 @@
 
 
      !Record number of calls that can output yaml file if you only need to write one set of input/output
-     n_calls = n_calls+1
+!     n_calls = n_calls+1
 
 !     if (n_calls==1) then ! output at the first call only, modify this if condition (see below) if writing out other calls
 
@@ -96,9 +96,7 @@
 
      if(y_nstep /= y_nstep_old) then
         hadact(:) = .false.
-        n_calls = 1
      endif
-     write(103,*) 'y_nstep, y_nstep_old, y_i, n_calls, iact, hadact: ', y_nstep, y_nstep_old, y_i, n_calls, iact, hadact(0), hadact(1), hadact(2)
      y_nstep_old = y_nstep
 
 
@@ -106,12 +104,9 @@
 
         hadact(iact) = .true.
 
-        write(103,*) 'af y_nstep, y_nstep_old, y_i, n_calls, iact, hadact: ', y_nstep, y_nstep_old, y_i, n_calls, iact, hadact(0), hadact(1), hadact(2)
-
         !(**remove these yaml% variables if generating data for a dependent subroutines**)
         yaml%lchnk_print = y_lchnk
         yaml%flag_print  = .true.
-
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
@@ -150,8 +145,6 @@
 
         call write_var(unit_input,unit_output,'numptr_amode',numptr_amode)
         call write_var(unit_input,unit_output,'lmassptr_amode',lmassptr_amode)
-
-
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
