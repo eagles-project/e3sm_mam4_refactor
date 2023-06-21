@@ -3,12 +3,11 @@ module mo_chm_diags
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods,    only : gas_pcnst
   use mo_tracname,  only : solsym
-  use chem_mods,    only : gas_pcnst, indexm, adv_mass
+  use chem_mods,    only : gas_pcnst, adv_mass
   use ppgrid,       only : pcols, pver
   use mo_constants, only : pi, rgrav, rearth, avogadro
   use mo_chem_utls, only : get_rxt_ndx, get_spc_ndx
   use cam_history,  only : fieldname_len
-  use mo_jeuv,      only : neuv
 
   private
 
@@ -16,24 +15,8 @@ module mo_chm_diags
   public :: chm_diags
   public :: het_diags
 
-  integer :: id_n,id_no,id_no2,id_no3,id_n2o5,id_hno3,id_ho2no2,id_clono2,id_brono2
-  integer :: id_cl,id_clo,id_hocl,id_cl2,id_cl2o2,id_oclo,id_hcl,id_brcl
-  integer :: id_ccl4,id_cfc11,id_cfc113,id_ch3ccl3,id_cfc12,id_ch3cl,id_hcfc22,id_cf2clbr
-  integer :: id_br,id_bro,id_hbr,id_hobr,id_ch4,id_h2o,id_h2
-  integer :: id_o,id_o2,id_h
   integer :: id_o3
-
-  integer, parameter :: NJEUV = neuv
-  integer :: rid_jeuv(NJEUV), rid_jno_i, rid_jno
-
-  logical :: has_jeuvs, has_jno_i, has_jno
-
-  integer :: nox_species(3),  noy_species(15)
-  integer :: clox_species(6), cloy_species(9), tcly_species(17)
-  integer :: brox_species(2), broy_species(6)
-  integer :: toth_species(3)
   integer :: sox_species(3)
-  integer :: nhx_species(3)
   integer :: aer_species(gas_pcnst)
 
   character(len=fieldname_len) :: dtchem_name(gas_pcnst)
@@ -42,13 +25,10 @@ module mo_chm_diags
   character(len=fieldname_len) :: wetdep_name(gas_pcnst)
   character(len=fieldname_len) :: wtrate_name(gas_pcnst)
 
-  real(r8), parameter :: N_molwgt = 14.00674_r8
   real(r8), parameter :: S_molwgt = 32.066_r8
 
   ! constants for converting O3 mixing ratio to DU
   real(r8), parameter :: DUfac = 2.687e20_r8   ! 1 DU in molecules per m^2
-
-  character(len=32) :: chempkg
 
 contains
 
@@ -60,23 +40,18 @@ contains
 
     use cam_history,  only : addfld, horiz_only, add_default
     use constituents, only : cnst_get_ind, cnst_longname
-    use dyn_grid,     only : get_dyn_grid_parm, get_horiz_grid_d
-    use phys_control, only: phys_getopts
+    use phys_control, only : phys_getopts
 
     implicit none
 
     integer :: i, j, k, m, n
-    character(len=16) :: jname, spc_name, attr
-    character(len=2)  :: jchar
-    character(len=64) :: lname
+    character(len=16) :: spc_name, attr
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
 
-    integer :: id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3
+    integer :: id_nh4no3
     integer :: id_so2, id_so4, id_h2so4
-    integer :: id_nh3, id_nh4
     integer :: id_dst01, id_dst02, id_dst03, id_dst04, id_sslt01, id_sslt02, id_sslt03, id_sslt04
     integer :: id_soa,  id_oc1, id_oc2, id_cb1, id_cb2
-    integer :: id_bry, id_cly 
     integer :: id_soam,id_soai,id_soat,id_soab,id_soax
 
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
@@ -88,64 +63,15 @@ contains
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
                        history_amwg_out    = history_amwg,  &
-                       history_verbose_out = history_verbose,  &
-                       cam_chempkg_out     = chempkg   )
+                       history_verbose_out = history_verbose)
 
-    id_bry     = get_spc_ndx( 'BRY' )
-    id_cly     = get_spc_ndx( 'CLY' )
-
-    id_n       = get_spc_ndx( 'N' )
-    id_no      = get_spc_ndx( 'NO' )
-    id_no2     = get_spc_ndx( 'NO2' )
-    id_no3     = get_spc_ndx( 'NO3' )
-    id_n2o5    = get_spc_ndx( 'N2O5' )
-    id_hno3    = get_spc_ndx( 'HNO3' )
-    id_ho2no2  = get_spc_ndx( 'HO2NO2' )
-    id_clono2  = get_spc_ndx( 'CLONO2' )
-    id_brono2  = get_spc_ndx( 'BRONO2' )
-    id_cl      = get_spc_ndx( 'CL' )
-    id_clo     = get_spc_ndx( 'CLO' )
-    id_hocl    = get_spc_ndx( 'HOCL' )
-    id_cl2     = get_spc_ndx( 'CL2' )
-    id_cl2o2   = get_spc_ndx( 'CL2O2' )
-    id_oclo    = get_spc_ndx( 'OCLO' )
-    id_hcl     = get_spc_ndx( 'HCL' )
-    id_brcl    = get_spc_ndx( 'BRCL' )
-    id_ccl4    = get_spc_ndx( 'CCL4' )
-    id_cfc11   = get_spc_ndx( 'CFC11' )
-    id_cfc113  = get_spc_ndx( 'CFC113' )
-    id_ch3ccl3 = get_spc_ndx( 'CH3CCL3' )
-    id_cfc12   = get_spc_ndx( 'CFC12' )
-    id_ch3cl   = get_spc_ndx( 'CH3CL' )
-    id_hcfc22  = get_spc_ndx( 'HCFC22' )
-    id_cf2clbr = get_spc_ndx( 'CF2CLBR' )
-    id_br      = get_spc_ndx( 'BR' )
-    id_bro     = get_spc_ndx( 'BRO' )
-    id_hbr     = get_spc_ndx( 'HBR' )
-    id_hobr    = get_spc_ndx( 'HOBR' )
-    id_ch4     = get_spc_ndx( 'CH4' )
-    id_h2o     = get_spc_ndx( 'H2O' )
-    id_h2      = get_spc_ndx( 'H2' )
-    id_o       = get_spc_ndx( 'O' )
-    id_o2      = get_spc_ndx( 'O2' )
     id_o3      = get_spc_ndx( 'O3' )
-    id_h       = get_spc_ndx( 'H' )
-
-    id_pan     = get_spc_ndx( 'PAN' )
-    id_onit    = get_spc_ndx( 'ONIT' )
-    id_mpan    = get_spc_ndx( 'MPAN' )
-    id_isopno3 = get_spc_ndx( 'ISOPNO3' )
-    id_onitr   = get_spc_ndx( 'ONITR' )
-    id_nh4no3  = get_spc_ndx( 'NH4NO3' )
 
     id_so2     = get_spc_ndx( 'SO2' )
     id_so4     = get_spc_ndx( 'SO4' )
     id_h2so4   = get_spc_ndx( 'H2SO4' )
 
-    id_nh3     = get_spc_ndx( 'NH3' )
-    id_nh4     = get_spc_ndx( 'NH4' )
     id_nh4no3  = get_spc_ndx( 'NH4NO3' )
-
     id_dst01   = get_spc_ndx( 'DST01' )
     id_dst02   = get_spc_ndx( 'DST02' )
     id_dst03   = get_spc_ndx( 'DST03' )
@@ -155,14 +81,11 @@ contains
     id_sslt03  = get_spc_ndx( 'SSLT03' )
     id_sslt04  = get_spc_ndx( 'SSLT04' )
     id_soa     = get_spc_ndx( 'SOA' )
-    id_so4     = get_spc_ndx( 'SO4' )
     id_oc1     = get_spc_ndx( 'OC1' )
     id_oc2     = get_spc_ndx( 'OC2' )
     id_cb1     = get_spc_ndx( 'CB1' )
     id_cb2     = get_spc_ndx( 'CB2' )
 
-    rid_jno   = get_rxt_ndx( 'jno' )
-    rid_jno_i = get_rxt_ndx( 'jno_i' )
 
     id_soam = get_spc_ndx( 'SOAM' )
     id_soai = get_spc_ndx( 'SOAI' )
@@ -170,19 +93,7 @@ contains
     id_soab = get_spc_ndx( 'SOAB' )
     id_soax = get_spc_ndx( 'SOAX' )
 
-    nox_species = (/ id_n, id_no, id_no2 /)
-    noy_species = (/ id_n, id_no, id_no2, id_no3, id_n2o5, id_hno3, id_ho2no2, id_clono2, &
-                     id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3 /)
-    clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
-    cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
-    tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, &
-                      id_ccl4, id_cfc11, id_cfc113, id_ch3ccl3, id_cfc12, id_ch3cl, id_hcfc22, id_cf2clbr /)
-
-    brox_species = (/ id_br, id_bro /)
-    broy_species = (/ id_br, id_bro, id_hbr, id_brono2, id_brcl, id_hobr /)
-
     sox_species = (/ id_so2, id_so4, id_h2so4 /)
-    nhx_species = (/ id_nh3, id_nh4, id_nh4no3 /)
     bulkaero_species(:) = -1
     bulkaero_species(1:20) = (/ id_dst01, id_dst02, id_dst03, id_dst04, &
                                 id_sslt01, id_sslt02, id_sslt03, id_sslt04, &
@@ -202,8 +113,6 @@ contains
        endif
     enddo
 
-    toth_species = (/ id_ch4, id_h2o, id_h2 /)
-
     call addfld( 'NOX', (/ 'lev' /), 'A', 'mol/mol', 'nox volume mixing ratio' )
     call addfld( 'NOY', (/ 'lev' /), 'A', 'mol/mol', 'noy volume mixing ratio' )
     call addfld( 'BROX', (/ 'lev' /), 'A','mol/mol', 'brox volume mixing ratio' )
@@ -216,35 +125,6 @@ contains
     call addfld( 'NOY_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NOy mass mixing ratio' )
     call addfld( 'SOX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'SOx mass mixing ratio' )
     call addfld( 'NHX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NHx mass mixing ratio' )
-
-    do j = 1,NJEUV
-       write( jchar, '(I2)' ) j
-       jname = 'jeuv_'//trim(adjustl(jchar))
-       rid_jeuv(j) = get_rxt_ndx( trim(jname) )
-    enddo
-
-    has_jeuvs = all( rid_jeuv(:) > 0 )
-    has_jno_i = rid_jno_i>0
-    has_jno   = rid_jno>0
-
-    if ( has_jeuvs ) then
-       call addfld( 'PION_EUV', (/ 'lev' /), 'I','/cm^3/s', 'total euv ionization rate' )
-       call addfld( 'PEUV1', (/ 'lev' /), 'I',   '/cm^3/s', '(j1+j2+j3)*o' )
-       call addfld( 'PEUV1e', (/ 'lev' /), 'I',  '/cm^3/s', '(j14+j15+j16)*o' )
-       call addfld( 'PEUV2', (/ 'lev' /), 'I',   '/cm^3/s', 'j4*n' )
-       call addfld( 'PEUV3', (/ 'lev' /), 'I',   '/cm^3/s', '(j5+j7+j8+j9)*o2' )
-       call addfld( 'PEUV3e', (/ 'lev' /), 'I',  '/cm^3/s', '(j17+j19+j20+j21)*o2' )
-       call addfld( 'PEUV4', (/ 'lev' /), 'I',   '/cm^3/s', '(j10+j11)*n2' )
-       call addfld( 'PEUV4e', (/ 'lev' /), 'I',  '/cm^3/s', '(j22+j23)*n2' )
-       call addfld( 'PEUVN2D', (/ 'lev' /), 'I', '/cm^3/s', '(j11+j13)*n2' )
-       call addfld( 'PEUVN2De', (/ 'lev' /), 'I','/cm^3/s', '(j23+j25)*n2' )
-    endif
-    if ( has_jno ) then
-       call addfld( 'PJNO', (/ 'lev' /), 'I', '/cm^3/s', 'jno*no' )
-    endif
-    if ( has_jno_i ) then
-       call addfld( 'PJNO_I', (/ 'lev' /), 'I', '/cm^3/s', 'jno_i*no' )
-    endif
 
     do m = 1,gas_pcnst
 
@@ -287,15 +167,14 @@ contains
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
        endif
 
-       if ((m /= id_cly) .and. (m /= id_bry)) then
-          if (history_aerosol) then
-             if (history_verbose .or. trim(spc_name) == 'O3' .or. trim(spc_name) == 'SO2' ) &
+       if (history_aerosol) then
+          if (history_verbose .or. trim(spc_name) == 'O3' .or. trim(spc_name) == 'SO2' ) then
              call add_default( spc_name, 1, ' ' )
-             call add_default( trim(spc_name)//'_SRF', 1, ' ' )
-          endif 
-          if (history_amwg) then
-             call add_default( trim(spc_name)//'_SRF', 1, ' ' )
           endif
+          call add_default( trim(spc_name)//'_SRF', 1, ' ' )
+       endif 
+       if (history_amwg) then
+          call add_default( trim(spc_name)//'_SRF', 1, ' ' )
        endif
 
     enddo
