@@ -134,7 +134,6 @@ contains
 
     level_loop : do kk = 1,pver
        tinv(:)           = 1._r8 / temp(:ncol,kk)
-!BJG       tp(:)             = 300._r8 * tinv(:)
        tp(:)             = t0 * tinv(:)
        sqrt_t(:)         = sqrt( temp(:ncol,kk) )
 
