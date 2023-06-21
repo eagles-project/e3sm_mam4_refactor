@@ -12,7 +12,8 @@
 
       contains
 
-      subroutine adjrxt( rate, inv, mtot, ncol )
+      subroutine adjrxt( rate, &  ! inout
+                          inv, mtot, ncol )  ! in
 
       use ppgrid, only : pver
       use shr_kind_mod, only : r8 => shr_kind_r8

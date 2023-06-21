@@ -568,7 +568,8 @@ contains
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
     !-----------------------------------------------------------------------      
-    call setrxt( reaction_rates, tfld, ncol )
+    call setrxt( reaction_rates, & ! inout
+                 tfld, ncol )  ! in
 
     sulfate(:,:) = 0._r8
     if( so4_ndx < 1 ) then ! get offline so4 field if not prognostic
@@ -602,8 +603,8 @@ contains
     
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
-    call usrrxt( reaction_rates, tfld, invariants, &
-                 invariants(:,:,indexm), ncol )
+    call usrrxt( reaction_rates, &  ! inout
+                 tfld, invariants, invariants(:,:,indexm), ncol ) ! in
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 
@@ -619,7 +620,8 @@ contains
        call outfld( rxn_names(i-phtcnt), reaction_rates(:,:,i), ncol, lchnk )
     enddo
 
-    call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol )
+    call adjrxt( reaction_rates, & ! inout
+                 invariants, invariants(1,1,indexm), ncol )  ! in
 
     !-----------------------------------------------------------------------
     !        ... Compute the photolysis rates at time = t(n+1)

@@ -9,25 +9,24 @@ module mo_usrrxt
   implicit none
 
   private
-  public :: usrrxt, usrrxt_inti, usrrxt_hrates
+  public :: usrrxt, usrrxt_inti
 
   save
 
   integer :: usr_O_O2_ndx
-  integer :: usr_HO2_HO2_ndx
+  integer :: usr_HO2_HO2_ndx 
   integer :: usr_N2O5_M_ndx
-  integer :: usr_HNO3_OH_ndx
+  integer :: usr_HNO3_OH_ndx 
   integer :: usr_HO2NO2_M_ndx
   integer :: usr_N2O5_aer_ndx
   integer :: usr_NO3_aer_ndx
   integer :: usr_NO2_aer_ndx
-  integer :: usr_CO_OH_a_ndx
   integer :: usr_CO_OH_b_ndx
   integer :: usr_PAN_M_ndx
   integer :: usr_CH3COCH3_OH_ndx
   integer :: usr_MCO3_NO2_ndx
   integer :: usr_MPAN_M_ndx
-  integer :: usr_XOOH_OH_ndx
+  integer :: usr_XOOH_OH_ndx 
   integer :: usr_SO2_OH_ndx
   integer :: usr_DMS_OH_ndx
   integer :: usr_HO2_aer_ndx
@@ -38,96 +37,10 @@ module mo_usrrxt
   integer :: tag_C2H4_OH_ndx
   integer :: tag_C3H6_OH_ndx
   integer :: tag_CH3CO3_NO2_ndx
-  
-  integer :: usr_OA_O2_NDX
-  integer :: usr_XNO2NO3_M_ndx
-  integer :: usr_NO2XNO3_M_ndx
-  integer :: usr_XHNO3_OH_ndx
-  integer :: usr_XHO2NO2_M_ndx
-  integer :: usr_XNO2NO3_aer_ndx
-  integer :: usr_NO2XNO3_aer_ndx
-  integer :: usr_XNO3_aer_ndx
-  integer :: usr_XNO2_aer_ndx
-  integer :: usr_XPAN_M_ndx
-  integer :: usr_XMPAN_M_ndx
-  integer :: usr_MCO3_XNO2_ndx
-  
-  integer :: usr_C2O3_NO2_ndx
-  integer :: usr_C2H4_OH_ndx
-  integer :: usr_XO2N_HO2_ndx
-  integer :: usr_C2O3_XNO2_ndx
-  
-  integer :: tag_XO2N_NO_ndx
-  integer :: tag_XO2_HO2_ndx
-  integer :: tag_XO2_NO_ndx
-  
-  integer :: usr_O_O_ndx
-  integer :: usr_CL2O2_M_ndx
-  integer :: usr_SO3_H2O_ndx
-  integer :: tag_CLO_CLO_ndx
-  
-  integer :: ion1_ndx, ion2_ndx, ion3_ndx, ion11_ndx
-  integer :: elec1_ndx, elec2_ndx, elec3_ndx
-  integer :: het1_ndx
 
-  integer :: usr_oh_co_ndx, het_no2_h2o_ndx, usr_oh_dms_ndx, aq_so2_h2o2_ndx, aq_so2_o3_ndx
-
-  integer :: h2o_ndx, so4_ndx, cb2_ndx, oc2_ndx, soa_ndx, nit_ndx
-
-!lke++
-  integer :: usr_COhc_OH_ndx
-  integer :: usr_COme_OH_ndx
-  integer :: usr_CO01_OH_ndx
-  integer :: usr_CO02_OH_ndx
-  integer :: usr_CO03_OH_ndx
-  integer :: usr_CO04_OH_ndx
-  integer :: usr_CO05_OH_ndx
-  integer :: usr_CO06_OH_ndx
-  integer :: usr_CO07_OH_ndx
-  integer :: usr_CO08_OH_ndx
-  integer :: usr_CO09_OH_ndx
-  integer :: usr_CO10_OH_ndx
-  integer :: usr_CO11_OH_ndx
-  integer :: usr_CO12_OH_ndx
-  integer :: usr_CO13_OH_ndx
-  integer :: usr_CO14_OH_ndx
-  integer :: usr_CO15_OH_ndx
-  integer :: usr_CO16_OH_ndx
-  integer :: usr_CO17_OH_ndx
-  integer :: usr_CO18_OH_ndx
-  integer :: usr_CO19_OH_ndx
-  integer :: usr_CO20_OH_ndx
-  integer :: usr_CO21_OH_ndx
-  integer :: usr_CO22_OH_ndx
-  integer :: usr_CO23_OH_ndx
-  integer :: usr_CO24_OH_ndx
-  integer :: usr_CO25_OH_ndx
-  integer :: usr_CO26_OH_ndx
-  integer :: usr_CO27_OH_ndx
-  integer :: usr_CO28_OH_ndx
-  integer :: usr_CO29_OH_ndx
-  integer :: usr_CO30_OH_ndx
-  integer :: usr_CO31_OH_ndx
-  integer :: usr_CO32_OH_ndx
-  integer :: usr_CO33_OH_ndx
-  integer :: usr_CO34_OH_ndx
-  integer :: usr_CO35_OH_ndx
-  integer :: usr_CO36_OH_ndx
-  integer :: usr_CO37_OH_ndx
-  integer :: usr_CO38_OH_ndx
-  integer :: usr_CO39_OH_ndx
-  integer :: usr_CO40_OH_ndx
-  integer :: usr_CO41_OH_ndx
-  integer :: usr_CO42_OH_ndx
-!lke--
-
-  logical :: has_aerosols
+  integer :: h2o_ndx
 
   real(r8), parameter :: t0     = 300._r8                ! K
-  real(r8), parameter :: trlim2 = 17._r8/3._r8           ! K
-  real(r8), parameter :: trlim3 = 15._r8/3._r8           ! K
-
-  logical :: has_ion_rxts
 
 contains
 
@@ -144,6 +57,7 @@ contains
 !
 ! full tropospheric chemistry
 !
+
     usr_O_O2_ndx         = get_rxt_ndx( 'usr_O_O2' )
     usr_HO2_HO2_ndx      = get_rxt_ndx( 'usr_HO2_HO2' )
     usr_N2O5_M_ndx       = get_rxt_ndx( 'usr_N2O5_M' )
@@ -152,7 +66,6 @@ contains
     usr_N2O5_aer_ndx     = get_rxt_ndx( 'usr_N2O5_aer' )
     usr_NO3_aer_ndx      = get_rxt_ndx( 'usr_NO3_aer' )
     usr_NO2_aer_ndx      = get_rxt_ndx( 'usr_NO2_aer' )
-    usr_CO_OH_a_ndx      = get_rxt_ndx( 'usr_CO_OH_a' )
     usr_CO_OH_b_ndx      = get_rxt_ndx( 'usr_CO_OH_b' )
     usr_PAN_M_ndx        = get_rxt_ndx( 'usr_PAN_M' )
     usr_CH3COCH3_OH_ndx  = get_rxt_ndx( 'usr_CH3COCH3_OH' )
@@ -169,123 +82,8 @@ contains
     tag_C2H4_OH_ndx      = get_rxt_ndx( 'tag_C2H4_OH' )
     tag_C3H6_OH_ndx      = get_rxt_ndx( 'tag_C3H6_OH' )
     tag_CH3CO3_NO2_ndx   = get_rxt_ndx( 'tag_CH3CO3_NO2' )     
- !
- ! additional reactions for O3A/XNO
- !
-    usr_OA_O2_ndx        = get_rxt_ndx( 'usr_OA_O2' )
-    usr_XNO2NO3_M_ndx    = get_rxt_ndx( 'usr_XNO2NO3_M' )
-    usr_NO2XNO3_M_ndx    = get_rxt_ndx( 'usr_NO2XNO3_M' )
-    usr_XNO2NO3_aer_ndx  = get_rxt_ndx( 'usr_XNO2NO3_aer' )
-    usr_NO2XNO3_aer_ndx  = get_rxt_ndx( 'usr_NO2XNO3_aer' )
-    usr_XHNO3_OH_ndx     = get_rxt_ndx( 'usr_XHNO3_OH' )
-    usr_XNO3_aer_ndx     = get_rxt_ndx( 'usr_XNO3_aer' )
-    usr_XNO2_aer_ndx     = get_rxt_ndx( 'usr_XNO2_aer' )
-    usr_MCO3_XNO2_ndx    = get_rxt_ndx( 'usr_MCO3_XNO2' )
-    usr_XPAN_M_ndx       = get_rxt_ndx( 'usr_XPAN_M' )
-    usr_XMPAN_M_ndx      = get_rxt_ndx( 'usr_XMPAN_M' )
-    usr_XHO2NO2_M_ndx    = get_rxt_ndx( 'usr_XHO2NO2_M' )
-!
-! reduced hydrocarbon chemistry
-!
-    usr_C2O3_NO2_ndx     = get_rxt_ndx( 'usr_C2O3_NO2' )
-    usr_C2H4_OH_ndx      = get_rxt_ndx( 'usr_C2H4_OH' )
-    usr_XO2N_HO2_ndx     = get_rxt_ndx( 'usr_XO2N_HO2' )
-    usr_C2O3_XNO2_ndx    = get_rxt_ndx( 'usr_C2O3_XNO2' )
-!
-    tag_XO2N_NO_ndx      = get_rxt_ndx( 'tag_XO2N_NO' )
-    tag_XO2_HO2_ndx      = get_rxt_ndx( 'tag_XO2_HO2' )
-    tag_XO2_NO_ndx       = get_rxt_ndx( 'tag_XO2_NO' )
-!
-! stratospheric chemistry
-!
-    usr_O_O_ndx          = get_rxt_ndx( 'usr_O_O' )
-    usr_CL2O2_M_ndx      = get_rxt_ndx( 'usr_CL2O2_M' )
-    usr_SO3_H2O_ndx      = get_rxt_ndx( 'usr_SO3_H2O' )
-!    
-    tag_CLO_CLO_ndx      = get_rxt_ndx( 'tag_CLO_CLO' )
-!
-! stratospheric aerosol chemistry
-!
-    het1_ndx             = get_rxt_ndx( 'het1' )
-!
-! ion chemistry
-!   
-    ion1_ndx  = get_rxt_ndx( 'ion_Op_O2' )
-    ion2_ndx  = get_rxt_ndx( 'ion_Op_N2' )
-    ion3_ndx  = get_rxt_ndx( 'ion_N2p_Oa' )
-    ion11_ndx = get_rxt_ndx( 'ion_N2p_Ob' )
 
-    elec1_ndx  = get_rxt_ndx( 'elec1' )
-    elec2_ndx  = get_rxt_ndx( 'elec2' )
-    elec3_ndx  = get_rxt_ndx( 'elec3' )
-
-    has_ion_rxts = ion1_ndx>0 .and. ion2_ndx>0 .and. ion3_ndx>0 .and. elec1_ndx>0 &
-                 .and. elec2_ndx>0 .and. elec3_ndx>0
-
-    so4_ndx    = get_spc_ndx( 'SO4' )
-    cb2_ndx    = get_spc_ndx( 'CB2' )
-    oc2_ndx    = get_spc_ndx( 'OC2' )
-    soa_ndx    = get_spc_ndx( 'SOA' )
-    nit_ndx    = get_spc_ndx( 'NH4NO3' )
     h2o_ndx    = get_spc_ndx( 'H2O' )
-
-    !
-    ! llnl super fast
-    !
-    usr_oh_co_ndx  = get_rxt_ndx( 'usr_oh_co' )
-    het_no2_h2o_ndx  = get_rxt_ndx( 'het_no2_h2o' )
-    usr_oh_dms_ndx  = get_rxt_ndx( 'usr_oh_dms' )
-    aq_so2_h2o2_ndx  = get_rxt_ndx( 'aq_so2_h2o2' )
-    aq_so2_o3_ndx  = get_rxt_ndx( 'aq_so2_o3' )
-    
-!lke++
-! CO tags
-!
-    usr_COhc_OH_ndx      = get_rxt_ndx( 'usr_COhc_OH' )
-    usr_COme_OH_ndx      = get_rxt_ndx( 'usr_COme_OH' )
-    usr_CO01_OH_ndx      = get_rxt_ndx( 'usr_CO01_OH' )
-    usr_CO02_OH_ndx      = get_rxt_ndx( 'usr_CO02_OH' )
-    usr_CO03_OH_ndx      = get_rxt_ndx( 'usr_CO03_OH' )
-    usr_CO04_OH_ndx      = get_rxt_ndx( 'usr_CO04_OH' )
-    usr_CO05_OH_ndx      = get_rxt_ndx( 'usr_CO05_OH' )
-    usr_CO06_OH_ndx      = get_rxt_ndx( 'usr_CO06_OH' )
-    usr_CO07_OH_ndx      = get_rxt_ndx( 'usr_CO07_OH' )
-    usr_CO08_OH_ndx      = get_rxt_ndx( 'usr_CO08_OH' )
-    usr_CO09_OH_ndx      = get_rxt_ndx( 'usr_CO09_OH' )
-    usr_CO10_OH_ndx      = get_rxt_ndx( 'usr_CO10_OH' )
-    usr_CO11_OH_ndx      = get_rxt_ndx( 'usr_CO11_OH' )
-    usr_CO12_OH_ndx      = get_rxt_ndx( 'usr_CO12_OH' )
-    usr_CO13_OH_ndx      = get_rxt_ndx( 'usr_CO13_OH' )
-    usr_CO14_OH_ndx      = get_rxt_ndx( 'usr_CO14_OH' )
-    usr_CO15_OH_ndx      = get_rxt_ndx( 'usr_CO15_OH' )
-    usr_CO16_OH_ndx      = get_rxt_ndx( 'usr_CO16_OH' )
-    usr_CO17_OH_ndx      = get_rxt_ndx( 'usr_CO17_OH' )
-    usr_CO18_OH_ndx      = get_rxt_ndx( 'usr_CO18_OH' )
-    usr_CO19_OH_ndx      = get_rxt_ndx( 'usr_CO19_OH' )
-    usr_CO20_OH_ndx      = get_rxt_ndx( 'usr_CO20_OH' )
-    usr_CO21_OH_ndx      = get_rxt_ndx( 'usr_CO21_OH' )
-    usr_CO22_OH_ndx      = get_rxt_ndx( 'usr_CO22_OH' )
-    usr_CO23_OH_ndx      = get_rxt_ndx( 'usr_CO23_OH' )
-    usr_CO24_OH_ndx      = get_rxt_ndx( 'usr_CO24_OH' )
-    usr_CO25_OH_ndx      = get_rxt_ndx( 'usr_CO25_OH' )
-    usr_CO26_OH_ndx      = get_rxt_ndx( 'usr_CO26_OH' )
-    usr_CO27_OH_ndx      = get_rxt_ndx( 'usr_CO27_OH' )
-    usr_CO28_OH_ndx      = get_rxt_ndx( 'usr_CO28_OH' )
-    usr_CO29_OH_ndx      = get_rxt_ndx( 'usr_CO29_OH' )
-    usr_CO30_OH_ndx      = get_rxt_ndx( 'usr_CO30_OH' )
-    usr_CO31_OH_ndx      = get_rxt_ndx( 'usr_CO31_OH' )
-    usr_CO32_OH_ndx      = get_rxt_ndx( 'usr_CO32_OH' )
-    usr_CO33_OH_ndx      = get_rxt_ndx( 'usr_CO33_OH' )
-    usr_CO34_OH_ndx      = get_rxt_ndx( 'usr_CO34_OH' )
-    usr_CO35_OH_ndx      = get_rxt_ndx( 'usr_CO35_OH' )
-    usr_CO36_OH_ndx      = get_rxt_ndx( 'usr_CO36_OH' )
-    usr_CO37_OH_ndx      = get_rxt_ndx( 'usr_CO37_OH' )
-    usr_CO38_OH_ndx      = get_rxt_ndx( 'usr_CO38_OH' )
-    usr_CO39_OH_ndx      = get_rxt_ndx( 'usr_CO39_OH' )
-    usr_CO40_OH_ndx      = get_rxt_ndx( 'usr_CO40_OH' )
-    usr_CO41_OH_ndx      = get_rxt_ndx( 'usr_CO41_OH' )
-    usr_CO42_OH_ndx      = get_rxt_ndx( 'usr_CO42_OH' )
-!lke--
 
     if (masterproc) then
        write(iulog,*) ' '
@@ -294,11 +92,12 @@ contains
                             ,tag_NO2_HO2_ndx,usr_HO2NO2_M_ndx,usr_N2O5_aer_ndx,usr_NO3_aer_ndx,usr_NO2_aer_ndx &
                             ,usr_CO_OH_b_ndx,tag_C2H4_OH_ndx,tag_C3H6_OH_ndx,tag_CH3CO3_NO2_ndx,usr_PAN_M_ndx,usr_CH3COCH3_OH_ndx &
                             ,usr_MCO3_NO2_ndx,usr_MPAN_M_ndx,usr_XOOH_OH_ndx,usr_SO2_OH_ndx,usr_DMS_OH_ndx,usr_HO2_aer_ndx
-    end if
+    endif
 
   end subroutine usrrxt_inti
 
-  subroutine usrrxt( rxt, temp, invariants, mtot, ncol )
+  subroutine usrrxt( rxt, & ! inout
+                    temp, invariants, mtot, ncol )  ! in
 
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
@@ -306,7 +105,6 @@ contains
     
     use chem_mods,     only : nfs, rxntot
     use mo_setinv,     only : inv_h2o_ndx=>h2o_ndx
-    use modal_aero_data,   only: ntot_amode
     implicit none
 
 !-----------------------------------------------------------------
@@ -336,7 +134,8 @@ contains
 
     level_loop : do kk = 1,pver
        tinv(:)           = 1._r8 / temp(:ncol,kk)
-       tp(:)             = 300._r8 * tinv(:)
+!BJG       tp(:)             = 300._r8 * tinv(:)
+       tp(:)             = t0 * tinv(:)
        sqrt_t(:)         = sqrt( temp(:ncol,kk) )
 
 !-----------------------------------------------------------------
@@ -379,99 +178,6 @@ contains
 
   end subroutine usrrxt
 
-      subroutine usrrxt_hrates( rxt, tempn, tempi, tempe, invariants, &
-				h2ovmr, pmid, m, ncol, kbot )
-!-----------------------------------------------------------------
-!        ... set the user specified reaction rates for heating
-!-----------------------------------------------------------------
-
-      use shr_kind_mod,  only : r8 => shr_kind_r8
-      use chem_mods,     only : nfs, rxntot
-      use ppgrid,        only : pver, pcols
-
-      implicit none
-
-!-----------------------------------------------------------------
-!        ... dummy arguments
-!-----------------------------------------------------------------
-      integer, intent(in)     :: ncol                         ! number columns in chunk
-      integer, intent(in)     :: kbot                         ! heating levels
-      real(r8), intent(in)    :: tempn(pcols,pver)            ! neutral temperature (K)
-      real(r8), intent(in)    :: tempi(pcols,pver)            ! ion temperature (K)
-      real(r8), intent(in)    :: tempe(pcols,pver)            ! electron temperature (K)
-      real(r8), intent(in)    :: m(ncol,pver)                 ! total atm density (1/cm^3)
-      real(r8), intent(in)    :: h2ovmr(ncol,pver)            ! water vapor (vmr)
-      real(r8), intent(in)    :: pmid(pcols,pver)             ! midpoint pressure (Pa)
-      real(r8), intent(in)    :: invariants(ncol,pver,nfs)    ! invariants density (1/cm^3)
-      real(r8), intent(inout) :: rxt(ncol,pver,rxntot)        ! gas phase rates
-      
-!-----------------------------------------------------------------
-!        ... local variables
-!-----------------------------------------------------------------
-
-      integer  ::  k
-      real(r8), dimension(ncol) :: &
-                   tp, &
-                   tinv, &
-                   ko, &
-                   kinf, &
-                   fc, &
-                   xr                       ! factor to increase particle radii depending on rel hum
-
-!-----------------------------------------------------------------
-!	... o + o2 + m --> o3 + m
-!-----------------------------------------------------------------
-      do k = 1,kbot
-         tinv(:ncol)       = 1._r8 / tempn(:ncol,k)
-         tp(:)             = 300._r8 * tinv(:)
-         rxt(:,k,usr_O_O2_ndx) = 6.e-34_r8 * tp(:)**2.4_r8
-
-!-----------------------------------------------------------------
-!	... o + o + m -> o2 + m
-!-----------------------------------------------------------------
-         rxt(:,k,usr_O_O_ndx) = 2.76e-34_r8 * exp( 720.0_r8*tinv(:) )
-
-!-----------------------------------------------------------------
-!	... ho2 + ho2 --> h2o2
-!	Note: this rate involves the water vapor number density
-!-----------------------------------------------------------------
-         ko(:)   = 3.5e-13_r8 * exp( 430._r8*tinv(:) )
-         kinf(:) = 1.7e-33_r8 * m(:,k) * exp( 1000._r8*tinv(:) )
-         fc(:)   = 1._r8 + 1.4e-21_r8 * m(:,k) * h2ovmr(:,k) * exp( 2200._r8*tinv(:) )
-         rxt(:,k,usr_HO2_HO2_ndx) = (ko(:) + kinf(:)) * fc(:)
-
-      end do
-
-!-----------------------------------------------------------------
-! 	... the ionic rates
-!-----------------------------------------------------------------
-      if ( has_ion_rxts ) then
-         level_loop2 :  do k = 1,kbot
-            tp(:ncol)         = (2._r8*tempi(:ncol,k) + tempn(:ncol,k)) / ( 3._r8 * t0 )
-            tp(:)             = max( min( tp(:),20._r8 ),1._r8 )
-            rxt(:,k,ion1_ndx) = 2.82e-11_r8 + tp(:)*(-7.74e-12_r8 + tp(:)*(1.073e-12_r8  &
-                 + tp(:)*(-5.17e-14_r8 + 9.65e-16_r8*tp(:))))
-            tp(:ncol)         = (.6363_r8*tempi(:ncol,k) + .3637_r8*tempn(:ncol,k)) / t0
-            tp(:)             = max( min( tp(:),trlim2 ),1._r8 )
-            rxt(:,k,ion2_ndx) = 1.533e-12_r8 + tp(:)*(-5.92e-13_r8 + tp(:)*8.6e-14_r8)
-            tp(:ncol)         = 2._r8 * t0 /(tempi(:ncol,k) + tempn(:ncol,k))
-            where( tp(:ncol) < trlim3 )
-               rxt(:,k,ion3_ndx)  = 1.4e-10_r8 * tp(:)**.44_r8
-            elsewhere
-               rxt(:,k,ion3_ndx)  = 5.2e-11_r8 / tp(:)**.2_r8
-            endwhere
-            tp(:ncol)          = t0 / tempe(:ncol,k)
-            rxt(:,k,elec1_ndx) = 4.e-7_r8 * tp(:)**.85_r8
-            rxt(:,k,elec3_ndx) = 1.8e-7_r8 * tp(:)**.39_r8
-            where( tp(:ncol) < 4._r8 )
-               rxt(:,k,elec2_ndx) = 2.7e-7_r8 * tp(:)**.7_r8
-            elsewhere
-               rxt(:,k,elec2_ndx) = 1.6e-7_r8 * tp(:)**.55_r8
-            endwhere
-         end do level_loop2
-      endif
-      end subroutine usrrxt_hrates
-
 !-------------------------------------------------------------------------
 !-------------------------------------------------------------------------
   subroutine comp_exp( x, y, n )
@@ -489,33 +195,5 @@ contains
 #endif
 
   end subroutine comp_exp
-
-  !-------------------------------------------------------------------------
-  !  Heterogeneous reaction rates for uptake of a gas on an aerosol:
-  !-------------------------------------------------------------------------
-  function hetrxtrate( sfc, dm_aer, dg_gas, c_gas, gamma_gas ) result(rate)
-
-    real(r8), intent(in) :: sfc(:)
-    real(r8), intent(in) :: dm_aer(:)
-    real(r8), intent(in) :: dg_gas
-    real(r8), intent(in) :: c_gas
-    real(r8), intent(in) :: gamma_gas
-    real(r8) :: rate
-
-    real(r8),allocatable :: rxt(:)
-    integer :: n, i
-
-    n = size(sfc)
-
-    allocate(rxt(n))
-    do i=1,n
-       rxt(i) = sfc(i) / (0.5_r8*dm_aer(i)/dg_gas + (4._r8/(c_gas*gamma_gas)))
-    enddo
-
-    rate = sum(rxt)
-
-    deallocate(rxt)
-
-  endfunction hetrxtrate
 
 end module mo_usrrxt

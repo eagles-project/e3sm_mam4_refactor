@@ -99,9 +99,7 @@
       use mo_heatnirco2,     only : heatnirco2
       use mo_airglow,        only : airglow
       use mo_aurora,         only : aurora
-      use mo_setrxt,         only : setrxt_hrates
       use mo_adjrxt,         only : adjrxt
-      use mo_usrrxt,         only : usrrxt_hrates
       use mo_setinv,         only : setinv
       use mo_mass_xforms,    only : mmr2vmr
       use physics_types,     only : physics_state
@@ -284,9 +282,6 @@
             reaction_rates(:,k,m) = 0._r8
          end do
       end do
-      call setrxt_hrates( reaction_rates, state%t, invariants(1,1,indexm), ncol, kbot_hrates )
-      call usrrxt_hrates( reaction_rates, state%t, state%t, state%t, invariants, &
-                          h2ovmr, state%pmid, invariants(:,:,indexm), ncol, kbot_hrates )
       call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol )
       
 !-----------------------------------------------------------------------      
