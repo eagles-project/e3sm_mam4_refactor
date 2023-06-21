@@ -33,7 +33,7 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
 !  integer,save :: n_calls=0
   integer,save :: y_nstep_old = 0  
-  integer,save :: hadact(3) = .false.
+  logical,save :: hadact(0:2) = .false.
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
@@ -99,13 +99,14 @@
      endif
      y_nstep_old = y_nstep
 
+
      if(.not.(hadact(iact))) then
 
         hadact(iact) = .true.
+
         !(**remove these yaml% variables if generating data for a dependent subroutines**)
         yaml%lchnk_print = y_lchnk
         yaml%flag_print  = .true.
-
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
