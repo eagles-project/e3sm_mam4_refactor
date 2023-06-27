@@ -63,7 +63,6 @@ module mo_photo
   logical              :: has_o2_col
   logical              :: has_o3_col
   logical              :: has_fixed_press
-  logical  :: waccm
   real(r8) :: max_zen_angle       ! degrees
 
   integer :: jo1d_ndx, jo3p_ndx, jno2_ndx, jn2o5_ndx
@@ -158,29 +157,18 @@ contains
        return
     end if
 
-    if (present(is_waccm)) then
-       waccm = is_waccm
-    else
-       waccm = .false.
+    if (present(is_waccm) .and. is_waccm==.true. ) then
+       call endrun('FORTRAN refactoring: code related to waccm is removed in MAMxx. is_waccm=true is currently not supported') 
     endif
-write(101,*) waccm, xactive_prates  
+    if (xactive_prates) call endrun('FORTRAN refactoring: xactive_prates=true is removed in MAMxx')
+
     !----------------------------------------------------------------------------
     !  Need a larger maximum zenith angle for WACCM-X extended to high altitudes
     !----------------------------------------------------------------------------
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
-       max_zen_angle = 116._r8
-    else if ( waccm ) then
-       max_zen_angle = 97.01_r8 ! degrees
-    else
-       max_zen_angle = 88.85_r8 ! degrees
-    endif
+    max_zen_angle = 88.85_r8 ! degrees
 
-    ! jeuv_1,,, jeuv_25 --> need euv calculations --> must be waccm 
-    ! how to determine if shrt calc is needed ?? -- use top level pressure => waccm = true ? false
-
-    if ( waccm .and. xactive_prates ) then
-       call endrun( " photo_inti: xactive_prates option is not available in WACCM" )
-    endif
+    ! jeuv_1,,, jeuv_25 --> need euv calculations  
+    ! how to determine if shrt calc is needed ?? -- use top level pressure 
 
     if ( .not. has_spectrum ) then
        write(iulog,*) 'photo_inti: solar_data file needs to contain irradiance spectrum'
@@ -277,24 +265,11 @@ write(101,*) waccm, xactive_prates
     !----------------------------------------------------------------------
     !	... call module initializers
     !----------------------------------------------------------------------
-    is_xactive : if( xactive_prates ) then
-       do_jshort = .false.
-       jch3cho_a_ndx = get_rxt_ndx( 'jch3cho_a' )
-       jch3cho_b_ndx = get_rxt_ndx( 'jch3cho_b' )
-       jch3cho_c_ndx = get_rxt_ndx( 'jch3cho_c' )
-       jonitr_ndx    = get_rxt_ndx( 'jonitr' )
-       jho2no2_ndx   = get_rxt_ndx( 'jho2no2' )
-       call tuv_inti( pverp, tuv_xsect_file, lng_indexer )
-    else is_xactive
-       call jlong_init( xs_long_file, rsf_file, lng_indexer )
-       if (waccm) then
-          call jeuv_init( euvacdat_file, photon_file, electron_file, euv_indexer )
-       endif
-       if (do_jshort) then
+    call jlong_init( xs_long_file, rsf_file, lng_indexer )
+    if (do_jshort) then
           call jshort_init( xs_coef_file, xs_short_file, sht_indexer )
-       endif
-       jho2no2_ndx = get_rxt_ndx( 'jho2no2_b' )
-    end if is_xactive
+    endif
+    jho2no2_ndx = get_rxt_ndx( 'jho2no2_b' )
 
     !----------------------------------------------------------------------
     !        ... check that each photorate is in short or long datasets
@@ -324,11 +299,6 @@ write(101,*) waccm, xactive_prates
        write(iulog,*) '*********************************************'
        write(iulog,*) ' '
     endif
-
-    if( xactive_prates ) then
-       call o2_xsect_inti( o2_xsect_file )
-       call photoin_inti( nlng, lng_indexer )
-    end if
 
     !----------------------------------------------------------------------
     !	... check for o2, o3 absorber columns
@@ -603,7 +573,7 @@ write(101,*) waccm, xactive_prates
        return
     end if
 
-    if ((.not.do_jshort) .or. (waccm)) then
+    if ((.not.do_jshort) ) then
        n_jshrt_levs = pver
        p1 = 1 
        p2 = pver
@@ -619,16 +589,6 @@ write(101,*) waccm, xactive_prates
 !-----------------------------------------------------------------
 !	... allocate short, long temp arrays
 !-----------------------------------------------------------------
-    if ( waccm ) then
-       if (neuv>0) then
-          allocate( euv_prates(pver,neuv),stat=astat )
-          if( astat /= 0 ) then
-             write(iulog,*) 'photo: Failed to allocate euv_prates; error = ',astat
-             call endrun
-          end if
-       endif
-    endif
-    
     if (nsht>0) then
        allocate( sht_prates(n_jshrt_levs,nsht),stat=astat )
        if( astat /= 0 ) then
@@ -675,18 +635,6 @@ write(101,*) waccm, xactive_prates
           tline(p1:p2) = temper(i,:pver)
 
           zarg(p1:p2) = zmid(i,:pver)
-
-          if ( waccm ) then
-             !-----------------------------------------------------------------
-             !	... euv photorates do not include cloud effects ??
-             !-----------------------------------------------------------------
-             call jeuv( pver, sza, o_den, o2_den, n2_den,  zarg, euv_prates )
-             do m = 1,phtcnt
-                if( euv_indexer(m) > 0 ) then
-                   photos(i,:,m) = esfact * euv_prates(:,euv_indexer(m))
-                endif
-             enddo
-          endif
 
           !-----------------------------------------------------------------
           !     ... compute eff_alb and cld_mult -- needs to be before jlong
@@ -1077,13 +1025,6 @@ write(101,*) waccm, xactive_prates
     integer :: m
     real(r8) :: f107
     real(r8) :: f107a
-
-    if (waccm) then
-       if( is_end_curr_day() ) then
-          call solar_parms_get( f107_s = f107, f107a_s = f107a )
-          call euvac_set_etf( f107, f107a )
-       end if
-    endif
 
     if( has_o2_col .or. has_o3_col ) then
        if( calday < days(1) ) then
