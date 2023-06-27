@@ -188,7 +188,7 @@ contains
 
     use chem_mods,         only : nabscol, nfs, indexm
     use physconst,         only : rga
-    use mo_photo,          only : set_ub_col, setcol, table_photo, xactive_photo
+    use mo_photo,          only : set_ub_col, setcol, table_photo
     use mo_imp_sol,        only : imp_sol
     use mo_setrxt,         only : setrxt
     use mo_adjrxt,         only : adjrxt
@@ -649,10 +649,10 @@ contains
        !-----------------------------------------------------------------
        !	... compute the photolysis rates
        !-----------------------------------------------------------------
-       call xactive_photo( reaction_rates, vmr, tfld, cwat, cldfr, &
-            pmid, zmidr, col_dens, zen_angle, asdir, &
-            invariants(1,1,indexm), ps, ts, &
-            esfact, relhum, dust_vmr, dt_diag, fracday, ncol, lchnk )
+!       call xactive_photo( reaction_rates, vmr, tfld, cwat, cldfr, &
+!            pmid, zmidr, col_dens, zen_angle, asdir, &
+!            invariants(1,1,indexm), ps, ts, &
+!            esfact, relhum, dust_vmr, dt_diag, fracday, ncol, lchnk )
 
        call outfld('DTCBS',   dt_diag(:ncol,1), ncol, lchnk )
        call outfld('DTOCS',   dt_diag(:ncol,2), ncol, lchnk )

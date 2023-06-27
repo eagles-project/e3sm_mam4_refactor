@@ -178,8 +178,6 @@ end function chem_is
     use short_lived_species, only : slvd_index, short_lived_map=>map, register_short_lived_species
     use cfc11star,           only : register_cfc11star
     use phys_control,        only : waccmx_is   ! WACCM-X switch query function
-    use mo_photo,            only : photo_register
-    use mo_aurora,           only : aurora_register
     use aero_model,          only : aero_model_register
 
     implicit none
@@ -384,11 +382,6 @@ end function chem_is
        call register_cfc11star()
     endif
 
-    if ( waccmx_is('ionosphere') ) then 
-       call photo_register()
-       call aurora_register()
-    endif
-    
     ! add fields to pbuf needed by aerosol models
     call aero_model_register(imozart, species_class) 
 
