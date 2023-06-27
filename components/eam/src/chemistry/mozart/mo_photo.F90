@@ -692,7 +692,9 @@ contains
     real(r8)    :: fac1(pver)
     real(r8)    :: fac2(pver)
 
-    real(r8), parameter :: rgrav = 1._r8/9.80616_r8
+    real(r8), parameter :: rgrav = 1._r8/9.80616_r8  ! 1/g [s^2/m]
+    real(r8), parameter :: f_lwp2tau = .155_r8  ! factor converting LWP to tau [unknown source and unit]
+    real(r8), parameter :: tau_min = 5._r8      ! tau threshold below which assign cloud as zero
 
     !---------------------------------------------------------
     !	... modify lwc for cloud fraction and form
@@ -707,7 +709,7 @@ contains
     !    	... form tau for each model layer
     !---------------------------------------------------------
     where( clouds(:) /= 0._r8 )
-       del_tau(:) = del_lwp(:) *.155_r8 * clouds(:)**1.5_r8
+       del_tau(:) = del_lwp(:) * f_lwp2tau * clouds(:)**1.5_r8
     elsewhere
        del_tau(:) = 0._r8
     end where
@@ -759,10 +761,10 @@ contains
     where( below_cld(:pverm) /= 0._r8 )
        below_tau(:pverm) = below_tau(:pverm) / below_cld(:pverm)
     end where
-    where( above_tau(2:pver) < 5._r8 )
+    where( above_tau(2:pver) < tau_min )
        above_cld(2:pver) = 0._r8
     end where
-    where( below_tau(:pverm) < 5._r8 )
+    where( below_tau(:pverm) < tau_min )
        below_cld(:pverm) = 0._r8
     end where
     !---------------------------------------------------------
@@ -780,7 +782,7 @@ contains
        eff_alb(:) = srf_alb
     end where
     coschi = max( cos( zen_angle ),.5_r8 )
-    where( del_lwp(:)*.155_r8 < 5._r8 )
+    where( del_lwp(:)*f_lwp2tau < tau_min )
        fac1(:) = 0._r8
     elsewhere
        fac1(:) = 1.4_r8 * coschi - 1._r8
