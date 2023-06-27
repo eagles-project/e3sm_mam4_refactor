@@ -72,7 +72,6 @@ module mo_photo
   integer :: jhno3a_ndx, jno3a_ndx, jpana_ndx, jmpana_ndx, jho2no2a_ndx 
   integer :: jonitra_ndx
 
-  logical :: do_jshort = .false.
   logical :: do_diag = .false.
 
   integer :: ion_rates_idx = -1
@@ -100,7 +99,6 @@ contains
     use mo_chem_utls,  only : get_spc_ndx, get_rxt_ndx, get_inv_ndx
     use mo_jlong,      only : jlong_init
     use seasalt_model, only : sslt_names=>seasalt_names, sslt_ncnst=>seasalt_nbin
-    use mo_jshort,     only : jshort_init
     use mo_jeuv,       only : jeuv_init
     use dyn_grid,      only : get_dyn_grid_parm
     use phys_grid,     only : get_ncols_p, get_rlat_all_p    
@@ -260,15 +258,11 @@ contains
        o_ndx = get_inv_ndx( 'O' )
     end if
 
-    do_jshort = o_ndx>0 .and. o2_ndx>0 .and. (o3_ndx>0.or.o3_inv_ndx>0) .and. n2_ndx>0 .and. no_ndx>0
 
     !----------------------------------------------------------------------
     !	... call module initializers
     !----------------------------------------------------------------------
     call jlong_init( xs_long_file, rsf_file, lng_indexer )
-    if (do_jshort) then
-          call jshort_init( xs_coef_file, xs_short_file, sht_indexer )
-    endif
     jho2no2_ndx = get_rxt_ndx( 'jho2no2_b' )
 
     !----------------------------------------------------------------------
@@ -503,7 +497,6 @@ contains
 
     use chem_mods,   only : ncol_abs => nabscol, phtcnt, gas_pcnst, nfs
     use chem_mods,   only : pht_alias_mult, indexm
-    use mo_jshort,   only : nsht => nj, jshort
     use mo_jlong,    only : nlng => numj, jlong
     use mo_jeuv,     only : neuv, jeuv, nIonRates
     use physics_buffer, only : physics_buffer_desc, pbuf_set_field
@@ -573,30 +566,16 @@ contains
        return
     end if
 
-    if ((.not.do_jshort) ) then
-       n_jshrt_levs = pver
-       p1 = 1 
-       p2 = pver
-    else
-       n_jshrt_levs = pver+1
-       p1 = 2
-       p2 = pver+1
-    endif
+    n_jshrt_levs = pver
+    p1 = 1 
+    p2 = pver
 
     allocate( zarg(n_jshrt_levs) )
     allocate( tline(n_jshrt_levs) )
 
 !-----------------------------------------------------------------
-!	... allocate short, long temp arrays
+!	... allocate long temp arrays
 !-----------------------------------------------------------------
-    if (nsht>0) then
-       allocate( sht_prates(n_jshrt_levs,nsht),stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'photo: Failed to allocate sht_prates; error = ',astat
-          call endrun
-       end if
-    endif
-
     if (nlng>0) then
        allocate( lng_prates(nlng,pver),stat=astat )
        if( astat /= 0 ) then
@@ -1005,7 +984,6 @@ contains
     use time_manager,   only : is_end_curr_day
     use euvac,          only : euvac_set_etf
     use mo_solar_parms, only : solar_parms_get
-    use mo_jshort,      only : jshort_timestep_init
     use mo_jlong,       only : jlong_timestep_init
 
     !-----------------------------------------------------------------------------
@@ -1058,13 +1036,6 @@ contains
     !-----------------------------------------------------------------------
     call jlong_timestep_init
     
-    if ( do_jshort ) then
-       !-----------------------------------------------------------------------
-       ! Set jshort etf
-       !-----------------------------------------------------------------------
-       call jshort_timestep_init
-    endif
-
   end subroutine photo_timestep_init
 
 end module mo_photo
