@@ -2,6 +2,7 @@ module mo_extfrc
   !---------------------------------------------------------------
   ! 	... insitu forcing module
   !---------------------------------------------------------------
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use ppgrid,       only : pcols, begchunk, endchunk, pver, pverp
@@ -317,6 +318,7 @@ contains
     real(r8) :: frcing_col(1:ncol)
     integer  :: kk, isec
     real(r8),parameter :: km_to_cm = 1.e5_r8
+#include "../yaml/mo_extfrc/f90_yaml/extfrc_set_beg_yml.f90"
 
     frcing(:,:,:) = 0._r8
 
@@ -354,6 +356,7 @@ contains
 
     enddo src_loop
 
+#include "../yaml/mo_extfrc/f90_yaml/extfrc_set_end_yml.f90"
   end subroutine extfrc_set
 
 !==========================================================================
