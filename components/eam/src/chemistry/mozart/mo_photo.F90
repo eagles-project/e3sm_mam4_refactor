@@ -679,7 +679,7 @@ contains
     !-----------------------------------------------------------------------
     ! 	... local variables
     !-----------------------------------------------------------------------
-    integer :: k
+    integer :: kk
     real(r8)    :: coschi  ! cos (solar zenith angle)
     real(r8)    :: del_lwp(pver)        ! liquid water path in each layer [g/m2]
     real(r8)    :: del_tau(pver)        ! cloud optical depth in each layer
@@ -712,15 +712,15 @@ contains
     !---------------------------------------------------------
     above_tau(1) = 0._r8
     above_cld(1) = 0._r8
-    do k = 1,pverm
-       above_tau(k+1) = del_tau(k) + above_tau(k)
-       above_cld(k+1) = clouds(k) * del_tau(k) + above_cld(k)
+    do kk = 1,pverm
+       above_tau(kk+1) = del_tau(kk) + above_tau(kk)
+       above_cld(kk+1) = clouds(kk) * del_tau(kk) + above_cld(kk)
     enddo
-    do k = 2,pver
-       if( above_tau(k) /= 0._r8 ) then
-          above_cld(k) = above_cld(k) / above_tau(k)
+    do kk = 2,pver
+       if( above_tau(kk) /= 0._r8 ) then
+          above_cld(kk) = above_cld(kk) / above_tau(kk)
        else
-          above_cld(k) = above_cld(k-1)
+          above_cld(kk) = above_cld(kk-1)
        endif
     enddo
     !---------------------------------------------------------
@@ -728,15 +728,15 @@ contains
     !---------------------------------------------------------
     below_tau(pver) = 0._r8
     below_cld(pver) = 0._r8
-    do k = pverm,1,-1
-       below_tau(k) = del_tau(k+1) + below_tau(k+1)
-       below_cld(k) = clouds(k+1) * del_tau(k+1) + below_cld(k+1)
+    do kk = pverm,1,-1
+       below_tau(kk) = del_tau(kk+1) + below_tau(kk+1)
+       below_cld(kk) = clouds(kk+1) * del_tau(kk+1) + below_cld(kk+1)
     end do
-    do k = pverm,1,-1
-       if( below_tau(k) /= 0._r8 ) then
-          below_cld(k) = below_cld(k) / below_tau(k)
+    do kk = pverm,1,-1
+       if( below_tau(kk) /= 0._r8 ) then
+          below_cld(kk) = below_cld(kk) / below_tau(kk)
        else
-          below_cld(k) = below_cld(k+1)
+          below_cld(kk) = below_cld(kk+1)
        endif
     enddo
     !---------------------------------------------------------
