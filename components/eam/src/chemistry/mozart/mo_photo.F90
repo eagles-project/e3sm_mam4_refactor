@@ -698,21 +698,15 @@ contains
 
     !---------------------------------------------------------
     !	... modify lwc for cloud fraction and form
-    !	    liquid water path for each layer
+    !	    liquid water path and tau for each layer
     !---------------------------------------------------------
     where( clouds(:) /= 0._r8 )
        del_lwp(:) = rgrav * lwc(:) * delp(:) * 1.e3_r8 / clouds(:)
-    elsewhere
-       del_lwp(:) = 0._r8
-    endwhere
-    !---------------------------------------------------------
-    !    	... form tau for each model layer
-    !---------------------------------------------------------
-    where( clouds(:) /= 0._r8 )
        del_tau(:) = del_lwp(:) * f_lwp2tau * clouds(:)**1.5_r8
     elsewhere
+       del_lwp(:) = 0._r8
        del_tau(:) = 0._r8
-    end where
+    endwhere
     !---------------------------------------------------------
     !    	... form integrated tau from top down
     !---------------------------------------------------------
