@@ -744,16 +744,16 @@ contains
     !---------------------------------------------------------
     where( above_cld(2:pver) /= 0._r8 )
        above_tau(2:pver) = above_tau(2:pver) / above_cld(2:pver)
-    end where
+    endwhere
     where( below_cld(:pverm) /= 0._r8 )
        below_tau(:pverm) = below_tau(:pverm) / below_cld(:pverm)
-    end where
+    endwhere
     where( above_tau(2:pver) < tau_min )
        above_cld(2:pver) = 0._r8
-    end where
+    endwhere
     where( below_tau(:pverm) < tau_min )
        below_cld(:pverm) = 0._r8
-    end where
+    endwhere
     !---------------------------------------------------------
     !	... form transmission factors
     !---------------------------------------------------------
@@ -763,20 +763,21 @@ contains
     !	... form effective albedo
     !---------------------------------------------------------
     where( below_cld(:) /= 0._r8 )
-       eff_alb(:) = srf_alb + below_cld(:) * (1._r8 - below_tra(:)) &
-                  * (1._r8 - srf_alb)
+       eff_alb(:) = srf_alb + below_cld(:) * (1._r8 - below_tra(:)) * (1._r8 - srf_alb)
     elsewhere
        eff_alb(:) = srf_alb
-    end where
-    coschi = max( cos( zen_angle ),.5_r8 )
+    endwhere
+
+    coschi = max( cos( zen_angle ), .5_r8 )
     where( del_lwp(:)*f_lwp2tau < tau_min )
        fac1(:) = 0._r8
     elsewhere
        fac1(:) = 1.4_r8 * coschi - 1._r8
-    end where
-    fac2(:)     = min( 0._r8,1.6_r8*coschi*above_tra(:) - 1._r8 )
+    endwhere
+
+    fac2(:)     = min( 0._r8,  (1.6_r8*coschi*above_tra(:))-1._r8 )
     cld_mult(:) = 1._r8 + fac1(:) * clouds(:) + fac2(:) * above_cld(:)
-    cld_mult(:) = max( .05_r8,cld_mult(:) )
+    cld_mult(:) = max( .05_r8, cld_mult(:) )
 
   end subroutine cloud_mod
 
