@@ -708,35 +708,28 @@ contains
        del_tau(:) = 0._r8
     endwhere
     !---------------------------------------------------------
-    !    	... form integrated tau from top down
+    !    	... form integrated tau and cloud cover from top down
     !---------------------------------------------------------
     above_tau(1) = 0._r8
-    do k = 1,pverm
-       above_tau(k+1) = del_tau(k) + above_tau(k)
-    end do
-    !---------------------------------------------------------
-    !    	... form integrated tau from bottom up
-    !---------------------------------------------------------
-    below_tau(pver) = 0._r8
-    do k = pverm,1,-1
-       below_tau(k) = del_tau(k+1) + below_tau(k+1)
-    end do
-    !---------------------------------------------------------
-    !	... form vertically averaged cloud cover above and below
-    !---------------------------------------------------------
     above_cld(1) = 0._r8
     do k = 1,pverm
+       above_tau(k+1) = del_tau(k) + above_tau(k)
        above_cld(k+1) = clouds(k) * del_tau(k) + above_cld(k)
-    end do
+    enddo
     do k = 2,pver
        if( above_tau(k) /= 0._r8 ) then
           above_cld(k) = above_cld(k) / above_tau(k)
        else
           above_cld(k) = above_cld(k-1)
-       end if
-    end do
+       endif
+    enddo
+    !---------------------------------------------------------
+    !    	... form integrated tau and cloud cover from bottom up
+    !---------------------------------------------------------
+    below_tau(pver) = 0._r8
     below_cld(pver) = 0._r8
     do k = pverm,1,-1
+       below_tau(k) = del_tau(k+1) + below_tau(k+1)
        below_cld(k) = clouds(k+1) * del_tau(k+1) + below_cld(k+1)
     end do
     do k = pverm,1,-1
@@ -744,8 +737,8 @@ contains
           below_cld(k) = below_cld(k) / below_tau(k)
        else
           below_cld(k) = below_cld(k+1)
-       end if
-    end do
+       endif
+    enddo
     !---------------------------------------------------------
     !	... modify above_tau and below_tau via jfm
     !---------------------------------------------------------
