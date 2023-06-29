@@ -657,8 +657,8 @@ contains
   end subroutine table_photo
 
 !====================================================================================
-  subroutine cloud_mod( zen_angle, clouds, lwc, delp, srf_alb, &
-                        eff_alb, cld_mult )
+  subroutine cloud_mod( zen_angle, clouds, lwc, delp, srf_alb, & ! in
+                        eff_alb, cld_mult                      ) ! out
     !-----------------------------------------------------------------------
     ! 	... cloud alteration factors for photorates and albedo
     !-----------------------------------------------------------------------
@@ -668,29 +668,29 @@ contains
     !-----------------------------------------------------------------------
     ! 	... dummy arguments
     !-----------------------------------------------------------------------
-    real(r8), intent(in)    ::  zen_angle         ! zenith angle
-    real(r8), intent(in)    ::  srf_alb           ! surface albedo
-    real(r8), intent(in)    ::  clouds(pver)       ! cloud fraction
-    real(r8), intent(in)    ::  lwc(pver)          ! liquid water content (mass mr)
-    real(r8), intent(in)    ::  delp(pver)         ! del press about midpoint in pascals
-    real(r8), intent(out)   ::  eff_alb(pver)      ! effective albedo
+    real(r8), intent(in)    ::  zen_angle         ! zenith angle [deg]
+    real(r8), intent(in)    ::  srf_alb           ! surface albedo [fraction]
+    real(r8), intent(in)    ::  clouds(pver)       ! cloud fraction [fraction]
+    real(r8), intent(in)    ::  lwc(pver)          ! liquid water content [kg/kg]
+    real(r8), intent(in)    ::  delp(pver)         ! del press about midpoint [Pa]
+    real(r8), intent(out)   ::  eff_alb(pver)      ! effective albedo [fraction]
     real(r8), intent(out)   ::  cld_mult(pver)     ! photolysis mult factor
 
     !-----------------------------------------------------------------------
     ! 	... local variables
     !-----------------------------------------------------------------------
     integer :: k
-    real(r8)    :: coschi
-    real(r8)    :: del_lwp(pver)
-    real(r8)    :: del_tau(pver)
-    real(r8)    :: above_tau(pver)
-    real(r8)    :: below_tau(pver)
-    real(r8)    :: above_cld(pver)
-    real(r8)    :: below_cld(pver)
-    real(r8)    :: above_tra(pver)
-    real(r8)    :: below_tra(pver)
-    real(r8)    :: fac1(pver)
-    real(r8)    :: fac2(pver)
+    real(r8)    :: coschi  ! cos (solar zenith angle)
+    real(r8)    :: del_lwp(pver)        ! liquid water path in each layer [g/m2]
+    real(r8)    :: del_tau(pver)        ! cloud optical depth in each layer
+    real(r8)    :: above_tau(pver)      ! cloud optical depth above this layer
+    real(r8)    :: below_tau(pver)      ! cloud optical depth below this layer
+    real(r8)    :: above_cld(pver)      ! cloud cover above this layer
+    real(r8)    :: below_cld(pver)      ! cloud cover below this layer
+    real(r8)    :: above_tra(pver)      ! transmission factor above this layer
+    real(r8)    :: below_tra(pver)      ! transmission factor below this layer
+    real(r8)    :: fac1(pver)           ! factor to calculate cld_mult
+    real(r8)    :: fac2(pver)           ! factor to calculate cld_mult
 
     real(r8), parameter :: rgrav = 1._r8/9.80616_r8  ! 1/g [s^2/m]
     real(r8), parameter :: f_lwp2tau = .155_r8  ! factor converting LWP to tau [unknown source and unit]
@@ -701,7 +701,7 @@ contains
     !	    liquid water path and tau for each layer
     !---------------------------------------------------------
     where( clouds(:) /= 0._r8 )
-       del_lwp(:) = rgrav * lwc(:) * delp(:) * 1.e3_r8 / clouds(:)
+       del_lwp(:) = rgrav * lwc(:) * delp(:) * 1.e3_r8 / clouds(:) ! the unit is (likely) g/m^2
        del_tau(:) = del_lwp(:) * f_lwp2tau * clouds(:)**1.5_r8
     elsewhere
        del_lwp(:) = 0._r8
