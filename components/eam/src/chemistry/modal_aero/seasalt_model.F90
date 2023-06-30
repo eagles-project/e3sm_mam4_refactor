@@ -374,9 +374,11 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, & !
 
     fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
+    ! calculate seasalt number emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, num_flx_flag, &  ! in
                               cflx)                                          ! inout
  
+    ! calculate seasalt mass emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, mass_flx_flag, & ! in
                               cflx)                                          ! inout
 
@@ -403,59 +405,48 @@ subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
     integer  :: ispec, ibin
     integer  :: mode_idx
     real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
+    integer  :: num_idx_append
 
+    num_idx_append = 0
 
-    if (flx_type == 0) then
-
-       do ispec = 1,nslt
-          mode_idx  = seasalt_indices(nslt+nslt_om+ispec)  ! Index of number mode
-      
-          if (mode_idx>0) then
-
-             ! Total number flux per mode
-             do ibin=1, nsections
-                cflx_tmp1(:ncol) = 0.0_r8
-
-                if (Dg(ibin) >= sst_sz_range_lo(ispec) .and. Dg(ibin) < sst_sz_range_hi(ispec)) then
-                   cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale  !++ ag: scale sea-salt
-                
-                   ! Mixing state 3: internal mixture, add OM to mass and number
-                   cflx(:ncol,mode_idx) = cflx(:ncol,mode_idx) + cflx_tmp1(:ncol)
-                endif
-             enddo
-          endif
-       enddo
+    if (flx_type == 0) num_idx_append = nslt+nslt_om
    
-    else
+    do ispec = 1, nslt
+       mode_idx  = seasalt_indices(num_idx_append+ispec)  ! Index of number mode
+       
+       if (mode_idx>0) then 
+          ! Note for C++ port, ideally initialization of clfx should be done
+          ! for both number and mass modes. We only zero-out number, because
+          ! zero-out mass fluxes cause NBFB                 
+          if (flx_type == 1) cflx(:ncol,mode_idx) = 0.0_r8 ! for number fluxes, zero-out the fluxes 
 
-       do ispec = 1,nslt
-          mode_idx = seasalt_indices(ispec)  ! Index of mass mode
-                                                           
-          cflx(:ncol,mode_idx) = 0.0_r8
-
-          ! Total mass flux per mode
+          ! Total number flux per mode
           do ibin=1, nsections
+             cflx_tmp1(:ncol) = 0.0_r8
+
              if (Dg(ibin) >= sst_sz_range_lo(ispec) .and. Dg(ibin) < sst_sz_range_hi(ispec)) then
-                cflx_tmp1(:ncol) = 0.0_r8
-                cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale  &   !++ ag: scale sea-salt
-                               *4._r8/3._r8*pi*rdry(ibin)**3*dns_aer_sst  ! should use dry size, convert from number to mass flux (kg/m2/s)
+                cflx_tmp1(:ncol) = fi(:ncol,ibin)*ocnfrc(:ncol)*emis_scale 
+              
+                ! For mass fluxes, multiply by the diameter
+                ! Note for C++ port, 4._r8/3._r8*pi*rdry(ibin)**3*dns_aer_sst
+                ! can be factored out in a function, but it is not done here as
+                ! the results might not stay BFB
+                if (flx_type == 1) cflx_tmp1(:ncol) = cflx_tmp1(:ncol) * 4._r8/3._r8*pi*rdry(ibin)**3*dns_aer_sst
 
                 ! Mixing state 3: internal mixture, add OM to mass and number
                 cflx(:ncol,mode_idx) = cflx(:ncol,mode_idx) + cflx_tmp1(:ncol)
              endif
-          enddo
-       enddo
+          enddo          
+       endif       
+    enddo
 
-    endif
 end subroutine seasalt_emisflx_calc
 
 
 subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, &  ! in
                                cflx)                                                   ! inout
 
-    use sslt_sections, only: nsections, fluxes, Dg, rdry
-    use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
-    use cam_history,   only: outfld
+    use sslt_sections, only: nsections, fluxes
     use spmd_utils,    only: masterproc
 
     ! input
@@ -544,7 +535,7 @@ subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
                                       om_ssa, emit_this_mode, &        ! in
                                       cflx)                            ! inout
 
-    use sslt_sections, only: nsections, fluxes, Dg
+    use sslt_sections, only: nsections, Dg
 
     ! input
     integer, intent(in)  :: ncol
@@ -563,13 +554,13 @@ subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
     integer  :: om_num_idx
     real(r8) :: cflx_tmp1(pcols)               ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
 
+    if (size(om_num_ind) .eq. 1) then
+       call endrun( "Error: om_num_ind is a scalar, but attempting to calculate MOM. &
+                     Something bad happened!!  We should never get here!")
+    endif
 
     ! Loop over OM modes
     do ispec = 1, om_num_modes ! modes in which to emit OM
-       if (size(om_num_ind) .eq. 1) then
-          call endrun( "Error: om_num_ind is a scalar, but attempting to calculate MOM. &
-                       Something bad happened!!  We should never get here!")
-       endif
 
        om_num_idx = om_num_ind(ispec)
        num_mode_idx=seasalt_indices(nslt+nslt_om+om_num_idx)
@@ -596,7 +587,7 @@ subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  
                                        mass_frac_bub_section, emit_this_mode, & ! in
                                        cflx)                                    ! inout
 
-    use sslt_sections, only: nsections, fluxes, Dg, rdry
+    use sslt_sections, only: nsections, Dg, rdry
     use mo_constants,  only: dns_aer_sst=>seasalt_density, pi
 
     ! input
@@ -681,7 +672,6 @@ subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
    real(r8) :: theta_help(ncol, n_org)
    real(r8) :: mass_frac_bub_help(ncol, n_org)
 
-   real(r8), parameter :: particle_size_for_OMF_param = 0.5_r8 ! in microns
    real(r8), parameter :: omfrac_max = 0.78  ! OMF maximum and minimum values -- max from Rinaldi et al. (2013)
    real(r8), parameter :: liter_to_m3 = 1.0e-3_r8  
 
