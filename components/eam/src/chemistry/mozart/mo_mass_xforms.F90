@@ -5,7 +5,7 @@ module mo_mass_xforms
 
 
   private
-  public :: mmr2vmr, mmr2vmri, vmr2mmr, vmr2mmri, h2o_to_vmr, h2o_to_mmr, init_mass_xforms
+  public :: mmr2vmr, mmr2vmri, vmr2mmr, h2o_to_vmr, init_mass_xforms
   save
 
   real(r8) :: adv_mass_h2o = 18._r8
@@ -13,20 +13,10 @@ module mo_mass_xforms
 contains
 
   subroutine init_mass_xforms
-    use mo_chem_utls, only : get_spc_ndx
-    use chem_mods,    only : adv_mass
 
     implicit none
 
-    integer  :: id_h2o
-
-    id_h2o = get_spc_ndx('H2O')
-
-    if ( id_h2o > 0 ) then
-       adv_mass_h2o = adv_mass(id_h2o)
-    else
-       adv_mass_h2o = 18._r8
-    endif
+    adv_mass_h2o = 18._r8
 
   endsubroutine init_mass_xforms
 
@@ -104,58 +94,28 @@ contains
     !-----------------------------------------------------------------
     !	... Dummy args
     !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)
-    real(r8), intent(inout) :: mmr(pcols,pver,gas_pcnst)
+    integer, intent(in)     :: ncol ! number of columns
+    real(r8), intent(in)    :: mbar(ncol,pver)  ! atmos mean atomic mass [g/mol or amu]
+    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst) ! volume mixing ratio [mol/mol air]
+    real(r8), intent(inout) :: mmr(pcols,pver,gas_pcnst) ! mass mixing ratio [kg/kg air]
 
     !-----------------------------------------------------------------
     !	... Local variables
     !-----------------------------------------------------------------
-    integer :: k, m
+    integer :: kk, mm ! indices for vertical level and  gas constituent
 
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
-    do m = 1,gas_pcnst
-       if( adv_mass(m) /= 0._r8 ) then
-          do k = 1,pver
-             mmr(:ncol,k,m) = adv_mass(m) * vmr(:ncol,k,m) / mbar(:ncol,k)
+    do mm = 1,gas_pcnst
+       if( adv_mass(mm) /= 0._r8 ) then
+          do kk = 1,pver
+             mmr(:ncol,kk,mm) = adv_mass(mm) * vmr(:ncol,kk,mm) / mbar(:ncol,kk)
           end do
        end if
     end do
 
   end subroutine vmr2mmr
-
-  subroutine vmr2mmri( vmr, mmr, mbar, mi, ncol )
-    !-----------------------------------------------------------------
-    !	... Xfrom from volume to mass mixing ratio
-    !-----------------------------------------------------------------
-
-    implicit none
-
-    !-----------------------------------------------------------------
-    !	... dummy args
-    !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol
-    real(r8), intent(in)    :: mi
-    real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: vmr(ncol,pver)
-    real(r8), intent(inout) :: mmr(pcols,pver)
-
-    !-----------------------------------------------------------------
-    !	... local variables
-    !-----------------------------------------------------------------
-    integer :: k, m
-
-    !-----------------------------------------------------------------
-    !	... mass to volume mixing for individual species
-    !-----------------------------------------------------------------
-    do k = 1,pver
-       mmr(:ncol,k) = mi * vmr(:ncol,k) / mbar(:ncol,k)
-    end do
-
-  end subroutine vmr2mmri
 
   subroutine h2o_to_vmr( h2o_mmr, h2o_vmr, mbar, ncol )
     !-----------------------------------------------------------------------
@@ -187,36 +147,5 @@ contains
     enddo
 
   end subroutine h2o_to_vmr
-
-  subroutine h2o_to_mmr( h2o_vmr, h2o_mmr, mbar, ncol )
-    !-----------------------------------------------------------------------
-    !     ... Transform water vapor from volumetric to mass mixing ratio
-    !-----------------------------------------------------------------------
-
-    use chem_mods, only : adv_mass
-
-    implicit none
-
-    !-----------------------------------------------------------------------
-    !	... Dummy arguments
-    !-----------------------------------------------------------------------
-    integer, intent(in) ::    ncol
-    real(r8), dimension(ncol,pver), intent(in)  :: &
-         mbar                   ! atmos mean mass
-    real(r8), dimension(ncol,pver), intent(in)  :: &
-         h2o_vmr               ! water vapor vmr
-    real(r8), dimension(pcols,pver), intent(out) :: &
-         h2o_mmr                ! specific humidity ( mmr )
-
-    !-----------------------------------------------------------------------
-    !	... Local variables
-    !-----------------------------------------------------------------------
-    integer ::   k
-
-    do k = 1,pver
-       h2o_mmr(:ncol,k) = h2o_vmr(:ncol,k) * adv_mass_h2o / mbar(:ncol,k)
-    end do
-
-  end subroutine h2o_to_mmr
 
 end module mo_mass_xforms
