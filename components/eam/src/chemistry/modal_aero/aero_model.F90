@@ -1552,7 +1552,7 @@ lphase_jnmw_conditional: &
   !=============================================================================
   !=============================================================================
   subroutine aero_model_emissions( state, cam_in )
-    use seasalt_model, only: seasalt_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
+    use seasalt_model, only: seasalt_emis, marine_organic_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
          has_mam_mom, nslt_om
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
 
@@ -1569,7 +1569,6 @@ lphase_jnmw_conditional: &
     real(r8) :: sflx(pcols)   ! accumulate over all bins for output
     real(r8) :: u10cubed(pcols)
     real(r8) :: u10(pcols)               ! Needed in Gantt et al. calculation of organic mass fraction
-    real(r8) :: F_eff(pcols) ! optional diagnostic output -- organic enrichment ratio
 
     real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
 
@@ -1602,9 +1601,12 @@ lphase_jnmw_conditional: &
        u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
 
        sflx(:)=0._r8
-       F_eff(:)=0._r8
 
-       call seasalt_emis(u10, u10cubed, lchnk, cam_in%sst, cam_in%ocnfrac, ncol, cam_in%cflx, seasalt_emis_scale, F_eff)
+       call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, &  ! in 
+                         cam_in%cflx)                                                              ! inout
+
+       call marine_organic_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, & ! in
+                                cam_in%cflx)                                                             ! inout
 
        ! Write out salt mass fluxes to history files
        do m=1,seasalt_nbin-nslt_om
@@ -1616,17 +1618,16 @@ lphase_jnmw_conditional: &
        call outfld('SSTSFMBL',sflx(:),pcols,lchnk)
 
        ! Write out marine organic mass fluxes to history files
-       if ( has_mam_mom ) then
-          sflx(:)=0._r8
-          do m=seasalt_nbin-nslt_om+1,seasalt_nbin
-             mm = seasalt_indices(m)
-             sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-             call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
-          enddo
-          ! accumulated flux
-          call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
+        sflx(:)=0._r8
+        do m=seasalt_nbin-nslt_om+1,seasalt_nbin
+           mm = seasalt_indices(m)
+           sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
+           call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
+        enddo
+        
+        ! accumulated flux
+        call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
 
-       endif
 
     endif
 
