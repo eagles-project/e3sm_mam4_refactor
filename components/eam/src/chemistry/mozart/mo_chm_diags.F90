@@ -3,12 +3,11 @@ module mo_chm_diags
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods,    only : gas_pcnst
   use mo_tracname,  only : solsym
-  use chem_mods,    only : rxntot, nfs, gas_pcnst, indexm, adv_mass
+  use chem_mods,    only : gas_pcnst, adv_mass
   use ppgrid,       only : pcols, pver
   use mo_constants, only : pi, rgrav, rearth, avogadro
   use mo_chem_utls, only : get_rxt_ndx, get_spc_ndx
   use cam_history,  only : fieldname_len
-  use mo_jeuv,      only : neuv
 
   private
 
@@ -16,24 +15,8 @@ module mo_chm_diags
   public :: chm_diags
   public :: het_diags
 
-  integer :: id_n,id_no,id_no2,id_no3,id_n2o5,id_hno3,id_ho2no2,id_clono2,id_brono2
-  integer :: id_cl,id_clo,id_hocl,id_cl2,id_cl2o2,id_oclo,id_hcl,id_brcl
-  integer :: id_ccl4,id_cfc11,id_cfc113,id_ch3ccl3,id_cfc12,id_ch3cl,id_hcfc22,id_cf2clbr
-  integer :: id_br,id_bro,id_hbr,id_hobr,id_ch4,id_h2o,id_h2
-  integer :: id_o,id_o2,id_h
   integer :: id_o3
-
-  integer, parameter :: NJEUV = neuv
-  integer :: rid_jeuv(NJEUV), rid_jno_i, rid_jno
-
-  logical :: has_jeuvs, has_jno_i, has_jno
-
-  integer :: nox_species(3),  noy_species(15)
-  integer :: clox_species(6), cloy_species(9), tcly_species(17)
-  integer :: brox_species(2), broy_species(6)
-  integer :: toth_species(3)
   integer :: sox_species(3)
-  integer :: nhx_species(3)
   integer :: aer_species(gas_pcnst)
 
   character(len=fieldname_len) :: dtchem_name(gas_pcnst)
@@ -42,16 +25,14 @@ module mo_chm_diags
   character(len=fieldname_len) :: wetdep_name(gas_pcnst)
   character(len=fieldname_len) :: wtrate_name(gas_pcnst)
 
-  real(r8), parameter :: N_molwgt = 14.00674_r8
   real(r8), parameter :: S_molwgt = 32.066_r8
 
   ! constants for converting O3 mixing ratio to DU
   real(r8), parameter :: DUfac = 2.687e20_r8   ! 1 DU in molecules per m^2
 
-  character(len=32) :: chempkg
-
 contains
 
+!========================================================================
   subroutine chm_diags_inti
     !--------------------------------------------------------------------
     !	... initialize utility routine
@@ -59,23 +40,18 @@ contains
 
     use cam_history,  only : addfld, horiz_only, add_default
     use constituents, only : cnst_get_ind, cnst_longname
-    use dyn_grid,     only : get_dyn_grid_parm, get_horiz_grid_d
-    use phys_control, only: phys_getopts
+    use phys_control, only : phys_getopts
 
     implicit none
 
     integer :: i, j, k, m, n
-    character(len=16) :: jname, spc_name, attr
-    character(len=2)  :: jchar
-    character(len=64) :: lname
+    character(len=16) :: spc_name, attr
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
 
-    integer :: id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3
+    integer :: id_nh4no3
     integer :: id_so2, id_so4, id_h2so4
-    integer :: id_nh3, id_nh4
     integer :: id_dst01, id_dst02, id_dst03, id_dst04, id_sslt01, id_sslt02, id_sslt03, id_sslt04
     integer :: id_soa,  id_oc1, id_oc2, id_cb1, id_cb2
-    integer :: id_bry, id_cly 
     integer :: id_soam,id_soai,id_soat,id_soab,id_soax
 
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
@@ -87,64 +63,15 @@ contains
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
                        history_amwg_out    = history_amwg,  &
-                       history_verbose_out = history_verbose,  &
-                       cam_chempkg_out     = chempkg   )
+                       history_verbose_out = history_verbose)
 
-    id_bry     = get_spc_ndx( 'BRY' )
-    id_cly     = get_spc_ndx( 'CLY' )
-
-    id_n       = get_spc_ndx( 'N' )
-    id_no      = get_spc_ndx( 'NO' )
-    id_no2     = get_spc_ndx( 'NO2' )
-    id_no3     = get_spc_ndx( 'NO3' )
-    id_n2o5    = get_spc_ndx( 'N2O5' )
-    id_hno3    = get_spc_ndx( 'HNO3' )
-    id_ho2no2  = get_spc_ndx( 'HO2NO2' )
-    id_clono2  = get_spc_ndx( 'CLONO2' )
-    id_brono2  = get_spc_ndx( 'BRONO2' )
-    id_cl      = get_spc_ndx( 'CL' )
-    id_clo     = get_spc_ndx( 'CLO' )
-    id_hocl    = get_spc_ndx( 'HOCL' )
-    id_cl2     = get_spc_ndx( 'CL2' )
-    id_cl2o2   = get_spc_ndx( 'CL2O2' )
-    id_oclo    = get_spc_ndx( 'OCLO' )
-    id_hcl     = get_spc_ndx( 'HCL' )
-    id_brcl    = get_spc_ndx( 'BRCL' )
-    id_ccl4    = get_spc_ndx( 'CCL4' )
-    id_cfc11   = get_spc_ndx( 'CFC11' )
-    id_cfc113  = get_spc_ndx( 'CFC113' )
-    id_ch3ccl3 = get_spc_ndx( 'CH3CCL3' )
-    id_cfc12   = get_spc_ndx( 'CFC12' )
-    id_ch3cl   = get_spc_ndx( 'CH3CL' )
-    id_hcfc22  = get_spc_ndx( 'HCFC22' )
-    id_cf2clbr = get_spc_ndx( 'CF2CLBR' )
-    id_br      = get_spc_ndx( 'BR' )
-    id_bro     = get_spc_ndx( 'BRO' )
-    id_hbr     = get_spc_ndx( 'HBR' )
-    id_hobr    = get_spc_ndx( 'HOBR' )
-    id_ch4     = get_spc_ndx( 'CH4' )
-    id_h2o     = get_spc_ndx( 'H2O' )
-    id_h2      = get_spc_ndx( 'H2' )
-    id_o       = get_spc_ndx( 'O' )
-    id_o2      = get_spc_ndx( 'O2' )
     id_o3      = get_spc_ndx( 'O3' )
-    id_h       = get_spc_ndx( 'H' )
-
-    id_pan     = get_spc_ndx( 'PAN' )
-    id_onit    = get_spc_ndx( 'ONIT' )
-    id_mpan    = get_spc_ndx( 'MPAN' )
-    id_isopno3 = get_spc_ndx( 'ISOPNO3' )
-    id_onitr   = get_spc_ndx( 'ONITR' )
-    id_nh4no3  = get_spc_ndx( 'NH4NO3' )
 
     id_so2     = get_spc_ndx( 'SO2' )
     id_so4     = get_spc_ndx( 'SO4' )
     id_h2so4   = get_spc_ndx( 'H2SO4' )
 
-    id_nh3     = get_spc_ndx( 'NH3' )
-    id_nh4     = get_spc_ndx( 'NH4' )
     id_nh4no3  = get_spc_ndx( 'NH4NO3' )
-
     id_dst01   = get_spc_ndx( 'DST01' )
     id_dst02   = get_spc_ndx( 'DST02' )
     id_dst03   = get_spc_ndx( 'DST03' )
@@ -154,14 +81,11 @@ contains
     id_sslt03  = get_spc_ndx( 'SSLT03' )
     id_sslt04  = get_spc_ndx( 'SSLT04' )
     id_soa     = get_spc_ndx( 'SOA' )
-    id_so4     = get_spc_ndx( 'SO4' )
     id_oc1     = get_spc_ndx( 'OC1' )
     id_oc2     = get_spc_ndx( 'OC2' )
     id_cb1     = get_spc_ndx( 'CB1' )
     id_cb2     = get_spc_ndx( 'CB2' )
 
-    rid_jno   = get_rxt_ndx( 'jno' )
-    rid_jno_i = get_rxt_ndx( 'jno_i' )
 
     id_soam = get_spc_ndx( 'SOAM' )
     id_soai = get_spc_ndx( 'SOAI' )
@@ -169,19 +93,7 @@ contains
     id_soab = get_spc_ndx( 'SOAB' )
     id_soax = get_spc_ndx( 'SOAX' )
 
-    nox_species = (/ id_n, id_no, id_no2 /)
-    noy_species = (/ id_n, id_no, id_no2, id_no3, id_n2o5, id_hno3, id_ho2no2, id_clono2, &
-                     id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3 /)
-    clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
-    cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
-    tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, &
-                      id_ccl4, id_cfc11, id_cfc113, id_ch3ccl3, id_cfc12, id_ch3cl, id_hcfc22, id_cf2clbr /)
-
-    brox_species = (/ id_br, id_bro /)
-    broy_species = (/ id_br, id_bro, id_hbr, id_brono2, id_brcl, id_hobr /)
-
     sox_species = (/ id_so2, id_so4, id_h2so4 /)
-    nhx_species = (/ id_nh3, id_nh4, id_nh4no3 /)
     bulkaero_species(:) = -1
     bulkaero_species(1:20) = (/ id_dst01, id_dst02, id_dst03, id_dst04, &
                                 id_sslt01, id_sslt02, id_sslt03, id_sslt04, &
@@ -201,8 +113,6 @@ contains
        endif
     enddo
 
-    toth_species = (/ id_ch4, id_h2o, id_h2 /)
-
     call addfld( 'NOX', (/ 'lev' /), 'A', 'mol/mol', 'nox volume mixing ratio' )
     call addfld( 'NOY', (/ 'lev' /), 'A', 'mol/mol', 'noy volume mixing ratio' )
     call addfld( 'BROX', (/ 'lev' /), 'A','mol/mol', 'brox volume mixing ratio' )
@@ -215,35 +125,6 @@ contains
     call addfld( 'NOY_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NOy mass mixing ratio' )
     call addfld( 'SOX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'SOx mass mixing ratio' )
     call addfld( 'NHX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NHx mass mixing ratio' )
-
-    do j = 1,NJEUV
-       write( jchar, '(I2)' ) j
-       jname = 'jeuv_'//trim(adjustl(jchar))
-       rid_jeuv(j) = get_rxt_ndx( trim(jname) )
-    enddo
-
-    has_jeuvs = all( rid_jeuv(:) > 0 )
-    has_jno_i = rid_jno_i>0
-    has_jno   = rid_jno>0
-
-    if ( has_jeuvs ) then
-       call addfld( 'PION_EUV', (/ 'lev' /), 'I','/cm^3/s', 'total euv ionization rate' )
-       call addfld( 'PEUV1', (/ 'lev' /), 'I',   '/cm^3/s', '(j1+j2+j3)*o' )
-       call addfld( 'PEUV1e', (/ 'lev' /), 'I',  '/cm^3/s', '(j14+j15+j16)*o' )
-       call addfld( 'PEUV2', (/ 'lev' /), 'I',   '/cm^3/s', 'j4*n' )
-       call addfld( 'PEUV3', (/ 'lev' /), 'I',   '/cm^3/s', '(j5+j7+j8+j9)*o2' )
-       call addfld( 'PEUV3e', (/ 'lev' /), 'I',  '/cm^3/s', '(j17+j19+j20+j21)*o2' )
-       call addfld( 'PEUV4', (/ 'lev' /), 'I',   '/cm^3/s', '(j10+j11)*n2' )
-       call addfld( 'PEUV4e', (/ 'lev' /), 'I',  '/cm^3/s', '(j22+j23)*n2' )
-       call addfld( 'PEUVN2D', (/ 'lev' /), 'I', '/cm^3/s', '(j11+j13)*n2' )
-       call addfld( 'PEUVN2De', (/ 'lev' /), 'I','/cm^3/s', '(j23+j25)*n2' )
-    endif
-    if ( has_jno ) then
-       call addfld( 'PJNO', (/ 'lev' /), 'I', '/cm^3/s', 'jno*no' )
-    endif
-    if ( has_jno_i ) then
-       call addfld( 'PJNO_I', (/ 'lev' /), 'I', '/cm^3/s', 'jno_i*no' )
-    endif
 
     do m = 1,gas_pcnst
 
@@ -286,15 +167,14 @@ contains
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
        endif
 
-       if ((m /= id_cly) .and. (m /= id_bry)) then
-          if (history_aerosol) then
-             if (history_verbose .or. trim(spc_name) == 'O3' .or. trim(spc_name) == 'SO2' ) &
+       if (history_aerosol) then
+          if (history_verbose .or. trim(spc_name) == 'O3' .or. trim(spc_name) == 'SO2' ) then
              call add_default( spc_name, 1, ' ' )
-             call add_default( trim(spc_name)//'_SRF', 1, ' ' )
-          endif 
-          if (history_amwg) then
-             call add_default( trim(spc_name)//'_SRF', 1, ' ' )
           endif
+          call add_default( trim(spc_name)//'_SRF', 1, ' ' )
+       endif 
+       if (history_amwg) then
+          call add_default( trim(spc_name)//'_SRF', 1, ' ' )
        endif
 
     enddo
@@ -345,7 +225,8 @@ contains
 
   end subroutine chm_diags_inti
 
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
+!========================================================================
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
@@ -356,14 +237,7 @@ contains
     use phys_grid,    only : get_area_all_p, pcols
     use physconst,    only : mwdry                   ! molecular weight of dry air
     use physics_buffer, only : physics_buffer_desc
-
-! here and below for the calculations of total aerosol mass mixing ratios for each aerosol class
-! are only enabled when MODAL aerosol is used (i.e., -DMODAL_AERO is set in macro)
-
-#ifdef MODAL_AERO
     use modal_aero_data,  only : cnst_name_cw, qqcw_get_field ! for calculate sum of aerosol masses
-#endif
-
     use phys_control, only: phys_getopts
     
     implicit none
@@ -375,8 +249,6 @@ contains
     integer,  intent(in)  :: ncol
     real(r8), intent(in)  :: vmr(ncol,pver,gas_pcnst)
     real(r8), intent(in)  :: mmr(ncol,pver,gas_pcnst)
-    real(r8), intent(in)  :: rxt_rates(ncol,pver,rxntot)
-    real(r8), intent(in)  :: invariants(ncol,pver,max(1,nfs))
     real(r8), intent(in)  :: depvel(ncol, gas_pcnst)
     real(r8), intent(in)  :: depflx(ncol, gas_pcnst)
     real(r8), intent(in)  :: mmr_tend(ncol,pver,gas_pcnst)
@@ -388,17 +260,17 @@ contains
     !--------------------------------------------------------------------
     !	... local variables
     !--------------------------------------------------------------------
-    integer     :: i,j,k, m, n
-    integer :: plat
-    real(r8)    :: wrk(ncol,pver)
-    real(r8)    :: un2(ncol)
+    integer     :: icol,kk, mm, nn
+    real(r8)    :: ozone_layer(ncol,pver)   ! ozone concentration [DU]
+    real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
+    real(r8)    :: ozone_trop(ncol)         ! vertical integration of ozone in troposphere [DU]
+    real(r8)    :: ozone_strat(ncol)        ! vertical integration of ozone in stratosphere [DU]
     
     real(r8), dimension(ncol,pver) :: vmr_nox, vmr_noy, vmr_clox, vmr_cloy, vmr_tcly, vmr_brox, vmr_broy, vmr_toth
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
     real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx
 
     real(r8) :: area(ncol), mass(ncol,pver), drymass(ncol,pver)
-    real(r8) :: wrk1d(ncol)
     real(r8) :: wgt
     character(len=16) :: spc_name
     real(r8), pointer :: fldcw(:,:)  !working pointer to extract data from pbuf for sum of mass for aerosol classes
@@ -454,9 +326,9 @@ contains
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
 
-    do k = 1,pver
-       mass(:ncol,k) = pdel(:ncol,k) * area(:ncol) * rgrav
-       drymass(:ncol,k) = pdeldry(:ncol,k) * area(:ncol) * rgrav
+    do kk = 1,pver
+       mass(:ncol,kk) = pdel(:ncol,kk) * area(:ncol) * rgrav
+       drymass(:ncol,kk) = pdeldry(:ncol,kk) * area(:ncol) * rgrav
     enddo
 
     call outfld( 'AREA', area(:ncol),   ncol, lchnk )
@@ -464,147 +336,85 @@ contains
     call outfld( 'DRYMASS', drymass(:ncol,:), ncol, lchnk )
 
     ! convert ozone from mol/mol (w.r.t. dry air mass) to DU
-    wrk(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
+    ozone_layer(:ncol,:) = pdeldry(:ncol,:)*vmr(:ncol,:,id_o3)*avogadro*rgrav/mwdry/DUfac*1.e3_r8
     ! total column ozone
-    wrk1d(:) = 0._r8
-    do k = 1,pver ! loop from top of atmosphere to surface
-       wrk1d(:) = wrk1d(:) + wrk(:ncol,k)
-    end do
-    call outfld( 'TOZ', wrk1d,   ncol, lchnk )
-
+    ozone_col(:) = 0._r8
+    ozone_trop(:) = 0._r8
+    ozone_strat(:) = 0._r8
+    do icol = 1,ncol
+       do kk = 1,pver
+          ozone_col(icol) = ozone_col(icol) + ozone_layer(icol,kk)
+          if (kk <= ltrop(icol)) then
+             ozone_strat(icol) = ozone_strat(icol) + ozone_layer(icol,kk)
+          else
+             ozone_trop(icol) = ozone_trop(icol) + ozone_layer(icol,kk)
+          endif
+       enddo
+    enddo
+    call outfld( 'TOZ', ozone_col, ncol, lchnk )
     ! stratospheric column ozone
-    wrk1d(:) = 0._r8
-    do i = 1,ncol
-       do k = 1,pver
-          if (k > ltrop(i)) then
-            exit
-          end if
-          wrk1d(i) = wrk1d(i) + wrk(i,k)
-       end do
-    end do
-    call outfld( 'SCO', wrk1d,   ncol, lchnk )
-
+    call outfld( 'SCO', ozone_strat, ncol, lchnk )
     ! tropospheric column ozone
-    wrk1d(:) = 0._r8
-    do i = 1,ncol
-       do k = 1,pver
-          if (k <= ltrop(i)) then
-            cycle
-          end if
-          wrk1d(i) = wrk1d(i) + wrk(i,k)
-       end do
-    end do
-    call outfld( 'TCO', wrk1d,   ncol, lchnk )
+    call outfld( 'TCO', ozone_trop, ncol, lchnk )
 
-    do m = 1,gas_pcnst
+    do mm = 1,gas_pcnst
 
-       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2) then
-          wgt = 2._r8
-       elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 ) then
-          wgt = 3._r8
-       elseif ( m == id_ccl4 ) then
-          wgt = 4._r8
-       else
-          wgt = 1._r8
-       endif
+      ! other options of species are not used, only use weight=1
+       wgt = 1._r8
 
-       if ( any( nox_species == m ) ) then
-          vmr_nox(:ncol,:) = vmr_nox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( noy_species == m ) ) then
-          vmr_noy(:ncol,:) = vmr_noy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any( noy_species == m ) ) then
-          mmr_noy(:ncol,:) = mmr_noy(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-       if ( any( sox_species == m ) ) then
-          mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-       if ( any( nhx_species == m ) ) then
-          mmr_nhx(:ncol,:) = mmr_nhx(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-
-       if ( any( clox_species == m ) ) then
-          vmr_clox(:ncol,:) = vmr_clox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( cloy_species == m ) ) then
-          vmr_cloy(:ncol,:) = vmr_cloy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( tcly_species == m ) ) then
-          vmr_tcly(:ncol,:) = vmr_tcly(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any( brox_species == m ) ) then
-          vmr_brox(:ncol,:) = vmr_brox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( broy_species == m ) ) then
-          vmr_broy(:ncol,:) = vmr_broy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-
-       if ( any ( toth_species == m ) ) then
-          vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
+       if ( any( sox_species == mm ) ) then
+          mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,mm)
        endif
        
-       if ( any( aer_species == m ) ) then
-          call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
-          call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
-#ifdef MODAL_AERO
+       if ( any( aer_species == mm ) ) then
+          call outfld( solsym(mm), mmr(:ncol,:,mm), ncol ,lchnk )
+          call outfld( trim(solsym(mm))//'_SRF', mmr(:ncol,pver,mm), ncol ,lchnk )
           if (history_aerosol .and. .not. history_verbose) then
-             select case (trim(solsym(m)))
+             select case (trim(solsym(mm)))
              case ('bc_a1','bc_a3','bc_a4')
-                  mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,m)
+                  mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,mm)
              case ('dst_a1','dst_a3')
-                  mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,m)
+                  mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,mm)
              case ('mom_a1','mom_a2','mom_a3','mom_a4')
-                  mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,m)
+                  mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,mm)
              case ('ncl_a1','ncl_a2','ncl_a3')
-                  mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,m)
+                  mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,mm)
              case ('pom_a1','pom_a3','pom_a4')
-                  mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,m)
+                  mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,mm)
              case ('so4_a1','so4_a2','so4_a3')
-                  mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,m)
+                  mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,mm)
              case ('soa_a1','soa_a2','soa_a3')
-                  mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,m)
-             end select
+                  mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,mm)
+             endselect
           endif
-#endif
        else
-          call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
-          call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
+          call outfld( solsym(mm), vmr(:ncol,:,mm), ncol ,lchnk )
+          call outfld( trim(solsym(mm))//'_SRF', vmr(:ncol,pver,mm), ncol ,lchnk )
        endif
 
-       call outfld( depvel_name(m), depvel(:ncol,m), ncol ,lchnk )
-       call outfld( depflx_name(m), depflx(:ncol,m), ncol ,lchnk )
+       call outfld( depvel_name(mm), depvel(:ncol,mm), ncol ,lchnk )
+       call outfld( depflx_name(mm), depflx(:ncol,mm), ncol ,lchnk )
 
-       if ( any( noy_species == m ) ) then
-          df_noy(:ncol) = df_noy(:ncol) +  wgt * depflx(:ncol,m)*N_molwgt/adv_mass(m)
-       endif
-       if ( any( sox_species == m ) ) then
-          df_sox(:ncol) = df_sox(:ncol) +  wgt * depflx(:ncol,m)*S_molwgt/adv_mass(m)
-       endif
-       if ( any( nhx_species == m ) ) then
-          df_nhx(:ncol) = df_nhx(:ncol) +  wgt * depflx(:ncol,m)*N_molwgt/adv_mass(m)
+       if ( any( sox_species == mm ) ) then
+          df_sox(:ncol) = df_sox(:ncol) +  wgt * depflx(:ncol,mm)*S_molwgt/adv_mass(mm)
        endif
 
-       do k=1,pver
-          do i=1,ncol
-             net_chem(i,k) = mmr_tend(i,k,m) * mass(i,k) 
-          end do
-       end do
-       call outfld( dtchem_name(m), net_chem(:ncol,:), ncol, lchnk )
+       do kk=1,pver
+          do icol=1,ncol
+             net_chem(icol,kk) = mmr_tend(icol,kk,mm) * mass(icol,kk) 
+          enddo
+       enddo
+       call outfld( dtchem_name(mm), net_chem(:ncol,:), ncol, lchnk )
 
     enddo
 
-#ifdef MODAL_AERO
     ! diagnostics for cloud-borne aerosols, then add to corresponding mass accumulators
     if (history_aerosol .and. .not. history_verbose) then
 
-
-       do n = 1,pcnst
-          fldcw => qqcw_get_field(pbuf,n,lchnk,errorhandle=.true.)
+       do nn = 1,pcnst
+          fldcw => qqcw_get_field(pbuf,nn,lchnk,errorhandle=.true.)
           if(associated(fldcw)) then
-             select case (trim(cnst_name_cw(n)))
+             select case (trim(cnst_name_cw(nn)))
                 case ('bc_c1','bc_c3','bc_c4')
                      mass_bc(:ncol,:) = mass_bc(:ncol,:) + fldcw(:ncol,:)
                 case ('dst_c1','dst_c3')
@@ -619,9 +429,9 @@ contains
                      mass_so4(:ncol,:) = mass_so4(:ncol,:) + fldcw(:ncol,:)
                 case ('soa_c1','soa_c2','soa_c3')
                      mass_soa(:ncol,:) = mass_soa(:ncol,:) + fldcw(:ncol,:)
-             end select
+             endselect
           endif
-       end do
+       enddo
        call outfld( 'Mass_bc', mass_bc(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_dst', mass_dst(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_mom', mass_mom(:ncol,:),ncol,lchnk)
@@ -630,7 +440,6 @@ contains
        call outfld( 'Mass_so4', mass_so4(:ncol,:),ncol,lchnk)
        call outfld( 'Mass_soa', mass_soa(:ncol,:),ncol,lchnk)
     endif
-#endif
 
     call outfld( 'NOX',  vmr_nox(:ncol,:),  ncol, lchnk )
     call outfld( 'NOY',  vmr_noy(:ncol,:),  ncol, lchnk )
@@ -646,100 +455,10 @@ contains
     call outfld( 'DF_SOX', df_sox(:ncol), ncol ,lchnk )
     call outfld( 'DF_NHX', df_nhx(:ncol), ncol ,lchnk )
 
-    !--------------------------------------------------------------------
-    !	... euv ion production
-    !--------------------------------------------------------------------
-
-    jeuvs: if ( has_jeuvs ) then
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(1)) + rxt_rates(:,k,rid_jeuv(2)) &
-               + rxt_rates(:,k,rid_jeuv(3)) + rxt_rates(:,k,rid_jeuv(14)) &
-               + rxt_rates(:,k,rid_jeuv(15)) + rxt_rates(:,k,rid_jeuv(16))) &
-               + vmr(:,k,id_n)*rxt_rates(:,k,rid_jeuv(4)) &
-               + vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(5)) + rxt_rates(:,k,rid_jeuv(7)) &
-               + rxt_rates(:,k,rid_jeuv(8)) + rxt_rates(:,k,rid_jeuv(9)) &
-               + rxt_rates(:,k,rid_jeuv(17)) + rxt_rates(:,k,rid_jeuv(19)) &
-               + rxt_rates(:,k,rid_jeuv(20)) + rxt_rates(:,k,rid_jeuv(21))) &
-               + un2(:)*(rxt_rates(:,k,rid_jeuv(6)) + rxt_rates(:,k,rid_jeuv(10)) &
-               + rxt_rates(:,k,rid_jeuv(11)) + rxt_rates(:,k,rid_jeuv(18)) &
-               + rxt_rates(:,k,rid_jeuv(22)) + rxt_rates(:,k,rid_jeuv(23)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PION_EUV', wrk, ncol, lchnk )
-
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(1)) + rxt_rates(:,k,rid_jeuv(2)) &
-               + rxt_rates(:,k,rid_jeuv(3)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV1', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o)*(rxt_rates(:,k,rid_jeuv(14)) + rxt_rates(:,k,rid_jeuv(15)) &
-               + rxt_rates(:,k,rid_jeuv(16)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV1e', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_n)*rxt_rates(:,k,rid_jeuv(4))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV2', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(5)) + rxt_rates(:,k,rid_jeuv(7)) &
-               + rxt_rates(:,k,rid_jeuv(8)) + rxt_rates(:,k,rid_jeuv(9)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV3', wrk, ncol, lchnk )
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_o2)*(rxt_rates(:,k,rid_jeuv(17)) + rxt_rates(:,k,rid_jeuv(19)) &
-               + rxt_rates(:,k,rid_jeuv(20)) + rxt_rates(:,k,rid_jeuv(21)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV3e', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(6)) + rxt_rates(:,k,rid_jeuv(10)) + rxt_rates(:,k,rid_jeuv(11)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV4', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(18)) + rxt_rates(:,k,rid_jeuv(22)) + rxt_rates(:,k,rid_jeuv(23)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUV4e', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(11)) + rxt_rates(:,k,rid_jeuv(13)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUVN2D', wrk, ncol, lchnk )
-       do k = 1,pver
-          un2(:)   = 1._r8 - (vmr(:,k,id_o) + vmr(:,k,id_o2) + vmr(:,k,id_h))
-          wrk(:,k) = un2(:)*(rxt_rates(:,k,rid_jeuv(23)) + rxt_rates(:,k,rid_jeuv(25)))
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PEUVN2De', wrk, ncol, lchnk )
-    endif jeuvs
-
-    if ( has_jno_i ) then
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_no)*rxt_rates(:,k,rid_jno_i)
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PJNO_I', wrk, ncol, lchnk )
-    endif
-    if ( has_jno ) then
-       do k = 1,pver
-          wrk(:,k) = vmr(:,k,id_no)*rxt_rates(:,k,rid_jno)
-          wrk(:,k) = wrk(:,k) * invariants(:,k,indexm)
-       end do
-       call outfld( 'PJNO', wrk, ncol, lchnk )
-    endif
 
   end subroutine chm_diags
 
+!========================================================================
   subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol )
 
     use cam_history,  only : outfld
@@ -753,8 +472,7 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
 
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
-    integer :: m, k, j
-    integer :: plat
+    integer  :: mm, kk
     real(r8) :: wght(ncol)
     !
     ! output integrated wet deposition field
@@ -765,35 +483,26 @@ contains
 
     call get_wght_all_p(lchnk, ncol, wght)
 
-    do m = 1,gas_pcnst
+    do mm = 1,gas_pcnst
        !
        ! compute vertical integral
        !
        wrk_wd(:ncol) = 0._r8
-       do k = 1,pver
-          wrk_wd(:ncol) = wrk_wd(:ncol) + het_rates(:ncol,k,m) * mmr(:ncol,k,m) * pdel(:ncol,k) 
-       end do
+       do kk = 1,pver
+          wrk_wd(:ncol) = wrk_wd(:ncol) + het_rates(:ncol,kk,mm) * mmr(:ncol,kk,mm) * pdel(:ncol,kk) 
+       enddo
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
 
-       call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
-       call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
+       call outfld( wetdep_name(mm), wrk_wd(:ncol),         ncol, lchnk )
+       call outfld( wtrate_name(mm), het_rates(:ncol,:,mm), ncol, lchnk )
 
-       if ( any(noy_species == m ) ) then
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-       if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-       if ( any(sox_species == m ) ) then
-          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
-       endif
-       if ( any(nhx_species == m ) ) then
-          nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+       if ( any(sox_species == mm ) ) then
+          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(mm)
        endif
 
-    end do
+    enddo
     
     call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
@@ -801,4 +510,5 @@ contains
 
   end subroutine het_diags
 
+!========================================================================
 end module mo_chm_diags
