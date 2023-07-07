@@ -43,39 +43,27 @@ module mo_drydep
   integer :: map(gas_pcnst)                 ! indices for drydep species
   integer :: nspecies                       ! number of depvel species in input file
 
-  integer :: no2_ndx, hno3_ndx, o3_ndx, &
-             h2o2_ndx, onit_ndx, onitr_ndx, ch4_ndx, ch2o_ndx, &
-             ch3ooh_ndx, pooh_ndx, ch3coooh_ndx, c2h5ooh_ndx, eooh_ndx, &
-             c3h7ooh_ndx, rooh_ndx, ch3cocho_ndx, co_ndx, ch3coch3_ndx, &
-             no_ndx, ho2no2_ndx, glyald_ndx, hyac_ndx, ch3oh_ndx, c2h5oh_ndx, &
-             hydrald_ndx, h2_ndx, Pb_ndx, o3s_ndx, o3inert_ndx, macrooh_ndx, &
-             xooh_ndx
+  integer :: o3_ndx, ch4_ndx,  &
+             co_ndx, no_ndx, c2h5oh_ndx, h2_ndx
   integer :: soa_ndx, so4_ndx
   logical :: soa_dd, so4_dd
 
-  logical :: no2_dd, hno3_dd, o3_dd, isopooh_dd, ch4_dd,&
-             h2o2_dd, onit_dd, onitr_dd, ch2o_dd, macrooh_dd, xooh_dd, &
-             c3h7ooh_dd, rooh_dd, ch3cocho_dd, co_dd, ch3coch3_dd, &
-             glyald_dd, hyac_dd, ch3oh_dd, hydrald_dd, h2_dd, Pb_dd, o3s_dd, o3inert_dd
+  logical :: o3_dd, ch4_dd,&
+             co_dd, &
+             h2_dd
 
   integer :: so2_ndx
-  integer :: hcooh_ndx
-  logical :: hcn_dd, hcooh_dd
 
-  integer :: o3a_ndx,xno2_ndx,xhno3_ndx,xonit_ndx,xonitr_ndx,xno_ndx
-  logical :: o3a_dd,xno2_dd, xhno3_dd, xonit_dd, xonitr_dd, xno_dd
+  integer :: o3a_ndx, xno_ndx
+  logical :: o3a_dd,  xno_dd
 
 
 
   integer :: &
        o3_tab_ndx = -1, &
-       h2o2_tab_ndx = -1, &
-       ch3ooh_tab_ndx = -1, &
        co_tab_ndx = -1
   logical :: &
        o3_in_tab = .false., &
-       h2o2_in_tab = .false., &
-       ch3ooh_in_tab = .false., &
        co_in_tab = .false.
 
   real(r8), parameter    :: small_value = 1.e-36_r8
@@ -1294,13 +1282,9 @@ contains
                       endif
                    endif
                    if( has_rain(i) ) then
-                      ! rlux(i,lt,o3_ndx) = 1./(1.e-3 + (1./(3.*rlu(sndx,lt))))
                       rlux_o3(i,lt)     = 3000._r8*rlu(sndx,lt)/(1000._r8 + 3._r8*rlu(sndx,lt))
                       if( o3_ndx > 0 ) then
                          rlux(i,lt,o3_ndx) = rlux_o3(i,lt)
-                      endif
-                      if( o3a_ndx > 0 ) then
-                         rlux(i,lt,o3a_ndx) = rlux_o3(i,lt)
                       endif
                    endif
                 endif
