@@ -4,15 +4,12 @@ module mo_photo
   !----------------------------------------------------------------------
 
   use shr_kind_mod, only : r8 => shr_kind_r8
-  use ppgrid,       only : pcols, pver, pverp, begchunk, endchunk
+  use ppgrid,       only : pcols, pver, begchunk, endchunk
   use cam_abortutils,   only : endrun
-  use mo_constants, only : pi,r2d,boltz,d2r
-  use ref_pres,     only : num_pr_lev, ptop_ref 
   use pio
   use cam_pio_utils,only : cam_pio_openfile
   use spmd_utils,   only : masterproc
   use cam_logfile,  only : iulog
-  use phys_control, only : waccmx_is
 
   implicit none
 
@@ -25,22 +22,14 @@ module mo_photo
 
   save
 
-  real(r8), parameter :: kg2g = 1.e3_r8
   integer, parameter  :: pverm = pver - 1
+!  Need a larger maximum zenith angle for WACCM-X extended to high altitudes
+  real(r8), parameter :: max_zen_angle = 88.85_r8  !  degrees
 
-  integer ::  jno_ndx
   integer ::  jonitr_ndx
   integer ::  jho2no2_ndx
-  integer ::  jch3cho_a_ndx, jch3cho_b_ndx, jch3cho_c_ndx
-  integer ::  jo2_a_ndx, jo2_b_ndx
   integer ::  ox_ndx, o3_ndx, o3_inv_ndx, o3rad_ndx
-  integer ::  oc1_ndx, oc2_ndx
-  integer ::  cb1_ndx, cb2_ndx
-  integer ::  soa_ndx
-  integer ::  ant_ndx
-  integer ::  so4_ndx
-  integer ::  sa1_ndx, sa2_ndx, sa3_ndx, sa4_ndx
-  integer ::  n2_ndx, no_ndx, o2_ndx, o_ndx
+  integer ::  o2_ndx
   integer, allocatable :: lng_indexer(:)
   integer, allocatable :: sht_indexer(:)
   integer, allocatable :: euv_indexer(:)
@@ -55,26 +44,12 @@ module mo_photo
   real(r8), allocatable    :: levs(:)
   real(r8), allocatable    :: o2_exo_coldens(:,:,:,:)
   real(r8), allocatable    :: o3_exo_coldens(:,:,:,:)
-  logical              :: o_is_inv
   logical              :: o2_is_inv
-  logical              :: n2_is_inv
   logical              :: o3_is_inv
-  logical              :: no_is_inv
   logical              :: has_o2_col
   logical              :: has_o3_col
   logical              :: has_fixed_press
-  real(r8) :: max_zen_angle       ! degrees
 
-  integer :: jo1d_ndx, jo3p_ndx, jno2_ndx, jn2o5_ndx
-  integer :: jhno3_ndx, jno3_ndx, jpan_ndx, jmpan_ndx
-
-  integer :: jo1da_ndx, jo3pa_ndx, jno2a_ndx, jn2o5a_ndx, jn2o5b_ndx
-  integer :: jhno3a_ndx, jno3a_ndx, jpana_ndx, jmpana_ndx, jho2no2a_ndx 
-  integer :: jonitra_ndx
-
-  logical :: do_diag = .false.
-
-  integer :: ion_rates_idx = -1
 
 contains
 
@@ -98,6 +73,8 @@ contains
     use ioFileMod,     only : getfil
     use mo_chem_utls,  only : get_spc_ndx, get_rxt_ndx, get_inv_ndx
     use mo_jlong,      only : jlong_init
+    use mo_constants, only : d2r
+    use ref_pres,     only : num_pr_lev, ptop_ref
     use seasalt_model, only : sslt_names=>seasalt_names, sslt_ncnst=>seasalt_nbin
     use mo_jeuv,       only : jeuv_init
     use dyn_grid,      only : get_dyn_grid_parm
@@ -160,10 +137,6 @@ contains
     endif
     if (xactive_prates) call endrun('FORTRAN refactoring: xactive_prates=true is removed in MAMxx')
 
-    !----------------------------------------------------------------------------
-    !  Need a larger maximum zenith angle for WACCM-X extended to high altitudes
-    !----------------------------------------------------------------------------
-    max_zen_angle = 88.85_r8 ! degrees
 
     ! jeuv_1,,, jeuv_25 --> need euv calculations  
     ! how to determine if shrt calc is needed ?? -- use top level pressure 
@@ -198,34 +171,6 @@ contains
     end if
     euv_indexer(:) = 0
 
-    jno_ndx     = get_rxt_ndx( 'jno' )
-    jo2_a_ndx   = get_rxt_ndx( 'jo2_a' )
-    jo2_b_ndx   = get_rxt_ndx( 'jo2_b' )
-
-    jo1da_ndx = get_rxt_ndx( 'jo1da' )
-    jo3pa_ndx = get_rxt_ndx( 'jo3pa' )
-    jno2a_ndx = get_rxt_ndx( 'jno2a' )
-    jn2o5a_ndx = get_rxt_ndx( 'jn2o5a' )
-    jn2o5b_ndx = get_rxt_ndx( 'jn2o5b' )
-    jhno3a_ndx = get_rxt_ndx( 'jhno3a' )
-    jno3a_ndx = get_rxt_ndx( 'jno3a' )
-    jpana_ndx = get_rxt_ndx( 'jpana' )
-    jmpana_ndx = get_rxt_ndx( 'jmpana' )
-    jho2no2a_ndx  = get_rxt_ndx( 'jho2no2a' )
-    jonitra_ndx = get_rxt_ndx( 'jonitra' )
-
-    jo1d_ndx = get_rxt_ndx( 'jo1d' )
-    jo3p_ndx = get_rxt_ndx( 'jo3p' )
-    jno2_ndx = get_rxt_ndx( 'jno2' )
-    jn2o5_ndx = get_rxt_ndx( 'jn2o5' )
-    jn2o5_ndx = get_rxt_ndx( 'jn2o5' )
-    jhno3_ndx = get_rxt_ndx( 'jhno3' )
-    jno3_ndx = get_rxt_ndx( 'jno3' )
-    jpan_ndx = get_rxt_ndx( 'jpan' )
-    jmpan_ndx = get_rxt_ndx( 'jmpan' )
-    jho2no2_ndx  = get_rxt_ndx( 'jho2no2' )
-    jonitr_ndx = get_rxt_ndx( 'jonitr' )
-
 
     ox_ndx     = get_spc_ndx( 'OX' )
     if( ox_ndx < 1 ) then
@@ -235,28 +180,12 @@ contains
     o3rad_ndx  = get_spc_ndx( 'O3RAD' )
     o3_inv_ndx = get_inv_ndx( 'O3' )
 
-    n2_ndx     = get_inv_ndx( 'N2' )
-    n2_is_inv  = n2_ndx > 0
-    if( .not. n2_is_inv ) then
-       n2_ndx = get_spc_ndx( 'N2' )
-    end if
     o2_ndx     = get_inv_ndx( 'O2' )
     o2_is_inv  = o2_ndx > 0
     if( .not. o2_is_inv ) then
        o2_ndx = get_spc_ndx( 'O2' )
     end if
-    no_ndx     = get_spc_ndx( 'NO' )
-    no_is_inv  = no_ndx < 1
-    if( no_is_inv ) then
-       no_ndx = get_inv_ndx( 'NO' )
-    end if
     o3_is_inv  = o3_ndx < 1
-
-    o_ndx     = get_spc_ndx( 'O' )
-    o_is_inv  = o_ndx < 1
-    if( o_is_inv ) then
-       o_ndx = get_inv_ndx( 'O' )
-    end if
 
 
     !----------------------------------------------------------------------
@@ -324,20 +253,6 @@ contains
     if ( len_trim(exo_coldens_file) == 0 ) then
        has_o2_col = .false.
        has_o3_col = .false.
-    endif
-
-    oc1_ndx = get_spc_ndx( 'OC1' )
-    oc2_ndx = get_spc_ndx( 'OC2' )
-    cb1_ndx = get_spc_ndx( 'CB1' )
-    cb2_ndx = get_spc_ndx( 'CB2' )
-    soa_ndx = get_spc_ndx( 'SOA' )
-    ant_ndx = get_spc_ndx( 'NH4NO3' )
-    so4_ndx = get_spc_ndx( 'SO4' )
-    if (sslt_ncnst == 4) then
-       sa1_ndx = get_spc_ndx( sslt_names(1) )
-       sa2_ndx = get_spc_ndx( sslt_names(2) )
-       sa3_ndx = get_spc_ndx( sslt_names(3) )
-       sa4_ndx = get_spc_ndx( sslt_names(4) )
     endif
 
     has_abs_columns : if( has_o2_col .or. has_o3_col ) then
@@ -499,6 +414,7 @@ contains
     use chem_mods,   only : pht_alias_mult, indexm
     use mo_jlong,    only : nlng => numj, jlong
     use mo_jeuv,     only : neuv, jeuv, nIonRates
+    use mo_constants, only : r2d
     use physics_buffer, only : physics_buffer_desc, pbuf_set_field
 
     implicit none
@@ -582,14 +498,6 @@ contains
           write(iulog,*) 'photo: Failed to allocate lng_prates; error = ',astat
           call endrun
        end if
-    endif
-
-!------------------------------------------------------------------------------------------------------------
-!  Point to production rates array in physics buffer where rates will be stored for ionosphere module
-!  access.  Also, initialize variables to zero before column loop
-!------------------------------------------------------------------------------------------------------------
-    if (ion_rates_idx>0) then
-       call pbuf_set_field(pbuf, ion_rates_idx, 0._r8)
     endif
 
 !-----------------------------------------------------------------
@@ -731,7 +639,7 @@ contains
     do kk = pverm,1,-1
        below_tau(kk) = del_tau(kk+1) + below_tau(kk+1)
        below_cld(kk) = clouds(kk+1) * del_tau(kk+1) + below_cld(kk+1)
-    end do
+    enddo
     do kk = pverm,1,-1
        if( below_tau(kk) /= 0._r8 ) then
           below_cld(kk) = below_cld(kk) / below_tau(kk)
