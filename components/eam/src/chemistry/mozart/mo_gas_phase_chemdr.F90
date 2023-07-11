@@ -867,7 +867,8 @@ contains
             linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
             linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
             vmr(:,:,o3_ndx) ) !in-out
-       call   lin_strat_sfcsink (ncol, lchnk,  vmr(:,:,o3_ndx), delt, pdel(:ncol,:))
+       call   lin_strat_sfcsink (ncol, lchnk, delt, pdel(:ncol,:), &
+            vmr(:,:,o3_ndx))
     end if
 
     !-----------------------------------------------------------------------      

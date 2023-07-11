@@ -184,12 +184,9 @@ end subroutine linoz_readnl
     use ppgrid,        only : pcols, pver
     use cam_history,   only : outfld
 
-    !
-    ! dummy arguments
-    !
+    !!inten ins
     integer,  intent(in)                           :: ncol                ! number of columns in chunk
     integer,  intent(in)                           :: lchnk               ! chunk index
-    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [vmr]
     real(r8), intent(in)   , dimension(ncol ,pver) :: o3col               ! ozone column above box [mol/cm^2]
     real(r8), intent(in)   , dimension(pcols,pver) :: temp                ! temperature [K]
     real(r8), intent(in)   , dimension(ncol )      :: sza                 ! local solar zenith angle
@@ -206,10 +203,12 @@ end subroutine linoz_readnl
     real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dT      ! Sensitivity of P minus L to T [K]
     real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dO3col  ! Sensitivity of P minus L to overhead O3 column [vmr/DU]
     real(r8),  intent(in), dimension(:,:) :: linoz_cariolle_psc ! Cariolle parameter for PSC loss of ozone [1/s]
-    !
-    ! local
-    !
-    integer :: i,k,n !,index_lat,index_month
+
+    !inten in-outs
+    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [vmr]
+
+    !Local
+    integer :: icol,kk !indices
     real(r8) :: o3col_du,delta_temp,delta_o3col,o3_old,o3_new,delta_o3
     real(r8) :: max_sza, psc_loss
     real(r8) :: o3_clim
@@ -236,37 +235,37 @@ end subroutine linoz_readnl
     !is there more than the background chlorine?
     excess_chlorine = (chlorine_loading-chlorine_loading_bgnd) > 0._r8
 
-    LOOP_COL: do i=1,ncol
-       LOOP_LEV: do k=1,ltrop(i)
+    LOOP_COL: do icol = 1, ncol
+       LOOP_LEV: do kk = 1, ltrop(icol)
 
-          o3_clim = linoz_o3_clim(i,k)     ! climatological ozone
-          o3clim_linoz_diag(i,k) = o3_clim ! diagnostic for output
-          o3_old = o3_vmr(i,k)             ! old ozone mixing ratio
-          o3col_du = o3col(i,k) * convert_to_du ! convert o3col from mol/cm2
-          o3col_du_diag(i,k) = o3col_du    !update diagnostic output
+          o3_clim = linoz_o3_clim(icol,kk)     ! climatological ozone
+          o3clim_linoz_diag(icol,kk) = o3_clim ! diagnostic for output
+          o3_old = o3_vmr(icol,kk)             ! old ozone mixing ratio
+          o3col_du = o3col(icol,kk) * convert_to_du ! convert o3col from mol/cm2
+          o3col_du_diag(icol,kk) = o3col_du    !update diagnostic output
 
           ! compute differences from climatology
-          delta_temp  = temp(i,k) - linoz_t_clim    (i,k)
-          delta_o3col = o3col_du  - linoz_o3col_clim(i,k)
+          delta_temp  = temp(icol,kk) - linoz_t_clim    (icol,kk)
+          delta_o3col = o3col_du  - linoz_o3col_clim(icol,kk)
 
           ! steady state ozone
-          ss_o3(i,k) = o3_clim - (               linoz_PmL_clim   (i,k)   &
-               + delta_o3col * linoz_dPmL_dO3col(i,k)   &
-               + delta_temp  * linoz_dPmL_dT    (i,k)   &
-               ) / linoz_dPmL_dO3   (i,k)
+          ss_o3(icol,kk) = o3_clim - (               linoz_PmL_clim   (icol,kk)   &
+               + delta_o3col * linoz_dPmL_dO3col(icol,kk)   &
+               + delta_temp  * linoz_dPmL_dT    (icol,kk)   &
+               ) / linoz_dPmL_dO3   (icol,kk)
 
-          delta_o3 = (ss_o3(i,k)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(i,k)*delta_t)) ! ozone change
+          delta_o3 = (ss_o3(icol,kk)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(icol,kk)*delta_t)) ! ozone change
 
           o3_new = o3_old + delta_o3 ! define new ozone mixing ratio
 
-          do3_linoz(i,k) = delta_o3/delta_t ! output diagnostic
+          do3_linoz(icol,kk) = delta_o3/delta_t ! output diagnostic
 
           ! PSC activation (follows Cariolle et al 1990.)
-          call psc_activation( lats(i), temp(i,k), pmid(i,k), sza(i), linoz_cariolle_psc(i,k), delta_t, & !in
+          call psc_activation( lats(icol), temp(icol,kk), pmid(icol,kk), sza(icol), linoz_cariolle_psc(icol,kk), delta_t, & !in
                excess_chlorine, o3_old, &  !in
-               o3_new, do3_linoz_psc(i,k)) !out
+               o3_new, do3_linoz_psc(icol,kk)) !out
 
-          o3_vmr(i,k) = o3_new ! update ozone vmr
+          o3_vmr(icol,kk) = o3_new ! update ozone vmr
 
        enddo LOOP_LEV
     enddo LOOP_COL
@@ -307,8 +306,8 @@ end subroutine linoz_readnl
     real(r8), intent(out) :: do3_linoz_psc ![vmr/s]
 
     !local
-    real(r8), parameter :: lats_threshold = 40.0_r8
-    real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value [ppbv]
+    real(r8), parameter :: lats_threshold        = 40.0_r8
+    real(r8), parameter :: chlorine_loading_1987 = 2.5977_r8     ! EESC value [ppbv]
 
     real(r8) :: max_sza, psc_loss
 
@@ -338,7 +337,8 @@ end subroutine linoz_readnl
 !------------------------------------------------------------------------------------------------------------
 !------------------------------------------------------------------------------------------------------------
 
-  subroutine lin_strat_sfcsink( ncol, lchnk, o3l_vmr, delta_t, pdel)
+  subroutine lin_strat_sfcsink( ncol, lchnk, delta_t, pdel, & !in
+   o3l_vmr) !in-out
 
     use ppgrid,        only : pcols, pver
     use physconst,     only : mw_air => mwdry, &
@@ -349,11 +349,14 @@ end subroutine linoz_readnl
 
     implicit none
 
+    !intent-ins
     integer,  intent(in)                           :: ncol                ! number of columns in chunk
     integer,  intent(in)                           :: lchnk               ! chunk index
-    real(r8), intent(inout), dimension(ncol ,pver) :: o3l_vmr             ! ozone volume mixing ratio
     real(r8), intent(in)                           :: delta_t             ! timestep size (secs)
     real(r8), intent(in)                           :: pdel(ncol,pver)     ! pressure delta about midpoints (Pa)
+
+    !inten in-outs
+    real(r8), intent(inout), dimension(ncol ,pver) :: o3l_vmr             ! ozone volume mixing ratio
 
 ! three parameters are applied to Linoz O3 for surface sink, O3l is not coupled to real O3
     real(r8), parameter :: KgtoTg                   = 1.0e-9_r8
