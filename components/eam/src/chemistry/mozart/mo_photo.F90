@@ -710,11 +710,9 @@ contains
     !---------------------------------------------------------------
     !        ... assign column density at the upper boundary
     !            the first column is o3 and the second is o2.
-    !            add 10 du o3 column above top of model.
     !---------------------------------------------------------------
-    !---------------------------------------------------------------
+
     !	... set exo absorber columns
-    !---------------------------------------------------------------
     o2_exo_col(:) = 0._r8
     o3_exo_col(:) = 0._r8
     has_abs_cols : if( has_o2_col .and. has_o3_col ) then
