@@ -28,7 +28,7 @@ module mo_photo
 
   integer ::  jonitr_ndx
   integer ::  jho2no2_ndx
-  integer ::  ox_ndx, o3_ndx, o3_inv_ndx, o3rad_ndx
+  integer ::  o3_ndx, o3_inv_ndx
   integer ::  o2_ndx
   integer, allocatable :: lng_indexer(:)
   integer, allocatable :: sht_indexer(:)
@@ -172,12 +172,7 @@ contains
     euv_indexer(:) = 0
 
 
-    ox_ndx     = get_spc_ndx( 'OX' )
-    if( ox_ndx < 1 ) then
-       ox_ndx  = get_spc_ndx( 'O3' )
-    end if
     o3_ndx     = get_spc_ndx( 'O3' )
-    o3rad_ndx  = get_spc_ndx( 'O3RAD' )
     o3_inv_ndx = get_inv_ndx( 'O3' )
 
     o2_ndx     = get_inv_ndx( 'O2' )
@@ -227,10 +222,7 @@ contains
     !	... check for o2, o3 absorber columns
     !----------------------------------------------------------------------
     if( ncol_abs > 0 ) then
-       spc_ndx = ox_ndx
-       if( spc_ndx < 1 ) then
-          spc_ndx = o3_ndx
-       end if
+       spc_ndx = o3_ndx
        if( spc_ndx > 0 ) then
           has_o3_col = .true.
        else
@@ -785,36 +777,21 @@ contains
        o3_exo_col(:) = 0._r8
     end if has_abs_cols
 
-    if( o3rad_ndx > 0 ) then
-       spc_ndx = o3rad_ndx
-    else
-       spc_ndx = ox_ndx
-    end if
-    if( spc_ndx < 1 ) then
-       spc_ndx = o3_ndx
-    end if
-    if (spc_ndx > 0 .or. o3_inv_ndx > 0) then
+    col_delta(:,:,:) = 0._r8
 
+    if (o3_ndx > 0 .or. o3_inv_ndx > 0) then
         call calc_col_delta(   col_delta(:,0:,1),  & ! out
                 (o3_inv_ndx>0),o3_ndx, o3_inv_ndx, & ! in
                 o3_exo_col,    vmr,    invariants, & ! in
-                pdel, ncol                         )
-
-    else
-       col_delta(:,:,1) = 0._r8
-    end if
-    if( ncol_abs > 1 ) then
-       if( o2_ndx > 1 ) then
-
-           call calc_col_delta( col_delta(:,0:,2), & ! out
-                o2_is_inv,    o2_ndx, o2_ndx,      & ! in   o2_ndx is inv if o2_is_inv=.true.
-                o2_exo_col,   vmr,    invariants,  & ! in
                 pdel, ncol                         ) ! in
+    endif
 
-       else
-          col_delta(:,:,2) = 0._r8
-       end if
-    end if
+    if( ncol_abs > 1 .and. o2_ndx > 1 ) then
+        call calc_col_delta( col_delta(:,0:,2), & ! out
+             o2_is_inv,    o2_ndx, o2_ndx,      & ! in   o2_ndx is inv if o2_is_inv=.true.
+             o2_exo_col,   vmr,    invariants,  & ! in
+             pdel, ncol                         ) ! in
+    endif
 
   end subroutine set_ub_col
 
