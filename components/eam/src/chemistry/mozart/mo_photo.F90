@@ -682,38 +682,30 @@ contains
   end subroutine cloud_mod
 
 !====================================================================================
-  subroutine set_ub_col( col_delta, vmr, invariants, ptop, pdel, ncol, lchnk )
+  subroutine set_ub_col( col_delta,             & ! out
+             vmr, invariants, pdel, ncol, lchnk ) ! in
     !---------------------------------------------------------------
     !        ... set the column densities at the upper boundary
     !---------------------------------------------------------------
-
-    use chem_mods, only : nfs, ncol_abs=>nabscol, indexm
-    use chem_mods, only : nabscol, gas_pcnst, indexm, nfs
-    use chem_mods, only : gas_pcnst
+    use chem_mods, only : nabscol, nfs, gas_pcnst
 
     implicit none
 
     !---------------------------------------------------------------
     !        ... dummy args
     !---------------------------------------------------------------
-    real(r8), intent(in)    ::  ptop(pcols)                            ! top pressure (Pa)
     integer,  intent(in)    ::  ncol                                   ! number of columns in current chunk
     integer,  intent(in)    ::  lchnk                                  ! latitude indicies in chunk
-    real(r8), intent(in)    ::  vmr(ncol,pver,gas_pcnst)               ! xported species vmr
-    real(r8), intent(in)    ::  pdel(pcols,pver)                       ! pressure delta about midpoints (Pa)
-    real(r8), intent(in)    ::  invariants(ncol,pver,nfs)
-    real(r8), intent(out)   ::  col_delta(ncol,0:pver,max(1,nabscol))  ! /cm**2 o2,o3 col dens above model
+    real(r8), intent(in)    ::  vmr(ncol,pver,gas_pcnst)               ! xported species vmr [mol/mol]
+    real(r8), intent(in)    ::  pdel(pcols,pver)                       ! pressure delta about midpoints [Pa]
+    real(r8), intent(in)    ::  invariants(ncol,pver,nfs)              ! invariant densities [molecules/cm^3]
+    real(r8), intent(out)   ::  col_delta(ncol,0:pver,max(1,nabscol))  ! o2,o3 col dens above model [1/cm^2]
 
     !---------------------------------------------------------------
     !        ... local variables
     !---------------------------------------------------------------
-    integer :: k, kl, spc_ndx
-    integer :: ku(ncol)
-    real(r8)    :: dp(ncol)
-    real(r8)    :: tint_vals(2)
     real(r8)    :: o2_exo_col(ncol)
     real(r8)    :: o3_exo_col(ncol)
-    integer :: lat, i
  
     !---------------------------------------------------------------
     !        ... assign column density at the upper boundary
@@ -738,15 +730,6 @@ contains
                                 o3_exo_col) ! out
           endif
 
-#ifdef DEBUG
-          write(iulog,*) '-----------------------------------'
-          write(iulog,*) 'set_ub_col: diagnostics @ lat = ',lat
-          write(iulog,*) 'o2_exo_col'
-          write(iulog,'(1p,5g15.7)') o2_exo_col(:)
-          write(iulog,*) 'o3_exo_col'
-          write(iulog,'(1p,5g15.7)') o3_exo_col(:)
-          write(iulog,*) '-----------------------------------'
-#endif
        endif   ! has_fixed_press
     endif has_abs_cols
 
@@ -760,7 +743,7 @@ contains
                 pdel, ncol                         ) ! in
     endif
 
-    if( ncol_abs > 1 .and. o2_ndx > 1 ) then
+    if( nabscol > 1 .and. o2_ndx > 1 ) then
         call calc_col_delta( col_delta(:,0:,2), & ! out
              o2_is_inv,    o2_ndx, o2_ndx,      & ! in   o2_ndx is inv if o2_is_inv=.true.
              o2_exo_col,   vmr,    invariants,  & ! in
@@ -779,7 +762,7 @@ contains
     implicit none
 
     integer,  intent(in)  :: ncol         ! number of columns in current chunk
-    real(r8), intent(in)  :: exo_coldens(:,:,:)   ! [molecules/cm^2]
+    real(r8), intent(in)  :: exo_coldens(:,:,:)     ! [molecules/cm^2]
     real(r8), intent(out) :: spc_exo_col(ncol)      ! exo absorber columns [molecules/cm^2]
 
     integer     :: icol
