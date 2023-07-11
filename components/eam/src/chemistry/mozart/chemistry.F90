@@ -1017,7 +1017,7 @@ end function chem_is_active
      
      call O1D_to_2OH_adj_init()
 
-     call lin_strat_chem_inti(phys_state)
+     call lin_strat_chem_inti()
      call chlorine_loading_init( chlorine_loading_file, &
                                  type = chlorine_loading_type, &
                                  ymd = chlorine_loading_fixed_ymd, &

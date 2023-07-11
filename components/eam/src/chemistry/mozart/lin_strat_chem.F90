@@ -12,7 +12,6 @@
 module lin_strat_chem
 
   use shr_kind_mod, only : r8 => shr_kind_r8
-  use ppgrid,       only : begchunk, endchunk
   use physics_types,only : physics_state
   use cam_logfile,  only : iulog
   use cam_abortutils,   only : endrun
@@ -109,7 +108,7 @@ end subroutine linoz_readnl
 
 !--------------------------------------------------------------------
 !--------------------------------------------------------------------
-  subroutine lin_strat_chem_inti(phys_state)
+  subroutine lin_strat_chem_inti()
     !
     ! initialize linearized stratospheric chemistry by reading
     ! input parameters from netcdf file and interpolate to
@@ -119,12 +118,8 @@ end subroutine linoz_readnl
     use ppgrid,       only : pver
     use mo_chem_utls, only : get_spc_ndx
     use cam_history,  only : addfld, horiz_only, add_default
-    use physics_buffer, only : physics_buffer_desc
 
     implicit none
-
-
-    type(physics_state), intent(in) :: phys_state(begchunk:endchunk)
 
     if (.not.has_linoz_data) return
 
@@ -184,9 +179,7 @@ end subroutine linoz_readnl
     ! using linearized chemistry 
     !
     use ppgrid,        only : pcols, pver
-    use physconst,     only : pi, &
-                              grav => gravit, &
-                              mw_air => mwdry
+    use physconst,     only : pi
     use cam_history,   only : outfld
     use linoz_data,    only : fields, o3_clim_ndx,t_clim_ndx,o3col_clim_ndx,PmL_clim_ndx,dPmL_dO3_ndx,&
                                       dPmL_dT_ndx,dPmL_dO3col_ndx,cariolle_pscs_ndx
@@ -226,7 +219,6 @@ end subroutine linoz_readnl
     ! parameters
     !
     real(r8), parameter :: convert_to_du = 1._r8/(2.687e16_r8)      ! convert ozone column from mol/cm^2 to DU
-    real(r8), parameter :: degrees_to_radians = pi/180._r8          ! conversion factors
     real(r8), parameter :: radians_to_degrees = 180._r8/pi
     real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value (ppbv)
     real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value (ppbv) for background conditions
@@ -376,9 +368,7 @@ end subroutine linoz_readnl
     use physconst,     only : mw_air => mwdry, &
                               mw_o3  => mwo3   !in grams
 
-    use mo_constants, only : pi, rgrav, rearth
-
-    use phys_grid,    only : get_area_all_p
+    use mo_constants, only : rgrav
 
     use cam_history,   only : outfld
 
@@ -394,7 +384,7 @@ end subroutine linoz_readnl
     real(r8), parameter :: KgtoTg                   = 1.0e-9_r8
     real(r8), parameter :: peryear                  = 86400._r8* 365.0_r8 ! to multiply to convert per second to per year
     
-    real(r8) :: area(ncol), mass(ncol,pver)
+    real(r8) :: mass(ncol,pver)
     real(r8) :: o3l_old, o3l_new, efactor, do3
     real(r8), dimension(ncol)  :: do3mass, o3l_sfcsink
     integer i, k
