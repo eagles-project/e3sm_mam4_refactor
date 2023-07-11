@@ -30,7 +30,6 @@ module lin_strat_chem
   public :: linoz_readnl   ! read linoz_nl namelist
 
   integer :: index_o3
-!  integer :: index_o3l
 
   logical :: do_lin_strat_chem
 
@@ -127,10 +126,8 @@ end subroutine linoz_readnl
     ! find index of ozone
     !
     index_o3  =  get_spc_ndx('O3')
-!    index_o3l =  get_spc_ndx('O3L') ! introduce O3L that couples to parameterized surface sink
 
     do_lin_strat_chem = has_linoz_data
-!    if ( index_o3 <= 0 .and. index_o3l <=0 ) then !added index_o3l
      if ( index_o3 <= 0 ) then !added index_o3l
        write(iulog,*) ' No ozone in the chemical mechanism, skipping lin_strat_chem'
        do_lin_strat_chem = .false.
@@ -218,8 +215,8 @@ end subroutine linoz_readnl
     !
     ! parameters
     !
-    real(r8), parameter :: convert_to_du = 1._r8/(2.687e16_r8)      ! convert ozone column from mol/cm^2 to DU
-    real(r8), parameter :: radians_to_degrees = 180._r8/pi
+    real(r8), parameter :: convert_to_du            = 1._r8/(2.687e16_r8)      ! convert ozone column from mol/cm^2 to DU
+    real(r8), parameter :: radians_to_degrees       = 180._r8/pi
     real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value (ppbv)
     real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value (ppbv) for background conditions
     real(r8), parameter :: pressure_threshold       = 210.e+2_r8    ! {PJC} for diagnostics only
@@ -267,7 +264,6 @@ end subroutine linoz_readnl
           if ( pmid(i,k) > pressure_threshold ) THEN   ! PJC diagnostic
              WRITE(iulog,*)'LINOZ WARNING: Exceeded PRESSURE threshold (i,k,p_threshold,pmid,o3)=',&
                i,k,nint(pressure_threshold/100._r8),'mb',nint(pmid(i,k)/100._r8),'mb',nint(o3_vmr(i,k)*1e9_r8),'ppb'   !PJC
-!             cycle LOOP_LEV
           endif
           !
           ! diagnostic for output
@@ -322,9 +318,7 @@ end subroutine linoz_readnl
                    ! define maximum SZA for PSC loss (= tangent height at sunset)
                    !
                    max_sza = (90._r8 + sqrt( max( 16._r8*log10(100000._r8/pmid(i,k)),0._r8)))
-#ifdef DEBUG
-                   write(iulog,'(A, 2f8.1)')'sza/max_saz', sza(i),max_sza
-#endif
+
                    if ( (sza(i)*radians_to_degrees) <= max_sza ) then
 
                       psc_loss = exp(-linoz_cariolle_psc(i,k) &
