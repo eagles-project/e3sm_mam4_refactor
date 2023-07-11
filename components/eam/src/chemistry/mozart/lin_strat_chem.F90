@@ -338,11 +338,11 @@ end subroutine linoz_readnl
 !------------------------------------------------------------------------------------------------------------
 
   subroutine lin_strat_sfcsink( ncol, lchnk, delta_t, pdel, & !in
-   o3l_vmr) !in-out
+       o3l_vmr) !in-out
 
     use ppgrid,        only : pcols, pver
     use physconst,     only : mw_air => mwdry, &
-                              mw_o3  => mwo3   !in grams
+         mw_o3  => mwo3   !in grams
 
     use mo_constants, only : rgrav
     use cam_history,   only : outfld
@@ -350,53 +350,53 @@ end subroutine linoz_readnl
     implicit none
 
     !intent-ins
-    integer,  intent(in)                           :: ncol                ! number of columns in chunk
-    integer,  intent(in)                           :: lchnk               ! chunk index
-    real(r8), intent(in)                           :: delta_t             ! timestep size (secs)
-    real(r8), intent(in)                           :: pdel(ncol,pver)     ! pressure delta about midpoints (Pa)
+    integer,  intent(in)   :: ncol                ! number of columns in chunk
+    integer,  intent(in)   :: lchnk               ! chunk index
+    real(r8), intent(in)   :: delta_t             ! timestep size [secs]
+    real(r8), intent(in)   :: pdel(ncol,pver)     ! pressure delta about midpoints [Pa]
 
     !inten in-outs
-    real(r8), intent(inout), dimension(ncol ,pver) :: o3l_vmr             ! ozone volume mixing ratio
+    real(r8), intent(inout):: o3l_vmr(ncol ,pver)             ! ozone volume mixing ratio [vmr]
 
-! three parameters are applied to Linoz O3 for surface sink, O3l is not coupled to real O3
+    !local
+    !Two parameters are applied to Linoz O3 for surface sink, O3l is not coupled to real O3
     real(r8), parameter :: KgtoTg                   = 1.0e-9_r8
     real(r8), parameter :: peryear                  = 86400._r8* 365.0_r8 ! to multiply to convert per second to per year
 
     real(r8) :: mass(ncol,pver)
     real(r8) :: o3l_old, o3l_new, efactor, do3
     real(r8), dimension(ncol)  :: do3mass, o3l_sfcsink
-    integer i, k
+    integer icol, kk
 
     if ( .not. do_lin_strat_chem ) return
- !
- !   initializing array
- !
 
-    o3l_sfcsink =0._r8
+    !initializing array
+    o3l_sfcsink = 0._r8
 
-    do k = 1,pver
-       mass(:ncol,k) = pdel(:ncol,k) * rgrav  ! air mass in kg/m2
+    do kk = 1, pver
+       mass(:ncol,kk) = pdel(:ncol,kk) * rgrav  ! air mass in kg/m2
     enddo
 
-    efactor  = (1.d0 - exp(-delta_t/o3_tau))
-    LOOP_COL: do i=1,ncol
+    efactor  = (1.d0 - exp(-delta_t/o3_tau)) !compute time scale factor
 
-       do3mass(i) =0._r8
+    do icol = 1, ncol
 
-       LOOP_SFC: do k= pver, pver-o3_lbl+1, -1
+       do3mass(icol) =0._r8
 
-          o3l_old = o3l_vmr(i,k)  !vmr
+       do kk = pver, pver-o3_lbl+1, -1
+
+          o3l_old = o3l_vmr(icol,kk)  !vmr
 
           do3 =  (o3_sfc - o3l_old)* efactor !vmr
 
           o3l_new  = o3l_old + do3
 
-          do3mass(i) = do3mass(i) + do3* mass(i,k) * mw_o3/mw_air  ! loss in kg/m2 summed over boundary layers within one time step
+          do3mass(icol) = do3mass(icol) + do3* mass(icol,kk) * mw_o3/mw_air  ! loss in kg/m2 summed over boundary layers within one time step
 
-          o3l_vmr(i,k) = o3l_new
+          o3l_vmr(icol,kk) = o3l_new
 
-       enddo  LOOP_SFC
-      enddo  Loop_COL
+       enddo
+    enddo
 
     o3l_sfcsink(:ncol) = do3mass(:ncol)/delta_t * KgtoTg * peryear ! saved in Tg/yr/m2 unit
 
@@ -405,7 +405,5 @@ end subroutine linoz_readnl
     return
 
   end subroutine lin_strat_sfcsink
-
-
 
 end module lin_strat_chem
