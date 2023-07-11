@@ -67,7 +67,7 @@ contains
     use mo_seto2,      only : o2_xsect_inti      
     use interpolate_data, only: lininterp_init, lininterp, lininterp_finish, interp_type
     use chem_mods,     only : phtcnt
-    use chem_mods,     only : ncol_abs => nabscol
+    use chem_mods,     only : nabscol
     use chem_mods,     only : rxt_tag_lst, pht_alias_lst, pht_alias_mult
     use time_manager,  only : get_calday
     use ioFileMod,     only : getfil
@@ -221,14 +221,14 @@ contains
     !----------------------------------------------------------------------
     !	... check for o2, o3 absorber columns
     !----------------------------------------------------------------------
-    if( ncol_abs > 0 ) then
+    if( nabscol > 0 ) then
        spc_ndx = o3_ndx
        if( spc_ndx > 0 ) then
           has_o3_col = .true.
        else
           has_o3_col = .false.
        end if
-       if( ncol_abs > 1 ) then
+       if( nabscol > 1 ) then
           if( o2_ndx > 1 ) then
              has_o2_col = .true.
           else
@@ -402,7 +402,7 @@ contains
 !   	... table photorates for wavelengths > 200nm
 !-----------------------------------------------------------------
 
-    use chem_mods,   only : ncol_abs => nabscol, phtcnt, gas_pcnst, nfs
+    use chem_mods,   only : nabscol, phtcnt, gas_pcnst, nfs
     use chem_mods,   only : pht_alias_mult, indexm
     use mo_jlong,    only : nlng => numj, jlong
     use mo_jeuv,     only : neuv, jeuv, nIonRates
@@ -418,7 +418,7 @@ contains
     integer,  intent(in)    :: ncol
     real(r8), intent(in)    :: esfact                       ! earth sun distance factor
     real(r8), intent(in)    :: vmr(ncol,pver,max(1,gas_pcnst)) ! vmr
-    real(r8), intent(in)    :: col_dens(ncol,pver,ncol_abs) ! column densities (molecules/cm^2)
+    real(r8), intent(in)    :: col_dens(ncol,pver,nabscol) ! column densities (molecules/cm^2)
     real(r8), intent(in)    :: zen_angle(ncol)              ! solar zenith angle (radians)
     real(r8), intent(in)    :: srf_alb(pcols)               ! surface albedo
     real(r8), intent(in)    :: lwc(ncol,pver)               ! liquid water content (kg/kg)
@@ -841,7 +841,7 @@ contains
     !     	... set the column densities
     !---------------------------------------------------------------
 
-    use chem_mods, only : ncol_abs=>nabscol
+    use chem_mods, only : nabscol
 
     implicit none
 
@@ -861,7 +861,7 @@ contains
     !           current eta index in the calling routine.
     !           the first column is o3 and the second is o2.
     !---------------------------------------------------------------
-    do mm = 1,ncol_abs
+    do mm = 1,nabscol
        col_dens(:,1,mm) = col_delta(:,0,mm) + .5_r8 * col_delta(:,1,mm)  ! kk=1
        do kk = 2,pver
           km1 = kk - 1
