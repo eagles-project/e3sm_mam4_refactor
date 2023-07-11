@@ -167,7 +167,10 @@ end subroutine linoz_readnl
 
 !--------------------------------------------------------------------
 !--------------------------------------------------------------------
-  subroutine lin_strat_chem_solve( ncol, lchnk, o3_vmr, o3col, temp, sza, pmid, delta_t, rlats, ltrop )
+  subroutine lin_strat_chem_solve( ncol, lchnk, o3col, temp, sza, pmid, delta_t, rlats, ltrop, & !in
+            linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
+            linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
+            o3_vmr) !in-out
  
     use chlorine_loading_data, only: chlorine_loading
 
@@ -178,21 +181,29 @@ end subroutine linoz_readnl
     use ppgrid,        only : pcols, pver
     use physconst,     only : pi
     use cam_history,   only : outfld
-    use linoz_data,    only : fields, o3_clim_ndx,t_clim_ndx,o3col_clim_ndx,PmL_clim_ndx,dPmL_dO3_ndx,&
-                                      dPmL_dT_ndx,dPmL_dO3col_ndx,cariolle_pscs_ndx
+
     !
     ! dummy arguments
     !
     integer,  intent(in)                           :: ncol                ! number of columns in chunk
     integer,  intent(in)                           :: lchnk               ! chunk index
-    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio
-    real(r8), intent(in)   , dimension(ncol ,pver) :: o3col               ! ozone column above box (mol/cm^2)
-    real(r8), intent(in)   , dimension(pcols,pver) :: temp                ! temperature (K)
+    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [units???]
+    real(r8), intent(in)   , dimension(ncol ,pver) :: o3col               ! ozone column above box [mol/cm^2]
+    real(r8), intent(in)   , dimension(pcols,pver) :: temp                ! temperature [K]
     real(r8), intent(in)   , dimension(ncol )      :: sza                 ! local solar zenith angle
-    real(r8), intent(in)   , dimension(pcols,pver) :: pmid                ! midpoint pressure (Pa)
-    real(r8), intent(in)                           :: delta_t             ! timestep size (secs)
+    real(r8), intent(in)   , dimension(pcols,pver) :: pmid                ! midpoint pressure [Pa]
+    real(r8), intent(in)                           :: delta_t             ! timestep size [secs]
     real(r8), intent(in)                           :: rlats(ncol)         ! column latitudes (radians)
     integer,  intent(in)   , dimension(pcols)      :: ltrop               ! chunk index
+
+    real(r8),  intent(in), dimension(:,:) :: linoz_o3_clim      ! ozone (climatology) [vmr]
+    real(r8),  intent(in), dimension(:,:) :: linoz_t_clim       ! temperature (climatology) [K]
+    real(r8),  intent(in), dimension(:,:) :: linoz_o3col_clim   ! Column O3 above box (climatology) [Dobson Units or DU]
+    real(r8),  intent(in), dimension(:,:) :: linoz_PmL_clim     ! P minus L (climatology) [vmr/s]
+    real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dO3     ! Sensitivity of P minus L to O3 [1/s]
+    real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dT      ! Sensitivity of P minus L to T [K]
+    real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dO3col  ! Sensitivity of P minus L to overhead O3 column [vmr/DU]
+    real(r8),  intent(in), dimension(:,:) :: linoz_cariolle_psc ! Cariolle parameter for PSC loss of ozone [1/s]
     !
     ! local
     !
@@ -203,120 +214,58 @@ end subroutine linoz_readnl
     real(r8), dimension(ncol) :: lats
     real(r8), dimension(ncol,pver) :: do3_linoz,do3_linoz_psc,ss_o3,o3col_du_diag,o3clim_linoz_diag
 
-    real(r8), dimension(:,:), pointer :: linoz_o3_clim
-    real(r8), dimension(:,:), pointer :: linoz_t_clim
-    real(r8), dimension(:,:), pointer :: linoz_o3col_clim
-    real(r8), dimension(:,:), pointer :: linoz_PmL_clim
-    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3
-    real(r8), dimension(:,:), pointer :: linoz_dPmL_dT
-    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3col
-    real(r8), dimension(:,:), pointer :: linoz_cariolle_psc
-
     !
     ! parameters
     !
-    real(r8), parameter :: convert_to_du            = 1._r8/(2.687e16_r8)      ! convert ozone column from mol/cm^2 to DU
+    real(r8), parameter :: convert_to_du            = 1._r8/(2.687e16_r8)      ! convert ozone column from [mol/cm^2] to [DU]
     real(r8), parameter :: radians_to_degrees       = 180._r8/pi
-    real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value (ppbv)
-    real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value (ppbv) for background conditions
-    real(r8), parameter :: pressure_threshold       = 210.e+2_r8    ! {PJC} for diagnostics only
+    real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value [ppbv]
+    real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value [ppbv] for background conditions
+    real(r8), parameter :: pressure_threshold       = 210.e+2_r8    ! {PJC} for diagnostics only [Pa]
 
-
-    !
     ! skip if no ozone field available
-    !
     if ( .not. do_lin_strat_chem ) return
 
-    ! 
-    ! associate the field pointers
-    !
-    linoz_o3_clim      => fields(o3_clim_ndx)      %data(:,:,lchnk )
-    linoz_t_clim       => fields(t_clim_ndx)       %data(:,:,lchnk )
-    linoz_o3col_clim   => fields(o3col_clim_ndx)   %data(:,:,lchnk )
-    linoz_PmL_clim     => fields(PmL_clim_ndx)     %data(:,:,lchnk )
-    linoz_dPmL_dO3     => fields(dPmL_dO3_ndx)     %data(:,:,lchnk )
-    linoz_dPmL_dT      => fields(dPmL_dT_ndx)      %data(:,:,lchnk )
-    linoz_dPmL_dO3col  => fields(dPmL_dO3col_ndx)  %data(:,:,lchnk )
-    linoz_cariolle_psc => fields(cariolle_pscs_ndx)%data(:,:,lchnk )
-
-    !
     ! initialize output arrays
-    !
     do3_linoz         = 0._r8
     do3_linoz_psc     = 0._r8
     o3col_du_diag     = 0._r8
     o3clim_linoz_diag = 0._r8
     ss_o3             = 0._r8
-    !
-    ! convert lats from radians to degrees
-    !
-    lats = rlats * radians_to_degrees
+
+    lats = rlats * radians_to_degrees ! convert lats from radians to degrees
 
     LOOP_COL: do i=1,ncol
        LOOP_LEV: do k=1,ltrop(i)
-          !
-          ! climatological ozone
-          !
-          o3_clim = linoz_o3_clim(i,k)
-          !
-          ! skip if not in the stratosphere
-          !
-          if ( pmid(i,k) > pressure_threshold ) THEN   ! PJC diagnostic
-             WRITE(iulog,*)'LINOZ WARNING: Exceeded PRESSURE threshold (i,k,p_threshold,pmid,o3)=',&
-               i,k,nint(pressure_threshold/100._r8),'mb',nint(pmid(i,k)/100._r8),'mb',nint(o3_vmr(i,k)*1e9_r8),'ppb'   !PJC
-          endif
-          !
-          ! diagnostic for output
-          !
-          o3clim_linoz_diag(i,k) = o3_clim
-          !
-          ! old ozone mixing ratio
-          !
-          o3_old = o3_vmr(i,k)
-          !
-          ! convert o3col from mol/cm2
-          !
-          o3col_du = o3col(i,k) * convert_to_du
-          o3col_du_diag(i,k) = o3col_du
-          !
+
+          o3_clim = linoz_o3_clim(i,k)     ! climatological ozone
+          o3clim_linoz_diag(i,k) = o3_clim ! diagnostic for output
+          o3_old = o3_vmr(i,k)             ! old ozone mixing ratio
+          o3col_du = o3col(i,k) * convert_to_du ! convert o3col from mol/cm2
+          o3col_du_diag(i,k) = o3col_du    !update diagnostic output
+          
           ! compute differences from climatology
-          !
           delta_temp  = temp(i,k) - linoz_t_clim    (i,k)
           delta_o3col = o3col_du  - linoz_o3col_clim(i,k)
 
-
-          !
           ! steady state ozone
-          !
           ss_o3(i,k) = o3_clim - (               linoz_PmL_clim   (i,k)   &
                                  + delta_o3col * linoz_dPmL_dO3col(i,k)   &
                                  + delta_temp  * linoz_dPmL_dT    (i,k)   &
                                              ) / linoz_dPmL_dO3   (i,k)
 
-
-          !
-          ! ozone change
-          !
-          delta_o3 = (ss_o3(i,k)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(i,k)*delta_t))
-          !
-          ! define new ozone mixing ratio
-          !
-          o3_new = o3_old + delta_o3
-          !
-          ! output diagnostic
-          !
-          do3_linoz(i,k) = delta_o3/delta_t
-          !
+          delta_o3 = (ss_o3(i,k)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(i,k)*delta_t)) ! ozone change
+          
+          o3_new = o3_old + delta_o3 ! define new ozone mixing ratio
+          
+          do3_linoz(i,k) = delta_o3/delta_t ! output diagnostic
+          
           ! PSC activation (follows Cariolle et al 1990.)
-          !
           ! use only if abs(latitude) > 40.
-          !
           if ( abs(lats(i)) > 40._r8 ) then   
              if ( (chlorine_loading-chlorine_loading_bgnd) > 0._r8 ) then
                 if ( temp(i,k) <= psc_T ) then
-                   !
                    ! define maximum SZA for PSC loss (= tangent height at sunset)
-                   !
                    max_sza = (90._r8 + sqrt( max( 16._r8*log10(100000._r8/pmid(i,k)),0._r8)))
 
                    if ( (sza(i)*radians_to_degrees) <= max_sza ) then
@@ -326,25 +275,18 @@ end subroutine linoz_readnl
                            * delta_t )
 
                       o3_new = o3_old * psc_loss
-                      !
-                      ! output diagnostic
-                      !
-                      do3_linoz_psc(i,k) = (o3_new-o3_old)/delta_t
-                      !
-                   end if
-                end if
-             end if
-          end if
-          !
-          ! update ozone vmr
-          !
-          o3_vmr(i,k) = o3_new
+                      
+                      do3_linoz_psc(i,k) = (o3_new-o3_old)/delta_t ! output diagnostic
+                   endif
+                endif
+             endif
+          endif
+          o3_vmr(i,k) = o3_new ! update ozone vmr
 
-       end do LOOP_LEV
-    end do LOOP_COL
-    !
+       enddo LOOP_LEV
+    enddo LOOP_COL
+    
     ! output
-    !
     call outfld( 'LINOZ_DO3'    , do3_linoz              , ncol, lchnk )
     call outfld( 'LINOZ_DO3_PSC', do3_linoz_psc          , ncol, lchnk )
     call outfld( 'LINOZ_SSO3'   , ss_o3                  , ncol, lchnk )
@@ -358,12 +300,10 @@ end subroutine linoz_readnl
   subroutine lin_strat_sfcsink( ncol, lchnk, o3l_vmr, delta_t, pdel)
 
     use ppgrid,        only : pcols, pver
-
     use physconst,     only : mw_air => mwdry, &
                               mw_o3  => mwo3   !in grams
 
     use mo_constants, only : rgrav
-
     use cam_history,   only : outfld
 
     implicit none 
@@ -411,8 +351,8 @@ end subroutine linoz_readnl
 
           o3l_vmr(i,k) = o3l_new
 
-       end do  LOOP_SFC
-    End do  Loop_COL
+       enddo  LOOP_SFC
+      enddo  Loop_COL
        
     o3l_sfcsink(:ncol) = do3mass(:ncol)/delta_t * KgtoTg * peryear ! saved in Tg/yr/m2 unit
     
