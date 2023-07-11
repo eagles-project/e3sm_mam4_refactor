@@ -629,7 +629,8 @@ contains
     !-----------------------------------------------------------------------      
     !     	... Set the column densities
     !-----------------------------------------------------------------------      
-    call setcol( col_delta, col_dens, vmr, pdel,  ncol )
+    call setcol(  col_delta, & ! in
+                  col_dens ) ! out
 
     !-----------------------------------------------------------------------      
     !     	... Calculate the photodissociation rates

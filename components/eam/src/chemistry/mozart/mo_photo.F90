@@ -785,7 +785,7 @@ contains
           write(iulog,'(1p,5g15.7)') o3_exo_col(:)
           write(iulog,*) '-----------------------------------'
 #endif
-       end if
+       end if   ! has_fixed_press
     else
        o2_exo_col(:) = 0._r8
        o3_exo_col(:) = 0._r8
@@ -832,47 +832,38 @@ contains
   end subroutine set_ub_col
 
 !====================================================================================
-  subroutine setcol( col_delta, col_dens, vmr, pdel,  ncol )
+  subroutine setcol( col_delta, & ! in
+                     col_dens ) ! out
     !---------------------------------------------------------------
     !     	... set the column densities
     !---------------------------------------------------------------
 
-    use chem_mods, only : ncol_abs=>nabscol, gas_pcnst
+    use chem_mods, only : ncol_abs=>nabscol
 
     implicit none
 
     !---------------------------------------------------------------
     !     	... dummy arguments
     !---------------------------------------------------------------
-    integer,  intent(in)    :: ncol                              ! no. of columns in current chunk
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)          ! xported species vmr
-    real(r8), intent(in)    :: pdel(pcols,pver)                  ! delta about midpoints
-    real(r8), intent(in)    :: col_delta(:,0:,:)                 ! layer column densities (molecules/cm^2)
-    real(r8), intent(out)   :: col_dens(:,:,:)                   ! column densities ( /cm**2 )
+    real(r8), intent(in)    :: col_delta(:,0:,:)                 ! layer column densities [molecules/cm^2]
+    real(r8), intent(out)   :: col_dens(:,:,:)                   ! column densities [ 1/cm**2 ]
 
     !---------------------------------------------------------------
     !        the local variables
     !---------------------------------------------------------------
-    integer  ::   i, k, km1, m      ! long, alt indicies
-
-    !---------------------------------------------------------------
-    !        note: xfactor = 10.*r/(k*g) in cgs units.
-    !              the factor 10. is to convert pdel
-    !              from pascals to dyne/cm**2.
-    !---------------------------------------------------------------
-    real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
+    integer  ::   kk, km1, mm      ! indicies
 
     !---------------------------------------------------------------
     !   	... compute column densities down to the
     !           current eta index in the calling routine.
     !           the first column is o3 and the second is o2.
     !---------------------------------------------------------------
-    do m = 1,ncol_abs
-       col_dens(:,1,m) = col_delta(:,0,m) + .5_r8 * col_delta(:,1,m)
-       do k = 2,pver
-          km1 = k - 1
-          col_dens(:,k,m) = col_dens(:,km1,m) + .5_r8 * (col_delta(:,km1,m) + col_delta(:,k,m))
-       end do
+    do mm = 1,ncol_abs
+       col_dens(:,1,mm) = col_delta(:,0,mm) + .5_r8 * col_delta(:,1,mm)  ! kk=1
+       do kk = 2,pver
+          km1 = kk - 1
+          col_dens(:,kk,mm) = col_dens(:,km1,mm) + .5_r8 * (col_delta(:,km1,mm) + col_delta(:,kk,mm))
+       enddo
     enddo
 
   end subroutine setcol
