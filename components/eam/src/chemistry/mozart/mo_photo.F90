@@ -715,12 +715,6 @@ contains
     !---------------------------------------------------------------
     !        ... local variables
     !---------------------------------------------------------------
-    !---------------------------------------------------------------
-    !        note: xfactor = 10.*r/(k*g) in cgs units.
-    !              the factor 10. is to convert pdel
-    !              from pascals to dyne/cm**2.
-    !---------------------------------------------------------------
-    real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
     integer :: k, kl, spc_ndx
     integer :: ku(ncol)
     real(r8)    :: dp(ncol)
@@ -799,37 +793,73 @@ contains
     if( spc_ndx < 1 ) then
        spc_ndx = o3_ndx
     end if
-    if( spc_ndx > 0 ) then
-       col_delta(:,0,1) = o3_exo_col(:)
-       do k = 1,pver
-          col_delta(:ncol,k,1) = xfactor * pdel(:ncol,k) * vmr(:ncol,k,spc_ndx)
-       end do
-    else if( o3_inv_ndx > 0 ) then
-       col_delta(:,0,1) = o3_exo_col(:)
-       do k = 1,pver
-          col_delta(:ncol,k,1) = xfactor * pdel(:ncol,k) * invariants(:ncol,k,o3_inv_ndx)/invariants(:ncol,k,indexm)
-       end do
+    if (spc_ndx > 0 .or. o3_inv_ndx > 0) then
+
+        call calc_col_delta(   col_delta(:,0:,1),  & ! out
+                (o3_inv_ndx>0),o3_ndx, o3_inv_ndx, & ! in
+                o3_exo_col,    vmr,    invariants, & ! in
+                pdel, ncol                         )
+
     else
        col_delta(:,:,1) = 0._r8
     end if
     if( ncol_abs > 1 ) then
        if( o2_ndx > 1 ) then
-          col_delta(:,0,2) = o2_exo_col(:)
-          if( o2_is_inv ) then
-             do k = 1,pver
-                col_delta(:ncol,k,2) = xfactor * pdel(:ncol,k) * invariants(:ncol,k,o2_ndx)/invariants(:ncol,k,indexm)
-             end do
-          else
-             do k = 1,pver
-                col_delta(:ncol,k,2) = xfactor * pdel(:ncol,k) * vmr(:ncol,k,o2_ndx)
-             end do
-          endif
+
+           call calc_col_delta( col_delta(:,0:,2), & ! out
+                o2_is_inv,    o2_ndx, o2_ndx,      & ! in   o2_ndx is inv if o2_is_inv=.true.
+                o2_exo_col,   vmr,    invariants,  & ! in
+                pdel, ncol                         ) ! in
+
        else
           col_delta(:,:,2) = 0._r8
        end if
     end if
 
   end subroutine set_ub_col
+
+!====================================================================================
+  subroutine calc_col_delta(  col_delta_s,          & ! out
+                spc_is_inv,   spc_ndx, spc_inv_ndx, & ! in
+                spc_exo_col,  vmr,     invariants,  & ! in
+                pdel,         ncol                  ) ! in
+    !--------------------------------------------------------------------------------
+    ! calculate o2,o3 (o) col density above model layer 
+    !--------------------------------------------------------------------------------
+    use chem_mods, only : gas_pcnst, indexm, nfs
+
+    implicit none
+    logical, intent(in) :: spc_is_inv  ! if the index is inversed
+    integer, intent(in) :: ncol
+    integer, intent(in) :: spc_ndx, spc_inv_ndx  ! index or inverse index of the species
+    real(r8),intent(in) :: spc_exo_col(ncol)     ! exo absorber columns [molecules/cm^2]
+    real(r8),intent(in) :: vmr(ncol,pver,gas_pcnst)       ! xported species vmr [mol/mol]
+    real(r8),intent(in) :: pdel(pcols,pver)               ! pressure delta about midpoints [Pa]
+    real(r8),intent(in) :: invariants(ncol,pver,nfs)      ! invariant densities [molecules/cm^3]
+    real(r8),intent(out):: col_delta_s(ncol,0:pver)       ! layer column densities [molecules/cm^2]
+
+    !        ... local variables
+    integer  :: kk
+    !---------------------------------------------------------------
+    !        note: xfactor = 10.*r/(k*g) in cgs units.
+    !              the factor 10. is to convert pdel
+    !              from pascals to dyne/cm**2.
+    !---------------------------------------------------------------
+    real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
+
+
+     col_delta_s(:,0) = spc_exo_col(:)
+     if( spc_is_inv ) then
+        do kk = 1,pver
+           col_delta_s(:ncol,kk) = xfactor * pdel(:ncol,kk) * invariants(:ncol,kk,spc_inv_ndx)/invariants(:ncol,kk,indexm)
+        enddo
+     else
+        do kk = 1,pver
+           col_delta_s(:ncol,kk) = xfactor * pdel(:ncol,kk) * vmr(:ncol,kk,spc_ndx)
+        enddo
+     endif
+
+  end subroutine calc_col_delta
 
 !====================================================================================
   subroutine setcol( col_delta, & ! in
