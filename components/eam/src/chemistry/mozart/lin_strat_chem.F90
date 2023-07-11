@@ -17,6 +17,7 @@ module lin_strat_chem
   use cam_abortutils,   only : endrun
   use spmd_utils,   only : masterproc
   use physconst,     only : pi
+  use chlorine_loading_data, only: chlorine_loading
   !
   implicit none
   !
@@ -176,9 +177,6 @@ end subroutine linoz_readnl
        linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
        linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
        o3_vmr) !in-out
-
-    use chlorine_loading_data, only: chlorine_loading
-
     !
     ! this subroutine updates the ozone mixing ratio in the stratosphere
     ! using linearized chemistry
@@ -191,7 +189,7 @@ end subroutine linoz_readnl
     !
     integer,  intent(in)                           :: ncol                ! number of columns in chunk
     integer,  intent(in)                           :: lchnk               ! chunk index
-    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [units???]
+    real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [vmr]
     real(r8), intent(in)   , dimension(ncol ,pver) :: o3col               ! ozone column above box [mol/cm^2]
     real(r8), intent(in)   , dimension(pcols,pver) :: temp                ! temperature [K]
     real(r8), intent(in)   , dimension(ncol )      :: sza                 ! local solar zenith angle
@@ -234,6 +232,8 @@ end subroutine linoz_readnl
     ss_o3             = 0._r8
 
     lats = rlats * radians_to_degrees ! convert lats from radians to degrees
+
+    !is there more than the background chlorine?
     excess_chlorine = (chlorine_loading-chlorine_loading_bgnd) > 0._r8
 
     LOOP_COL: do i=1,ncol
@@ -263,7 +263,7 @@ end subroutine linoz_readnl
 
           ! PSC activation (follows Cariolle et al 1990.)
           call psc_activation( lats(i), temp(i,k), pmid(i,k), sza(i), linoz_cariolle_psc(i,k), delta_t, & !in
-               excess_chlorine, o3_old, chlorine_loading, &  !in
+               excess_chlorine, o3_old, &  !in
                o3_new, do3_linoz_psc(i,k)) !out
 
           o3_vmr(i,k) = o3_new ! update ozone vmr
@@ -286,25 +286,25 @@ end subroutine linoz_readnl
 !------------------------------------------------------------------------------------------------------------
 
   subroutine psc_activation( lats, temp, pmid, sza, linoz_cariolle_psc, delta_t, & !in
-       excess_chlorine, o3_old, chlorine_loading, &     !in
+       excess_chlorine, o3_old, &     !in
        o3_new, do3_linoz_psc) !out
 
+    ! PSC activation (follows Cariolle et al 1990.)
     implicit none
 
     !intent-ins
-    real(r8), intent(in) :: lats
-    real(r8), intent(in) :: temp
-    real(r8), intent(in) :: pmid
-    real(r8), intent(in) :: sza
-    real(r8), intent(in) :: linoz_cariolle_psc
-    real(r8), intent(in) :: delta_t
-    logical,  intent(in) :: excess_chlorine
-    real(r8), intent(in) :: o3_old
-    real(r8), intent(in) :: chlorine_loading
+    real(r8), intent(in) :: lats !lattitude [degree]
+    real(r8), intent(in) :: temp !Temperature [K]
+    real(r8), intent(in) :: pmid !Midpoint Pressure [Pa]
+    real(r8), intent(in) :: sza  !local solar zenith angle
+    real(r8), intent(in) :: linoz_cariolle_psc ! Cariolle parameter for PSC loss of ozone [1/s]
+    real(r8), intent(in) :: delta_t ! timestep size [secs]
+    logical,  intent(in) :: excess_chlorine !.TRUE. if chlorine is more than the backgroud chlorine
+    real(r8), intent(in) :: o3_old ! ozone volume mixing ratio [vmr]
 
     !intent-outs
-    real(r8), intent(out) :: o3_new
-    real(r8), intent(out) :: do3_linoz_psc
+    real(r8), intent(out) :: o3_new ! ozone volume mixing ratio [vmr]
+    real(r8), intent(out) :: do3_linoz_psc ![vmr/s]
 
     !local
     real(r8), parameter :: lats_threshold = 40.0_r8
