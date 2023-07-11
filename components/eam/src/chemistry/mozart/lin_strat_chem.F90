@@ -16,6 +16,7 @@ module lin_strat_chem
   use cam_logfile,  only : iulog
   use cam_abortutils,   only : endrun
   use spmd_utils,   only : masterproc
+  use physconst,     only : pi
   !
   implicit none
   !
@@ -32,6 +33,9 @@ module lin_strat_chem
   integer :: index_o3
 
   logical :: do_lin_strat_chem
+  
+  real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value [ppbv] for background conditions
+  real(r8), parameter :: radians_to_degrees       = 180._r8/pi
 
   real(r8), parameter :: unset_r8   = huge(1.0_r8)
   integer , parameter :: unset_int  = huge(1)
@@ -179,7 +183,6 @@ end subroutine linoz_readnl
     ! using linearized chemistry 
     !
     use ppgrid,        only : pcols, pver
-    use physconst,     only : pi
     use cam_history,   only : outfld
 
     !
@@ -213,15 +216,11 @@ end subroutine linoz_readnl
     real(r8) :: o3_clim
     real(r8), dimension(ncol) :: lats
     real(r8), dimension(ncol,pver) :: do3_linoz,do3_linoz_psc,ss_o3,o3col_du_diag,o3clim_linoz_diag
-
+    logical :: excess_chlorine
     !
     ! parameters
     !
     real(r8), parameter :: convert_to_du            = 1._r8/(2.687e16_r8)      ! convert ozone column from [mol/cm^2] to [DU]
-    real(r8), parameter :: radians_to_degrees       = 180._r8/pi
-    real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value [ppbv]
-    real(r8), parameter :: chlorine_loading_bgnd    = 0.0000_r8     ! EESC value [ppbv] for background conditions
-    real(r8), parameter :: pressure_threshold       = 210.e+2_r8    ! {PJC} for diagnostics only [Pa]
 
     ! skip if no ozone field available
     if ( .not. do_lin_strat_chem ) return
@@ -234,6 +233,7 @@ end subroutine linoz_readnl
     ss_o3             = 0._r8
 
     lats = rlats * radians_to_degrees ! convert lats from radians to degrees
+    excess_chlorine = (chlorine_loading-chlorine_loading_bgnd) > 0._r8
 
     LOOP_COL: do i=1,ncol
        LOOP_LEV: do k=1,ltrop(i)
@@ -261,31 +261,15 @@ end subroutine linoz_readnl
           do3_linoz(i,k) = delta_o3/delta_t ! output diagnostic
           
           ! PSC activation (follows Cariolle et al 1990.)
-          ! use only if abs(latitude) > 40.
-          if ( abs(lats(i)) > 40._r8 ) then   
-             if ( (chlorine_loading-chlorine_loading_bgnd) > 0._r8 ) then
-                if ( temp(i,k) <= psc_T ) then
-                   ! define maximum SZA for PSC loss (= tangent height at sunset)
-                   max_sza = (90._r8 + sqrt( max( 16._r8*log10(100000._r8/pmid(i,k)),0._r8)))
+          call psc_activation( lats(i), temp(i,k), pmid(i,k), sza(i), linoz_cariolle_psc(i,k), delta_t, & !in
+          excess_chlorine, o3_old, chlorine_loading, &  !in  
+          o3_new, do3_linoz_psc(i,k)) !out
 
-                   if ( (sza(i)*radians_to_degrees) <= max_sza ) then
-
-                      psc_loss = exp(-linoz_cariolle_psc(i,k) &
-                           * (chlorine_loading/chlorine_loading_1987)**2 &
-                           * delta_t )
-
-                      o3_new = o3_old * psc_loss
-                      
-                      do3_linoz_psc(i,k) = (o3_new-o3_old)/delta_t ! output diagnostic
-                   endif
-                endif
-             endif
-          endif
           o3_vmr(i,k) = o3_new ! update ozone vmr
 
        enddo LOOP_LEV
     enddo LOOP_COL
-    
+
     ! output
     call outfld( 'LINOZ_DO3'    , do3_linoz              , ncol, lchnk )
     call outfld( 'LINOZ_DO3_PSC', do3_linoz_psc          , ncol, lchnk )
@@ -296,6 +280,59 @@ end subroutine linoz_readnl
     
     return
   end subroutine lin_strat_chem_solve
+
+  subroutine psc_activation( lats, temp, pmid, sza, linoz_cariolle_psc, delta_t, & !in
+   excess_chlorine, o3_old, chlorine_loading, &     !in
+   o3_new, do3_linoz_psc) !out
+
+   implicit none
+
+   !intent-ins
+   real(r8), intent(in) :: lats
+   real(r8), intent(in) :: temp
+   real(r8), intent(in) :: pmid
+   real(r8), intent(in) :: sza
+   real(r8), intent(in) :: linoz_cariolle_psc
+   real(r8), intent(in) :: delta_t
+   logical,  intent(in) :: excess_chlorine
+   real(r8), intent(in) :: o3_old
+   real(r8), intent(in) :: chlorine_loading
+
+   !intent-outs
+   real(r8), intent(out) :: o3_new
+   real(r8), intent(out) :: do3_linoz_psc
+
+   !local
+   real(r8), parameter :: lats_threshold = 40.0_r8
+   real(r8), parameter :: chlorine_loading_1987    = 2.5977_r8     ! EESC value [ppbv]
+
+   real(r8) :: max_sza, psc_loss
+
+  ! use only if abs(latitude) > lats_threshold
+  if ( abs(lats) > lats_threshold ) then   
+   if ( excess_chlorine ) then
+      if ( temp <= psc_T ) then
+         ! define maximum SZA for PSC loss (= tangent height at sunset)
+         max_sza = (90._r8 + sqrt( max( 16._r8*log10(100000._r8/pmid),0._r8)))
+
+         if ( (sza*radians_to_degrees) <= max_sza ) then
+
+            psc_loss = exp(-linoz_cariolle_psc &
+                 * (chlorine_loading/chlorine_loading_1987)**2 &
+                 * delta_t )
+
+            o3_new = o3_old * psc_loss
+            
+            do3_linoz_psc = (o3_new-o3_old)/delta_t ! output diagnostic
+         endif
+      endif
+   endif
+endif
+
+end subroutine psc_activation
+
+
+
 
   subroutine lin_strat_sfcsink( ncol, lchnk, o3l_vmr, delta_t, pdel)
 
