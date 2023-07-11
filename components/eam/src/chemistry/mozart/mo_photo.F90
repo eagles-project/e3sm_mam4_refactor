@@ -723,45 +723,21 @@ contains
     !---------------------------------------------------------------
     !	... set exo absorber columns
     !---------------------------------------------------------------
+    o2_exo_col(:) = 0._r8
+    o3_exo_col(:) = 0._r8
     has_abs_cols : if( has_o2_col .and. has_o3_col ) then
        if( has_fixed_press ) then
-          kl = ki - 1
+
           if( has_o2_col ) then
-             do i = 1,ncol
-                if ( kl > 0 ) then
-                   tint_vals(1) = o2_exo_coldens(kl,i,lchnk,last) &
-                        + delp * (o2_exo_coldens(ki,i,lchnk,last) &
-                        - o2_exo_coldens(kl,i,lchnk,last))
-                   tint_vals(2) = o2_exo_coldens(kl,i,lchnk,next) &
-                        + delp * (o2_exo_coldens(ki,i,lchnk,next) &
-                        - o2_exo_coldens(kl,i,lchnk,next))
-                else
-                   tint_vals(1) = o2_exo_coldens( 1,i,lchnk,last) 
-                   tint_vals(2) = o2_exo_coldens( 1,i,lchnk,next) 
-                endif
-                o2_exo_col(i) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
-             end do
-          else
-             o2_exo_col(:) = 0._r8
-          end if
+              call calc_exo_col(ncol, o2_exo_coldens(:,:,lchnk,:), & ! in
+                                o2_exo_col) ! out
+          endif
+
           if( has_o3_col ) then
-             do i = 1,ncol
-                if ( kl > 0 ) then
-                   tint_vals(1) = o3_exo_coldens(kl,i,lchnk,last) &
-                        + delp * (o3_exo_coldens(ki,i,lchnk,last) &
-                        - o3_exo_coldens(kl,i,lchnk,last))
-                   tint_vals(2) = o3_exo_coldens(kl,i,lchnk,next) &
-                        + delp * (o3_exo_coldens(ki,i,lchnk,next) &
-                        - o3_exo_coldens(kl,i,lchnk,next))
-                else
-                   tint_vals(1) = o3_exo_coldens( 1,i,lchnk,last) 
-                   tint_vals(2) = o3_exo_coldens( 1,i,lchnk,next) 
-                endif
-                o3_exo_col(i) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
-             end do
-          else
-             o3_exo_col(:) = 0._r8
-          end if
+              call calc_exo_col(ncol, o3_exo_coldens(:,:,lchnk,:), & ! in
+                                o3_exo_col) ! out
+          endif
+
 #ifdef DEBUG
           write(iulog,*) '-----------------------------------'
           write(iulog,*) 'set_ub_col: diagnostics @ lat = ',lat
@@ -771,12 +747,10 @@ contains
           write(iulog,'(1p,5g15.7)') o3_exo_col(:)
           write(iulog,*) '-----------------------------------'
 #endif
-       end if   ! has_fixed_press
-    else
-       o2_exo_col(:) = 0._r8
-       o3_exo_col(:) = 0._r8
-    end if has_abs_cols
+       endif   ! has_fixed_press
+    endif has_abs_cols
 
+    !---------------------------------------------------------------
     col_delta(:,:,:) = 0._r8
 
     if (o3_ndx > 0 .or. o3_inv_ndx > 0) then
@@ -794,6 +768,45 @@ contains
     endif
 
   end subroutine set_ub_col
+
+!====================================================================================
+  subroutine calc_exo_col ( ncol,  exo_coldens, & ! in
+                            spc_exo_col         ) ! out
+    !--------------------------------------------------------------------------------
+    ! calculate exo absorber columns for o2 or o3
+    !--------------------------------------------------------------------------------
+
+    implicit none
+
+    integer,  intent(in)  :: ncol         ! number of columns in current chunk
+    real(r8), intent(in)  :: exo_coldens(:,:,:)   ! [molecules/cm^2]
+    real(r8), intent(out) :: spc_exo_col(ncol)      ! exo absorber columns [molecules/cm^2]
+
+    integer     :: icol
+    integer     :: kl           ! ki - 1
+    real(r8)    :: tint_vals(2) ! [molecules/cm^2]
+
+    ! get ki-1
+    kl = ki-1
+
+    ! note that ki, last, next, delp, dels, are all from module variables
+    do icol = 1,ncol
+        if ( kl > 0 ) then
+            tint_vals(1) = exo_coldens(kl,icol,last) &
+                 + delp * (exo_coldens(ki,icol,last) &
+                 - exo_coldens(kl,icol,last))
+            tint_vals(2) = exo_coldens(kl,icol,next) &
+                 + delp * (exo_coldens(ki,icol,next) &
+                 - exo_coldens(kl,icol,next))
+        else
+            tint_vals(1) = exo_coldens( 1,icol,last)
+            tint_vals(2) = exo_coldens( 1,icol,next)
+        endif
+        spc_exo_col(icol) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
+
+      enddo
+
+  end subroutine calc_exo_col
 
 !====================================================================================
   subroutine calc_col_delta(  col_delta_s,          & ! out
