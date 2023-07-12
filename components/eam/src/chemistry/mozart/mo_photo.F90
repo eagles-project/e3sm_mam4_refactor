@@ -28,7 +28,7 @@ module mo_photo
 
   integer ::  jonitr_ndx
   integer ::  jho2no2_ndx
-  integer ::  ox_ndx, o3_ndx, o3_inv_ndx, o3rad_ndx
+  integer ::  o3_ndx, o3_inv_ndx
   integer ::  o2_ndx
   integer, allocatable :: lng_indexer(:)
   integer, allocatable :: sht_indexer(:)
@@ -67,7 +67,7 @@ contains
     use mo_seto2,      only : o2_xsect_inti      
     use interpolate_data, only: lininterp_init, lininterp, lininterp_finish, interp_type
     use chem_mods,     only : phtcnt
-    use chem_mods,     only : ncol_abs => nabscol
+    use chem_mods,     only : nabscol
     use chem_mods,     only : rxt_tag_lst, pht_alias_lst, pht_alias_mult
     use time_manager,  only : get_calday
     use ioFileMod,     only : getfil
@@ -172,12 +172,7 @@ contains
     euv_indexer(:) = 0
 
 
-    ox_ndx     = get_spc_ndx( 'OX' )
-    if( ox_ndx < 1 ) then
-       ox_ndx  = get_spc_ndx( 'O3' )
-    end if
     o3_ndx     = get_spc_ndx( 'O3' )
-    o3rad_ndx  = get_spc_ndx( 'O3RAD' )
     o3_inv_ndx = get_inv_ndx( 'O3' )
 
     o2_ndx     = get_inv_ndx( 'O2' )
@@ -226,17 +221,14 @@ contains
     !----------------------------------------------------------------------
     !	... check for o2, o3 absorber columns
     !----------------------------------------------------------------------
-    if( ncol_abs > 0 ) then
-       spc_ndx = ox_ndx
-       if( spc_ndx < 1 ) then
-          spc_ndx = o3_ndx
-       end if
+    if( nabscol > 0 ) then
+       spc_ndx = o3_ndx
        if( spc_ndx > 0 ) then
           has_o3_col = .true.
        else
           has_o3_col = .false.
        end if
-       if( ncol_abs > 1 ) then
+       if( nabscol > 1 ) then
           if( o2_ndx > 1 ) then
              has_o2_col = .true.
           else
@@ -410,7 +402,7 @@ contains
 !   	... table photorates for wavelengths > 200nm
 !-----------------------------------------------------------------
 
-    use chem_mods,   only : ncol_abs => nabscol, phtcnt, gas_pcnst, nfs
+    use chem_mods,   only : nabscol, phtcnt, gas_pcnst, nfs
     use chem_mods,   only : pht_alias_mult, indexm
     use mo_jlong,    only : nlng => numj, jlong
     use mo_jeuv,     only : neuv, jeuv, nIonRates
@@ -426,7 +418,7 @@ contains
     integer,  intent(in)    :: ncol
     real(r8), intent(in)    :: esfact                       ! earth sun distance factor
     real(r8), intent(in)    :: vmr(ncol,pver,max(1,gas_pcnst)) ! vmr
-    real(r8), intent(in)    :: col_dens(ncol,pver,ncol_abs) ! column densities (molecules/cm^2)
+    real(r8), intent(in)    :: col_dens(ncol,pver,nabscol) ! column densities (molecules/cm^2)
     real(r8), intent(in)    :: zen_angle(ncol)              ! solar zenith angle (radians)
     real(r8), intent(in)    :: srf_alb(pcols)               ! surface albedo
     real(r8), intent(in)    :: lwc(ncol,pver)               ! liquid water content (kg/kg)
@@ -690,189 +682,189 @@ contains
   end subroutine cloud_mod
 
 !====================================================================================
-  subroutine set_ub_col( col_delta, vmr, invariants, ptop, pdel, ncol, lchnk )
+  subroutine set_ub_col( col_delta,             & ! out
+             vmr, invariants, pdel, ncol, lchnk ) ! in
     !---------------------------------------------------------------
     !        ... set the column densities at the upper boundary
     !---------------------------------------------------------------
-
-    use chem_mods, only : nfs, ncol_abs=>nabscol, indexm
-    use chem_mods, only : nabscol, gas_pcnst, indexm, nfs
-    use chem_mods, only : gas_pcnst
+    use chem_mods, only : nabscol, nfs, gas_pcnst
 
     implicit none
 
     !---------------------------------------------------------------
     !        ... dummy args
     !---------------------------------------------------------------
-    real(r8), intent(in)    ::  ptop(pcols)                            ! top pressure (Pa)
     integer,  intent(in)    ::  ncol                                   ! number of columns in current chunk
     integer,  intent(in)    ::  lchnk                                  ! latitude indicies in chunk
-    real(r8), intent(in)    ::  vmr(ncol,pver,gas_pcnst)               ! xported species vmr
-    real(r8), intent(in)    ::  pdel(pcols,pver)                       ! pressure delta about midpoints (Pa)
-    real(r8), intent(in)    ::  invariants(ncol,pver,nfs)
-    real(r8), intent(out)   ::  col_delta(ncol,0:pver,max(1,nabscol))  ! /cm**2 o2,o3 col dens above model
+    real(r8), intent(in)    ::  vmr(ncol,pver,gas_pcnst)               ! xported species vmr [mol/mol]
+    real(r8), intent(in)    ::  pdel(pcols,pver)                       ! pressure delta about midpoints [Pa]
+    real(r8), intent(in)    ::  invariants(ncol,pver,nfs)              ! invariant densities [molecules/cm^3]
+    real(r8), intent(out)   ::  col_delta(ncol,0:pver,max(1,nabscol))  ! o2,o3 col dens above model [1/cm^2]
 
     !---------------------------------------------------------------
     !        ... local variables
     !---------------------------------------------------------------
+    real(r8)    :: o2_exo_col(ncol)
+    real(r8)    :: o3_exo_col(ncol)
+ 
+    !---------------------------------------------------------------
+    !        ... assign column density at the upper boundary
+    !            the first column is o3 and the second is o2.
+    !---------------------------------------------------------------
+
+    !	... set exo absorber columns
+    o2_exo_col(:) = 0._r8
+    o3_exo_col(:) = 0._r8
+    has_abs_cols : if( has_o2_col .and. has_o3_col ) then
+       if( has_fixed_press ) then
+
+          if( has_o2_col ) then
+              call calc_exo_col(ncol, o2_exo_coldens(:,:,lchnk,:), & ! in
+                                o2_exo_col) ! out
+          endif
+
+          if( has_o3_col ) then
+              call calc_exo_col(ncol, o3_exo_coldens(:,:,lchnk,:), & ! in
+                                o3_exo_col) ! out
+          endif
+
+       endif   ! has_fixed_press
+    endif has_abs_cols
+
+    !---------------------------------------------------------------
+    col_delta(:,:,:) = 0._r8
+
+    if (o3_ndx > 0 .or. o3_inv_ndx > 0) then
+        call calc_col_delta(   col_delta(:,0:,1),  & ! out
+                (o3_inv_ndx>0),o3_ndx, o3_inv_ndx, & ! in
+                o3_exo_col,    vmr,    invariants, & ! in
+                pdel, ncol                         ) ! in
+    endif
+
+    if( nabscol > 1 .and. o2_ndx > 1 ) then
+        call calc_col_delta( col_delta(:,0:,2), & ! out
+             o2_is_inv,    o2_ndx, o2_ndx,      & ! in   o2_ndx is inv if o2_is_inv=.true.
+             o2_exo_col,   vmr,    invariants,  & ! in
+             pdel, ncol                         ) ! in
+    endif
+
+  end subroutine set_ub_col
+
+!====================================================================================
+  subroutine calc_exo_col ( ncol,  exo_coldens, & ! in
+                            spc_exo_col         ) ! out
+    !--------------------------------------------------------------------------------
+    ! calculate exo absorber columns for o2 or o3
+    !--------------------------------------------------------------------------------
+
+    implicit none
+
+    integer,  intent(in)  :: ncol         ! number of columns in current chunk
+    real(r8), intent(in)  :: exo_coldens(:,:,:)     ! [molecules/cm^2]
+    real(r8), intent(out) :: spc_exo_col(ncol)      ! exo absorber columns [molecules/cm^2]
+
+    integer     :: icol
+    integer     :: kl           ! ki - 1
+    real(r8)    :: tint_vals(2) ! [molecules/cm^2]
+
+    ! get ki-1
+    kl = ki-1
+
+    ! note that ki, last, next, delp, dels, are all from module variables
+    do icol = 1,ncol
+        if ( kl > 0 ) then
+            tint_vals(1) = exo_coldens(kl,icol,last) &
+                 + delp * (exo_coldens(ki,icol,last) &
+                 - exo_coldens(kl,icol,last))
+            tint_vals(2) = exo_coldens(kl,icol,next) &
+                 + delp * (exo_coldens(ki,icol,next) &
+                 - exo_coldens(kl,icol,next))
+        else
+            tint_vals(1) = exo_coldens( 1,icol,last)
+            tint_vals(2) = exo_coldens( 1,icol,next)
+        endif
+        spc_exo_col(icol) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
+
+      enddo
+
+  end subroutine calc_exo_col
+
+!====================================================================================
+  subroutine calc_col_delta(  col_delta_s,          & ! out
+                spc_is_inv,   spc_ndx, spc_inv_ndx, & ! in
+                spc_exo_col,  vmr,     invariants,  & ! in
+                pdel,         ncol                  ) ! in
+    !--------------------------------------------------------------------------------
+    ! calculate o2,o3 (o) col density above model layer 
+    !--------------------------------------------------------------------------------
+    use chem_mods, only : gas_pcnst, indexm, nfs
+
+    implicit none
+    logical, intent(in) :: spc_is_inv  ! if the index is inversed
+    integer, intent(in) :: ncol
+    integer, intent(in) :: spc_ndx, spc_inv_ndx  ! index or inverse index of the species
+    real(r8),intent(in) :: spc_exo_col(ncol)     ! exo absorber columns [molecules/cm^2]
+    real(r8),intent(in) :: vmr(ncol,pver,gas_pcnst)       ! xported species vmr [mol/mol]
+    real(r8),intent(in) :: pdel(pcols,pver)               ! pressure delta about midpoints [Pa]
+    real(r8),intent(in) :: invariants(ncol,pver,nfs)      ! invariant densities [molecules/cm^3]
+    real(r8),intent(out):: col_delta_s(ncol,0:pver)       ! layer column densities [molecules/cm^2]
+
+    !        ... local variables
+    integer  :: kk
     !---------------------------------------------------------------
     !        note: xfactor = 10.*r/(k*g) in cgs units.
     !              the factor 10. is to convert pdel
     !              from pascals to dyne/cm**2.
     !---------------------------------------------------------------
     real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
-    integer :: k, kl, spc_ndx
-    integer :: ku(ncol)
-    real(r8)    :: dp(ncol)
-    real(r8)    :: tint_vals(2)
-    real(r8)    :: o2_exo_col(ncol)
-    real(r8)    :: o3_exo_col(ncol)
-    integer :: lat, i
- 
-    !---------------------------------------------------------------
-    !        ... assign column density at the upper boundary
-    !            the first column is o3 and the second is o2.
-    !            add 10 du o3 column above top of model.
-    !---------------------------------------------------------------
-    !---------------------------------------------------------------
-    !	... set exo absorber columns
-    !---------------------------------------------------------------
-    has_abs_cols : if( has_o2_col .and. has_o3_col ) then
-       if( has_fixed_press ) then
-          kl = ki - 1
-          if( has_o2_col ) then
-             do i = 1,ncol
-                if ( kl > 0 ) then
-                   tint_vals(1) = o2_exo_coldens(kl,i,lchnk,last) &
-                        + delp * (o2_exo_coldens(ki,i,lchnk,last) &
-                        - o2_exo_coldens(kl,i,lchnk,last))
-                   tint_vals(2) = o2_exo_coldens(kl,i,lchnk,next) &
-                        + delp * (o2_exo_coldens(ki,i,lchnk,next) &
-                        - o2_exo_coldens(kl,i,lchnk,next))
-                else
-                   tint_vals(1) = o2_exo_coldens( 1,i,lchnk,last) 
-                   tint_vals(2) = o2_exo_coldens( 1,i,lchnk,next) 
-                endif
-                o2_exo_col(i) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
-             end do
-          else
-             o2_exo_col(:) = 0._r8
-          end if
-          if( has_o3_col ) then
-             do i = 1,ncol
-                if ( kl > 0 ) then
-                   tint_vals(1) = o3_exo_coldens(kl,i,lchnk,last) &
-                        + delp * (o3_exo_coldens(ki,i,lchnk,last) &
-                        - o3_exo_coldens(kl,i,lchnk,last))
-                   tint_vals(2) = o3_exo_coldens(kl,i,lchnk,next) &
-                        + delp * (o3_exo_coldens(ki,i,lchnk,next) &
-                        - o3_exo_coldens(kl,i,lchnk,next))
-                else
-                   tint_vals(1) = o3_exo_coldens( 1,i,lchnk,last) 
-                   tint_vals(2) = o3_exo_coldens( 1,i,lchnk,next) 
-                endif
-                o3_exo_col(i) = tint_vals(1) + dels * (tint_vals(2) - tint_vals(1))
-             end do
-          else
-             o3_exo_col(:) = 0._r8
-          end if
-#ifdef DEBUG
-          write(iulog,*) '-----------------------------------'
-          write(iulog,*) 'set_ub_col: diagnostics @ lat = ',lat
-          write(iulog,*) 'o2_exo_col'
-          write(iulog,'(1p,5g15.7)') o2_exo_col(:)
-          write(iulog,*) 'o3_exo_col'
-          write(iulog,'(1p,5g15.7)') o3_exo_col(:)
-          write(iulog,*) '-----------------------------------'
-#endif
-       end if
-    else
-       o2_exo_col(:) = 0._r8
-       o3_exo_col(:) = 0._r8
-    end if has_abs_cols
 
-    if( o3rad_ndx > 0 ) then
-       spc_ndx = o3rad_ndx
-    else
-       spc_ndx = ox_ndx
-    end if
-    if( spc_ndx < 1 ) then
-       spc_ndx = o3_ndx
-    end if
-    if( spc_ndx > 0 ) then
-       col_delta(:,0,1) = o3_exo_col(:)
-       do k = 1,pver
-          col_delta(:ncol,k,1) = xfactor * pdel(:ncol,k) * vmr(:ncol,k,spc_ndx)
-       end do
-    else if( o3_inv_ndx > 0 ) then
-       col_delta(:,0,1) = o3_exo_col(:)
-       do k = 1,pver
-          col_delta(:ncol,k,1) = xfactor * pdel(:ncol,k) * invariants(:ncol,k,o3_inv_ndx)/invariants(:ncol,k,indexm)
-       end do
-    else
-       col_delta(:,:,1) = 0._r8
-    end if
-    if( ncol_abs > 1 ) then
-       if( o2_ndx > 1 ) then
-          col_delta(:,0,2) = o2_exo_col(:)
-          if( o2_is_inv ) then
-             do k = 1,pver
-                col_delta(:ncol,k,2) = xfactor * pdel(:ncol,k) * invariants(:ncol,k,o2_ndx)/invariants(:ncol,k,indexm)
-             end do
-          else
-             do k = 1,pver
-                col_delta(:ncol,k,2) = xfactor * pdel(:ncol,k) * vmr(:ncol,k,o2_ndx)
-             end do
-          endif
-       else
-          col_delta(:,:,2) = 0._r8
-       end if
-    end if
 
-  end subroutine set_ub_col
+     col_delta_s(:,0) = spc_exo_col(:)
+     if( spc_is_inv ) then
+        do kk = 1,pver
+           col_delta_s(:ncol,kk) = xfactor * pdel(:ncol,kk) * invariants(:ncol,kk,spc_inv_ndx)/invariants(:ncol,kk,indexm)
+        enddo
+     else
+        do kk = 1,pver
+           col_delta_s(:ncol,kk) = xfactor * pdel(:ncol,kk) * vmr(:ncol,kk,spc_ndx)
+        enddo
+     endif
+
+  end subroutine calc_col_delta
 
 !====================================================================================
-  subroutine setcol( col_delta, col_dens, vmr, pdel,  ncol )
+  subroutine setcol( col_delta, & ! in
+                     col_dens ) ! out
     !---------------------------------------------------------------
     !     	... set the column densities
     !---------------------------------------------------------------
 
-    use chem_mods, only : ncol_abs=>nabscol, gas_pcnst
+    use chem_mods, only : nabscol
 
     implicit none
 
     !---------------------------------------------------------------
     !     	... dummy arguments
     !---------------------------------------------------------------
-    integer,  intent(in)    :: ncol                              ! no. of columns in current chunk
-    real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)          ! xported species vmr
-    real(r8), intent(in)    :: pdel(pcols,pver)                  ! delta about midpoints
-    real(r8), intent(in)    :: col_delta(:,0:,:)                 ! layer column densities (molecules/cm^2)
-    real(r8), intent(out)   :: col_dens(:,:,:)                   ! column densities ( /cm**2 )
+    real(r8), intent(in)    :: col_delta(:,0:,:)                 ! layer column densities [molecules/cm^2]
+    real(r8), intent(out)   :: col_dens(:,:,:)                   ! column densities [ 1/cm**2 ]
 
     !---------------------------------------------------------------
     !        the local variables
     !---------------------------------------------------------------
-    integer  ::   i, k, km1, m      ! long, alt indicies
-
-    !---------------------------------------------------------------
-    !        note: xfactor = 10.*r/(k*g) in cgs units.
-    !              the factor 10. is to convert pdel
-    !              from pascals to dyne/cm**2.
-    !---------------------------------------------------------------
-    real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
+    integer  ::   kk, km1, mm      ! indicies
 
     !---------------------------------------------------------------
     !   	... compute column densities down to the
     !           current eta index in the calling routine.
     !           the first column is o3 and the second is o2.
     !---------------------------------------------------------------
-    do m = 1,ncol_abs
-       col_dens(:,1,m) = col_delta(:,0,m) + .5_r8 * col_delta(:,1,m)
-       do k = 2,pver
-          km1 = k - 1
-          col_dens(:,k,m) = col_dens(:,km1,m) + .5_r8 * (col_delta(:,km1,m) + col_delta(:,k,m))
-       end do
+    do mm = 1,nabscol
+       col_dens(:,1,mm) = col_delta(:,0,mm) + .5_r8 * col_delta(:,1,mm)  ! kk=1
+       do kk = 2,pver
+          km1 = kk - 1
+          col_dens(:,kk,mm) = col_dens(:,km1,mm) + .5_r8 * (col_delta(:,km1,mm) + col_delta(:,kk,mm))
+       enddo
     enddo
 
   end subroutine setcol

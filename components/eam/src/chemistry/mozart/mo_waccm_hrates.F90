@@ -272,7 +272,8 @@
 !-----------------------------------------------------------------------      
 !        ... set the column densities at the upper boundary
 !-----------------------------------------------------------------------      
-      call set_ub_col( col_delta, vmr, invariants, state%pint(:,1), state%pdel, ncol, lchnk )
+      call set_ub_col( col_delta, & ! out
+                vmr, invariants, state%pdel, ncol, lchnk ) ! in
 
 !-----------------------------------------------------------------------      
 !       ...  set rates for "tabular" and user specified reactions
@@ -313,7 +314,8 @@
 !-----------------------------------------------------------------------      
 !     	... set the column densities
 !-----------------------------------------------------------------------      
-      call setcol( col_delta, col_dens, vmr, state%pdel,  ncol )
+      call setcol(  col_delta, & ! in
+                     col_dens ) ! out
 !-----------------------------------------------------------------------
 !        ... compute the thermal heating rates
 !-----------------------------------------------------------------------      

@@ -563,7 +563,8 @@ contains
     !-----------------------------------------------------------------------      
     !        ... Set the column densities at the upper boundary
     !-----------------------------------------------------------------------      
-    call set_ub_col( col_delta, vmr, invariants, pint(:,1), pdel, ncol, lchnk)
+    call set_ub_col( col_delta, & ! out
+                vmr, invariants, pdel, ncol, lchnk) ! in
 
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
@@ -629,7 +630,8 @@ contains
     !-----------------------------------------------------------------------      
     !     	... Set the column densities
     !-----------------------------------------------------------------------      
-    call setcol( col_delta, col_dens, vmr, pdel,  ncol )
+    call setcol(  col_delta, & ! in
+                  col_dens ) ! out
 
     !-----------------------------------------------------------------------      
     !     	... Calculate the photodissociation rates
