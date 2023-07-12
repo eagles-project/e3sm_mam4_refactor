@@ -716,11 +716,11 @@ Level_loop : &
                if( press(iz) < p_in(k) ) then
                   izl = iz
                   exit
-               end if
-            end do
+               endif
+            enddo
             pind  = max( min( iz,nump ),2 )
             wght1 = min_max_bound(0._r8, 1._r8, (p_in(k) - press(pind)) * del_p(pind-1))
-         end if
+         endif
 !----------------------------------------------------------------------
 !        ... find "o3 ratios"
 !----------------------------------------------------------------------
@@ -735,17 +735,22 @@ Level_loop : &
          else
             ratindl = ratindu
             v3ratl  = o3rat(ratindu)
-         end if
+         endif
 
 !----------------------------------------------------------------------
 !        ... compute the weigths
 !----------------------------------------------------------------------
          ial   = albind
          ialp1 = ial + 1
-         iv    = ratindl
+
+         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(k) - alb(ial)) * del_alb(ial) )
+
+
+         iz   = pind
+         iv   = ratindl
+         ivp1 = iv + 1
 
          dels(2) = min_max_bound(0._r8, 1._r8, (v3ratl - o3rat(iv)) * del_o3rat(iv) )
-         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(k) - alb(ial)) * del_alb(ial) )
 
          wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
          wghtl(0,0,0) = wrk0*wrk1
@@ -760,7 +765,21 @@ Level_loop : &
          wghtl(0,1,1) = wrk0*wrk1
          wghtl(1,1,1) = dels(1)*wrk1
 
-         iv  = ratindu
+         do wn = 1,nw
+            psum_l(wn) = wghtl(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
+                         + wghtl(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
+                         + wghtl(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
+                         + wghtl(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
+                         + wghtl(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
+                         + wghtl(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
+                         + wghtl(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
+                         + wghtl(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
+         enddo
+
+         iz   = iz - 1
+         iv   = ratindu
+         ivp1 = iv + 1
+
          dels(2) = min_max_bound(0._r8, 1._r8, (v3ratu - o3rat(iv)) * del_o3rat(iv) )
 
          wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
@@ -775,24 +794,6 @@ Level_loop : &
          wrk1         = dels(2)*dels(3)
          wghtu(0,1,1) = wrk0*wrk1
          wghtu(1,1,1) = dels(1)*wrk1
-
-         iz   = pind
-         iv   = ratindl
-         ivp1 = iv + 1
-         do wn = 1,nw
-            psum_l(wn) = wghtl(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
-                         + wghtl(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
-                         + wghtl(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
-                         + wghtl(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
-                         + wghtl(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
-                         + wghtl(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
-                         + wghtl(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
-                         + wghtl(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
-         end do
-
-         iz   = iz - 1
-         iv   = ratindu
-         ivp1 = iv + 1
          do wn = 1,nw
             psum_u = wghtu(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
                      + wghtu(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
@@ -802,8 +803,10 @@ Level_loop : &
                      + wghtu(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
                      + wghtu(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
                      + wghtu(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
+
             rsf(wn,k) = (psum_l(wn) + wght1*(psum_u - psum_l(wn)))
-         end do
+         enddo
+
 !------------------------------------------------------------------------------
 !      etfphot comes in as photons/cm^2/sec/nm  (rsf includes the wlintv factor -- nm)
 !     ... --> convert to photons/cm^2/s 
