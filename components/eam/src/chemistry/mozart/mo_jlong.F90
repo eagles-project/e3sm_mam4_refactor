@@ -719,7 +719,7 @@ Level_loop : &
                end if
             end do
             pind  = max( min( iz,nump ),2 )
-            wght1 = max( 0._r8,min( 1._r8,(p_in(k) - p(pind)) * del_p(pind-1) ) )
+            wght1 = min_max_bound(0._r8, 1._r8, (p_in(k) - p(pind)) * del_p(pind-1))
          end if
 !----------------------------------------------------------------------
 !        ... find "o3 ratios"
@@ -744,8 +744,8 @@ Level_loop : &
          ialp1 = ial + 1
          iv    = ratindl
 
-         dels(2)  = max( 0._r8,min( 1._r8,(v3ratl - o3rat(iv)) * del_o3rat(iv) ) )
-         dels(3)  = max( 0._r8,min( 1._r8,(alb_in(k) - alb(ial)) * del_alb(ial) ) )
+         dels(2) = min_max_bound(0._r8, 1._r8, (v3ratl - o3rat(iv)) * del_o3rat(iv) )
+         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(k) - alb(ial)) * del_alb(ial) )
 
          wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
          wghtl(0,0,0) = wrk0*wrk1
@@ -761,7 +761,7 @@ Level_loop : &
          wghtl(1,1,1) = dels(1)*wrk1
 
          iv  = ratindu
-         dels(2)  = max( 0._r8,min( 1._r8,(v3ratu - o3rat(iv)) * del_o3rat(iv) ) )
+         dels(2) = min_max_bound(0._r8, 1._r8, (v3ratu - o3rat(iv)) * del_o3rat(iv) )
 
          wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
          wghtu(0,0,0) = wrk0*wrk1
