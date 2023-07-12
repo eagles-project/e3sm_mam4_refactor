@@ -644,6 +644,7 @@ level_loop_1 : &
     subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
 
       use error_messages, only : alloc_err
+      use mam_support, only : min_max_bound
 
       implicit none
 
@@ -689,11 +690,12 @@ level_loop_1 : &
       do is = 1,numsza
          if( sza(is) > sza_in ) then
             exit
-         end if
-      end do
-      is   = max( min( is,numsza ) - 1,1 )
-      isp1 = is + 1
-      dels(1)  = max( 0._r8,min( 1._r8,(sza_in - sza(is)) * del_sza(is) ) )
+         endif
+      enddo
+      is   = max( min(is,numsza)-1, 1 )
+      isp1 = is + 1 
+
+      dels(1) = min_max_bound(0._r8, 1._r8, (sza_in-sza(is))*del_sza(is) )
       wrk0     = 1._r8 - dels(1)
 
       izl = 2
