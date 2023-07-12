@@ -68,7 +68,7 @@
       logical :: jlong_used = .false.
 
       contains
-
+!======================================================================================
       subroutine jlong_init( xs_long_file, rsf_file, lng_indexer )
 
       use ppgrid,         only : pver
@@ -117,6 +117,7 @@
  
       end subroutine jlong_init
 
+!======================================================================================
       subroutine get_xsqy( xs_long_file, lng_indexer )
 !=============================================================================!
 !   PURPOSE:                                                                  !
@@ -308,6 +309,7 @@
 
       end subroutine get_xsqy
 
+!======================================================================================
       subroutine get_rsf(rsf_file)
 !=============================================================================!
 !   PURPOSE:                                                                  !
@@ -511,6 +513,7 @@
 
       end subroutine jlong_timestep_init
 
+!======================================================================================
       subroutine jlong_hrates( nlev, sza_in, alb_in, p_in, t_in, &
                                mw, o2_vmr, o3_vmr, colo3_in, qrl_col, &
                                cparg, kbot )
@@ -642,7 +645,8 @@ level_loop_1 : &
 
       end subroutine jlong_hrates
 
-       subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
+!======================================================================================
+      subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
                               colo3_in, j_long )
 !==============================================================================
 !   Purpose:                                                                   
@@ -764,6 +768,7 @@ level_loop_1 : &
 
       end subroutine jlong_photo
 
+!======================================================================================
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 !        ... interpolate table rsf to model variables
@@ -958,5 +963,5 @@ Level_loop : &
 
       end subroutine interpolate_rsf
 
-
-      end module mo_jlong
+!======================================================================================
+  end module mo_jlong
