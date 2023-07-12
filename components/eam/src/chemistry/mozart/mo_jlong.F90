@@ -68,7 +68,7 @@
 
       contains
 !======================================================================================
-      subroutine jlong_init( xs_long_file, rsf_file, lng_indexer )
+   subroutine jlong_init( xs_long_file, rsf_file, lng_indexer )
 
       use ppgrid,         only : pver
       use time_manager,   only : is_end_curr_day
@@ -114,10 +114,10 @@
 
       jlong_used = .true.
  
-      end subroutine jlong_init
+   end subroutine jlong_init
 
 !======================================================================================
-      subroutine get_xsqy( xs_long_file, lng_indexer )
+   subroutine get_xsqy( xs_long_file, lng_indexer )
 !=============================================================================!
 !   PURPOSE:                                                                  !
 !   Reads a NetCDF file that contains:                                        !
@@ -306,10 +306,10 @@
 #endif
       dprs(:np_xs-1) = 1._r8/(prs(1:np_xs-1) - prs(2:np_xs))
 
-      end subroutine get_xsqy
+   end subroutine get_xsqy
 
 !======================================================================================
-      subroutine get_rsf(rsf_file)
+   subroutine get_rsf(rsf_file)
 !=============================================================================!
 !   PURPOSE:                                                                  !
 !   Reads a NetCDF file that contains:
@@ -510,10 +510,10 @@
 
       call rebin( data_nw, nw, data_we, we, data_etf, etfphot )
 
-      end subroutine jlong_timestep_init
+   end subroutine jlong_timestep_init
 
 !======================================================================================
-      subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
+   subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
                               colo3_in, j_long )
 !==============================================================================
 !   Purpose:                                                                   
@@ -633,7 +633,7 @@ level_loop_1 : &
 
       deallocate( rsf, xswk )
 
-      end subroutine jlong_photo
+    end subroutine jlong_photo
 
 !======================================================================================
 !----------------------------------------------------------------------
@@ -641,9 +641,9 @@ level_loop_1 : &
 !        ... interpolate table rsf to model variables
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
+    subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
 
-        use error_messages, only : alloc_err
+      use error_messages, only : alloc_err
 
       implicit none
 
@@ -703,11 +703,11 @@ Level_loop : &
 !        ... find albedo indicies
 !----------------------------------------------------------------------
          do ial = 1,numalb
-	    if( alb(ial) > alb_in(k) ) then
-	       exit
-	    end if
-	 end do
-	 albind = max( min( ial,numalb ) - 1,1 )
+            if( alb(ial) > alb_in(k) ) then
+               exit
+            end if
+         end do
+         albind = max( min( ial,numalb ) - 1,1 )
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
 !----------------------------------------------------------------------
@@ -720,8 +720,8 @@ Level_loop : &
          else
             do iz = izl,nump
                if( p(iz) < p_in(k) ) then
-	          izl = iz
-	          exit
+                  izl = iz
+                  exit
                end if
             end do
             pind  = max( min( iz,nump ),2 )
@@ -746,53 +746,53 @@ Level_loop : &
                end if
             end do
             ratindl = max( min( iv,numcolo3 ) - 1,1 )
-	 else
+         else
             ratindl = ratindu
             v3ratl  = o3rat(ratindu)
-	 end if
+         end if
 
 !----------------------------------------------------------------------
 !        ... compute the weigths
 !----------------------------------------------------------------------
-	 ial   = albind
-	 ialp1 = ial + 1
-	 iv    = ratindl
+         ial   = albind
+         ialp1 = ial + 1
+         iv    = ratindl
 
          dels(2)  = max( 0._r8,min( 1._r8,(v3ratl - o3rat(iv)) * del_o3rat(iv) ) )
          dels(3)  = max( 0._r8,min( 1._r8,(alb_in(k) - alb(ial)) * del_alb(ial) ) )
 
-	 wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-	 wghtl(0,0,0) = wrk0*wrk1
-	 wghtl(1,0,0) = dels(1)*wrk1
-	 wrk1         = (1._r8 - dels(2))*dels(3)
-	 wghtl(0,0,1) = wrk0*wrk1
-	 wghtl(1,0,1) = dels(1)*wrk1
-	 wrk1         = dels(2)*(1._r8 - dels(3))
-	 wghtl(0,1,0) = wrk0*wrk1
-	 wghtl(1,1,0) = dels(1)*wrk1
-	 wrk1         = dels(2)*dels(3)
-	 wghtl(0,1,1) = wrk0*wrk1
-	 wghtl(1,1,1) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
+         wghtl(0,0,0) = wrk0*wrk1
+         wghtl(1,0,0) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*dels(3)
+         wghtl(0,0,1) = wrk0*wrk1
+         wghtl(1,0,1) = dels(1)*wrk1
+         wrk1         = dels(2)*(1._r8 - dels(3))
+         wghtl(0,1,0) = wrk0*wrk1
+         wghtl(1,1,0) = dels(1)*wrk1
+         wrk1         = dels(2)*dels(3)
+         wghtl(0,1,1) = wrk0*wrk1
+         wghtl(1,1,1) = dels(1)*wrk1
 
-	 iv  = ratindu
+         iv  = ratindu
          dels(2)  = max( 0._r8,min( 1._r8,(v3ratu - o3rat(iv)) * del_o3rat(iv) ) )
 
-	 wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-	 wghtu(0,0,0) = wrk0*wrk1
-	 wghtu(1,0,0) = dels(1)*wrk1
-	 wrk1         = (1._r8 - dels(2))*dels(3)
-	 wghtu(0,0,1) = wrk0*wrk1
-	 wghtu(1,0,1) = dels(1)*wrk1
-	 wrk1         = dels(2)*(1._r8 - dels(3))
-	 wghtu(0,1,0) = wrk0*wrk1
-	 wghtu(1,1,0) = dels(1)*wrk1
-	 wrk1         = dels(2)*dels(3)
-	 wghtu(0,1,1) = wrk0*wrk1
-	 wghtu(1,1,1) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
+         wghtu(0,0,0) = wrk0*wrk1
+         wghtu(1,0,0) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*dels(3)
+         wghtu(0,0,1) = wrk0*wrk1
+         wghtu(1,0,1) = dels(1)*wrk1
+         wrk1         = dels(2)*(1._r8 - dels(3))
+         wghtu(0,1,0) = wrk0*wrk1
+         wghtu(1,1,0) = dels(1)*wrk1
+         wrk1         = dels(2)*dels(3)
+         wghtu(0,1,1) = wrk0*wrk1
+         wghtu(1,1,1) = dels(1)*wrk1
 
-	 iz   = pind
-	 iv   = ratindl
-	 ivp1 = iv + 1
+         iz   = pind
+         iv   = ratindl
+         ivp1 = iv + 1
          do wn = 1,nw
             psum_l(wn) = wghtl(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
                          + wghtl(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
@@ -804,9 +804,9 @@ Level_loop : &
                          + wghtl(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
          end do
 
-	 iz   = iz - 1
-	 iv   = ratindu
-	 ivp1 = iv + 1
+         iz   = iz - 1
+         iv   = ratindu
+         ivp1 = iv + 1
          do wn = 1,nw
             psum_u = wghtu(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
                      + wghtu(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
@@ -828,7 +828,7 @@ Level_loop : &
 
       deallocate( psum_l )
 
-      end subroutine interpolate_rsf
+   end subroutine interpolate_rsf
 
 !======================================================================================
-  end module mo_jlong
+   end module mo_jlong
