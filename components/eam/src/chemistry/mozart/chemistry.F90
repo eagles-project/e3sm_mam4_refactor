@@ -109,10 +109,6 @@ module chemistry
 
   character(len=shr_kind_cl) :: sad_file = 'sad_file'
 
-  ! trop sulf
-
-  character(len=shr_kind_cl) :: sulf_file = 'sulf_file'
-
   type(time_ramp)    :: sad_timing      != time_ramp( "CYCLICAL",  19970101, 0 )
 
 ! for linoz
@@ -487,7 +483,7 @@ end function chem_is
          solar_parms_file, euvac_file, &
          euvacdat_file, photon_file, electron_file, &
          sad_type, sad_cycle_yr, sad_fixed_ymd, sad_fixed_tod, sad_file, &
-         sulf_file, depvel_file, xs_coef_file, xs_short_file, &
+         depvel_file, xs_coef_file, xs_short_file, &
          exo_coldens_file, tuv_xsect_file, o2_xsect_file, &
          xs_long_file, rsf_file, &
          lght_no_prd_factor, xactive_prates, &
@@ -676,10 +672,6 @@ end function chem_is
     call mpibcast (sad_cycle_yr,      1,                               mpiint,  0, mpicom)
     call mpibcast (sad_fixed_ymd,     1,                               mpiint,  0, mpicom)
     call mpibcast (sad_fixed_tod,     1,                               mpiint,  0, mpicom)
-
-   ! trop sulf
-
-    call mpibcast (sulf_file,         len(sulf_file),                  mpichar, 0, mpicom)
 
 #if ( defined WACCM_MOZART || defined WACCM_GHG )
     ! upper boundary
@@ -979,7 +971,6 @@ end function chem_is_active
        , photon_file &
        , electron_file &
        , airpl_emis_file &
-       , sulf_file &
        , sad_file &
        , sad_timing &
        , depvel_file &
@@ -1199,7 +1190,6 @@ end function chem_is_active
     use time_manager,      only : get_nstep
     use time_manager,      only : get_curr_calday
     use mo_srf_emissions,  only : set_srf_emissions_time
-    use mo_sulf,           only : set_sulf_time
     use mo_extfrc,         only : extfrc_timestep_init
     use mo_flbc,           only : flbc_chk
     use tracer_cnst,       only : tracer_cnst_adv
@@ -1249,11 +1239,6 @@ end function chem_is_active
     ! Set external forcings timing factors
     !-----------------------------------------------------------------------
     call extfrc_timestep_init( pbuf2d, phys_state )
-
-    !-----------------------------------------------------------------------
-    ! Set sulf timing factors
-    !-----------------------------------------------------------------------
-    call set_sulf_time( pbuf2d, phys_state  )
 
     !-----------------------------------------------------------------------
     ! Set fixed lower boundary timing factors

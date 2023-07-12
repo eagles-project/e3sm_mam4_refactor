@@ -19,7 +19,6 @@ contains
        , photon_file &
        , electron_file &
        , airpl_emis_file &
-       , sulf_file &
        , sad_file &
        , sad_timing &
        , depvel_file &
@@ -57,7 +56,6 @@ contains
 
     use mo_airplane,       only : airpl_src
     use mo_srf_emissions,  only : srf_emissions_inti
-    use mo_sulf,           only : sulf_inti
     use mo_photo,          only : photo_inti
     use mo_lightning,      only : lightning_inti
     use mo_drydep,         only : drydep_inti
@@ -105,7 +103,6 @@ contains
     character(len=*), intent(in) :: electron_file
 
     character(len=*), intent(in) :: airpl_emis_file
-    character(len=*), intent(in) :: sulf_file
     character(len=*), intent(in) :: sad_file
     type(time_ramp),  intent(in) :: sad_timing 
     character(len=*), intent(in) :: depvel_file
@@ -187,10 +184,6 @@ contains
     !-----------------------------------------------------------------------
     call strato_sad_inti(sad_file, sad_timing)
     if (masterproc) write(iulog,*) 'chemini: after strato_sad_inti on node ',iam
-
-
-    call sulf_inti(sulf_file)
-    if (masterproc) write(iulog,*) 'chemini: after sulf_inti on node ',iam
 
     !-----------------------------------------------------------------------
     !	... initialize the sad module
