@@ -563,7 +563,8 @@ contains
     !-----------------------------------------------------------------------      
     !        ... Set the column densities at the upper boundary
     !-----------------------------------------------------------------------      
-    call set_ub_col( col_delta, vmr, invariants, pdel, ncol, lchnk)
+    call set_ub_col( col_delta, & ! out
+                vmr, invariants, pdel, ncol, lchnk) ! in
 
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
