@@ -687,11 +687,8 @@ level_loop_1 : &
 !----------------------------------------------------------------------
 !        ... find the zenith angle index ( same for all levels )
 !----------------------------------------------------------------------
-      do is = 1,numsza
-         if( sza(is) > sza_in ) then
-            exit
-         endif
-      enddo
+      call find_index(sza, numsza, sza_in,  & ! in
+                      is                    ) ! out
       is   = max( min(is,numsza)-1, 1 )
       isp1 = is + 1 
 
@@ -704,11 +701,8 @@ Level_loop : &
 !----------------------------------------------------------------------
 !        ... find albedo indicies
 !----------------------------------------------------------------------
-         do ial = 1,numalb
-            if( alb(ial) > alb_in(k) ) then
-               exit
-            end if
-         end do
+         call find_index(alb, numalb, alb_in(k),  & ! in
+                         ial                      ) ! out
          albind = max( min( ial,numalb ) - 1,1 )
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
@@ -733,20 +727,14 @@ Level_loop : &
 !        ... find "o3 ratios"
 !----------------------------------------------------------------------
          v3ratu  = colo3_in(k) / colo3(pind-1)
-         do iv = 1,numcolo3
-            if( o3rat(iv) > v3ratu ) then
-               exit
-            end if
-         end do
+         call find_index(o3rat, numcolo3, v3ratu,  & ! in
+                         iv                        ) ! out
          ratindu = max( min( iv,numcolo3 ) - 1,1 )
 
          if( colo3(pind) /= 0._r8 ) then
             v3ratl = colo3_in(k) / colo3(pind)
-            do iv = 1,numcolo3
-               if( o3rat(iv) > v3ratl ) then
-                  exit
-               end if
-            end do
+            call find_index(o3rat, numcolo3, v3ratl,  & ! in
+                            iv                        ) ! out
             ratindl = max( min( iv,numcolo3 ) - 1,1 )
          else
             ratindl = ratindu
@@ -831,6 +819,29 @@ Level_loop : &
       deallocate( psum_l )
 
    end subroutine interpolate_rsf
+
+!======================================================================================
+   subroutine find_index(var_in, var_len, var_min,  & ! in
+                         idx_out                    ) ! out
+!------------------------------------------------------------------------------
+! find the index of the first element in var_in(1:var_len) where the value is > var_min
+!------------------------------------------------------------------------------
+      integer, intent(in) :: var_len  ! length of the input variable
+      real(r8),intent(in) :: var_in(var_len)   ! input variable
+      real(r8),intent(in) :: var_min  ! variable threshold
+      integer, intent(out):: idx_out  ! index
+
+      integer :: ii
+
+      do ii = 1,var_len
+         if( var_in(ii) > var_min ) then
+            exit
+         endif
+      enddo
+
+      idx_out = ii
+
+   end subroutine find_index
 
 !======================================================================================
    end module mo_jlong
