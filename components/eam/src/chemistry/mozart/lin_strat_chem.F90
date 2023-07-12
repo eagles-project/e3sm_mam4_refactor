@@ -184,7 +184,7 @@ end subroutine linoz_readnl
     use ppgrid,        only : pcols, pver
     use cam_history,   only : outfld
 
-    !!inten ins
+    !intent in
     integer,  intent(in)                           :: ncol                ! number of columns in chunk
     integer,  intent(in)                           :: lchnk               ! chunk index
     real(r8), intent(in)   , dimension(ncol ,pver) :: o3col               ! ozone column above box [mol/cm^2]
@@ -204,7 +204,7 @@ end subroutine linoz_readnl
     real(r8),  intent(in), dimension(:,:) :: linoz_dPmL_dO3col  ! Sensitivity of P minus L to overhead O3 column [vmr/DU]
     real(r8),  intent(in), dimension(:,:) :: linoz_cariolle_psc ! Cariolle parameter for PSC loss of ozone [1/s]
 
-    !inten in-outs
+    !intent in-out
     real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [vmr]
 
     !Local
@@ -261,6 +261,7 @@ end subroutine linoz_readnl
           do3_linoz(icol,kk) = delta_o3/delta_t ! output diagnostic
 
           ! PSC activation (follows Cariolle et al 1990.)
+          ! used only if abs(latitude) > lats_threshold
           call psc_activation( lats(icol), temp(icol,kk), pmid(icol,kk), sza(icol), linoz_cariolle_psc(icol,kk), delta_t, & !in
                excess_chlorine, o3_old, &  !in
                o3_new, do3_linoz_psc(icol,kk)) !out
@@ -341,8 +342,7 @@ end subroutine linoz_readnl
        o3l_vmr) !in-out
 
     use ppgrid,        only : pcols, pver
-    use physconst,     only : mw_air => mwdry, &
-         mw_o3  => mwo3   !in grams
+    use physconst,     only : mwdry, mwo3   !in grams
 
     use mo_constants, only : rgrav
     use cam_history,   only : outfld
@@ -391,7 +391,7 @@ end subroutine linoz_readnl
 
           o3l_new  = o3l_old + do3
 
-          do3mass(icol) = do3mass(icol) + do3* mass(icol,kk) * mw_o3/mw_air  ! loss in kg/m2 summed over boundary layers within one time step
+          do3mass(icol) = do3mass(icol) + do3* mass(icol,kk) * mwo3/mwdry  ! loss in kg/m2 summed over boundary layers within one time step
 
           o3l_vmr(icol,kk) = o3l_new
 
