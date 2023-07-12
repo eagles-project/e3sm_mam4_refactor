@@ -689,7 +689,6 @@ level_loop_1 : &
 !----------------------------------------------------------------------
       call find_index(sza, numsza, sza_in,  & ! in
                       is                    ) ! out
-      is   = max( min(is,numsza)-1, 1 )
       isp1 = is + 1 
 
       dels(1) = min_max_bound(0._r8, 1._r8, (sza_in-sza(is))*del_sza(is) )
@@ -702,8 +701,7 @@ Level_loop : &
 !        ... find albedo indicies
 !----------------------------------------------------------------------
          call find_index(alb, numalb, alb_in(k),  & ! in
-                         ial                      ) ! out
-         albind = max( min( ial,numalb ) - 1,1 )
+                         albind                   ) ! out
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
 !----------------------------------------------------------------------
@@ -728,14 +726,12 @@ Level_loop : &
 !----------------------------------------------------------------------
          v3ratu  = colo3_in(k) / colo3(pind-1)
          call find_index(o3rat, numcolo3, v3ratu,  & ! in
-                         iv                        ) ! out
-         ratindu = max( min( iv,numcolo3 ) - 1,1 )
+                         ratindu                   ) ! out
 
          if( colo3(pind) /= 0._r8 ) then
             v3ratl = colo3_in(k) / colo3(pind)
             call find_index(o3rat, numcolo3, v3ratl,  & ! in
-                            iv                        ) ! out
-            ratindl = max( min( iv,numcolo3 ) - 1,1 )
+                            ratindl                   ) ! out
          else
             ratindl = ratindu
             v3ratl  = o3rat(ratindu)
@@ -839,7 +835,7 @@ Level_loop : &
          endif
       enddo
 
-      idx_out = ii
+      idx_out = max( min(ii,var_len)-1, 1 )
 
    end subroutine find_index
 
