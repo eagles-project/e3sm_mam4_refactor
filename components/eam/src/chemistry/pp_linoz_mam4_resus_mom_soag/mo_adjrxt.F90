@@ -6,7 +6,7 @@
 
 
       module mo_adjrxt
-
+#include "../yaml/common_files/common_uses.ymlf90"
       private
       public :: adjrxt
 
@@ -33,7 +33,7 @@
 ! ... local variables
 !--------------------------------------------------------------------
       real(r8) :: imtot(ncol,pver)  ! inverse of total atm molec. density [cm^3/molecules]
-
+#include "../yaml/mo_adjrxt/f90_yaml/adjrxt_beg_yml.f90"
 
          rate(:,:, 3) = rate(:,:, 3) * inv(:,:, 5)
          rate(:,:, 4) = rate(:,:, 4) * inv(:,:, 5)
@@ -42,7 +42,7 @@
          rate(:,:, 7) = rate(:,:, 7) * inv(:,:, 6)
          imtot(:,:) = 1._r8 / mtot(:,:)
          rate(:,:, 2) = rate(:,:, 2) * inv(:,:, 7) * inv(:,:, 7) * imtot(:,:)
-
+#include "../yaml/mo_adjrxt/f90_yaml/adjrxt_end_yml.f90"
       end subroutine adjrxt
 
       end module mo_adjrxt
