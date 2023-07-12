@@ -52,7 +52,7 @@
       real(r8), allocatable :: xs_o2b(:,:,:)
       real(r8), allocatable :: xs_o3a(:,:,:)
       real(r8), allocatable :: xs_o3b(:,:,:)
-      real(r8), allocatable :: p(:)
+      real(r8), allocatable :: press(:)
       real(r8), allocatable :: del_p(:)
       real(r8), allocatable :: prs(:)
       real(r8), allocatable :: dprs(:)
@@ -397,7 +397,7 @@
       if( iret /= 0 ) then 
          call alloc_err( iret, 'get_rsf', 'bde', nw )
       end if
-      allocate( p(nump),del_p(nump-1),stat=iret )
+      allocate( press(nump),del_p(nump-1),stat=iret )
       if( iret /= 0 ) then 
          call alloc_err( iret, 'get_rsf', 'p,delp', nump )
       end if
@@ -432,7 +432,7 @@
          iret = nf90_inq_varid( ncid, 'wlintv', varid )
          iret = nf90_get_var( ncid, varid, wlintv )
          iret = nf90_inq_varid( ncid, 'pm', varid )
-         iret = nf90_get_var( ncid, varid, p )
+         iret = nf90_get_var( ncid, varid, press )
          iret = nf90_inq_varid( ncid, 'sza', varid )
          iret = nf90_get_var( ncid, varid, sza )
          iret = nf90_inq_varid( ncid, 'alb', varid )
@@ -467,7 +467,7 @@
 #ifdef SPMD
       call mpibcast( wc,      nw,       mpir8, 0, mpicom )
       call mpibcast( wlintv,  nw,       mpir8, 0, mpicom )
-      call mpibcast( p,       nump,     mpir8, 0, mpicom )
+      call mpibcast( press,   nump,     mpir8, 0, mpicom )
       call mpibcast( sza,     numsza,   mpir8, 0, mpicom )
       call mpibcast( alb,     numalb,   mpir8, 0, mpicom )
       call mpibcast( o3rat,   numcolo3, mpir8, 0, mpicom )
@@ -487,7 +487,7 @@
       bde_o3_b(:) = hc/wc(:)
 #endif
 
-      del_p(:nump-1)         = 1._r8/abs(p(1:nump-1)- p(2:nump))
+      del_p(:nump-1)         = 1._r8/abs(press(1:nump-1)- press(2:nump))
       del_sza(:numsza-1)     = 1._r8/(sza(2:numsza) - sza(1:numsza-1))
       del_alb(:numalb-1)     = 1._r8/(alb(2:numalb) - alb(1:numalb-1))
       del_o3rat(:numcolo3-1) = 1._r8/(o3rat(2:numcolo3) - o3rat(1:numcolo3-1))
@@ -694,7 +694,7 @@ level_loop_1 : &
       dels(1) = min_max_bound(0._r8, 1._r8, (sza_in-sza(is))*del_sza(is) )
       wrk0     = 1._r8 - dels(1)
 
-      izl = 2
+      izl = 2   ! may change in the level_loop
 Level_loop : &
       do k = kbot,1,-1
 !----------------------------------------------------------------------
@@ -705,21 +705,21 @@ Level_loop : &
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
 !----------------------------------------------------------------------
-         if( p_in(k) > p(1) ) then
+         if( p_in(k) > press(1) ) then
             pind  = 2
             wght1 = 1._r8
-         else if( p_in(k) <= p(nump) ) then
+         elseif( p_in(k) <= press(nump) ) then
             pind  = nump
             wght1 = 0._r8
          else
             do iz = izl,nump
-               if( p(iz) < p_in(k) ) then
+               if( press(iz) < p_in(k) ) then
                   izl = iz
                   exit
                end if
             end do
             pind  = max( min( iz,nump ),2 )
-            wght1 = min_max_bound(0._r8, 1._r8, (p_in(k) - p(pind)) * del_p(pind-1))
+            wght1 = min_max_bound(0._r8, 1._r8, (p_in(k) - press(pind)) * del_p(pind-1))
          end if
 !----------------------------------------------------------------------
 !        ... find "o3 ratios"
