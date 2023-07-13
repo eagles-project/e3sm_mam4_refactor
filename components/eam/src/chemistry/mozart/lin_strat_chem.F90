@@ -52,66 +52,66 @@ module lin_strat_chem
 
 contains
 
-subroutine linoz_readnl(nlfile)
+  subroutine linoz_readnl(nlfile)
 
-   use namelist_utils,  only: find_group_name
-   use units,           only: getunit, freeunit
-   use mpishorthand
+    use namelist_utils,  only: find_group_name
+    use units,           only: getunit, freeunit
+    use mpishorthand
 
-   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
-   ! Local variables
-   integer :: unitn, ierr
-   character(len=*), parameter :: subname = 'linoz_readnl'
+    ! Local variables
+    integer :: unitn, ierr
+    character(len=*), parameter :: subname = 'linoz_readnl'
 
-   namelist /linoz_nl/ linoz_lbl, linoz_sfc, linoz_tau, linoz_psc_T
-   !-----------------------------------------------------------------------------
+    namelist /linoz_nl/ linoz_lbl, linoz_sfc, linoz_tau, linoz_psc_T
+    !-----------------------------------------------------------------------------
 
-   ! Set default values
-   linoz_lbl = 4
-   linoz_sfc = 30.0e-9_r8
-   linoz_tau = 172800.0_r8
-   linoz_psc_T = 193.0_r8
+    ! Set default values
+    linoz_lbl = 4
+    linoz_sfc = 30.0e-9_r8
+    linoz_tau = 172800.0_r8
+    linoz_psc_T = 193.0_r8
 
-   if (masterproc) then
-      unitn = getunit()
-      open( unitn, file=trim(nlfile), status='old' )
-      call find_group_name(unitn, 'linoz_nl', status=ierr)
-      if (ierr == 0) then
-         read(unitn, linoz_nl, iostat=ierr)
-         if (ierr /= 0) then
-            call endrun(subname // ':: ERROR reading namelist')
-         end if
-      end if
-      close(unitn)
-      call freeunit(unitn)
+    if (masterproc) then
+       unitn = getunit()
+       open( unitn, file=trim(nlfile), status='old' )
+       call find_group_name(unitn, 'linoz_nl', status=ierr)
+       if (ierr == 0) then
+          read(unitn, linoz_nl, iostat=ierr)
+          if (ierr /= 0) then
+             call endrun(subname // ':: ERROR reading namelist')
+          end if
+       end if
+       close(unitn)
+       call freeunit(unitn)
 
-      ! set local variables
-      o3_lbl = linoz_lbl
-      o3_sfc = linoz_sfc
-      o3_tau = linoz_tau
-      psc_T  = linoz_psc_T
+       ! set local variables
+       o3_lbl = linoz_lbl
+       o3_sfc = linoz_sfc
+       o3_tau = linoz_tau
+       psc_T  = linoz_psc_T
 
-      ! check
-      write(iulog,*) subname // ', linoz_lbl:', o3_lbl
-      write(iulog,*) subname // ', linoz_sfc:', o3_sfc
-      write(iulog,*) subname // ', linoz_tau:', o3_tau
-      write(iulog,*) subname // ', linoz_psc_T:', psc_T
+       ! check
+       write(iulog,*) subname // ', linoz_lbl:', o3_lbl
+       write(iulog,*) subname // ', linoz_sfc:', o3_sfc
+       write(iulog,*) subname // ', linoz_tau:', o3_tau
+       write(iulog,*) subname // ', linoz_psc_T:', psc_T
 
-   end if
+    end if
 
 #ifdef SPMD
-   ! Broadcast namelist variables
-   call mpibcast(o3_lbl,            1, mpiint, 0, mpicom)
-   call mpibcast(o3_sfc,            1, mpir8,  0, mpicom)
-   call mpibcast(o3_tau,            1, mpir8,  0, mpicom)
-   call mpibcast(psc_T,             1, mpir8,  0, mpicom)
+    ! Broadcast namelist variables
+    call mpibcast(o3_lbl,            1, mpiint, 0, mpicom)
+    call mpibcast(o3_sfc,            1, mpir8,  0, mpicom)
+    call mpibcast(o3_tau,            1, mpir8,  0, mpicom)
+    call mpibcast(psc_T,             1, mpir8,  0, mpicom)
 #endif
 
-end subroutine linoz_readnl
+  end subroutine linoz_readnl
 
-!--------------------------------------------------------------------
-!--------------------------------------------------------------------
+  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------
   subroutine lin_strat_chem_inti()
     !
     ! initialize linearized stratospheric chemistry by reading
@@ -133,7 +133,7 @@ end subroutine linoz_readnl
     index_o3  =  get_spc_ndx('O3')
 
     do_lin_strat_chem = has_linoz_data
-     if ( index_o3 <= 0 ) then !added index_o3l
+    if ( index_o3 <= 0 ) then !added index_o3l
        write(iulog,*) ' No ozone in the chemical mechanism, skipping lin_strat_chem'
        do_lin_strat_chem = .false.
        return
@@ -168,7 +168,6 @@ end subroutine linoz_readnl
     call add_default( 'LINOZ_SFCSINK', 1, ' ' )
     return
   end subroutine lin_strat_chem_inti
-
 
   !--------------------------------------------------------------------
   !--------------------------------------------------------------------
@@ -208,17 +207,15 @@ end subroutine linoz_readnl
     real(r8), intent(inout), dimension(ncol ,pver) :: o3_vmr              ! ozone volume mixing ratio [vmr]
 
     !Local
-    integer :: icol,kk !indices
-    real(r8) :: o3col_du,delta_temp,delta_o3col,o3_old,o3_new,delta_o3
-    real(r8) :: max_sza, psc_loss
+    integer :: icol, kk !indices
+    real(r8) :: o3col_du, delta_o3col,o3_old, o3_new, delta_o3
     real(r8) :: o3_clim
     real(r8), dimension(ncol) :: lats
-    real(r8), dimension(ncol,pver) :: do3_linoz,do3_linoz_psc,ss_o3,o3col_du_diag,o3clim_linoz_diag
+    real(r8), dimension(ncol,pver) :: do3_linoz, do3_linoz_psc, ss_o3, o3col_du_diag, o3clim_linoz_diag
     logical :: excess_chlorine
-    !
-    ! parameters
-    !
-    real(r8), parameter :: convert_to_du            = 1._r8/(2.687e16_r8)      ! convert ozone column from [mol/cm^2] to [DU]
+
+    !parameters
+    real(r8), parameter :: convert_to_du = 1._r8/(2.687e16_r8)      ! convert ozone column from [mol/cm^2] to [DU]
 
     ! skip if no ozone field available
     if ( .not. do_lin_strat_chem ) return
@@ -241,18 +238,17 @@ end subroutine linoz_readnl
           o3_clim = linoz_o3_clim(icol,kk)     ! climatological ozone
           o3clim_linoz_diag(icol,kk) = o3_clim ! diagnostic for output
           o3_old = o3_vmr(icol,kk)             ! old ozone mixing ratio
+
           o3col_du = o3col(icol,kk) * convert_to_du ! convert o3col from mol/cm2
           o3col_du_diag(icol,kk) = o3col_du    !update diagnostic output
 
-          ! compute differences from climatology
-          delta_temp  = temp(icol,kk) - linoz_t_clim    (icol,kk)
-          delta_o3col = o3col_du  - linoz_o3col_clim(icol,kk)
+          !compute steady state ozone
+          call compute_steady_state_ozone(o3_clim, o3col_du, temp(icol,kk), &  !in
+               linoz_t_clim(icol,kk), linoz_o3col_clim(icol,kk),            &  !in            
+               linoz_PmL_clim(icol,kk),linoz_dPmL_dT(icol,kk),              &  !in
+               linoz_dPmL_dO3(icol,kk), linoz_dPmL_dO3col(icol,kk),         &  !in
+               ss_o3(icol,kk)) !out
 
-          ! steady state ozone
-          ss_o3(icol,kk) = o3_clim - (               linoz_PmL_clim   (icol,kk)   &
-               + delta_o3col * linoz_dPmL_dO3col(icol,kk)   &
-               + delta_temp  * linoz_dPmL_dT    (icol,kk)   &
-               ) / linoz_dPmL_dO3   (icol,kk)
 
           delta_o3 = (ss_o3(icol,kk)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(icol,kk)*delta_t)) ! ozone change
 
@@ -282,8 +278,41 @@ end subroutine linoz_readnl
     return
   end subroutine lin_strat_chem_solve
 
-!------------------------------------------------------------------------------------------------------------
-!------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
+
+  subroutine compute_steady_state_ozone(o3_clim, o3col_du, temp, linoz_t_clim, linoz_o3col_clim, &  !in            
+       linoz_PmL_clim,linoz_dPmL_dT, linoz_dPmL_dO3, linoz_dPmL_dO3col,      &  !in
+       ss_o3) !out
+
+    !intent in
+    real(r8), intent(in) :: o3_clim           ! ozone (climatology) [vmr]
+    real(r8), intent(in) :: o3col_du          ! ozone column above box [DU]
+    real(r8), intent(in) :: temp              ! temperature [K]
+    real(r8), intent(in) :: linoz_t_clim      ! temperature (climatology) [K]
+    real(r8), intent(in) :: linoz_o3col_clim  ! Column O3 above box (climatology) [Dobson Units or DU]
+    real(r8), intent(in) :: linoz_PmL_clim    ! P minus L (climatology) [vmr/s]
+    real(r8), intent(in) :: linoz_dPmL_dT     ! Sensitivity of P minus L to T [K]
+    real(r8), intent(in) :: linoz_dPmL_dO3    ! Sensitivity of P minus L to O3 [1/s]
+    real(r8), intent(in) :: linoz_dPmL_dO3col ! Sensitivity of P minus L to overhead O3 column [vmr/DU]
+
+    !intent out
+    real(r8), intent(out) :: ss_o3
+
+    !local
+    real(r8) :: delta_temp, delta_o3col
+
+    ! compute differences from climatology
+    delta_temp  = temp - linoz_t_clim    
+    delta_o3col = o3col_du - linoz_o3col_clim
+
+    ! steady state ozone
+    ss_o3 = o3_clim - (linoz_PmL_clim + delta_o3col * linoz_dPmL_dO3col +  &
+         delta_temp  * linoz_dPmL_dT) / linoz_dPmL_dO3   
+  end subroutine compute_steady_state_ozone
+
+  !------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
 
   subroutine psc_activation( lats, temp, pmid, sza, linoz_cariolle_psc, delta_t, & !in
        excess_chlorine, o3_old, &     !in
@@ -335,8 +364,8 @@ end subroutine linoz_readnl
 
   end subroutine psc_activation
 
-!------------------------------------------------------------------------------------------------------------
-!------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------------------------------------
 
   subroutine lin_strat_sfcsink( ncol, lchnk, delta_t, pdel, & !in
        o3l_vmr) !in-out
