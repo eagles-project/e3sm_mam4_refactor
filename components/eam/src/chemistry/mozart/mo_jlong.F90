@@ -513,8 +513,8 @@
    end subroutine jlong_timestep_init
 
 !======================================================================================
-   subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
-                              colo3_in, j_long )
+   subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, colo3_in, & ! in
+                            j_long )  ! out
 !==============================================================================
 !   Purpose:                                                                   
 !     To calculate the total J for selective species longward of 200nm.        
@@ -533,35 +533,33 @@
 !        will be derived.
 !==============================================================================
 
- use spmd_utils,   only : masterproc
-        use error_messages, only : alloc_err
+      use error_messages, only : alloc_err
 
-	implicit none
+      implicit none
 
 !------------------------------------------------------------------------------
 !    	... dummy arguments
 !------------------------------------------------------------------------------
       integer, intent (in)     :: nlev               ! number vertical levels
-      real(r8), intent(in)     :: sza_in             ! solar zenith angle (degrees)
+      real(r8), intent(in)     :: sza_in             ! solar zenith angle [degrees]
       real(r8), intent(in)     :: alb_in(nlev)       ! albedo
-      real(r8), intent(in)     :: p_in(nlev)         ! midpoint pressure (hPa)
-      real(r8), intent(in)     :: t_in(nlev)         ! Temperature profile (K)
-      real(r8), intent(in)     :: colo3_in(nlev)     ! o3 column density (molecules/cm^3)
-      real(r8), intent(out)    :: j_long(:,:)	     ! photo rates (1/s)
+      real(r8), intent(in)     :: p_in(nlev)         ! midpoint pressure [hPa]
+      real(r8), intent(in)     :: t_in(nlev)         ! Temperature profile [K]
+      real(r8), intent(in)     :: colo3_in(nlev)     ! o3 column density [molecules/cm^3]
+      real(r8), intent(out)    :: j_long(:,:)        ! photo rates [1/s]
 
 !----------------------------------------------------------------------
 !  	... local variables
 !----------------------------------------------------------------------
       integer  ::  astat
-      integer  ::  k, km, m
+      integer  ::  kk, km
       integer  ::  wn
-      integer  ::  t_index					! Temperature index
+      integer  ::  t_index      ! Temperature index
       integer  ::  pndx
       real(r8) ::  ptarget
       real(r8) ::  delp
-      real(r8) ::  hfactor
-      real(r8), allocatable :: rsf(:,:)	        ! Radiative source function
-      real(r8), allocatable :: xswk(:,:)	! working xsection array
+      real(r8), allocatable :: rsf(:,:)         ! Radiative source function
+      real(r8), allocatable :: xswk(:,:)        ! working xsection array
 
 !----------------------------------------------------------------------
 !        ... allocate variables
@@ -569,11 +567,11 @@
       allocate( rsf(nw,nlev),stat=astat )
       if( astat /= 0 ) then
          call alloc_err( astat, 'jlong_photo', 'rsf', nw*nlev )
-      end if
+      endif
       allocate( xswk(numj,nw),stat=astat )
       if( astat /= 0 ) then
          call alloc_err( astat, 'jlong_photo', 'xswk', numj*nw )
-      end if
+      endif
 
 !----------------------------------------------------------------------
 !        ... interpolate table rsf to model variables
@@ -592,45 +590,40 @@
 !     between 1 and 201.
 !------------------------------------------------------------------------------
 level_loop_1 : &
-      do k = 1,nlev
+      do kk = 1,nlev
 !----------------------------------------------------------------------
 !   	... get index into xsqy
 !----------------------------------------------------------------------
-        t_index = t_in(k) - 148.5_r8
+        t_index = t_in(kk) - 148.5_r8
         t_index = min( 201,max( t_index,1) )
 !----------------------------------------------------------------------
 !   	... find pressure level
 !----------------------------------------------------------------------
-	ptarget = p_in(k)
-	if( ptarget >= prs(1) ) then
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,1)
-	   end do
-	else if( ptarget <= prs(np_xs) ) then
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,np_xs)
-	   end do
-	else
-	   do km = 2,np_xs
-	      if( ptarget >= prs(km) ) then
-		 pndx = km - 1
-		 delp = (prs(pndx) - ptarget)*dprs(pndx)
-		 exit
-	      end if
-	   end do
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,pndx) &
-                           + delp*(xsqy(:,wn,t_index,pndx+1) - xsqy(:,wn,t_index,pndx))
-	   end do
-	end if
-#ifdef USE_ESSL
-        call dgemm( 'N', 'N', numj, 1, nw, &
-		    1._r8, xswk, numj, rsf(1,k), nw, &
-		    0._r8, j_long(1,k), numj )
-#else
-        j_long(:,k) = matmul( xswk(:,:),rsf(:,k) )
-#endif
-      end do level_loop_1
+        ptarget = p_in(kk)
+        if( ptarget >= prs(1) ) then
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,1)
+           enddo
+        elseif( ptarget <= prs(np_xs) ) then
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,np_xs)
+           enddo
+        else
+           do km = 2,np_xs
+              if( ptarget >= prs(km) ) then
+                 pndx = km - 1
+                 delp = (prs(pndx) - ptarget)*dprs(pndx)
+                 exit
+              endif
+           enddo
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,pndx) &
+                         + delp*(xsqy(:,wn,t_index,pndx+1) - xsqy(:,wn,t_index,pndx))
+           enddo
+        endif
+        j_long(:,kk) = matmul( xswk(:,:),rsf(:,kk) )
+
+      enddo level_loop_1
 
       deallocate( rsf, xswk )
 
