@@ -578,7 +578,8 @@
 !----------------------------------------------------------------------
 !        ... interpolate table rsf to model variables
 !----------------------------------------------------------------------
-      call interpolate_rsf( alb_in, sza_in, p_in, colo3_in, nlev, rsf )
+      call interpolate_rsf( alb_in, sza_in, p_in, colo3_in, nlev, & ! in
+                            rsf ) ! out
 
 !------------------------------------------------------------------------------
 !     ... calculate total Jlong for wavelengths >200nm
@@ -641,7 +642,8 @@ level_loop_1 : &
 !        ... interpolate table rsf to model variables
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-    subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
+    subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, & ! in
+                                rsf ) ! out
 
       use error_messages, only : alloc_err
       use mam_support, only : min_max_bound
@@ -651,28 +653,25 @@ level_loop_1 : &
 !------------------------------------------------------------------------------
 !    	... dummy arguments
 !------------------------------------------------------------------------------
-      real(r8), intent(in)  :: alb_in(:)       ! albedo
-      real(r8), intent(in)  :: sza_in          ! solar zenith angle (degrees)
-      integer,  intent(in)  :: kbot            ! heating levels
-      real(r8), intent(in)  :: p_in(:)         ! midpoint pressure (hPa)
-      real(r8), intent(in)  :: colo3_in(:)     ! o3 column density (molecules/cm^3)
-      real(r8), intent(out) :: rsf(:,:)
+      real(r8), intent(in)  :: alb_in(:)       ! albedo [unitless]
+      real(r8), intent(in)  :: sza_in          ! solar zenith angle [degrees]
+      integer,  intent(in)  :: kbot            ! heating levels [level]
+      real(r8), intent(in)  :: p_in(:)         ! midpoint pressure [hPa]
+      real(r8), intent(in)  :: colo3_in(:)     ! o3 column density [molecules/cm^3]
+      real(r8), intent(out) :: rsf(:,:)        ! Radiative Source Function [quanta cm-2 sec-1]
+
 
 !----------------------------------------------------------------------
 !  	... local variables
 !----------------------------------------------------------------------
       integer  ::  astat
       integer  ::  is, iv, ial
-      integer  ::  isp1, ivp1, ialp1
-      real(r8), dimension(3)               :: dels
-      real(r8), dimension(0:1,0:1,0:1)     :: wghtl, wghtu
-!      real(r8) ::  psum_u
-      real(r8), allocatable                :: psum_l(:), psum_u(:)
+      real(r8), dimension(3)     :: dels
+      real(r8), allocatable      :: psum_l(:), psum_u(:)
       real(r8) ::  v3ratl, v3ratu
       integer  ::  pind, albind
-      real(r8) ::  wrk0, wrk1, wght1
-      integer  ::  iz, k, m
-      integer  ::  izl
+      real(r8) ::  wrk0, wght1
+      integer  ::  iz, izl, kk
       integer  ::  ratindl, ratindu
       integer  ::  wn
 
@@ -692,47 +691,46 @@ level_loop_1 : &
 !----------------------------------------------------------------------
       call find_index(sza, numsza, sza_in,  & ! in
                       is                    ) ! out
-      isp1 = is + 1 
 
       dels(1) = min_max_bound(0._r8, 1._r8, (sza_in-sza(is))*del_sza(is) )
       wrk0     = 1._r8 - dels(1)
 
       izl = 2   ! may change in the level_loop
 Level_loop : &
-      do k = kbot,1,-1
+      do kk = kbot,1,-1
 !----------------------------------------------------------------------
 !        ... find albedo indicies
 !----------------------------------------------------------------------
-         call find_index(alb, numalb, alb_in(k),  & ! in
+         call find_index(alb, numalb, alb_in(kk),  & ! in
                          albind                   ) ! out
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
 !----------------------------------------------------------------------
-         if( p_in(k) > press(1) ) then
+         if( p_in(kk) > press(1) ) then
             pind  = 2
             wght1 = 1._r8
-         elseif( p_in(k) <= press(nump) ) then
+         elseif( p_in(kk) <= press(nump) ) then
             pind  = nump
             wght1 = 0._r8
          else
             do iz = izl,nump
-               if( press(iz) < p_in(k) ) then
+               if( press(iz) < p_in(kk) ) then
                   izl = iz
                   exit
                endif
             enddo
             pind  = max( min( iz,nump ),2 )
-            wght1 = min_max_bound(0._r8, 1._r8, (p_in(k) - press(pind)) * del_p(pind-1))
+            wght1 = min_max_bound(0._r8, 1._r8, (p_in(kk) - press(pind)) * del_p(pind-1))
          endif
 !----------------------------------------------------------------------
 !        ... find "o3 ratios"
 !----------------------------------------------------------------------
-         v3ratu  = colo3_in(k) / colo3(pind-1)
+         v3ratu  = colo3_in(kk) / colo3(pind-1)
          call find_index(o3rat, numcolo3, v3ratu,  & ! in
                          ratindu                   ) ! out
 
          if( colo3(pind) /= 0._r8 ) then
-            v3ratl = colo3_in(k) / colo3(pind)
+            v3ratl = colo3_in(kk) / colo3(pind)
             call find_index(o3rat, numcolo3, v3ratl,  & ! in
                             ratindl                   ) ! out
          else
@@ -745,7 +743,7 @@ Level_loop : &
 !----------------------------------------------------------------------
          ial   = albind
 
-         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(k) - alb(ial)) * del_alb(ial) )
+         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(kk) - alb(ial)) * del_alb(ial) )
 
 
          iv   = ratindl
@@ -761,18 +759,19 @@ Level_loop : &
                              psum_u               ) ! inout
 
          do wn = 1,nw
-            rsf(wn,k) = (psum_l(wn) + wght1*(psum_u(wn) - psum_l(wn)))
+            rsf(wn,kk) = (psum_l(wn) + wght1*(psum_u(wn) - psum_l(wn)))
          enddo
 
 !------------------------------------------------------------------------------
 !      etfphot comes in as photons/cm^2/sec/nm  (rsf includes the wlintv factor -- nm)
 !     ... --> convert to photons/cm^2/s 
 !------------------------------------------------------------------------------
-         rsf(:,k) = etfphot(:) * rsf(:,k)
+         rsf(:,kk) = etfphot(:) * rsf(:,kk)
 
-      end do Level_loop
+      enddo Level_loop
 
       deallocate( psum_l )
+      deallocate( psum_u )
 
    end subroutine interpolate_rsf
 
