@@ -666,8 +666,8 @@ level_loop_1 : &
       integer  ::  isp1, ivp1, ialp1
       real(r8), dimension(3)               :: dels
       real(r8), dimension(0:1,0:1,0:1)     :: wghtl, wghtu
-      real(r8) ::  psum_u
-      real(r8), allocatable                :: psum_l(:)
+!      real(r8) ::  psum_u
+      real(r8), allocatable                :: psum_l(:), psum_u(:)
       real(r8) ::  v3ratl, v3ratu
       integer  ::  pind, albind
       real(r8) ::  wrk0, wrk1, wght1
@@ -683,7 +683,10 @@ level_loop_1 : &
       if( astat /= 0 ) then
          call alloc_err( astat, 'jlong_hrates', 'psum_l', nw )
       end if
-
+      allocate( psum_u(nw),stat=astat )
+      if( astat /= 0 ) then
+         call alloc_err( astat, 'jlong_hrates', 'psum_u', nw )
+      end if
 !----------------------------------------------------------------------
 !        ... find the zenith angle index ( same for all levels )
 !----------------------------------------------------------------------
@@ -741,70 +744,24 @@ Level_loop : &
 !        ... compute the weigths
 !----------------------------------------------------------------------
          ial   = albind
-         ialp1 = ial + 1
 
          dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(k) - alb(ial)) * del_alb(ial) )
 
 
-         iz   = pind
          iv   = ratindl
-         ivp1 = iv + 1
-
          dels(2) = min_max_bound(0._r8, 1._r8, (v3ratl - o3rat(iv)) * del_o3rat(iv) )
+         call calc_sum_wght (dels, wrk0,        & ! in
+                             pind, is, iv, ial, & ! in
+                             psum_l             ) ! out
 
-         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-         wghtl(0,0,0) = wrk0*wrk1
-         wghtl(1,0,0) = dels(1)*wrk1
-         wrk1         = (1._r8 - dels(2))*dels(3)
-         wghtl(0,0,1) = wrk0*wrk1
-         wghtl(1,0,1) = dels(1)*wrk1
-         wrk1         = dels(2)*(1._r8 - dels(3))
-         wghtl(0,1,0) = wrk0*wrk1
-         wghtl(1,1,0) = dels(1)*wrk1
-         wrk1         = dels(2)*dels(3)
-         wghtl(0,1,1) = wrk0*wrk1
-         wghtl(1,1,1) = dels(1)*wrk1
-
-         do wn = 1,nw
-            psum_l(wn) = wghtl(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
-                         + wghtl(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
-                         + wghtl(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
-                         + wghtl(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
-                         + wghtl(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
-                         + wghtl(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
-                         + wghtl(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
-                         + wghtl(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
-         enddo
-
-         iz   = iz - 1
          iv   = ratindu
-         ivp1 = iv + 1
-
          dels(2) = min_max_bound(0._r8, 1._r8, (v3ratu - o3rat(iv)) * del_o3rat(iv) )
+         call calc_sum_wght (dels, wrk0,          & ! in
+                             pind-1, is, iv, ial, & ! in
+                             psum_u               ) ! inout
 
-         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-         wghtu(0,0,0) = wrk0*wrk1
-         wghtu(1,0,0) = dels(1)*wrk1
-         wrk1         = (1._r8 - dels(2))*dels(3)
-         wghtu(0,0,1) = wrk0*wrk1
-         wghtu(1,0,1) = dels(1)*wrk1
-         wrk1         = dels(2)*(1._r8 - dels(3))
-         wghtu(0,1,0) = wrk0*wrk1
-         wghtu(1,1,0) = dels(1)*wrk1
-         wrk1         = dels(2)*dels(3)
-         wghtu(0,1,1) = wrk0*wrk1
-         wghtu(1,1,1) = dels(1)*wrk1
          do wn = 1,nw
-            psum_u = wghtu(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
-                     + wghtu(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
-                     + wghtu(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
-                     + wghtu(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
-                     + wghtu(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
-                     + wghtu(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
-                     + wghtu(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
-                     + wghtu(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
-
-            rsf(wn,k) = (psum_l(wn) + wght1*(psum_u - psum_l(wn)))
+            rsf(wn,k) = (psum_l(wn) + wght1*(psum_u(wn) - psum_l(wn)))
          enddo
 
 !------------------------------------------------------------------------------
@@ -819,6 +776,54 @@ Level_loop : &
 
    end subroutine interpolate_rsf
 
+!======================================================================================
+   subroutine calc_sum_wght (dels, wrk0,        & ! in
+                             iz, is, iv, ial,   & ! in
+                             psum               ) ! out
+
+      implicit none
+      real(r8), intent(in) :: dels(3)
+      real(r8), intent(in) :: wrk0
+      integer,  intent(in) :: iz, is, iv, ial
+      real(r8), intent(inout)  :: psum(:)
+
+      ! local variables
+      real(r8) :: wrk1
+      real(r8) :: wght(0:1,0:1,0:1)
+      integer  :: wn
+      integer  :: isp1, ivp1, ialp1
+
+      isp1 = is + 1
+      ivp1 = iv + 1
+      ialp1 = ial + 1
+
+         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
+         wght(0,0,0) = wrk0*wrk1
+         wght(1,0,0) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*dels(3)
+         wght(0,0,1) = wrk0*wrk1
+         wght(1,0,1) = dels(1)*wrk1
+         wrk1         = dels(2)*(1._r8 - dels(3))
+         wght(0,1,0) = wrk0*wrk1
+         wght(1,1,0) = dels(1)*wrk1
+         wrk1         = dels(2)*dels(3)
+         wght(0,1,1) = wrk0*wrk1
+         wght(1,1,1) = dels(1)*wrk1
+
+         ! nw and rsf_tab are module variables
+         do wn = 1,nw
+            psum(wn) = wght(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
+                     + wght(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
+                     + wght(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
+                     + wght(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
+                     + wght(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
+                     + wght(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
+                     + wght(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
+                     + wght(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
+         enddo
+
+   end subroutine calc_sum_wght
+ 
 !======================================================================================
    subroutine find_index(var_in, var_len, var_min,  & ! in
                          idx_out                    ) ! out
