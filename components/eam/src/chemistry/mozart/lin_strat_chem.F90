@@ -240,7 +240,7 @@ contains
           o3_old = o3_vmr(icol,kk)             ! old ozone mixing ratio
 
           o3col_du = o3col(icol,kk) * convert_to_du ! convert o3col from mol/cm2
-          o3col_du_diag(icol,kk) = o3col_du    !update diagnostic output
+          o3col_du_diag(icol,kk) = o3col_du         !update diagnostic output
 
           !compute steady state ozone
           call compute_steady_state_ozone(o3_clim, o3col_du, temp(icol,kk), &  !in
@@ -248,7 +248,6 @@ contains
                linoz_PmL_clim(icol,kk),linoz_dPmL_dT(icol,kk),              &  !in
                linoz_dPmL_dO3(icol,kk), linoz_dPmL_dO3col(icol,kk),         &  !in
                ss_o3(icol,kk)) !out
-
 
           delta_o3 = (ss_o3(icol,kk)-o3_old) * (1._r8 - exp(linoz_dPmL_dO3(icol,kk)*delta_t)) ! ozone change
 
@@ -278,8 +277,8 @@ contains
     return
   end subroutine lin_strat_chem_solve
 
-  !------------------------------------------------------------------------------------------------------------
-  !------------------------------------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
 
   subroutine compute_steady_state_ozone(o3_clim, o3col_du, temp, linoz_t_clim, linoz_o3col_clim, &  !in            
        linoz_PmL_clim,linoz_dPmL_dT, linoz_dPmL_dO3, linoz_dPmL_dO3col,      &  !in
@@ -311,8 +310,8 @@ contains
          delta_temp  * linoz_dPmL_dT) / linoz_dPmL_dO3   
   end subroutine compute_steady_state_ozone
 
-  !------------------------------------------------------------------------------------------------------------
-  !------------------------------------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
 
   subroutine psc_activation( lats, temp, pmid, sza, linoz_cariolle_psc, delta_t, & !in
        excess_chlorine, o3_old, &     !in
@@ -364,9 +363,9 @@ contains
 
   end subroutine psc_activation
 
-  !------------------------------------------------------------------------------------------------------------
-  !------------------------------------------------------------------------------------------------------------
-
+  !--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
+  
   subroutine lin_strat_sfcsink( ncol, lchnk, delta_t, pdel, & !in
        o3l_vmr) !in-out
 
