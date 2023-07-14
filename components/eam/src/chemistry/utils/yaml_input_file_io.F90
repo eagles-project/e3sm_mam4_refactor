@@ -236,6 +236,28 @@ contains
   end function get_lon
 
   !================================================================================
+  function remove_nan_real(field_in)
+  ! Change NaN value to value realnanval below
+  ! which indicates this situation while allowing output file processing to proceed
+
+    !input
+    real(r8), intent(in) :: field_in    
+
+    !output (return value)
+    real(r8) :: remove_nan_real
+
+    real(r8), parameter :: realnanval    = -98765432.
+
+    if(isnan(field_in)) then
+        remove_nan_real = realnanval
+    else
+        remove_nan_real = field_in
+    endif
+
+    return
+  end function remove_nan_real
+
+  !================================================================================
   !-------------------------- * Write headers * -----------------------------------
   !================================================================================
 
@@ -948,8 +970,8 @@ contains
 
   end subroutine write_1d_var_real_drv
 
-  !================================================================================
 
+  !================================================================================
   subroutine write_1d_var_real(unit_input, unit_output, fld_name,dim,field)
     !------------------------------------------------------------------
     !Purpose: Writes a 1D input and output field in a YAML file format
@@ -964,10 +986,6 @@ contains
     real(r8), intent(in)  :: field(:)        ! field values in r8
 
     integer :: k
-    real(r8) :: fieldnonan                   ! field values in r8,
-                                             ! but any NaN value that occurs will be set to realnanval
-                                             ! to indicate presence yet allow output files to be processed
-    real(r8), parameter :: realnanval = -98765432.
 
     !check if file is open to write or not
     call is_file_open(unit_input)
@@ -978,21 +996,10 @@ contains
 11  format(A,E17.10E3)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
-
-    if(isnan(field(lbound(field,1)))) then
-        fieldnonan = realnanval
-    else
-        fieldnonan = field(lbound(field,1))
-    endif
-    write(unit_input,10,advance="no")fieldnonan
+    write(unit_input,10,advance="no")remove_nan_real(field(lbound(field,1)))
 
     do k = lbound(field,1)+1, ubound(field,1)
-       if(isnan(field(k))) then
-          fieldnonan = realnanval
-       else
-          fieldnonan = field(k)
-       endif
-       write(unit_input,11,advance="no")',',fieldnonan
+       write(unit_input,11,advance="no")',', remove_nan_real(field(k))
     enddo
 
     write(unit_input,'(A)')']'
@@ -1030,10 +1037,6 @@ contains
     character(len=*), intent(in) :: fld_name ! name of the field
     integer, intent(in)   :: dim             ! dimensions of the field
     real(r8), intent(in)  :: field(:)        ! field values in r8
-    real(r8) :: fieldnonan                   ! field values in r8,
-                                             ! but any NaN value that occurs will be set to realnanval
-                                             ! to indicate presence yet allow output files to be processed
-    real(r8), parameter :: realnanval = -98765432.
 
     !optional input
     !Since we capture for input and output of a subroutine in python format, this
@@ -1061,12 +1064,7 @@ contains
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
     do k = lbound(field,1), ubound(field,1)
-       if(isnan(field(k))) then
-          fieldnonan = realnanval
-       else
-          fieldnonan = field(k)
-       endif
-       write(unit_output,12,advance="no"),fieldnonan,','
+       write(unit_output,12,advance="no"),remove_nan_real(field(k)),','
     enddo
 
     write(unit_output,'(A)')'],]'
@@ -1372,10 +1370,6 @@ contains
     integer, intent(in)   :: dim1, dim2      ! dimensions of the field
     character(len=*), intent(in) :: fld_name ! name of the field
     real(r8), intent(in)  :: field(:,:)        ! field values in r8
-    real(r8) :: fieldnonan                   ! field values in r8,
-                                             ! but any NaN value that occurs will be set to realnanval
-                                             ! to indicate presence yet allow output files to be processed
-    real(r8), parameter :: realnanval = -98765432.
 
     !local
     integer :: d1, d2
@@ -1391,32 +1385,17 @@ contains
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     ! For maintaining format in the YAML inout file we have to  print first element of the array first
-    if(isnan(field(lbound(field,1),lbound(field,2)))) then
-       fieldnonan = realnanval
-    else
-       fieldnonan = field(lbound(field,1),lbound(field,2))
-    endif
-    write(unit_input,10,advance="no")fieldnonan
+    write(unit_input,10,advance="no")remove_nan_real(field(lbound(field,1),lbound(field,2)))
 
     !print rest of the column for d2=1
     d2 = lbound(field,2)
     do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
-       if(isnan(field(d1,d2))) then
-          fieldnonan = realnanval
-       else
-          fieldnonan = field(d1,d2)
-       endif
-       write(unit_input,11,advance="no")',',fieldnonan
+       write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2))
     enddo
 
     do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
        do d1 = lbound(field,1), ubound(field,1)
-       if(isnan(field(d1,d2))) then
-          fieldnonan = realnanval
-       else
-          fieldnonan = field(d1,d2)
-       endif
-          write(unit_input,11,advance="no")',',fieldnonan
+          write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2))
        enddo
     enddo
 
@@ -1456,10 +1435,6 @@ contains
     character(len=*), intent(in) :: fld_name ! name of the field
     integer, intent(in)   :: dim1, dim2      ! dimensions of the field
     real(r8), intent(in)  :: field(:,:)        ! field values in r8
-    real(r8) :: fieldnonan                   ! field values in r8,
-                                             ! but any NaN value that occurs will be set to realnanval
-                                             ! to indicate presence yet allow output files to be processed
-    real(r8), parameter :: realnanval = -98765432.
 
     !optional input
     !Since we capture for input and output of a subroutine in python format, this
@@ -1488,12 +1463,7 @@ contains
 
     do d2 = lbound(field,2), ubound(field,2)
        do d1 = lbound(field,1), ubound(field,1)
-          if(isnan(field(d1,d2))) then
-             fieldnonan = realnanval
-          else
-             fieldnonan = field(d1,d2)
-          endif
-          write(unit_output,12,advance="no"),fieldnonan,','
+          write(unit_output,12,advance="no"),remove_nan_real(field(d1,d2)),','
        enddo
     enddo
 
