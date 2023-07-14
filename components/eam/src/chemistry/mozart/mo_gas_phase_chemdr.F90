@@ -197,7 +197,6 @@ contains
     use mo_usrrxt,         only : usrrxt
     use mo_setinv,         only : setinv
     use mo_negtrc,         only : negtrc
-    use mo_sulf,           only : sulf_interp
     use mo_lightning,      only : prod_no
     use mo_setext,         only : setext
     use mo_sethet,         only : sethet
@@ -496,21 +495,6 @@ contains
     sad_sage(:,:) = 0.0_r8
     call strato_sad_set( pmid, sad_sage, ncol, lchnk)
 
-    !-----------------------------------------------------------------------      
-    !        ... set tropospheric ozone for Linoz_MAM  (pjc, 2015)
-    !-----------------------------------------------------------------------
-!    if ( chem_name == 'linoz_mam3'.or.chem_name == 'linoz_mam4_resus'.or.chem_name == 'linoz_mam4_resus_mom' &
-!       .or.chem_name == 'linoz_mam4_resus_soag'.or.chem_name == 'linoz_mam4_resus_mom_soag' ) then
-!     write(iulog,*) 'Set tropospheric ozone for linoz_mam: inv_ndx_cnst_o3 =',inv_ndx_cnst_o3
-!      do k = 1, pver                !Following loop logic from below.  However, reordering loops can get rid of IF statement.
-!         do i = 1, ncol
-!            if( k > troplev(i) ) then
-!              vmr(i,k,o3_ndx) = invariants(i,k,inv_ndx_cnst_o3) / invariants(i,k,inv_ndx_m)   ! O3 and cnst_o3
-!            endif
-!         end do
-!      end do
-!    end if
-
     !-----------------------------------------------------------------
     ! ... zero out sulfate below tropopause
     !-----------------------------------------------------------------
@@ -524,54 +508,6 @@ contains
        end do
     end do
 
-    if ( has_strato_chem ) then
-       !-----------------------------------------------------------------------      
-       !        ... initialize condensed and gas phases; all hno3 to gas
-       !-----------------------------------------------------------------------      
-       do k = 1,pver
-          hno3_gas(:,k)   = vmr(:,k,hno3_ndx)
-          h2o_gas(:,k)    = h2ovmr(:,k)
-          wrk(:,k)        = h2ovmr(:,k)
-          cldice(:ncol,k) = q(:ncol,k,cldice_ndx)
-       end do
-       do m = 1,2
-          do k = 1,pver
-             hno3_cond(:,k,m) = 0._r8
-          end do
-       end do
-       call mmr2vmri( cldice, h2o_cond, mbar, cnst_mw(cldice_ndx), ncol )
-
-       !-----------------------------------------------------------------------      
-       !        ... call SAD routine
-       !-----------------------------------------------------------------------      
-       call sad_strat_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, hno3_gas, &
-            hno3_cond, h2o_gas, h2o_cond, strato_sad(:ncol,:), radius_strat, &
-            sad_strat, ncol, pbuf )
-       do k = 1,pver
-          vmr(:,k,hno3_ndx) = hno3_gas(:,k)
-          h2ovmr(:,k)       = h2o_gas(:,k)
-          vmr(:,k,h2o_ndx)  = h2o_gas(:,k)
-          wrk(:,k)          = (h2ovmr(:,k) - wrk(:,k))*delt_inverse
-       end do
-       call outfld( 'QDSAD', wrk(:,:), ncol, lchnk )
-       call outfld( 'SAD', strato_sad(:ncol,:), ncol, lchnk )
-       call outfld( 'SAD_SULFC', sad_strat(:,:,1), ncol, lchnk )
-       call outfld( 'SAD_SAGE',   sad_sage(:,:), ncol, lchnk )
-       call outfld( 'SAD_LNAT', sad_strat(:,:,2), ncol, lchnk )
-       call outfld( 'SAD_ICE', sad_strat(:,:,3), ncol, lchnk )
-       call outfld( 'RAD_SULFC', radius_strat(:,:,1), ncol, lchnk )
-       call outfld( 'RAD_LNAT', radius_strat(:,:,2), ncol, lchnk )
-       call outfld( 'RAD_ICE', radius_strat(:,:,3), ncol, lchnk )
-
-       !-----------------------------------------------------------------------      
-       !        ... call aerosol reaction rates
-       !-----------------------------------------------------------------------      
-       call ratecon_sfstrat( invariants(:,:,indexm), pmid, tfld, &
-            radius_strat(:,:,1), sad_strat(:,:,1), sad_strat(:,:,2), &
-            sad_strat(:,:,3), h2ovmr, vmr, reaction_rates, ncol )
-
-    endif
-
     !-----------------------------------------------------------------------      
     !        ... Set the column densities at the upper boundary
     !-----------------------------------------------------------------------      
@@ -583,13 +519,9 @@ contains
     !-----------------------------------------------------------------------      
     call setrxt( reaction_rates, & ! inout
                  tfld, ncol )  ! in
-
+    
+    !NOTE: read_sulf is .false. for MAM4, so setting sulfate to zero here
     sulfate(:,:) = 0._r8
-    if( so4_ndx < 1 ) then ! get offline so4 field if not prognostic
-       call sulf_interp( ncol, lchnk, sulfate )
-    else
-       sulfate(:,:) = vmr(:,:,so4_ndx)
-    endif
 
     !-----------------------------------------------------------------
     ! ... zero out sulfate above tropopause
