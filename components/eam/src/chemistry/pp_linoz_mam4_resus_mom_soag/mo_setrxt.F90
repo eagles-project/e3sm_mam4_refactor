@@ -2,7 +2,7 @@
       module mo_setrxt
 
       use shr_kind_mod, only : r8 => shr_kind_r8
-
+#include "../yaml/common_files/common_uses.ymlf90"
       private
       public :: setrxt
 
@@ -28,12 +28,12 @@
 !       ... local variables
 !-------------------------------------------------------
       real(r8)  ::  itemp(ncol,pver)  ! inverse midpoint temperature [K^-1]
-
+#include "../yaml/mo_setrxt/f90_yaml/setrxt_beg_yml.f90"
       itemp(:ncol,:) = 1._r8 / temp(:ncol,:)
       rate(:,:,3) = 2.9e-12_r8 * exp( -160._r8 * itemp(:,:) )
       rate(:,:,5) = 9.6e-12_r8 * exp( -234._r8 * itemp(:,:) )
       rate(:,:,7) = 1.9e-13_r8 * exp( 520._r8 * itemp(:,:) )
-
+#include "../yaml/mo_setrxt/f90_yaml/setrxt_end_yml.f90"
       end subroutine setrxt
 
       end module mo_setrxt

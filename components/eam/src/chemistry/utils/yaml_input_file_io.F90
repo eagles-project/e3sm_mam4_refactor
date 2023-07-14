@@ -14,6 +14,7 @@ module yaml_input_file_io
   use cam_abortutils, only: endrun
   use constituents,   only: pcnst, cnst_name
   use phys_grid,      only: get_rlat_p, get_rlon_p
+  use shr_infnan_mod, only: isnan => shr_infnan_isnan
 
 
   implicit none
@@ -233,6 +234,28 @@ contains
 
     return
   end function get_lon
+
+  !================================================================================
+  function remove_nan_real(field_in)
+  ! Change NaN value to value realnanval below
+  ! which indicates this situation while allowing output file processing to proceed
+
+    !input
+    real(r8), intent(in) :: field_in    
+
+    !output (return value)
+    real(r8) :: remove_nan_real
+
+    real(r8), parameter :: realnanval    = -98765432.
+
+    if(isnan(field_in)) then
+        remove_nan_real = realnanval
+    else
+        remove_nan_real = field_in
+    endif
+
+    return
+  end function remove_nan_real
 
   !================================================================================
   !-------------------------- * Write headers * -----------------------------------
@@ -947,8 +970,8 @@ contains
 
   end subroutine write_1d_var_real_drv
 
-  !================================================================================
 
+  !================================================================================
   subroutine write_1d_var_real(unit_input, unit_output, fld_name,dim,field)
     !------------------------------------------------------------------
     !Purpose: Writes a 1D input and output field in a YAML file format
@@ -973,11 +996,10 @@ contains
 11  format(A,E17.10E3)
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
-
-    write(unit_input,10,advance="no")field(lbound(field,1))
+    write(unit_input,10,advance="no")remove_nan_real(field(lbound(field,1)))
 
     do k = lbound(field,1)+1, ubound(field,1)
-       write(unit_input,11,advance="no")',',field(k)
+       write(unit_input,11,advance="no")',', remove_nan_real(field(k))
     enddo
 
     write(unit_input,'(A)')']'
@@ -1042,7 +1064,7 @@ contains
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
     do k = lbound(field,1), ubound(field,1)
-       write(unit_output,12,advance="no"),field(k),','
+       write(unit_output,12,advance="no"),remove_nan_real(field(k)),','
     enddo
 
     write(unit_output,'(A)')'],]'
@@ -1363,17 +1385,17 @@ contains
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     ! For maintaining format in the YAML inout file we have to  print first element of the array first
-    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
+    write(unit_input,10,advance="no")remove_nan_real(field(lbound(field,1),lbound(field,2)))
 
     !print rest of the column for d2=1
     d2 = lbound(field,2)
     do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
-       write(unit_input,11,advance="no")',',field(d1,d2)
+       write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2))
     enddo
 
     do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
        do d1 = lbound(field,1), ubound(field,1)
-          write(unit_input,11,advance="no")',',field(d1,d2)
+          write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2))
        enddo
     enddo
 
@@ -1441,7 +1463,7 @@ contains
 
     do d2 = lbound(field,2), ubound(field,2)
        do d1 = lbound(field,1), ubound(field,1)
-          write(unit_output,12,advance="no"),field(d1,d2),','
+          write(unit_output,12,advance="no"),remove_nan_real(field(d1,d2)),','
        enddo
     enddo
 

@@ -47,5 +47,12 @@ use spmd_utils,   only : masterproc
 ! mo_prod_loss
 !#define YAML_PROD_LOSS
 
+! mo_adjrxt
+!#define YAML_ADJRXT
+
+! mo_setrxt
+!#define YAML_SETRXT
+
+
 use yaml_input_file_io
 
