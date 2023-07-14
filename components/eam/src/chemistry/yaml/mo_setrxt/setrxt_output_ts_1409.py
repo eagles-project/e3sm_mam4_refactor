@@ -13,10 +13,10 @@ input = Object()
 input.dt = [    0.00, ]
 input.ncol=[[         4],]
 input.temp=[[0.2516766072E+003],]
-input.rate=[[              NaN,              NaN,              NaN,              NaN,              NaN,              NaN,              NaN,],]
+input.rate=[[-.9876543200E+008,-.9876543200E+008,-.9876543200E+008,-.9876543200E+008,-.9876543200E+008,-.9876543200E+008,-.9876543200E+008,],]
 input.pver=[[        72],]
 input.pcols=[[         4],]
 input.rxntot=[[         7],]
 # Output data is stored here.
 output = Object()
-output.rate=[[              NaN,              NaN,0.1535681503E-011,              NaN,0.3788607353E-011,              NaN,0.1499920863E-011,],]
+output.rate=[[-.9876543200E+008,-.9876543200E+008,0.1535681503E-011,-.9876543200E+008,0.3788607353E-011,-.9876543200E+008,0.1499920863E-011,],]

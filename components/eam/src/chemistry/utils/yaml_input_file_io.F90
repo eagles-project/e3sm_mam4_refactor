@@ -14,6 +14,7 @@ module yaml_input_file_io
   use cam_abortutils, only: endrun
   use constituents,   only: pcnst, cnst_name
   use phys_grid,      only: get_rlat_p, get_rlon_p
+  use shr_infnan_mod, only: isnan => shr_infnan_isnan
 
 
   implicit none
@@ -963,6 +964,10 @@ contains
     real(r8), intent(in)  :: field(:)        ! field values in r8
 
     integer :: k
+    real(r8) :: fieldnonan                   ! field values in r8,
+                                             ! but any NaN value that occurs will be set to realnanval
+                                             ! to indicate presence yet allow output files to be processed
+    real(r8), parameter :: realnanval = -98765432.
 
     !check if file is open to write or not
     call is_file_open(unit_input)
@@ -974,10 +979,20 @@ contains
 
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
-    write(unit_input,10,advance="no")field(lbound(field,1))
+    if(isnan(field(lbound(field,1)))) then
+        fieldnonan = realnanval
+    else
+        fieldnonan = field(lbound(field,1))
+    endif
+    write(unit_input,10,advance="no")fieldnonan
 
     do k = lbound(field,1)+1, ubound(field,1)
-       write(unit_input,11,advance="no")',',field(k)
+       if(isnan(field(k))) then
+          fieldnonan = realnanval
+       else
+          fieldnonan = field(k)
+       endif
+       write(unit_input,11,advance="no")',',fieldnonan
     enddo
 
     write(unit_input,'(A)')']'
@@ -1015,6 +1030,10 @@ contains
     character(len=*), intent(in) :: fld_name ! name of the field
     integer, intent(in)   :: dim             ! dimensions of the field
     real(r8), intent(in)  :: field(:)        ! field values in r8
+    real(r8) :: fieldnonan                   ! field values in r8,
+                                             ! but any NaN value that occurs will be set to realnanval
+                                             ! to indicate presence yet allow output files to be processed
+    real(r8), parameter :: realnanval = -98765432.
 
     !optional input
     !Since we capture for input and output of a subroutine in python format, this
@@ -1042,7 +1061,12 @@ contains
     write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
 
     do k = lbound(field,1), ubound(field,1)
-       write(unit_output,12,advance="no"),field(k),','
+       if(isnan(field(k))) then
+          fieldnonan = realnanval
+       else
+          fieldnonan = field(k)
+       endif
+       write(unit_output,12,advance="no"),fieldnonan,','
     enddo
 
     write(unit_output,'(A)')'],]'
@@ -1348,6 +1372,10 @@ contains
     integer, intent(in)   :: dim1, dim2      ! dimensions of the field
     character(len=*), intent(in) :: fld_name ! name of the field
     real(r8), intent(in)  :: field(:,:)        ! field values in r8
+    real(r8) :: fieldnonan                   ! field values in r8,
+                                             ! but any NaN value that occurs will be set to realnanval
+                                             ! to indicate presence yet allow output files to be processed
+    real(r8), parameter :: realnanval = -98765432.
 
     !local
     integer :: d1, d2
@@ -1363,17 +1391,32 @@ contains
     write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
 
     ! For maintaining format in the YAML inout file we have to  print first element of the array first
-    write(unit_input,10,advance="no")field(lbound(field,1),lbound(field,2))
+    if(isnan(field(lbound(field,1),lbound(field,2)))) then
+       fieldnonan = realnanval
+    else
+       fieldnonan = field(lbound(field,1),lbound(field,2))
+    endif
+    write(unit_input,10,advance="no")fieldnonan
 
     !print rest of the column for d2=1
     d2 = lbound(field,2)
     do d1 = lbound(field,1)+1, ubound(field,1) !first element is already printed, start from the 2nd
-       write(unit_input,11,advance="no")',',field(d1,d2)
+       if(isnan(field(d1,d2))) then
+          fieldnonan = realnanval
+       else
+          fieldnonan = field(d1,d2)
+       endif
+       write(unit_input,11,advance="no")',',fieldnonan
     enddo
 
     do d2 = lbound(field,2)+1, ubound(field,2) !First column is already printed, start from the 2nd
        do d1 = lbound(field,1), ubound(field,1)
-          write(unit_input,11,advance="no")',',field(d1,d2)
+       if(isnan(field(d1,d2))) then
+          fieldnonan = realnanval
+       else
+          fieldnonan = field(d1,d2)
+       endif
+          write(unit_input,11,advance="no")',',fieldnonan
        enddo
     enddo
 
@@ -1413,6 +1456,10 @@ contains
     character(len=*), intent(in) :: fld_name ! name of the field
     integer, intent(in)   :: dim1, dim2      ! dimensions of the field
     real(r8), intent(in)  :: field(:,:)        ! field values in r8
+    real(r8) :: fieldnonan                   ! field values in r8,
+                                             ! but any NaN value that occurs will be set to realnanval
+                                             ! to indicate presence yet allow output files to be processed
+    real(r8), parameter :: realnanval = -98765432.
 
     !optional input
     !Since we capture for input and output of a subroutine in python format, this
@@ -1441,7 +1488,12 @@ contains
 
     do d2 = lbound(field,2), ubound(field,2)
        do d1 = lbound(field,1), ubound(field,1)
-          write(unit_output,12,advance="no"),field(d1,d2),','
+          if(isnan(field(d1,d2))) then
+             fieldnonan = realnanval
+          else
+             fieldnonan = field(d1,d2)
+          endif
+          write(unit_output,12,advance="no"),fieldnonan,','
        enddo
     enddo
 
