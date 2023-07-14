@@ -238,6 +238,8 @@ contains
 !
     use lin_strat_chem,    only : do_lin_strat_chem, lin_strat_chem_solve, lin_strat_sfcsink
     use linoz_data,        only : has_linoz_data
+    use linoz_data,        only : fields, o3_clim_ndx, t_clim_ndx, o3col_clim_ndx, PmL_clim_ndx, dPmL_dO3_ndx,&
+                                  dPmL_dT_ndx, dPmL_dO3col_ndx, cariolle_pscs_ndx
 !
 ! for aqueous chemistry and aerosol growth
 !
@@ -372,7 +374,17 @@ contains
     real(r8) :: mmr_tend(pcols,pver,gas_pcnst) ! chemistry species tendencies (kg/kg/s)
     real(r8) :: qh2o(pcols,pver)               ! specific humidity (kg/kg)
     real(r8) :: delta
-    real(r8) :: o3lsfcsink(ncol)               ! linoz o3l surface sink from call lin_strat_sfcsink 
+    real(r8) :: o3lsfcsink(ncol)               ! linoz o3l surface sink from call lin_strat_sfcsink
+
+    !pointers to read LINOZ data
+    real(r8), dimension(:,:), pointer :: linoz_o3_clim
+    real(r8), dimension(:,:), pointer :: linoz_t_clim
+    real(r8), dimension(:,:), pointer :: linoz_o3col_clim
+    real(r8), dimension(:,:), pointer :: linoz_PmL_clim
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dT
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3col
+    real(r8), dimension(:,:), pointer :: linoz_cariolle_psc
 
   ! for aerosol formation....  
     real(r8) :: del_h2so4_gasprod(ncol,pver)
@@ -840,8 +852,23 @@ contains
 ! LINOZ
 !
     if ( do_lin_strat_chem ) then
-       call lin_strat_chem_solve( ncol, lchnk, vmr(:,:,o3_ndx), col_dens(:,:,1), tfld, zen_angle, pmid, delt, rlats, troplev )
-       call   lin_strat_sfcsink (ncol, lchnk,  vmr(:,:,o3_ndx), delt, pdel(:ncol,:))
+       ! associate the field pointers
+       linoz_o3_clim      => fields(o3_clim_ndx)      %data(:,:,lchnk )
+       linoz_t_clim       => fields(t_clim_ndx)       %data(:,:,lchnk )
+       linoz_o3col_clim   => fields(o3col_clim_ndx)   %data(:,:,lchnk )
+       linoz_PmL_clim     => fields(PmL_clim_ndx)     %data(:,:,lchnk )
+       linoz_dPmL_dO3     => fields(dPmL_dO3_ndx)     %data(:,:,lchnk )
+       linoz_dPmL_dT      => fields(dPmL_dT_ndx)      %data(:,:,lchnk )
+       linoz_dPmL_dO3col  => fields(dPmL_dO3col_ndx)  %data(:,:,lchnk )
+       linoz_cariolle_psc => fields(cariolle_pscs_ndx)%data(:,:,lchnk )
+
+       call lin_strat_chem_solve( ncol, lchnk, col_dens(:,:,1), tfld, zen_angle, pmid, delt, rlats, troplev, & !in
+            linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
+            linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
+            vmr(:,:,o3_ndx) ) !in-out
+            
+       call   lin_strat_sfcsink (ncol, lchnk, delt, pdel(:ncol,:), & !in
+            vmr(:,:,o3_ndx)) !in-outs
     end if
 
     !-----------------------------------------------------------------------      
