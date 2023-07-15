@@ -16,10 +16,6 @@
 
       implicit none
 
-      interface jlong
-         module procedure jlong_photo
-      end interface
-
       private
       public :: jlong_init
       public :: jlong_timestep_init
@@ -513,7 +509,7 @@
    end subroutine jlong_timestep_init
 
 !======================================================================================
-   subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, colo3_in, & ! in
+   subroutine jlong( nlev, sza_in, alb_in, p_in, t_in, colo3_in, & ! in
                             j_long )  ! out
 !==============================================================================
 !   Purpose:                                                                   
@@ -566,11 +562,11 @@
 !----------------------------------------------------------------------
       allocate( rsf(nw,nlev),stat=astat )
       if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_photo', 'rsf', nw*nlev )
+         call alloc_err( astat, 'jlong', 'rsf', nw*nlev )
       endif
       allocate( xswk(numj,nw),stat=astat )
       if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_photo', 'xswk', numj*nw )
+         call alloc_err( astat, 'jlong', 'xswk', numj*nw )
       endif
 
 !----------------------------------------------------------------------
@@ -627,7 +623,7 @@ level_loop_1 : &
 
       deallocate( rsf, xswk )
 
-    end subroutine jlong_photo
+    end subroutine jlong
 
 !======================================================================================
 !----------------------------------------------------------------------
