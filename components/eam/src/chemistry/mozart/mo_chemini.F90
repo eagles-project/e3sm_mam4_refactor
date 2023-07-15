@@ -88,7 +88,6 @@ contains
     use mo_solar_parms,    only : solar_parms_init, solar_parms_get
     use euvac,             only : euvac_init, euvac_set_etf
     use mo_heatnirco2,     only : heatnirco2_init
-    use mo_waccm_hrates,   only : init_hrates
     use mo_aurora,         only : aurora_inti
     use clybry_fam,        only : clybry_fam_init
     use mo_neu_wetdep,     only : neu_wetdep_init 
@@ -147,7 +146,6 @@ contains
     call setinv_inti()
     call sethet_inti()
     call usrrxt_inti()
-    call init_hrates
     call init_airglow
 
     call init_strato_rates

@@ -16,11 +16,6 @@
 
       implicit none
 
-      interface jlong
-         module procedure jlong_photo
-         module procedure jlong_hrates
-      end interface
-
       private
       public :: jlong_init
       public :: jlong_timestep_init
@@ -53,7 +48,7 @@
       real(r8), allocatable :: xs_o2b(:,:,:)
       real(r8), allocatable :: xs_o3a(:,:,:)
       real(r8), allocatable :: xs_o3b(:,:,:)
-      real(r8), allocatable :: p(:)
+      real(r8), allocatable :: press(:)
       real(r8), allocatable :: del_p(:)
       real(r8), allocatable :: prs(:)
       real(r8), allocatable :: dprs(:)
@@ -68,8 +63,8 @@
       logical :: jlong_used = .false.
 
       contains
-
-      subroutine jlong_init( xs_long_file, rsf_file, lng_indexer )
+!======================================================================================
+   subroutine jlong_init( xs_long_file, rsf_file, lng_indexer )
 
       use ppgrid,         only : pver
       use time_manager,   only : is_end_curr_day
@@ -115,9 +110,10 @@
 
       jlong_used = .true.
  
-      end subroutine jlong_init
+   end subroutine jlong_init
 
-      subroutine get_xsqy( xs_long_file, lng_indexer )
+!======================================================================================
+   subroutine get_xsqy( xs_long_file, lng_indexer )
 !=============================================================================!
 !   PURPOSE:                                                                  !
 !   Reads a NetCDF file that contains:                                        !
@@ -306,9 +302,10 @@
 #endif
       dprs(:np_xs-1) = 1._r8/(prs(1:np_xs-1) - prs(2:np_xs))
 
-      end subroutine get_xsqy
+   end subroutine get_xsqy
 
-      subroutine get_rsf(rsf_file)
+!======================================================================================
+   subroutine get_rsf(rsf_file)
 !=============================================================================!
 !   PURPOSE:                                                                  !
 !   Reads a NetCDF file that contains:
@@ -396,7 +393,7 @@
       if( iret /= 0 ) then 
          call alloc_err( iret, 'get_rsf', 'bde', nw )
       end if
-      allocate( p(nump),del_p(nump-1),stat=iret )
+      allocate( press(nump),del_p(nump-1),stat=iret )
       if( iret /= 0 ) then 
          call alloc_err( iret, 'get_rsf', 'p,delp', nump )
       end if
@@ -431,7 +428,7 @@
          iret = nf90_inq_varid( ncid, 'wlintv', varid )
          iret = nf90_get_var( ncid, varid, wlintv )
          iret = nf90_inq_varid( ncid, 'pm', varid )
-         iret = nf90_get_var( ncid, varid, p )
+         iret = nf90_get_var( ncid, varid, press )
          iret = nf90_inq_varid( ncid, 'sza', varid )
          iret = nf90_get_var( ncid, varid, sza )
          iret = nf90_inq_varid( ncid, 'alb', varid )
@@ -466,7 +463,7 @@
 #ifdef SPMD
       call mpibcast( wc,      nw,       mpir8, 0, mpicom )
       call mpibcast( wlintv,  nw,       mpir8, 0, mpicom )
-      call mpibcast( p,       nump,     mpir8, 0, mpicom )
+      call mpibcast( press,   nump,     mpir8, 0, mpicom )
       call mpibcast( sza,     numsza,   mpir8, 0, mpicom )
       call mpibcast( alb,     numalb,   mpir8, 0, mpicom )
       call mpibcast( o3rat,   numcolo3, mpir8, 0, mpicom )
@@ -486,7 +483,7 @@
       bde_o3_b(:) = hc/wc(:)
 #endif
 
-      del_p(:nump-1)         = 1._r8/abs(p(1:nump-1)- p(2:nump))
+      del_p(:nump-1)         = 1._r8/abs(press(1:nump-1)- press(2:nump))
       del_sza(:numsza-1)     = 1._r8/(sza(2:numsza) - sza(1:numsza-1))
       del_alb(:numalb-1)     = 1._r8/(alb(2:numalb) - alb(1:numalb-1))
       del_o3rat(:numcolo3-1) = 1._r8/(o3rat(2:numcolo3) - o3rat(1:numcolo3-1))
@@ -509,141 +506,11 @@
 
       call rebin( data_nw, nw, data_we, we, data_etf, etfphot )
 
-      end subroutine jlong_timestep_init
+   end subroutine jlong_timestep_init
 
-      subroutine jlong_hrates( nlev, sza_in, alb_in, p_in, t_in, &
-                               mw, o2_vmr, o3_vmr, colo3_in, qrl_col, &
-                               cparg, kbot )
-!==============================================================================
-!   Purpose:                                                                   
-!     To calculate the thermal heating rates longward of 200nm.        
-!==============================================================================
-!   Approach:
-!     1) Reads the Cross Section*QY NetCDF file
-!     2) Given a temperature profile, derives the appropriate XS*QY
-!
-!     3) Reads the Radiative Source function (RSF) NetCDF file
-!        Units = quanta cm-2 sec-1
-!
-!     4) Indices are supplied to select a RSF that is consistent with
-!        the reference atmosphere in TUV (for direct comparision of J's).
-!        This approach will be replaced in the global model. Here colo3, zenith
-!        angle, and altitude will be inputed and the correct entry in the table
-!        will be derived.
-!==============================================================================
-
-	use physconst,       only : avogad
-        use error_messages, only : alloc_err
-
-	implicit none
-
-!------------------------------------------------------------------------------
-!    	... dummy arguments
-!------------------------------------------------------------------------------
-      integer, intent (in)     :: nlev               ! number vertical levels
-      integer, intent (in)     :: kbot               ! heating levels
-      real(r8), intent(in)     :: o2_vmr(nlev)       ! o2 conc (mol/mol)
-      real(r8), intent(in)     :: o3_vmr(nlev)       ! o3 conc (mol/mol)
-      real(r8), intent(in)     :: sza_in             ! solar zenith angle (degrees)
-      real(r8), intent(in)     :: alb_in(nlev)       ! albedo
-      real(r8), intent(in)     :: p_in(nlev)         ! midpoint pressure (hPa)
-      real(r8), intent(in)     :: t_in(nlev)         ! Temperature profile (K)
-      real(r8), intent(in)     :: colo3_in(nlev)     ! o3 column density (molecules/cm^3)
-      real(r8), intent(in)     :: mw(nlev)           ! atms molecular weight
-      real(r8), intent(in)     :: cparg(nlev)        ! specific heat capacity
-      real(r8), intent(inout)  :: qrl_col(:,:)	     ! heating rates
-
-!----------------------------------------------------------------------
-!  	... local variables
-!----------------------------------------------------------------------
-      integer  ::  astat
-      integer  ::  k, km, m
-      integer  ::  t_index					! Temperature index
-      integer  ::  pndx
-      real(r8) ::  ptarget
-      real(r8) ::  delp
-      real(r8) ::  hfactor
-      real(r8), allocatable                :: rsf(:,:)	        ! Radiative source function
-      real(r8), allocatable                :: xswk(:,:)	        ! working xsection array
-      real(r8), allocatable                :: wrk(:)	        ! work vector
-
-!----------------------------------------------------------------------
-!        ... allocate variables
-!----------------------------------------------------------------------
-      allocate( rsf(nw,kbot),stat=astat )
-      if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_hrates', 'rsf', nw*nlev )
-      end if
-      allocate( xswk(nw,3),wrk(nw),stat=astat )
-      if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_hrates', 'xswk,wrk', 3*nw )
-      end if
-
-!----------------------------------------------------------------------
-!        ... interpolate table rsf to model variables
-!----------------------------------------------------------------------
-      call interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
-
-!------------------------------------------------------------------------------
-!     ... calculate thermal heating rates for wavelengths >200nm
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!     LLNL LUT approach to finding temperature index...
-!     Calculate the temperature index into the cross section
-!     data which lists coss sections for temperatures from
-!     150 to 350 degrees K.  Make sure the index is a value
-!     between 1 and 201.
-!------------------------------------------------------------------------------
-      qrl_col(kbot+1:nlev,:) = 0._r8
-level_loop_1 : &
-      do k = 1,kbot
-!----------------------------------------------------------------------
-!   	... get index into xsqy
-!----------------------------------------------------------------------
-        t_index = t_in(k) - 148.5_r8
-        t_index = min( 201,max( t_index,1) )
-!----------------------------------------------------------------------
-!   	... find pressure level
-!----------------------------------------------------------------------
-	ptarget = p_in(k)
-	if( ptarget >= prs(1) ) then
-	   xswk(:,1) = xs_o2b(:,t_index,1)
-	   xswk(:,2) = xs_o3a(:,t_index,1)
-	   xswk(:,3) = xs_o3b(:,t_index,1)
-	else if( ptarget <= prs(np_xs) ) then
-	   xswk(:,1) = xs_o2b(:,t_index,np_xs)
-	   xswk(:,2) = xs_o3a(:,t_index,np_xs)
-	   xswk(:,3) = xs_o3b(:,t_index,np_xs)
-	else
-	   do km = 2,np_xs
-	      if( ptarget >= prs(km) ) then
-		 pndx = km - 1
-		 delp = (prs(pndx) - ptarget)*dprs(pndx)
-		 exit
-	      end if
-	   end do
-	   xswk(:,1) = xs_o2b(:,t_index,pndx) &
-                       + delp*(xs_o2b(:,t_index,pndx+1) - xs_o2b(:,t_index,pndx))
-	   xswk(:,2) = xs_o3a(:,t_index,pndx) &
-                       + delp*(xs_o3a(:,t_index,pndx+1) - xs_o3a(:,t_index,pndx))
-	   xswk(:,3) = xs_o3b(:,t_index,pndx) &
-                       + delp*(xs_o3b(:,t_index,pndx+1) - xs_o3b(:,t_index,pndx))
-	end if
-	hfactor      = avogad/(cparg(k)*mw(k))
-	wrk(:)       = xswk(:,1)*bde_o2_b(:)
-	qrl_col(k,2) = dot_product( wrk(:),rsf(:,k) ) * o2_vmr(k) * hfactor
-	wrk(:)       = xswk(:,2)*bde_o3_a(:)
-	qrl_col(k,3) = dot_product( wrk(:),rsf(:,k) ) * o3_vmr(k) * hfactor
-	wrk(:)       = xswk(:,3)*bde_o3_b(:)
-	qrl_col(k,4) = dot_product( wrk(:),rsf(:,k) ) * o3_vmr(k) * hfactor
-      end do level_loop_1
-
-      deallocate( rsf, xswk, wrk )
-
-      end subroutine jlong_hrates
-
-       subroutine jlong_photo( nlev, sza_in, alb_in, p_in, t_in, &
-                              colo3_in, j_long )
+!======================================================================================
+   subroutine jlong( nlev, sza_in, alb_in, p_in, t_in, colo3_in, & ! in
+                            j_long )  ! out
 !==============================================================================
 !   Purpose:                                                                   
 !     To calculate the total J for selective species longward of 200nm.        
@@ -662,52 +529,51 @@ level_loop_1 : &
 !        will be derived.
 !==============================================================================
 
- use spmd_utils,   only : masterproc
-        use error_messages, only : alloc_err
+      use error_messages, only : alloc_err
 
-	implicit none
+      implicit none
 
 !------------------------------------------------------------------------------
 !    	... dummy arguments
 !------------------------------------------------------------------------------
       integer, intent (in)     :: nlev               ! number vertical levels
-      real(r8), intent(in)     :: sza_in             ! solar zenith angle (degrees)
+      real(r8), intent(in)     :: sza_in             ! solar zenith angle [degrees]
       real(r8), intent(in)     :: alb_in(nlev)       ! albedo
-      real(r8), intent(in)     :: p_in(nlev)         ! midpoint pressure (hPa)
-      real(r8), intent(in)     :: t_in(nlev)         ! Temperature profile (K)
-      real(r8), intent(in)     :: colo3_in(nlev)     ! o3 column density (molecules/cm^3)
-      real(r8), intent(out)    :: j_long(:,:)	     ! photo rates (1/s)
+      real(r8), intent(in)     :: p_in(nlev)         ! midpoint pressure [hPa]
+      real(r8), intent(in)     :: t_in(nlev)         ! Temperature profile [K]
+      real(r8), intent(in)     :: colo3_in(nlev)     ! o3 column density [molecules/cm^3]
+      real(r8), intent(out)    :: j_long(:,:)        ! photo rates [1/s]
 
 !----------------------------------------------------------------------
 !  	... local variables
 !----------------------------------------------------------------------
       integer  ::  astat
-      integer  ::  k, km, m
+      integer  ::  kk, km
       integer  ::  wn
-      integer  ::  t_index					! Temperature index
+      integer  ::  t_index      ! Temperature index
       integer  ::  pndx
       real(r8) ::  ptarget
       real(r8) ::  delp
-      real(r8) ::  hfactor
-      real(r8), allocatable :: rsf(:,:)	        ! Radiative source function
-      real(r8), allocatable :: xswk(:,:)	! working xsection array
+      real(r8), allocatable :: rsf(:,:)         ! Radiative source function
+      real(r8), allocatable :: xswk(:,:)        ! working xsection array
 
 !----------------------------------------------------------------------
 !        ... allocate variables
 !----------------------------------------------------------------------
       allocate( rsf(nw,nlev),stat=astat )
       if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_photo', 'rsf', nw*nlev )
-      end if
+         call alloc_err( astat, 'jlong', 'rsf', nw*nlev )
+      endif
       allocate( xswk(numj,nw),stat=astat )
       if( astat /= 0 ) then
-         call alloc_err( astat, 'jlong_photo', 'xswk', numj*nw )
-      end if
+         call alloc_err( astat, 'jlong', 'xswk', numj*nw )
+      endif
 
 !----------------------------------------------------------------------
 !        ... interpolate table rsf to model variables
 !----------------------------------------------------------------------
-      call interpolate_rsf( alb_in, sza_in, p_in, colo3_in, nlev, rsf )
+      call interpolate_rsf( alb_in, sza_in, p_in, colo3_in, nlev, & ! in
+                            rsf ) ! out
 
 !------------------------------------------------------------------------------
 !     ... calculate total Jlong for wavelengths >200nm
@@ -720,86 +586,81 @@ level_loop_1 : &
 !     between 1 and 201.
 !------------------------------------------------------------------------------
 level_loop_1 : &
-      do k = 1,nlev
+      do kk = 1,nlev
 !----------------------------------------------------------------------
 !   	... get index into xsqy
 !----------------------------------------------------------------------
-        t_index = t_in(k) - 148.5_r8
+        t_index = t_in(kk) - 148.5_r8
         t_index = min( 201,max( t_index,1) )
 !----------------------------------------------------------------------
 !   	... find pressure level
 !----------------------------------------------------------------------
-	ptarget = p_in(k)
-	if( ptarget >= prs(1) ) then
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,1)
-	   end do
-	else if( ptarget <= prs(np_xs) ) then
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,np_xs)
-	   end do
-	else
-	   do km = 2,np_xs
-	      if( ptarget >= prs(km) ) then
-		 pndx = km - 1
-		 delp = (prs(pndx) - ptarget)*dprs(pndx)
-		 exit
-	      end if
-	   end do
-	   do wn = 1,nw
-	      xswk(:,wn) = xsqy(:,wn,t_index,pndx) &
-                           + delp*(xsqy(:,wn,t_index,pndx+1) - xsqy(:,wn,t_index,pndx))
-	   end do
-	end if
-#ifdef USE_ESSL
-        call dgemm( 'N', 'N', numj, 1, nw, &
-		    1._r8, xswk, numj, rsf(1,k), nw, &
-		    0._r8, j_long(1,k), numj )
-#else
-        j_long(:,k) = matmul( xswk(:,:),rsf(:,k) )
-#endif
-      end do level_loop_1
+        ptarget = p_in(kk)
+        if( ptarget >= prs(1) ) then
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,1)
+           enddo
+        elseif( ptarget <= prs(np_xs) ) then
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,np_xs)
+           enddo
+        else
+           do km = 2,np_xs
+              if( ptarget >= prs(km) ) then
+                 pndx = km - 1
+                 delp = (prs(pndx) - ptarget)*dprs(pndx)
+                 exit
+              endif
+           enddo
+           do wn = 1,nw
+              xswk(:,wn) = xsqy(:,wn,t_index,pndx) &
+                         + delp*(xsqy(:,wn,t_index,pndx+1) - xsqy(:,wn,t_index,pndx))
+           enddo
+        endif
+        j_long(:,kk) = matmul( xswk(:,:),rsf(:,kk) )
+
+      enddo level_loop_1
 
       deallocate( rsf, xswk )
 
-      end subroutine jlong_photo
+    end subroutine jlong
 
+!======================================================================================
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 !        ... interpolate table rsf to model variables
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, rsf )
+    subroutine interpolate_rsf( alb_in, sza_in, p_in, colo3_in, kbot, & ! in
+                                rsf ) ! out
 
-        use error_messages, only : alloc_err
+      use error_messages, only : alloc_err
+      use mam_support, only : min_max_bound
 
       implicit none
 
 !------------------------------------------------------------------------------
 !    	... dummy arguments
 !------------------------------------------------------------------------------
-      real(r8), intent(in)  :: alb_in(:)       ! albedo
-      real(r8), intent(in)  :: sza_in          ! solar zenith angle (degrees)
-      integer,  intent(in)  :: kbot            ! heating levels
-      real(r8), intent(in)  :: p_in(:)         ! midpoint pressure (hPa)
-      real(r8), intent(in)  :: colo3_in(:)     ! o3 column density (molecules/cm^3)
-      real(r8), intent(out) :: rsf(:,:)
+      real(r8), intent(in)  :: alb_in(:)       ! albedo [unitless]
+      real(r8), intent(in)  :: sza_in          ! solar zenith angle [degrees]
+      integer,  intent(in)  :: kbot            ! heating levels [level]
+      real(r8), intent(in)  :: p_in(:)         ! midpoint pressure [hPa]
+      real(r8), intent(in)  :: colo3_in(:)     ! o3 column density [molecules/cm^3]
+      real(r8), intent(out) :: rsf(:,:)        ! Radiative Source Function [quanta cm-2 sec-1]
+
 
 !----------------------------------------------------------------------
 !  	... local variables
 !----------------------------------------------------------------------
       integer  ::  astat
       integer  ::  is, iv, ial
-      integer  ::  isp1, ivp1, ialp1
-      real(r8), dimension(3)               :: dels
-      real(r8), dimension(0:1,0:1,0:1)     :: wghtl, wghtu
-      real(r8) ::  psum_u
-      real(r8), allocatable                :: psum_l(:)
+      real(r8), dimension(3)     :: dels
+      real(r8), allocatable      :: psum_l(:), psum_u(:)
       real(r8) ::  v3ratl, v3ratu
       integer  ::  pind, albind
-      real(r8) ::  wrk0, wrk1, wght1
-      integer  ::  iz, k, m
-      integer  ::  izl
+      real(r8) ::  wrk0, wght1
+      integer  ::  iz, izl, kk
       integer  ::  ratindl, ratindu
       integer  ::  wn
 
@@ -810,153 +671,169 @@ level_loop_1 : &
       if( astat /= 0 ) then
          call alloc_err( astat, 'jlong_hrates', 'psum_l', nw )
       end if
-
+      allocate( psum_u(nw),stat=astat )
+      if( astat /= 0 ) then
+         call alloc_err( astat, 'jlong_hrates', 'psum_u', nw )
+      end if
 !----------------------------------------------------------------------
 !        ... find the zenith angle index ( same for all levels )
 !----------------------------------------------------------------------
-      do is = 1,numsza
-         if( sza(is) > sza_in ) then
-            exit
-         end if
-      end do
-      is   = max( min( is,numsza ) - 1,1 )
-      isp1 = is + 1
-      dels(1)  = max( 0._r8,min( 1._r8,(sza_in - sza(is)) * del_sza(is) ) )
+      call find_index(sza, numsza, sza_in,  & ! in
+                      is                    ) ! out
+
+      dels(1) = min_max_bound(0._r8, 1._r8, (sza_in-sza(is))*del_sza(is) )
       wrk0     = 1._r8 - dels(1)
 
-      izl = 2
+      izl = 2   ! may change in the level_loop
 Level_loop : &
-      do k = kbot,1,-1
+      do kk = kbot,1,-1
 !----------------------------------------------------------------------
 !        ... find albedo indicies
 !----------------------------------------------------------------------
-         do ial = 1,numalb
-	    if( alb(ial) > alb_in(k) ) then
-	       exit
-	    end if
-	 end do
-	 albind = max( min( ial,numalb ) - 1,1 )
+         call find_index(alb, numalb, alb_in(kk),  & ! in
+                         albind                   ) ! out
 !----------------------------------------------------------------------
 !        ... find pressure level indicies
 !----------------------------------------------------------------------
-         if( p_in(k) > p(1) ) then
+         if( p_in(kk) > press(1) ) then
             pind  = 2
             wght1 = 1._r8
-         else if( p_in(k) <= p(nump) ) then
+         elseif( p_in(kk) <= press(nump) ) then
             pind  = nump
             wght1 = 0._r8
          else
             do iz = izl,nump
-               if( p(iz) < p_in(k) ) then
-	          izl = iz
-	          exit
-               end if
-            end do
+               if( press(iz) < p_in(kk) ) then
+                  izl = iz
+                  exit
+               endif
+            enddo
             pind  = max( min( iz,nump ),2 )
-            wght1 = max( 0._r8,min( 1._r8,(p_in(k) - p(pind)) * del_p(pind-1) ) )
-         end if
+            wght1 = min_max_bound(0._r8, 1._r8, (p_in(kk) - press(pind)) * del_p(pind-1))
+         endif
 !----------------------------------------------------------------------
 !        ... find "o3 ratios"
 !----------------------------------------------------------------------
-         v3ratu  = colo3_in(k) / colo3(pind-1)
-         do iv = 1,numcolo3
-            if( o3rat(iv) > v3ratu ) then
-               exit
-            end if
-         end do
-         ratindu = max( min( iv,numcolo3 ) - 1,1 )
+         v3ratu  = colo3_in(kk) / colo3(pind-1)
+         call find_index(o3rat, numcolo3, v3ratu,  & ! in
+                         ratindu                   ) ! out
 
          if( colo3(pind) /= 0._r8 ) then
-            v3ratl = colo3_in(k) / colo3(pind)
-            do iv = 1,numcolo3
-               if( o3rat(iv) > v3ratl ) then
-                  exit
-               end if
-            end do
-            ratindl = max( min( iv,numcolo3 ) - 1,1 )
-	 else
+            v3ratl = colo3_in(kk) / colo3(pind)
+            call find_index(o3rat, numcolo3, v3ratl,  & ! in
+                            ratindl                   ) ! out
+         else
             ratindl = ratindu
             v3ratl  = o3rat(ratindu)
-	 end if
+         endif
 
 !----------------------------------------------------------------------
 !        ... compute the weigths
 !----------------------------------------------------------------------
-	 ial   = albind
-	 ialp1 = ial + 1
-	 iv    = ratindl
+         ial   = albind
 
-         dels(2)  = max( 0._r8,min( 1._r8,(v3ratl - o3rat(iv)) * del_o3rat(iv) ) )
-         dels(3)  = max( 0._r8,min( 1._r8,(alb_in(k) - alb(ial)) * del_alb(ial) ) )
+         dels(3) = min_max_bound(0._r8, 1._r8, (alb_in(kk) - alb(ial)) * del_alb(ial) )
 
-	 wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-	 wghtl(0,0,0) = wrk0*wrk1
-	 wghtl(1,0,0) = dels(1)*wrk1
-	 wrk1         = (1._r8 - dels(2))*dels(3)
-	 wghtl(0,0,1) = wrk0*wrk1
-	 wghtl(1,0,1) = dels(1)*wrk1
-	 wrk1         = dels(2)*(1._r8 - dels(3))
-	 wghtl(0,1,0) = wrk0*wrk1
-	 wghtl(1,1,0) = dels(1)*wrk1
-	 wrk1         = dels(2)*dels(3)
-	 wghtl(0,1,1) = wrk0*wrk1
-	 wghtl(1,1,1) = dels(1)*wrk1
 
-	 iv  = ratindu
-         dels(2)  = max( 0._r8,min( 1._r8,(v3ratu - o3rat(iv)) * del_o3rat(iv) ) )
+         iv   = ratindl
+         dels(2) = min_max_bound(0._r8, 1._r8, (v3ratl - o3rat(iv)) * del_o3rat(iv) )
+         call calc_sum_wght (dels, wrk0,        & ! in
+                             pind, is, iv, ial, & ! in
+                             psum_l             ) ! out
 
-	 wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
-	 wghtu(0,0,0) = wrk0*wrk1
-	 wghtu(1,0,0) = dels(1)*wrk1
-	 wrk1         = (1._r8 - dels(2))*dels(3)
-	 wghtu(0,0,1) = wrk0*wrk1
-	 wghtu(1,0,1) = dels(1)*wrk1
-	 wrk1         = dels(2)*(1._r8 - dels(3))
-	 wghtu(0,1,0) = wrk0*wrk1
-	 wghtu(1,1,0) = dels(1)*wrk1
-	 wrk1         = dels(2)*dels(3)
-	 wghtu(0,1,1) = wrk0*wrk1
-	 wghtu(1,1,1) = dels(1)*wrk1
+         iv   = ratindu
+         dels(2) = min_max_bound(0._r8, 1._r8, (v3ratu - o3rat(iv)) * del_o3rat(iv) )
+         call calc_sum_wght (dels, wrk0,          & ! in
+                             pind-1, is, iv, ial, & ! in
+                             psum_u               ) ! inout
 
-	 iz   = pind
-	 iv   = ratindl
-	 ivp1 = iv + 1
          do wn = 1,nw
-            psum_l(wn) = wghtl(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
-                         + wghtl(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
-                         + wghtl(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
-                         + wghtl(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
-                         + wghtl(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
-                         + wghtl(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
-                         + wghtl(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
-                         + wghtl(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
-         end do
+            rsf(wn,kk) = (psum_l(wn) + wght1*(psum_u(wn) - psum_l(wn)))
+         enddo
 
-	 iz   = iz - 1
-	 iv   = ratindu
-	 ivp1 = iv + 1
-         do wn = 1,nw
-            psum_u = wghtu(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
-                     + wghtu(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
-                     + wghtu(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
-                     + wghtu(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
-                     + wghtu(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
-                     + wghtu(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
-                     + wghtu(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
-                     + wghtu(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
-            rsf(wn,k) = (psum_l(wn) + wght1*(psum_u - psum_l(wn)))
-         end do
 !------------------------------------------------------------------------------
 !      etfphot comes in as photons/cm^2/sec/nm  (rsf includes the wlintv factor -- nm)
 !     ... --> convert to photons/cm^2/s 
 !------------------------------------------------------------------------------
-         rsf(:,k) = etfphot(:) * rsf(:,k)
+         rsf(:,kk) = etfphot(:) * rsf(:,kk)
 
-      end do Level_loop
+      enddo Level_loop
 
       deallocate( psum_l )
+      deallocate( psum_u )
 
-      end subroutine interpolate_rsf
+   end subroutine interpolate_rsf
 
+!======================================================================================
+   subroutine calc_sum_wght (dels, wrk0,        & ! in
+                             iz, is, iv, ial,   & ! in
+                             psum               ) ! out
 
-      end module mo_jlong
+      implicit none
+      real(r8), intent(in) :: dels(3)
+      real(r8), intent(in) :: wrk0
+      integer,  intent(in) :: iz, is, iv, ial
+      real(r8), intent(inout)  :: psum(:)
+
+      ! local variables
+      real(r8) :: wrk1
+      real(r8) :: wght(0:1,0:1,0:1)
+      integer  :: wn
+      integer  :: isp1, ivp1, ialp1
+
+      isp1 = is + 1
+      ivp1 = iv + 1
+      ialp1 = ial + 1
+
+         wrk1         = (1._r8 - dels(2))*(1._r8 - dels(3))
+         wght(0,0,0) = wrk0*wrk1
+         wght(1,0,0) = dels(1)*wrk1
+         wrk1         = (1._r8 - dels(2))*dels(3)
+         wght(0,0,1) = wrk0*wrk1
+         wght(1,0,1) = dels(1)*wrk1
+         wrk1         = dels(2)*(1._r8 - dels(3))
+         wght(0,1,0) = wrk0*wrk1
+         wght(1,1,0) = dels(1)*wrk1
+         wrk1         = dels(2)*dels(3)
+         wght(0,1,1) = wrk0*wrk1
+         wght(1,1,1) = dels(1)*wrk1
+
+         ! nw and rsf_tab are module variables
+         do wn = 1,nw
+            psum(wn) = wght(0,0,0) * rsf_tab(wn,iz,is,iv,ial) &
+                     + wght(0,0,1) * rsf_tab(wn,iz,is,iv,ialp1) &
+                     + wght(0,1,0) * rsf_tab(wn,iz,is,ivp1,ial) &
+                     + wght(0,1,1) * rsf_tab(wn,iz,is,ivp1,ialp1) &
+                     + wght(1,0,0) * rsf_tab(wn,iz,isp1,iv,ial) &
+                     + wght(1,0,1) * rsf_tab(wn,iz,isp1,iv,ialp1) &
+                     + wght(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
+                     + wght(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
+         enddo
+
+   end subroutine calc_sum_wght
+ 
+!======================================================================================
+   subroutine find_index(var_in, var_len, var_min,  & ! in
+                         idx_out                    ) ! out
+!------------------------------------------------------------------------------
+! find the index of the first element in var_in(1:var_len) where the value is > var_min
+!------------------------------------------------------------------------------
+      integer, intent(in) :: var_len  ! length of the input variable
+      real(r8),intent(in) :: var_in(var_len)   ! input variable
+      real(r8),intent(in) :: var_min  ! variable threshold
+      integer, intent(out):: idx_out  ! index
+
+      integer :: ii
+
+      do ii = 1,var_len
+         if( var_in(ii) > var_min ) then
+            exit
+         endif
+      enddo
+
+      idx_out = max( min(ii,var_len)-1, 1 )
+
+   end subroutine find_index
+
+!======================================================================================
+   end module mo_jlong
