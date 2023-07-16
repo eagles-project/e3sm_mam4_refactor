@@ -437,7 +437,7 @@ contains
 !-----------------------------------------------------------------
     real(r8), parameter :: Pa2mb         = 1.e-2_r8       ! pascals to mb
 
-    integer ::  i, k, m, n                 ! indicies
+    integer ::  icol, kk, mm                 ! indicies
     integer ::  astat
     real(r8) ::  sza
     real(r8) ::  colo3(pver)               ! vertical o3 column density
@@ -446,7 +446,6 @@ contains
     real(r8) ::  eff_alb(pver)             ! effective albedo from cloud modifications
     real(r8) ::  cld_mult(pver)            ! clould multiplier
     real(r8), allocatable ::  lng_prates(:,:) ! photorates matrix (1/s)
-    real(r8), allocatable :: zarg(:)
     real(r8), allocatable :: tline(:)               ! vertical temperature array
 
 
@@ -454,7 +453,6 @@ contains
        return
     endif
 
-    allocate( zarg(pver) )
     allocate( tline(pver) )
 
 !-----------------------------------------------------------------
@@ -471,36 +469,36 @@ contains
 !-----------------------------------------------------------------
 !	... zero all photorates
 !-----------------------------------------------------------------
-    do m = 1,max(1,phtcnt)
-       do k = 1,pver
-          photos(:,k,m) = 0._r8
+    do mm = 1,max(1,phtcnt)
+       do kk = 1,pver
+          photos(:,kk,mm) = 0._r8
        enddo
     enddo
 
-    col_loop : do i = 1,ncol
-       sza = zen_angle(i)*r2d
+    col_loop : do icol = 1,ncol
+       sza = zen_angle(icol)*r2d
        daylight : if( sza >= 0._r8 .and. sza < max_zen_angle ) then
-          parg(:)     = Pa2mb*pmid(i,:)
-          colo3(:)    = col_dens(i,:,1)
-          
-          tline(1:pver) = temper(i,:pver)
-          zarg(1:pver) = zmid(i,:pver)
-
           !-----------------------------------------------------------------
           !     ... compute eff_alb and cld_mult -- needs to be before jlong
           !-----------------------------------------------------------------
-          call cloud_mod( zen_angle(i), clouds(i,:), lwc(i,:), pdel(i,:), srf_alb(i), &
-                          eff_alb, cld_mult )
+          call cloud_mod( zen_angle(icol), clouds(icol,:), lwc(icol,:), & ! in
+                          pdel(icol,:), srf_alb(icol), & ! in
+                          eff_alb, cld_mult ) ! out
           cld_mult(:) = esfact * cld_mult(:)
 
           !-----------------------------------------------------------------
           !	... long wave length component
           !-----------------------------------------------------------------
-          call jlong( pver, sza, eff_alb, parg, tline, colo3, lng_prates )          
-          do m = 1,phtcnt
-             if( lng_indexer(m) > 0 ) then
-                photos(i,:,m) = (photos(i,:,m) + &
-                               pht_alias_mult(m,2) * lng_prates(lng_indexer(m),:))*cld_mult(:)
+          parg(:)     = Pa2mb*pmid(icol,:)
+          colo3(:)    = col_dens(icol,:,1)
+          tline(1:pver) = temper(icol,:pver)
+          call jlong( pver, sza, eff_alb, parg, tline, colo3, & ! in
+                      lng_prates ) ! out
+
+          do mm = 1,phtcnt
+             if( lng_indexer(mm) > 0 ) then
+                photos(icol,:,mm) = cld_mult(:) * (photos(icol,:,mm) + &
+                               pht_alias_mult(mm,2)*lng_prates(lng_indexer(mm),:) ) 
              endif
           enddo
 
@@ -508,7 +506,6 @@ contains
     enddo col_loop
 
     if ( allocated(lng_prates) ) deallocate( lng_prates )
-    if ( allocated(zarg) )    deallocate( zarg )
     if ( allocated(tline) )   deallocate( tline )
 
   end subroutine table_photo
