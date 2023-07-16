@@ -395,42 +395,35 @@ contains
   end subroutine photo_inti
 
 !====================================================================================
-  subroutine table_photo( photos, pmid, pdel, temper, zmid, zint, &
-                          col_dens, zen_angle, srf_alb, lwc, clouds, &
-                          esfact, vmr, invariants, ncol, lchnk, pbuf )
+  subroutine table_photo( photos, & ! out
+                          pmid, pdel, temper, & ! in
+                          col_dens, zen_angle, srf_alb, lwc, clouds, & ! in
+                          esfact, ncol ) ! in
 !-----------------------------------------------------------------
 !   	... table photorates for wavelengths > 200nm
 !-----------------------------------------------------------------
 
-    use chem_mods,   only : nabscol, phtcnt, gas_pcnst, nfs
-    use chem_mods,   only : pht_alias_mult, indexm
+    use chem_mods,   only : nabscol, phtcnt, nfs
+    use chem_mods,   only : pht_alias_mult
     use mo_jlong,    only : nlng => numj, jlong
-    use mo_jeuv,     only : neuv, jeuv, nIonRates
     use mo_constants, only : r2d
-    use physics_buffer, only : physics_buffer_desc, pbuf_set_field
 
     implicit none
 
 !-----------------------------------------------------------------
 !   	... dummy arguments
 !-----------------------------------------------------------------
-    integer,  intent(in)    :: lchnk
     integer,  intent(in)    :: ncol
     real(r8), intent(in)    :: esfact                       ! earth sun distance factor
-    real(r8), intent(in)    :: vmr(ncol,pver,max(1,gas_pcnst)) ! vmr
-    real(r8), intent(in)    :: col_dens(ncol,pver,nabscol) ! column densities (molecules/cm^2)
-    real(r8), intent(in)    :: zen_angle(ncol)              ! solar zenith angle (radians)
+    real(r8), intent(in)    :: col_dens(ncol,pver,nabscol) ! column densities [molecules/cm^2]
+    real(r8), intent(in)    :: zen_angle(ncol)              ! solar zenith angle [radians]
     real(r8), intent(in)    :: srf_alb(pcols)               ! surface albedo
-    real(r8), intent(in)    :: lwc(ncol,pver)               ! liquid water content (kg/kg)
+    real(r8), intent(in)    :: lwc(ncol,pver)               ! liquid water content [kg/kg]
     real(r8), intent(in)    :: clouds(ncol,pver)            ! cloud fraction
-    real(r8), intent(in)    :: pmid(pcols,pver)             ! midpoint pressure (Pa)
-    real(r8), intent(in)    :: pdel(pcols,pver)             ! pressure delta about midpoint (Pa)
-    real(r8), intent(in)    :: temper(pcols,pver)           ! midpoint temperature (K)
-    real(r8), intent(in)    :: zmid(ncol,pver)              ! midpoint height (km)
-    real(r8), intent(in)    :: zint(ncol,pver)              ! interface height (km)
-    real(r8), intent(in)    :: invariants(ncol,pver,max(1,nfs)) ! invariant densities (molecules/cm^3)
-    real(r8), intent(inout) :: photos(ncol,pver,phtcnt)     ! photodissociation rates (1/s)
-    type(physics_buffer_desc),pointer :: pbuf(:)
+    real(r8), intent(in)    :: pmid(pcols,pver)             ! midpoint pressure [Pa]
+    real(r8), intent(in)    :: pdel(pcols,pver)             ! pressure delta about midpoint [Pa]
+    real(r8), intent(in)    :: temper(pcols,pver)           ! midpoint temperature [K]
+    real(r8), intent(out)   :: photos(ncol,pver,phtcnt)     ! photodissociation rates [1/s]
 
 !-----------------------------------------------------------------
 !    	... local variables
@@ -441,12 +434,12 @@ contains
     integer ::  astat
     real(r8) ::  sza
     real(r8) ::  colo3(pver)               ! vertical o3 column density
-    real(r8) ::  parg(pver)                ! vertical pressure array (hPa)
+    real(r8) ::  parg(pver)                ! vertical pressure array [hPa]
 
     real(r8) ::  eff_alb(pver)             ! effective albedo from cloud modifications
     real(r8) ::  cld_mult(pver)            ! clould multiplier
-    real(r8), allocatable ::  lng_prates(:,:) ! photorates matrix (1/s)
-    real(r8), allocatable :: tline(:)               ! vertical temperature array
+    real(r8), allocatable ::  lng_prates(:,:) ! photorates matrix [1/s]
+    real(r8), allocatable :: tline(:)         ! vertical temperature array [K]
 
 
     if( phtcnt < 1 ) then
