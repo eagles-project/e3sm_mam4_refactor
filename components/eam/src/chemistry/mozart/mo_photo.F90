@@ -440,7 +440,6 @@ contains
     integer ::  i, k, m, n                 ! indicies
     integer ::  astat
     real(r8) ::  sza
-    real(r8) ::  alias_factor
     real(r8) ::  colo3(pver)               ! vertical o3 column density
     real(r8) ::  parg(pver)                ! vertical pressure array (hPa)
 
@@ -453,8 +452,7 @@ contains
 
     if( phtcnt < 1 ) then
        return
-    end if
-
+    endif
 
     allocate( zarg(pver) )
     allocate( tline(pver) )
@@ -467,7 +465,7 @@ contains
        if( astat /= 0 ) then
           write(iulog,*) 'photo: Failed to allocate lng_prates; error = ',astat
           call endrun
-       end if
+       endif
     endif
 
 !-----------------------------------------------------------------
@@ -476,8 +474,8 @@ contains
     do m = 1,max(1,phtcnt)
        do k = 1,pver
           photos(:,k,m) = 0._r8
-       end do
-    end do
+       enddo
+    enddo
 
     col_loop : do i = 1,ncol
        sza = zen_angle(i)*r2d
@@ -486,7 +484,6 @@ contains
           colo3(:)    = col_dens(i,:,1)
           
           tline(1:pver) = temper(i,:pver)
-
           zarg(1:pver) = zmid(i,:pver)
 
           !-----------------------------------------------------------------
@@ -502,17 +499,13 @@ contains
           call jlong( pver, sza, eff_alb, parg, tline, colo3, lng_prates )          
           do m = 1,phtcnt
              if( lng_indexer(m) > 0 ) then
-                alias_factor = pht_alias_mult(m,2)
-                if( alias_factor == 1._r8 ) then
-                   photos(i,:,m) = (photos(i,:,m) + lng_prates(lng_indexer(m),:))*cld_mult(:)
-                else
-                   photos(i,:,m) = (photos(i,:,m) + alias_factor * lng_prates(lng_indexer(m),:))*cld_mult(:)
-                end if
-             end if
-          end do
+                photos(i,:,m) = (photos(i,:,m) + &
+                               pht_alias_mult(m,2) * lng_prates(lng_indexer(m),:))*cld_mult(:)
+             endif
+          enddo
 
-       end if daylight
-    end do col_loop
+       endif daylight
+    enddo col_loop
 
     if ( allocated(lng_prates) ) deallocate( lng_prates )
     if ( allocated(zarg) )    deallocate( zarg )
