@@ -439,47 +439,25 @@ contains
 
     integer ::  i, k, m, n                 ! indicies
     integer ::  astat
-    integer ::  indxIR                     ! pbuf index for ionization rates
     real(r8) ::  sza
     real(r8) ::  alias_factor
-    real(r8) ::  fac1(pver)                ! work space for j(no) calc
-    real(r8) ::  fac2(pver)                ! work space for j(no) calc
     real(r8) ::  colo3(pver)               ! vertical o3 column density
     real(r8) ::  parg(pver)                ! vertical pressure array (hPa)
 
-    real(r8) ::  cld_line(pver)            ! vertical cloud array
-    real(r8) ::  lwc_line(pver)            ! vertical lwc array
     real(r8) ::  eff_alb(pver)             ! effective albedo from cloud modifications
     real(r8) ::  cld_mult(pver)            ! clould multiplier
-    real(r8) ::  tmp(ncol,pver)            ! wrk array
     real(r8), allocatable ::  lng_prates(:,:) ! photorates matrix (1/s)
-    real(r8), allocatable ::  sht_prates(:,:) ! photorates matrix (1/s)
-    real(r8), allocatable ::  euv_prates(:,:) ! photorates matrix (1/s)
-    
-
     real(r8), allocatable :: zarg(:)
     real(r8), allocatable :: tline(:)               ! vertical temperature array
-    real(r8), allocatable :: o_den(:)               ! o density (molecules/cm^3)
-    real(r8), allocatable :: o2_den(:)              ! o2 density (molecules/cm^3)
-    real(r8), allocatable :: o3_den(:)              ! o3 density (molecules/cm^3)
-    real(r8), allocatable :: no_den(:)              ! no density (molecules/cm^3)
-    real(r8), allocatable :: n2_den(:)              ! n2 density (molecules/cm^3)
-    real(r8), allocatable :: jno_sht(:)             ! no short photorate
-    real(r8), allocatable :: jo2_sht(:,:)           ! o2 short photorate
 
-    integer :: n_jshrt_levs, p1, p2
-    real(r8) :: ideltaZkm, factor
 
     if( phtcnt < 1 ) then
        return
     end if
 
-    n_jshrt_levs = pver
-    p1 = 1 
-    p2 = pver
 
-    allocate( zarg(n_jshrt_levs) )
-    allocate( tline(n_jshrt_levs) )
+    allocate( zarg(pver) )
+    allocate( tline(pver) )
 
 !-----------------------------------------------------------------
 !	... allocate long temp arrays
@@ -506,19 +484,15 @@ contains
        daylight : if( sza >= 0._r8 .and. sza < max_zen_angle ) then
           parg(:)     = Pa2mb*pmid(i,:)
           colo3(:)    = col_dens(i,:,1)
-          fac1(:)     = pdel(i,:)
-          lwc_line(:) = lwc(i,:)
-          cld_line(:) = clouds(i,:)
-
           
-          tline(p1:p2) = temper(i,:pver)
+          tline(1:pver) = temper(i,:pver)
 
-          zarg(p1:p2) = zmid(i,:pver)
+          zarg(1:pver) = zmid(i,:pver)
 
           !-----------------------------------------------------------------
           !     ... compute eff_alb and cld_mult -- needs to be before jlong
           !-----------------------------------------------------------------
-          call cloud_mod( zen_angle(i), cld_line, lwc_line, fac1, srf_alb(i), &
+          call cloud_mod( zen_angle(i), clouds(i,:), lwc(i,:), pdel(i,:), srf_alb(i), &
                           eff_alb, cld_mult )
           cld_mult(:) = esfact * cld_mult(:)
 
@@ -541,18 +515,8 @@ contains
     end do col_loop
 
     if ( allocated(lng_prates) ) deallocate( lng_prates )
-    if ( allocated(sht_prates) ) deallocate( sht_prates )
-    if ( allocated(euv_prates) ) deallocate( euv_prates )
-
     if ( allocated(zarg) )    deallocate( zarg )
     if ( allocated(tline) )   deallocate( tline )
-    if ( allocated(o_den) )   deallocate( o_den )
-    if ( allocated(o2_den) )  deallocate( o2_den )
-    if ( allocated(o3_den) )  deallocate( o3_den )
-    if ( allocated(no_den) )  deallocate( no_den )
-    if ( allocated(n2_den) )  deallocate( n2_den )
-    if ( allocated(jno_sht) ) deallocate( jno_sht )
-    if ( allocated(jo2_sht) ) deallocate( jo2_sht )
 
   end subroutine table_photo
 
