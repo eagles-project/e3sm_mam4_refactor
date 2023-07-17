@@ -8,7 +8,6 @@ module rate_diags
   use cam_history,  only : addfld
   use cam_history,  only : outfld
   use chem_mods,    only : rxt_tag_cnt, rxt_tag_lst, rxt_tag_map
-  use ppgrid,       only : pver
 
   implicit none
   private 
@@ -23,47 +22,48 @@ contains
 !--------------------------------------------------------------------------------
   subroutine rate_diags_init
 
-    integer :: i, len, pos
+    integer :: ii, len, pos
 
     character(len=64) :: name
 
-    do i = 1,rxt_tag_cnt
+    do ii = 1,rxt_tag_cnt
        pos = 0
-       pos = index(rxt_tag_lst(i),'tag_')
-       if (pos <= 0) pos = index(rxt_tag_lst(i),'usr_')
-       if (pos <= 0) pos = index(rxt_tag_lst(i),'cph_')
-       if (pos <= 0) pos = index(rxt_tag_lst(i),'ion_')
+       pos = index(rxt_tag_lst(ii),'tag_')
+       if (pos <= 0) pos = index(rxt_tag_lst(ii),'usr_')
+       if (pos <= 0) pos = index(rxt_tag_lst(ii),'cph_')
+       if (pos <= 0) pos = index(rxt_tag_lst(ii),'ion_')
        if (pos>0) then
-          name = 'r_'//trim(rxt_tag_lst(i)(5:))
+          name = 'r_'//trim(rxt_tag_lst(ii)(5:))
        else
-          name = 'r_'//trim(rxt_tag_lst(i)(1:))
+          name = 'r_'//trim(rxt_tag_lst(ii)(1:))
        endif
        len = min(fieldname_len,len_trim(name))
-       rate_names(i) = trim(name(1:len))
-       call addfld(rate_names(i), (/ 'lev' /),'A', 'molecules/cm3/sec','reaction rate')
+       rate_names(ii) = trim(name(1:len))
+       call addfld(rate_names(ii), (/ 'lev' /),'A', 'molecules/cm3/sec','reaction rate')
     enddo
 
   end subroutine rate_diags_init
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-  subroutine rate_diags_calc( rxt_rates, vmr, m, ncol, lchnk )
+  subroutine rate_diags_calc( rxt_rates, & !inout
+      vmr, air_density, ncol, lchnk ) !in
 
     use mo_rxt_rates_conv, only: set_rates
 
-    real(r8), intent(inout) :: rxt_rates(:,:,:) ! 'molec/cm3/sec'
-    real(r8), intent(in)    :: vmr(:,:,:)
-    real(r8), intent(in)    :: m(:,:)           ! air density (molecules/cm3)
+    real(r8), intent(inout) :: rxt_rates(:,:,:) ! reaction rates[molec/cm3/sec]
+    real(r8), intent(in)    :: vmr(:,:,:)       ! volule mixing ratio [mol/mol]
+    real(r8), intent(in)    :: air_density(:,:) ! air density [molecules/cm3]
     integer,  intent(in)    :: ncol, lchnk
 
-    integer :: i
+    integer :: ii
 
     call set_rates( rxt_rates, vmr, ncol )
     
-    do i = 1, rxt_tag_cnt
+    do ii = 1, rxt_tag_cnt
        ! convert from vmr/sec to molecules/cm3/sec
-       rxt_rates(:ncol,:,rxt_tag_map(i)) = rxt_rates(:ncol,:,rxt_tag_map(i)) *  m(:,:)
-       call outfld( rate_names(i), rxt_rates(:ncol,:,rxt_tag_map(i)), ncol, lchnk )
+       rxt_rates(:ncol,:,rxt_tag_map(ii)) = rxt_rates(:ncol,:,rxt_tag_map(ii)) *  air_density(:,:)
+       call outfld( rate_names(ii), rxt_rates(:ncol,:,rxt_tag_map(ii)), ncol, lchnk )
 
     enddo
   end subroutine rate_diags_calc
