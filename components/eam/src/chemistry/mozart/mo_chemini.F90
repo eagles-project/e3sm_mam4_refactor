@@ -78,7 +78,6 @@ contains
     use mo_synoz,          only : synoz_inti
     use mo_chem_utls,      only : get_spc_ndx
     use mo_airglow,        only : init_airglow
-    use mo_mean_mass,      only : init_mean_mass
     use mo_mass_xforms,    only : init_mass_xforms
     use mo_strato_rates,   only : init_strato_rates
     use mo_cph,            only : init_cph
@@ -140,7 +139,6 @@ contains
 
     call gas_phase_chemdr_inti(chem_name)
 
-    call init_mean_mass
     call init_mass_xforms
 
     call setinv_inti()

@@ -4,25 +4,11 @@ module mo_mean_mass
   implicit none
 
   private
-  public :: set_mean_mass, init_mean_mass
-
-  integer :: id_o2, id_o, id_h, id_n
+  public :: set_mean_mass
 
 contains
-
-  subroutine init_mean_mass
-    use mo_chem_utls, only : get_spc_ndx
-
-    implicit none
-
-    id_o2 = get_spc_ndx('O2')
-    id_o  = get_spc_ndx('O')
-    id_h  = get_spc_ndx('H')
-    id_n  = get_spc_ndx('N')
-
-  endsubroutine init_mean_mass
-
-  subroutine set_mean_mass( ncol, mbar )
+  subroutine set_mean_mass( ncol, &! in
+       mbar ) !out
     !-----------------------------------------------------------------
     !        ... Set the invariant densities (molecules/cm**3)
     !-----------------------------------------------------------------
