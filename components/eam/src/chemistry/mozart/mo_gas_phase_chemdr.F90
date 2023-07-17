@@ -889,7 +889,8 @@ contains
                     depvel(:ncol,:),  sflx(:ncol,:), &
                     mmr_tend(:ncol,:,:), pdel(:ncol,:), pdeldry(:ncol,:), pbuf, troplev(:ncol)  )
 
-    call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
+    call rate_diags_calc( reaction_rates(:,:,:), &! inout
+         vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk ) !in
     call t_stopf('chemdr_diags')
 
   end subroutine gas_phase_chemdr

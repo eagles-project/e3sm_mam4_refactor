@@ -18,8 +18,8 @@ module rate_diags
 
 contains
 
-!--------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
   subroutine rate_diags_init
 
     integer :: ii, len, pos
@@ -44,22 +44,23 @@ contains
 
   end subroutine rate_diags_init
 
-!--------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------
   subroutine rate_diags_calc( rxt_rates, & !inout
-      vmr, air_density, ncol, lchnk ) !in
+       vmr, air_density, ncol, lchnk ) !in
 
     use mo_rxt_rates_conv, only: set_rates
 
-    real(r8), intent(inout) :: rxt_rates(:,:,:) ! reaction rates[molec/cm3/sec]
+    real(r8), intent(inout) :: rxt_rates(:,:,:) ! reaction rates[molec/cm^3/sec]
     real(r8), intent(in)    :: vmr(:,:,:)       ! volule mixing ratio [mol/mol]
-    real(r8), intent(in)    :: air_density(:,:) ! air density [molecules/cm3]
+    real(r8), intent(in)    :: air_density(:,:) ! invariant densities [molecules/cm^3]
     integer,  intent(in)    :: ncol, lchnk
 
     integer :: ii
 
-    call set_rates( rxt_rates, vmr, ncol )
-    
+    call set_rates( rxt_rates, & !inout
+         vmr, ncol ) !in
+
     do ii = 1, rxt_tag_cnt
        ! convert from vmr/sec to molecules/cm3/sec
        rxt_rates(:ncol,:,rxt_tag_map(ii)) = rxt_rates(:ncol,:,rxt_tag_map(ii)) *  air_density(:,:)
