@@ -6,7 +6,7 @@
 
       contains
 
-      subroutine negtrc( header, fld, ncol )
+      subroutine negtrc( fld, ncol )
 !-----------------------------------------------------------------------
 !  	... Check for negative constituent values and
 !	    replace with zero value
@@ -22,23 +22,22 @@
 !  	... Dummy arguments
 !-----------------------------------------------------------------------
       integer, intent(in)          :: ncol
-      character(len=*), intent(in) :: header
-      real(r8), intent(inout)          :: fld(ncol,pver,gas_pcnst) ! field to check
+      real(r8), intent(inout)      :: fld(ncol,pver,gas_pcnst) ! field to check [vmr]
 
 !-----------------------------------------------------------------------
 !  	... Local variables
 !-----------------------------------------------------------------------
-      integer :: m
+      integer :: icnst
       integer :: nneg                       ! flag counter
 
-      do m  = 1,gas_pcnst
-         nneg = count( fld(:,:,m) < 0._r8 )
+      do icnst  = 1, gas_pcnst
+         nneg = count( fld(:,:,icnst) < 0._r8 )
 	 if( nneg > 0 ) then
-            where( fld(:,:,m) < 0._r8 )
-	       fld(:,:,m) = 0._r8
+            where( fld(:,:,icnst) < 0._r8 )
+	       fld(:,:,icnst) = 0._r8
 	    endwhere
-	 end if
-      end do
+	 endif
+      enddo
 
       end subroutine negtrc
 

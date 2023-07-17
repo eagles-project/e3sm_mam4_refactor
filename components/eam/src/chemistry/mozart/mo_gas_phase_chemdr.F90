@@ -806,7 +806,7 @@ contains
     !-----------------------------------------------------------------------      
     !         ... Check for negative values and reset to zero
     !-----------------------------------------------------------------------      
-    call negtrc( 'After chemistry ', vmr, ncol )
+    call negtrc( vmr, ncol )
 
     !-----------------------------------------------------------------------      
     !         ... Set upper boundary mmr values
