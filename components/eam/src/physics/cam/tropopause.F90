@@ -1169,23 +1169,15 @@ contains
     ! Dispatch the request to the appropriate routine.
     ! BJG:  if output_all can be assumed to be always false, then analytic, stobie, wmo options can be removed below, as well as other sections
     select case(algorithm)
-      case(TROP_ALG_ANALYTIC)
-        call tropopause_analytic(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_CLIMATE)
         call tropopause_climate(pstate, tropLev, tropP, tropT, tropZ)
-
-      case(TROP_ALG_STOBIE)
-        call tropopause_stobie(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_HYBSTOB)
         call tropopause_hybridstobie(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_TWMO)
         call tropopause_twmo(pstate, tropLev, tropP, tropT, tropZ)
-
-      case(TROP_ALG_WMO)
-        call tropopause_wmo(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_CPP)
         call tropopause_cpp(pstate, tropLev, tropP, tropT, tropZ)
@@ -1419,31 +1411,6 @@ contains
     call outfld('TROPF_PD',  tropPdf(:ncol, :), ncol, lchnk)
     call outfld('TROPF_FD',  tropFound(:ncol),  ncol, lchnk)
     
-    ! If requested, do all of the algorithms.
-    if (output_all) then
-    
-      do alg = 2, TROP_NALG
-    
-        ! Find the tropopause using just the analytic algorithm.
-        call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, primary=alg, backup=TROP_ALG_NONE)
-  
-        tropPdf(:,:) = 0._r8
-        tropFound(:) = 0._r8
-      
-        do i = 1, ncol
-          if (tropLev(i) /= NOTFOUND) then
-            tropPdf(i, tropLev(i)) = 1._r8
-            tropFound(i) = 1._r8
-          end if
-        end do
-  
-        call outfld('TROP' // TROP_LETTER(alg) // '_P',   tropP(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_T',   tropT(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_Z',   tropZ(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_PD',  tropPdf(:ncol, :), ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_FD',  tropFound(:ncol),  ncol, lchnk)
-      end do
-    end if
     
     return
   end subroutine tropopause_output
