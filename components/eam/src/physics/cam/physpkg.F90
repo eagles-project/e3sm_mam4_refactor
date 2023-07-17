@@ -71,6 +71,8 @@ module physpkg
   integer ::  snow_sh_idx        = 0
   integer :: dgnumwet_idx        = 0
   integer :: wetdens_ap_idx      = 0
+  integer :: dgnum_idx           = 0
+  integer :: pblh_idx            = 0
   integer :: species_class(pcnst)  = -1 !BSINGH: Moved from modal_aero_data.F90 as it is being used in second call to zm deep convection scheme (convect_deep_tend_2)
 
   save
@@ -361,7 +363,7 @@ subroutine phys_inidat( cam_out, pbuf2d )
     real(r8), pointer :: qpert(:,:)
 
     character*11 :: subname='phys_inidat' ! subroutine name
-    integer :: tpert_idx, qpert_idx, pblh_idx, vmag_gust_idx
+    integer :: tpert_idx, qpert_idx, vmag_gust_idx
 
     logical :: found=.false., found2=.false.
     integer :: ierr
@@ -909,9 +911,13 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     prec_sh_idx  = pbuf_get_index('PREC_SH')
     snow_sh_idx  = pbuf_get_index('SNOW_SH')
 
-    !Pbuf fields needed for drydep of aerosols
+    !Pbuf fields needed for drydep and gas-aerosol exchange of aerosols
     dgnumwet_idx   = pbuf_get_index('DGNUMWET')
     wetdens_ap_idx = pbuf_get_index('WETDENS_AP')
+
+    !Pbuf fields needed for gas-aerosol exchange of aerosols
+    dgnum_idx      = pbuf_get_index('DGNUM')
+    pblh_idx       = pbuf_get_index('pblh')
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
 
@@ -1523,9 +1529,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     !For aerosol drydep process
     real(r8), pointer :: dgncur_awet(:,:,:) ! geometric mean wet diameter for number distribution [m]
     real(r8), pointer :: wetdens(:,:,:)     ! wet density of interstitial aerosol [kg/m3]
+    real(r8), pointer :: pblh(:)            ! pbl height [m]
+
+    real(r8), pointer :: dgnum(:,:,:)            ! geometric mean dry diameter for number distribution [m]
+
     ! ptr2d_t is used to create arrays of pointers to 2D fields
-    
-    type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
+        type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
 
     character(len=16)  :: deep_scheme             ! Default set in phys_control.F90
 
@@ -1650,8 +1659,20 @@ if (l_tracer_aero) then
 
     ! Chemistry calculation
     if (chem_is_active()) then
+       do icnst = 1, pcnst
+         !errorhandle=.true. allows users to handles errors themselves, so it
+         !let the simulation run even if qqcw fiels is unassociated (e.g. for water specie indices)
+         qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk, errorhandle=.true.)
+       enddo
+
+       ! read additional variables from pbuf
+       call pbuf_get_field(pbuf, dgnum_idx,      dgnum,  start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+       call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet )
+       call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
+       call pbuf_get_field(pbuf, pblh_idx,       pblh)
+
        call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, &
-            pbuf,  fh2o, fsds)
+            pbuf,  fh2o, fsds, qqcw, pblh, dgnum, dgncur_awet, wetdens )
 
        call physics_update(state, ptend, ztodt, tend)
        call check_energy_chng(state, tend, "chem", nstep, ztodt, fh2o, zero, zero, zero)

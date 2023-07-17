@@ -21,64 +21,87 @@ module mam_support
      real(r8), pointer :: fld(:,:)
   end type ptr2d_t
 
+  interface min_max_bound
+   module procedure min_max_bound_cell
+   module procedure min_max_bound_array
+  end interface min_max_bound
+
 contains
-  !===============================================================================
-  subroutine assign_la_lc( imode,      ispec,          & ! in
-       la,         lc,             & ! out
-       is_lc_append_in             ) ! optional in
-    !-----------------------------------------------------------------------
-    ! get the index of interstital (la) and cloudborne (lc) aerosols
-    ! from mode index and species index
-    ! is_lc_append_in is true when cloudborne aerosols are appended after 
-    ! interstitial aerosol array (default is false)
-    !-----------------------------------------------------------------------
-    use constituents,    only: pcnst
-    use modal_aero_data, only: lmassptr_amode, lmassptrcw_amode, &
-         numptr_amode, numptrcw_amode
+!===============================================================================
+   subroutine assign_la_lc( imode,      ispec,          & ! in
+                            la,         lc,             & ! out
+                            is_lc_append_in             ) ! optional in
+!-----------------------------------------------------------------------
+! get the index of interstital (la) and cloudborne (lc) aerosols
+! from mode index and species index
+! is_lc_append_in is true when cloudborne aerosols are appended after 
+! interstitial aerosol array (default is false)
+!-----------------------------------------------------------------------
+   use constituents,    only: pcnst
+   use modal_aero_data, only: lmassptr_amode, lmassptrcw_amode, &
+                              numptr_amode, numptrcw_amode
 
-    integer, intent(in)     :: imode            ! index of MAM4 modes
-    integer, intent(in)     :: ispec            ! index of species, in which:
-    ! 0 = number concentration
-    ! other = mass concentration
-    integer, intent(out)    :: la               ! index of interstitial aerosol
-    integer, intent(out)    :: lc               ! index of cloudborne aerosol
-    logical, optional, intent(in) :: is_lc_append_in  ! if cloudborne aerosol is appended after interstitial aerosols
+   integer, intent(in)     :: imode            ! index of MAM4 modes
+   integer, intent(in)     :: ispec            ! index of species, in which:
+                                               ! 0 = number concentration
+                                               ! other = mass concentration
+   integer, intent(out)    :: la               ! index of interstitial aerosol
+   integer, intent(out)    :: lc               ! index of cloudborne aerosol
+   logical, optional, intent(in) :: is_lc_append_in  ! if cloudborne aerosol is appended after interstitial aerosols
 
-    logical :: is_lc_append   
+   logical :: is_lc_append   
 
-    ! the default option is treat cloudborne aerosols in separated array
-    is_lc_append = .false.
-    if (present(is_lc_append_in)) is_lc_append=is_lc_append_in
+   ! the default option is treat cloudborne aerosols in separated array
+   is_lc_append = .false.
+   if (present(is_lc_append_in)) is_lc_append=is_lc_append_in
 
-    if (ispec == 0) then
-       la = numptr_amode(imode)
-       lc = numptrcw_amode(imode)
-    else
-       la = lmassptr_amode(ispec,imode)
-       lc = lmassptrcw_amode(ispec,imode)
-    endif
+   if (ispec == 0) then
+      la = numptr_amode(imode)
+      lc = numptrcw_amode(imode)
+   else
+      la = lmassptr_amode(ispec,imode)
+      lc = lmassptrcw_amode(ispec,imode)
+   endif
 
-    ! if true: cloudborne aerosol is append after interstitial aerosol
-    if (is_lc_append) then
-       lc = lc + pcnst  
-    endif
+   ! if true: cloudborne aerosol is append after interstitial aerosol
+   if (is_lc_append) then
+        lc = lc + pcnst  
+   endif
 
-  end subroutine assign_la_lc
+   end subroutine assign_la_lc
 
-  !===============================================================================
-  pure function min_max_bound(minlim, maxlim, input) result(bounded)
+!===============================================================================
+   pure function min_max_bound_cell(minlim, maxlim, input) result(bounded)
+   !Bound a quantity between a min limit and a max limit
+   real(r8), intent(in) :: minlim, maxlim
+   real(r8), intent(in) :: input
+
+   !return value
+   real(r8) :: bounded
+
+   bounded = max(min(maxlim, input), minlim)
+
+ end function min_max_bound_cell
+
+!===============================================================================
+  pure function min_max_bound_array(minlim, maxlim, input,len_arr) result(bounded)
     !Bound a quantity between a min limit and a max limit
+    integer, intent(in)  :: len_arr
     real(r8), intent(in) :: minlim, maxlim
-    real(r8), intent(in) :: input
+    real(r8), intent(in) :: input(len_arr)
 
     !return value
-    real(r8) :: bounded
+    real(r8) :: bounded(len_arr)
 
-    bounded = max(min(maxlim, input), minlim)
+    !local
+    integer :: ii
 
-  end function min_max_bound
-  !===============================================================================
+    do ii = 1, len_arr
+      bounded(ii) = min_max_bound_cell(minlim, maxlim, input(ii))
+    enddo
 
+  end function min_max_bound_array
+!===============================================================================
   subroutine get_cldbrn_mmr(lchnk, pbuf, qqcw)
     !Get MMR for cloud borne aerosols using qqcw_get_field function
     use constituents,    only: pcnst
@@ -102,6 +125,4 @@ contains
     enddo
 
   end subroutine get_cldbrn_mmr
-  !===============================================================================
-
 end module mam_support

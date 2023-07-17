@@ -34,6 +34,7 @@ module ndrop
   use cam_logfile,      only: iulog
   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, lmassptr_amode, numptr_amode, &
        lspectype_amode, specdens_amode, spechygro
+  use mam_support,      only: ptr2d_cw
 
   implicit none
   private
@@ -322,7 +323,7 @@ contains
     real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step [fraction]
 
     ! inout arguments
-    type(ptr2d_t), intent(inout) :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
+    type(ptr2d_cw), intent(inout) :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
     ! output arguments
     type(physics_ptend), intent(out)   :: ptend

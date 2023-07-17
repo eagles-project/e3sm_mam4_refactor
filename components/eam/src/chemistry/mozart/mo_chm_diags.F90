@@ -227,19 +227,18 @@ contains
   end subroutine chm_diags_inti
 
 !========================================================================
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, depvel, depflx, mmr_tend, pdel, pdeldry, pbuf, ltrop )
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, depvel, depflx, mmr_tend, pdel, pdeldry, qqcw, ltrop ) !intent-ins
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
     
     use cam_history,  only : outfld
     use constituents, only : pcnst
-    use constituents, only : cnst_get_ind
     use phys_grid,    only : get_area_all_p, pcols
-    use physconst,    only : mwdry                   ! molecular weight of dry air
-    use physics_buffer, only : physics_buffer_desc
-    use modal_aero_data,  only : cnst_name_cw, qqcw_get_field ! for calculate sum of aerosol masses
+    use physconst,    only : mwdry            ! molecular weight of dry air
+    use modal_aero_data,  only : cnst_name_cw ! for calculate sum of aerosol masses
     use phys_control, only: phys_getopts
+    use mam_support,  only: ptr2d_cw
     
     implicit none
 
@@ -256,7 +255,7 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
     real(r8), intent(in)  :: pdeldry(ncol,pver)
     integer,  intent(in)  :: ltrop(pcols)  ! index of the lowest stratospheric level
-    type(physics_buffer_desc), pointer :: pbuf(:)
+    type(ptr2d_cw), target, intent(in) :: qqcw(:)                 ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
     !--------------------------------------------------------------------
     !	... local variables
@@ -273,7 +272,6 @@ contains
 
     real(r8) :: area(ncol), mass(ncol,pver), drymass(ncol,pver)
     real(r8) :: wgt
-    character(len=16) :: spc_name
     real(r8), pointer :: fldcw(:,:)  !working pointer to extract data from pbuf for sum of mass for aerosol classes
     real(r8), dimension(ncol,pver) :: mass_bc, mass_dst, mass_mom, mass_ncl, mass_pom, mass_so4, mass_soa
 
@@ -414,7 +412,7 @@ contains
     if (history_aerosol .and. .not. history_verbose) then
 
        do nn = 1,pcnst
-          fldcw => qqcw_get_field(pbuf,nn,lchnk,errorhandle=.true.)
+          fldcw => qqcw(nn)%fld(:,:)
           if(associated(fldcw)) then
              select case (trim(cnst_name_cw(nn)))
                 case ('bc_c1','bc_c3','bc_c4')

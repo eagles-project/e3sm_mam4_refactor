@@ -132,7 +132,6 @@ module chemistry
   integer :: ndx_cldtop
   integer :: h2o_ndx
   integer :: ixndrop             ! cloud droplet number index
-  integer :: ndx_pblh
 
   logical :: ghg_chem = .false.      ! .true. => use ghg chem package
   logical :: chem_step = .true.
@@ -877,9 +876,7 @@ end function chem_is_active
     use cam_history,         only : addfld, horiz_only, add_default, fieldname_len
     use chem_mods,           only : gas_pcnst, nfs, inv_lst
     use mo_chemini,          only : chemini
-    use mo_ghg_chem,         only : ghg_chem_init
     use mo_tracname,         only : solsym
-    use llnl_O1D_to_2OH_adj, only : O1D_to_2OH_adj_init
     use lin_strat_chem,      only : lin_strat_chem_inti
     use chlorine_loading_data, only : chlorine_loading_init
     use cfc11star,             only : init_cfc11star
@@ -929,7 +926,6 @@ end function chem_is_active
     ndx_nevapr = pbuf_get_index('NEVAPR')
     ndx_prain  = pbuf_get_index('PRAIN')
     ndx_cldtop = pbuf_get_index('CLDTOP')
-    ndx_pblh   = pbuf_get_index('pblh')
 
     call addfld( 'HEIGHT',        (/ 'ilev' /),'A',    'm', 'geopotential height above surface at interfaces (m)' )
     call addfld( 'CT_H2O_GHG', (/ 'lev' /), 'A','kg/kg/s', 'ghg-chem h2o source/sink' )
@@ -1001,12 +997,6 @@ end function chem_is_active
        , chem_name &
        , pbuf2d &
        )
-
-     if ( ghg_chem ) then
-        call ghg_chem_init(phys_state, bndtvg, h2orates)
-     endif
-     
-     call O1D_to_2OH_adj_init()
 
      call lin_strat_chem_inti()
      call chlorine_loading_init( chlorine_loading_file, &
@@ -1194,7 +1184,6 @@ end function chem_is_active
     use mo_flbc,           only : flbc_chk
     use tracer_cnst,       only : tracer_cnst_adv
     use tracer_srcs,       only : tracer_srcs_adv
-    use mo_ghg_chem,       only : ghg_chem_timestep_init
 
     use mo_solar_parms,    only : solar_parms_timestep_init
     use mo_jshort,         only : jshort_timestep_init
@@ -1266,9 +1255,6 @@ end function chem_is_active
     call linoz_data_adv(pbuf2d, phys_state)
     call chlorine_loading_advance()
 
-    if ( ghg_chem ) then
-       call ghg_chem_timestep_init(phys_state)
-    endif
 
     if (chem_is('waccm_ghg') .or. chem_is('waccm_mozart') .or. chem_is('waccm_mozart_mam3')) then
        !-----------------------------------------------------------------------
@@ -1309,7 +1295,8 @@ end function chem_is_active
 
   end subroutine chem_timestep_init
 
-  subroutine chem_timestep_tend( state, ptend, cam_in, cam_out, dt, pbuf,  fh2o, fsds )
+  subroutine chem_timestep_tend( state, ptend, cam_in, cam_out, dt, pbuf,  fh2o, fsds, qqcw, pblh, dgnum, &
+   dgncur_awet, wetdens )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -1336,6 +1323,9 @@ end function chem_is_active
     use tropopause,          only : tropopause_find, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
     use mo_neu_wetdep,       only : neu_wetdep_tend, do_neu_wetdep
     use aerodep_flx,         only : aerodep_flx_prescribed
+    use linoz_data,          only : fields, o3_clim_ndx, t_clim_ndx, o3col_clim_ndx, PmL_clim_ndx, dPmL_dO3_ndx,&
+    dPmL_dT_ndx, dPmL_dO3col_ndx, cariolle_pscs_ndx
+    use mam_support,         only: ptr2d_cw
     
     implicit none
 
@@ -1343,6 +1333,7 @@ end function chem_is_active
 ! Dummy arguments
 !-----------------------------------------------------------------------
     real(r8),            intent(in)    :: dt              ! time step
+    real(r8),            intent(in)    :: pblh(:)            ! pbl height [m]
     type(physics_state), intent(in)    :: state           ! Physics state variables
     type(physics_ptend), intent(out)   :: ptend           ! indivdual parameterization tendencies
     type(cam_in_t),      intent(inout) :: cam_in
@@ -1352,6 +1343,11 @@ end function chem_is_active
 
     type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8),            intent(in)    :: fsds(pcols)     ! longwave down at sfc
+    type(ptr2d_cw), target, intent(inout) :: qqcw(:)       ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    real(r8), target, intent(inout) :: dgncur_awet(:,:,:) ! geometric mean wet diameter for number distribution [m]
+    real(r8), target, intent(inout) :: wetdens(:,:,:)     ! wet density of interstitial aerosol [kg/m3]
+
+    real(r8), target, intent(inout) :: dgnum(:,:,:)            ! geometric mean dry diameter for number distribution [m]
 
 !-----------------------------------------------------------------------
 ! Local variables
@@ -1365,7 +1361,6 @@ end function chem_is_active
     real(r8) :: drydepflx(pcols,pcnst)             ! dry deposition fluxes (kg/m2/s)
     integer  :: tropLev(pcols)
     real(r8) :: ncldwtr(pcols,pver)                ! droplet number concentration (#/kg)
-    real(r8), pointer :: pblh(:)
     real(r8), pointer :: prain(:,:)
     real(r8), pointer :: cldfr(:,:)
     real(r8), pointer :: cmfdqr(:,:)
@@ -1376,12 +1371,32 @@ end function chem_is_active
 
     logical :: lq(pcnst)
 
+    !pointers to read LINOZ data
+    real(r8), dimension(:,:), pointer :: linoz_o3_clim
+    real(r8), dimension(:,:), pointer :: linoz_t_clim
+    real(r8), dimension(:,:), pointer :: linoz_o3col_clim
+    real(r8), dimension(:,:), pointer :: linoz_PmL_clim
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dT
+    real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3col
+    real(r8), dimension(:,:), pointer :: linoz_cariolle_psc
+
     if ( .not. chem_step ) return
 
     chem_dt = chem_freq*dt
 
     lchnk = state%lchnk
     ncol  = state%ncol
+
+    ! associate the field pointers
+    linoz_o3_clim      => fields(o3_clim_ndx)      %data(:,:,lchnk )
+    linoz_t_clim       => fields(t_clim_ndx)       %data(:,:,lchnk )
+    linoz_o3col_clim   => fields(o3col_clim_ndx)   %data(:,:,lchnk )
+    linoz_PmL_clim     => fields(PmL_clim_ndx)     %data(:,:,lchnk )
+    linoz_dPmL_dO3     => fields(dPmL_dO3_ndx)     %data(:,:,lchnk )
+    linoz_dPmL_dT      => fields(dPmL_dT_ndx)      %data(:,:,lchnk )
+    linoz_dPmL_dO3col  => fields(dPmL_dO3col_ndx)  %data(:,:,lchnk )
+    linoz_cariolle_psc => fields(cariolle_pscs_ndx)%data(:,:,lchnk )
 
     lq(:) = .false.
     do n = 1,pcnst
@@ -1405,7 +1420,6 @@ end function chem_is_active
     call tropopause_find(lchnk,ncol,state%pmid,state%pint,state%t,state%zm,state%zi,tropLev,primary=TROP_ALG_HYBSTOB,backup=TROP_ALG_CLIMATE)
 
     tim_ndx = pbuf_old_tim_idx()
-    call pbuf_get_field(pbuf, ndx_pblh,       pblh)
     call pbuf_get_field(pbuf, ndx_prain,      prain,  start=(/1,1/), kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cld,        cldfr,  start=(/1,1,tim_ndx/), kount=(/ncol,pver,1/) )
     call pbuf_get_field(pbuf, ndx_cmfdqr,     cmfdqr, start=(/1,1/),         kount=(/ncol,pver/))
@@ -1432,10 +1446,14 @@ end function chem_is_active
                           state%phis, state%zm, state%zi, calday, &
                           state%t, state%pmid, state%pdel, state%pdeldry, state%pint, &
                           cldw, tropLev, ncldwtr, state%u, state%v, &
-                          chem_dt, state%ps, xactive_prates, &
-                          fsds, cam_in%ts, cam_in%asdir, cam_in%ocnfrac, cam_in%icefrac, &
-                          cam_out%precc, cam_out%precl, cam_in%snowhland, ghg_chem, state%latmapback, &
-                          chem_name, drydepflx, cam_in%cflx, ptend%q, pbuf)
+                          prain, cldfr, cmfdqr, nevapr, &
+                          chem_dt, state%ps, linoz_o3_clim, linoz_t_clim, &
+                          linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
+                          linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
+                          fsds, cam_in%ts, cam_in%asdir, &
+                          cam_out%precc, cam_out%precl, cam_in%snowhland, pblh, &
+                          drydepflx, cam_in%cflx, ptend%q, pbuf, qqcw, &
+                          dgnum, dgncur_awet, wetdens         ) ! inout
 
     call t_stopf( 'chemdr' )
 

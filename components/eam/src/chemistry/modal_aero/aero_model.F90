@@ -1420,8 +1420,9 @@ lphase_jnmw_conditional: &
                                     latndx, lonndx,                 & ! in
                                     tfld, pmid, pdel, mbar,         & ! in
                                     zm,  qh2o, cwat, cldfr, cldnum, & ! in
-                                    airdens,            & ! in
-                                    vmr0, vmr, pbuf                 ) ! inout
+                                    airdens, vmr0, pblh,            & ! in
+                                    vmr, qqcw, dgnum,               & ! inout
+                                    dgnumwet, wetdens               ) ! inout
     !-----------------------------------------------------------------------
     ! interface to gas-aerosol exchange
     !-----------------------------------------------------------------------
@@ -1430,6 +1431,7 @@ lphase_jnmw_conditional: &
     use modal_aero_amicphys,   only : modal_aero_amicphys_intr
     use mo_setsox,             only : setsox
     use modal_aero_data,       only : qqcw_get_field
+    use mam_support,           only : ptr2d_cw
 
     !  dummy arguments
     integer,  intent(in) :: loffset           ! offset applied to modal aero "pointers"
@@ -1448,20 +1450,18 @@ lphase_jnmw_conditional: &
     real(r8), intent(in) :: cwat(:,:)         ! cloud liquid water content [kg/kg]
     real(r8), intent(in) :: cldfr(:,:)        ! cloud fraction [fraction]
     real(r8), intent(in) :: cldnum(:,:)       ! droplet number concentration [#/kg]
+    real(r8), intent(in) :: pblh(:)           ! pbl height [m]
     real(r8), intent(in) :: vmr0(:,:,:)       ! initial mixing ratios (before gas-phase chem changes) [vmr or mol/mol]
     real(r8), intent(inout) :: vmr(:,:,:)     ! mixing ratios [vmr or mol/mol]
-    type(physics_buffer_desc), pointer :: pbuf(:)
-    
-    ! local vars 
-    
+    type(ptr2d_cw), target, intent(inout) :: qqcw(:) ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    real(r8), intent(in), pointer :: dgnum(:,:,:)           ! aerosol diameter [m]
+    real(r8), intent(in), pointer :: dgnumwet(:,:,:)        ! aerosol wet diameter [m]
+    real(r8), intent(in), pointer :: wetdens(:,:,:)         ! aerosol wet density [kg/m3] 
+
+    ! local vars     
     integer :: imode, mm
     integer :: icol,kk
     integer :: nstep
-
-    real(r8), pointer :: dgnum(:,:,:)           ! aerosol diameter [m]
-    real(r8), pointer :: dgnumwet(:,:,:)        ! aerosol wet diameter [m]
-    real(r8), pointer :: wetdens(:,:,:)         ! aerosol wet density [kg/m3] 
-    real(r8), pointer :: pblh(:)                ! pbl height [m]
 
     real(r8), dimension(ncol) :: dvmrdt_col     ! column-integrated tendency from chemistry [kg/m2/s]
     character(len=32)         :: out_name       ! output variable name string
@@ -1474,12 +1474,6 @@ lphase_jnmw_conditional: &
     real(r8), pointer :: fldcw(:,:)             ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------------
-
-    ! read additional variables from pbuf
-    call pbuf_get_field(pbuf, dgnum_idx,      dgnum,  start=(/1,1,1/), kount=(/pcols,pver,ntot_amode/) )
-    call pbuf_get_field(pbuf, dgnumwet_idx,   dgnumwet )
-    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
-    call pbuf_get_field(pbuf, pblh_idx,       pblh)
 
     do imode=1,ntot_amode
        call outfld(dgnum_name(imode),dgnumwet(1:ncol,1:pver,imode), ncol, lchnk )
@@ -1502,9 +1496,9 @@ lphase_jnmw_conditional: &
 !
 ! Aerosol processes ...
 !
-    ! get mass mixing ratio from pbuf 
+    ! get mass mixing ratio from qqcw
     do mm = 1,gas_pcnst
-       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       fldcw => qqcw(mm+loffset)%fld
        if(associated(fldcw)) then
            fldcw_all(:ncol,:,mm) = fldcw(:ncol,:)
        else
@@ -1564,15 +1558,15 @@ lphase_jnmw_conditional: &
 
     ! calculate cloudborne aerosols after exchange
     call vmr2qqcw( vmrcw, mbar, fldcw_all )
-    ! assign mass mixing ratio back to pbuf
+    ! assign mass mixing ratio back to qqcw
     do mm = 1,gas_pcnst
-       fldcw => qqcw_get_field(pbuf, mm+loffset,lchnk,errorhandle=.true.)
+       fldcw => qqcw(mm+loffset)%fld
        if(associated(fldcw))   fldcw(:ncol,:) = fldcw_all(:ncol,:,mm)
     enddo
 
     ! diagnostics for cloud-borne aerosols... 
     do mm = 1,pcnst
-       fldcw => qqcw_get_field(pbuf,mm,lchnk,errorhandle=.true.)
+       fldcw => qqcw(mm)%fld
        if(associated(fldcw)) then
           call outfld( cnst_name_cw(mm), fldcw(:,:), pcols, lchnk )
        endif
