@@ -56,5 +56,8 @@ use spmd_utils,   only : masterproc
 ! mo_jlong
 !#define YAML_JLONG
 
+!aerosol drydep
+!#define YAML_AERO_DRYDEP
+
 use yaml_input_file_io
 

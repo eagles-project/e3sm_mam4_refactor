@@ -6,24 +6,26 @@
 !    gravitational settling and turbulent dry deposition of cloud droplets.
 !===============================================================================
 module modal_aero_drydep
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod,   only: r8 => shr_kind_r8
-  use constituents,   only: pcnst, cnst_name
-  use modal_aero_data,only: cnst_name_cw
+  use modal_aero_data, only: pcnst 
   use ppgrid,         only: pcols, pver, pverp
   use modal_aero_data,only: ntot_amode
   use physconst,      only: gravit, rair, rhoh2o, pi, boltz
-  use camsrfexch,     only: cam_in_t, cam_out_t
-  use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
-  use physics_buffer, only: physics_buffer_desc
-  use physics_buffer, only: pbuf_get_field, pbuf_get_index, pbuf_set_field
+  use camsrfexch,     only: cam_out_t
+  use physics_types,  only: physics_ptend, physics_ptend_init
 
   use cam_history,    only: outfld
 
   implicit none
   private
 
-  public :: aero_model_drydep
+  public :: aero_model_drydep, ptr2d_t
+
+  type ptr2d_t
+      real(r8), pointer :: fld(:,:)
+  end type ptr2d_t
 
 contains
   
@@ -31,49 +33,43 @@ contains
   ! Main subroutine of aerosol dry deposition parameterization.
   ! Also serves as the interface routine called by EAM's physics driver.
   !=============================================================================
-  subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
+  subroutine aero_model_drydep  ( lchnk, ncol, psetcols, tair, pmid, pint, pdel, state_q, &
+   dgncur_awet, wetdens, qqcw, obklen, ustar, landfrac, icefrac, ocnfrac, &
+   fricvelin, ram1in, dt, cam_out, ptend )
 
-    use aero_model,        only: drydep_lq, dgnumwet_idx, nmodes, wetdens_ap_idx
-    use modal_aero_data,   only: qqcw_get_field
-    use modal_aero_data,   only: cnst_name_cw
-    use modal_aero_data,   only: alnsg_amode
-    use modal_aero_data,   only: sigmag_amode
-    use modal_aero_data,   only: nspec_amode
-    use modal_aero_data,   only: numptr_amode
-    use modal_aero_data,   only: numptrcw_amode
-    use modal_aero_data,   only: lmassptr_amode
-    use modal_aero_data,   only: lmassptrcw_amode
+    use aero_model,        only: drydep_lq
+    use constituents,      only: cnst_name
+    use modal_aero_data,   only: cnst_name_cw, ntot_amode, alnsg_amode, sigmag_amode, nspec_amode, &
+      numptr_amode, numptrcw_amode, lmassptr_amode, lmassptrcw_amode
     use modal_aero_deposition, only: set_srf_drydep
 
     ! Arguments
-
-    type(physics_state),target,intent(in) :: state     ! Physics state variables
+    integer,                intent(in)    :: lchnk         ! chunk identifier
+    integer ,               intent(in)    :: ncol          ! number of active atmospheric columns
+    integer ,               intent(in)    :: psetcols      ! max number of columns set - if subcols = pcols*psubcols, else = pcols
+    real(r8),               intent(in)    :: tair(:,:)     ! air temperture [k]
+    real(r8),               intent(in)    :: pmid(:,:)     ! air pressure at layer midpoint [Pa]
+    real(r8),               intent(in)    :: pint(:,:)     ! air pressure at layer interface [Pa]
+    real(r8),               intent(in)    :: pdel(:,:)     ! layer thickness [Pa]
+    real(r8),  target,      intent(in)    :: state_q(:,:,:)! mixing ratios [kg/kg or 1/kg]
+    real(r8),               intent(in)    :: dgncur_awet(:,:,:) ! geometric mean wet diameter for number distribution [m]
+    real(r8),               intent(in)    :: wetdens(:,:,:)     ! wet density of interstitial aerosol [kg/m3]
     real(r8),               intent(in)    :: obklen(:) ! Obukhov length [m]
     real(r8),               intent(in)    :: ustar(:)  ! sfc friction velocity [m/s]
-    type(cam_in_t), target, intent(in)    :: cam_in    ! import state
+    real(r8),               intent(in)    :: landfrac(:) ! land fraction [unitless]
+    real(r8),               intent(in)    :: icefrac(:)  ! ice fraction [unitless]
+    real(r8),               intent(in)    :: ocnfrac(:)  ! ocean fraction [unitless]
+    real(r8),               intent(in)    :: fricvelin(:)! friction velocity from land model [m/s]
+    real(r8),               intent(in)    :: ram1in(:)   ! aerodynamical resistance from land model [s/m]
     real(r8),               intent(in)    :: dt        ! time step [s]
     type(cam_out_t),        intent(inout) :: cam_out   ! export state
     type(physics_ptend),    intent(out)   :: ptend     ! indivdual parameterization tendencies
-    type(physics_buffer_desc), pointer    :: pbuf(:)
+    type(ptr2d_t), target,  intent(inout)    :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
     ! Local variables
-
-    real(r8), pointer :: landfrac(:) ! land fraction [unitless]
-    real(r8), pointer :: icefrac(:)  ! ice fraction [unitless]
-    real(r8), pointer :: ocnfrac(:)  ! ocean fraction [unitless]
-    real(r8), pointer :: fricvelin(:)! friction velocity from land model [m/s]
-    real(r8), pointer :: ram1in(:)   ! aerodynamical resistance from land model [s/m]
-
-    real(r8), pointer :: tair(:,:)   ! air temperture [k]
-    real(r8), pointer :: pmid(:,:)   ! air pressure at layer midpoint [Pa]
-    real(r8), pointer :: pint(:,:)   ! air pressure at layer interface [Pa]
-    real(r8), pointer :: pdel(:,:)   ! layer thickness [Pa]
-
     real(r8) :: fricvel(pcols)     ! friction velocity used in the calculaiton of turbulent dry deposition velocity [m/s]
     real(r8) ::    ram1(pcols)     ! aerodynamical resistance used in the calculaiton of turbulent dry deposition velocity [s/m]
 
-    integer :: lchnk   ! chunk identifier
-    integer :: ncol    ! number of active atmospheric columns
     integer :: lspec   ! index for aerosol number / chem-mass / water-mass
     integer :: imode   ! aerosol mode index
     integer :: icnst   ! tracer index
@@ -106,35 +102,13 @@ contains
     real(r8)::  vlc_trb(pcols,4)          ! dep velocity of turbulent dry deposition [m/s]
     real(r8) :: vlc_dry(pcols,pver,4)     ! dep velocity, sum of vlc_grv and vlc_trb [m/s]
 
-    ! The pointers below are used for retrieving information from pbuf
-
     real(r8), pointer :: qq(:,:)            ! mixing ratio of a single tracer [kg/kg] or [1/kg]
-    real(r8), pointer :: dgncur_awet(:,:,:) ! geometric mean wet diameter for number distribution [m]
-    real(r8), pointer :: wetdens(:,:,:)     ! wet density of interstitial aerosol [kg/m3]
 
-    !---------------------------------------------------------------------------
-    ! Retrieve input variables; initialize output (i.e., ptend).
-    !---------------------------------------------------------------------------
-    landfrac  => cam_in%landfrac(:)
-    icefrac   => cam_in%icefrac(:)
-    ocnfrac   => cam_in%ocnfrac(:)
-    fricvelin => cam_in%fv(:)
-    ram1in    => cam_in%ram1(:)
-
-    lchnk = state%lchnk
-    ncol  = state%ncol
-
-    tair => state%t(:,:)
-    pmid => state%pmid(:,:)
-    pint => state%pint(:,:)
-    pdel => state%pdel(:,:)
+#include "../yaml/modal_aero_drydep/f90_yaml/aero_model_drydep_beg_yml.f90"
 
     rho(:ncol,:)=  pmid(:ncol,:)/(rair*tair(:ncol,:))
 
-    call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-
-    call physics_ptend_init(ptend, state%psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
+    call physics_ptend_init(ptend, psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 
     !--------------------------------------------------------------------------------
     ! For turbulent dry deposition: calculate ram and fricvel over ocean and sea ice; 
@@ -199,7 +173,7 @@ contains
            icnst = lmassptrcw_amode(lspec,imode) ; jvlc = 4
        endif
 
-       qq => qqcw_get_field(pbuf,icnst,lchnk)
+       qq => qqcw(icnst)%fld
        call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
                                                rho, tair, pint, pmid, pdel,        &! in
                                                dqdt_tmp, sflx                      )! out
@@ -261,7 +235,7 @@ contains
              icnst = lmassptr_amode(lspec,imode) ; jvlc = 2
           endif
 
-          qq => state%q(:,:,icnst)
+          qq => state_q(:,:,icnst)
           call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
                                                   rho, tair, pint, pmid, pdel,        &! in
                                                   dqdt_tmp, sflx                      )! out
@@ -288,6 +262,7 @@ contains
     !=====================================================================
     call set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
 
+#include "../yaml/modal_aero_drydep/f90_yaml/aero_model_drydep_end_yml.f90"
   end subroutine aero_model_drydep
 
   !-----------------------------------------------------------------------
@@ -465,6 +440,7 @@ contains
 
     real(r8),parameter :: radius_max = 50.0e-6_r8
 
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_depvel_part_beg_yml.f90"
     !------------------------------------------------------------------------------------
     ! Calculate deposition velocity of gravitational settling in all grid layers
     !------------------------------------------------------------------------------------
@@ -486,6 +462,7 @@ contains
                                           sig_part(:,pver),                          &! in
                                           fricvel(:), ram1(:), vlc_grv(:,pver),      &! in
                                           vlc_trb(:), vlc_dry(:,pver)                )! out
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_depvel_part_end_yml.f90"                                    
 
   end subroutine modal_aero_depvel_part
   !---------------------------------------------------------------------------------
@@ -645,7 +622,7 @@ contains
     real(r8) :: vsc_dyn_atm   ! Dynamic viscosity of air [kg m-1 s-1]
     real(r8) :: slp_crc       ! Slip correction factor [unitless]
     real(r8) :: radius_moment ! median radius for moment [m]
-
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_gravit_settling_velocity_beg_yml.f90"
     !-----------
     do kk=1,nver
     do ii=1,ncol
@@ -661,7 +638,7 @@ contains
     enddo
     enddo
     !----
-
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_gravit_settling_velocity_end_yml.f90"
   end subroutine modal_aero_gravit_settling_velocity
 
   !------------------------------------------------------------------------------------
@@ -729,30 +706,25 @@ contains
     real(r8),parameter :: beta = 2.0_r8 ! empirical parameter $\beta$ in Eq. (7c) of Zhang L. et al. (2001)
     real(r8),parameter :: stickfrac_lowerbnd  = 1.0e-10_r8  ! lower bound of stick fraction
 
-    real(r8) gamma(11)      ! exponent of schmidt number
-    data gamma/0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &        
+    ! exponent of schmidt number
+    real(r8),parameter :: gamma(11) = [0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &        
                0.56e+00_r8,  0.50e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.54e+00_r8, &
-               0.54e+00_r8/
-    save gamma
+               0.54e+00_r8]
 
-    real(r8) alpha(11)      ! parameter for impaction
-    data alpha/1.50e+00_r8,   1.20e+00_r8,  1.20e+00_r8,  0.80e+00_r8,  1.00e+00_r8, &
+    ! parameter for impaction
+    real(r8), parameter :: alpha(11)= [1.50e+00_r8,   1.20e+00_r8,  1.20e+00_r8,  0.80e+00_r8,  1.00e+00_r8, &
                0.80e+00_r8, 100.00e+00_r8, 50.00e+00_r8,  2.00e+00_r8,  1.20e+00_r8, &
-              50.00e+00_r8/
-    save alpha
-
-    real(r8) radius_collector(11) ! radius (m) of surface collectors
-    data radius_collector/10.00e-03_r8,  3.50e-03_r8,  3.50e-03_r8,  5.10e-03_r8,  2.00e-03_r8, &
+              50.00e+00_r8]
+    
+    ! radius (m) of surface collectors
+    real(r8), parameter :: radius_collector(11) = [10.00e-03_r8,  3.50e-03_r8,  3.50e-03_r8,  5.10e-03_r8,  2.00e-03_r8, &
                            5.00e-03_r8, -1.00e+00_r8, -1.00e+00_r8, 10.00e-03_r8,  3.50e-03_r8, &
-                          -1.00e+00_r8/
-    save radius_collector
+                          -1.00e+00_r8]
 
-    integer  :: iwet(11) ! flag for wet surface = 1, otherwise = -1
-    data iwet/-1,  -1,   -1,   -1,   -1,  &
-              -1,   1,   -1,    1,   -1,  &
-              -1/
-    save iwet
+   ! flag for wet surface = 1, otherwise = -1
+    integer, parameter  :: iwet(11) =[-1,  -1,   -1,   -1,   -1, -1,   1,   -1,    1,   -1, -1]
 
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_turb_drydep_velocity_beg_yml.f90"
     !---------
     do ii=1,ncol
 
@@ -842,7 +814,7 @@ contains
 
     enddo ! ii=1,ncol
     !-------
-
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_turb_drydep_velocity_end_yml.f90"
   end subroutine modal_aero_turb_drydep_velocity
 
   !==============================================================================
