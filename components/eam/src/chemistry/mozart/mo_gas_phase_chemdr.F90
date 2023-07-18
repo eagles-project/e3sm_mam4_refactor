@@ -608,9 +608,12 @@ contains
        !-----------------------------------------------------------------
        !	... lookup the photolysis rates from table
        !-----------------------------------------------------------------
-       call table_photo( reaction_rates, pmid, pdel, tfld, zmid, zint, &
-                         col_dens, zen_angle, asdir, cwat, cldfr, &
-                         esfact, vmr, invariants, ncol, lchnk, pbuf )
+       ! FORTRAN refactor notes: it looks that reaction_rates is reset in this
+       ! subroutine, and does not depend on how it was calculated before
+       call table_photo( reaction_rates, & ! out
+                         pmid, pdel, tfld, & ! in
+                         col_dens, zen_angle, asdir, cwat, cldfr, & ! in
+                         esfact,  ncol ) ! in
     endif
 
     do i = 1,phtcnt
