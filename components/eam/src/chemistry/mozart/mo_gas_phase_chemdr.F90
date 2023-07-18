@@ -230,7 +230,7 @@ contains
     use physics_buffer,    only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
     use infnan,            only : nan, assignment(=)
     use rate_diags,        only : rate_diags_calc
-    use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr, mmr2vmri
+    use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr
     use orbit,             only : zenith
 !
 ! LINOZ
@@ -454,7 +454,8 @@ contains
     !-----------------------------------------------------------------------      
     !        ... Set atmosphere mean mass
     !-----------------------------------------------------------------------      
-    call set_mean_mass( ncol, mbar )
+    call set_mean_mass( ncol, & !in
+         mbar ) !out
 
     !-----------------------------------------------------------------------      
     !        ... Xform from mmr to vmr

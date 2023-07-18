@@ -5,7 +5,7 @@ module mo_mass_xforms
 
 
   private
-  public :: mmr2vmr, mmr2vmri, vmr2mmr, h2o_to_vmr, init_mass_xforms
+  public :: mmr2vmr, vmr2mmr, h2o_to_vmr, init_mass_xforms
   save
 
   real(r8) :: adv_mass_h2o = 18._r8
@@ -52,41 +52,11 @@ contains
 
   end subroutine mmr2vmr
 
-  subroutine mmr2vmri( mmr, vmr, mbar, mi, ncol )
-    !-----------------------------------------------------------------
-    !	... Xfrom from mass to volume mixing ratio
-    !-----------------------------------------------------------------
-
-    implicit none
-
-    !-----------------------------------------------------------------
-    !	... Dummy args
-    !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol
-    real(r8), intent(in)    :: mi
-    real(r8), intent(in)    :: mbar(:,:)
-    real(r8), intent(in)    :: mmr(:,:)
-    real(r8), intent(inout) :: vmr(:,:)
-
-    !-----------------------------------------------------------------
-    !	... Local variables
-    !-----------------------------------------------------------------
-    integer  :: k
-    real(r8) :: rmi
-
-    rmi = 1._r8/mi
-    do k = 1,pver
-       vmr(:ncol,k) = mbar(:ncol,k) * mmr(:ncol,k) * rmi
-    end do
-
-  end subroutine mmr2vmri
-
   subroutine vmr2mmr( vmr, mmr, mbar, ncol )
     !-----------------------------------------------------------------
     !	... Xfrom from volume to mass mixing ratio
     !-----------------------------------------------------------------
 
-    use m_spc_id
     use chem_mods, only : adv_mass, gas_pcnst
 
     implicit none
@@ -121,8 +91,6 @@ contains
     !-----------------------------------------------------------------------
     !     ... Transform water vapor from mass to volumetric mixing ratio
     !-----------------------------------------------------------------------
-
-    use chem_mods, only : adv_mass
 
     implicit none
 
