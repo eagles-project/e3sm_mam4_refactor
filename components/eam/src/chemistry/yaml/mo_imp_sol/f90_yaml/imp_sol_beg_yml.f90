@@ -87,12 +87,12 @@
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'base_sol',base_sol(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'reaction_rates',reaction_rates(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'het_rates',het_rates(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'extfrc',extfrc(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'base_sol',base_sol(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'reaction_rates',reaction_rates(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'het_rates',het_rates(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'extfrc',extfrc(yaml%col_print,:,:))
         call write_var(unit_input,unit_output,'delt',delt)
-        call write_var(unit_input,unit_output,'xhnm',xhnm(yaml%col_print,yaml%lev_print))
+        call write_var(unit_input,unit_output,'xhnm',xhnm(yaml%col_print,:))
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'ltrop',ltrop(yaml%col_print))
 
