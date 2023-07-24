@@ -173,43 +173,9 @@ contains
          'Troposphere boundary calculated in chemistry' )
 
     ! If requested, be prepared to output results from all of the methods.
-    if (output_all) then
-      call addfld('TROPA_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (analytic)', flag_xyfill=.True.)
-      call addfld('TROPA_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (analytic)', flag_xyfill=.True.)
-      call addfld('TROPA_Z',           horiz_only,    'A',  'm', 'Tropopause Height (analytic)', flag_xyfill=.True.)
-      call addfld('TROPA_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (analytic)')
-      call addfld('TROPA_FD', horiz_only,    'A', 'probability', 'Tropopause Found (analytic)')
-
-      call addfld('TROPC_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (climatology)', flag_xyfill=.True.)
-      call addfld('TROPC_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (climatology)', flag_xyfill=.True.)
-      call addfld('TROPC_Z',           horiz_only,    'A',  'm', 'Tropopause Height (climatology)', flag_xyfill=.True.)
-      call addfld('TROPC_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (climatology)')
-      call addfld('TROPC_FD', horiz_only,    'A', 'probability', 'Tropopause Found (climatology)')
-
-      call addfld('TROPS_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (stobie)', flag_xyfill=.True.)
-      call addfld('TROPS_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (stobie)', flag_xyfill=.True.)
-      call addfld('TROPS_Z',           horiz_only,    'A',  'm', 'Tropopause Height (stobie)', flag_xyfill=.True.)
-      call addfld('TROPS_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (stobie)')
-      call addfld('TROPS_FD', horiz_only,    'A', 'probability', 'Tropopause Found (stobie)')
-
-      call addfld('TROPT_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (twmo)', flag_xyfill=.True.)
-      call addfld('TROPT_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (twmo)', flag_xyfill=.True.)
-      call addfld('TROPT_Z',           horiz_only,    'A',  'm', 'Tropopause Height (twmo)', flag_xyfill=.True.)
-      call addfld('TROPT_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (twmo)')
-      call addfld('TROPT_FD', horiz_only,    'A', 'probability', 'Tropopause Found (twmo)')
-
-      call addfld('TROPW_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (WMO)', flag_xyfill=.True.)
-      call addfld('TROPW_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (WMO)', flag_xyfill=.True.)
-      call addfld('TROPW_Z',           horiz_only,    'A',  'm', 'Tropopause Height (WMO)', flag_xyfill=.True.)
-      call addfld('TROPW_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (WMO)')
-      call addfld('TROPW_FD', horiz_only,    'A', 'probability', 'Tropopause Found (WMO)')
-
-      call addfld('TROPH_P',          horiz_only,    'A',  'Pa', 'Tropopause Pressure (Hybrid Stobie)', flag_xyfill=.True.)
-      call addfld('TROPH_T',           horiz_only,    'A',  'K', 'Tropopause Temperature (Hybrid Stobie)', flag_xyfill=.True.)
-      call addfld('TROPH_Z',           horiz_only,    'A',  'm', 'Tropopause Height (Hybrid Stobie)', flag_xyfill=.True.)
-      call addfld('TROPH_PD', (/ 'lev' /), 'A', 'probability', 'Tropopause Distribution (Hybrid Stobie)')
-      call addfld('TROPH_FD', horiz_only,    'A', 'probability', 'Tropopause Found (Hybrid Stobie)')
-     end if
+    ! BJG:  since output_all can be assumed to be always false, below section is removed
+!BJG    if (output_all) then
+!BJG     end if
 
     call add_default('TROP_P', 1, ' ')
     call add_default('TROP_T', 1, ' ')
@@ -370,57 +336,10 @@ contains
 
   ! This analytic expression closely matches the mean tropopause determined
   ! by the NCEP reanalysis and has been used by the radiation code.
-  subroutine tropopause_analytic(pstate, tropLev, tropP, tropT, tropZ)
+! BJG below removed since not called in our tests
+!BJG  subroutine tropopause_analytic(pstate, tropLev, tropP, tropT, tropZ)
 
-    implicit none
-
-    type(physics_state), intent(in)     :: pstate
-    integer,            intent(inout)   :: tropLev(pcols)             ! tropopause level index   
-    real(r8), optional, intent(inout)   :: tropP(pcols)               ! tropopause pressure (Pa)  
-    real(r8), optional, intent(inout)   :: tropT(pcols)               ! tropopause temperature (K)
-    real(r8), optional, intent(inout)   :: tropZ(pcols)               ! tropopause height (m)
-    
-    ! Local Variables
-    integer       :: i
-    integer       :: k
-    integer       :: ncol                     ! number of columns in the chunk
-    integer       :: lchnk                    ! chunk identifier
-    real(r8)      :: tP                       ! tropopause pressure (Pa)
- 
-    ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
-
-    ! Iterate over all of the columns.
-    do i = 1, ncol
-     
-      ! Skip column in which the tropopause has already been found.
-      if (tropLev(i) == NOTFOUND) then
-      
-        ! Calculate the pressure of the tropopause.
-        tP = (25000.0_r8 - 15000.0_r8 * (cos(pstate%lat(i)))**2)
-      
-        ! Find the level that contains the tropopause.
-        do k = pver, 2, -1
-          if (tP >= pstate%pint(i, k)) then
-            tropLev(i) = k
-            exit
-          end if
-        end do
-        
-        ! Return the optional outputs
-        if (present(tropP)) tropP(i) = tP
-        
-        if (present(tropT)) then
-          tropT(i) = tropopause_interpolateT(pstate, i, tropLev(i), tP)
-        end if
-
-        if (present(tropZ)) then
-          tropZ(i) = tropopause_interpolateZ(pstate, i, tropLev(i), tP)
-        end if
-      end if
-    end do
-  end subroutine tropopause_analytic
+!BJG  end subroutine tropopause_analytic
 
 
   ! Read the tropopause pressure in from a file containging a climatology. The
@@ -624,78 +543,10 @@ contains
   ! This routine originates with Stobie at NASA Goddard, but does not have a
   ! known reference. It was supplied by Philip Cameron-Smith of LLNL.
   !
-  subroutine tropopause_stobie(pstate, tropLev, tropP, tropT, tropZ)
+!BJG below not called so removed
+!BJG  subroutine tropopause_stobie(pstate, tropLev, tropP, tropT, tropZ)
 
-    implicit none
-
-    type(physics_state), intent(in)     :: pstate 
-    integer,            intent(inout)   :: tropLev(pcols)             ! tropopause level index   
-    real(r8), optional, intent(inout)   :: tropP(pcols)               ! tropopause pressure (Pa)  
-    real(r8), optional, intent(inout)   :: tropT(pcols)               ! tropopause temperature (K)
-    real(r8), optional, intent(inout)   :: tropZ(pcols)               ! tropopause height (m)
-    
-    ! Local Variables
-    integer       :: i
-    integer       :: k
-    integer       :: ncol                     ! number of columns in the chunk
-    integer       :: lchnk                    ! chunk identifier
-    integer       :: tLev                     ! tropopause level
-    real(r8)      :: tP                       ! tropopause pressure (Pa)
-    real(r8)      :: stobie(pver)             ! stobie weighted temperature
-    real(r8)      :: sTrop                    ! stobie value at the tropopause
- 
-    ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
-
-    ! Iterate over all of the columns.
-    do i = 1, ncol
-     
-      ! Skip column in which the tropopause has already been found.
-      if (tropLev(i) == NOTFOUND) then
-      
-        ! Caclulate a pressure weighted temperature.
-        stobie(:) = ALPHA * pstate%t(i,:) - log10(pstate%pmid(i, :))
-
-        ! Search from the bottom up, looking for the first minimum.
-        tLev  = -1
-  
-        do k = pver-1, 1, -1
-    
-          if (pstate%pmid(i, k) <= 4000._r8) then
-            exit
-          end if
-    
-          if (pstate%pmid(i, k) >= 55000._r8) then
-            cycle
-          end if
-          
-          if ((tLev == -1) .or. (stobie(k) < sTrop)) then
-            tLev  = k
-            tP    = pstate%pmid(i, k)
-            sTrop = stobie(k)
-          end if
-        end do
-        
-        if (tLev /= -1) then
-          tropLev(i) = tLev
-        
-          ! Return the optional outputs
-          if (present(tropP)) tropP(i) = tP
-          
-          if (present(tropT)) then
-            tropT(i) = tropopause_interpolateT(pstate, i, tropLev(i), tP)
-          end if
-
-          if (present(tropZ)) then
-            tropZ(i) = tropopause_interpolateZ(pstate, i, tropLev(i), tP)
-          end if
-        end if
-      end if
-    end do
-    
-    return
-  end subroutine tropopause_stobie
+!BJG  end subroutine tropopause_stobie
 
 
   ! This routine is an implementation of Reichler et al. [2003] done by
@@ -889,94 +740,10 @@ contains
   ! NOTE: This code was modeled after the code in mo_tropopause; however, the
   ! requirement that dt be greater than 0 was removed and the check to make
   ! sure that the lapse rate is maintained for 2 km was added.
-  subroutine tropopause_wmo(pstate, tropLev, tropP, tropT, tropZ)
+! BJG below not used, so deleted
+!BJG  subroutine tropopause_wmo(pstate, tropLev, tropP, tropT, tropZ)
 
-    implicit none
-
-    type(physics_state), intent(in)    :: pstate 
-    integer,            intent(inout)  :: tropLev(pcols)            ! tropopause level index   
-    real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure (Pa)   
-    real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature (K)
-    real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height (m)
-
-    ! Local Variables 
-    real(r8), parameter    :: ztrop_low   = 5000._r8        ! lowest tropopause level allowed (m)
-    real(r8), parameter    :: ztrop_high  = 20000._r8       ! highest tropopause level allowed (m)
-    real(r8), parameter    :: max_dtdz    = 0.002_r8        ! max dt/dz for tropopause level (K/m)
-    real(r8), parameter    :: min_trop_dz = 2000._r8        ! min tropopause thickness (m)
-
-    integer                 :: i
-    integer                 :: k
-    integer                 :: k2
-    integer                 :: ncol                         ! number of columns in the chunk
-    integer                 :: lchnk                        ! chunk identifier
-    real(r8)                :: tP                           ! tropopause pressure (Pa)
-    real(r8)                :: dt
-
-    ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
-
-    ! Iterate over all of the columns.
-    do i = 1, ncol
-     
-      ! Skip column in which the tropopause has already been found.
-      if (tropLev(i) == NOTFOUND) then
-
-        kloop: do k = pver-1, 2, -1
-         
-          ! Skip levels below the minimum and stop if nothing is found
-          ! before the maximum.
-          if (pstate%zm(i, k) < ztrop_low) then
-            cycle kloop
-          else if (pstate%zm(i, k) > ztrop_high) then
-            exit kloop
-          end if
-          
-          ! Compare the actual lapse rate to the threshold
-          dt = pstate%t(i, k) - pstate%t(i, k-1)
-            
-          if (dt <= (max_dtdz * (pstate%zm(i, k-1) - pstate%zm(i, k)))) then
-            
-            ! Make sure that the lapse rate stays below the threshold for the
-            ! specified range.
-            k2loop: do k2 = k-1, 2, -1
-              if ((pstate%zm(i, k2) - pstate%zm(i, k)) >= min_trop_dz) then
-                tP = pstate%pmid(i, k)
-                tropLev(i) = k
-                exit k2loop
-              end if
-              
-              dt = pstate%t(i, k) - pstate%t(i, k2)
-              if (dt > (max_dtdz * (pstate%zm(i, k2) - pstate%zm(i, k)))) then
-                exit k2loop
-              end if
-           end do k2loop
-
-           if (tropLev(i) == NOTFOUND) then
-              cycle kloop
-           else 
-
-              ! Return the optional outputs
-              if (present(tropP)) tropP(i) = tP
-              
-              if (present(tropT)) then
-                tropT(i) = tropopause_interpolateT(pstate, i, tropLev(i), tP)
-              end if
-  
-              if (present(tropZ)) then
-                tropZ(i) = tropopause_interpolateZ(pstate, i, tropLev(i), tP)
-              end if
-
-              exit kloop
-            end if
-          end if
-        end do kloop
-      end if
-    end do
-    
-    return
-  end subroutine tropopause_wmo
+!BJG  end subroutine tropopause_wmo
   
   ! This routine searches for the cold point tropopause, and uses a parabolic
   ! fit of the coldest point and two adjacent points to interpolate the cold point
