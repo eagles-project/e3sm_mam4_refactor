@@ -22,10 +22,10 @@
 ! This part of the code is for finding the best lat/lon and n_calls.
 
 ! find lag/lon/y_nstep/y_k
-if(masterproc .and. get_nstep()==yaml%nstep_print) then
-  write(101,*)'phys_debug_lat = ',get_lat(y_lchnk, y_i), &
-  ' phys_debug_lon = ', get_lon(y_lchnk, y_i), y_i, yaml%col_print
-endif
+!if(masterproc .and. get_nstep()==yaml%nstep_print) then
+!  write(101,*)'phys_debug_lat = ',get_lat(y_lchnk, y_i), &
+!  ' phys_debug_lon = ', get_lon(y_lchnk, y_i), y_i, yaml%col_print
+!endif
 
 ! find n_calls. the if statement below should be consistent with the if condition in the *_beg_yml.f90 file
 ! so that the corresponding n_calls are printed out here.
