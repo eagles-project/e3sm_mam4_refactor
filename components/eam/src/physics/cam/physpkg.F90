@@ -69,6 +69,8 @@ module physpkg
   integer ::  snow_dp_idx        = 0
   integer ::  prec_sh_idx        = 0
   integer ::  snow_sh_idx        = 0
+  integer :: dgnumwet_idx        = 0
+  integer :: wetdens_ap_idx      = 0
   integer :: species_class(pcnst)  = -1 !BSINGH: Moved from modal_aero_data.F90 as it is being used in second call to zm deep convection scheme (convect_deep_tend_2)
 
   save
@@ -87,6 +89,7 @@ module physpkg
   character(len=16) :: macrop_scheme
   character(len=16) :: microp_scheme 
   integer           :: cld_macmic_num_steps    ! Number of macro/micro substeps
+  integer           :: nmodes              !number of aerosol modes
   logical           :: do_clubb_sgs
   logical           :: use_subcol_microp   ! if true, use subcolumns in microphysics
   logical           :: state_debug_checks  ! Debug physics_state.
@@ -160,8 +163,6 @@ subroutine phys_register
     integer  :: m        ! loop index
     integer  :: mm       ! constituent index 
     !-----------------------------------------------------------------------
-
-    integer :: nmodes
 
     call phys_getopts(shallow_scheme_out       = shallow_scheme, &
                       macrop_scheme_out        = macrop_scheme,   &
@@ -908,6 +909,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     prec_sh_idx  = pbuf_get_index('PREC_SH')
     snow_sh_idx  = pbuf_get_index('SNOW_SH')
 
+    !Pbuf fields needed for drydep of aerosols
+    dgnumwet_idx   = pbuf_get_index('DGNUMWET')
+    wetdens_ap_idx = pbuf_get_index('WETDENS_AP')
+
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
 
     if (clim_modal_aero) then
@@ -1430,7 +1435,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use tracers,            only: tracers_timestep_tend
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o, latvap,latice, rga
-    use modal_aero_drydep,  only: aero_model_drydep
+    use modal_aero_drydep,  only: aero_model_drydep, ptr2d_t
     use check_energy,       only: check_energy_chng, check_water, & 
                                   check_prect, check_qflx , &
                                   check_tracers_data, check_tracers_init, &
@@ -1450,6 +1455,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
     use co2_cycle,          only: co2_cycle_set_ptend
+    use modal_aero_data,   only: qqcw_get_field
 
     implicit none
 
@@ -1513,6 +1519,13 @@ subroutine tphysac (ztodt,   cam_in,  &
     !DCAPE-ULL: physics buffer fields to compute tendencies for dcape
     real(r8), pointer, dimension(:,:) :: t_star   ! temperature
     real(r8), pointer, dimension(:,:) :: q_star   ! moisture
+    
+    !For aerosol drydep process
+    real(r8), pointer :: dgncur_awet(:,:,:) ! geometric mean wet diameter for number distribution [m]
+    real(r8), pointer :: wetdens(:,:,:)     ! wet density of interstitial aerosol [kg/m3]
+    ! ptr2d_t is used to create arrays of pointers to 2D fields
+    
+    type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
 
     character(len=16)  :: deep_scheme             ! Default set in phys_control.F90
 
@@ -1711,7 +1724,15 @@ if (l_tracer_aero) then
 
     !  aerosol dry deposition processes
     call t_startf('aero_drydep')
-    call aero_model_drydep( state, pbuf, obklen, surfric, cam_in, ztodt, cam_out, ptend )
+    do i = 16, pcnst
+      qqcw(i)%fld => qqcw_get_field(pbuf,i,lchnk)
+    enddo
+    call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
+    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
+
+    call aero_model_drydep( lchnk, ncol, state%psetcols, state%t, state%pmid, state%pint, state%pdel, &
+     state%q, dgncur_awet, wetdens, qqcw, obklen, surfric, cam_in%landfrac, cam_in%icefrac, cam_in%ocnfrac, &
+     cam_in%fv, cam_in%ram1, ztodt, cam_out, ptend )
     call physics_update(state, ptend, ztodt, tend)
     call t_stopf('aero_drydep')
 
