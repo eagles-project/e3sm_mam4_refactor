@@ -846,22 +846,20 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
                refi(i)   = abs(aimag(crefin(i)))
             end do
 
-            ! call t_startf('binterp')
-
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(extpsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
-                         itab, jtab, ttab, utab, cext)
-            call binterp(abspsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
-                         itab, jtab, ttab, utab, cabs)
-            call binterp(asmpsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
-                         itab, jtab, ttab, utab, casm)
+            call binterp(extpsw(:,:,:,isw), ncol,                & !in
+                 refr, refi, refrtabsw(:,isw), refitabsw(:,isw), & !in
+                 itab, jtab, ttab, utab, cext)                     !inout/out
 
-            ! call t_stopf('binterp')
+            call binterp(abspsw(:,:,:,isw), ncol,                & !in
+                 refr, refi, refrtabsw(:,isw), refitabsw(:,isw), & !in
+                 itab, jtab, ttab, utab, cabs)                     !inout/out
+
+            call binterp(asmpsw(:,:,:,isw), ncol,                & !in
+                 refr, refi, refrtabsw(:,isw), refitabsw(:,isw), & !in
+                 itab, jtab, ttab, utab, casm)                     !inout/out
 
             ! parameterized optical properties
             do i=1,ncol
@@ -1361,9 +1359,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(absplw(mm,:,:,:,ilw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtablw(mm,:,ilw), refitablw(mm,:,ilw), &
-                         itab, jtab, ttab, utab, cabs)
+            call binterp(absplw(:,:,:,ilw), ncol,                        & !in
+                 refr, refi, refrtablw(:,ilw), refitablw(:,ilw), & !in
+                 itab, jtab, ttab, utab, cabs)                     !inout/out
 
             ! parameterized optical properties
             do icol = 1, ncol
@@ -1632,71 +1630,114 @@ end subroutine modal_size_parameters
 
 !===============================================================================
 
-      subroutine binterp(table,ncol,km,im,jm,x,y,xtab,ytab,ix,jy,t,u,out)
 
-!     bilinear interpolation of table
-!
-      implicit none
-      integer im,jm,km,ncol
-      real(r8) table(km,im,jm),xtab(im),ytab(jm),out(pcols,km)
-      integer i,ix(pcols),ip1,j,jy(pcols),jp1,k,ic
-      real(r8) x(pcols),dx,t(pcols),y(pcols),dy,u(pcols), &
-             tu(pcols),tuc(pcols),tcu(pcols),tcuc(pcols)
+subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &! in
+     itab, jtab, ttab, utab, coef) !inout/out
 
-      if(ix(1).gt.0)go to 30
-      if(im.gt.1)then
-        do ic=1,ncol
-          do i=1,im
-            if(x(ic).lt.xtab(i))go to 10
-          enddo
-   10     ix(ic)=max0(i-1,1)
-          ip1=min(ix(ic)+1,im)
-          dx=(xtab(ip1)-xtab(ix(ic)))
-          if(abs(dx).gt.1.e-20_r8)then
-             t(ic)=(x(ic)-xtab(ix(ic)))/dx
-          else
-             t(ic)=0._r8
-          endif
-	end do
-      else
-        ix(:ncol)=1
-        t(:ncol)=0._r8
-      endif
-      if(jm.gt.1)then
-        do ic=1,ncol
-          do j=1,jm
-            if(y(ic).lt.ytab(j))go to 20
-          enddo
-   20     jy(ic)=max0(j-1,1)
-          jp1=min(jy(ic)+1,jm)
-          dy=(ytab(jp1)-ytab(jy(ic)))
-          if(abs(dy).gt.1.e-20_r8)then
-             u(ic)=(y(ic)-ytab(jy(ic)))/dy
-             if(u(ic).lt.0._r8.or.u(ic).gt.1._r8)then
-                write(iulog,*) 'u,y,jy,ytab,dy=',u(ic),y(ic),jy(ic),ytab(jy(ic)),dy
-             endif
-          else
-            u(ic)=0._r8
-          endif
-	end do
-      else
-        jy(:ncol)=1
-        u(:ncol)=0._r8
-      endif
-   30 continue
-      do ic=1,ncol
-         tu(ic)=t(ic)*u(ic)
-         tuc(ic)=t(ic)-tu(ic)
-         tcuc(ic)=1._r8-tuc(ic)-u(ic)
-         tcu(ic)=u(ic)-tu(ic)
-         jp1=min(jy(ic)+1,jm)
-         ip1=min(ix(ic)+1,im)
-         do k=1,km
-            out(ic,k)=tcuc(ic)*table(k,ix(ic),jy(ic))+tuc(ic)*table(k,ip1,jy(ic))   &
-               +tu(ic)*table(k,ip1,jp1)+tcu(ic)*table(k,ix(ic),jp1)
-	 end do
-      enddo
-      return
-      end subroutine binterp
+  !------------------------------------------------------------------------------
+  ! Bilinear interpolation along the refractive index dimensions
+  ! of the table to estimate Chebyshev coefficients at an
+  ! intermediate refractive index.
+
+  ! In short wave, the first call computes itab, jtab, ttab, utab and coef.
+  ! The subsequent calls use itab, jtab, ttab and utab as inputs and compute coef
+
+  ! In long wave, we have just one call to compute itab,jtab,ttab, utab and coef
+  !------------------------------------------------------------------------------
+  implicit none
+
+  !intent-ins
+  integer, intent(in)  :: ncol
+  real(r8), intent(in) :: table(ncoef,prefr,prefi)
+  real(r8), intent(in) :: ref_real(pcols), ref_img(pcols) !real and imganinary parts of refractive indices [unitless]
+  real(r8), intent(in) :: ref_real_tab(prefr), ref_img_tab(prefi) !!real and imganinary table refractive indices [unitless]
+
+  !intent-inouts/outs
+  integer,  intent(inout) :: itab(pcols), jtab(pcols)
+  real(r8), intent(inout) :: ttab(pcols), utab(pcols)
+  real(r8), intent(out)   :: coef(pcols,ncoef) !coefficient interpolated bilinearly
+
+  !local
+  integer  :: ip1, jp1, icoef, ic
+  real(r8) :: tu(pcols), tuc(pcols),tcu(pcols), tcuc(pcols)
+
+  if(itab(1) <= 0) then
+
+     !compute factors for the real part
+     call compute_factors(prefr, ncol, ref_real, ref_real_tab, & !in
+          itab, ttab) !out
+     !compute factors for the imaginary part
+     call compute_factors(prefi, ncol, ref_img, ref_img_tab, & !in
+          jtab, utab, .true.) !out
+
+  endif
+
+  !Interpolate coef
+  do ic = 1, ncol
+     tu(ic)   = ttab(ic)*utab(ic)
+     tuc(ic)  = ttab(ic)-tu(ic)
+     tcuc(ic) = 1._r8-tuc(ic)-utab(ic)
+     tcu(ic)  = utab(ic)-tu(ic)
+     jp1      = min(jtab(ic)+1,prefi)
+     ip1      = min(itab(ic)+1,prefr)
+     do icoef = 1, ncoef
+        coef(ic,icoef) = tcuc(ic)* table(icoef,itab(ic),jtab(ic)) + &
+             tuc(ic) * table(icoef,ip1,   jtab(ic)) + &
+             tu(ic)  * table(icoef,ip1,   jp1)    + &
+             tcu(ic) * table(icoef,itab(ic),jp1)
+     enddo
+  enddo
+end subroutine binterp
+
+
+subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
+     ix, tt, & !out
+     do_print) !in-optional
+
+  ! Compute factors for the real or imaginary parts
+  implicit none
+
+  integer, intent(in)  :: prefri, ncol
+  real(r8), intent(in) :: ref_table(:) !refractive index table [unitless]
+  real(r8), intent(in) :: ref_ind(:)   !refractive index       [unitless]
+
+  !FORTRAN refactor note: "do_print" is kept to maintain code consistenty with the
+  !original code. THis can be removed from the C++ ported code
+  logical, intent(in), optional :: do_print ! to print log msg or not
+
+  !intent-inouts/outs
+  integer,  intent(inout) :: ix(:)
+  real(r8), intent(inout) :: tt(:)
+
+  !local
+  integer  :: ii, ip1, ic
+  real(r8) :: dx
+
+  real(r8), parameter :: threshold = 1.e-20_r8
+
+  if(prefri > 1) then
+     do ic = 1, ncol
+        do ii = 1, prefri
+           if(ref_ind(ic) < ref_table(ii)) exit
+        enddo
+        ix(ic) = max(ii-1,1)
+        ip1    = min(ix(ic)+1,prefri)
+        dx     = (ref_table(ip1)-ref_table(ix(ic)))
+        if(abs(dx) > threshold) then
+           tt(ic) = (ref_ind(ic)-ref_table(ix(ic)))/dx
+           if (present(do_print) .and. do_print) then
+              if(tt(ic) < 0._r8 .or. tt(ic) > 1._r8) then
+                 write(iulog,*) 'tt,ref_ind,ix,ref_table,dx=',tt(ic),ref_ind(ic),ix(ic),ref_table(ix(ic)),dx
+              endif
+           endif
+        else
+           tt(ic) = 0._r8
+        endif
+     enddo
+  else
+     ix(:ncol) = 1
+     tt(:ncol) = 0._r8
+  endif
+end subroutine compute_factors
 
 end module modal_aer_opt
