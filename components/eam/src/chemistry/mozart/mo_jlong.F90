@@ -4,6 +4,7 @@
 #define USE_BDE
 
       module mo_jlong
+#include "../yaml/common_files/common_uses.ymlf90"
 
       use shr_kind_mod, only : r4 => shr_kind_r4
       use shr_kind_mod, only : r8 => shr_kind_r8
@@ -556,6 +557,7 @@
       real(r8) ::  delp
       real(r8), allocatable :: rsf(:,:)         ! Radiative source function
       real(r8), allocatable :: xswk(:,:)        ! working xsection array
+#include "../yaml/mo_jlong/f90_yaml/jlong_beg_yml.f90"
 
 !----------------------------------------------------------------------
 !        ... allocate variables
@@ -622,6 +624,7 @@ level_loop_1 : &
       enddo level_loop_1
 
       deallocate( rsf, xswk )
+#include "../yaml/mo_jlong/f90_yaml/jlong_end_yml.f90"
 
     end subroutine jlong
 
@@ -663,6 +666,7 @@ level_loop_1 : &
       integer  ::  iz, izl, kk
       integer  ::  ratindl, ratindu
       integer  ::  wn
+#include "../yaml/mo_jlong/f90_yaml/interpolate_rsf_beg_yml.f90"
 
 !----------------------------------------------------------------------
 !        ... allocate variables
@@ -761,6 +765,7 @@ Level_loop : &
 
       deallocate( psum_l )
       deallocate( psum_u )
+#include "../yaml/mo_jlong/f90_yaml/interpolate_rsf_end_yml.f90"
 
    end subroutine interpolate_rsf
 
@@ -780,6 +785,7 @@ Level_loop : &
       real(r8) :: wght(0:1,0:1,0:1)
       integer  :: wn
       integer  :: isp1, ivp1, ialp1
+#include "../yaml/mo_jlong/f90_yaml/calc_sum_wght_beg_yml.f90"
 
       isp1 = is + 1
       ivp1 = iv + 1
@@ -809,6 +815,7 @@ Level_loop : &
                      + wght(1,1,0) * rsf_tab(wn,iz,isp1,ivp1,ial) &
                      + wght(1,1,1) * rsf_tab(wn,iz,isp1,ivp1,ialp1)
          enddo
+#include "../yaml/mo_jlong/f90_yaml/calc_sum_wght_end_yml.f90"
 
    end subroutine calc_sum_wght
  
@@ -824,6 +831,7 @@ Level_loop : &
       integer, intent(out):: idx_out  ! index
 
       integer :: ii
+#include "../yaml/mo_jlong/f90_yaml/find_index_beg_yml.f90"
 
       do ii = 1,var_len
          if( var_in(ii) > var_min ) then
@@ -832,6 +840,7 @@ Level_loop : &
       enddo
 
       idx_out = max( min(ii,var_len)-1, 1 )
+#include "../yaml/mo_jlong/f90_yaml/find_index_end_yml.f90"
 
    end subroutine find_index
 
