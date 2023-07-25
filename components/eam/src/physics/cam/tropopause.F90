@@ -47,6 +47,9 @@ module tropopause
   ! backup algorithm is meant to provide a solution when the primary algorithm
   ! fail. The algorithms that can't fail are: TROP_ALG_ANALYTIC, TROP_ALG_CLIMATE
   ! and TROP_ALG_STOBIE.
+  ! NOTE:  TROP_ALG_ANALYTIC, TROP_ALG_STOBIE, and TROP_ALG_WMO are not currently
+  ! invoked anywhere in the code, so these algorithms have been removed from the source code.
+  
   integer, parameter    :: TROP_ALG_NONE      = 1    ! Don't evaluate
   integer, parameter    :: TROP_ALG_ANALYTIC  = 2    ! Analytic Expression
   integer, parameter    :: TROP_ALG_CLIMATE   = 3    ! Climatology
@@ -333,12 +336,18 @@ contains
   !
   ! NOTE: The data is read in during tropopause_init and stored in the module
   ! variable trop
-  subroutine tropopause_climate(pstate, tropLev, tropP, tropT, tropZ)
-     use time_manager, only : get_curr_calday
+  subroutine tropopause_climate(lchnk,ncol,pmid,pint,temp,zm,zi,tropLev,tropP,tropT,tropZ)
+    use time_manager, only : get_curr_calday
 
     implicit none
 
-    type(physics_state), intent(in)    :: pstate 
+    integer,           intent(in)       :: lchnk  ! chunk identifier
+    integer,           intent(in)       :: ncol ! number of columns in the chunk
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: pint(:,:)  ! top interface pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
+    real(r8),          intent(in)       :: zi(:,:)    ! interface geopotential height above sfc [m]
     integer,            intent(inout)  :: tropLev(pcols)            ! tropopause level index   
     real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure [Pa]   
     real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature [K]
@@ -348,18 +357,12 @@ contains
     integer       :: icol                     ! index of column
     integer       :: kk                       ! index of vertical level
     integer       :: mn                       ! index of month
-    integer       :: ncol                     ! number of columns in the chunk
-    integer       :: lchnk                    ! chunk identifier
     real(r8)      :: tP                       ! tropopause pressure (Pa)
     real(r8)      :: calday                   ! day of year including fraction
     real(r8)      :: dels
     integer       :: last
     integer       :: next
 
-    ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
-    
     ! If any columns remain to be indentified, the nget the current
     ! day from the calendar.
     
@@ -408,7 +411,7 @@ contains
                 
           ! Find the associated level.
           do kk = pver, 2, -1
-            if (tP >= pstate%pint(icol, kk)) then
+            if (tP >= pint(icol, kk)) then
               tropLev(icol) = kk
               exit
             end if
@@ -418,11 +421,11 @@ contains
           if (present(tropP)) tropP(icol) = tP
           
           if (present(tropT)) then
-            tropT(icol) = tropopause_interpolateT(pstate, icol, tropLev(icol), tP)
+            tropT(icol) = tropopause_interpolateT(pmid,temp,icol,tropLev(icol),tP)
           end if
 
           if (present(tropZ)) then
-            tropZ(icol) = tropopause_interpolateZ(pstate, icol, tropLev(icol), tP)
+            tropZ(icol) = tropopause_interpolateZ(pint,pmid,zm,zi,icol,tropLev(icol),tP)
           end if
         end if
       end do
@@ -433,7 +436,7 @@ contains
   
   !-----------------------------------------------------------------------
   !-----------------------------------------------------------------------
-  subroutine tropopause_hybridstobie(pstate, tropLev, tropP, tropT, tropZ)
+  subroutine tropopause_hybridstobie(lchnk,ncol,pmid,temp,zm,tropLev,tropP,tropT,tropZ)
     use cam_history,  only : outfld
   
     !-----------------------------------------------------------------------
@@ -451,7 +454,11 @@ contains
     
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    integer,           intent(in)       :: lchnk  ! chunk identifier
+    integer,           intent(in)       :: ncol ! number of columns in the chunk
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
     integer,            intent(inout)   :: tropLev(pcols)             ! tropopause level index   
     real(r8), optional, intent(inout)   :: tropP(pcols)               ! tropopause pressure [Pa]  
     real(r8), optional, intent(inout)   :: tropT(pcols)               ! tropopause temperature [K]
@@ -460,7 +467,7 @@ contains
     real(r8),parameter  ::  min_Stobie_Pressure= 40.E2_r8 !For case 2 & 4.  [Pa]
     real(r8),parameter  ::  max_Linoz_Pressure =208.E2_r8 !For case     4.  [Pa]
 
-    integer      :: icol, kk, ncol  ! column index, vertical level index, total number of columns in chunk
+    integer      :: icol, kk  ! column index, vertical level index
     real(r8)     :: stobie_min, shybrid_temp      !temporary variable for case 2 & 3.
     integer      :: ltrop_linoz(pcols)            !Lowest possible Linoz vertical level
     integer      :: ltrop_trop(pcols)             !Tropopause level for hybrid case.
@@ -472,7 +479,6 @@ contains
     !    write(iulog,*) 'In set_chem_trop, o3_ndx =',o3_ndx
     ltrop_linoz(:) = 1  ! Initialize to default value.
     ltrop_trop(:) = 1   ! Initialize to default value.
-    ncol = pstate%ncol
 
     LOOP_COL4: do icol=1,ncol
 
@@ -482,14 +488,14 @@ contains
           stobie_min = 1.e10_r8    ! An impossibly large number
           ltrop_linoz_set = .FALSE.
           LOOP_LEV: do kk=pver,1,-1
-             IF (pstate%pmid(icol,kk) < min_stobie_pressure) cycle
-             shybrid_temp = ALPHA * pstate%t(icol,kk) - Log10(pstate%pmid(icol,kk))
+             IF (pmid(icol,kk) < min_stobie_pressure) cycle
+             shybrid_temp = ALPHA * temp(icol,kk) - Log10(pmid(icol,kk))
              !PJC_NOTE: the units of pmid won't matter, because it is just an additive offset.
              IF (shybrid_temp<stobie_min) then 
                 ltrop_trop(icol)=kk     
                 stobie_min = shybrid_temp
              ENDIF
-             IF (pstate%pmid(icol,kk) < max_Linoz_pressure .AND. .NOT. ltrop_linoz_set) THEN
+             IF (pmid(icol,kk) < max_Linoz_pressure .AND. .NOT. ltrop_linoz_set) THEN
                 ltrop_linoz(icol) = kk
                 ltrop_linoz_set = .TRUE.
              ENDIF
@@ -498,13 +504,13 @@ contains
           tropLev(icol) = MIN(ltrop_trop(icol),ltrop_linoz(icol))
 
           if (present(tropP)) then
-             tropP(icol) = pstate%pmid(icol,tropLev(icol))
+             tropP(icol) = pmid(icol,tropLev(icol))
           endif
           if (present(tropT)) then
-             tropT(icol) = pstate%   t(icol,tropLev(icol))
+             tropT(icol) = temp(icol,tropLev(icol))
           endif
           if (present(tropZ)) then
-             tropZ(icol) = pstate%  zm(icol,tropLev(icol))
+             tropZ(icol) = zm(icol,tropLev(icol))
           endif
 
        endif not_found
@@ -520,9 +526,9 @@ contains
        trop_trop_output(icol,ltrop_trop(icol))=1._r8
     enddo
 
-    call outfld( 'hstobie_trop',   trop_output(:ncol,:),       ncol, pstate%lchnk )
-    call outfld( 'hstobie_linoz',  trop_linoz_output(:ncol,:), ncol, pstate%lchnk )
-    call outfld( 'hstobie_tropop', trop_trop_output(:ncol,:),  ncol, pstate%lchnk )
+    call outfld( 'hstobie_trop',   trop_output(:ncol,:),       ncol, lchnk )
+    call outfld( 'hstobie_linoz',  trop_linoz_output(:ncol,:), ncol, lchnk )
+    call outfld( 'hstobie_tropop', trop_trop_output(:ncol,:),  ncol, lchnk )
 
   endsubroutine tropopause_hybridstobie
   
@@ -549,49 +555,49 @@ contains
   ! reference: Reichler, T., M. Dameris, and R. Sausen (2003)
   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine twmo(t, p, plimu, pliml, gam, trp)
+  subroutine twmo(temp1d, pmid1d, plimu, pliml, gam, trp)
 
-    real(r8), intent(in), dimension(:)      :: t, p
+    real(r8), intent(in), dimension(:)      :: temp1d, pmid1d
     real(r8), intent(in)                    :: plimu, pliml, gam
     real(r8), intent(out)                   :: trp
     
     real(r8), parameter                     :: deltaz = 2000.0_r8
 
-    real(r8)                                :: pmk, pm, a, b, tm, dtdp, dtdz
+    real(r8)                                :: pmk, pm, a1, b1, tm, dtdp, dtdz
     real(r8)                                :: ag, bg, ptph
     real(r8)                                :: pm0, pmk0, dtdz0
     real(r8)                                :: p2km, asum, aquer
     real(r8)                                :: pmk2, pm2, a2, b2, tm2, dtdp2, dtdz2
     integer                                 :: level
     integer                                 :: icount, jj
-    integer                                 :: j
+    integer                                 :: kk
     
 
     trp=-99.0_r8                           ! negative means not valid
     
     ! initialize start level
     ! dt/dz
-    level = size(t)
-    pmk= .5_r8 * (p(level-1)**cnst_kap+p(level)**cnst_kap)
+    level = size(temp1d)
+    pmk= .5_r8 * (pmid1d(level-1)**cnst_kap+pmid1d(level)**cnst_kap)
     pm = pmk**(1/cnst_kap)               
-    a = (t(level-1)-t(level))/(p(level-1)**cnst_kap-p(level)**cnst_kap)
-    b = t(level)-(a*p(level)**cnst_kap)
-    tm = a * pmk + b               
-    dtdp = a * cnst_kap * (pm**cnst_ka1)
+    a1 = (temp1d(level-1)-temp1d(level))/(pmid1d(level-1)**cnst_kap-pmid1d(level)**cnst_kap)
+    b1 = temp1d(level)-(a1*pmid1d(level)**cnst_kap)
+    tm = a1 * pmk + b1               
+    dtdp = a1 * cnst_kap * (pm**cnst_ka1)
     dtdz = cnst_faktor*dtdp*pm/tm
 
-    main_loop: do j=level-1,2,-1
+    main_loop: do kk=level-1,2,-1
       pm0 = pm
       pmk0 = pmk
       dtdz0  = dtdz
     
       ! dt/dz
-      pmk= .5_r8 * (p(j-1)**cnst_kap+p(j)**cnst_kap)
+      pmk= .5_r8 * (pmid1d(kk-1)**cnst_kap+pmid1d(kk)**cnst_kap)
       pm = pmk**(1/cnst_kap)               
-      a = (t(j-1)-t(j))/(p(j-1)**cnst_kap-p(j)**cnst_kap)
-      b = t(j)-(a*p(j)**cnst_kap)
-      tm = a * pmk + b               
-      dtdp = a * cnst_kap * (pm**cnst_ka1)
+      a1 = (temp1d(kk-1)-temp1d(kk))/(pmid1d(kk-1)**cnst_kap-pmid1d(kk)**cnst_kap)
+      b1 = temp1d(kk)-(a1*pmid1d(kk)**cnst_kap)
+      tm = a1 * pmk + b1
+      dtdp = a1 * cnst_kap * (pm**cnst_ka1)
       dtdz = cnst_faktor*dtdp*pm/tm
       ! dt/dz valid?
       if (dtdz.le.gam) cycle main_loop    ! no, dt/dz < -2 K/km
@@ -615,16 +621,16 @@ contains
       icount = 0                                   ! number of levels above
   
       ! test until apm < p2km
-      in_loop: do jj=j,2,-1
+      in_loop: do jj=kk,2,-1
     
-        pmk2 = .5_r8 * (p(jj-1)**cnst_kap+p(jj)**cnst_kap) ! p mean ^kappa
+        pmk2 = .5_r8 * (pmid1d(jj-1)**cnst_kap+pmid1d(jj)**cnst_kap) ! p mean ^kappa
         pm2 = pmk2**(1/cnst_kap)                           ! p mean
         if(pm2.gt.ptph) cycle in_loop            ! doesn't happen
         if(pm2.lt.p2km) exit in_loop             ! ptropo is valid
 
-        a2 = (t(jj-1)-t(jj))                     ! a
-        a2 = a2/(p(jj-1)**cnst_kap-p(jj)**cnst_kap)
-        b2 = t(jj)-(a2*p(jj)**cnst_kap)          ! b
+        a2 = (temp1d(jj-1)-temp1d(jj))                     ! a
+        a2 = a2/(pmid1d(jj-1)**cnst_kap-pmid1d(jj)**cnst_kap)
+        b2 = temp1d(jj)-(a2*pmid1d(jj)**cnst_kap)          ! b
         tm2 = a2 * pmk2 + b2                     ! T mean
         dtdp2 = a2 * cnst_kap * (pm2**(cnst_kap-1))  ! dt/dp
         dtdz2 = cnst_faktor*dtdp2*pm2/tm2
@@ -647,60 +653,58 @@ contains
   ! This routine uses an implementation of Reichler et al. [2003] done by
   ! Reichler and downloaded from his web site. This is similar to the WMO
   ! routines, but is designed for GCMs with a coarse vertical grid.
-  subroutine tropopause_twmo(pstate, tropLev, tropP, tropT, tropZ)
-
+  subroutine tropopause_twmo(ncol,pmid,pint,temp,zm,zi,tropLev,tropP,tropT,tropZ)
     implicit none
 
-    type(physics_state), intent(in)    :: pstate 
+    integer,           intent(in)       :: ncol ! number of columns in the chunk
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: pint(:,:)  ! top interface pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
+    real(r8),          intent(in)       :: zi(:,:)    ! interface geopotential height above sfc [m]
     integer,            intent(inout)  :: tropLev(pcols)            ! tropopause level index   
-    real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure (Pa)   
-    real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature (K)
-    real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height (m)
+    real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure [Pa]   
+    real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature [K]
+    real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height [m]
 
     ! Local Variables 
-    real(r8), parameter     :: gam    = -0.002_r8         ! K/m
-    real(r8), parameter     :: plimu    = 45000._r8         ! Pa
-    real(r8), parameter     :: pliml    = 7500._r8          ! Pa
+    real(r8), parameter     :: gam    = -0.002_r8         ! [K/m]
+    real(r8), parameter     :: plimu    = 45000._r8         ! [Pa]
+    real(r8), parameter     :: pliml    = 7500._r8          ! [Pa]
      
-    integer                 :: i
-    integer                 :: k
-    integer                 :: ncol                         ! number of columns in the chunk
-    integer                 :: lchnk                        ! chunk identifier
-    real(r8)                :: tP                       ! tropopause pressure (Pa)
-
-    ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
+    integer                 :: icol
+    integer                 :: kk
+    real(r8)                :: tP                       ! tropopause pressure [Pa]
 
     ! Iterate over all of the columns.
-    do i = 1, ncol
+    do icol = 1, ncol
      
       ! Skip column in which the tropopause has already been found.
-      if (tropLev(i) == NOTFOUND) then
+      if (tropLev(icol) == NOTFOUND) then
 
         ! Use the routine from Reichler.
-        call twmo(pstate%t(i, :), pstate%pmid(i, :), plimu, pliml, gam, tP)
+        call twmo(temp(icol, :), pmid(icol, :), plimu, pliml, gam, tP)
      
         ! if successful, store of the results and find the level and temperature.
         if (tP > 0) then
         
           ! Find the associated level.
-          do k = pver, 2, -1
-            if (tP >= pstate%pint(i, k)) then
-              tropLev(i) = k
+          do kk = pver, 2, -1
+            if (tP >= pint(icol, kk)) then
+              tropLev(icol) = kk
               exit
             end if
           end do
           
           ! Return the optional outputs
-          if (present(tropP)) tropP(i) = tP
+          if (present(tropP)) tropP(icol) = tP
           
           if (present(tropT)) then
-            tropT(i) = tropopause_interpolateT(pstate, i, tropLev(i), tP)
+            tropT(icol) = tropopause_interpolateT(pmid,temp,icol,tropLev(icol),tP)
           end if
 
           if (present(tropZ)) then
-            tropZ(i) = tropopause_interpolateZ(pstate, i, tropLev(i), tP)
+            tropZ(icol) = tropopause_interpolateZ(pmid,pint,zm,zi,icol,tropLev(icol),tP)
           end if
         end if
       end if
@@ -712,82 +716,78 @@ contains
   ! This routine searches for the cold point tropopause, and uses a parabolic
   ! fit of the coldest point and two adjacent points to interpolate the cold point
   ! between model levels.
-  subroutine tropopause_cpp(pstate, tropLev, tropP, tropT, tropZ)
-
+  subroutine tropopause_cpp(ncol,pmid,temp,zm,tropLev,tropP,tropT,tropZ)
     implicit none
 
-    type(physics_state), intent(in)    :: pstate 
+    integer,           intent(in)       :: ncol ! number of columns in the chunk
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
     integer,            intent(inout)  :: tropLev(pcols)            ! tropopause level index   
-    real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure (Pa)   
-    real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature (K)
-    real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height (m)
+    real(r8), optional, intent(inout)  :: tropP(pcols)              ! tropopause pressure [Pa]   
+    real(r8), optional, intent(inout)  :: tropT(pcols)              ! tropopause temperature [K]
+    real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height [m]
 
     ! Local Variables 
-    real(r8), parameter    :: ztrop_low   = 5000._r8        ! lowest tropopause level allowed (m)
-    real(r8), parameter    :: ztrop_high  = 25000._r8       ! highest tropopause level allowed (m)
+    real(r8), parameter    :: ztrop_low   = 5000._r8        ! lowest tropopause level allowed [m]
+    real(r8), parameter    :: ztrop_high  = 25000._r8       ! highest tropopause level allowed [m]
 
-    integer                 :: i
-    integer                 :: k, firstk, lastk
+    integer                 :: icol
+    integer                 :: kk, firstk, lastk
     integer                 :: k2
-    integer                 :: ncol                         ! number of columns in the chunk
-    integer                 :: lchnk                        ! chunk identifier
-    real(r8)                :: tZ                           ! tropopause height (m)
+    real(r8)                :: tZ                           ! tropopause height [m]
     real(r8)                :: tmin
     real(r8)                :: f0, f1, f2
     real(r8)                :: x0, x1, x2
     real(r8)                :: c0, c1, c2
-    real(r8)                :: a, b, c
-
-      ! Information about the chunk.  
-    lchnk = pstate%lchnk
-    ncol  = pstate%ncol
+    real(r8)                :: aterm, bterm, cterm
 
     ! Iterate over all of the columns.
-    do i = 1, ncol
+    do icol = 1, ncol
      
       firstk = 0
       lastk  = pver+1
 
       ! Skip column in which the tropopause has already been found.
-      if (tropLev(i) == NOTFOUND) then
+      if (tropLev(icol) == NOTFOUND) then
         tmin = 1e6_r8
 
-        kloop: do k = pver-1, 2, -1
+        kloop: do kk = pver-1, 2, -1
          
           ! Skip levels below the minimum and stop if nothing is found
           ! before the maximum.
-          if (pstate%zm(i, k) < ztrop_low) then
-            firstk = k
+          if (zm(icol, kk) < ztrop_low) then
+            firstk = kk
             cycle kloop
-          else if (pstate%zm(i, k) > ztrop_high) then
-            lastk = k
+          elseif (zm(icol, kk) > ztrop_high) then
+            lastk = kk
             exit kloop
-          end if
+          endif
           
           ! Find the coldest point
-          if (pstate%t(i, k) < tmin) then
-            tropLev(i) = k
-            tmin = pstate%t(i,k)
-          end if
-        end do kloop
+          if (temp(icol, kk) < tmin) then
+            tropLev(icol) = kk
+            tmin = temp(icol,kk)
+          endif
+        enddo kloop
 
         ! If the minimum is at the edge of the search range, then don't
         ! consider this to be a minima
-        if ((tropLev(i) >= (firstk-1)) .or. (tropLev(i) <= (lastk+1))) then
-          tropLev(i) = NOTFOUND
+        if ((tropLev(icol) >= (firstk-1)) .or. (tropLev(icol) <= (lastk+1))) then
+          tropLev(icol) = NOTFOUND
         else
 
           ! If returning P, Z, or T, then do a parabolic fit using the
           ! cold point and it its 2 surrounding points to interpolate
           ! between model levels.
           if (present(tropP) .or. present(tropZ) .or. present(tropT)) then
-            f0 = pstate%t(i, tropLev(i)-1)
-            f1 = pstate%t(i, tropLev(i))
-            f2 = pstate%t(i, tropLev(i)+1)
+            f0 = temp(icol, tropLev(icol)-1)
+            f1 = temp(icol, tropLev(icol))
+            f2 = temp(icol, tropLev(icol)+1)
 
-            x0 = pstate%zm(i, tropLev(i)-1)
-            x1 = pstate%zm(i, tropLev(i))
-            x2 = pstate%zm(i, tropLev(i)+1)
+            x0 = zm(icol, tropLev(icol)-1)
+            x1 = zm(icol, tropLev(icol))
+            x2 = zm(icol, tropLev(icol)+1)
 
             c0 = (x0-x1)*(x0-x2)
             c1 = (x1-x0)*(x1-x2)
@@ -795,35 +795,40 @@ contains
 
             ! Determine the quadratic coefficients of:
             !   T = a * z^2 - b*z + c
-            a = (f0/c0 + f1/c1 + f2/c2)
-            b = (f0/c0*(x1+x2) + f1/c1*(x0+x2) + f2/c2*(x0+x1))
-            c = f0/c0*x1*x2 + f1/c1*x0*x2 + f2/c2*x0*x1
+            aterm = (f0/c0 + f1/c1 + f2/c2)
+            bterm = (f0/c0*(x1+x2) + f1/c1*(x0+x2) + f2/c2*(x0+x1))
+            cterm = f0/c0*x1*x2 + f1/c1*x0*x2 + f2/c2*x0*x1
 
             ! Find the altitude of the minimum temperature
-            tZ = 0.5_r8 * b / a
+            tZ = 0.5_r8 * bterm / aterm
             
             ! The fit should be between the upper and lower points,
             ! so skip the point if the fit fails.
             if ((tZ >= x0) .or. (tZ <= x2)) then
-              tropLev(i) = NOTFOUND
+              tropLev(icol) = NOTFOUND
             else
               ! Return the optional outputs
               if (present(tropP)) then
-                tropP(i) = tropopause_interpolateP(pstate, i, tropLev(i), tZ)
-              end if
+                tropP(icol) = tropopause_interpolateP(pmid,zm,icol,tropLev(icol),tZ)
+              endif
             
               if (present(tropT)) then
-                tropT(i) = a * tZ*tZ - b*tZ + c
-              end if
+                tropT(icol) = aterm * tZ*tZ - bterm*tZ + cterm
+              endif
 
               if (present(tropZ)) then
-                tropZ(i) = tZ
-              end if
-            end if
-          end if
-        end if
-      end if
-    end do
+                tropZ(icol) = tZ
+              endif
+
+            endif  !   if ((tZ >= x0) .or. (tZ <= x2))
+
+          endif  !  if (present(tropP) .or. present(tropZ) .or. present(tropT)) 
+
+        endif   ! if ((tropLev(icol) >= (firstk-1)) .or. (tropLev(icol) <= (lastk+1))) 
+
+      endif    ! if (tropLev(icol) == NOTFOUND)
+
+    enddo
     
     return
   end subroutine tropopause_cpp
@@ -833,11 +838,18 @@ contains
   ! backup routine which will be tried only if the first routine fails. If the
   ! tropopause can not be identified by either routine, then a NOTFOUND is returned
   ! for the tropopause level, temperature and pressure.
-  subroutine tropopause_find(pstate, tropLev, tropP, tropT, tropZ, primary, backup)
+    subroutine tropopause_find(lchnk,ncol,pmid,pint,temp,zm,zi,tropLev,tropP,tropT,tropZ,primary,backup)
 
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    integer,           intent(in)       :: lchnk
+    integer,           intent(in)       :: ncol
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: pint(:,:)  ! top interface pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
+    real(r8),          intent(in)       :: zi(:,:)    ! interface geopotential height above sfc [m]
+
     integer, optional, intent(in)       :: primary                   ! primary detection algorithm
     integer, optional, intent(in)       :: backup                    ! backup detection algorithm
     integer,            intent(out)     :: tropLev(pcols)            ! tropopause level index   
@@ -871,11 +883,11 @@ contains
     
     ! Try to find the tropopause using the primary algorithm.
     if (primAlg /= TROP_ALG_NONE) then
-      call tropopause_findUsing(pstate, primAlg, tropLev, tropP, tropT, tropZ)
+      call tropopause_findUsing(lchnk,ncol,pmid,pint,temp,zm,zi,primAlg, tropLev, tropP, tropT, tropZ)
     endif
  
     if ((backAlg /= TROP_ALG_NONE) .and. any(tropLev(:) == NOTFOUND)) then
-      call tropopause_findUsing(pstate, backAlg, tropLev, tropP, tropT, tropZ)
+      call tropopause_findUsing(lchnk,ncol,pmid,pint,temp,zm,zi,backAlg, tropLev, tropP, tropT, tropZ)
     endif
     
     return
@@ -886,11 +898,17 @@ contains
   !
   ! NOTE: It is assumed that the output fields have been initialized by the
   ! caller, and only output values set to fillvalue will be detected.
-  subroutine tropopause_findUsing(pstate, algorithm, tropLev, tropP, tropT, tropZ)
+  subroutine tropopause_findUsing(lchnk,ncol,pmid,pint,temp,zm,zi,algorithm,tropLev,tropP,tropT,tropZ)
 
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    integer,           intent(in)       :: lchnk
+    integer,           intent(in)       :: ncol
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: pint(:,:)  ! top interface pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
+    real(r8),          intent(in)       :: zi(:,:)    ! interface geopotential height above sfc [m]
     integer,            intent(in)      :: algorithm                 ! detection algorithm
     integer,            intent(inout)   :: tropLev(pcols)            ! tropopause level index   
     real(r8), optional, intent(inout)   :: tropP(pcols)              ! tropopause pressure [Pa]  
@@ -901,17 +919,13 @@ contains
     select case(algorithm)
 
       case(TROP_ALG_CLIMATE)
-        call tropopause_climate(pstate, tropLev, tropP, tropT, tropZ)
-
+        call tropopause_climate(lchnk,ncol,pmid,pint,temp,zm,zi,tropLev,tropP,tropT,tropZ)
       case(TROP_ALG_HYBSTOB)
-        call tropopause_hybridstobie(pstate, tropLev, tropP, tropT, tropZ)
-
+        call tropopause_hybridstobie(lchnk,ncol,pmid,temp,zm,tropLev,tropP,tropT,tropZ)
       case(TROP_ALG_TWMO)
-        call tropopause_twmo(pstate, tropLev, tropP, tropT, tropZ)
-
+        call tropopause_twmo(ncol,pmid,pint,temp,zm,zi,tropLev,tropP,tropT,tropZ)
       case(TROP_ALG_CPP)
-        call tropopause_cpp(pstate, tropLev, tropP, tropT, tropZ)
-
+        call tropopause_cpp(ncol,pmid,temp,zm,tropLev,tropP,tropT,tropZ)
       case default
         write(iulog, *) 'tropopause: Invalid detection algorithm (',  algorithm, ') specified.'
         call endrun
@@ -922,11 +936,12 @@ contains
 
   ! This routine interpolates the pressures in the physics state to
   ! find the pressure at the specified tropopause altitude.
-  function tropopause_interpolateP(pstate, icol, tropLev, tropZ)
+  function tropopause_interpolateP(pmid,zm,icol,tropLev,tropZ)
  
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
     integer, intent(in)                 :: icol               ! column being processed
     integer, intent(in)                 :: tropLev            ! tropopause level index   
     real(r8), optional, intent(in)      :: tropZ              ! tropopause pressure [m]
@@ -939,24 +954,24 @@ contains
     ! Interpolate the temperature linearly against log(P)
     
     ! Is the tropopause at the midpoint?
-    if (tropZ == pstate%zm(icol, tropLev)) then
-      tropP = pstate%pmid(icol, tropLev)
+    if (tropZ == zm(icol, tropLev)) then
+      tropP = pmid(icol, tropLev)
     
-    elseif (tropZ > pstate%zm(icol, tropLev)) then
+    elseif (tropZ > zm(icol, tropLev)) then
     
       ! It is above the midpoint? Make sure we aren't at the top.
       if (tropLev > 1) then
-        dlogPdZ = (log(pstate%pmid(icol, tropLev)) - log(pstate%pmid(icol, tropLev - 1))) / &
-          (pstate%zm(icol, tropLev) - pstate%zm(icol, tropLev - 1)) 
-        tropP = pstate%pmid(icol, tropLev) + exp((tropZ - pstate%zm(icol, tropLev)) * dlogPdZ)
+        dlogPdZ = (log(pmid(icol, tropLev)) - log(pmid(icol, tropLev - 1))) / &
+          (zm(icol, tropLev) - zm(icol, tropLev - 1)) 
+        tropP = pmid(icol, tropLev) + exp((tropZ - zm(icol, tropLev)) * dlogPdZ)
       endif
     else
       
       ! It is below the midpoint. Make sure we aren't at the bottom.
       if (tropLev < pver) then
-        dlogPdZ =  (log(pstate%pmid(icol, tropLev + 1)) - log(pstate%pmid(icol, tropLev))) / &
-          (pstate%zm(icol, tropLev + 1) - pstate%zm(icol, tropLev))
-        tropP = pstate%pmid(icol, tropLev) + exp((tropZ - pstate%zm(icol, tropLev)) * dlogPdZ)
+        dlogPdZ =  (log(pmid(icol, tropLev + 1)) - log(pmid(icol, tropLev))) / &
+          (zm(icol, tropLev + 1) - zm(icol, tropLev))
+        tropP = pmid(icol, tropLev) + exp((tropZ - zm(icol, tropLev)) * dlogPdZ)
       endif
     endif
     
@@ -965,11 +980,12 @@ contains
 
   ! This routine interpolates the temperatures in the physics state to
   ! find the temperature at the specified tropopause pressure.
-  function tropopause_interpolateT(pstate, icol, tropLev, tropP)
+  function tropopause_interpolateT(pmid,temp,icol,tropLev,tropP)
  
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: temp(:,:)  ! temperature [K]
     integer, intent(in)                 :: icol               ! column being processed
     integer, intent(in)                 :: tropLev            ! tropopause level index   
     real(r8), optional, intent(in)      :: tropP              ! tropopause pressure [Pa]
@@ -982,24 +998,24 @@ contains
     ! Intrepolate the temperature linearly against log(P)
     
     ! Is the tropopause at the midpoint?
-    if (tropP == pstate%pmid(icol, tropLev)) then
-      tropT = pstate%t(icol, tropLev)
+    if (tropP == pmid(icol, tropLev)) then
+      tropT = temp(icol, tropLev)
     
-    elseif (tropP < pstate%pmid(icol, tropLev)) then
+    elseif (tropP < pmid(icol, tropLev)) then
     
       ! It is above the midpoint? Make sure we aren't at the top.
       if (tropLev > 1) then
-        dTdlogP = (pstate%t(icol, tropLev) - pstate%t(icol, tropLev - 1)) / & 
-          (log(pstate%pmid(icol, tropLev)) - log(pstate%pmid(icol, tropLev - 1)))
-        tropT = pstate%t(icol, tropLev) + (log(tropP) - log(pstate%pmid(icol, tropLev))) * dTdlogP
+        dTdlogP = (temp(icol, tropLev) - temp(icol, tropLev - 1)) / & 
+          (log(pmid(icol, tropLev)) - log(pmid(icol, tropLev - 1)))
+        tropT = temp(icol, tropLev) + (log(tropP) - log(pmid(icol, tropLev))) * dTdlogP
       endif
     else
       
       ! It is below the midpoint. Make sure we aren't at the bottom.
       if (tropLev < pver) then
-        dTdlogP = (pstate%t(icol, tropLev + 1) - pstate%t(icol, tropLev)) / &
-          (log(pstate%pmid(icol, tropLev + 1)) - log(pstate%pmid(icol, tropLev)))
-        tropT = pstate%t(icol, tropLev) + (log(tropP) - log(pstate%pmid(icol, tropLev))) * dTdlogP
+        dTdlogP = (temp(icol, tropLev + 1) - temp(icol, tropLev)) / &
+          (log(pmid(icol, tropLev + 1)) - log(pmid(icol, tropLev)))
+        tropT = temp(icol, tropLev) + (log(tropP) - log(pmid(icol, tropLev))) * dTdlogP
       endif
     endif
     
@@ -1009,11 +1025,14 @@ contains
   
   ! This routine interpolates the geopotential height in the physics state to
   ! find the geopotential height at the specified tropopause pressure.
-  function tropopause_interpolateZ(pstate, icol, tropLev, tropP)
+  function tropopause_interpolateZ(pmid,pint,zm,zi,icol,tropLev,tropP)
  
     implicit none
 
-    type(physics_state), intent(in)     :: pstate 
+    real(r8),          intent(in)       :: pmid(:,:)  ! midpoint pressure [Pa]
+    real(r8),          intent(in)       :: pint(:,:)  ! top interface pressure [Pa]
+    real(r8),          intent(in)       :: zm(:,:)    ! midpoint geopotential height above the surface [m]
+    real(r8),          intent(in)       :: zi(:,:)    ! interface geopotential height above sfc [m]
     integer, intent(in)                 :: icol               ! column being processed
     integer, intent(in)                 :: tropLev            ! tropopause level index   
     real(r8), optional, intent(in)      :: tropP              ! tropopause pressure [Pa]
@@ -1026,21 +1045,21 @@ contains
     ! Intrepolate the geopotential height linearly against log(P)
     
     ! Is the tropoause at the midpoint?
-    if (tropP == pstate%pmid(icol, tropLev)) then
-      tropZ = pstate%zm(icol, tropLev)
+    if (tropP == pmid(icol, tropLev)) then
+      tropZ = zm(icol, tropLev)
     
-    elseif (tropP < pstate%pmid(icol, tropLev)) then
+    elseif (tropP < pmid(icol, tropLev)) then
     
       ! It is above the midpoint? Make sure we aren't at the top.
-      dZdlogP = (pstate%zm(icol, tropLev) - pstate%zi(icol, tropLev)) / &
-        (log(pstate%pmid(icol, tropLev)) - log(pstate%pint(icol, tropLev)))
-      tropZ = pstate%zm(icol, tropLev) + (log(tropP) - log(pstate%pmid(icol, tropLev))) * dZdlogP
+      dZdlogP = (zm(icol, tropLev) - zi(icol, tropLev)) / &
+        (log(pmid(icol, tropLev)) - log(pint(icol, tropLev)))
+      tropZ = zm(icol, tropLev) + (log(tropP) - log(pmid(icol, tropLev))) * dZdlogP
     else
       
       ! It is below the midpoint. Make sure we aren't at the bottom.
-      dZdlogP = (pstate%zm(icol, tropLev) - pstate%zi(icol, tropLev+1)) / &
-        (log(pstate%pmid(icol, tropLev)) - log(pstate%pint(icol, tropLev+1)))
-      tropZ = pstate%zm(icol, tropLev) + (log(tropP) - log(pstate%pmid(icol, tropLev))) * dZdlogP
+      dZdlogP = (zm(icol, tropLev) - zi(icol, tropLev+1)) / &
+        (log(pmid(icol, tropLev)) - log(pint(icol, tropLev+1)))
+      tropZ = zm(icol, tropLev) + (log(tropP) - log(pmid(icol, tropLev))) * dZdlogP
     endif
     
     tropopause_interpolateZ = tropZ
@@ -1059,16 +1078,16 @@ contains
     type(physics_state), intent(in)     :: pstate
   
     ! Local Variables
-    integer       :: i
+    integer       :: icol
     integer       :: alg
-    integer       :: ncol                     ! number of cloumns in the chunk
+    integer       :: ncol                     ! number of columns in the chunk
     integer       :: lchnk                    ! chunk identifier
     integer       :: tropLev(pcols)           ! tropopause level index   
-    real(r8)      :: tropP(pcols)             ! tropopause pressure (Pa)  
-    real(r8)      :: tropT(pcols)             ! tropopause temperature (K) 
-    real(r8)      :: tropZ(pcols)             ! tropopause height (m) 
+    real(r8)      :: tropP(pcols)             ! tropopause pressure [Pa]  
+    real(r8)      :: tropT(pcols)             ! tropopause temperature [K] 
+    real(r8)      :: tropZ(pcols)             ! tropopause height [m] 
     real(r8)      :: tropFound(pcols)         ! tropopause found  
-    real(r8)      :: tropDZ(pcols, pver)      ! relative tropopause height (m) 
+    real(r8)      :: tropDZ(pcols, pver)      ! relative tropopause height [m] 
     real(r8)      :: tropPdf(pcols, pver)     ! tropopause probability distribution  
 
     ! Information about the chunk.  
@@ -1076,16 +1095,17 @@ contains
     ncol  = pstate%ncol
 
     ! Find the tropopause using the default algorithm backed by the climatology.
-    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ)
+    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,  &
+         tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ)
     
     tropPdf(:,:) = 0._r8
     tropFound(:) = 0._r8
     tropDZ(:,:) = fillvalue 
-    do i = 1, ncol
-      if (tropLev(i) /= NOTFOUND) then
-        tropPdf(i, tropLev(i)) = 1._r8
-        tropFound(i) = 1._r8
-        tropDZ(i,:) = pstate%zm(i,:) - tropZ(i) 
+    do icol = 1, ncol
+      if (tropLev(icol) /= NOTFOUND) then
+        tropPdf(icol, tropLev(icol)) = 1._r8
+        tropFound(icol) = 1._r8
+        tropDZ(icol,:) = pstate%zm(icol,:) - tropZ(icol) 
       end if
     end do
 
@@ -1098,17 +1118,18 @@ contains
     
     
     ! Find the tropopause using just the primary algorithm.
-    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, backup=TROP_ALG_NONE)
+    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,    &
+         tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,backup=TROP_ALG_NONE)
 
     tropPdf(:,:) = 0._r8
     tropFound(:) = 0._r8
     tropDZ(:,:) = fillvalue 
     
-    do i = 1, ncol
-      if (tropLev(i) /= NOTFOUND) then
-        tropPdf(i, tropLev(i)) = 1._r8
-        tropFound(i) = 1._r8
-        tropDZ(i,:) = pstate%zm(i,:) - tropZ(i) 
+    do icol = 1, ncol
+      if (tropLev(icol) /= NOTFOUND) then
+        tropPdf(icol, tropLev(icol)) = 1._r8
+        tropFound(icol) = 1._r8
+        tropDZ(icol,:) = pstate%zm(icol,:) - tropZ(icol) 
       end if
     end do
 
@@ -1120,17 +1141,18 @@ contains
     call outfld('TROPP_FD',  tropFound(:ncol),  ncol, lchnk)
     
     ! Find the tropopause using just the cold point algorithm.
-    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, primary=TROP_ALG_CPP, backup=TROP_ALG_NONE)
+    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,    &
+         tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,primary=TROP_ALG_CPP,backup=TROP_ALG_NONE)
 
     tropPdf(:,:) = 0._r8
     tropFound(:) = 0._r8
     tropDZ(:,:) = fillvalue
 
-    do i = 1, ncol
-      if (tropLev(i) /= NOTFOUND) then
-        tropPdf(i, tropLev(i)) = 1._r8
-        tropFound(i) = 1._r8
-        tropDZ(i,:) = pstate%zm(i,:) - tropZ(i)
+    do icol = 1, ncol
+      if (tropLev(icol) /= NOTFOUND) then
+        tropPdf(icol, tropLev(icol)) = 1._r8
+        tropFound(icol) = 1._r8
+        tropDZ(icol,:) = pstate%zm(icol,:) - tropZ(icol)
       end if
     end do
 
