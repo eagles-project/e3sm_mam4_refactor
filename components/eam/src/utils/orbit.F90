@@ -2,7 +2,10 @@ module orbit
 
 contains
 
-subroutine zenith(calday, clat, clon, coszrs, ncol, dt_avg, uniform_angle )
+subroutine zenith(calday, clat, clon, & ! in
+                  coszrs,             & ! out
+                  ncol,               & ! in
+                  dt_avg, uniform_angle ) ! optional in
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -17,7 +20,7 @@ subroutine zenith(calday, clat, clon, coszrs, ncol, dt_avg, uniform_angle )
 ! 
 !-----------------------------------------------------------------------
    use shr_kind_mod, only: r8 => shr_kind_r8
-   use shr_orb_mod
+   use shr_orb_mod,  only: shr_orb_decl, shr_orb_cosz
    use cam_control_mod, only: lambm0, obliqr, eccen, mvelpp
    implicit none
 
@@ -25,7 +28,7 @@ subroutine zenith(calday, clat, clon, coszrs, ncol, dt_avg, uniform_angle )
 !
 ! Input arguments
 !
-   integer, intent(in) :: ncol                 ! number of positions
+   integer,  intent(in) :: ncol                ! number of positions
    real(r8), intent(in) :: calday              ! Calendar day, including fraction
    real(r8), intent(in) :: clat(ncol)          ! Current centered latitude (radians)
    real(r8), intent(in) :: clon(ncol)          ! Centered longitude (radians)
@@ -38,24 +41,25 @@ subroutine zenith(calday, clat, clon, coszrs, ncol, dt_avg, uniform_angle )
 !
 !---------------------------Local variables-----------------------------
 !
-   integer i         ! Position loop index
+   integer  icol     ! Position loop index
    real(r8) delta    ! Solar declination angle  in radians
    real(r8) eccf     ! Earth orbit eccentricity factor
 !
 !-----------------------------------------------------------------------
 !
-   call shr_orb_decl (calday  ,eccen     ,mvelpp  ,lambm0  ,obliqr  , &
-                      delta   ,eccf      )
+   call shr_orb_decl (calday  ,eccen     ,mvelpp  ,lambm0  ,obliqr  , & ! in
+                      delta   ,eccf      )      ! out
 !
 ! Compute local cosine solar zenith angle,
 !
-   do i=1,ncol
+   do icol=1,ncol
       if (present(uniform_angle)) then
-         coszrs(i) = shr_orb_cosz( calday, clat(i), clon(i), delta, dt_avg, uniform_angle=uniform_angle )
+         coszrs(icol) = shr_orb_cosz( calday, clat(icol), clon(icol), delta, &
+                        dt_avg, uniform_angle=uniform_angle )
       else
-         coszrs(i) = shr_orb_cosz( calday, clat(i), clon(i), delta, dt_avg )
-      end if
-   end do
+         coszrs(icol) = shr_orb_cosz( calday, clat(icol), clon(icol), delta, dt_avg )
+      endif
+   enddo
 
 end subroutine zenith
 end module orbit
