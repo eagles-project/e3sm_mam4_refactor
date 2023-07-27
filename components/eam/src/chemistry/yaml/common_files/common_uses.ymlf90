@@ -59,5 +59,8 @@ use spmd_utils,   only : masterproc
 !aerosol drydep
 !#define YAML_AERO_DRYDEP
 
+! zenith in orbit.F90
+!#define YAML_ZENITH
+
 use yaml_input_file_io
 
