@@ -53,6 +53,9 @@ use spmd_utils,   only : masterproc
 ! mo_setrxt
 !#define YAML_SETRXT
 
+! mo_photo
+!#define YAML_PHOTO
+
 ! mo_jlong
 !#define YAML_JLONG
 

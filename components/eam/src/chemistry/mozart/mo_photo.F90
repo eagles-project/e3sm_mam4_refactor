@@ -2,6 +2,7 @@ module mo_photo
   !----------------------------------------------------------------------
   !	... photolysis interp table and related arrays
   !----------------------------------------------------------------------
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use ppgrid,       only : pcols, pver, begchunk, endchunk
@@ -440,6 +441,7 @@ contains
     real(r8) ::  cld_mult(pver)            ! clould multiplier
     real(r8), allocatable ::  lng_prates(:,:) ! photorates matrix [1/s]
     real(r8), allocatable :: tline(:)         ! vertical temperature array [K]
+#include "../yaml/mo_photo/f90_yaml/table_photo_beg_yml.f90"
 
 
     if( phtcnt < 1 ) then
@@ -500,6 +502,7 @@ contains
 
     if ( allocated(lng_prates) ) deallocate( lng_prates )
     if ( allocated(tline) )   deallocate( tline )
+#include "../yaml/mo_photo/f90_yaml/table_photo_end_yml.f90"
 
   end subroutine table_photo
 
@@ -542,6 +545,7 @@ contains
     real(r8), parameter :: rgrav = 1._r8/9.80616_r8  ! 1/g [s^2/m]
     real(r8), parameter :: f_lwp2tau = .155_r8  ! factor converting LWP to tau [unknown source and unit]
     real(r8), parameter :: tau_min = 5._r8      ! tau threshold below which assign cloud as zero
+#include "../yaml/mo_photo/f90_yaml/cloud_mod_beg_yml.f90"
 
     !---------------------------------------------------------
     !	... modify lwc for cloud fraction and form
@@ -626,6 +630,7 @@ contains
     cld_mult(:) = 1._r8 + fac1(:) * clouds(:) + fac2(:) * above_cld(:)
     cld_mult(:) = max( .05_r8, cld_mult(:) )
 
+#include "../yaml/mo_photo/f90_yaml/cloud_mod_end_yml.f90"
   end subroutine cloud_mod
 
 !====================================================================================
@@ -653,6 +658,7 @@ contains
     !---------------------------------------------------------------
     real(r8)    :: o2_exo_col(ncol)
     real(r8)    :: o3_exo_col(ncol)
+#include "../yaml/mo_photo/f90_yaml/set_ub_col_beg_yml.f90"
  
     !---------------------------------------------------------------
     !        ... assign column density at the upper boundary
@@ -694,6 +700,7 @@ contains
              o2_exo_col,   vmr,    invariants,  & ! in
              pdel, ncol                         ) ! in
     endif
+#include "../yaml/mo_photo/f90_yaml/set_ub_col_end_yml.f90"
 
   end subroutine set_ub_col
 
@@ -713,6 +720,7 @@ contains
     integer     :: icol
     integer     :: kl           ! ki - 1
     real(r8)    :: tint_vals(2) ! [molecules/cm^2]
+#include "../yaml/mo_photo/f90_yaml/calc_exo_col_beg_yml.f90"
 
     ! get ki-1
     kl = ki-1
@@ -734,6 +742,7 @@ contains
 
       enddo
 
+#include "../yaml/mo_photo/f90_yaml/calc_exo_col_end_yml.f90"
   end subroutine calc_exo_col
 
 !====================================================================================
@@ -764,6 +773,7 @@ contains
     !              from pascals to dyne/cm**2.
     !---------------------------------------------------------------
     real(r8), parameter :: xfactor = 2.8704e21_r8/(9.80616_r8*1.38044_r8)
+#include "../yaml/mo_photo/f90_yaml/calc_col_delta_beg_yml.f90"
 
 
      col_delta_s(:,0) = spc_exo_col(:)
@@ -777,6 +787,7 @@ contains
         enddo
      endif
 
+#include "../yaml/mo_photo/f90_yaml/calc_col_delta_end_yml.f90"
   end subroutine calc_col_delta
 
 !====================================================================================
