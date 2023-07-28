@@ -1,11 +1,12 @@
 module orbit
+#include "../chemistry/yaml/common_files/common_uses.ymlf90"
 
 contains
 
 subroutine zenith(calday, clat, clon, & ! in
                   coszrs,             & ! out
                   ncol,               & ! in
-                  dt_avg, uniform_angle ) ! optional in
+                  dt_avg ) ! optional in
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -33,7 +34,6 @@ subroutine zenith(calday, clat, clon, & ! in
    real(r8), intent(in) :: clat(ncol)          ! Current centered latitude (radians)
    real(r8), intent(in) :: clon(ncol)          ! Centered longitude (radians)
    real(r8), intent(in), optional :: dt_avg    ! if present, time step to use for the shr_orb_cosz calculation
-   real(r8), intent(in), optional :: uniform_angle ! if present, use a globally uniform zenith angle [radians]
 !
 ! Output arguments
 !
@@ -44,6 +44,7 @@ subroutine zenith(calday, clat, clon, & ! in
    integer  icol     ! Position loop index
    real(r8) delta    ! Solar declination angle  in radians
    real(r8) eccf     ! Earth orbit eccentricity factor
+#include "../chemistry/yaml/orbit/f90_yaml/zenith_beg_yml.f90"
 !
 !-----------------------------------------------------------------------
 !
@@ -53,13 +54,9 @@ subroutine zenith(calday, clat, clon, & ! in
 ! Compute local cosine solar zenith angle,
 !
    do icol=1,ncol
-      if (present(uniform_angle)) then
-         coszrs(icol) = shr_orb_cosz( calday, clat(icol), clon(icol), delta, &
-                        dt_avg, uniform_angle=uniform_angle )
-      else
-         coszrs(icol) = shr_orb_cosz( calday, clat(icol), clon(icol), delta, dt_avg )
-      endif
+     coszrs(icol) = shr_orb_cosz( calday, clat(icol), clon(icol), delta, dt_avg )
    enddo
+#include "../chemistry/yaml/orbit/f90_yaml/zenith_end_yml.f90"
 
 end subroutine zenith
 end module orbit
