@@ -1520,13 +1520,13 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
 
    integer,  intent(in)  :: ncol
    real(r8), intent(in)  :: sigma_logr_aer  ! geometric standard deviation of number distribution
-   real(r8), intent(in)  :: dgnumwet(:,:)   ! aerosol wet number mode diameter (m)
-   real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius
+   real(r8), intent(in)  :: dgnumwet(:,:)   ! aerosol wet number mode diameter [m]
+   real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius [m]
    real(r8), intent(out) :: logradsurf(:,:) ! log(aerosol surface mode radius)
-   real(r8), intent(out) :: cheb(:,:,:)
+   real(r8), intent(out) :: cheb(:,:,:)     ! chebychev polynomial parameters
 
    integer  :: icol, kk, nc
-   real(r8) :: alnsg_amode
+   real(r8) :: alnsg_amode      ! log(sigma)
    real(r8) :: explnsigma
    real(r8) :: xrad ! normalized aerosol radius
    !-------------------------------------------------------------------------------
