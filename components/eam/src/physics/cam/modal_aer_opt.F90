@@ -1528,7 +1528,7 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
    integer  :: i, k, nc
    real(r8) :: alnsg_amode
    real(r8) :: explnsigma
-   real(r8) :: xrad(pcols) ! normalized aerosol radius
+   real(r8) :: xrad ! normalized aerosol radius
    !-------------------------------------------------------------------------------
 
    alnsg_amode = log(sigma_logr_aer)
@@ -1540,13 +1540,13 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
          radsurf(i,k) = 0.5_r8*dgnumwet(i,k)*explnsigma
          logradsurf(i,k) = log(radsurf(i,k))
          ! normalize size parameter
-         xrad(i) = min_max_bound(xrmin, xrmax, logradsurf(i,k))
-         xrad(i) = (2._r8*xrad(i)-xrmax-xrmin)/(xrmax-xrmin)
+         xrad = min_max_bound(xrmin, xrmax, logradsurf(i,k))
+         xrad = (2._r8*xrad-xrmax-xrmin)/(xrmax-xrmin)
          ! chebyshev polynomials
          cheb(1,i,k) = 1._r8
-         cheb(2,i,k) = xrad(i)
+         cheb(2,i,k) = xrad
          do nc = 3, ncoef
-            cheb(nc,i,k) = 2._r8*xrad(i)*cheb(nc-1,i,k)-cheb(nc-2,i,k)
+            cheb(nc,i,k) = 2._r8*xrad*cheb(nc-1,i,k)-cheb(nc-2,i,k)
          end do
       end do
    end do
