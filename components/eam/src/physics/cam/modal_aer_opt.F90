@@ -1513,7 +1513,10 @@ end subroutine read_water_refindex
 
 !===============================================================================
 
-subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, logradsurf, cheb)
+subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+                                 radsurf, logradsurf, cheb       ) ! out
+
+   use mam_support, only : min_max_bound
 
    integer,  intent(in)  :: ncol
    real(r8), intent(in)  :: sigma_logr_aer  ! geometric standard deviation of number distribution
@@ -1537,8 +1540,7 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, lograd
          radsurf(i,k) = 0.5_r8*dgnumwet(i,k)*explnsigma
          logradsurf(i,k) = log(radsurf(i,k))
          ! normalize size parameter
-         xrad(i) = max(logradsurf(i,k),xrmin)
-         xrad(i) = min(xrad(i),xrmax)
+         xrad(i) = min_max_bound(xrmin, xrmax, logradsurf(i,k))
          xrad(i) = (2._r8*xrad(i)-xrmax-xrmin)/(xrmax-xrmin)
          ! chebyshev polynomials
          cheb(1,i,k) = 1._r8
