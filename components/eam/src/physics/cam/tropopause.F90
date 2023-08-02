@@ -590,12 +590,8 @@ contains
     level = size(temp1d)
     pmk= .5_r8 * (pmid1d(level-1)**cnst_kap+pmid1d(level)**cnst_kap)
     pm = pmk**(1/cnst_kap)               
-    call get_dtdz(pm,pmk,pmid1d(level-1),pmid1d(level),temp1d(level-1),temp1d(level),dtdz,tm)
-!BJG    a1 = (temp1d(level-1)-temp1d(level))/(pmid1d(level-1)**cnst_kap-pmid1d(level)**cnst_kap)
-!BJG    b1 = temp1d(level)-(a1*pmid1d(level)**cnst_kap)
-!BJG    tm = a1 * pmk + b1               
-!BJG    dtdp = a1 * cnst_kap * (pm**cnst_ka1)
-!BJG    dtdz = cnst_faktor*dtdp*pm/tm
+    call get_dtdz(pm,pmk,pmid1d(level-1),pmid1d(level),temp1d(level-1),temp1d(level),  & ! in
+         dtdz,tm)  ! inout
 
     main_loop: do kk=level-1,2,-1
       pm0 = pm
@@ -605,12 +601,8 @@ contains
       ! dt/dz
       pmk= .5_r8 * (pmid1d(kk-1)**cnst_kap+pmid1d(kk)**cnst_kap)
       pm = pmk**(1/cnst_kap)               
-      call get_dtdz(pm,pmk,pmid1d(kk-1),pmid1d(kk),temp1d(kk-1),temp1d(kk),dtdz,tm)
-!BJG      a1 = (temp1d(kk-1)-temp1d(kk))/(pmid1d(kk-1)**cnst_kap-pmid1d(kk)**cnst_kap)
-!BJG      b1 = temp1d(kk)-(a1*pmid1d(kk)**cnst_kap)
-!BJG      tm = a1 * pmk + b1
-!BJG      dtdp = a1 * cnst_kap * (pm**cnst_ka1)
-!BJG      dtdz = cnst_faktor*dtdp*pm/tm
+      call get_dtdz(pm,pmk,pmid1d(kk-1),pmid1d(kk),temp1d(kk-1),temp1d(kk),   & ! in 
+           dtdz,tm)  ! inout
       ! dt/dz valid?
       if (dtdz<=gam)   cycle main_loop    ! no, dt/dz < -2 K/km
       if (pm>plimu)   cycle main_loop    ! no, too low
@@ -640,13 +632,8 @@ contains
         if(pm2>ptph) cycle in_loop            ! doesn't happen
         if(pm2<p2km) exit in_loop             ! ptropo is valid
 
-        call get_dtdz(pm2,pmk2,pmid1d(jj-1),pmid1d(jj),temp1d(jj-1),temp1d(jj),dtdz2,tm2)
-!BJG        a2 = (temp1d(jj-1)-temp1d(jj))                     ! a
-!BJG        a2 = a2/(pmid1d(jj-1)**cnst_kap-pmid1d(jj)**cnst_kap)
-!BJG        b2 = temp1d(jj)-(a2*pmid1d(jj)**cnst_kap)          ! b
-!BJG        tm2 = a2 * pmk2 + b2                     ! T mean
-!BJG        dtdp2 = a2 * cnst_kap * (pm2**(cnst_kap-1))  ! dt/dp
-!BJG        dtdz2 = cnst_faktor*dtdp2*pm2/tm2
+        call get_dtdz(pm2,pmk2,pmid1d(jj-1),pmid1d(jj),temp1d(jj-1),temp1d(jj),  & ! in
+             dtdz2,tm2) ! out
         asum = asum+dtdz2
         icount = icount+1
         aquer = asum/float(icount)               ! dt/dz mean
@@ -662,7 +649,8 @@ contains
     
   end subroutine twmo
   
-  subroutine get_dtdz(pm,pmk,pmid1d_up,pmid1d_down,temp1d_up,temp1d_down,dtdz,tm)
+  subroutine get_dtdz(pm,pmk,pmid1d_up,pmid1d_down,temp1d_up,temp1d_down,    & ! in
+             dtdz,tm)   ! inout
 
     implicit none
 
