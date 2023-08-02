@@ -92,8 +92,18 @@
         call write_var(unit_input,unit_output,'colo3_in',colo3_in)
         call write_var(unit_input,unit_output,'kbot',kbot)
         call write_var(unit_input,unit_output,'nw',nw)
-
-
+        call write_var(unit_input,unit_output,'sza',sza)
+        call write_var(unit_input,unit_output,'del_sza',del_sza)
+        call write_var(unit_input,unit_output,'alb',alb)
+        call write_var(unit_input,unit_output,'press',press)
+        call write_var(unit_input,unit_output,'del_p',del_p)
+        call write_var(unit_input,unit_output,'colo3',colo3)
+        call write_var(unit_input,unit_output,'o3rat',o3rat)
+        call write_var(unit_input,unit_output,'del_alb',del_alb)
+        call write_var(unit_input,unit_output,'del_o3rat',del_o3rat)
+        call write_var(unit_input,unit_output,'etfphot',etfphot)
+        call write_var(unit_input,unit_output,'shape_of_rsf_tab', shape(rsf_tab))
+!write(101,*) rsf_tab
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
         !call write_aerosol_mmr_from_stateq(unit_input, unit_output, fld_name,field,aer_num_only)
