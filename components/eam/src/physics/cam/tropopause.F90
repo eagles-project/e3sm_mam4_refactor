@@ -339,6 +339,7 @@ contains
   subroutine tropopause_climate(lchnk,ncol,pmid,pint,temp,zm,zi,    &  ! in
              tropLev,tropP,tropT,tropZ)   ! inout
     use time_manager, only : get_curr_calday
+    use mam_support,  only : min_max_bound
 
     implicit none
 
@@ -387,15 +388,14 @@ contains
         do mn = 11,1,-1
            if( calday >= days(mn) ) then
               exit
-           end if
-        end do
+           endif
+        enddo
         last = mn
         next = mn + 1
         dels = (calday - days(mn)) / (days(mn+1) - days(mn))
       end if
       
-      dels = max( min( 1._r8,dels ),0._r8 )
-        
+      dels = min_max_bound(0._r8,1._r8,dels)  
 
       ! Iterate over all of the columns.
       do icol = 1, ncol
@@ -569,17 +569,15 @@ contains
     
     real(r8), parameter                     :: deltaz = 2000.0_r8   ! [m]
 
-    real(r8)                                :: pmk, a1, b1
+    real(r8)                                :: pmk, pmk2
     real(r8)                                :: pm, pm2      ! mean pressure [Pa]
-    real(r8)                                :: tm,tm2       ! mean temperature [K]
-    real(r8)                                :: dtdp, dtdp2  ! temperature lapse rate vs pressure [K/Pa]
+    real(r8)                                :: tm, tm2      ! mean temperature [K]
     real(r8)                                :: dtdz     ! temperature lapse rate vs. height [K/m]
     real(r8)                                :: ag, bg
     real(r8)                                :: ptph     ! pressure at tropopause height [Pa]
     real(r8)                                :: pm0, pmk0
     real(r8)                                :: dtdz0, dtdz2, asum, aquer    ! [K/m]
     real(r8)                                :: p2km     ! pressure at 2 km above tropopause height [Pa]
-    real(r8)                                :: pmk2, a2, b2
     integer                                 :: level   ! size of temp1d array
     integer                                 :: icount, jj
     integer                                 :: kk      ! vertical level index
@@ -592,11 +590,12 @@ contains
     level = size(temp1d)
     pmk= .5_r8 * (pmid1d(level-1)**cnst_kap+pmid1d(level)**cnst_kap)
     pm = pmk**(1/cnst_kap)               
-    a1 = (temp1d(level-1)-temp1d(level))/(pmid1d(level-1)**cnst_kap-pmid1d(level)**cnst_kap)
-    b1 = temp1d(level)-(a1*pmid1d(level)**cnst_kap)
-    tm = a1 * pmk + b1               
-    dtdp = a1 * cnst_kap * (pm**cnst_ka1)
-    dtdz = cnst_faktor*dtdp*pm/tm
+    call get_dtdz(pm,pmk,pmid1d(level-1),pmid1d(level),temp1d(level-1),temp1d(level),dtdz,tm)
+!BJG    a1 = (temp1d(level-1)-temp1d(level))/(pmid1d(level-1)**cnst_kap-pmid1d(level)**cnst_kap)
+!BJG    b1 = temp1d(level)-(a1*pmid1d(level)**cnst_kap)
+!BJG    tm = a1 * pmk + b1               
+!BJG    dtdp = a1 * cnst_kap * (pm**cnst_ka1)
+!BJG    dtdz = cnst_faktor*dtdp*pm/tm
 
     main_loop: do kk=level-1,2,-1
       pm0 = pm
@@ -606,17 +605,18 @@ contains
       ! dt/dz
       pmk= .5_r8 * (pmid1d(kk-1)**cnst_kap+pmid1d(kk)**cnst_kap)
       pm = pmk**(1/cnst_kap)               
-      a1 = (temp1d(kk-1)-temp1d(kk))/(pmid1d(kk-1)**cnst_kap-pmid1d(kk)**cnst_kap)
-      b1 = temp1d(kk)-(a1*pmid1d(kk)**cnst_kap)
-      tm = a1 * pmk + b1
-      dtdp = a1 * cnst_kap * (pm**cnst_ka1)
-      dtdz = cnst_faktor*dtdp*pm/tm
+      call get_dtdz(pm,pmk,pmid1d(kk-1),pmid1d(kk),temp1d(kk-1),temp1d(kk),dtdz,tm)
+!BJG      a1 = (temp1d(kk-1)-temp1d(kk))/(pmid1d(kk-1)**cnst_kap-pmid1d(kk)**cnst_kap)
+!BJG      b1 = temp1d(kk)-(a1*pmid1d(kk)**cnst_kap)
+!BJG      tm = a1 * pmk + b1
+!BJG      dtdp = a1 * cnst_kap * (pm**cnst_ka1)
+!BJG      dtdz = cnst_faktor*dtdp*pm/tm
       ! dt/dz valid?
-      if (dtdz.le.gam)   cycle main_loop    ! no, dt/dz < -2 K/km
-      if (pm.gt.plimu)   cycle main_loop    ! no, too low
+      if (dtdz<=gam)   cycle main_loop    ! no, dt/dz < -2 K/km
+      if (pm>plimu)   cycle main_loop    ! no, too low
   
       ! dtdz is valid, calculate tropopause pressure
-      if (dtdz0.lt.gam) then
+      if (dtdz0<gam) then
         ag = (dtdz-dtdz0) / (pmk-pmk0)     
         bg = dtdz0 - (ag * pmk0)          
         ptph = exp(log((gam-bg)/ag)/cnst_kap)
@@ -624,8 +624,8 @@ contains
         ptph = pm
       endif
   
-      if (ptph.lt.pliml) cycle main_loop
-      if (ptph.gt.plimu) cycle main_loop
+      if (ptph<pliml) cycle main_loop
+      if (ptph>plimu) cycle main_loop
   
       ! 2nd test: dtdz above 2 km must not exceed gam
       p2km = ptph + deltaz*(pm/tm)*cnst_faktor     ! p at ptph + 2km
@@ -637,15 +637,16 @@ contains
     
         pmk2 = .5_r8 * (pmid1d(jj-1)**cnst_kap+pmid1d(jj)**cnst_kap) ! p mean ^kappa
         pm2 = pmk2**(1/cnst_kap)                           ! p mean
-        if(pm2.gt.ptph) cycle in_loop            ! doesn't happen
-        if(pm2.lt.p2km) exit in_loop             ! ptropo is valid
+        if(pm2>ptph) cycle in_loop            ! doesn't happen
+        if(pm2<p2km) exit in_loop             ! ptropo is valid
 
-        a2 = (temp1d(jj-1)-temp1d(jj))                     ! a
-        a2 = a2/(pmid1d(jj-1)**cnst_kap-pmid1d(jj)**cnst_kap)
-        b2 = temp1d(jj)-(a2*pmid1d(jj)**cnst_kap)          ! b
-        tm2 = a2 * pmk2 + b2                     ! T mean
-        dtdp2 = a2 * cnst_kap * (pm2**(cnst_kap-1))  ! dt/dp
-        dtdz2 = cnst_faktor*dtdp2*pm2/tm2
+        call get_dtdz(pm2,pmk2,pmid1d(jj-1),pmid1d(jj),temp1d(jj-1),temp1d(jj),dtdz2,tm2)
+!BJG        a2 = (temp1d(jj-1)-temp1d(jj))                     ! a
+!BJG        a2 = a2/(pmid1d(jj-1)**cnst_kap-pmid1d(jj)**cnst_kap)
+!BJG        b2 = temp1d(jj)-(a2*pmid1d(jj)**cnst_kap)          ! b
+!BJG        tm2 = a2 * pmk2 + b2                     ! T mean
+!BJG        dtdp2 = a2 * cnst_kap * (pm2**(cnst_kap-1))  ! dt/dp
+!BJG        dtdz2 = cnst_faktor*dtdp2*pm2/tm2
         asum = asum+dtdz2
         icount = icount+1
         aquer = asum/float(icount)               ! dt/dz mean
@@ -661,6 +662,30 @@ contains
     
   end subroutine twmo
   
+  subroutine get_dtdz(pm,pmk,pmid1d_up,pmid1d_down,temp1d_up,temp1d_down,dtdz,tm)
+
+    implicit none
+
+    real(r8), intent(in)                    :: pm      ! mean pressure [Pa]
+    real(r8), intent(in)                    :: pmk
+    real(r8), intent(in)                    :: pmid1d_up     !  midpoint pressure in column at upper level [Pa]
+    real(r8), intent(in)                    :: pmid1d_down   !  midpoint pressure in column at lower level [Pa]
+    real(r8), intent(in)                    :: temp1d_up     !  temperature in column at upper level [K]
+    real(r8), intent(in)                    :: temp1d_down   !  temperature in column at lower level [K]
+    real(r8), intent(inout)                 :: dtdz     ! temperature lapse rate vs. height [K/m]
+    real(r8), intent(inout)                 :: tm       ! mean temperature [K] -- needed to find pressure at trop + 2 km
+
+    real(r8)                                :: a1, b1
+    real(r8)                                :: dtdp     ! temperature lapse rate vs pressure [K/Pa]
+
+
+    a1 = (temp1d_up-temp1d_down)/(pmid1d_up**cnst_kap-pmid1d_down**cnst_kap)
+    b1 = temp1d_down-(a1*pmid1d_down**cnst_kap)
+    tm = a1 * pmk + b1
+    dtdp = a1 * cnst_kap * (pm**cnst_ka1)
+    dtdz = cnst_faktor*dtdp*pm/tm
+
+  end subroutine get_dtdz
 
   ! This routine uses an implementation of Reichler et al. [2003] done by
   ! Reichler and downloaded from his web site. This is similar to the WMO
