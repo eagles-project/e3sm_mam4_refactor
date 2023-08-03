@@ -1382,43 +1382,13 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
                dopaer(i) = pabs(i)*mass(i,k)
             end do
 
+            ! FORTRAN refactor: check and writeout error/warning message
             do i = 1, ncol
-
-               if ((dopaer(i) <= -1.e-10_r8) .or. (dopaer(i) >= 20._r8)) then
-
-                  if (dopaer(i) <= -1.e-10_r8) then
-                     write(iulog,*) "ERROR: Negative aerosol optical depth &
-                          &in this layer."
-                  else
-                     write(iulog,*) "WARNING: Aerosol optical depth is &
-                          &unreasonably high in this layer."
-                  end if
-
-                  write(iulog,*) 'dopaer(',i,',',k,',',m,',',lchnk,')=', dopaer(i)
-                  write(iulog,*) 'k=',k,' pabs=', pabs(i)
-                  write(iulog,*) 'wetvol=',wetvol(i),' dryvol=',dryvol(i),     &
-                     ' watervol=',watervol(i)
-                  write(iulog,*) 'cabs=', (cabs(i,l),l=1,ncoef)
-                  write(iulog,*) 'crefin=', crefin(i)
-                  write(iulog,*) 'nspec=', nspec
-                  do l = 1,nspec
-                     call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, specmmr)
-                     call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                                 refindex_aer_lw=specrefindex)
-                     volf = specmmr(i,k)/specdens
-                     write(iulog,*) 'l=',l,'vol(l)=',volf
-                     write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ilw)
-                     write(iulog,*) 'specdens=',specdens
-                  end do
-
-                  nerr_dopaer = nerr_dopaer + 1
-                  if (nerr_dopaer >= nerrmax_dopaer .or. dopaer(i) < -1.e-10_r8) then
-                     write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
-                     call endrun()
-                  end if
-
-               end if
-            end do
+                call check_error_warning(subname, lchnk,i, k,m, ilw, nspec, list_idx,& ! in
+                        state, pbuf,  & ! in
+                        dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        nerr_dopaer) ! inout
+            enddo
 
             do i = 1, ncol
                tauxar(i,k,ilw) = tauxar(i,k,ilw) + dopaer(i)
@@ -1436,6 +1406,75 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
+!===================================================================
+subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx, & ! in
+                        state,pbuf,              & ! in
+                        dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        nerr_dopaer) ! inout
+    !------------------------------------------------------------
+    ! check and writeout error and warning message
+    !------------------------------------------------------------
+
+   implicit none
+   integer,intent(in) :: lchnk,icol, kk, mm, ilw, nspec, list_idx
+   character(len=*),intent(in) :: subname
+   type(physics_state), intent(in), target :: state    ! state variables
+   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8),intent(in) :: dopaer(pcols)    ! aerosol optical depth in layer
+   real(r8),intent(in) :: pabs(pcols)      ! parameterized specific absorption (m2/kg)
+   real(r8),intent(in) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
+   real(r8),intent(in) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
+   real(r8),intent(in) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
+   complex(r8),intent(in) :: crefin(pcols) ! complex refractive index
+   real(r8),intent(in) :: cabs(pcols,ncoef)
+   integer, intent(inout) :: nerr_dopaer
+
+   integer :: ll
+   integer, parameter :: nerrmax_dopaer=1000
+   real(r8) :: specdens
+   real(r8) :: volf             ! volume fraction of insoluble aerosol
+   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
+   complex(r8), pointer :: specrefindex(:)     ! species refractive index
+
+    ! FORTRAN refactor: This if condition is never met in testing run ...
+    if ((dopaer(icol) <= -1.e-10_r8) .or. (dopaer(icol) >= 20._r8)) then
+
+        if (dopaer(icol) <= -1.e-10_r8) then
+            write(iulog,*) "ERROR: Negative aerosol optical depth &
+                          &in this layer."
+        else
+            write(iulog,*) "WARNING: Aerosol optical depth is &
+                         &unreasonably high in this layer."
+        endif
+
+        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',',lchnk,')=', dopaer(icol)
+        write(iulog,*) 'kk=',kk,' pabs=', pabs(icol)
+        write(iulog,*) 'wetvol=',wetvol(icol),' dryvol=',dryvol(icol),     &
+                       ' watervol=',watervol(icol)
+        write(iulog,*) 'cabs=', (cabs(icol,ll),ll=1,ncoef)
+        write(iulog,*) 'crefin=', crefin(icol)
+        write(iulog,*) 'nspec=', nspec
+        do ll = 1,nspec
+            call rad_cnst_get_aer_mmr(list_idx, mm, ll, 'a', state, pbuf,specmmr)
+            call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
+                                        refindex_aer_lw=specrefindex)
+            volf = specmmr(icol,kk)/specdens
+            write(iulog,*) 'll=',ll,'vol(l)=',volf
+            write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ilw)
+            write(iulog,*) 'specdens=',specdens
+        enddo
+
+        nerr_dopaer = nerr_dopaer + 1
+        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer(icol) < -1.e-10_r8) then
+             write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
+             call endrun()
+         endif
+
+     endif
+
+end subroutine check_error_warning
+
+!======================================================================
 subroutine read_water_refindex(infilename)
 
    ! read water refractive index file and set module data
