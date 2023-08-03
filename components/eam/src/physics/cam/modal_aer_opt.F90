@@ -1230,7 +1230,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
-   integer :: i, ifld, ilw, k, l, m, nc, ns
+   integer :: i, ifld, ilw, k, l, ll, m, nc, ns
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nmodes
@@ -1252,6 +1252,10 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
    real(r8)             :: specdens            ! species density (kg/m3)
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
+   real(r8),allocatable :: volf_l(:)             ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specdens_l(:)
+   real(r8),allocatable :: specmmr_l(:,:,:)
+   complex(r8),allocatable :: specrefindex_l(:,:)     ! species refractive index
 
    real(r8) :: vol(pcols)       ! volume concentration of aerosol specie (m3/kg)
    real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
@@ -1326,6 +1330,15 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
                                  radsurf, logradsurf, cheby, ismethod2=.true.) 
 
+      allocate(volf_l(nspec),stat=istat)
+      if (istat .ne. 0) call endrun("Unable to allocate volf_l: "//errmsg(__FILE__,__LINE__) )
+      allocate(specdens_l(nspec),stat=istat)
+      if (istat .ne. 0) call endrun("Unable to allocate specdens_l: "//errmsg(__FILE__,__LINE__) )
+      allocate(specmmr_l(ncol, pver, nspec),stat=istat)
+      if (istat .ne. 0) call endrun("Unable to allocate specmmr_l: "//errmsg(__FILE__,__LINE__) )
+      allocate(specrefindex_l(nspec,nlwbands),stat=istat)
+      if (istat .ne. 0) call endrun("Unable to allocate specrefindex_l: "//errmsg(__FILE__,__LINE__) )
+
       do ilw = 1, nlwbands
 
          do k = top_lev, pver
@@ -1381,10 +1394,19 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
                pabs   = max(0._r8,pabs)
                dopaer = pabs*mass(i,k)
 
+                do ll = 1,nspec
+                    call rad_cnst_get_aer_mmr(list_idx, m, ll, 'a', state, pbuf,specmmr)
+                    call rad_cnst_get_aer_props(list_idx, m, ll,density_aer=specdens, &
+                                     refindex_aer_lw=specrefindex)
+                    specdens_l(ll) = specdens
+                    specrefindex_l(ll,:) = specrefindex
+                    specmmr_l(:,:,ll) = specmmr(:,:)
+                    volf_l(ll) = specmmr(i,k)/specdens
+                enddo
                 ! FORTRAN refactor: check and writeout error/warning message
                 call check_error_warning(subname, lchnk,i, k,m, ilw, nspec, list_idx,& ! in
-                        state, pbuf,  & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        specdens_l, specrefindex_l, volf_l, &
                         nerr_dopaer) ! inout
 
                ! update absorption optical depth
@@ -1395,6 +1417,10 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
       end do  ! nlwbands
 
+      deallocate(volf_l)
+      deallocate(specmmr_l)
+      deallocate(specdens_l)
+      deallocate(specrefindex_l)
    end do ! m = 1, nmodes
 
 end subroutine modal_aero_lw
@@ -1405,8 +1431,8 @@ end subroutine modal_aero_lw
 
 !===================================================================
 subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx, & ! in
-                        state,pbuf,              & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        specdens_l, specrefindex_l, volf_l, &
                         nerr_dopaer) ! inout
     !------------------------------------------------------------
     ! check and writeout error and warning message
@@ -1415,8 +1441,6 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
    implicit none
    integer,intent(in) :: lchnk,icol, kk, mm, ilw, nspec, list_idx
    character(len=*),intent(in) :: subname
-   type(physics_state), intent(in), target :: state    ! state variables
-   type(physics_buffer_desc), pointer :: pbuf(:)
    real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
    real(r8),intent(in) :: pabs      ! parameterized specific absorption (m2/kg)
    real(r8),intent(in) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
@@ -1424,14 +1448,14 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
    real(r8),intent(in) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
    complex(r8),intent(in) :: crefin(pcols) ! complex refractive index
    real(r8),intent(in) :: cabs(pcols,ncoef)
+   real(r8),intent(in) :: volf_l(nspec)             ! volume fraction of insoluble aerosol
+   real(r8),intent(in) :: specdens_l(nspec)
+   complex(r8), intent(in) :: specrefindex_l(nspec, nlwbands)     ! species refractive index
    integer, intent(inout) :: nerr_dopaer
 
    integer :: ll
    integer, parameter :: nerrmax_dopaer=1000
    real(r8) :: specdens
-   real(r8) :: volf             ! volume fraction of insoluble aerosol
-   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
-   complex(r8), pointer :: specrefindex(:)     ! species refractive index
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
     if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
@@ -1452,13 +1476,9 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
         write(iulog,*) 'crefin=', crefin(icol)
         write(iulog,*) 'nspec=', nspec
         do ll = 1,nspec
-            call rad_cnst_get_aer_mmr(list_idx, mm, ll, 'a', state, pbuf,specmmr)
-            call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
-                                        refindex_aer_lw=specrefindex)
-            volf = specmmr(icol,kk)/specdens
-            write(iulog,*) 'll=',ll,'vol(l)=',volf
-            write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ilw)
-            write(iulog,*) 'specdens=',specdens
+            write(iulog,*) 'll=',ll,'vol(l)=',volf_l(ll)
+            write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex_l(ll,ilw)
+            write(iulog,*) 'specdens=',specdens_l(ll)
         enddo
 
         nerr_dopaer = nerr_dopaer + 1
@@ -1470,6 +1490,7 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
      endif
 
 end subroutine check_error_warning
+
 
 !======================================================================
 subroutine read_water_refindex(infilename)
