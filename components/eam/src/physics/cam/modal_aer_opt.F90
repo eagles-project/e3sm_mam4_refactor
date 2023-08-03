@@ -1244,6 +1244,8 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8) :: alnsg_amode
    real(r8) :: xrad(pcols)
    real(r8) :: cheby(ncoef,pcols,pver)  ! chebychef polynomials
+   real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
+   real(r8) :: logradsurf(pcols,pver) ! log(aerosol surface mode radius)
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
@@ -1319,26 +1321,10 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
       call rad_cnst_get_info(list_idx, m, nspec=nspec)
 
       ! calc size parameter for all columns
-      ! this is the same calculation that's done in modal_size_parameters, but there
-      ! some intermediate results are saved and the chebyshev polynomials are stored
-      ! in a array with different index order.  Could be unified.
-      do k = top_lev, pver
-         do i = 1, ncol
-            alnsg_amode = log( sigma_logr_aer )
-            ! convert from number diameter to surface area
-            xrad(i) = log(0.5_r8*dgnumwet(i,k)) + 2.0_r8*alnsg_amode*alnsg_amode
-            ! normalize size parameter
-            xrad(i) = max(xrad(i), xrmin)
-            xrad(i) = min(xrad(i), xrmax)
-            xrad(i) = (2*xrad(i)-xrmax-xrmin)/(xrmax-xrmin)
-            ! chebyshev polynomials
-            cheby(1,i,k) = 1.0_r8
-            cheby(2,i,k) = xrad(i)
-            do nc = 3, ncoef
-               cheby(nc,i,k) = 2.0_r8*xrad(i)*cheby(nc-1,i,k)-cheby(nc-2,i,k)
-            end do
-         end do
-      end do
+      ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test. 
+      ! can be removed when porting to C++
+      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+                                 radsurf, logradsurf, cheby, ismethod2=.true.) 
 
       do ilw = 1, nlwbands
 
@@ -1514,7 +1500,8 @@ end subroutine read_water_refindex
 !===============================================================================
 
 subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
-                                 radsurf, logradsurf, cheb       ) ! out
+                                 radsurf, logradsurf, cheb,      & ! out
+                                 ismethod2 ) ! optional in
 
    use mam_support, only : min_max_bound
 
@@ -1524,6 +1511,9 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
    real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius [m]
    real(r8), intent(out) :: logradsurf(:,:) ! log(aerosol surface mode radius)
    real(r8), intent(out) :: cheb(:,:,:)     ! chebychev polynomial parameters
+
+   ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test
+   logical,intent(in),optional :: ismethod2
 
    integer  :: icol, kk, nc
    real(r8) :: alnsg_amode      ! log(sigma)
@@ -1538,7 +1528,17 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
       do icol = 1, ncol
          ! convert from number mode diameter to surface area
          radsurf(icol,kk) = 0.5_r8*dgnumwet(icol,kk)*explnsigma
-         logradsurf(icol,kk) = log(radsurf(icol,kk))
+
+         ! --------------- FORTRAN refactoring -------------------
+         ! here two calculations are used to ensure passing BFB test
+         ! can be simplified (there is only round-off difference
+         if (present(ismethod2) .and. ismethod2) then
+             logradsurf(icol,kk) = log(0.5_r8*dgnumwet(icol,kk)) + 2.0_r8*alnsg_amode*alnsg_amode
+         else
+             logradsurf(icol,kk) = log(radsurf(icol,kk))
+         endif
+         ! --------------- FORTRAN refactoring -------------------
+
          ! normalize size parameter
          xrad = min_max_bound(xrmin, xrmax, logradsurf(icol,kk))
          xrad = (2._r8*xrad-xrmax-xrmin)/(xrmax-xrmin)
