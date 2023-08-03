@@ -1267,8 +1267,8 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
    real(r8) :: cabs(pcols,ncoef)
-   real(r8) :: pabs(pcols)      ! parameterized specific absorption (m2/kg)
-   real(r8) :: dopaer(pcols)    ! aerosol optical depth in layer
+   real(r8) :: pabs      ! parameterized specific absorption (m2/kg)
+   real(r8) :: dopaer    ! aerosol optical depth in layer
 
    integer, parameter :: nerrmax_dopaer=1000
    integer  :: nerr_dopaer = 0
@@ -1373,26 +1373,23 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
             ! parameterized optical properties
             do i = 1, ncol
-               pabs(i) = 0.5_r8*cabs(i,1)
+               pabs = 0.5_r8*cabs(i,1)
                do nc = 2, ncoef
-                  pabs(i) = pabs(i) + cheby(nc,i,k)*cabs(i,nc)
-               end do
-               pabs(i)   = pabs(i)*wetvol(i)*rhoh2o
-               pabs(i)   = max(0._r8,pabs(i))
-               dopaer(i) = pabs(i)*mass(i,k)
-            end do
+                  pabs = pabs + cheby(nc,i,k)*cabs(i,nc)
+               enddo
+               pabs   = pabs*wetvol(i)*rhoh2o
+               pabs   = max(0._r8,pabs)
+               dopaer = pabs*mass(i,k)
 
-            ! FORTRAN refactor: check and writeout error/warning message
-            do i = 1, ncol
+                ! FORTRAN refactor: check and writeout error/warning message
                 call check_error_warning(subname, lchnk,i, k,m, ilw, nspec, list_idx,& ! in
                         state, pbuf,  & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         nerr_dopaer) ! inout
-            enddo
 
-            do i = 1, ncol
-               tauxar(i,k,ilw) = tauxar(i,k,ilw) + dopaer(i)
-            end do
+               ! update absorption optical depth
+               tauxar(i,k,ilw) = tauxar(i,k,ilw) + dopaer
+            enddo
 
          end do ! k = top_lev, pver
 
@@ -1420,8 +1417,8 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
    character(len=*),intent(in) :: subname
    type(physics_state), intent(in), target :: state    ! state variables
    type(physics_buffer_desc), pointer :: pbuf(:)
-   real(r8),intent(in) :: dopaer(pcols)    ! aerosol optical depth in layer
-   real(r8),intent(in) :: pabs(pcols)      ! parameterized specific absorption (m2/kg)
+   real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
+   real(r8),intent(in) :: pabs      ! parameterized specific absorption (m2/kg)
    real(r8),intent(in) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
    real(r8),intent(in) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
    real(r8),intent(in) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
@@ -1437,9 +1434,9 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
-    if ((dopaer(icol) <= -1.e-10_r8) .or. (dopaer(icol) >= 20._r8)) then
+    if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
 
-        if (dopaer(icol) <= -1.e-10_r8) then
+        if (dopaer <= -1.e-10_r8) then
             write(iulog,*) "ERROR: Negative aerosol optical depth &
                           &in this layer."
         else
@@ -1447,8 +1444,8 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
                          &unreasonably high in this layer."
         endif
 
-        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',',lchnk,')=', dopaer(icol)
-        write(iulog,*) 'kk=',kk,' pabs=', pabs(icol)
+        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',',lchnk,')=', dopaer
+        write(iulog,*) 'kk=',kk,' pabs=', pabs
         write(iulog,*) 'wetvol=',wetvol(icol),' dryvol=',dryvol(icol),     &
                        ' watervol=',watervol(icol)
         write(iulog,*) 'cabs=', (cabs(icol,ll),ll=1,ncoef)
@@ -1465,7 +1462,7 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
         enddo
 
         nerr_dopaer = nerr_dopaer + 1
-        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer(icol) < -1.e-10_r8) then
+        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer < -1.e-10_r8) then
              write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
              call endrun()
          endif
