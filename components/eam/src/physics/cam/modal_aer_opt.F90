@@ -1513,41 +1513,43 @@ end subroutine read_water_refindex
 
 !===============================================================================
 
-subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, logradsurf, cheb)
+subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+                                 radsurf, logradsurf, cheb       ) ! out
+
+   use mam_support, only : min_max_bound
 
    integer,  intent(in)  :: ncol
    real(r8), intent(in)  :: sigma_logr_aer  ! geometric standard deviation of number distribution
-   real(r8), intent(in)  :: dgnumwet(:,:)   ! aerosol wet number mode diameter (m)
-   real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius
+   real(r8), intent(in)  :: dgnumwet(:,:)   ! aerosol wet number mode diameter [m]
+   real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius [m]
    real(r8), intent(out) :: logradsurf(:,:) ! log(aerosol surface mode radius)
-   real(r8), intent(out) :: cheb(:,:,:)
+   real(r8), intent(out) :: cheb(:,:,:)     ! chebychev polynomial parameters
 
-   integer  :: i, k, nc
-   real(r8) :: alnsg_amode
+   integer  :: icol, kk, nc
+   real(r8) :: alnsg_amode      ! log(sigma)
    real(r8) :: explnsigma
-   real(r8) :: xrad(pcols) ! normalized aerosol radius
+   real(r8) :: xrad ! normalized aerosol radius
    !-------------------------------------------------------------------------------
 
    alnsg_amode = log(sigma_logr_aer)
    explnsigma = exp(2.0_r8*alnsg_amode*alnsg_amode)
 
-   do k = top_lev, pver
-      do i = 1, ncol
+   do kk = top_lev, pver
+      do icol = 1, ncol
          ! convert from number mode diameter to surface area
-         radsurf(i,k) = 0.5_r8*dgnumwet(i,k)*explnsigma
-         logradsurf(i,k) = log(radsurf(i,k))
+         radsurf(icol,kk) = 0.5_r8*dgnumwet(icol,kk)*explnsigma
+         logradsurf(icol,kk) = log(radsurf(icol,kk))
          ! normalize size parameter
-         xrad(i) = max(logradsurf(i,k),xrmin)
-         xrad(i) = min(xrad(i),xrmax)
-         xrad(i) = (2._r8*xrad(i)-xrmax-xrmin)/(xrmax-xrmin)
+         xrad = min_max_bound(xrmin, xrmax, logradsurf(icol,kk))
+         xrad = (2._r8*xrad-xrmax-xrmin)/(xrmax-xrmin)
          ! chebyshev polynomials
-         cheb(1,i,k) = 1._r8
-         cheb(2,i,k) = xrad(i)
+         cheb(1,icol,kk) = 1._r8
+         cheb(2,icol,kk) = xrad
          do nc = 3, ncoef
-            cheb(nc,i,k) = 2._r8*xrad(i)*cheb(nc-1,i,k)-cheb(nc-2,i,k)
-         end do
-      end do
-   end do
+            cheb(nc,icol,kk) = 2._r8*xrad*cheb(nc-1,icol,kk) - cheb(nc-2,icol,kk)
+         enddo
+      enddo
+   enddo
 
 end subroutine modal_size_parameters
 
