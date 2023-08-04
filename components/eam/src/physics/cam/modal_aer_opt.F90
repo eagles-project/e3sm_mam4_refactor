@@ -1221,7 +1221,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    ! calculates aerosol lw radiative properties
 
    integer,             intent(in)  :: list_idx ! index of the climate or a diagnostic list
-   real(r8),            intent(in)  :: dt       ! time step(s)
+   real(r8),            intent(in)  :: dt       ! time step [s]
    type(physics_state), intent(in), target :: state    ! state variables
    type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -1235,27 +1235,27 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    integer :: nspec
    integer :: istat
 
-   real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter (m)
-   real(r8), pointer :: qaerwat(:,:)   ! aerosol water (g/g)
+   real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter [m]
+   real(r8), pointer :: qaerwat(:,:)   ! aerosol water [g/g]
 
    real(r8) :: sigma_logr_aer          ! geometric standard deviation of number distribution
    real(r8) :: alnsg_amode
-   real(r8) :: cheby(ncoef,pcols,pver)  ! chebychef polynomials
-   real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
-   real(r8) :: logradsurf(pcols,pver) ! log(aerosol surface mode radius)
+   real(r8) :: cheby(ncoef,pcols,pver) ! chebychef polynomials
+   real(r8) :: radsurf(pcols,pver)     ! aerosol surface mode radius
+   real(r8) :: logradsurf(pcols,pver)  ! log(aerosol surface mode radius)
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
-   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
-   real(r8)             :: specdens            ! species density (kg/m3)
+   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [g/g]
+   real(r8)             :: specdens            ! species density [kg/m3]
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
-   real(r8),allocatable :: volf_l(:,:)             ! volume fraction of insoluble aerosol
-   real(r8),allocatable :: specdens_l(:)
+   real(r8),allocatable :: volf_l(:,:)         ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specdens_l(:)       ! species density for all species [kg/m3]
    complex(r8),allocatable :: specrefindex_l(:,:)     ! species refractive index
 
-   real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
-   real(r8) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
-   real(r8) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
+   real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode [m3/kg]
+   real(r8) :: wetvol(pcols)    ! volume concentration of wet mode [m3/kg]
+   real(r8) :: watervol(pcols)  ! volume concentration of water in each mode [m3/kg]
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
@@ -1266,7 +1266,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
    real(r8) :: cabs(pcols,ncoef)
-   real(r8) :: pabs      ! parameterized specific absorption (m2/kg)
+   real(r8) :: pabs      ! parameterized specific absorption [m2/kg]
    real(r8) :: dopaer    ! aerosol optical depth in layer
 
    integer  :: nerr_dopaer = 0
@@ -1398,15 +1398,15 @@ subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
     !-------------------------------------------------------------------
 
     implicit none
-    character(len=*),intent(in) :: subname
-    integer,  intent(in) :: ncol, ilw
-    real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk (g/g)
-    real(r8), intent(in) :: volf_l(:,:)
+    character(len=*),intent(in) :: subname  ! subroutine name
+    integer,  intent(in) :: ncol, ilw       
+    real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk [g/g]
+    real(r8), intent(in) :: volf_l(:,:)     ! volume fraction of insoluble aerosol [fraction]
     complex(r8), intent(in) :: specrefindex_l(:,:)     ! species refractive index
 
-    real(r8),intent(out) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
-    real(r8),intent(out) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
-    real(r8),intent(out) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
+    real(r8),intent(out) :: dryvol(pcols)    ! volume concentration of aerosol mode [m3/kg]
+    real(r8),intent(out) :: wetvol(pcols)    ! volume concentration of wet mode [m3/kg]
+    real(r8),intent(out) :: watervol(pcols)  ! volume concentration of water in each mode [m3/kg]
     real(r8),intent(out) :: refr(pcols)      ! real part of refractive index
     real(r8),intent(out) :: refi(pcols)      ! imaginary part of refractive index
     complex(r8),intent(out) :: crefin(pcols) ! complex refractive index
@@ -1450,23 +1450,22 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
     !------------------------------------------------------------
 
    implicit none
-   integer,intent(in) :: lchnk,icol, kk, mm, ilw, nspec, list_idx
-   character(len=*),intent(in) :: subname
+   integer,intent(in) :: lchnk,icol, kk, mm, ilw, nspec, list_idx  ! indices
+   character(len=*),intent(in) :: subname     ! subroutine name
    real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
-   real(r8),intent(in) :: pabs      ! parameterized specific absorption (m2/kg)
-   real(r8),intent(in) :: dryvol(:)    ! volume concentration of aerosol mode (m3/kg)
-   real(r8),intent(in) :: wetvol(:)    ! volume concentration of wet mode (m3/kg)
-   real(r8),intent(in) :: watervol(:)  ! volume concentration of water in each mode (m3/kg)
+   real(r8),intent(in) :: pabs      ! parameterized specific absorption [m2/kg]
+   real(r8),intent(in) :: dryvol(:)    ! volume concentration of aerosol mode [m3/kg]
+   real(r8),intent(in) :: wetvol(:)    ! volume concentration of wet mode [m3/kg]
+   real(r8),intent(in) :: watervol(:)  ! volume concentration of water in each mode [m3/kg]
    complex(r8),intent(in) :: crefin(:) ! complex refractive index
    real(r8),intent(in) :: cabs(:,:)
-   real(r8),intent(in) :: volf_l(:,:)             ! volume fraction of insoluble aerosol
-   real(r8),intent(in) :: specdens_l(:)
+   real(r8),intent(in) :: volf_l(:,:)   ! volume fraction of insoluble aerosol [fraction]
+   real(r8),intent(in) :: specdens_l(:) ! species density [kg/m3]
    complex(r8), intent(in) :: specrefindex_l(:, :)     ! species refractive index
-   integer, intent(inout) :: nerr_dopaer
+   integer, intent(inout) :: nerr_dopaer    ! total number of error times
 
    integer :: ll
    integer, parameter :: nerrmax_dopaer=1000
-   real(r8) :: specdens
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
     if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
