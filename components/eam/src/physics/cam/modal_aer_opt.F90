@@ -1214,7 +1214,6 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 end subroutine modal_aero_sw
 
 !===============================================================================
-
 subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
@@ -1224,13 +1223,12 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    integer,             intent(in)  :: list_idx ! index of the climate or a diagnostic list
    real(r8),            intent(in)  :: dt       ! time step(s)
    type(physics_state), intent(in), target :: state    ! state variables
-
    type(physics_buffer_desc), pointer :: pbuf(:)
 
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
-   integer :: icol, ifld, ilw, kk, ll, mm, nc, ns
+   integer :: icol, ilw, kk, ll, mm, nc
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nmodes
@@ -1242,7 +1240,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
    real(r8) :: sigma_logr_aer          ! geometric standard deviation of number distribution
    real(r8) :: alnsg_amode
-   real(r8) :: xrad(pcols)
    real(r8) :: cheby(ncoef,pcols,pver)  ! chebychef polynomials
    real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
    real(r8) :: logradsurf(pcols,pver) ! log(aerosol surface mode radius)
@@ -1256,7 +1253,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8),allocatable :: specdens_l(:)
    complex(r8),allocatable :: specrefindex_l(:,:)     ! species refractive index
 
-   real(r8) :: vol(pcols)       ! volume concentration of aerosol specie (m3/kg)
    real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
    real(r8) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
    real(r8) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
@@ -1273,9 +1269,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8) :: pabs      ! parameterized specific absorption (m2/kg)
    real(r8) :: dopaer    ! aerosol optical depth in layer
 
-   integer, parameter :: nerrmax_dopaer=1000
    integer  :: nerr_dopaer = 0
-   real(r8) :: volf             ! volume fraction of insoluble aerosol
 
    character(len=*), parameter :: subname = 'modal_aero_lw'
    !----------------------------------------------------------------------------
