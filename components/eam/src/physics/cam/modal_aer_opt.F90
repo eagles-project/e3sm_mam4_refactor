@@ -1230,7 +1230,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
-   integer :: i, ifld, ilw, k, l, ll, m, nc, ns
+   integer :: icol, ifld, ilw, kk, ll, mm, nc, ns
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nmodes
@@ -1282,17 +1282,13 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
    lchnk = state%lchnk
    ncol  = state%ncol
-
-   ! initialize output variables
-   tauxar(:ncol,:,:) = 0._r8
-
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    if (clim_modal_aero .and. .not. prog_modal_aero) then   ! For prescribed aerosol codes
       !radiation diagnostics are not supported for prescribed aerosols cases
-      if(list_idx .ne. 0) then
+      if(list_idx /= 0) then
          call endrun('Radiation diagnostic calls are not supported for ' // &
               ' prescribed aerosols '//errmsg(__FILE__,__LINE__))
       endif
@@ -1307,21 +1303,23 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
         qaerwat_m)
    
-
-   ! loop over all aerosol modes
    call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
-   do m = 1, nmodes
+   ! initialize output variables
+   tauxar(:ncol,:,:) = 0._r8
 
-      dgnumwet => dgnumwet_m(:,:,m)
-      qaerwat  => qaerwat_m(:,:,m)
+   ! loop over all aerosol modes
+   do mm = 1, nmodes
+
+      dgnumwet => dgnumwet_m(:,:,mm)
+      qaerwat  => qaerwat_m(:,:,mm)
 
       ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigma_logr_aer, refrtablw=refrtablw , &
+      call rad_cnst_get_mode_props(list_idx, mm, sigmag=sigma_logr_aer, refrtablw=refrtablw , &
          refitablw=refitablw, absplw=absplw)
 
       ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
+      call rad_cnst_get_info(list_idx, mm, nspec=nspec)
 
       ! calc size parameter for all columns
       ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test. 
@@ -1330,28 +1328,28 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
                                  radsurf, logradsurf, cheby, ismethod2=.true.) 
 
       allocate(volf_l(ncol,nspec),stat=istat)
-      if (istat .ne. 0) call endrun("Unable to allocate volf_l: "//errmsg(__FILE__,__LINE__) )
+      if (istat /= 0) call endrun("Unable to allocate volf_l: "//errmsg(__FILE__,__LINE__) )
       allocate(specdens_l(nspec),stat=istat)
-      if (istat .ne. 0) call endrun("Unable to allocate specdens_l: "//errmsg(__FILE__,__LINE__) )
+      if (istat /= 0) call endrun("Unable to allocate specdens_l: "//errmsg(__FILE__,__LINE__) )
       allocate(specrefindex_l(nspec,nlwbands),stat=istat)
-      if (istat .ne. 0) call endrun("Unable to allocate specrefindex_l: "//errmsg(__FILE__,__LINE__) )
+      if (istat /= 0) call endrun("Unable to allocate specrefindex_l: "//errmsg(__FILE__,__LINE__) )
 
       do ilw = 1, nlwbands
 
-         do k = top_lev, pver
+         do kk = top_lev, pver
             ! get aerosol properties and save for each species
             do ll = 1, nspec
-               call rad_cnst_get_aer_mmr(list_idx, m, ll, 'a', state, pbuf, specmmr)
-               call rad_cnst_get_aer_props(list_idx, m, ll, density_aer=specdens, &
+               call rad_cnst_get_aer_mmr(list_idx, mm, ll, 'a', state, pbuf, specmmr)
+               call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
                                            refindex_aer_lw=specrefindex)
                specdens_l(ll) = specdens
                specrefindex_l(ll,:) = specrefindex
-               volf_l(:,ll) = specmmr(:,k)/specdens
+               volf_l(:,ll) = specmmr(:,kk)/specdens
             enddo
 
             ! calculate complex refractive index
             call calc_refin_complex(ncol, ilw, subname, & ! in
-                   qaerwat(:,k), volf_l, specrefindex_l,  & ! in
+                   qaerwat(:,kk), volf_l, specrefindex_l,  & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! interpolate coefficients linear in refractive index
@@ -1362,33 +1360,34 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
                          itab, jtab, ttab, utab, cabs)
 
             ! parameterized optical properties
-            do i = 1, ncol
-               pabs = 0.5_r8*cabs(i,1)
+            do icol = 1, ncol
+               pabs = 0.5_r8*cabs(icol,1)
                do nc = 2, ncoef
-                  pabs = pabs + cheby(nc,i,k)*cabs(i,nc)
+                  pabs = pabs + cheby(nc,icol,kk)*cabs(icol,nc)
                enddo
-               pabs   = pabs*wetvol(i)*rhoh2o
+               pabs   = pabs*wetvol(icol)*rhoh2o
                pabs   = max(0._r8,pabs)
-               dopaer = pabs*mass(i,k)
+               dopaer = pabs*mass(icol,kk)
 
                ! FORTRAN refactor: check and writeout error/warning message
-               call check_error_warning(subname, lchnk,i, k,m, ilw, nspec, list_idx,& ! in
+               call check_error_warning(subname, lchnk,icol, kk,mm, ilw, nspec, list_idx,& ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens_l, specrefindex_l, volf_l, &
                         nerr_dopaer) ! inout
 
                ! update absorption optical depth
-               tauxar(i,k,ilw) = tauxar(i,k,ilw) + dopaer
+               tauxar(icol,kk,ilw) = tauxar(icol,kk,ilw) + dopaer
             enddo
 
-         end do ! k = top_lev, pver
+         enddo ! kk = top_lev, pver
 
-      end do  ! nlwbands
+      enddo  ! nlwbands
 
       deallocate(volf_l)
       deallocate(specdens_l)
       deallocate(specrefindex_l)
-   end do ! m = 1, nmodes
+
+   enddo ! mm = 1, nmodes
 
 end subroutine modal_aero_lw
 
@@ -1396,8 +1395,8 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
-subroutine calc_refin_complex(ncol, ilw, subname, & ! in
-                qaerwat_kk, volf_l, specrefindex_l, & ! in
+subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
+                qaerwat_kk,  volf_l, specrefindex_l,        & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
     !-------------------------------------------------------------------
     ! calculate complex refractive index 
