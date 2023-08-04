@@ -1,6 +1,6 @@
 
 module mo_usrrxt
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
   use ppgrid,       only : pver, pcols
@@ -98,7 +98,6 @@ contains
 
   subroutine usrrxt( rxt, & ! inout
                     temp, invariants, mtot, ncol )  ! in
-
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
 !-----------------------------------------------------------------
@@ -128,7 +127,7 @@ contains
     real(r8) ::  fc(ncol)   
     real(r8) ::  sqrt_t(ncol)                   ! sqrt( temp )
     real(r8) ::  exp_fac(ncol)                  ! vector exponential
-
+#include "../yaml/mo_usrrxt/f90_yaml/usrrxt_beg_yml.f90"
 
 
 
@@ -174,7 +173,7 @@ contains
        endif
 
     enddo level_loop
-
+#include "../yaml/mo_usrrxt/f90_yaml/usrrxt_end_yml.f90"
   end subroutine usrrxt
 
 !-------------------------------------------------------------------------
@@ -187,11 +186,7 @@ contains
     real(r8), intent(in)  :: y(:)
     integer,  intent(in)  :: n
     
-#ifdef IBM
-    call vexp( x, y, n )
-#else
     x(:n) = exp( y(:n) )
-#endif
 
   end subroutine comp_exp
 
