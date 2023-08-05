@@ -1217,6 +1217,8 @@ end subroutine modal_aero_sw
 subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
+  use modal_aero_data,  only: nmodes=>ntot_amode, nspec_amode, specdens_amode, &
+                              sigmag_amode, specrefndxlw, lspectype_amode, lmassptr_amode
 
    ! calculates aerosol lw radiative properties
 
@@ -1231,7 +1233,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    integer :: icol, ilw, kk, ll, mm, nc
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
-   integer :: nmodes
    integer :: nspec
    integer :: istat
 
@@ -1297,7 +1298,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
         qaerwat_m)
    
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
    ! initialize output variables
    tauxar(:ncol,:,:) = 0._r8
@@ -1313,8 +1313,11 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
          refitablw=refitablw, absplw=absplw)
 
       ! get mode info
-      call rad_cnst_get_info(list_idx, mm, nspec=nspec)
-
+      nspec = nspec_amode(mm)
+      sigma_logr_aer = sigmag_amode(mm)
+!      refrtablw = real(specrefndxlw)
+!      refitablw = aimag(specrefndxlw)
+      
       ! calc size parameter for all columns
       ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test. 
       ! can be removed when porting to C++
@@ -1333,11 +1336,12 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
          do kk = top_lev, pver
             ! get aerosol properties and save for each species
             do ll = 1, nspec
-               call rad_cnst_get_aer_mmr(list_idx, mm, ll, 'a', state, pbuf, specmmr)
+               specmmr => state%q(:,:,lmassptr_amode(ll,mm))
+               specdens = specdens_amode(ll)
                call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
                                            refindex_aer_lw=specrefindex)
                specdens_l(ll) = specdens
-               specrefindex_l(ll,:) = specrefindex
+               specrefindex_l(ll,:) = specrefndxlw(:,lspectype_amode(ll,mm))
                volf_l(:,ll) = specmmr(:,kk)/specdens
             enddo
 
