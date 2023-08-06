@@ -1214,7 +1214,8 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(dt, state, pbuf, tauxar)
+subroutine modal_aero_lw(dt, state, pbuf, & ! in
+                        tauxar            ) ! out
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
   use modal_aero_data,  only: nmodes=>ntot_amode, nspec_amode, specdens_amode, &
@@ -1263,6 +1264,7 @@ subroutine modal_aero_lw(dt, state, pbuf, tauxar)
    real(r8), pointer :: refrtablw(:,:) ! table of real refractive indices for aerosols
    real(r8), pointer :: refitablw(:,:) ! table of imag refractive indices for aerosols
    real(r8), pointer :: absplw(:,:,:,:) ! specific absorption
+   real(r8), pointer :: state_q(:,:,:)  ! state%q
 
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
@@ -1279,6 +1281,7 @@ subroutine modal_aero_lw(dt, state, pbuf, tauxar)
    ncol  = state%ncol
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
+   state_q => state%q
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
@@ -1326,7 +1329,7 @@ subroutine modal_aero_lw(dt, state, pbuf, tauxar)
          do kk = top_lev, pver
             ! get aerosol properties and save for each species
             do ll = 1, nspec
-               specmmr => state%q(:,:,lmassptr_amode(ll,mm))
+               specmmr => state_q(:,:,lmassptr_amode(ll,mm))
                specdens = specdens_amode(ll)
                call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
                                            refindex_aer_lw=specrefindex)
