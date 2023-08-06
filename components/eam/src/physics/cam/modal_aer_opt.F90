@@ -1249,7 +1249,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: mass(pcols,pver) ! layer mass
 
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [g/g]
-   real(r8)             :: specdens            ! species density [kg/m3]
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
    real(r8),allocatable :: volf_l(:,:)         ! volume fraction of insoluble aerosol
    real(r8),allocatable :: specdens_l(:)       ! species density for all species [kg/m3]
@@ -1330,12 +1329,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             ! get aerosol properties and save for each species
             do ll = 1, nspec
                specmmr => state_q(:,:,lmassptr_amode(ll,mm))
-               specdens = specdens_amode(ll)
-               call rad_cnst_get_aer_props(list_idx, mm, ll, density_aer=specdens, &
-                                           refindex_aer_lw=specrefindex)
-               specdens_l(ll) = specdens
+               specdens_l(ll) = specdens_amode(lspectype_amode(ll,mm))
                specrefindex_l(ll,:) = specrefndxlw(:,lspectype_amode(ll,mm))
-               volf_l(:,ll) = specmmr(:,kk)/specdens
+               volf_l(:,ll) = specmmr(:,kk)/specdens_l(ll)
             enddo
 
             ! calculate complex refractive index
