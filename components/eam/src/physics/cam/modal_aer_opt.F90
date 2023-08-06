@@ -1214,7 +1214,7 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
+subroutine modal_aero_lw(dt, state, pbuf, tauxar)
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
   use modal_aero_data,  only: nmodes=>ntot_amode, nspec_amode, specdens_amode, &
@@ -1222,7 +1222,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
    ! calculates aerosol lw radiative properties
 
-   integer,             intent(in)  :: list_idx ! index of the climate or a diagnostic list
    real(r8),            intent(in)  :: dt       ! time step [s]
    type(physics_state), intent(in), target :: state    ! state variables
    type(physics_buffer_desc), pointer :: pbuf(:)
@@ -1231,6 +1230,7 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
    ! Local variables
    integer :: icol, ilw, kk, ll, mm, nc
+   integer :: list_idx                 ! index of the climate or a diagnostic list
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
@@ -1280,20 +1280,10 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
 
-   ! Calculate aerosol size distribution parameters and aerosol water uptake
-   if (clim_modal_aero .and. .not. prog_modal_aero) then   ! For prescribed aerosol codes
-      !radiation diagnostics are not supported for prescribed aerosols cases
-      if(list_idx /= 0) then
-         call endrun('Radiation diagnostic calls are not supported for ' // &
-              ' prescribed aerosols '//errmsg(__FILE__,__LINE__))
-      endif
-      ! diagnostic aerosol size calculations
-      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m)
-   else
-      !For prognostic aerosols
-      call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
+   !FORTRAN refactoring: For prognostic aerosols only, other options are removed
+   list_idx = 0   ! index of the climate or a diagnostic list
+   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
-   endif
 
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
         qaerwat_m)

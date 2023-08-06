@@ -418,7 +418,7 @@ subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer)
 
    ! Contributions from modal aerosols.
    if (nmodes > 0) then
-      call modal_aero_lw(list_idx, dt, state, pbuf, odap_aer)
+      call modal_aero_lw(dt, state, pbuf, odap_aer)
    else
       odap_aer = 0._r8
    end if
