@@ -194,7 +194,6 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
    integer  :: trop_level(pcols), icol
    real(r8), pointer :: ext_cmip6_sw(:,:,:)
    real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of 1/m
-! BJG inserted below
    real(r8) :: zi(pcols,pver+1)
    real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
 
@@ -202,7 +201,6 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
    ncol  = state%ncol
    lchnk = state%lchnk
-!BJG added below
    zi = state%zi
 
    ! compute mixing ratio to mass conversion
@@ -244,12 +242,15 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
       !converting it from 1/km to 1/m
 
       call pbuf_get_field(pbuf, idx_ext_sw, ext_cmip6_sw)
-!BJG added below two
-      call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
-      call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
 
       call outfld('extinct_sw_inp',ext_cmip6_sw(:,:,idx_sw_diag), pcols, lchnk)
       ext_cmip6_sw_inv_m = ext_cmip6_sw * km_inv_to_m_inv !convert from 1/km to 1/m
+
+  !Obtain read in values for ssa and asymmetry factor (af) from the
+  !volcanic input file
+      call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
+      call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
+
 
       !Find tropopause as extinction should be applied only above tropopause
       !trop_level has value for tropopause for each column
@@ -280,7 +281,6 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
    if (is_cmip6_volc) then
       !update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
-!BJG      call volcanic_cmip_sw(state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, tau_w, tau_w_g, tau_w_f)
       call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, tau, tau_w, tau_w_g, tau_w_f)
    endif
 
@@ -747,13 +747,9 @@ end subroutine get_volcanic_radius_rad_props
 
 !==============================================================================
 
-!BJGsubroutine volcanic_cmip_sw (state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, tau_w, tau_w_g, tau_w_f)
-!ncol,zi,ssa_cmpi6_sw,af_cmpi6_sw
 subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, tau, tau_w, tau_w_g, tau_w_f)
 
   !Intent-in
-!BJG  type(physics_state), intent(in), target :: state
-!BJG  type(physics_buffer_desc), pointer :: pbuf(:)
   integer,  intent(in) :: ncol
   real(r8), intent(in) :: zi(:,:)
   integer,  intent(in) :: trop_level(pcols)
@@ -767,24 +763,13 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
   real(r8), intent(inout) :: tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * tau * w
 
   !Local variables
-!BJG  integer   :: ncol, icol, ipver, ilev_tropp
   integer   :: icol, ipver, ilev_tropp
   real(r8)  :: lyr_thk, ext_unitless(nswbands), asym_unitless(nswbands)
   real(r8)  :: ext_ssa(nswbands),ext_ssa_asym(nswbands)
 
-!BJG  real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
-
-!BJG  ncol = state%ncol
-
   !Logic:
   !Update taus, tau_w, tau_w_g and tau_w_f with the read in volcanic
-  !aerosol extinction (1/km), single scattering albedo and asymmtry factors.
-
-  !Obtain read in values for ssa and asymmetry factor (af) from the
-  !volcanic input file
-
-!BJG  call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
-!BJG  call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
+  !aerosol extinction (1/km), single scattering albedo and asymmetry factors.
 
   !Above the tropopause, the read in values from the file include both the stratospheric
   !and volcanic aerosols. Therefore, we need to zero out taus above the tropopause
@@ -796,8 +781,6 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
   !First handle the case of tropopause layer itself:
   do icol = 1, ncol
      ilev_tropp = trop_level(icol) !tropopause level
-
-!BJG     lyr_thk = state%zi(icol,ilev_tropp) - state%zi(icol,ilev_tropp+1)
      lyr_thk = zi(icol,ilev_tropp) - zi(icol,ilev_tropp+1)
 
      ext_unitless(:)  = lyr_thk * ext_cmip6_sw_inv_m(icol,ilev_tropp,:)
@@ -809,13 +792,7 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
      tau_w  (icol,ilev_tropp,:) = 0.5_r8 * ( tau_w  (icol,ilev_tropp,:) + ext_ssa(:))
      tau_w_g(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_g(icol,ilev_tropp,:) + ext_ssa_asym(:))
      tau_w_f(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_f(icol,ilev_tropp,:) + ext_ssa_asym(:) * asym_unitless(:))
-  enddo
-
-  !As it will be more efficient for FORTRAN to loop over levels and then columns, the following loops
-  !are nested keeping that in mind
-  do ipver = 1 , pver
-     do icol = 1, ncol
-        ilev_tropp = trop_level(icol) !tropopause level
+     do ipver = 1 , pver
         if (ipver < ilev_tropp) then !BALLI: see if this is right!
 
            lyr_thk = zi(icol,ipver) - zi(icol,ipver+1)
