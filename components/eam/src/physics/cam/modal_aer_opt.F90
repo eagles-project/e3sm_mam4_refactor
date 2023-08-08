@@ -1219,7 +1219,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
   use modal_aero_data,  only: nmodes=>ntot_amode, nspec_amode, specdens_amode, &
-                              sigmag_amode, specrefndxlw, lspectype_amode, lmassptr_amode
+                              sigmag_amode, specrefndxlw, lspectype_amode, lmassptr_amode, &
+                              refrtablw,refitablw,absplw
 
    ! calculates aerosol lw radiative properties
 
@@ -1260,9 +1261,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: refrtablw(:,:) ! table of real refractive indices for aerosols
-   real(r8), pointer :: refitablw(:,:) ! table of imag refractive indices for aerosols
-   real(r8), pointer :: absplw(:,:,:,:) ! specific absorption
    real(r8), pointer :: state_q(:,:,:)  ! state%q
 
    integer  :: itab(pcols), jtab(pcols)
@@ -1284,6 +1282,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
+
    call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
@@ -1300,15 +1299,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
       dgnumwet => dgnumwet_m(:,:,mm)
       qaerwat  => qaerwat_m(:,:,mm)
 
-      ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, mm, sigmag=sigma_logr_aer, refrtablw=refrtablw , &
-         refitablw=refitablw, absplw=absplw)
-
       ! get mode info
       nspec = nspec_amode(mm)
       sigma_logr_aer = sigmag_amode(mm)
-!      refrtablw = real(specrefndxlw)
-!      refitablw = aimag(specrefndxlw)
       
       ! calc size parameter for all columns
       ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test. 
@@ -1342,8 +1335,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(absplw(:,:,:,ilw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtablw(:,ilw), refitablw(:,ilw), &
+            call binterp(absplw(mm,:,:,:,ilw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtablw(mm,:,ilw), refitablw(mm,:,ilw), &
                          itab, jtab, ttab, utab, cabs)
 
             ! parameterized optical properties
