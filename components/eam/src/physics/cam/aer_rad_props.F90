@@ -281,7 +281,8 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
    if (is_cmip6_volc) then
       !update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
-      call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, tau, tau_w, tau_w_g, tau_w_f)
+      call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
+           tau, tau_w, tau_w_g, tau_w_f)  ! inout
    endif
 
    ! Contributions from bulk aerosols.
@@ -747,13 +748,14 @@ end subroutine get_volcanic_radius_rad_props
 
 !==============================================================================
 
-subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, tau, tau_w, tau_w_g, tau_w_f)
+subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
+           tau, tau_w, tau_w_g, tau_w_f)  ! inout
 
   !Intent-in
-  integer,  intent(in) :: ncol
-  real(r8), intent(in) :: zi(:,:)
-  integer,  intent(in) :: trop_level(pcols)
-  real(r8), intent(in) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)
+  integer,  intent(in) :: ncol       ! Number of columns
+  real(r8), intent(in) :: zi(:,:)    ! Height above surface at interfaces [m]
+  integer,  intent(in) :: trop_level(pcols)  ! tropopause level index
+  real(r8), intent(in) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)  ! short wave extinction [m^{-1}]
   real(r8), intent(in) :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
 
   !Intent-inout
@@ -764,7 +766,8 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
 
   !Local variables
   integer   :: icol, ipver, ilev_tropp
-  real(r8)  :: lyr_thk, ext_unitless(nswbands), asym_unitless(nswbands)
+  real(r8)  :: lyr_thk   !  thickness between level interfaces [m]
+  real(r8)  :: ext_unitless(nswbands), asym_unitless(nswbands)
   real(r8)  :: ext_ssa(nswbands),ext_ssa_asym(nswbands)
 
   !Logic:
@@ -792,6 +795,9 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
      tau_w  (icol,ilev_tropp,:) = 0.5_r8 * ( tau_w  (icol,ilev_tropp,:) + ext_ssa(:))
      tau_w_g(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_g(icol,ilev_tropp,:) + ext_ssa_asym(:))
      tau_w_f(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_f(icol,ilev_tropp,:) + ext_ssa_asym(:) * asym_unitless(:))
+  enddo
+  do icol = 1, ncol
+     ilev_tropp = trop_level(icol) !tropopause level
      do ipver = 1 , pver
         if (ipver < ilev_tropp) then !BALLI: see if this is right!
 
