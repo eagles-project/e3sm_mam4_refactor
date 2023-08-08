@@ -1218,6 +1218,7 @@ end subroutine modal_aero_sw
 subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
+  use modal_aero_data, only:refrtablw,refitablw,absplw
 
    ! calculates aerosol lw radiative properties
 
@@ -1258,9 +1259,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: refrtablw(:,:) ! table of real refractive indices for aerosols
-   real(r8), pointer :: refitablw(:,:) ! table of imag refractive indices for aerosols
-   real(r8), pointer :: absplw(:,:,:,:) ! specific absorption
 
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
@@ -1301,7 +1299,6 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
 
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
         qaerwat_m)
-   
 
    ! loop over all aerosol modes
    call rad_cnst_get_info(list_idx, nmodes=nmodes)
@@ -1312,8 +1309,8 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
       qaerwat  => qaerwat_m(:,:,m)
 
       ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigma_logr_aer, refrtablw=refrtablw , &
-         refitablw=refitablw, absplw=absplw)
+      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigma_logr_aer)!, refrtablw=refrtablw , &
+      !   refitablw=refitablw, absplw=absplw)
 
       ! get mode info
       call rad_cnst_get_info(list_idx, m, nspec=nspec)
@@ -1381,8 +1378,8 @@ subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(absplw(:,:,:,ilw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtablw(:,ilw), refitablw(:,ilw), &
+            call binterp(absplw(m,:,:,:,ilw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtablw(m,:,ilw), refitablw(m,:,ilw), &
                          itab, jtab, ttab, utab, cabs)
 
             ! parameterized optical properties
