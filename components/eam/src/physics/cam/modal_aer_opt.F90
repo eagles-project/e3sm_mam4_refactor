@@ -1233,7 +1233,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    ! Local variables
    integer :: icol, ilw, kk, ll, mm, nc
    integer :: list_idx                 ! index of the climate or a diagnostic list
-   integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
    integer :: istat
@@ -1270,10 +1269,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    integer  :: nerr_dopaer = 0
 
-   character(len=*), parameter :: subname = 'modal_aero_lw'
    !----------------------------------------------------------------------------
 
-   lchnk = state%lchnk
    ncol  = state%ncol
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
@@ -1327,7 +1324,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             enddo
 
             ! calculate complex refractive index
-            call calc_refin_complex(ncol, ilw, subname, & ! in
+            call calc_refin_complex(ncol, ilw, & ! in
                    qaerwat(:,kk), volf, specrefindex,   & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
@@ -1349,7 +1346,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
                dopaer = pabs*mass(icol,kk)
 
                ! FORTRAN refactor: check and writeout error/warning message
-               call check_error_warning(subname, lchnk,icol, kk,mm, ilw, nspec, list_idx,& ! in
+               call check_error_warning(icol, kk,mm, ilw, nspec, list_idx,& ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, volf, & ! in
                         nerr_dopaer) ! inout
@@ -1374,7 +1371,7 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
-subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
+subroutine calc_refin_complex (ncol, ilw,                   & ! in
                 qaerwat_kk,  volf, specrefindex,            & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
     !-------------------------------------------------------------------
@@ -1383,7 +1380,6 @@ subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
     !-------------------------------------------------------------------
 
     implicit none
-    character(len=*),intent(in) :: subname  ! subroutine name
     integer,  intent(in) :: ncol, ilw       
     real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk [g/g]
     real(r8), intent(in) :: volf(:,:)       ! volume fraction of insoluble aerosol [fraction]
@@ -1411,7 +1407,7 @@ subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
       if (watervol(icol) < 0.0_r8) then
           if (abs(watervol(icol)) > 1.e-1_r8*wetvol(icol)) then
               write(iulog,*) 'watervol,wetvol,dryvol=',watervol(icol), &
-                         wetvol(icol),dryvol(icol),' in '//subname
+                         wetvol(icol),dryvol(icol)
           endif
           watervol(icol) = 0._r8
           wetvol(icol)   = dryvol(icol)
@@ -1426,7 +1422,7 @@ subroutine calc_refin_complex (ncol, ilw, subname,          & ! in
 end subroutine calc_refin_complex
 
 !===================================================================
-subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx, & ! in
+subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, volf, & ! in
                         nerr_dopaer) ! inout
@@ -1435,8 +1431,7 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
     !------------------------------------------------------------
 
    implicit none
-   integer,intent(in) :: lchnk,icol, kk, mm, ilw, nspec, list_idx  ! indices
-   character(len=*),intent(in) :: subname     ! subroutine name
+   integer,intent(in) :: icol, kk, mm, ilw, nspec, list_idx  ! indices
    real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
    real(r8),intent(in) :: pabs      ! parameterized specific absorption [m2/kg]
    real(r8),intent(in) :: dryvol(:)    ! volume concentration of aerosol mode [m3/kg]
@@ -1463,7 +1458,7 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
                          &unreasonably high in this layer."
         endif
 
-        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',',lchnk,')=', dopaer
+        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',)=', dopaer
         write(iulog,*) 'kk=',kk,' pabs=', pabs
         write(iulog,*) 'wetvol=',wetvol(icol),' dryvol=',dryvol(icol),     &
                        ' watervol=',watervol(icol)
@@ -1478,7 +1473,7 @@ subroutine check_error_warning(subname, lchnk,icol, kk, mm, ilw, nspec,list_idx,
 
         nerr_dopaer = nerr_dopaer + 1
         if (nerr_dopaer >= nerrmax_dopaer .or. dopaer < -1.e-10_r8) then
-             write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
+             write(iulog,*) '*** halting after nerr_dopaer =', nerr_dopaer
              call endrun()
          endif
 
