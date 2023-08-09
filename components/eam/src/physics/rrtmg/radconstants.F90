@@ -10,6 +10,11 @@ implicit none
 private
 save
 
+! dimensions for reading refractive index from modal radiative properties files
+integer, parameter, public :: refindex_real = 7 ; !real refractive index
+integer, parameter, public :: refindex_im   = 10; !imaginery refractive index
+integer, parameter, public :: coef_number   = 5 ; !number of coeficients
+
 ! SHORTWAVE DATA
 
 ! number of shorwave spectral intervals

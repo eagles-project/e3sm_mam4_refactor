@@ -405,6 +405,10 @@ contains
        complex(r8), pointer  :: refindex_aer_sw(:), &
             refindex_aer_lw(:)
        real(r8), pointer :: qqcw(:,:)
+       real(r8), pointer :: refrtablw_tmp(:,:) ! table of real refractive indices for aerosols
+       real(r8), pointer :: refitablw_tmp(:,:) ! table of imag refractive indices for aerosols
+       real(r8), pointer :: absplw_tmp(:,:,:,:) ! specific absorption
+
        real(r8), parameter :: huge_r8 = huge(1._r8)
        character(len=*), parameter :: routine='modal_aero_initialize'
        ! variables for MMF configuration
@@ -425,7 +429,12 @@ contains
        do m = 1, ntot_amode
           call rad_cnst_get_mode_props(0, m, &
              sigmag=sigmag_amode(m), dgnum=dgnum_amode(m), dgnumlo=dgnumlo_amode(m), &
-             dgnumhi=dgnumhi_amode(m), rhcrystal=rhcrystal_amode(m), rhdeliques=rhdeliques_amode(m))
+             dgnumhi=dgnumhi_amode(m), rhcrystal=rhcrystal_amode(m), rhdeliques=rhdeliques_amode(m), &
+             refrtablw=refrtablw_tmp, refitablw=refitablw_tmp, absplw=absplw_tmp)
+
+          refrtablw(m,:,:)  = refrtablw_tmp
+          refitablw(m,:,:)  = refitablw_tmp
+          absplw(m,:,:,:,:) = absplw_tmp
 
           !   compute frequently used parameters: ln(sigmag),
           !   volume-to-number and volume-to-surface conversions, ...

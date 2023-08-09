@@ -1214,235 +1214,156 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 end subroutine modal_aero_sw
 
 !===============================================================================
-
-subroutine modal_aero_lw(list_idx, dt, state, pbuf, tauxar)
+subroutine modal_aero_lw(dt, state, pbuf, & ! in
+                        tauxar            ) ! out
 
   use shr_log_mod ,     only: errmsg => shr_log_errmsg
+  use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
+                              sigmag_amode, lspectype_amode, lmassptr_amode, &
+                              specrefndxlw, refrtablw, refitablw, absplw
 
    ! calculates aerosol lw radiative properties
 
-   integer,             intent(in)  :: list_idx ! index of the climate or a diagnostic list
-   real(r8),            intent(in)  :: dt       ! time step(s)
+   real(r8),            intent(in)  :: dt       ! time step [s]
    type(physics_state), intent(in), target :: state    ! state variables
-
    type(physics_buffer_desc), pointer :: pbuf(:)
 
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
-   integer :: i, ifld, ilw, k, l, m, nc, ns
-   integer :: lchnk                    ! chunk id
+   integer :: icol, ilw, kk, ll, mm, nc
+   integer :: list_idx                 ! index of the climate or a diagnostic list
    integer :: ncol                     ! number of active columns in the chunk
-   integer :: nmodes
    integer :: nspec
    integer :: istat
 
-   real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter (m)
-   real(r8), pointer :: qaerwat(:,:)   ! aerosol water (g/g)
+   real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter [m]
+   real(r8), pointer :: qaerwat(:,:)   ! aerosol water [g/g]
 
    real(r8) :: sigma_logr_aer          ! geometric standard deviation of number distribution
    real(r8) :: alnsg_amode
-   real(r8) :: xrad(pcols)
-   real(r8) :: cheby(ncoef,pcols,pver)  ! chebychef polynomials
+   real(r8) :: cheby(ncoef,pcols,pver) ! chebychef polynomials
+   real(r8) :: radsurf(pcols,pver)     ! aerosol surface mode radius
+   real(r8) :: logradsurf(pcols,pver)  ! log(aerosol surface mode radius)
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
-   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
-   real(r8)             :: specdens            ! species density (kg/m3)
-   complex(r8), pointer :: specrefindex(:)     ! species refractive index
+   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [g/g]
+   real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
+   complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
 
-   real(r8) :: vol(pcols)       ! volume concentration of aerosol specie (m3/kg)
-   real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode (m3/kg)
-   real(r8) :: wetvol(pcols)    ! volume concentration of wet mode (m3/kg)
-   real(r8) :: watervol(pcols)  ! volume concentration of water in each mode (m3/kg)
+   real(r8) :: dryvol(pcols)    ! volume concentration of aerosol mode [m3/kg]
+   real(r8) :: wetvol(pcols)    ! volume concentration of wet mode [m3/kg]
+   real(r8) :: watervol(pcols)  ! volume concentration of water in each mode [m3/kg]
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: refrtablw(:,:) ! table of real refractive indices for aerosols
-   real(r8), pointer :: refitablw(:,:) ! table of imag refractive indices for aerosols
-   real(r8), pointer :: absplw(:,:,:,:) ! specific absorption
+   real(r8), pointer :: state_q(:,:,:)  ! state%q
 
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
    real(r8) :: cabs(pcols,ncoef)
-   real(r8) :: pabs(pcols)      ! parameterized specific absorption (m2/kg)
-   real(r8) :: dopaer(pcols)    ! aerosol optical depth in layer
+   real(r8) :: pabs      ! parameterized specific absorption [m2/kg]
+   real(r8) :: dopaer    ! aerosol optical depth in layer
 
-   integer, parameter :: nerrmax_dopaer=1000
    integer  :: nerr_dopaer = 0
-   real(r8) :: volf             ! volume fraction of insoluble aerosol
 
-   character(len=*), parameter :: subname = 'modal_aero_lw'
    !----------------------------------------------------------------------------
 
-   lchnk = state%lchnk
    ncol  = state%ncol
-
-   ! initialize output variables
-   tauxar(:ncol,:,:) = 0._r8
-
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
+   state_q => state%q
 
-   ! Calculate aerosol size distribution parameters and aerosol water uptake
-   if (clim_modal_aero .and. .not. prog_modal_aero) then   ! For prescribed aerosol codes
-      !radiation diagnostics are not supported for prescribed aerosols cases
-      if(list_idx .ne. 0) then
-         call endrun('Radiation diagnostic calls are not supported for ' // &
-              ' prescribed aerosols '//errmsg(__FILE__,__LINE__))
-      endif
-      ! diagnostic aerosol size calculations
-      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m)
-   else
-      !For prognostic aerosols
-      call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
+   !FORTRAN refactoring: For prognostic aerosols only, other options are removed
+   list_idx = 0   ! index of the climate or a diagnostic list
+
+   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
-   endif
 
    call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
         qaerwat_m)
    
 
+   ! initialize output variables
+   tauxar(:ncol,:,:) = 0._r8
+
    ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
+   do mm = 1, ntot_amode
 
-   do m = 1, nmodes
-
-      dgnumwet => dgnumwet_m(:,:,m)
-      qaerwat  => qaerwat_m(:,:,m)
-
-      ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigma_logr_aer, refrtablw=refrtablw , &
-         refitablw=refitablw, absplw=absplw)
+      dgnumwet => dgnumwet_m(:,:,mm)
+      qaerwat  => qaerwat_m(:,:,mm)
 
       ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
-
+      nspec = nspec_amode(mm)
+      sigma_logr_aer = sigmag_amode(mm)
+      
       ! calc size parameter for all columns
-      ! this is the same calculation that's done in modal_size_parameters, but there
-      ! some intermediate results are saved and the chebyshev polynomials are stored
-      ! in a array with different index order.  Could be unified.
-      do k = top_lev, pver
-         do i = 1, ncol
-            alnsg_amode = log( sigma_logr_aer )
-            ! convert from number diameter to surface area
-            xrad(i) = log(0.5_r8*dgnumwet(i,k)) + 2.0_r8*alnsg_amode*alnsg_amode
-            ! normalize size parameter
-            xrad(i) = max(xrad(i), xrmin)
-            xrad(i) = min(xrad(i), xrmax)
-            xrad(i) = (2*xrad(i)-xrmax-xrmin)/(xrmax-xrmin)
-            ! chebyshev polynomials
-            cheby(1,i,k) = 1.0_r8
-            cheby(2,i,k) = xrad(i)
-            do nc = 3, ncoef
-               cheby(nc,i,k) = 2.0_r8*xrad(i)*cheby(nc-1,i,k)-cheby(nc-2,i,k)
-            end do
-         end do
-      end do
+      ! FORTRAN refactoring: ismethod2 is tempararily used to ensure BFB test. 
+      ! can be removed when porting to C++
+      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+                                 radsurf, logradsurf, cheby, ismethod2=.true.) 
+
+      allocate(volf(ncol,nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate volf: "//errmsg(__FILE__,__LINE__) )
+      allocate(specdens(nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specdens: "//errmsg(__FILE__,__LINE__) )
+      allocate(specrefindex(nspec,nlwbands),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specrefindex: "//errmsg(__FILE__,__LINE__) )
 
       do ilw = 1, nlwbands
 
-         do k = top_lev, pver
+         do kk = top_lev, pver
+            ! get aerosol properties and save for each species
+            do ll = 1, nspec
+               specmmr => state_q(:,:,lmassptr_amode(ll,mm))
+               specdens(ll) = specdens_amode(lspectype_amode(ll,mm))
+               specrefindex(ll,:) = specrefndxlw(:,lspectype_amode(ll,mm))
+               volf(:,ll) = specmmr(:,kk)/specdens(ll)
+            enddo
 
-            ! form bulk refractive index. Use volume mixing for infrared
-            crefin(:ncol) = (0._r8, 0._r8)
-            dryvol(:ncol) = 0._r8
-
-            ! aerosol species loop
-            do l = 1, nspec
-               call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, specmmr)
-               call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                           refindex_aer_lw=specrefindex)
-
-               do i = 1, ncol
-                  vol(i)    = specmmr(i,k)/specdens
-                  dryvol(i) = dryvol(i) + vol(i)
-                  crefin(i) = crefin(i) + vol(i)*specrefindex(ilw)
-               end do
-            end do
-
-            do i = 1, ncol
-               watervol(i) = qaerwat(i,k)/rhoh2o
-               wetvol(i)   = watervol(i) + dryvol(i)
-               if (watervol(i) < 0.0_r8) then
-                  if (abs(watervol(i)) .gt. 1.e-1_r8*wetvol(i)) then
-                     write(iulog,*) 'watervol,wetvol,dryvol=',watervol(i),wetvol(i),dryvol(i),' in '//subname
-                  end if
-                  watervol(i) = 0._r8
-                  wetvol(i)   = dryvol(i)
-               end if
-
-               crefin(i) = crefin(i) + watervol(i)*crefwlw(ilw)
-               if (wetvol(i) > 1.e-40_r8) crefin(i) = crefin(i)/wetvol(i)
-               refr(i) = real(crefin(i))
-               refi(i) = aimag(crefin(i))
-            end do
+            ! calculate complex refractive index
+            call calc_refin_complex(ncol, ilw, & ! in
+                   qaerwat(:,kk), volf, specrefindex,   & ! in
+                   dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(absplw(:,:,:,ilw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtablw(:,ilw), refitablw(:,ilw), &
+            call binterp(absplw(mm,:,:,:,ilw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtablw(mm,:,ilw), refitablw(mm,:,ilw), &
                          itab, jtab, ttab, utab, cabs)
 
             ! parameterized optical properties
-            do i = 1, ncol
-               pabs(i) = 0.5_r8*cabs(i,1)
+            do icol = 1, ncol
+               pabs = 0.5_r8*cabs(icol,1)
                do nc = 2, ncoef
-                  pabs(i) = pabs(i) + cheby(nc,i,k)*cabs(i,nc)
-               end do
-               pabs(i)   = pabs(i)*wetvol(i)*rhoh2o
-               pabs(i)   = max(0._r8,pabs(i))
-               dopaer(i) = pabs(i)*mass(i,k)
-            end do
+                  pabs = pabs + cheby(nc,icol,kk)*cabs(icol,nc)
+               enddo
+               pabs   = pabs*wetvol(icol)*rhoh2o
+               pabs   = max(0._r8,pabs)
+               dopaer = pabs*mass(icol,kk)
 
-            do i = 1, ncol
+               ! FORTRAN refactor: check and writeout error/warning message
+               call check_error_warning(icol, kk,mm, ilw, nspec, list_idx,& ! in
+                        dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        specdens, specrefindex, volf, & ! in
+                        nerr_dopaer) ! inout
 
-               if ((dopaer(i) <= -1.e-10_r8) .or. (dopaer(i) >= 20._r8)) then
+               ! update absorption optical depth
+               tauxar(icol,kk,ilw) = tauxar(icol,kk,ilw) + dopaer
+            enddo
 
-                  if (dopaer(i) <= -1.e-10_r8) then
-                     write(iulog,*) "ERROR: Negative aerosol optical depth &
-                          &in this layer."
-                  else
-                     write(iulog,*) "WARNING: Aerosol optical depth is &
-                          &unreasonably high in this layer."
-                  end if
+         enddo ! kk = top_lev, pver
 
-                  write(iulog,*) 'dopaer(',i,',',k,',',m,',',lchnk,')=', dopaer(i)
-                  write(iulog,*) 'k=',k,' pabs=', pabs(i)
-                  write(iulog,*) 'wetvol=',wetvol(i),' dryvol=',dryvol(i),     &
-                     ' watervol=',watervol(i)
-                  write(iulog,*) 'cabs=', (cabs(i,l),l=1,ncoef)
-                  write(iulog,*) 'crefin=', crefin(i)
-                  write(iulog,*) 'nspec=', nspec
-                  do l = 1,nspec
-                     call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, specmmr)
-                     call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                                 refindex_aer_lw=specrefindex)
-                     volf = specmmr(i,k)/specdens
-                     write(iulog,*) 'l=',l,'vol(l)=',volf
-                     write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ilw)
-                     write(iulog,*) 'specdens=',specdens
-                  end do
+      enddo  ! nlwbands
 
-                  nerr_dopaer = nerr_dopaer + 1
-                  if (nerr_dopaer >= nerrmax_dopaer .or. dopaer(i) < -1.e-10_r8) then
-                     write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
-                     call endrun()
-                  end if
+      deallocate(volf)
+      deallocate(specdens)
+      deallocate(specrefindex)
 
-               end if
-            end do
-
-            do i = 1, ncol
-               tauxar(i,k,ilw) = tauxar(i,k,ilw) + dopaer(i)
-            end do
-
-         end do ! k = top_lev, pver
-
-      end do  ! nlwbands
-
-   end do ! m = 1, nmodes
+   enddo ! mm = 1, ntot_amode
 
 end subroutine modal_aero_lw
 
@@ -1450,6 +1371,118 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
+subroutine calc_refin_complex (ncol, ilw,                   & ! in
+                qaerwat_kk,  volf, specrefindex,            & ! in
+                dryvol, wetvol, watervol, crefin, refr, refi) ! out
+    !-------------------------------------------------------------------
+    ! calculate complex refractive index 
+    ! also output wetvol and watervol
+    !-------------------------------------------------------------------
+
+    implicit none
+    integer,  intent(in) :: ncol, ilw       
+    real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk [g/g]
+    real(r8), intent(in) :: volf(:,:)       ! volume fraction of insoluble aerosol [fraction]
+    complex(r8), intent(in) :: specrefindex(:,:)     ! species refractive index
+
+    real(r8),intent(out) :: dryvol(pcols)    ! volume concentration of aerosol mode [m3/kg]
+    real(r8),intent(out) :: wetvol(pcols)    ! volume concentration of wet mode [m3/kg]
+    real(r8),intent(out) :: watervol(pcols)  ! volume concentration of water in each mode [m3/kg]
+    real(r8),intent(out) :: refr(pcols)      ! real part of refractive index
+    real(r8),intent(out) :: refi(pcols)      ! imaginary part of refractive index
+    complex(r8),intent(out) :: crefin(pcols) ! complex refractive index
+
+    integer :: icol
+
+   crefin(:ncol) = (0._r8, 0._r8)
+   dryvol(:ncol) = 0._r8
+
+   do icol = 1, ncol
+      dryvol(icol) = sum(volf(icol,:))
+      crefin(icol) = sum(volf(icol,:)*specrefindex(:,ilw))
+
+      watervol(icol) = qaerwat_kk(icol)/rhoh2o
+      wetvol(icol)   = watervol(icol) + dryvol(icol)
+
+      if (watervol(icol) < 0.0_r8) then
+          if (abs(watervol(icol)) > 1.e-1_r8*wetvol(icol)) then
+              write(iulog,*) 'watervol,wetvol,dryvol=',watervol(icol), &
+                         wetvol(icol),dryvol(icol)
+          endif
+          watervol(icol) = 0._r8
+          wetvol(icol)   = dryvol(icol)
+      endif
+
+      crefin(icol) = crefin(icol) + watervol(icol)*crefwlw(ilw)
+      if (wetvol(icol) > 1.e-40_r8) crefin(icol) = crefin(icol)/wetvol(icol)
+      refr(icol) = real(crefin(icol))
+      refi(icol) = aimag(crefin(icol))
+   enddo
+
+end subroutine calc_refin_complex
+
+!===================================================================
+subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
+                        dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        specdens, specrefindex, volf, & ! in
+                        nerr_dopaer) ! inout
+    !------------------------------------------------------------
+    ! check and writeout error and warning message
+    !------------------------------------------------------------
+
+   implicit none
+   integer,intent(in) :: icol, kk, mm, ilw, nspec, list_idx  ! indices
+   real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
+   real(r8),intent(in) :: pabs      ! parameterized specific absorption [m2/kg]
+   real(r8),intent(in) :: dryvol(:)    ! volume concentration of aerosol mode [m3/kg]
+   real(r8),intent(in) :: wetvol(:)    ! volume concentration of wet mode [m3/kg]
+   real(r8),intent(in) :: watervol(:)  ! volume concentration of water in each mode [m3/kg]
+   complex(r8),intent(in) :: crefin(:) ! complex refractive index
+   real(r8),intent(in) :: cabs(:,:)
+   real(r8),intent(in) :: volf(:,:)   ! volume fraction of insoluble aerosol [fraction]
+   real(r8),intent(in) :: specdens(:) ! species density [kg/m3]
+   complex(r8), intent(in) :: specrefindex(:, :)     ! species refractive index
+   integer, intent(inout) :: nerr_dopaer    ! total number of error times
+
+   integer :: ll
+   integer, parameter :: nerrmax_dopaer=1000
+
+    ! FORTRAN refactor: This if condition is never met in testing run ...
+    if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
+
+        if (dopaer <= -1.e-10_r8) then
+            write(iulog,*) "ERROR: Negative aerosol optical depth &
+                          &in this layer."
+        else
+            write(iulog,*) "WARNING: Aerosol optical depth is &
+                         &unreasonably high in this layer."
+        endif
+
+        write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',)=', dopaer
+        write(iulog,*) 'kk=',kk,' pabs=', pabs
+        write(iulog,*) 'wetvol=',wetvol(icol),' dryvol=',dryvol(icol),     &
+                       ' watervol=',watervol(icol)
+        write(iulog,*) 'cabs=', (cabs(icol,ll),ll=1,ncoef)
+        write(iulog,*) 'crefin=', crefin(icol)
+        write(iulog,*) 'nspec=', nspec
+        do ll = 1,nspec
+            write(iulog,*) 'll=',ll,'vol(l)=',volf(icol,ll)
+            write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ll,ilw)
+            write(iulog,*) 'specdens=',specdens(ll)
+        enddo
+
+        nerr_dopaer = nerr_dopaer + 1
+        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer < -1.e-10_r8) then
+             write(iulog,*) '*** halting after nerr_dopaer =', nerr_dopaer
+             call endrun()
+         endif
+
+     endif
+
+end subroutine check_error_warning
+
+
+!======================================================================
 subroutine read_water_refindex(infilename)
 
    ! read water refractive index file and set module data
@@ -1514,7 +1547,8 @@ end subroutine read_water_refindex
 !===============================================================================
 
 subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
-                                 radsurf, logradsurf, cheb       ) ! out
+                                 radsurf, logradsurf, cheb,      & ! out
+                                 ismethod2 ) ! optional in
 
    use mam_support, only : min_max_bound
 
@@ -1524,6 +1558,9 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
    real(r8), intent(out) :: radsurf(:,:)    ! aerosol surface mode radius [m]
    real(r8), intent(out) :: logradsurf(:,:) ! log(aerosol surface mode radius)
    real(r8), intent(out) :: cheb(:,:,:)     ! chebychev polynomial parameters
+
+   ! FORTRAN refactoring: ismethod is tempararily used to ensure BFB test
+   logical,intent(in),optional :: ismethod2
 
    integer  :: icol, kk, nc
    real(r8) :: alnsg_amode      ! log(sigma)
@@ -1538,7 +1575,17 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
       do icol = 1, ncol
          ! convert from number mode diameter to surface area
          radsurf(icol,kk) = 0.5_r8*dgnumwet(icol,kk)*explnsigma
-         logradsurf(icol,kk) = log(radsurf(icol,kk))
+
+         ! --------------- FORTRAN refactoring -------------------
+         ! here two calculations are used to ensure passing BFB test
+         ! can be simplified (there is only round-off difference
+         if (present(ismethod2) .and. ismethod2) then
+             logradsurf(icol,kk) = log(0.5_r8*dgnumwet(icol,kk)) + 2.0_r8*alnsg_amode*alnsg_amode
+         else
+             logradsurf(icol,kk) = log(radsurf(icol,kk))
+         endif
+         ! --------------- FORTRAN refactoring -------------------
+
          ! normalize size parameter
          xrad = min_max_bound(xrmin, xrmax, logradsurf(icol,kk))
          xrad = (2._r8*xrad-xrmax-xrmin)/(xrmax-xrmin)

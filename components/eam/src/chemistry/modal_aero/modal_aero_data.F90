@@ -5,7 +5,7 @@
 !--------------------------------------------------------------
       use shr_kind_mod,  only: r8 => shr_kind_r8
       use constituents,  only: pcnst
-      use radconstants,  only: nswbands, nlwbands
+      use radconstants,  only: nswbands, nlwbands, refindex_real, refindex_im, coef_number
 
       implicit none
       save
@@ -197,6 +197,9 @@
           specdens_amode( maxd_aspectype ),       &   !
           spechygro( maxd_aspectype )
 
+      real(r8) :: refrtablw(ntot_amode,refindex_real,nlwbands), &
+                  refitablw(ntot_amode,refindex_im,nlwbands), &
+                  absplw(ntot_amode,coef_number,refindex_real,refindex_im,nlwbands)
 
       complex(r8)                                     &   !
           specrefndxsw( nswbands, maxd_aspectype ),   &   !
