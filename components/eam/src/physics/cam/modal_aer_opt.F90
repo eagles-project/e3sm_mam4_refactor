@@ -641,8 +641,9 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    endif
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
-                                  cldn, dgnumdry_m, dgnumwet_m, qaerwat_m, & ! in
-                                  list_idx_in=list_idx) ! optional in
+                                  cldn, dgnumdry_m, & ! in
+                                  dgnumwet_m, qaerwat_m, & ! inout
+                                  list_idx_in=list_idx   ) ! optional in
    
 
    ! loop over all aerosol modes
@@ -1310,8 +1311,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
            dgnumdry_m=dgnumdry_m)
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
-                                  cldn, dgnumdry_m, dgnumwet_m, qaerwat_m, & ! in
-                                  list_idx_in=list_idx) ! optional in
+                                  cldn, dgnumdry_m, & ! in
+                                  dgnumwet_m, qaerwat_m, & ! inout
+                                  list_idx_in=list_idx   ) ! optional in
    
 
    ! initialize output variables

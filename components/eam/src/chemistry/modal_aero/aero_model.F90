@@ -831,8 +831,9 @@ contains
     ! Aerosol water uptake
     call t_startf('wateruptake')
     call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
-                                   cldn, dgncur_a, dgnumwet,  qaerwat, & ! in
-                                   wetdens=wetdens) ! optional in
+                                   cldn, dgncur_a, & ! in
+                                   dgnumwet,  qaerwat, & ! inout
+                                   wetdens=wetdens     ) ! optional inout
     call t_stopf('wateruptake')
 
     ! skip wet deposition if nwetdep is non-positive

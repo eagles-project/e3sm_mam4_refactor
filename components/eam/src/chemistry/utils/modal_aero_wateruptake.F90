@@ -125,8 +125,9 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  & ! in
-                                     cldn, dgncur_a,dgncur_awet,  qaerwat, & ! in
-                                     list_idx_in, wetdens  ) ! optional in
+                                     cldn, dgncur_a,        & ! in
+                                     dgncur_awet,  qaerwat, & ! inout
+                                     list_idx_in, wetdens   ) ! optional in or inout
    !----------------------------------------------------------------------------
    !
    ! CAM specific driver for modal aerosol water uptake code.
@@ -144,12 +145,12 @@ subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  &
    real(r8), pointer,intent(in) :: state_q(:,:,:)     ! state%q [#/kg or kg/kg]
    real(r8), pointer,intent(in) :: cldn(:,:)          ! layer cloud fraction [fraction]
    real(r8), pointer,intent(in) :: dgncur_a(:,:,:)    ! aerosol particle diameter [m]
-   real(r8), pointer,intent(in) :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
-   real(r8), pointer,intent(in) :: qaerwat(:,:,:)     ! aerosol water [kg/kg]
+   real(r8), target, intent(inout) :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
+   real(r8), target, intent(inout) :: qaerwat(:,:,:)     ! aerosol water [kg/kg]
 
    ! Optional inputs for diagnostic mode
-   integer,  optional,          intent(in) :: list_idx_in
-   real(r8), optional, pointer, intent(in) :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
+   integer,  optional,         intent(in)    :: list_idx_in
+   real(r8), optional, target, intent(inout) :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
 
    ! local variables
    integer :: list_idx           ! radiative constituents list index
@@ -175,6 +176,7 @@ subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  &
    logical  :: history_aerosol      ! Output the MAM aerosol variables and tendencies
    logical  :: history_verbose      ! produce verbose history output
    character(len=3)  :: trnum       ! used to hold mode number (as characters)
+#include "../yaml/modal_aero_wateruptake/f90_yaml/modal_aero_wateruptake_dr_beg_yml.f90"
 
    !----------------------------------------------------------------------------
 
@@ -244,6 +246,7 @@ subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  &
          call outfld( 'aero_water',  aerosol_water(:ncol,:),    ncol, lchnk)
 
    endif
+#include "../yaml/modal_aero_wateruptake/f90_yaml/modal_aero_wateruptake_dr_end_yml.f90"
 
 end subroutine modal_aero_wateruptake_dr
 
