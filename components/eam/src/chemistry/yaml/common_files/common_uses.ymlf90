@@ -33,6 +33,9 @@ use spmd_utils,   only : masterproc
 ! mo_sethet.F90
 !#define YAML_SETHET
 
+! mo_setext.F90
+!#define YAML_SETEXT
+
 ! sox_cldaero_mod
 !#define YAML_SOXMOD
 
