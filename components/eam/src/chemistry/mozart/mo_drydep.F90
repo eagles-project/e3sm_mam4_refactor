@@ -31,7 +31,7 @@ module mo_drydep
   save
 
   private
-  public :: drydep_inti_xactive, drydep_xactive, set_soilw, chk_soilw, has_drydep
+  public :: drydep_inti_xactive, drydep_xactive,  has_drydep
   public :: n_land_type, fraction_landuse, drydep_srf_file
 
   real(r8)              :: dels
@@ -798,11 +798,12 @@ contains
   
   !-------------------------------------------------------------------------------------
   !-------------------------------------------------------------------------------------
-  subroutine drydep_xactive( ncdate, sfc_temp, pressure_sfc,  &
-                             wind_speed, spec_hum, air_temp, pressure_10m, rain, &
-                             snow, solar_flux, dvel, dflx, mmr, &
-                             tv, soilw, rh, ncol, lonndx, latndx, lchnk, &
-                             ocnfrc, icefrc, beglandtype, endlandtype )
+  subroutine drydep_xactive( lchnk, ncol, latndx, lonndx, &                                 ! in
+                             ncdate, sfc_temp, air_temp, tv, pressure_sfc, pressure_10m, &  ! in
+                             spec_hum, rh, wind_speed, rain, snow, solar_flux, mmr, &       ! in
+                             dvel, &                                                        ! out
+                             dflx)                                                          ! inout
+  
     !-------------------------------------------------------------------------------------
     !   code based on wesely (atmospheric environment, 1989, vol 23, p. 1293-1304) for
     !   calculation of r_c, and on walcek et. al. (atmospheric enviroment, 1986,
@@ -822,43 +823,37 @@ contains
     ! modified by JFL to be used in MOZART-2 (October 2002)
     !-------------------------------------------------------------------------------------
 
-    use seq_drydep_mod, only: z0, rgso, rgss, h2_a, h2_b, h2_c, ri, rclo, rcls, rlu, rac
+    use seq_drydep_mod, only: z0, rgso, rgss, ri, rclo, rcls, rlu, rac
     use seq_drydep_mod, only: seq_drydep_setHCoeff, foxd, drat
     use physconst,      only: tmelt
-    use seq_drydep_mod, only: drydep_method,  DD_XLND
 
     implicit none
 
     !-------------------------------------------------------------------------------------
-    ! 	... dummy arguments
+    ! 	input arguments
     !-------------------------------------------------------------------------------------
-    integer, intent(in)   :: ncol
-    integer, intent(in)   :: ncdate                   ! present date (yyyymmdd)
-    real(r8), intent(in)      :: sfc_temp(pcols)          ! surface temperature (K)
-    real(r8), intent(in)      :: pressure_sfc(pcols)      ! surface pressure (Pa)
-    real(r8), intent(in)      :: wind_speed(pcols)        ! 10 meter wind speed (m/s)
-    real(r8), intent(in)      :: spec_hum(pcols)          ! specific humidity (kg/kg)
-    real(r8), intent(in)      :: rh(ncol,1)               ! relative humidity
-    real(r8), intent(in)      :: air_temp(pcols)          ! surface air temperature (K)
-    real(r8), intent(in)      :: pressure_10m(pcols)      ! 10 meter pressure (Pa)
-    real(r8), intent(in)      :: rain(pcols)              
-    real(r8), intent(in)      :: snow(pcols)              ! snow height (m)
-    real(r8), intent(in)      :: soilw(pcols)             ! soil moisture fraction
-    real(r8), intent(in)      :: solar_flux(pcols)        ! direct shortwave radiation at surface (W/m^2)
-    real(r8), intent(in)      :: tv(pcols)                ! potential temperature
-    real(r8), intent(in)      :: mmr(pcols,plev,gas_pcnst)    ! constituent concentration (kg/kg)
-    real(r8), intent(out)     :: dvel(ncol,gas_pcnst)        ! deposition velocity (cm/s)
-    real(r8), intent(inout)   :: dflx(pcols,gas_pcnst)        ! deposition flux (/cm^2/s)
+    integer, intent(in) :: lchnk                     ! chunk number
+    integer, intent(in) :: ncol
+    integer, intent(in) :: latndx(pcols)             ! chunk latitude indicies
+    integer, intent(in) :: lonndx(pcols)             ! chunk longitude indicies 
+    integer, intent(in) :: ncdate                    ! present date (yyyymmdd)
+    real(r8), intent(in) :: sfc_temp(pcols)          ! surface temperature [K]
+    real(r8), intent(in) :: air_temp(pcols)          ! surface air temperature [K]   
+    real(r8), intent(in) :: tv(pcols)                ! potential temperature [K]
+    real(r8), intent(in) :: pressure_sfc(pcols)      ! surface pressure [Pa]
+    real(r8), intent(in) :: pressure_10m(pcols)      ! 10 meter pressure [Pa]
+    real(r8), intent(in) :: spec_hum(pcols)          ! specific humidity [kg/kg]
+    real(r8), intent(in) :: rh(ncol,1)               ! relative humidity
+    real(r8), intent(in) :: wind_speed(pcols)        ! 10 meter wind speed [m/s]
+    real(r8), intent(in) :: rain(pcols)              
+    real(r8), intent(in) :: snow(pcols)              ! snow height [m]
+    real(r8), intent(in) :: solar_flux(pcols)        ! direct shortwave radiation at surface [W/m^2]
+    real(r8), intent(in) :: mmr(pcols,plev,gas_pcnst)    ! constituent concentration [kg/kg]
 
-    integer, intent(in)     ::   latndx(pcols)           ! chunk latitude indicies
-    integer, intent(in)     ::   lonndx(pcols)           ! chunk longitude indicies
-    integer, intent(in)     ::   lchnk                   ! chunk number
+    ! output
+    real(r8), intent(out) :: dvel(ncol,gas_pcnst)         ! deposition velocity [cm/s]
+    real(r8), intent(inout) :: dflx(pcols,gas_pcnst)        ! deposition flux [/cm^2/s]
 
-    integer, intent(in), optional     ::  beglandtype
-    integer, intent(in), optional     ::  endlandtype
-
-    real(r8), intent(in), optional      :: ocnfrc(pcols) 
-    real(r8), intent(in), optional      :: icefrc(pcols) 
 
     !-------------------------------------------------------------------------------------
     ! 	... local variables
@@ -866,22 +861,14 @@ contains
     real(r8), parameter :: scaling_to_cm_per_s = 100._r8
     real(r8), parameter :: rain_threshold      = 1.e-7_r8  ! of the order of 1cm/day expressed in m/s
 
-    integer :: i, ispec, lt, m
-    integer :: sndx
+    integer :: icol, ispec, lt
     integer :: month
 
     real(r8) :: slope = 0._r8
-    real(r8) :: z0water ! revised z0 over water
-    real(r8) :: p       ! pressure at midpoint first layer
-    real(r8) :: pg      ! surface pressure
-    real(r8) :: es      ! saturation vapor pressure
-    real(r8) :: ws      ! saturation mixing ratio
-    real(r8) :: h       ! constant to compute xmol
-    real(r8) :: psih    ! stability correction factor
-    real(r8) :: rs      ! constant for calculating rsmx
-    real(r8) :: rmx     ! resistance by vegetation
-    real(r8) :: tc(ncol)  ! temperature in celsius
-    real(r8) :: cts(ncol) ! correction to rlu rcl and rgs for frost
+    real(r8) :: psih          ! stability correction factor
+    real(r8) :: rs            ! constant for calculating rsmx
+    real(r8) :: tc(ncol)      ! temperature in celsius
+    real(r8) :: cts(ncol)     ! correction to rlu rcl and rgs for frost
 
     !-------------------------------------------------------------------------------------
     ! local arrays: dependent on location and species
@@ -891,21 +878,18 @@ contains
     !-------------------------------------------------------------------------------------
     ! local arrays: dependent on location only
     !-------------------------------------------------------------------------------------
-    integer                :: index_season(ncol,n_land_type)
-    real(r8), dimension(ncol) :: tha     ! atmospheric virtual potential temperature
-    real(r8), dimension(ncol) :: thg     ! ground virtual potential temperature
-    real(r8), dimension(ncol) :: z       ! height of lowest level
-    real(r8), dimension(ncol) :: va      ! magnitude of v on cross points
-    real(r8), dimension(ncol) :: ribn    ! richardson number
-    real(r8), dimension(ncol) :: qs      ! saturation specific humidity
-    real(r8), dimension(ncol) :: crs     ! multiplier to calculate crs
-    real(r8), dimension(ncol) :: rdc     ! part of lower canopy resistance
-    real(r8), dimension(ncol) :: uustar  ! u*ustar (assumed constant over grid)
-    real(r8), dimension(ncol) :: z0b     ! average roughness length over grid
-    real(r8), dimension(ncol) :: wrk     ! work array
-    real(r8), dimension(ncol) :: term    ! work array
-    real(r8), dimension(ncol) :: resc    ! work array
-    real(r8), dimension(ncol) :: lnd_frc ! work array
+    integer :: index_season(ncol,n_land_type)
+    real(r8), dimension(ncol) :: tha      ! atmospheric virtual potential temperature [K]
+    real(r8), dimension(ncol) :: thg      ! ground virtual potential temperature [K]
+    real(r8), dimension(ncol) :: zl       ! height of lowest level [m]
+    real(r8), dimension(ncol) :: va       ! magnitude of v on cross points
+    real(r8), dimension(ncol) :: ribn     ! richardson number
+    real(r8), dimension(ncol) :: qs       ! saturation specific humidity [kg/kg]
+    real(r8), dimension(ncol) :: crs      ! multiplier to calculate crs
+    real(r8), dimension(ncol) :: rdc      ! part of lower canopy resistance
+    real(r8), dimension(ncol) :: uustar   ! u*ustar (assumed constant over grid)
+    real(r8), dimension(ncol) :: term     ! work array
+    real(r8), dimension(ncol) :: lnd_frc  ! work array
     logical,  dimension(ncol) :: unstable
     logical,  dimension(ncol) :: has_rain
     logical,  dimension(ncol) :: has_dew
@@ -913,10 +897,10 @@ contains
     !-------------------------------------------------------------------------------------
     ! local arrays: dependent on location and landtype
     !-------------------------------------------------------------------------------------
-    real(r8), dimension(ncol,n_land_type) :: b     ! buoyancy parameter for unstable conditions
-    real(r8), dimension(ncol,n_land_type) :: cvar  ! height parameter
-    real(r8), dimension(ncol,n_land_type) :: ustar ! friction velocity
-    real(r8), dimension(ncol,n_land_type) :: obklen  ! monin-obukhov length
+    real(r8), dimension(ncol,n_land_type) :: bycp    ! buoyancy parameter for unstable conditions
+    real(r8), dimension(ncol,n_land_type) :: cvar    ! height parameter
+    real(r8), dimension(ncol,n_land_type) :: ustar   ! friction velocity [m/s]
+    real(r8), dimension(ncol,n_land_type) :: obklen  ! monin-obukhov length [m]
 
     !-------------------------------------------------------------------------------------
     ! local arrays: dependent on location, landtype and species
@@ -924,37 +908,26 @@ contains
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rsmx  ! vegetative resistance (plant mesophyll)
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rclx  ! lower canopy resistance
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rlux  ! vegetative resistance (upper canopy)
-    real(r8), dimension(ncol,n_land_type) :: rlux_o3  ! vegetative resistance (upper canopy)
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rgsx  ! ground resistance
-    real(r8) :: pmid(ncol,1)                             ! for seasalt aerosols
-    real(r8) :: tfld(ncol,1)                             ! for seasalt aerosols
-    real(r8) :: fact
     real(r8) :: rc                                    ! combined surface resistance
-    real(r8) :: var_soilw, dv_soil_h2, fact_h2        ! h2 dvel wrking variables
     logical  :: fr_lnduse(ncol,n_land_type)           ! wrking array
-    real(r8) :: dewm                                  ! multiplier for rs when dew occurs
 
     real(r8) :: lcl_frc_landuse(ncol,n_land_type) 
 
     integer :: beglt, endlt
 
 
-    if (present( beglandtype)) then
-      beglt = beglandtype 
-    else
-      beglt = 1
-    endif
-    if (present( endlandtype)) then
-      endlt = endlandtype 
-    else
-      endlt = n_land_type
-    endif
+  
+    beglt = 1
+ 
+    endlt = n_land_type
+ 
   
     !-------------------------------------------------------------------------------------
     ! initialize
     !-------------------------------------------------------------------------------------
-    do m = 1,gas_pcnst
-       dvel(:,m) = 0._r8
+    do ispec = 1,gas_pcnst
+       dvel(:,ispec) = 0._r8
     end do
 
     if( all( .not. has_dvel(:) ) ) then
@@ -983,15 +956,15 @@ contains
     !-------------------------------------------------------------------------------------
     ! define season index based on fixed LAI
     !-------------------------------------------------------------------------------------
-    do i = 1,ncol
-       index_season(i,:) = index_season_lai(latndx(i),month)
+    do icol = 1,ncol
+       index_season(icol,:) = index_season_lai(latndx(icol),month)
     enddo
     !-------------------------------------------------------------------------------------
     ! special case for snow covered terrain
     !-------------------------------------------------------------------------------------
-    do i = 1,ncol
-       if( snow(i) > .01_r8 ) then
-          index_season(i,:) = 4
+    do icol = 1,ncol
+       if( snow(icol) > .01_r8 ) then
+          index_season(icol,:) = 4
        endif
     enddo
     !-------------------------------------------------------------------------------------
@@ -1002,92 +975,85 @@ contains
     !-------------------------------------------------------------------------------------
     ! loop over longitude points
     !-------------------------------------------------------------------------------------
-    col_loop :  do i = 1,ncol
-       p   = pressure_10m(i)
-       pg  = pressure_sfc(i)
+    col_loop :  do icol = 1,ncol
        !-------------------------------------------------------------------------------------
        ! potential temperature
        !-------------------------------------------------------------------------------------
-       tha(i) = air_temp(i) * (p00/p )**rovcp * (1._r8 + .61_r8*spec_hum(i))
-       thg(i) = sfc_temp(i) * (p00/pg)**rovcp * (1._r8 + .61_r8*spec_hum(i))
+       tha(icol) = get_potential_temperature(air_temp(icol), pressure_10m(icol), spec_hum(icol))       
+       thg(icol) = get_potential_temperature(sfc_temp(icol), pressure_sfc(icol), spec_hum(icol))
+
        !-------------------------------------------------------------------------------------
        ! height of 1st level
        !-------------------------------------------------------------------------------------
-       z(i) = - r/grav * air_temp(i) * (1._r8 + .61_r8*spec_hum(i)) * log(p/pg)
+       zl(icol) = - r/grav * air_temp(icol) * (1._r8 + .61_r8*spec_hum(icol)) * log(pressure_10m(icol)/pressure_sfc(icol))
        !-------------------------------------------------------------------------------------
        ! wind speed
        !-------------------------------------------------------------------------------------
-       va(i) = max( .01_r8,wind_speed(i) )
+       va(icol) = max( .01_r8,wind_speed(icol) )
 
        !-------------------------------------------------------------------------------------
        ! Richardson number
        !-------------------------------------------------------------------------------------
-       ribn(i) = z(i) * grav * (tha(i) - thg(i))/thg(i) / (va(i)*va(i))
-       ribn(i) = min( ribn(i),ric )
-       unstable(i) = ribn(i) < 0._r8
+       ribn(icol) = zl(icol) * grav * (tha(icol) - thg(icol))/thg(icol) / (va(icol)*va(icol))
+       ribn(icol) = min( ribn(icol),ric )
+
+       unstable(icol) = ribn(icol) < 0._r8
        !-------------------------------------------------------------------------------------
-       ! saturation vapor pressure (Pascals)
-       ! saturation mixing ratio
        ! saturation specific humidity
        !-------------------------------------------------------------------------------------
-       es    = 611._r8*exp( 5414.77_r8*(sfc_temp(i) - tmelt)/(tmelt*sfc_temp(i)) )
-       ws    = .622_r8*es/(pg - es)
-       qs(i) = ws/(1._r8 + ws)
-       has_dew(i) = .false.
-       if( qs(i) <= spec_hum(i) ) then
-          has_dew(i) = .true.
+       qs(icol) = get_saturation_specific_humidity(sfc_temp(icol), pressure_sfc(icol))
+     
+       has_dew(icol) = .false.
+       if( qs(icol) <= spec_hum(icol) ) then
+          has_dew(icol) = .true.
        endif
-       if( sfc_temp(i) < tmelt ) then
-          has_dew(i) = .false.
+       if( sfc_temp(icol) < tmelt ) then
+          has_dew(icol) = .false.
        endif
        !-------------------------------------------------------------------------------------
        ! constant in determining rs
        !-------------------------------------------------------------------------------------
-       tc(i) = sfc_temp(i) - tmelt
-       if( sfc_temp(i) > tmelt .and. sfc_temp(i) < 313.15_r8 ) then
-          crs(i) = (1._r8 + (200._r8/(solar_flux(i) + .1_r8))**2) * (400._r8/(tc(i)*(40._r8 - tc(i))))
+       tc(icol) = sfc_temp(icol) - tmelt
+       if( sfc_temp(icol) > tmelt .and. sfc_temp(icol) < 313.15_r8 ) then
+          crs(icol) = (1._r8 + (200._r8/(solar_flux(icol) + .1_r8))**2) * (400._r8/(tc(icol)*(40._r8 - tc(icol))))
        else
-          crs(i) = large_value
+          crs(icol) = large_value
        endif
+       
+
        !-------------------------------------------------------------------------------------
        ! rdc (lower canopy res)
        !-------------------------------------------------------------------------------------
-       rdc(i) = 100._r8*(1._r8 + 1000._r8/(solar_flux(i) + 10._r8))/(1._r8 + 1000._r8*slope)
+       rdc(icol) = 100._r8*(1._r8 + 1000._r8/(solar_flux(icol) + 10._r8))/(1._r8 + 1000._r8*slope)
     enddo col_loop
 
     !-------------------------------------------------------------------------------------
     ! 	... form working arrays
     !-------------------------------------------------------------------------------------
     do lt = 1,n_land_type
-       do i=1,ncol
-          lcl_frc_landuse(i,lt) = fraction_landuse(i,lt,lchnk)
+       do icol=1,ncol
+          lcl_frc_landuse(icol,lt) = fraction_landuse(icol,lt,lchnk)
        enddo
     enddo
-    if ( present(ocnfrc) .and. present(icefrc) ) then
-       do i=1,ncol
-          ! land type 7 is used for ocean
-          ! land type 8 is used for sea ice
-          lcl_frc_landuse(i,7) = ocnfrc(i)
-          lcl_frc_landuse(i,8) = icefrc(i)
-       enddo
-    endif
     do lt = 1,n_land_type
-       do i=1,ncol
-          fr_lnduse(i,lt) = lcl_frc_landuse(i,lt) > 0._r8
+       do icol=1,ncol
+          fr_lnduse(icol,lt) = lcl_frc_landuse(icol,lt) > 0._r8
        enddo
     enddo
 
-    call calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, &
-                              unstable, lcl_frc_landuse, va, z, ribn, &
-                              uustar)
 
-    call calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, z, uustar, ribn, ustar, cvar, b)
+    call calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, & ! in
+                              unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
+                              uustar)                                    ! out
+
+    call calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
+                         ustar, cvar, bycp)                                                          ! out
   
-    call calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, b, ribn, & ! in
-                                  obklen)                                                                        ! out 
+    call calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, & ! in
+                                  obklen)                                                                           ! out 
 
-    call calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, z, obklen, ustar, cvar, &  ! in
-                                                           dep_ra(:,:,lchnk), dep_rb(:,:,lchnk))                     ! out
+    call calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, zl, obklen, ustar, cvar, &  ! in
+                                                           dep_ra(:,:,lchnk), dep_rb(:,:,lchnk))                      ! out
 
     !-------------------------------------------------------------------------------------
     ! surface resistance : depends on both land type and species
@@ -1096,31 +1062,31 @@ contains
     !
     ! compute rsmx = 1/(rs+rm) : multiply by 3 if surface is wet
     !-------------------------------------------------------------------------------------
-    call calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &
-                                                tc, heff, crs, &
-                                                cts, rgsx, rsmx)
+    call calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
+                                                tc, heff, crs, &                                               ! in
+                                                cts, rgsx, rsmx)                                               ! out
    
-    call calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, & 
-                                   rclx)
+    call calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, & ! in
+                                   rclx)                                                     ! out
 
-    call calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &
-                                   sfc_temp, qs, spec_hum, heff, cts, &
-                                   rlux)
+    call calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, & ! in
+                                   sfc_temp, qs, spec_hum, heff, cts, &                              ! in
+                                   rlux)                                                             ! out
 
 
     term(:ncol) = 1.e-2_r8 * pressure_10m(:ncol) / (r*tv(:ncol))
-    call  calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, &
-                                             mmr, dep_ra(:,:,lchnk), dep_rb(:,:,lchnk), term, &
-                                             rsmx, rlux, rclx, rgsx, rdc, &
-                                             dvel, dflx)
+    call  calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, & ! in
+                                             mmr, dep_ra(:,:,lchnk), dep_rb(:,:,lchnk), term, &              ! in
+                                             rsmx, rlux, rclx, rgsx, rdc, &                                  ! in
+                                             dvel, dflx)                                                     ! out
 
     if ( beglt > 1 ) return
 
   end subroutine drydep_xactive
 
-  subroutine calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, &
-                              unstable, lcl_frc_landuse, va, z, ribn, &
-                              uustar)
+  subroutine calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, & ! in
+                              unstable, lcl_frc_landuse, va, z, ribn, &      ! in
+                              uustar)                                        ! out
 
     use seq_drydep_mod, only: z0
 
@@ -1182,7 +1148,8 @@ contains
   end subroutine calculate_uustar
 
 
-  subroutine calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, z, uustar, ribn, ustar, cvar, b)
+  subroutine calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, & ! in
+                             ustar, cvar, bycp)                                                         ! out
 
     use seq_drydep_mod, only: z0
 
@@ -1193,14 +1160,14 @@ contains
     integer, intent(in) :: index_season(ncol,n_land_type)
     logical, intent(in) :: fr_lnduse(ncol, n_land_type)
     logical, intent(in) :: unstable(ncol)
-    real(r8), intent(in) :: z(ncol)                    ! height of lowest level
-    real(r8), intent(in) :: uustar(ncol)               ! u*ustar (assumed constant over grid)
-    real(r8), intent(in) :: ribn(ncol)                 ! richardson number
+    real(r8), intent(in) :: zl(ncol)                      ! height of lowest level [m]
+    real(r8), intent(in) :: uustar(ncol)                  ! u*ustar (assumed constant over grid)
+    real(r8), intent(in) :: ribn(ncol)                    ! richardson number
 
     ! output
-    real(r8), intent(out) :: ustar(ncol,n_land_type)    ! friction velocity
-    real(r8), intent(out) :: cvar(ncol, n_land_type)    ! height parameter
-    real(r8), intent(out) :: b(ncol, n_land_type)       ! buoyancy parameter for unstable conditions
+    real(r8), intent(out) :: ustar(ncol,n_land_type)      ! friction velocity [m/s]
+    real(r8), intent(out) :: cvar(ncol, n_land_type)      ! height parameter
+    real(r8), intent(out) :: bycp(ncol, n_land_type)      ! buoyancy parameter for unstable conditions
 
     ! local variables
     integer :: icol, lt
@@ -1213,11 +1180,11 @@ contains
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
              if( unstable(icol) ) then
-                cvar(icol,lt)  = vonkar/log( z(icol)/z0(index_season(icol,lt),lt) )
-                b(icol,lt)     = 9.4_r8*(cvar(icol,lt)**2)* sqrt( abs(ribn(icol))*z(icol)/z0(index_season(icol,lt),lt) )
-                ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)*sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 7.4_r8*b(icol,lt))) ) )
+                cvar(icol,lt)  = vonkar/log( zl(icol)/z0(index_season(icol,lt),lt) )
+                bycp(icol,lt)  = 9.4_r8*(cvar(icol,lt)**2)* sqrt( abs(ribn(icol))*zl(icol)/z0(index_season(icol,lt),lt) )
+                ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)*sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 7.4_r8*bycp(icol,lt))) ) )
              else
-                cvar(icol,lt)  = vonkar/log( z(icol)/z0(index_season(icol,lt),lt) )
+                cvar(icol,lt)  = vonkar/log( zl(icol)/z0(index_season(icol,lt),lt) )
                 ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)/(1._r8 + 4.7_r8*ribn(icol)) )
              endif
           endif
@@ -1231,13 +1198,13 @@ contains
     do icol = 1,ncol
        if( fr_lnduse(icol,lt) ) then
           if( unstable(icol) ) then
-             z0water     = (.016_r8*(ustar(icol,lt)**2)/grav) + diffk/(9.1_r8*ustar(icol,lt))
-             cvar(icol,lt)  = vonkar/(log( z(icol)/z0water ))
-             b(icol,lt)     = 9.4_r8*(cvar(icol,lt)**2)*sqrt( abs(ribn(icol))*z(icol)/z0water )
-             ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)* sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8+ 7.4_r8*b(icol,lt))) ) )
+             z0water        = (.016_r8*(ustar(icol,lt)**2)/grav) + diffk/(9.1_r8*ustar(icol,lt))
+             cvar(icol,lt)  = vonkar/(log( zl(icol)/z0water ))
+             bycp(icol,lt)  = 9.4_r8*(cvar(icol,lt)**2)*sqrt( abs(ribn(icol))*zl(icol)/z0water )
+             ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)* sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8+ 7.4_r8*bycp(icol,lt))) ) )
           else
              z0water        = (.016_r8*(ustar(icol,lt)**2)/grav) + diffk/(9.1_r8*ustar(icol,lt))
-             cvar(icol,lt)  = vonkar/(log(z(icol)/z0water))
+             cvar(icol,lt)  = vonkar/(log(zl(icol)/z0water))
              ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)/(1._r8 + 4.7_r8*ribn(icol)) )
           endif
        endif
@@ -1245,8 +1212,8 @@ contains
   end subroutine calculate_ustar
 
 
-  subroutine  calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, b, ribn, &
-                                       obklen)
+  subroutine  calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, &  ! in
+                                       obklen)                                                                            ! out
 
     !-------------------------------------------------------------------------------------
     ! compute monin-obukhov length for unstable and stable conditions/ sublayer resistance
@@ -1258,16 +1225,16 @@ contains
     integer, intent(in) :: endlt
     logical, intent(in) :: fr_lnduse(ncol, n_land_type) 
     logical, intent(in) :: unstable(ncol)
-    real(r8), intent(in) :: tha(ncol)     ! atmospheric virtual potential temperature
-    real(r8), intent(in) :: thg(ncol)     ! ground virtual potential temperature    
-    real(r8), intent(in) :: ustar(ncol,n_land_type)    ! friction velocity
-    real(r8), intent(in) :: cvar(ncol, n_land_type)    ! height parameter 
-    real(r8), intent(in) :: va(ncol)                   ! magnitude of v on cross points
-    real(r8), intent(in) :: b(ncol, n_land_type)       ! buoyancy parameter for unstable conditions
-    real(r8), intent(in) :: ribn(ncol)    ! richardson number
+    real(r8), intent(in) :: tha(ncol)                   ! atmospheric virtual potential temperature [K]
+    real(r8), intent(in) :: thg(ncol)                   ! ground virtual potential temperature [k]    
+    real(r8), intent(in) :: ustar(ncol,n_land_type)     ! friction velocity [m/s]
+    real(r8), intent(in) :: cvar(ncol, n_land_type)     ! height parameter 
+    real(r8), intent(in) :: va(ncol)                    ! magnitude of v on cross points
+    real(r8), intent(in) :: bycp(ncol, n_land_type)     ! buoyancy parameter for unstable conditions
+    real(r8), intent(in) :: ribn(ncol)                  ! richardson number
 
     ! output
-    real(r8), intent(out) :: obklen(ncol, n_land_type)  ! monin-obukhov length
+    real(r8), intent(out) :: obklen(ncol, n_land_type)  ! monin-obukhov length [m]
 
     ! local variables
     integer :: icol, lt
@@ -1279,7 +1246,7 @@ contains
           if( fr_lnduse(icol,lt) ) then
              hvar = (va(icol)/0.74_r8) * (tha(icol) - thg(icol)) * (cvar(icol,lt)**2)
              if( unstable(icol) ) then                      ! unstable
-                h = hvar*(1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 5.3_r8*b(icol,lt))))
+                h = hvar*(1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 5.3_r8*bycp(icol,lt))))
              else
                 h = hvar/((1._r8+4.7_r8*ribn(icol))**2)
              endif
@@ -1291,37 +1258,37 @@ contains
   end subroutine  calculate_obukhov_length
 
 
-  subroutine calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, z, obklen, ustar, cvar, &
-                                                               dep_ra, dep_rb)
+  subroutine calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, zl, obklen, ustar, cvar, &  ! in
+                                                               dep_ra, dep_rb)                                           ! out
 
     ! input
     integer, intent(in) :: ncol
     integer, intent(in) :: beglt
     integer, intent(in) :: endlt
     logical, intent(in)  :: fr_lnduse(ncol, n_land_type)
-    real(r8), intent(in) :: z(ncol)                    ! height of lowest level
-    real(r8), intent(in) :: obklen(ncol, n_land_type)  ! monin-obukhov length
-    real(r8), intent(in) :: ustar(ncol,n_land_type)    ! friction velocity
-    real(r8), intent(in) :: cvar(ncol, n_land_type)    ! height parameter 
+    real(r8), intent(in) :: zl(ncol)                      ! height of lowest level [m]
+    real(r8), intent(in) :: obklen(ncol, n_land_type)     ! monin-obukhov length [m]
+    real(r8), intent(in) :: ustar(ncol,n_land_type)       ! friction velocity [m/s]
+    real(r8), intent(in) :: cvar(ncol, n_land_type)       ! height parameter 
 
     ! output
-    real(r8), intent(out) :: dep_ra(pcols, n_land_type)
-    real(r8), intent(out) :: dep_rb(pcols, n_land_type)
+    real(r8), intent(out) :: dep_ra(pcols, n_land_type)   ! aerodynamic resistance [s/m]
+    real(r8), intent(out) :: dep_rb(pcols, n_land_type)   ! sublayer resistance [s/m]
 
     ! local variables
     integer :: icol, lt
-    real(r8) :: psih    ! stability correction factor
+    real(r8) :: psih    ! stability correction factor [unitless]
     real(r8) :: zeta    ! dimensionless height scale z/L [unitless]
 
     do lt = beglt,endlt
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
              if( obklen(icol,lt) < 0._r8 ) then
-                zeta = z(icol)/obklen(icol,lt)
+                zeta = zl(icol)/obklen(icol,lt)
                 zeta = max( -1._r8, zeta )
                 psih = exp( .598_r8 + .39_r8*log( -zeta ) - .09_r8*(log( -zeta ))**2 )
              else
-                zeta = z(icol)/obklen(icol,lt)
+                zeta = zl(icol)/obklen(icol,lt)
                 zeta = min( 1._r8, zeta )
                 psih = -5._r8 * zeta
              endif
@@ -1333,9 +1300,9 @@ contains
 
   end subroutine calculate_aerodynamic_and_quasilaminar_resistance
 
-  subroutine calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &
-                                                tc, heff, crs, &
-                                                cts, rgsx, rsmx)   
+  subroutine calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, & ! in
+                                                tc, heff, crs, &                                                  ! in
+                                                cts, rgsx, rsmx)                                                  ! out
 
     use seq_drydep_mod, only: ri, rgso, rgss, foxd, drat
 
@@ -1349,20 +1316,20 @@ contains
     logical, intent(in) :: has_dew(ncol)
     real(r8), intent(in) :: tc(ncol)
     real(r8), intent(in) :: heff(ncol,nddvels)
-    real(r8), intent(in) :: crs(ncol)     ! multiplier to calculate crs
+    real(r8), intent(in) :: crs(ncol)                     ! multiplier to calculate crs
 
     ! output
-    real(r8), intent(out) :: cts(ncol) ! correction to rlu rcl and rgs for frost
+    real(r8), intent(out) :: cts(ncol)                         ! correction to rlu rcl and rgs for frost
     real(r8), intent(out) :: rgsx(ncol,n_land_type,gas_pcnst)  ! ground resistance
     real(r8), intent(out) :: rsmx(ncol,n_land_type,gas_pcnst)  ! vegetative resistance (plant mesophyll)
 
     ! local variables
-    integer :: icol, lt, ispec, m, sndx
+    integer :: icol, lt, ispec, idx_drydep, sndx
     real(r8) :: rmx, dewm, rs
 
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
-          m = map_dvel(ispec)
+          idx_drydep = map_dvel(ispec)
           do lt = beglt,endlt
              do icol = 1,ncol
                 if( fr_lnduse(icol,lt) ) then
@@ -1370,10 +1337,10 @@ contains
                    if( ispec == o3_ndx .or. ispec == o3a_ndx .or. ispec == so2_ndx ) then
                       rmx = 0._r8
                    else
-                      rmx = 1._r8/(heff(icol,m)/3000._r8 + 100._r8*foxd(m))
+                      rmx = 1._r8/(heff(icol,idx_drydep)/3000._r8 + 100._r8*foxd(idx_drydep))
                    endif
                    cts(icol) = 1000._r8*exp( - tc(icol) - 4._r8 )                 ! correction for frost
-                   rgsx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,m)/(1.e5_r8*rgss(sndx,lt))) + (foxd(m)/rgso(sndx,lt)))
+                   rgsx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,idx_drydep)/(1.e5_r8*rgss(sndx,lt))) + (foxd(idx_drydep)/rgso(sndx,lt)))
 
                    if( lt == 7 ) then
                       rsmx(icol,lt,ispec) = large_value
@@ -1384,7 +1351,7 @@ contains
                       else
                          dewm = 1._r8
                       endif
-                      rsmx(icol,lt,ispec) = (dewm*rs*drat(m) + rmx)
+                      rsmx(icol,lt,ispec) = (dewm*rs*drat(idx_drydep) + rmx)
                    endif
                 endif
              enddo
@@ -1394,8 +1361,8 @@ contains
   end subroutine calculate_resistance_rgsx_and_rsmx
 
 
-  subroutine calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, &
-                                       rclx)
+  subroutine calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, &   ! in
+                                       rclx)                                                       ! out
 
     use seq_drydep_mod, only: rclo, rcls, rlu, foxd
 
@@ -1412,12 +1379,12 @@ contains
     real(r8), intent(out) :: rclx(ncol,n_land_type,gas_pcnst)   ! lower canopy resistance
 
     ! local variables
-    integer :: icol, lt, ispec, m, sndx
+    integer :: icol, lt, ispec, idx_drydep, sndx
 
     
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
-          m = map_dvel(ispec)
+          idx_drydep = map_dvel(ispec)
           do lt = beglt,endlt
              do icol = 1,ncol
                 if( fr_lnduse(icol,lt) ) then
@@ -1426,7 +1393,7 @@ contains
                    if( lt == 7 ) then
                       rclx(icol,lt,ispec) = large_value
                    else
-                      rclx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,m)/(1.e5_r8*rcls(sndx,lt))) + (foxd(m)/rclo(sndx,lt)))
+                      rclx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,idx_drydep)/(1.e5_r8*rcls(sndx,lt))) + (foxd(idx_drydep)/rclo(sndx,lt)))
                    endif
                 endif
              enddo
@@ -1434,23 +1401,7 @@ contains
        endif
     enddo
 
-    do lt = beglt,endlt
-       if( lt /= 7 ) then
-          do icol = 1,ncol
-             if( fr_lnduse(icol,lt) ) then
-                sndx = index_season(icol,lt)
-
-                if ( o3_ndx > 0 ) then
-                   rclx(icol,lt,o3_ndx) = cts(icol) + rclo(index_season(icol,lt),lt)
-                endif
-
-             endif
-          enddo
-       endif
-    enddo
-    
     do ispec = 1,gas_pcnst
-       m = map_dvel(ispec)
        if ( has_dvel(ispec) ) then
           if( ispec == so2_ndx ) then
              do lt = beglt,endlt
@@ -1468,9 +1419,9 @@ contains
 
   end subroutine calculate_resistance_rclx
 
-  subroutine calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &
-                                       sfc_temp, qs, spec_hum, heff, cts, &
-                                       rlux)
+  subroutine calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
+                                       sfc_temp, qs, spec_hum, heff, cts, &                               ! in
+                                       rlux)                                                              ! out
   
     use seq_drydep_mod, only: rclo, rcls, rlu, foxd
     use physconst,      only: tmelt
@@ -1487,20 +1438,20 @@ contains
     real(r8), intent(in) :: qs(ncol)                 ! saturation specific humidity [kg/kg]
     real(r8), intent(in) :: spec_hum(pcols)          ! specific humidity [kg/kg]
 
-    real(r8), intent(in) :: heff(ncol,nddvels)
-    real(r8), intent(in) :: cts(ncol)                         ! correction to rlu rcl and rgs for frost
+    real(r8), intent(in) :: heff(ncol,nddvels)       ! 
+    real(r8), intent(in) :: cts(ncol)                ! correction to rlu rcl and rgs for frost
 
     ! output
-    real(r8), intent(out) :: rlux(ncol,n_land_type,gas_pcnst)   ! lower canopy resistance
+    real(r8), intent(out) :: rlux(ncol,n_land_type,gas_pcnst)   ! lower canopy resistance [s/m]
 
     ! local variables
-    integer :: icol, lt, ispec, m, sndx
-    real(r8), dimension(ncol,n_land_type) :: rlux_o3  ! vegetative resistance (upper canopy)
+    integer :: icol, lt, ispec, idx_drydep, sndx
+    real(r8), dimension(ncol,n_land_type) :: rlux_o3  ! vegetative resistance (upper canopy) [s/m]
 
     rlux = 0._r8
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
-          m = map_dvel(ispec)
+          idx_drydep = map_dvel(ispec)
           do lt = beglt,endlt
              do icol = 1,ncol
                 if( fr_lnduse(icol,lt) ) then
@@ -1509,7 +1460,7 @@ contains
                    if( lt == 7 ) then
                       rlux(icol,lt,ispec) = large_value
                    else
-                      rlux(icol,lt,ispec) = cts(icol) + rlu(sndx,lt)/(1.e-5_r8*heff(icol,m) + foxd(m))
+                      rlux(icol,lt,ispec) = cts(icol) + rlu(sndx,lt)/(1.e-5_r8*heff(icol,idx_drydep) + foxd(idx_drydep))
                    endif
                 endif
              enddo
@@ -1528,20 +1479,10 @@ contains
                 if( sfc_temp(icol) > tmelt ) then
                    if( has_dew(icol) ) then
                       rlux_o3(icol,lt)     = 3000._r8*rlu(sndx,lt)/(1000._r8 + rlu(sndx,lt))
-                      if( o3_ndx > 0 ) then
-                         rlux(icol,lt,o3_ndx) = rlux_o3(icol,lt)
-                      endif
                    endif
                    if( has_rain(icol) ) then
                       rlux_o3(icol,lt)     = 3000._r8*rlu(sndx,lt)/(1000._r8 + 3._r8*rlu(sndx,lt))
-                      if( o3_ndx > 0 ) then
-                         rlux(icol,lt,o3_ndx) = rlux_o3(icol,lt)
-                      endif
                    endif
-                endif
-
-                if ( o3_ndx > 0 ) then
-                   rlux(icol,lt,o3_ndx) = cts(icol) + rlux(icol,lt,o3_ndx)
                 endif
 
              endif
@@ -1550,7 +1491,7 @@ contains
     enddo
 
     do ispec = 1,gas_pcnst
-       m = map_dvel(ispec)
+       idx_drydep = map_dvel(ispec)
        if( has_dvel(ispec) ) then
           if( ispec /= o3_ndx .and. ispec /= o3a_ndx .and. ispec /= so2_ndx ) then
              do lt = beglt,endlt
@@ -1563,7 +1504,7 @@ contains
                          if( sfc_temp(icol) > tmelt ) then
                             if( has_dew(icol) ) then
                                rlux(icol,lt,ispec) = 1._r8/((1._r8/(3._r8*rlux(icol,lt,ispec))) &
-                                    + 1.e-7_r8*heff(icol,m) + foxd(m)/rlux_o3(icol,lt))
+                                    + 1.e-7_r8*heff(icol,idx_drydep) + foxd(idx_drydep)/rlux_o3(icol,lt))
                             endif
                          endif
                       endif
@@ -1604,10 +1545,10 @@ contains
 
   end subroutine calculate_resistance_rlux
 
-  subroutine calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, &
-                                                mmr, dep_ra, dep_rb, term, &
-                                                rsmx, rlux, rclx, rgsx, rdc, & 
-                                                dvel, dflx)
+  subroutine calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, &    ! in
+                                                mmr, dep_ra, dep_rb, term, &                                       ! in
+                                                rsmx, rlux, rclx, rgsx, rdc, &                                     ! in
+                                                dvel, dflx)                                                        ! out
     use seq_drydep_mod, only: rac
 
     ! input
@@ -1617,19 +1558,19 @@ contains
     integer, intent(in) :: index_season(ncol, n_land_type)
     logical, intent(in) :: fr_lnduse(ncol, n_land_type)
     real(r8), intent(in) :: lcl_frc_landuse(ncol, n_land_type)
-    real(r8), intent(in) :: mmr(pcols, plev, gas_pcnst)         ! constituent concentration (kg/kg)
-    real(r8), intent(in) :: dep_ra(pcols, n_land_type)
-    real(r8), intent(in) :: dep_rb(pcols, n_land_type)
+    real(r8), intent(in) :: mmr(pcols, plev, gas_pcnst)         ! constituent concentration [kg/kg]
+    real(r8), intent(in) :: dep_ra(pcols, n_land_type)          ! aerodynamic resistance [s/m]
+    real(r8), intent(in) :: dep_rb(pcols, n_land_type)          ! sublayer resistance [s/m]
     real(r8), intent(in) :: term(ncol)
-    real(r8), intent(in) :: rsmx(ncol,n_land_type,gas_pcnst)  ! vegetative resistance (plant mesophyll)
-    real(r8), intent(in) :: rlux(ncol,n_land_type,gas_pcnst)  ! vegetative resistance (upper canopy)
-    real(r8), intent(in) :: rclx(ncol,n_land_type,gas_pcnst)  ! lower canopy resistance
-    real(r8), intent(in) :: rgsx(ncol,n_land_type,gas_pcnst)  ! ground resistance
-    real(r8), intent(in) :: rdc(ncol)    ! part of lower canopy resistance
+    real(r8), intent(in) :: rsmx(ncol,n_land_type,gas_pcnst)    ! vegetative resistance (plant mesophyll) [s/m]
+    real(r8), intent(in) :: rlux(ncol,n_land_type,gas_pcnst)    ! vegetative resistance (upper canopy) [s/m]
+    real(r8), intent(in) :: rclx(ncol,n_land_type,gas_pcnst)    ! lower canopy resistance [s/m]
+    real(r8), intent(in) :: rgsx(ncol,n_land_type,gas_pcnst)    ! ground resistance [s/m]
+    real(r8), intent(in) :: rdc(ncol)                           ! part of lower canopy resistance [s/m]
 
     ! output
-    real(r8), intent(out)     :: dvel(ncol,gas_pcnst)        ! deposition velocity [cm/s]
-    real(r8), intent(out)   :: dflx(pcols,gas_pcnst)       ! deposition flux [/cm^2/s]
+    real(r8), intent(out) :: dvel(ncol,gas_pcnst)               ! deposition velocity [cm/s]
+    real(r8), intent(out) :: dflx(pcols,gas_pcnst)              ! deposition flux [/cm^2/s]
     
     ! local variables
     integer :: icol, lt, ispec
@@ -1683,83 +1624,35 @@ contains
 
   end subroutine calculate_gas_drydep_vlc_and_flux
 
-  !-------------------------------------------------------------------------------------
-  subroutine chk_soilw( calday )
-    !--------------------------------------------------------------------
-    !	... check timing for ub values
-    !--------------------------------------------------------------------
-
-    use mo_constants, only : dayspy
-
+  pure function get_potential_temperature(temperature, pressure, specific_humidity) result(theta)
+    
     implicit none
+    real(r8), intent(in) :: temperature
+    real(r8), intent(in) :: pressure
+    real(r8), intent(in) :: specific_humidity   
+    real(r8) :: theta 
+   
+    theta = temperature * (p00/pressure)**rovcp * (1._r8 + .61_r8*specific_humidity)
 
-    !--------------------------------------------------------------------
-    !	... dummy args
-    !--------------------------------------------------------------------
-    real(r8), intent(in)    :: calday
+  end function get_potential_temperature
 
-    !--------------------------------------------------------------------
-    !	... local variables
-    !--------------------------------------------------------------------
-    integer  ::  m, upper
-    real(r8)     ::  numer, denom
+  pure function get_saturation_specific_humidity(temperature, pressure) result(qs)
 
-    !--------------------------------------------------------
-    !	... setup the time interpolation
-    !--------------------------------------------------------
-    if( calday < days(1) ) then
-       next = 1
-       last = ndays
-    else
-       if( days(ndays) < dayspy ) then
-          upper = ndays
-       else
-          upper = ndays - 1
-       end if
-       do m = upper,1,-1
-          if( calday >= days(m) ) then
-             exit
-          end if
-       end do
-       last = m
-       next = mod( m,ndays ) + 1
-    end if
-    numer = calday - days(last)
-    denom = days(next) - days(last)
-    if( numer < 0._r8 ) then
-       numer = dayspy + numer
-    end if
-    if( denom < 0._r8 ) then
-       denom = dayspy + denom
-    end if
-    dels = max( min( 1._r8,numer/denom ),0._r8 )
+    use physconst,      only: tmelt
 
-  end subroutine chk_soilw
+    implicit none 
+    real(r8), intent(in) :: temperature  ! temperature [K]
+    real(r8), intent(in) :: pressure     ! pressure [Pa]
 
-  !-------------------------------------------------------------------------------------
-  !-------------------------------------------------------------------------------------
-  subroutine set_soilw( soilw, lchnk, calday )
-    !--------------------------------------------------------------------
-    !	... set the soil moisture
-    !--------------------------------------------------------------------
+    real(r8) :: qs      ! saturation specific humidity [kg/kg]
+    real(r8) :: es      ! saturation vapor pressure [Pa]
+    real(r8) :: ws      ! saturation mixing ratio [kg/kg]
 
-    implicit none
+    es    = 611._r8*exp( 5414.77_r8*(temperature - tmelt)/(tmelt*temperature) )
+    ws    = .622_r8*es/(pressure - es)
+    qs    = ws/(1._r8 + ws)
 
-    !--------------------------------------------------------------------
-    !	... dummy args
-    !--------------------------------------------------------------------
-    real(r8), intent(inout) :: soilw(pcols)
-    integer,  intent(in)    :: lchnk           ! chunk indice
-    real(r8), intent(in)    :: calday
-
-
-    integer :: i, ilon,ilat
-
-    call chk_soilw( calday )
-
-    soilw(:) = soilw_3d(:,last,lchnk) + dels *( soilw_3d(:,next,lchnk) - soilw_3d(:,last,lchnk))
-
-  end subroutine set_soilw
+  end function get_saturation_specific_humidity
 
   !-------------------------------------------------------------------------------------
   !-------------------------------------------------------------------------------------
