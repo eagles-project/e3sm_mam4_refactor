@@ -13,7 +13,7 @@ module aero_model
   use camsrfexch,     only: cam_in_t, cam_out_t
   use aerodep_flx,    only: aerodep_flx_prescribed
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
-  use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index, pbuf_set_field
+  use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index, pbuf_set_field,pbuf_old_tim_idx
   use phys_control,   only: phys_getopts
   use physconst,      only: gravit, rair, rhoh2o, spec_class_gas
   use mo_constants,   only: pi
@@ -40,6 +40,7 @@ module aero_model
 
  ! Misc private data 
   integer :: nmodes  ! number of modes
+  integer :: cld_idx      = 0
   integer :: pblh_idx            = 0
   integer :: dgnum_idx           = 0
   integer :: dgnumwet_idx        = 0
@@ -238,6 +239,7 @@ contains
        return
     endif ! ( iflagaa == 2 )
 
+    cld_idx        = pbuf_get_index('CLD')
     dgnum_idx      = pbuf_get_index('DGNUM')
     dgnumwet_idx   = pbuf_get_index('DGNUMWET')
     
@@ -746,6 +748,11 @@ contains
     real(r8), pointer :: pmid(:,:)           ! layer pressure [Pa]
     real(r8), pointer :: dgnumwet(:,:,:) ! wet aerosol diameter [m]
     real(r8), pointer :: fracis(:,:,:)   ! fraction of transported species that are insoluble
+    real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
+    real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
+    real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
+    real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
+    integer :: itim_old           ! index
 
     ! args for wetdepa_v2
     real(r8) :: iscavt(pcols, pver)  ! incloud scavenging tends [kg/kg/s]
@@ -788,6 +795,25 @@ contains
     temperature  => state%t
     pmid         => state%pmid
 
+!    compute_wetdens = .true.
+    call pbuf_get_field(pbuf, dgnum_idx,      dgncur_a )
+    call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens)
+    call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat)
+
+    itim_old    =  pbuf_old_tim_idx()
+    call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+    call wetdep_inputs_set( state, pbuf, dep_inputs )
+
+    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+    call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
+
+    !Compute variables needed for convproc unified convective transport
+    call pbuf_get_field(pbuf, rprddp_idx,      rprddp  )
+    call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh  )
+    call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
+    call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
+
     call physics_ptend_init(ptend, state%psetcols, 'aero_model_wetdep_ma', lq=wetdep_lq)
 
     ! Do calculations of mode radius and water uptake if:
@@ -804,22 +830,24 @@ contains
     
     ! Aerosol water uptake
     call t_startf('wateruptake')
-    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, pbuf)
+    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
+                                   cldn, dgncur_a, dgnumwet,  qaerwat, & ! in
+                                   wetdens=wetdens) ! optional in
     call t_stopf('wateruptake')
 
     ! skip wet deposition if nwetdep is non-positive
     if (nwetdep<1) return
 
-    call wetdep_inputs_set( state, pbuf, dep_inputs )
+!    call wetdep_inputs_set( state, pbuf, dep_inputs )
 
-    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-    call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
+!    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+!    call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
 
     !Compute variables needed for convproc unified convective transport
-    call pbuf_get_field(pbuf, rprddp_idx,      rprddp  )
-    call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh  )
-    call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
-    call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
+!    call pbuf_get_field(pbuf, rprddp_idx,      rprddp  )
+!    call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh  )
+!    call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
+!    call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
 
     call calc_sfc_flux(rprdsh(:ncol,:),  state%pdel(:ncol,:), rprdshsum(:ncol))  ! output the last argument
     call calc_sfc_flux(rprddp(:ncol,:),  state%pdel(:ncol,:), rprddpsum(:ncol))  ! output the last argument

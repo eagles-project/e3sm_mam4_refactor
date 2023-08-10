@@ -125,42 +125,35 @@ end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
 subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  & ! in
-                                 pbuf, list_idx_in, dgnumdry_m, & ! in
-                                        dgnumwet_m, qaerwat_m  ) ! inout
+                                     cldn, dgncur_a,dgncur_awet,  qaerwat, & ! in
+                                     list_idx_in, wetdens  ) ! optional in
    !----------------------------------------------------------------------------
    !
    ! CAM specific driver for modal aerosol water uptake code.
    !
    ! *** N.B. *** The calculation has been enabled for diagnostic mode lists
-   !              via optional arguments.  If the list_idx arg is present then
-   !              all the optional args must be present.
+   !              via optional arguments.  
    !
    !----------------------------------------------------------------------------
 
    ! Arguments
-   type(physics_buffer_desc),   pointer       :: pbuf(:)        ! physics buffer
    integer, intent(in) :: lchnk              ! chunk index
    integer, intent(in) :: ncol               ! number of columns
    real(r8),intent(in) :: temperature(:,:)   ! temperatures [K]
    real(r8),intent(in) :: pmid(:,:)          ! layer pressure [Pa]
-   real(r8),pointer,intent(in) :: state_q(:,:,:)     ! state%q [#/kg or kg/kg]
+   real(r8), pointer,intent(in) :: state_q(:,:,:)     ! state%q [#/kg or kg/kg]
+   real(r8), pointer,intent(in) :: cldn(:,:)          ! layer cloud fraction [fraction]
+   real(r8), pointer,intent(in) :: dgncur_a(:,:,:)    ! aerosol particle diameter [m]
+   real(r8), pointer,intent(in) :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
+   real(r8), pointer,intent(in) :: qaerwat(:,:,:)     ! aerosol water [kg/kg]
 
    ! Optional inputs for diagnostic mode
-   integer,  optional,          intent(in)    :: list_idx_in
-   real(r8), optional, allocatable, target, intent(in)    :: dgnumdry_m(:,:,:)
-   real(r8), optional, allocatable, target, intent(inout)   :: dgnumwet_m(:,:,:)
-   real(r8), optional, allocatable, target, intent(inout)   :: qaerwat_m(:,:,:)
+   integer,  optional,          intent(in) :: list_idx_in
+   real(r8), optional, pointer, intent(in) :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
 
    ! local variables
    integer :: list_idx           ! radiative constituents list index
    integer :: imode              ! mode index
-   integer :: itim_old           ! index
-
-   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
-   real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
-   real(r8), pointer :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
-   real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
-   real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
 
    real(r8) :: rh(pcols,pver)                   ! relative humidity [fraction]
    real(r8) :: hygro(pcols,pver,nmodes)         ! volume-weighted mean hygroscopicity [unitless]
@@ -188,41 +181,18 @@ subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  &
    list_idx = 0
    if (present(list_idx_in)) then
       list_idx = list_idx_in
-      ! check that all optional args for diagnostic mode are present
-      if (.not. present(dgnumdry_m) .or. .not. present(dgnumwet_m) .or. &
-          .not. present(qaerwat_m)) then
-         call endrun('modal_aero_wateruptake_dr called '// &
-              'with list_idx_in but required args not present '//errmsg(__FILE__,__LINE__))
-      endif
-      ! arrays for diagnostic calculations must be allocated
-      if (.not. allocated(dgnumdry_m) .or. .not. allocated(dgnumwet_m) .or. &
-          .not. allocated(qaerwat_m)) then
-         call endrun('modal_aero_wateruptake_dr called '// &
-              'with list_idx_in but required args not allocated '//errmsg(__FILE__,__LINE__))
-      endif
    endif ! if present(list_idx_in
 
    ! determine default variables
    call phys_getopts(history_aerosol_out = history_aerosol, &
                      history_verbose_out = history_verbose)
 
-   !by default set compute_wetdens to be true
-   compute_wetdens = .true.
-   if (.not. present(list_idx_in)) then
-      call pbuf_get_field(pbuf, dgnum_idx,      dgncur_a )
-      call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet )
-      call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens)
-      call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat)
+   !set compute_wetdens to flase if wetdens is not present
+   if (present(wetdens)) then
+      compute_wetdens = .true.
    else
-      dgncur_a    => dgnumdry_m
-      dgncur_awet => dgnumwet_m
-      qaerwat     => qaerwat_m
-      !set compute_wetdens to flase if wetdens is not present
       compute_wetdens = .false.
    endif
-
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
    !----------------------------------------------------------------------------
    ! retreive aerosol properties
