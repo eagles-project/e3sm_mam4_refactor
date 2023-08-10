@@ -795,7 +795,6 @@ contains
     temperature  => state%t
     pmid         => state%pmid
 
-!    compute_wetdens = .true.
     call pbuf_get_field(pbuf, dgnum_idx,      dgncur_a )
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens)
     call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat)
@@ -838,17 +837,6 @@ contains
 
     ! skip wet deposition if nwetdep is non-positive
     if (nwetdep<1) return
-
-!    call wetdep_inputs_set( state, pbuf, dep_inputs )
-
-!    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
-!    call pbuf_get_field(pbuf, fracis_idx,   fracis,   start=(/1,1,1/), kount=(/pcols,pver, pcnst/) )
-
-    !Compute variables needed for convproc unified convective transport
-!    call pbuf_get_field(pbuf, rprddp_idx,      rprddp  )
-!    call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh  )
-!    call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh )
-!    call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp )
 
     call calc_sfc_flux(rprdsh(:ncol,:),  state%pdel(:ncol,:), rprdshsum(:ncol))  ! output the last argument
     call calc_sfc_flux(rprddp(:ncol,:),  state%pdel(:ncol,:), rprddpsum(:ncol))  ! output the last argument
