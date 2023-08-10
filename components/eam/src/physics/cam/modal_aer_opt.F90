@@ -437,6 +437,9 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    real(r8) :: mass(pcols,pver)        ! layer mass
    real(r8) :: air_density(pcols,pver) ! (kg/m3)
 
+   real(r8),    pointer :: state_q(:,:,:)      ! state%q
+   real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
+   real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
    real(r8)             :: specdens            ! species density (kg/m3)
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
@@ -555,6 +558,9 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 
    lchnk = state%lchnk
    ncol  = state%ncol
+   state_q => state%q
+   temperature  => state%t
+   pmid         => state%pmid
 
    ! initialize output variables
    tauxar(:ncol,:,:) = 0._r8
@@ -625,8 +631,9 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
            dgnumdry_m=dgnumdry_m)
    endif
 
-   call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m)
+   call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
+                        pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
+                qaerwat_m)
    
 
    ! loop over all aerosol modes
@@ -1232,6 +1239,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    ! Local variables
    integer :: icol, ilw, kk, ll, mm, nc
+   integer :: lchnk
    integer :: list_idx                 ! index of the climate or a diagnostic list
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
@@ -1248,7 +1256,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
-   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [g/g]
    real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
    complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
@@ -1259,7 +1266,10 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: state_q(:,:,:)  ! state%q
+   real(r8), pointer :: state_q(:,:,:)     ! state%q
+   real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
+   real(r8), pointer :: temperature(:,:)   ! temperatures [K]
+   real(r8), pointer :: pmid(:,:)          ! layer pressure [Pa]
 
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
@@ -1272,9 +1282,12 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    !----------------------------------------------------------------------------
 
    ncol  = state%ncol
+   lchnk = state%lchnk
+   state_q      => state%q
+   temperature  => state%t
+   pmid         => state%pmid
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
-   state_q => state%q
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
@@ -1282,8 +1295,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
-   call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m)
+   call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
+                                pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
+                                qaerwat_m)
    
 
    ! initialize output variables

@@ -675,7 +675,7 @@ contains
 
     implicit none
     ! args
-    type(physics_state), intent(in)    :: state       ! Physics state variables
+    type(physics_state),target, intent(in)    :: state       ! Physics state variables
     type(physics_buffer_desc), pointer :: pbuf(:)
     type(physics_ptend), intent(out)   :: ptend       ! indivdual parameterization tendencies
     type(cam_out_t),     intent(inout) :: cam_out     ! export state
@@ -741,6 +741,9 @@ contains
     real(r8) :: evapcdpsum(pcols) ! vertical integration of deep rain evaporation [kg/m2/s]
     real(r8) :: evapcshsum(pcols) ! vertical integration of shallow rain evaporation [kg/m2/s]
 
+    real(r8), pointer :: state_q(:,:,:)      ! state%q
+    real(r8), pointer :: temperature(:,:)    ! temperatures [K]
+    real(r8), pointer :: pmid(:,:)           ! layer pressure [Pa]
     real(r8), pointer :: dgnumwet(:,:,:) ! wet aerosol diameter [m]
     real(r8), pointer :: fracis(:,:,:)   ! fraction of transported species that are insoluble
 
@@ -781,6 +784,9 @@ contains
 
     lchnk = state%lchnk
     ncol  = state%ncol
+    state_q      => state%q
+    temperature  => state%t
+    pmid         => state%pmid
 
     call physics_ptend_init(ptend, state%psetcols, 'aero_model_wetdep_ma', lq=wetdep_lq)
 
@@ -798,7 +804,7 @@ contains
     
     ! Aerosol water uptake
     call t_startf('wateruptake')
-    call modal_aero_wateruptake_dr(state, pbuf)
+    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, pbuf)
     call t_stopf('wateruptake')
 
     ! skip wet deposition if nwetdep is non-positive

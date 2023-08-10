@@ -124,7 +124,8 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 end subroutine modal_aero_wateruptake_init
 
 !===============================================================================
-subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! in
+subroutine modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid,  & ! in
+                                 pbuf, list_idx_in, dgnumdry_m, & ! in
                                         dgnumwet_m, qaerwat_m  ) ! inout
    !----------------------------------------------------------------------------
    !
@@ -137,8 +138,13 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    !----------------------------------------------------------------------------
 
    ! Arguments
-   type(physics_state), target, intent(in)    :: state          ! Physics state variables
    type(physics_buffer_desc),   pointer       :: pbuf(:)        ! physics buffer
+   integer, intent(in) :: lchnk              ! chunk index
+   integer, intent(in) :: ncol               ! number of columns
+   real(r8),intent(in) :: temperature(:,:)   ! temperatures [K]
+   real(r8),intent(in) :: pmid(:,:)          ! layer pressure [Pa]
+   real(r8),pointer,intent(in) :: state_q(:,:,:)     ! state%q [#/kg or kg/kg]
+
    ! Optional inputs for diagnostic mode
    integer,  optional,          intent(in)    :: list_idx_in
    real(r8), optional, allocatable, target, intent(in)    :: dgnumdry_m(:,:,:)
@@ -146,16 +152,10 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    real(r8), optional, allocatable, target, intent(inout)   :: qaerwat_m(:,:,:)
 
    ! local variables
-   integer :: lchnk              ! chunk index
-   integer :: ncol               ! number of columns
    integer :: list_idx           ! radiative constituents list index
    integer :: imode              ! mode index
    integer :: itim_old           ! index
 
-   real(r8), pointer :: state_q(:,:,:)   ! state%q [#/kg or kg/kg]
-   real(r8), pointer :: h2ommr(:,:)      ! specific humidity [kg/kg]
-   real(r8), pointer :: temperature(:,:) ! temperatures [K]
-   real(r8), pointer :: pmid(:,:)        ! layer pressure [Pa]
    real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
    real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
    real(r8), pointer :: dgncur_awet(:,:,:) ! wet aerosol diameter [m]
@@ -184,12 +184,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    character(len=3)  :: trnum       ! used to hold mode number (as characters)
 
    !----------------------------------------------------------------------------
-   lchnk = state%lchnk
-   ncol  = state%ncol
-   h2ommr       => state%q(:,:,1)
-   temperature  => state%t
-   pmid         => state%pmid
-   state_q      => state%q
 
    list_idx = 0
    if (present(list_idx_in)) then
@@ -240,9 +234,9 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, & ! i
    !----------------------------------------------------------------------------
    ! estimate clear air relative humidity using cloud fraction
 
-   call modal_aero_wateruptake_rh_clearair( ncol,         & ! in
-                        temperature, pmid,  h2ommr, cldn, & ! in
-                        rh                                ) ! out
+   call modal_aero_wateruptake_rh_clearair( ncol,                 & ! in
+                        temperature, pmid,  state_q(:,:,1), cldn, & ! in
+                        rh                                        ) ! out
 
    !----------------------------------------------------------------------------
    ! compute wet aerosol properties
