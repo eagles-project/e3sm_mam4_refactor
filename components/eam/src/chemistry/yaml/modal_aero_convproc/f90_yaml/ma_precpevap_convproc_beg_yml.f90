@@ -13,7 +13,7 @@
   !>
 
   ! character(len=200) :: ext_str  ! this is used when multiple sets of yaml output is needed to cover different options (e.g., true and false)
-  type(yaml_vars) :: yaml
+  type(yaml_vars),intent(in) :: yaml
   integer  :: unit_input, unit_output, y_nstep
   integer,save :: n_calls=0   ! some subroutines are called multiple times in one timestep, record the number of calls
 
