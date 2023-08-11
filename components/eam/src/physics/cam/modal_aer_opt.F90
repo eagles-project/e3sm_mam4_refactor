@@ -22,7 +22,7 @@ use rad_constituents,  only: n_diag, rad_cnst_get_call_list, rad_cnst_get_info, 
                              rad_cnst_get_aer_props, rad_cnst_get_mode_props
 use physics_types,     only: physics_state
 
-use physics_buffer, only : pbuf_get_index,physics_buffer_desc, pbuf_get_field
+use physics_buffer, only : pbuf_get_index,physics_buffer_desc,pbuf_get_field,pbuf_old_tim_idx
 use pio,               only: file_desc_t, var_desc_t, pio_inq_dimlen, pio_inq_dimid, pio_inq_varid, &
                              pio_get_var, pio_nowrite, pio_closefile
 use cam_pio_utils,     only: cam_pio_openfile
@@ -60,6 +60,7 @@ complex(r8) :: crefwsw(nswbands) ! complex refractive index for water visible
 complex(r8) :: crefwlw(nlwbands) ! complex refractive index for water infrared
 
 ! physics buffer indices
+integer :: cld_idx      = 0
 integer :: dgnumwet_idx = -1
 integer :: qaerwat_idx  = -1
 
@@ -68,7 +69,7 @@ character(len=4) :: diag(0:n_diag) = (/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 '
 
 !Declare the following threadprivate variables to be used for calcsize and water uptake
 !These are defined as module level variables to aviod allocation-deallocation in a loop
-real(r8), allocatable :: dgnumdry_m(:,:,:) ! number mode dry diameter for all modes
+real(r8), allocatable, target :: dgnumdry_m(:,:,:) ! number mode dry diameter for all modes
 real(r8), allocatable, target :: dgnumwet_m(:,:,:) ! number mode wet diameter for all modes
 real(r8), allocatable, target :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all modes
 !$OMP THREADPRIVATE(dgnumdry_m, dgnumwet_m, qaerwat_m)
@@ -170,6 +171,9 @@ subroutine modal_aer_opt_init()
          end do
       end if
    end do
+
+   cld_idx        = pbuf_get_index('CLD')
+
 
    ! Initialize physics buffer indices for dgnumwet and qaerwat.  Note the implicit assumption
    ! that the loops over modes in the optics calculations will use the values for dgnumwet and qaerwat
@@ -433,16 +437,21 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    integer :: nmodes
    integer :: nspec
    integer :: istat
+   integer :: itim_old           ! index
 
    real(r8) :: mass(pcols,pver)        ! layer mass
    real(r8) :: air_density(pcols,pver) ! (kg/m3)
 
+   real(r8),    pointer :: state_q(:,:,:)      ! state%q
+   real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
+   real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
    real(r8)             :: specdens            ! species density (kg/m3)
    complex(r8), pointer :: specrefindex(:)     ! species refractive index
    character*32         :: spectype            ! species type
    real(r8)             :: hygro_aer           !
 
+   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
    real(r8), pointer :: dgnumwet(:,:)     ! number mode wet diameter
    real(r8), pointer :: qaerwat(:,:)      ! aerosol water (g/g)
 
@@ -555,6 +564,12 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 
    lchnk = state%lchnk
    ncol  = state%ncol
+   state_q      => state%q
+   temperature  => state%t
+   pmid         => state%pmid
+
+   itim_old    =  pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
    ! initialize output variables
    tauxar(:ncol,:,:) = 0._r8
@@ -625,8 +640,10 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
            dgnumdry_m=dgnumdry_m)
    endif
 
-   call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m)
+   call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
+                                  cldn, dgnumdry_m, & ! in
+                                  dgnumwet_m, qaerwat_m, & ! inout
+                                  list_idx_in=list_idx   ) ! optional in
    
 
    ! loop over all aerosol modes
@@ -1232,10 +1249,12 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    ! Local variables
    integer :: icol, ilw, kk, ll, mm, nc
+   integer :: lchnk
    integer :: list_idx                 ! index of the climate or a diagnostic list
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
    integer :: istat
+   integer :: itim_old           ! index
 
    real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter [m]
    real(r8), pointer :: qaerwat(:,:)   ! aerosol water [g/g]
@@ -1248,7 +1267,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
-   real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [g/g]
    real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
    complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
@@ -1259,7 +1277,11 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: state_q(:,:,:)  ! state%q
+   real(r8), pointer :: state_q(:,:,:)     ! state%q
+   real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
+   real(r8), pointer :: temperature(:,:)   ! temperatures [K]
+   real(r8), pointer :: pmid(:,:)          ! layer pressure [Pa]
+   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
@@ -1272,18 +1294,26 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    !----------------------------------------------------------------------------
 
    ncol  = state%ncol
+   lchnk = state%lchnk
+   state_q      => state%q
+   temperature  => state%t
+   pmid         => state%pmid
    ! dry mass in each cell
    mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
-   state_q => state%q
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
+   itim_old    =  pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
+
 
    call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
-   call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-        qaerwat_m)
+   call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
+                                  cldn, dgnumdry_m, & ! in
+                                  dgnumwet_m, qaerwat_m, & ! inout
+                                  list_idx_in=list_idx   ) ! optional in
    
 
    ! initialize output variables
