@@ -519,6 +519,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    temperature  => state%t
    pmid         => state%pmid
 
+   mass(:ncol,:)        = state%pdeldry(:ncol,:)*rga
+   air_density(:ncol,:) = state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
+
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
    itim_old    =  pbuf_old_tim_idx()
@@ -529,15 +532,11 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    wa(:ncol,:,:)     = 0._r8
    ga(:ncol,:,:)     = 0._r8
    fa(:ncol,:,:)     = 0._r8
-
    ! zero'th layer does not contain aerosol
    tauxar(1:ncol,0,:)  = 0._r8
    wa(1:ncol,0,:)      = 0.925_r8
    ga(1:ncol,0,:)      = 0.850_r8
    fa(1:ncol,0,:)      = 0.7225_r8
-
-   mass(:ncol,:)        = state%pdeldry(:ncol,:)*rga
-   air_density(:ncol,:) = state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
    ! diagnostics for visible band summed over modes
    extinct(1:ncol,:)     = 0.0_r8
@@ -724,14 +723,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             do i = 1, ncol
                watervol(i) = qaerwat(i,k)/rhoh2o
                wetvol(i) = watervol(i) + dryvol(i)
-               if (watervol(i) < 0._r8) then
-                  if (abs(watervol(i)) .gt. 1.e-1_r8*wetvol(i)) then
-                     write(iulog,'(a,2e10.2,a)') 'watervol,wetvol=', &
-                        watervol(i), wetvol(i), ' in '//subname
-                  end if
-                  watervol(i) = 0._r8
-                  wetvol(i) = dryvol(i)
-               end if
 
                ! volume mixing
                crefin(i) = crefin(i) + watervol(i)*crefwsw(isw)
