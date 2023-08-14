@@ -1,5 +1,6 @@
 
 module mo_setext
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use cam_logfile, only: iulog
 
@@ -99,6 +100,7 @@ contains
     !--------------------------------------------------------
     ! variables for output. in current MAM4 they are not calculated and are assigned zero
     real(r8), dimension(ncol,pver) :: no_lgt, no_air, co_air
+#include "../yaml/mo_setext/f90_yaml/setext_beg_yml.f90"
 
     !--------------------------------------------------------
     !     ... set frcing from datasets
@@ -123,6 +125,7 @@ contains
     co_air(:,:) = 0._r8
     call outfld( 'NO_Aircraft',  no_air(:ncol,:), ncol, lchnk )
     call outfld( 'CO_Aircraft',  co_air(:ncol,:), ncol, lchnk )
+#include "../yaml/mo_setext/f90_yaml/setext_end_yml.f90"
 
   end subroutine setext
 

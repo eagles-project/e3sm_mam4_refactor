@@ -44,9 +44,9 @@
         call write_var(unit_input, unit_output, 'ktop', ktop)
         call write_var(unit_input, unit_output, 'kbot', kbot)
         call write_1d_var(unit_input,unit_output,'dpdry_i', pver,dpdry_i(:))
-        call write_1d_var(unit_input,unit_output,'du', pver,du(yaml%col_print,:))
-        call write_1d_var(unit_input,unit_output,'eu', pver,eu(yaml%col_print,:))
-        call write_1d_var(unit_input,unit_output,'ed', pver,ed(yaml%col_print,:))
+        call write_1d_var(unit_input,unit_output,'du', pver,du(ii,:))
+        call write_1d_var(unit_input,unit_output,'eu', pver,eu(ii,:))
+        call write_1d_var(unit_input,unit_output,'ed', pver,ed(ii,:))
         call write_1d_var(unit_input,unit_output,'mu_i', pverp,mu_i(:))
         call write_1d_var(unit_input,unit_output,'md_i', pverp,md_i(:))
         !call write_var(unit_input, unit_output, fld_name,field)!write a single variable
