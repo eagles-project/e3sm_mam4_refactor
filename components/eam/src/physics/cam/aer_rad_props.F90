@@ -260,7 +260,7 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
    ! Contributions from modal aerosols.
    if (nmodes > 0) then
-      call modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
+      call modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
            trop_level, tau, tau_w, tau_w_g, tau_w_f)
    else
       tau    (1:ncol,:,:) = 0._r8

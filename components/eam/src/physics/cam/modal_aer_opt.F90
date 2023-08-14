@@ -74,8 +74,6 @@ real(r8), allocatable, target :: dgnumwet_m(:,:,:) ! number mode wet diameter fo
 real(r8), allocatable, target :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all modes
 !$OMP THREADPRIVATE(dgnumdry_m, dgnumwet_m, qaerwat_m)
 
-logical :: clim_modal_aero ! true when radiatively constituents present (nmodes>0)
-logical :: prog_modal_aero ! Prognostic modal aerosols present
 
 !===============================================================================
 CONTAINS
@@ -149,8 +147,6 @@ subroutine modal_aer_opt_init()
 
    ! set flags to check aerosol settings
    call rad_cnst_get_info(0, nmodes=nmodes)
-   clim_modal_aero = (nmodes > 0)
-   call phys_getopts(prog_modal_aero_out=prog_modal_aero)
 
    ! Check that dimension sizes in the coefficient arrays used to
    ! parameterize aerosol radiative properties are consistent between this
@@ -385,12 +381,11 @@ end subroutine modal_aer_opt_init
 
 !===============================================================================
 
-subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  &
+subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  &
                          tauxar, wa, ga, fa)
 
    ! calculates aerosol sw radiative properties
 
-   integer,             intent(in) :: list_idx       ! index of the climate or a diagnostic list
    real(r8),            intent(in) :: dt             !timestep (s)
    type(physics_state), intent(in), target :: state          ! state variables
 
@@ -408,6 +403,7 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
 
    ! Local variables
    integer :: i, ifld, isw, k, l, m, nc, ns, ilev_tropp
+   integer :: list_idx       ! index of the climate or a diagnostic list
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
    integer :: nmodes
@@ -523,6 +519,8 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    temperature  => state%t
    pmid         => state%pmid
 
+   !FORTRAN refactoring: For prognostic aerosols only, other options are removed
+   list_idx = 0   ! index of the climate or a diagnostic list
    itim_old    =  pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
@@ -571,20 +569,9 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
    aodnir(:ncol)         = 0.0_r8
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
-   if (clim_modal_aero .and. .not. prog_modal_aero) then   ! For prescribed aerosol codes
-
-      !radiation diagnostics are not supported for prescribed aerosols cases
-      if(list_idx .ne. 0) then
-         call endrun('Radiation diagnostic calls are not supported for ' // &
-              ' prescribed aerosols '//errmsg(__FILE__,__LINE__))
-      endif
-      ! diagnostic aerosol size calculations
-      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m)
-   else
-      !For prognostic aerosols
-      call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
+   !For prognostic aerosols
+   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
-   endif
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
                                   cldn, dgnumdry_m, & ! in
@@ -1035,29 +1022,23 @@ subroutine modal_aero_sw(list_idx, dt, state, pbuf, nnite, idxnite, is_cmip6_vol
        end do
 
       call outfld('SSAVIS',        ssavis,        pcols, lchnk)
-
       call outfld('AODUV',         aoduv,         pcols, lchnk)
       call outfld('AODNIR',        aodnir,        pcols, lchnk)
-
       call outfld('BURDENDUST',    burdendust,    pcols, lchnk)
       call outfld('BURDENSO4' ,    burdenso4,     pcols, lchnk)
       call outfld('BURDENPOM' ,    burdenpom,     pcols, lchnk)
       call outfld('BURDENSOA' ,    burdensoa,     pcols, lchnk)
       call outfld('BURDENBC'  ,    burdenbc,      pcols, lchnk)
       call outfld('BURDENSEASALT', burdenseasalt, pcols, lchnk)
-
-      call outfld('BURDENMOM', burdenmom, pcols, lchnk)
-
+      call outfld('BURDENMOM',     burdenmom,     pcols, lchnk)
       call outfld('AODABSBC',      aodabsbc,      pcols, lchnk)
-
       call outfld('AODDUST',       dustaod,       pcols, lchnk)
       call outfld('AODSO4',        so4aod,        pcols, lchnk)
       call outfld('AODPOM',        pomaod,        pcols, lchnk)
       call outfld('AODSOA',        soaaod,        pcols, lchnk)
       call outfld('AODBC',         bcaod,         pcols, lchnk)
       call outfld('AODSS',         seasaltaod,    pcols, lchnk)
-
-      call outfld('AODMOM',         momaod,    pcols, lchnk)
+      call outfld('AODMOM',        momaod,        pcols, lchnk)
    end if
 
 end subroutine modal_aero_sw
