@@ -244,7 +244,7 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
       !Find tropopause as extinction should be applied only above tropopause
       !trop_level has value for tropopause for each column
-      call tropopause_find(lchnk,ncol,state%pmid,state%pint,state%t,state%zm,state%zi,trop_level)
+      call tropopause_find(state, trop_level)
       !Quit if tropopause is not found
       if (any(trop_level(1:ncol) == -1)) then
          do icol = 1, ncol
@@ -457,7 +457,7 @@ subroutine aer_rad_props_lw(is_cmip6_volc, list_idx, dt, state, pbuf,  odap_aer)
 
       !Find tropopause
       !trop_level has value for tropopause for each column
-      call tropopause_find(lchnk,ncol,state%pmid,state%pint,state%t,state%zm,state%zi,trop_level)
+      call tropopause_find(state, trop_level)
       !Quit if tropopause is not found
       if (any(trop_level(1:ncol) == -1)) then
          do icol = 1, ncol

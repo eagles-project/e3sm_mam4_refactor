@@ -320,8 +320,7 @@ end subroutine prescribed_volcaero_readnl
           call pbuf_get_field(pbuf_chnk, fields(1)%pbuf_ndx, data)
           data(:ncol,:) = to_mmr(:ncol,:) * data(:ncol,:) ! mmr
           
-          call tropopause_find(state(c)%lchnk,ncol,state(c)%pmid,state(c)%pint,state(c)%t,state(c)%zm,state(c)%zi,  &
-                     tropLev, primary=TROP_ALG_TWMO, backup=TROP_ALG_CLIMATE)
+          call tropopause_find(state(c), tropLev, primary=TROP_ALG_TWMO, backup=TROP_ALG_CLIMATE)
           do i = 1,ncol
              do k = 1,pver
                 ! set to zero below tropopause
