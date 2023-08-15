@@ -72,7 +72,7 @@ module tropopause
   character(len=256)    :: tropopause_climo_file = 'trop_climo'      ! absolute filepath of climatology file
 
   ! These variables are used to store the climatology data.
-  integer, parameter :: days_in_year_real = 365._r8
+  real, parameter    :: days_in_year_real = 365._r8
   integer, parameter :: months_in_year = 12
   integer, parameter :: first_month = 1
   real(r8)              :: days(months_in_year)                      ! days in the climatology
