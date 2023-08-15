@@ -604,7 +604,7 @@ contains
     integer                                 :: kk      ! vertical level index
 !! BJG below
     real(r8)                                :: a1, b1
-    real(r8)                                :: dtdp     ! temperature lapse rate vs pressure [K/Pa]
+    real(r8)                                :: dtdp,dtdp2     ! temperature lapse rate vs pressure [K/Pa]
 ! BJG end
     trp=-99.0_r8                           ! negative means not valid
     
