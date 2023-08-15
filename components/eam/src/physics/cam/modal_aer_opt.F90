@@ -383,8 +383,12 @@ end subroutine modal_aer_opt_init
 
 subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  &
                          tauxar, wa, ga, fa)
-
    ! calculates aerosol sw radiative properties
+
+  use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
+                              specname_amode, spechygro, & 
+                              sigmag_amode, lspectype_amode, lmassptr_amode, &
+                              specrefndxsw, refrtabsw, refitabsw, extpsw, abspsw, asmpsw
 
    real(r8),            intent(in) :: dt             !timestep (s)
    type(physics_state), intent(in), target :: state          ! state variables
@@ -402,11 +406,10 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8), intent(out) :: fa(pcols,0:pver,nswbands)     ! forward scattered fraction
 
    ! Local variables
-   integer :: i, ifld, isw, k, l, m, nc, ns, ilev_tropp
+   integer :: i, ifld, isw, k, l, ll,m, nc, ns, ilev_tropp
    integer :: list_idx       ! index of the climate or a diagnostic list
    integer :: lchnk                    ! chunk id
    integer :: ncol                     ! number of active columns in the chunk
-   integer :: nmodes
    integer :: nspec
    integer :: istat
    integer :: itim_old           ! index
@@ -418,8 +421,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
    real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
-   real(r8)             :: specdens            ! species density (kg/m3)
-   complex(r8), pointer :: specrefindex(:)     ! species refractive index
    character*32         :: spectype            ! species type
    real(r8)             :: hygro_aer           !
 
@@ -432,14 +433,13 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: logradsurf(pcols,pver) ! log(aerosol surface mode radius)
    real(r8) :: cheb(ncoef,pcols,pver)
 
+   real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
+   complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
+
    real(r8)    :: refr(pcols)     ! real part of refractive index
    real(r8)    :: refi(pcols)     ! imaginary part of refractive index
    complex(r8) :: crefin(pcols)   ! complex refractive index
-   real(r8), pointer :: refrtabsw(:,:) ! table of real refractive indices for aerosols
-   real(r8), pointer :: refitabsw(:,:) ! table of imag refractive indices for aerosols
-   real(r8), pointer :: extpsw(:,:,:,:) ! specific extinction
-   real(r8), pointer :: abspsw(:,:,:,:) ! specific absorption
-   real(r8), pointer :: asmpsw(:,:,:,:) ! asymmetry factor
 
    real(r8) :: vol(pcols)      ! volume concentration of aerosol specie (m3/kg)
    real(r8) :: dryvol(pcols)   ! volume concentration of aerosol mode (m3/kg)
@@ -510,7 +510,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    ! debug output
    integer, parameter :: nerrmax_dopaer=1000
    integer  :: nerr_dopaer = 0
-   real(r8) :: volf            ! volume fraction of insoluble aerosol
    character(len=*), parameter :: subname = 'modal_aero_sw'
    !----------------------------------------------------------------------------
    lchnk = state%lchnk
@@ -579,10 +578,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    
 
    ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
-
-
-   do m = 1, nmodes
+   do m = 1, ntot_amode
 
       ! diagnostics for visible band for each mode
       burden(:ncol)       = 0._r8
@@ -592,15 +588,20 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       dgnumwet => dgnumwet_m(:,:,m)
       qaerwat  => qaerwat_m(:,:,m)
 
-      ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigma_logr_aer, refrtabsw=refrtabsw , &
-         refitabsw=refitabsw, extpsw=extpsw, abspsw=abspsw, asmpsw=asmpsw)
-
       ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
+      nspec = nspec_amode(m)
+      sigma_logr_aer = sigmag_amode(m)
 
       ! calc size parameter for all columns
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, logradsurf, cheb)
+
+
+      allocate(volf(ncol,nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate volf: "//errmsg(__FILE__,__LINE__) )
+      allocate(specdens(nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specdens: "//errmsg(__FILE__,__LINE__) )
+      allocate(specrefindex(nspec,nswbands),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specrefindex: "//errmsg(__FILE__,__LINE__) )
 
       do isw = 1, nswbands
          savaervis = (isw .eq. idx_sw_diag)
@@ -638,22 +639,26 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
             ! aerosol species loop
             do l = 1, nspec
-               call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, specmmr)
-               call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                           refindex_aer_sw=specrefindex, spectype=spectype, &
-                                           hygro_aer=hygro_aer)
+
+               ! get aerosol properties and save for each species
+               specmmr => state_q(:,:,lmassptr_amode(l,m))
+               spectype = specname_amode(lspectype_amode(l,m))
+               hygro_aer = spechygro(lspectype_amode(l,m))
+               specdens(l) = specdens_amode(lspectype_amode(l,m))
+               specrefindex(l,:) = specrefndxsw(:,lspectype_amode(l,m))
+               volf(:,l) = specmmr(:,k)/specdens(l)
 
                do i = 1, ncol
-                  vol(i)      = specmmr(i,k)/specdens
+                  vol(i)      = specmmr(i,k)/specdens(l)
                   dryvol(i)   = dryvol(i) + vol(i)
-                  crefin(i)   = crefin(i) + vol(i)*specrefindex(isw)
+                  crefin(i)   = crefin(i) + vol(i)*specrefindex(l,isw)
                end do
 
                ! compute some diagnostics for visible band only
                if (savaervis) then
 
-                  specrefr = real(specrefindex(isw))
-                  specrefi = aimag(specrefindex(isw))
+                  specrefr = real(specrefindex(l,isw))
+                  specrefi = aimag(specrefindex(l,isw))
 
                   do i = 1, ncol
                      burden(i) = burden(i) + specmmr(i,k)*mass(i,k)
@@ -718,7 +723,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                      end do
                   end if
                end if
-            end do ! species loop
+            end do ! species loop l
 
             do i = 1, ncol
                watervol(i) = qaerwat(i,k)/rhoh2o
@@ -736,14 +741,14 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(extpsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
+            call binterp(extpsw(m,:,:,:,isw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtabsw(m,:,isw), refitabsw(m,:,isw), &
                          itab, jtab, ttab, utab, cext)
-            call binterp(abspsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
+            call binterp(abspsw(m,:,:,:,isw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtabsw(m,:,isw), refitabsw(m,:,isw), &
                          itab, jtab, ttab, utab, cabs)
-            call binterp(asmpsw(:,:,:,isw), ncol, ncoef, prefr, prefi, &
-                         refr, refi, refrtabsw(:,isw), refitabsw(:,isw), &
+            call binterp(asmpsw(m,:,:,:,isw), ncol, ncoef, prefr, prefi, &
+                         refr, refi, refrtabsw(m,:,isw), refitabsw(m,:,isw), &
                          itab, jtab, ttab, utab, casm)
 
             ! call t_stopf('binterp')
@@ -871,7 +876,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
                   endif
 
-               end do
+               end do ! i
             endif
 
             do i = 1, ncol
@@ -895,13 +900,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                   write(iulog,*) 'nspec=', nspec
                   ! write(iulog,*) 'cheb=', (cheb(nc,m,i,k),nc=2,ncoef)
                   do l = 1, nspec
-                     call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, specmmr)
-                     call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                                 refindex_aer_sw=specrefindex)
-                     volf = specmmr(i,k)/specdens
-                     write(iulog,*) 'l=', l, 'vol(l)=', volf
-                     write(iulog,*) 'isw=', isw, 'specrefindex(isw)=', specrefindex(isw)
-                     write(iulog,*) 'specdens=', specdens
+                     write(iulog,*) 'l=', l, 'vol(l)=', volf(i,l)
+                     write(iulog,*) 'isw=', isw, 'specrefindex(isw)=', specrefindex(l,isw)
+                     write(iulog,*) 'specdens=', specdens(l)
                   end do
 
                   nerr_dopaer = nerr_dopaer + 1
@@ -947,6 +948,10 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
          end if
 
       end if
+
+      deallocate(volf)
+      deallocate(specdens)
+      deallocate(specrefindex)
 
    end do ! nmodes
 

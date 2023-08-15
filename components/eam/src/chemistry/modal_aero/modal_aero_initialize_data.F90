@@ -408,6 +408,11 @@ contains
        real(r8), pointer :: refrtablw_tmp(:,:) ! table of real refractive indices for aerosols
        real(r8), pointer :: refitablw_tmp(:,:) ! table of imag refractive indices for aerosols
        real(r8), pointer :: absplw_tmp(:,:,:,:) ! specific absorption
+       real(r8), pointer :: refrtabsw_tmp(:,:) ! table of real refractive indices for aerosols
+       real(r8), pointer :: refitabsw_tmp(:,:) ! table of imag refractive indices for aerosols
+       real(r8), pointer :: abspsw_tmp(:,:,:,:) ! specific absorption
+       real(r8), pointer :: extpsw_tmp(:,:,:,:) ! specific extinction
+       real(r8), pointer :: asmpsw_tmp(:,:,:,:) ! asymmetry factor
 
        real(r8), parameter :: huge_r8 = huge(1._r8)
        character(len=*), parameter :: routine='modal_aero_initialize'
@@ -430,11 +435,18 @@ contains
           call rad_cnst_get_mode_props(0, m, &
              sigmag=sigmag_amode(m), dgnum=dgnum_amode(m), dgnumlo=dgnumlo_amode(m), &
              dgnumhi=dgnumhi_amode(m), rhcrystal=rhcrystal_amode(m), rhdeliques=rhdeliques_amode(m), &
-             refrtablw=refrtablw_tmp, refitablw=refitablw_tmp, absplw=absplw_tmp)
+             refrtablw=refrtablw_tmp, refitablw=refitablw_tmp, absplw=absplw_tmp, &
+             refrtabsw=refrtabsw_tmp, refitabsw=refitabsw_tmp, &
+             abspsw=abspsw_tmp, extpsw=extpsw_tmp, asmpsw=asmpsw_tmp)
 
           refrtablw(m,:,:)  = refrtablw_tmp
           refitablw(m,:,:)  = refitablw_tmp
           absplw(m,:,:,:,:) = absplw_tmp
+          refrtabsw(m,:,:)  = refrtabsw_tmp
+          refitabsw(m,:,:)  = refitabsw_tmp
+          abspsw(m,:,:,:,:) = abspsw_tmp
+          extpsw(m,:,:,:,:) = extpsw_tmp
+          asmpsw(m,:,:,:,:) = asmpsw_tmp
 
           !   compute frequently used parameters: ln(sigmag),
           !   volume-to-number and volume-to-surface conversions, ...
