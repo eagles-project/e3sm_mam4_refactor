@@ -35,7 +35,7 @@ module tropopause
   private
   
   public  :: tropopause_readnl, tropopause_init, tropopause_find, tropopause_output
-  public  :: tropopause_findChemTrop
+!BJG  public  :: tropopause_findChemTrop
   public  :: TROP_ALG_NONE, TROP_ALG_ANALYTIC, TROP_ALG_CLIMATE
   public  :: TROP_ALG_STOBIE, TROP_ALG_HYBSTOB, TROP_ALG_TWMO, TROP_ALG_WMO
   public  :: TROP_ALG_CPP
@@ -441,9 +441,9 @@ contains
     real(r8), optional, intent(inout)  :: tropZ(pcols)              ! tropopause height (m)
  
     ! Local Variables
-    integer       :: i
-    integer       :: k
-    integer       :: m
+    integer       :: icol
+    integer       :: kk
+    integer       :: mn
     integer       :: ncol                     ! number of columns in the chunk
     integer       :: lchnk                    ! chunk identifier
     real(r8)      :: tP                       ! tropopause pressure (Pa)
@@ -476,49 +476,49 @@ contains
         last = 12
         dels = (calday - days(12)) / (365._r8 + days(1) - days(12))
       else
-        do m = 11,1,-1
-           if( calday >= days(m) ) then
+        do mn = 11,1,-1
+           if( calday >= days(mn) ) then
               exit
            end if
         end do
-        last = m
-        next = m + 1
-        dels = (calday - days(m)) / (days(m+1) - days(m))
+        last = mn
+        next = mn + 1
+        dels = (calday - days(mn)) / (days(mn+1) - days(mn))
       end if
       
       dels = max( min( 1._r8,dels ),0._r8 )
         
 
       ! Iterate over all of the columns.
-      do i = 1, ncol
+      do icol = 1, ncol
        
         ! Skip column in which the tropopause has already been found.
-        if (tropLev(i) == NOTFOUND) then
+        if (tropLev(icol) == NOTFOUND) then
         
         !--------------------------------------------------------
         ! ... get tropopause level from climatology
         !--------------------------------------------------------
           ! Interpolate the tropopause pressure.
-          tP = tropp_p_loc(i,lchnk,last) &
-            + dels * (tropp_p_loc(i,lchnk,next) - tropp_p_loc(i,lchnk,last))
+          tP = tropp_p_loc(icol,lchnk,last) &
+            + dels * (tropp_p_loc(icol,lchnk,next) - tropp_p_loc(icol,lchnk,last))
                 
           ! Find the associated level.
-          do k = pver, 2, -1
-            if (tP >= pstate%pint(i, k)) then
-              tropLev(i) = k
+          do kk = pver, 2, -1
+            if (tP >= pstate%pint(icol, kk)) then
+              tropLev(icol) = kk
               exit
             end if
           end do
       
           ! Return the optional outputs
-          if (present(tropP)) tropP(i) = tP
+          if (present(tropP)) tropP(icol) = tP
           
           if (present(tropT)) then
-            tropT(i) = tropopause_interpolateT(pstate, i, tropLev(i), tP)
+            tropT(i) = tropopause_interpolateT(pstate, icol, tropLev(icol), tP)
           end if
 
           if (present(tropZ)) then
-            tropZ(i) = tropopause_interpolateZ(pstate, i, tropLev(i), tP)
+            tropZ(i) = tropopause_interpolateZ(pstate, icol, tropLev(icol), tP)
           end if
         end if
       end do
@@ -1151,63 +1151,6 @@ contains
     return
   end subroutine tropopause_find
   
-  ! Searches all the columns in the chunk and attempts to identify the "chemical"
-  ! tropopause. This is the lapse rate tropopause, backed up by the climatology
-  ! if the lapse rate fails to find the tropopause at pressures higher than a certain
-  ! threshold. This pressure threshold depends on latitude. Between 50S and 50N, 
-  ! the climatology is used if the lapse rate tropopause is not found at P > 75 hPa. 
-  ! At high latitude (poleward of 50), the threshold is increased to 125 hPa to 
-  ! eliminate false events that are sometimes detected in the cold polar stratosphere.
-  !
-  ! NOTE: This routine was adapted from code in chemistry.F90 and mo_gasphase_chemdr.F90.
-  subroutine tropopause_findChemTrop(pstate, tropLev, primary, backup)
-
-    implicit none
-
-    type(physics_state), intent(in)     :: pstate 
-    integer, optional, intent(in)       :: primary                   ! primary detection algorithm
-    integer, optional, intent(in)       :: backup                    ! backup detection algorithm
-    integer,            intent(out)     :: tropLev(pcols)            ! tropopause level index   
-
-    ! Local Variable
-    real(r8), parameter :: rad2deg = 180._r8/pi                      ! radians to degrees conversion factor
-    real(r8)            :: dlats(pcols)
-    integer             :: i
-    integer             :: ncol
-    integer             :: backAlg
-
-    ! First use the lapse rate tropopause.
-    ncol = pstate%ncol
-    call tropopause_find(pstate, tropLev, primary=primary, backup=TROP_ALG_NONE)
-   
-    ! Now check high latitudes (poleward of 50) and set the level to the
-    ! climatology if the level was not found or is at P <= 125 hPa.
-    dlats(:ncol) = pstate%lat(:ncol) * rad2deg ! convert to degrees
-
-    if (present(backup)) then
-      backAlg = backup
-    else
-      backAlg = default_backup
-    end if
-    
-    do i = 1, ncol
-      if (abs(dlats(i)) > 50._r8) then
-        if (tropLev(i) .ne. NOTFOUND) then
-          if (pstate%pmid(i, tropLev(i)) <= 12500._r8) then
-            tropLev(i) = NOTFOUND
-          end if
-        end if
-      end if
-    end do
-        
-    ! Now use the backup algorithm
-    if ((backAlg /= TROP_ALG_NONE) .and. any(tropLev(:) == NOTFOUND)) then
-      call tropopause_findUsing(pstate, backAlg, tropLev)
-    end if
-    
-    return
-  end subroutine tropopause_findChemTrop
-  
   ! Call the appropriate tropopause detection routine based upon the algorithm
   ! specifed.
   !
@@ -1226,14 +1169,14 @@ contains
 
     ! Dispatch the request to the appropriate routine.
     select case(algorithm)
-      case(TROP_ALG_ANALYTIC)
-        call tropopause_analytic(pstate, tropLev, tropP, tropT, tropZ)
+!BJG      case(TROP_ALG_ANALYTIC)
+!BJG        call tropopause_analytic(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_CLIMATE)
         call tropopause_climate(pstate, tropLev, tropP, tropT, tropZ)
 
-      case(TROP_ALG_STOBIE)
-        call tropopause_stobie(pstate, tropLev, tropP, tropT, tropZ)
+!BJG      case(TROP_ALG_STOBIE)
+!BJG        call tropopause_stobie(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_HYBSTOB)
         call tropopause_hybridstobie(pstate, tropLev, tropP, tropT, tropZ)
@@ -1241,8 +1184,8 @@ contains
       case(TROP_ALG_TWMO)
         call tropopause_twmo(pstate, tropLev, tropP, tropT, tropZ)
 
-      case(TROP_ALG_WMO)
-        call tropopause_wmo(pstate, tropLev, tropP, tropT, tropZ)
+!BJG      case(TROP_ALG_WMO)
+!BJG        call tropopause_wmo(pstate, tropLev, tropP, tropT, tropZ)
 
       case(TROP_ALG_CPP)
         call tropopause_cpp(pstate, tropLev, tropP, tropT, tropZ)
@@ -1476,31 +1419,6 @@ contains
     call outfld('TROPF_PD',  tropPdf(:ncol, :), ncol, lchnk)
     call outfld('TROPF_FD',  tropFound(:ncol),  ncol, lchnk)
     
-    ! If requested, do all of the algorithms.
-    if (output_all) then
-    
-      do alg = 2, TROP_NALG
-    
-        ! Find the tropopause using just the analytic algorithm.
-        call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, primary=alg, backup=TROP_ALG_NONE)
-  
-        tropPdf(:,:) = 0._r8
-        tropFound(:) = 0._r8
-      
-        do i = 1, ncol
-          if (tropLev(i) /= NOTFOUND) then
-            tropPdf(i, tropLev(i)) = 1._r8
-            tropFound(i) = 1._r8
-          end if
-        end do
-  
-        call outfld('TROP' // TROP_LETTER(alg) // '_P',   tropP(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_T',   tropT(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_Z',   tropZ(:ncol),      ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_PD',  tropPdf(:ncol, :), ncol, lchnk)
-        call outfld('TROP' // TROP_LETTER(alg) // '_FD',  tropFound(:ncol),  ncol, lchnk)
-      end do
-    end if
     
     return
   end subroutine tropopause_output
