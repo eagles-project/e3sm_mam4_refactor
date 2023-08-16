@@ -1165,7 +1165,7 @@ contains
     ncol  = pstate%ncol
 
     ! Find the tropopause using the default algorithm backed by the climatology.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,  &
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,  &
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ)
 !BJG    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ)
     
@@ -1189,7 +1189,7 @@ contains
     
     
     ! Find the tropopause using just the primary algorithm.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,    &
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,    &
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,backup=TROP_ALG_NONE)
 !BJG    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, backup=TROP_ALG_NONE)
 
@@ -1213,7 +1213,7 @@ contains
     call outfld('TROPP_FD',  tropFound(:ncol),  ncol, lchnk)
     
     ! Find the tropopause using just the cold point algorithm.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,    &
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,    &
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,primary=TROP_ALG_CPP,backup=TROP_ALG_NONE)
 !BJG    call tropopause_find(pstate, tropLev, tropP=tropP, tropT=tropT, tropZ=tropZ, primary=TROP_ALG_CPP, backup=TROP_ALG_NONE)
 
