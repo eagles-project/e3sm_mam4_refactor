@@ -876,7 +876,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
                   endif
 
-               end do ! i
+               enddo ! i
             endif
 
             do i = 1, ncol
@@ -892,19 +892,18 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                fa(i,k,isw)     = fa(i,k,isw)     + dopaer(i)*palb(i)*pasm(i)*pasm(i)
             enddo
 
-         end do ! pver
+         enddo ! pver
 
-      end do ! sw bands
+      enddo ! sw bands
 
       ! mode diagnostics
       ! The diagnostics are currently only output for the climate list.  Code mods will
       ! be necessary to provide output for the rad_diag lists.
       if (list_idx == 0) then
          do i = 1, nnite
-!            burden(idxnite(i))  = fillvalue
             aodmode(idxnite(i)) = fillvalue
             dustaodmode(idxnite(i)) = fillvalue
-         end do
+         enddo
 
          write(outname,'(a,i1)') 'BURDEN', m
          call outfld(trim(outname), burden, pcols, lchnk)
@@ -912,18 +911,15 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
          write(outname,'(a,i1)') 'AODMODE', m
          call outfld(trim(outname), aodmode, pcols, lchnk)
 
-         if (m .lt. 8) then ! dust doesn't appear in modes 8 or 9
-            write(outname,'(a,i1)') 'AODDUST', m
-            call outfld(trim(outname), dustaodmode, pcols, lchnk)
-         end if
-
-      end if
+         write(outname,'(a,i1)') 'AODDUST', m
+         call outfld(trim(outname), dustaodmode, pcols, lchnk)
+      endif
 
       deallocate(volf)
       deallocate(specdens)
       deallocate(specrefindex)
 
-   end do ! nmodes
+   enddo ! nmodes
 
    !Add contributions from volcanic aerosols directly read in extinction
    if(is_cmip6_volc) then
