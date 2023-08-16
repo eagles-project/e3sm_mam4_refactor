@@ -818,61 +818,53 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                      ! assume contribution is proportional to refractive index X volume
 
                      scath2o        = watervol(i)*real(crefwsw(isw))
-		     absh2o         = -watervol(i)*aimag(crefwsw(isw))
-		     sumscat        = scatso4(i) + scatpom(i) + scatsoa(i) + scatbc(i) + &
+                     absh2o         = -watervol(i)*aimag(crefwsw(isw))
+                     sumscat        = scatso4(i) + scatpom(i) + scatsoa(i) + scatbc(i) + &
                                       scatdust(i) + scatseasalt(i) + scath2o + &
                                       scatmom(i)
-		     sumabs         = absso4(i) + abspom(i) + abssoa(i) + absbc(i) + &
+                     sumabs         = absso4(i) + abspom(i) + abssoa(i) + absbc(i) + &
                                       absdust(i) + absseasalt(i) + absh2o + &
                                       absmom(i)
                      sumhygro       = hygroso4(i) + hygropom(i) + hygrosoa(i) + hygrobc(i) + &
                                       hygrodust(i) + hygroseasalt(i) + &
                                       hygromom(i)
 
-                     scatdust(i)    = (scatdust(i) + scath2o*hygrodust(i)/sumhygro)/sumscat
-                     absdust(i)     = (absdust(i) + absh2o*hygrodust(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygrodust(i), palb(i), dopaer(i), & ! in
+                           scatdust, absdust, dustaod ) ! inout
 
-                     scatso4(i)     = (scatso4(i) + scath2o*hygroso4(i)/sumhygro)/sumscat
-                     absso4(i)      = (absso4(i) + absh2o*hygroso4(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygroso4(i), palb(i), dopaer(i), & ! in
+                           scatso4, absso4, so4aod ) ! inout
 
-                     scatpom(i)     = (scatpom(i) + scath2o*hygropom(i)/sumhygro)/sumscat
-                     abspom(i)      = (abspom(i) + absh2o*hygropom(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygropom(i), palb(i), dopaer(i), & ! in
+                           scatpom, abspom, pomaod ) ! inout
 
-                     scatsoa(i)     = (scatsoa(i) + scath2o*hygrosoa(i)/sumhygro)/sumscat
-                     abssoa(i)      = (abssoa(i) + absh2o*hygrosoa(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygrosoa(i), palb(i), dopaer(i), & ! in
+                           scatsoa, abssoa, soaaod ) ! inout
 
-                     scatbc(i)      = (scatbc(i) + scath2o*hygrobc(i)/sumhygro)/sumscat
-                     absbc(i)       = (absbc(i) + absh2o*hygrobc(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygrobc(i), palb(i), dopaer(i), & ! in
+                           scatbc, absbc, bcaod ) ! inout
 
-                     scatseasalt(i) = (scatseasalt(i) + scath2o*hygroseasalt(i)/sumhygro)/sumscat
-                     absseasalt(i)  = (absseasalt(i) + absh2o*hygroseasalt(i)/sumhygro)/sumabs
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygroseasalt(i), palb(i), dopaer(i), & ! in
+                           scatseasalt, absseasalt, seasaltaod ) ! inout
 
-                     scatmom(i) = (scatmom(i) + scath2o*hygromom(i)/sumhygro)/sumscat
-                     absmom(i)  = (absmom(i) + absh2o*hygromom(i)/sumhygro)/sumabs
-
+                     call update_aod_spec ( i, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygromom(i), palb(i), dopaer(i), & ! in
+                           scatmom, absmom, momaod ) ! inout
 
                      aodabsbc(i)    = aodabsbc(i) + absbc(i)*dopaer(i)*(1.0_r8-palb(i))
-
-                     aodc           = (absdust(i)*(1.0_r8 - palb(i)) + palb(i)*scatdust(i))*dopaer(i)
-                     dustaod(i)     = dustaod(i) + aodc
-
-                     aodc           = (absso4(i)*(1.0_r8 - palb(i)) + palb(i)*scatso4(i))*dopaer(i)
-                     so4aod(i)      = so4aod(i) + aodc
-
-                     aodc           = (abspom(i)*(1.0_r8 - palb(i)) + palb(i)*scatpom(i))*dopaer(i)
-                     pomaod(i)      = pomaod(i) + aodc
-
-                     aodc           = (abssoa(i)*(1.0_r8 - palb(i)) + palb(i)*scatsoa(i))*dopaer(i)
-                     soaaod(i)      = soaaod(i) + aodc
-
-                     aodc           = (absbc(i)*(1.0_r8 - palb(i)) + palb(i)*scatbc(i))*dopaer(i)
-                     bcaod(i)       = bcaod(i) + aodc
-
-                     aodc           = (absseasalt(i)*(1.0_r8 - palb(i)) + palb(i)*scatseasalt(i))*dopaer(i)
-                     seasaltaod(i)  = seasaltaod(i) + aodc
-
-                     aodc           = (absmom(i)*(1.0_r8 - palb(i)) + palb(i)*scatmom(i))*dopaer(i)
-                     momaod(i)  = momaod(i) + aodc
 
                   endif
 
@@ -1160,6 +1152,30 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
+subroutine update_aod_spec ( icol, scath2o, absh2o, & ! in
+                           sumhygro, sumscat, sumabs, & ! in
+                           hygro_s, palb, dopaer, & ! in
+                           scat_s, abs_s, aod_s ) ! inout
+   ! update aerosol optical depth from scattering and absorption
+
+   implicit none
+   integer,  intent(in) :: icol
+   real(r8), intent(in) :: scath2o, absh2o, sumscat, sumabs, sumhygro
+   real(r8), intent(in) :: hygro_s, palb, dopaer
+   real(r8), intent(inout) :: scat_s(:), abs_s(:), aod_s(:)  ! scatering, absorption and aod for a species
+   ! local variables
+   real(r8) :: aodc  ! aod component
+
+   scat_s(icol)     = (scat_s(icol) + scath2o*hygro_s/sumhygro)/sumscat
+   abs_s(icol)      = (abs_s(icol) + absh2o*hygro_s/sumhygro)/sumabs
+
+   aodc           = (abs_s(icol)*(1.0_r8 - palb) + palb*scat_s(icol))*dopaer
+
+   aod_s(icol)      = aod_s(icol) + aodc
+
+end subroutine update_aod_spec
+
+!===============================================================================
 subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
                 extinct, tropopause_m ) ! inout/out
    ! calculate contributions from volcanic aerosol extinction
