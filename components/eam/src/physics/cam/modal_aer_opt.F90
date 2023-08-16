@@ -927,21 +927,8 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    !Add contributions from volcanic aerosols directly read in extinction
    if(is_cmip6_volc) then
-      !update tropopause layer first
-      do i = 1, ncol
-         ilev_tropp = trop_level(i)
-         tropopause_m(i) = state%zm(i,ilev_tropp)!in meters
-         extinct(i,ilev_tropp) = 0.5_r8*( extinct(i,ilev_tropp) + ext_cmip6_sw(i,ilev_tropp) )
-      enddo
-      do k = 1, pver
-         do i = 1, ncol
-            ilev_tropp = trop_level(i)
-            if (k < ilev_tropp) then
-               !extinction is assigned read in values only for visible band above tropopause
-               extinct(i,k) = ext_cmip6_sw(i,k)
-            endif
-         enddo
-      enddo
+        call calc_volc_ext(ncol, trop_level, state%zm, ext_cmip6_sw, & ! in
+                extinct, tropopause_m ) ! inout/out
    endif
 
 
@@ -1177,6 +1164,36 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
+subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
+                extinct, tropopause_m ) ! inout/out
+   ! calculate contributions from volcanic aerosol extinction
+
+   implicit none
+   integer,  intent(in) :: ncol
+   integer,  intent(in) :: trop_level(pcols)!tropopause level for each column
+   real(r8), intent(in) :: state_zm(:,:) ! state%zm [m]
+   real(r8), intent(in) :: ext_cmip6_sw(pcols,pver)
+   real(r8), intent(inout) :: extinct(pcols,pver)
+   real(r8), intent(out)   :: tropopause_m(pcols)
+
+   ! local variables
+   integer :: icol, kk_tropp
+
+   do icol = 1, ncol
+      kk_tropp = trop_level(icol)
+
+      ! diagnose tropopause height
+      tropopause_m(icol) = state_zm(icol,kk_tropp)!in meters
+
+      !update tropopause layer first
+      extinct(icol,kk_tropp) = 0.5_r8*( extinct(icol,kk_tropp) + ext_cmip6_sw(icol,kk_tropp) )
+      !extinction is assigned read in values only for visible band above tropopause
+      extinct(icol, 1:kk_tropp-1) = ext_cmip6_sw(icol, 1:kk_tropp-1)
+   enddo
+
+end subroutine calc_volc_ext
+
+!===============================================================================
 subroutine calc_refin_complex (ncol, ilw,                   & ! in
                 qaerwat_kk,  volf, specrefindex,            & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
