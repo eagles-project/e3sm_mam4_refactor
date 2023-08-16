@@ -1650,7 +1650,7 @@ subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &!
   integer, intent(in)  :: ncol
   real(r8), intent(in) :: table(ncoef,prefr,prefi)
   real(r8), intent(in) :: ref_real(pcols), ref_img(pcols) !real and imganinary parts of refractive indices [unitless]
-  real(r8), intent(in) :: ref_real_tab(prefr), ref_img_tab(prefi) !!real and imganinary table refractive indices [unitless]
+  real(r8), intent(in) :: ref_real_tab(prefr), ref_img_tab(prefi) !real and imganinary table refractive indices [unitless]
 
   !intent-inouts/outs
   integer,  intent(inout) :: itab(pcols), jtab(pcols)
@@ -1666,10 +1666,10 @@ subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &!
      !compute factors for the real part
      call compute_factors(prefr, ncol, ref_real, ref_real_tab, & !in
           itab, ttab) !out
+
      !compute factors for the imaginary part
      call compute_factors(prefi, ncol, ref_img, ref_img_tab, & !in
           jtab, utab, .true.) !out
-
   endif
 
   !Interpolate coef
@@ -1706,14 +1706,17 @@ subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
   logical, intent(in), optional :: do_print ! to print log msg or not
 
   !intent-inouts/outs
-  integer,  intent(inout) :: ix(:)
-  real(r8), intent(inout) :: tt(:)
+  integer,  intent(out) :: ix(:)
+  real(r8), intent(out) :: tt(:)
 
   !local
   integer  :: ii, ip1, ic
   real(r8) :: dx
 
   real(r8), parameter :: threshold = 1.e-20_r8
+
+  ix(:ncol) = 1
+  tt(:ncol) = 0._r8
 
   if(prefri > 1) then
      do ic = 1, ncol
@@ -1730,13 +1733,8 @@ subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
                  write(iulog,*) 'tt,ref_ind,ix,ref_table,dx=',tt(ic),ref_ind(ic),ix(ic),ref_table(ix(ic)),dx
               endif
            endif
-        else
-           tt(ic) = 0._r8
         endif
-     enddo
-  else
-     ix(:ncol) = 1
-     tt(:ncol) = 0._r8
+     enddo   
   endif
 end subroutine compute_factors
 
