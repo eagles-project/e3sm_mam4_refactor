@@ -880,47 +880,17 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             endif
 
             do i = 1, ncol
+                call check_error_warning('sw', i, k, m, isw, nspec,list_idx, & ! in
+                        dopaer(i), pabs(i), dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        specdens, specrefindex, volf, & ! in
+                        nerr_dopaer, & ! inout
+                        pext(i), specpext(i) ) ! optional in
 
-               if ((dopaer(i) <= -1.e-10_r8) .or. (dopaer(i) >= 30._r8)) then
-
-                  if (dopaer(i) <= -1.e-10_r8) then
-                     write(iulog,*) "ERROR: Negative aerosol optical depth &
-                          &in this layer."
-                  else
-                     write(iulog,*) "WARNING: Aerosol optical depth is &
-                          &unreasonably high in this layer."
-                  end if
-
-                  write(iulog,*) 'dopaer(', i, ',', k, ',', m, ',', lchnk, ')=', dopaer(i)
-                  ! write(iulog,*) 'itab,jtab,ttab,utab=',itab(i),jtab(i),ttab(i),utab(i)
-                  write(iulog,*) 'k=', k, ' pext=', pext(i), ' specext=', specpext(i)
-                  write(iulog,*) 'wetvol=', wetvol(i), ' dryvol=', dryvol(i), ' watervol=', watervol(i)
-                  ! write(iulog,*) 'cext=',(cext(i,l),l=1,ncoef)
-                  ! write(iulog,*) 'crefin=',crefin(i)
-                  write(iulog,*) 'nspec=', nspec
-                  ! write(iulog,*) 'cheb=', (cheb(nc,m,i,k),nc=2,ncoef)
-                  do l = 1, nspec
-                     write(iulog,*) 'l=', l, 'vol(l)=', volf(i,l)
-                     write(iulog,*) 'isw=', isw, 'specrefindex(isw)=', specrefindex(l,isw)
-                     write(iulog,*) 'specdens=', specdens(l)
-                  end do
-
-                  nerr_dopaer = nerr_dopaer + 1
-!                  if (nerr_dopaer >= nerrmax_dopaer) then
-                  if (dopaer(i) < -1.e-10_r8) then
-                     write(iulog,*) '*** halting in '//subname//' after nerr_dopaer =', nerr_dopaer
-                     call endrun('exit from '//subname)
-                  end if
-
-               end if
-            end do
-
-            do i=1,ncol
                tauxar(i,k,isw) = tauxar(i,k,isw) + dopaer(i)
                wa(i,k,isw)     = wa(i,k,isw)     + dopaer(i)*palb(i)
                ga(i,k,isw)     = ga(i,k,isw)     + dopaer(i)*palb(i)*pasm(i)
                fa(i,k,isw)     = fa(i,k,isw)     + dopaer(i)*palb(i)*pasm(i)*pasm(i)
-            end do
+            enddo
 
          end do ! pver
 
@@ -1185,7 +1155,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
                dopaer = pabs*mass(icol,kk)
 
                ! FORTRAN refactor: check and writeout error/warning message
-               call check_error_warning(icol, kk,mm, ilw, nspec, list_idx,& ! in
+               call check_error_warning('lw', icol, kk,mm, ilw, nspec, list_idx,& ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, volf, & ! in
                         nerr_dopaer) ! inout
@@ -1261,16 +1231,18 @@ subroutine calc_refin_complex (ncol, ilw,                   & ! in
 end subroutine calc_refin_complex
 
 !===================================================================
-subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
+subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx, & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, volf, & ! in
-                        nerr_dopaer) ! inout
+                        nerr_dopaer, & ! inout
+                        pext, specpext ) ! optional in
     !------------------------------------------------------------
     ! check and writeout error and warning message
     !------------------------------------------------------------
 
    implicit none
-   integer,intent(in) :: icol, kk, mm, ilw, nspec, list_idx  ! indices
+   character(len=2), intent(in) :: lwsw   ! indicator if this is lw or sw
+   integer,intent(in) :: icol, kk, mm, ilwsw, nspec, list_idx  ! indices
    real(r8),intent(in) :: dopaer    ! aerosol optical depth in layer
    real(r8),intent(in) :: pabs      ! parameterized specific absorption [m2/kg]
    real(r8),intent(in) :: dryvol(:)    ! volume concentration of aerosol mode [m3/kg]
@@ -1282,9 +1254,13 @@ subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
    real(r8),intent(in) :: specdens(:) ! species density [kg/m3]
    complex(r8), intent(in) :: specrefindex(:, :)     ! species refractive index
    integer, intent(inout) :: nerr_dopaer    ! total number of error times
+   real(r8),intent(in),optional :: pext         ! only write out for sw
+   real(r8),intent(in),optional :: specpext     ! only write out for sw
 
    integer :: ll
    integer, parameter :: nerrmax_dopaer=1000
+
+    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) call endrun()
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
     if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
@@ -1299,6 +1275,9 @@ subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
 
         write(iulog,*) 'dopaer(',icol,',',kk,',',mm,',)=', dopaer
         write(iulog,*) 'kk=',kk,' pabs=', pabs
+        if ((lwsw == 'sw') .and. present(pext) .and. present(specpext)) then
+            write(iulog,*) 'kk=', kk, ' pext=', pext, ' specext=', specpext
+        endif
         write(iulog,*) 'wetvol=',wetvol(icol),' dryvol=',dryvol(icol),     &
                        ' watervol=',watervol(icol)
         write(iulog,*) 'cabs=', (cabs(icol,ll),ll=1,ncoef)
@@ -1306,7 +1285,11 @@ subroutine check_error_warning(icol, kk, mm, ilw, nspec,list_idx, & ! in
         write(iulog,*) 'nspec=', nspec
         do ll = 1,nspec
             write(iulog,*) 'll=',ll,'vol(l)=',volf(icol,ll)
-            write(iulog,*) 'ilw=',ilw,' specrefindex(ilw)=',specrefindex(ll,ilw)
+            if (lwsw=='lw') then
+               write(iulog,*) 'ilw=',ilwsw,' specrefindex(ilw)=',specrefindex(ll,ilwsw)
+            elseif (lwsw=='sw') then
+               write(iulog,*) 'isw=', ilwsw, 'specrefindex(isw)=', specrefindex(ll,ilwsw)
+            endif
             write(iulog,*) 'specdens=',specdens(ll)
         enddo
 
