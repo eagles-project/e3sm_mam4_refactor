@@ -514,11 +514,11 @@ contains
           if (present(tropP)) tropP(icol) = tP
           
           if (present(tropT)) then
-            tropT(i) = tropopause_interpolateT(pstate, icol, tropLev(icol), tP)
+            tropT(icol) = tropopause_interpolateT(pstate, icol, tropLev(icol), tP)
           end if
 
           if (present(tropZ)) then
-            tropZ(i) = tropopause_interpolateZ(pstate, icol, tropLev(icol), tP)
+            tropZ(icol) = tropopause_interpolateZ(pstate, icol, tropLev(icol), tP)
           end if
         end if
       end do
