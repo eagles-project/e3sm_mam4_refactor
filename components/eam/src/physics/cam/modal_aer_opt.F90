@@ -952,7 +952,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       absorb(idxnite(i),:)  = fillvalue
       aodvis(idxnite(i))    = fillvalue
       aodabs(idxnite(i))    = fillvalue
-   end do
+   enddo
 
    call outfld('EXTINCT'//diag(list_idx),  extinct, pcols, lchnk)
    call outfld('tropopause_m', tropopause_m, pcols, lchnk)
@@ -969,23 +969,20 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
          else
             ssavis(i) = 0.925_r8
          endif
-      end do
+      enddo
 
       do i = 1, nnite
          ssavis(idxnite(i))     = fillvalue
-
          aoduv(idxnite(i))      = fillvalue
          aodnir(idxnite(i))     = fillvalue
-
          aodabsbc(idxnite(i))   = fillvalue
-
          dustaod(idxnite(i))    = fillvalue
          so4aod(idxnite(i))     = fillvalue
          pomaod(idxnite(i))     = fillvalue
          soaaod(idxnite(i))     = fillvalue
          bcaod(idxnite(i))      = fillvalue
-         momaod(idxnite(i)) = fillvalue
-       end do
+         momaod(idxnite(i))     = fillvalue
+       enddo
 
       call outfld('SSAVIS',        ssavis,        pcols, lchnk)
       call outfld('AODUV',         aoduv,         pcols, lchnk)
@@ -1005,7 +1002,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       call outfld('AODBC',         bcaod,         pcols, lchnk)
       call outfld('AODSS',         seasaltaod,    pcols, lchnk)
       call outfld('AODMOM',        momaod,        pcols, lchnk)
-   end if
+   endif  !  if (list_idx == 0)
 
 end subroutine modal_aero_sw
 
