@@ -1359,9 +1359,9 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             ! interpolate coefficients linear in refractive index
             ! first call calcs itab,jtab,ttab,utab
             itab(:ncol) = 0
-            call binterp(absplw(:,:,:,ilw), ncol,                        & !in
-                 refr, refi, refrtablw(:,ilw), refitablw(:,ilw), & !in
-                 itab, jtab, ttab, utab, cabs)                     !inout/out
+            call binterp(absplw(mm,:,:,:,ilw), ncol,                   & !in
+                 refr, refi, refrtablw(mm,:,ilw), refitablw(mm,:,ilw), & !in
+                 itab, jtab, ttab, utab, cabs)                           !inout/out
 
             ! parameterized optical properties
             do icol = 1, ncol
