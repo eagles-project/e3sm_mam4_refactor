@@ -755,13 +755,15 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             ! call t_stopf('binterp')
 
             ! parameterized optical properties
+            call calc_parameterized (ncol, ncoef, cext, cheb(:,:,k), & ! in
+                                     pext) ! out
+            call calc_parameterized (ncol, ncoef, cabs, cheb(:,:,k), & ! in
+                                     pabs) ! out
+            call calc_parameterized (ncol, ncoef, casm, cheb(:,:,k), & ! in
+                                     pasm) ! out
             do i=1,ncol
 
-               if (logradsurf(i,k) .le. xrmax) then
-                  pext(i) = 0.5_r8*cext(i,1)
-                  do nc = 2, ncoef
-                     pext(i) = pext(i) + cheb(nc,i,k)*cext(i,nc)
-                  enddo
+               if (logradsurf(i,k) <= xrmax) then
                   pext(i) = exp(pext(i))
                else
                   pext(i) = 1.5_r8/(radsurf(i,k)*rhoh2o) ! geometric optics
@@ -769,19 +771,12 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                ! convert from m2/kg water to m2/kg aerosol
                specpext(i) = pext(i)
                pext(i) = pext(i)*wetvol(i)*rhoh2o
- 
-               pabs(i) = 0.5_r8*cabs(i,1)
-               pasm(i) = 0.5_r8*casm(i,1)
-               do nc = 2, ncoef
-                  pabs(i) = pabs(i) + cheb(nc,i,k)*cabs(i,nc)
-                  pasm(i) = pasm(i) + cheb(nc,i,k)*casm(i,nc)
-               enddo
                pabs(i) = pabs(i)*wetvol(i)*rhoh2o
+
                pabs(i) = min_max_bound(0._r8, pext(i), pabs(i))
-
                palb(i) = 1._r8-pabs(i)/max(pext(i),1.e-40_r8)
-
                dopaer(i) = pext(i)*mass(i,k)
+
             enddo
 
             if (savaeruv) then
@@ -1036,7 +1031,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
    real(r8) :: cabs(pcols,ncoef)
-   real(r8) :: pabs      ! parameterized specific absorption [m2/kg]
+   real(r8) :: pabs(pcols)      ! parameterized specific absorption [m2/kg]
    real(r8) :: dopaer    ! aerosol optical depth in layer
 
    integer  :: nerr_dopaer = 0
@@ -1116,18 +1111,16 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
                          itab, jtab, ttab, utab, cabs)
 
             ! parameterized optical properties
+            call calc_parameterized (ncol, ncoef, cabs, cheby(:,:,kk), & ! in
+                                     pabs) ! out
             do icol = 1, ncol
-               pabs = 0.5_r8*cabs(icol,1)
-               do nc = 2, ncoef
-                  pabs = pabs + cheby(nc,icol,kk)*cabs(icol,nc)
-               enddo
-               pabs   = pabs*wetvol(icol)*rhoh2o
-               pabs   = max(0._r8,pabs)
-               dopaer = pabs*mass(icol,kk)
+               pabs(icol)   = pabs(icol)*wetvol(icol)*rhoh2o
+               pabs(icol)   = max(0._r8,pabs(icol))
+               dopaer = pabs(icol)*mass(icol,kk)
 
                ! FORTRAN refactor: check and writeout error/warning message
                call check_error_warning('lw', icol, kk,mm, ilw, nspec, list_idx,& ! in
-                        dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
+                        dopaer, pabs(icol), dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, volf, & ! in
                         nerr_dopaer) ! inout
 
@@ -1151,6 +1144,27 @@ end subroutine modal_aero_lw
 ! Private routines
 !===============================================================================
 
+subroutine calc_parameterized (ncol, ncoef, coef, cheb_k, & ! in
+                               para) ! out
+    ! calculate parameterized absorption, extinction or asymmetry factor
+    ! further calculations are needed. see modal_aero_sw and modal_aero_lw
+
+    implicit none
+    integer,  intent(in) :: ncol,ncoef
+    real(r8), intent(in) :: coef(pcols,ncoef)
+    real(r8), intent(in) :: cheb_k(ncoef,pcols)
+    real(r8), intent(out):: para(pcols)
+
+    integer :: nc
+
+    para(:ncol) = 0.5_r8*coef(:ncol,1)
+    do nc = 2, ncoef
+        para(:ncol) = para(:ncol) + cheb_k(nc,:ncol)*coef(:ncol,nc)
+    enddo
+
+end subroutine calc_parameterized
+
+!===============================================================================
 subroutine update_aod_spec ( icol, scath2o, absh2o, & ! in
                            sumhygro, sumscat, sumabs, & ! in
                            hygro_s, palb, dopaer, & ! in
