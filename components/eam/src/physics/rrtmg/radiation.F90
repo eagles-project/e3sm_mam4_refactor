@@ -1457,7 +1457,8 @@ end function radiation_nextsw_cday
                   ! update the conctrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
 
-                  call aer_rad_props_lw(is_cmip6_volc, icall, dt, state, pbuf,  aer_lw_abs)
+                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state, pbuf, & ! in
+                    aer_lw_abs) !out
                   
                   call t_startf ('rad_rrtmg_lw')
                   call rad_rrtmg_lw( &
