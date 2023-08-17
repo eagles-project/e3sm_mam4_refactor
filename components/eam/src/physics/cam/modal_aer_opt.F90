@@ -651,8 +651,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
                do i = 1, ncol
                   vol(i)      = specmmr(i,k)/specdens(l)
-                  dryvol(i)   = dryvol(i) + vol(i)
-                  crefin(i)   = crefin(i) + vol(i)*specrefindex(l,isw)
                end do
 
                ! compute some diagnostics for visible band only
@@ -726,16 +724,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                end if
             end do ! species loop l
 
-            do i = 1, ncol
-               watervol(i) = qaerwat(i,k)/rhoh2o
-               wetvol(i) = watervol(i) + dryvol(i)
-
-               ! volume mixing
-               crefin(i) = crefin(i) + watervol(i)*crefwsw(isw)
-               crefin(i) = crefin(i)/max(wetvol(i),1.e-60_r8)
-               refr(i)   = real(crefin(i))
-               refi(i)   = abs(aimag(crefin(i)))
-            end do
+            call calc_refin_complex ('sw', ncol, isw,          & ! in
+                   qaerwat(:,k), volf, specrefindex,           & ! in
+                   dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! call t_startf('binterp')
 
@@ -1099,7 +1090,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
             enddo
 
             ! calculate complex refractive index
-            call calc_refin_complex(ncol, ilw, & ! in
+            call calc_refin_complex('lw', ncol, ilw, & ! in
                    qaerwat(:,kk), volf, specrefindex,   & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
@@ -1219,7 +1210,7 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
 end subroutine calc_volc_ext
 
 !===============================================================================
-subroutine calc_refin_complex (ncol, ilw,                   & ! in
+subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
                 qaerwat_kk,  volf, specrefindex,            & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
     !-------------------------------------------------------------------
@@ -1228,7 +1219,8 @@ subroutine calc_refin_complex (ncol, ilw,                   & ! in
     !-------------------------------------------------------------------
 
     implicit none
-    integer,  intent(in) :: ncol, ilw       
+    character(len=2), intent(in) :: lwsw   ! indicator if this is lw or sw
+    integer,  intent(in) :: ncol, ilwsw       
     real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk [g/g]
     real(r8), intent(in) :: volf(:,:)       ! volume fraction of insoluble aerosol [fraction]
     complex(r8), intent(in) :: specrefindex(:,:)     ! species refractive index
@@ -1242,30 +1234,39 @@ subroutine calc_refin_complex (ncol, ilw,                   & ! in
 
     integer :: icol
 
-   crefin(:ncol) = (0._r8, 0._r8)
-   dryvol(:ncol) = 0._r8
+    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) call endrun()
 
-   do icol = 1, ncol
-      dryvol(icol) = sum(volf(icol,:))
-      crefin(icol) = sum(volf(icol,:)*specrefindex(:,ilw))
+    crefin(:ncol) = (0._r8, 0._r8)
+    dryvol(:ncol) = 0._r8
 
-      watervol(icol) = qaerwat_kk(icol)/rhoh2o
-      wetvol(icol)   = watervol(icol) + dryvol(icol)
+    do icol = 1, ncol
+       dryvol(icol) = sum(volf(icol,:))
+       crefin(icol) = sum(volf(icol,:)*specrefindex(:,ilwsw))
 
-      if (watervol(icol) < 0.0_r8) then
+       watervol(icol) = qaerwat_kk(icol)/rhoh2o
+       wetvol(icol)   = watervol(icol) + dryvol(icol)
+
+       if (watervol(icol) < 0.0_r8 .and. lwsw=='lw') then
           if (abs(watervol(icol)) > 1.e-1_r8*wetvol(icol)) then
               write(iulog,*) 'watervol,wetvol,dryvol=',watervol(icol), &
                          wetvol(icol),dryvol(icol)
           endif
           watervol(icol) = 0._r8
           wetvol(icol)   = dryvol(icol)
-      endif
+       endif
 
-      crefin(icol) = crefin(icol) + watervol(icol)*crefwlw(ilw)
-      if (wetvol(icol) > 1.e-40_r8) crefin(icol) = crefin(icol)/wetvol(icol)
-      refr(icol) = real(crefin(icol))
-      refi(icol) = aimag(crefin(icol))
-   enddo
+       ! some different treatments for lw and sw
+       if (lwsw=='lw') then
+          crefin(icol) = crefin(icol) + watervol(icol)*crefwlw(ilwsw)
+          if (wetvol(icol) > 1.e-40_r8) crefin(icol) = crefin(icol)/wetvol(icol)
+       elseif (lwsw=='sw') then
+          crefin(icol) = crefin(icol) + watervol(icol)*crefwsw(ilwsw)
+          crefin(icol) = crefin(icol)/max(wetvol(icol),1.e-60_r8)
+       endif
+
+       refr(icol) = real(crefin(icol))
+       refi(icol) = aimag(crefin(icol))
+    enddo
 
 end subroutine calc_refin_complex
 
