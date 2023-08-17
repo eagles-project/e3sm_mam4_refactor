@@ -86,14 +86,14 @@
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'temper',temper(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'col_dens',col_dens(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'zen_angle',zen_angle(yaml%col_print))
-        call write_var(unit_input,unit_output,'srf_alb',srf_alb(yaml%col_print))
-        call write_var(unit_input,unit_output,'lwc',lwc(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'clouds',clouds(yaml%col_print,yaml%lev_print))
+        call write_var(unit_input,unit_output,'pmid',pmid(:,yaml%lev_print))
+        call write_var(unit_input,unit_output,'pdel',pdel(:,yaml%lev_print))
+        call write_var(unit_input,unit_output,'temper',temper(:,yaml%lev_print))
+        call write_var(unit_input,unit_output,'col_dens',col_dens(:,yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'zen_angle',zen_angle(:))
+        call write_var(unit_input,unit_output,'srf_alb',srf_alb(:))
+        call write_var(unit_input,unit_output,'lwc',lwc(:,yaml%lev_print))
+        call write_var(unit_input,unit_output,'clouds',clouds(:,yaml%lev_print))
         call write_var(unit_input,unit_output,'esfact',esfact)
         call write_var(unit_input,unit_output,'ncol',ncol)
 
