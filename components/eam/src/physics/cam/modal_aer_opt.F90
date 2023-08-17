@@ -661,68 +661,47 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
                   do i = 1, ncol
                      burden(i) = burden(i) + specmmr(i,k)*mass(i,k)
-                  end do
+                  enddo
 
                   if (trim(spectype) == 'dust') then
-                     do i = 1, ncol
-                        burdendust(i) = burdendust(i) + specmmr(i,k)*mass(i,k)
-                        dustvol(i)    = vol(i)
-                        scatdust(i)   = vol(i)*specrefr
-                        absdust(i)    = -vol(i)*specrefi
-                        hygrodust(i)  = vol(i)*hygro_aer
-                     end do
-                  end if
-
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdendust, scatdust, absdust, hygrodust) ! out
+                        dustvol(:)    = vol(:)
+                  endif
                   if (trim(spectype) == 'sulfate') then
-                     do i = 1, ncol
-                        burdenso4(i) = burdenso4(i) + specmmr(i,k)*mass(i,k)
-                        scatso4(i)   = vol(i)*specrefr
-                        absso4(i)    = -vol(i)*specrefi
-                        hygroso4(i)  = vol(i)*hygro_aer
-                     end do
-                  end if
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdenso4, scatso4, absso4, hygroso4) ! out
+                  endif
                   if (trim(spectype) == 'black-c') then
-                     do i = 1, ncol
-                        burdenbc(i) = burdenbc(i) + specmmr(i,k)*mass(i,k)
-                        scatbc(i)   = vol(i)*specrefr
-                        absbc(i)    = -vol(i)*specrefi
-                        hygrobc(i)  = vol(i)*hygro_aer
-                   end do
-                  end if
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdenbc, scatbc, absbc, hygrobc) ! out
+                  endif
                   if (trim(spectype) == 'p-organic') then
-                     do i = 1, ncol
-                        burdenpom(i) = burdenpom(i) + specmmr(i,k)*mass(i,k)
-                        scatpom(i)   = vol(i)*specrefr
-                        abspom(i)    = -vol(i)*specrefi
-                        hygropom(i)  = vol(i)*hygro_aer
-                      end do
-                  end if
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdenpom, scatpom, abspom, hygropom) ! out
+                  endif
                   if (trim(spectype) == 's-organic') then
-                     do i = 1, ncol
-                        burdensoa(i) = burdensoa(i) + specmmr(i,k)*mass(i,k)
-                        scatsoa(i)   = vol(i)*specrefr
-                        abssoa(i)    = -vol(i)*specrefi
-                        hygrosoa(i)  = vol(i)*hygro_aer
-                     end do
-                  end if
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdensoa, scatsoa, abssoa, hygrosoa) ! out
+                  endif
                   if (trim(spectype) == 'seasalt') then
-                     do i = 1, ncol
-                        burdenseasalt(i) = burdenseasalt(i) + specmmr(i,k)*mass(i,k)
-                        scatseasalt(i)   = vol(i)*specrefr
-                        absseasalt(i)    = -vol(i)*specrefi
-                        hygroseasalt(i)  = vol(i)*hygro_aer
-                      end do
-                  end if
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdenseasalt, scatseasalt, absseasalt, hygroseasalt) ! out
+                  endif
                   if (trim(spectype) == 'm-organic') then
-                     do i = 1, ncol
-                        burdenmom(i) = burdenmom(i) + specmmr(i,k)*mass(i,k)
-                        scatmom(i)   = vol(i)*specrefr
-                        absmom(i)    = -vol(i)*specrefi
-                        hygromom(i)  = vol(i)*hygro_aer
-                     end do
-                  end if
-               end if
-            end do ! species loop l
+                        call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
+                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        burdenmom, scatmom, absmom, hygromom) ! out
+                  endif
+
+               endif ! if (savaervis)
+            enddo ! species loop l
 
             call calc_refin_complex ('sw', ncol, isw,          & ! in
                    qaerwat(:,k), volf, specrefindex,           & ! in
@@ -1154,6 +1133,34 @@ subroutine calc_parameterized (ncol, ncoef, coef, cheb_k, & ! in
     enddo
 
 end subroutine calc_parameterized
+!===============================================================================
+subroutine calc_diag_spec ( ncol, specmmr_k, mass_k, & ! in
+                        vol, specrefr, specrefi, hygro_aer, & ! in
+                        burden_s, scat_s, abs_s, hygro_s) ! out
+   ! calculate some diagnostics for a species
+   implicit none
+   integer,  intent(in) :: ncol
+   real(r8), intent(in),  pointer :: specmmr_k(:)
+   real(r8), intent(in) :: mass_k(:)
+   real(r8), intent(in) :: vol(:) ! volume concentration of aerosol species (m3/kg)
+   real(r8), intent(in) :: specrefr, specrefi  ! real and image part of specrefindex
+   real(r8), intent(in) :: hygro_aer  ! aerosol hygroscopicity
+   real(r8), intent(out) :: burden_s(pcols) ! aerosol burden of species
+   real(r8), intent(out) :: scat_s(pcols)   ! scattering of species
+   real(r8), intent(out) :: abs_s(pcols)    ! absorption of species
+   real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species
+   
+   integer :: icol
+
+   burden_s(:ncol) = 0._r8
+   do icol = 1, ncol
+       burden_s(icol) = burden_s(icol) + specmmr_k(icol)*mass_k(icol)
+       scat_s(icol)   = vol(icol)*specrefr
+       abs_s(icol)    = -vol(icol)*specrefi
+       hygro_s(icol)  = vol(icol)*hygro_aer
+   enddo
+
+end subroutine calc_diag_spec
 
 !===============================================================================
 subroutine update_aod_spec ( icol, scath2o, absh2o, & ! in
