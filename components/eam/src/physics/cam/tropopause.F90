@@ -72,9 +72,9 @@ module tropopause
   character(len=256)    :: tropopause_climo_file = 'trop_climo'      ! absolute filepath of climatology file
 
   ! These variables are used to store the climatology data.
-  integer, parameter :: days_in_year_real = 365._r8
-  integer, parameter :: months_in_year = 12
-  integer, parameter :: first_month = 1
+  real(r8), parameter :: days_in_year_real = 365._r8
+  integer, parameter  :: months_in_year = 12
+  integer, parameter  :: first_month = 1
   real(r8)              :: days(months_in_year)                      ! days in the climatology
   real(r8), pointer     :: tropp_p_loc(:,:,:)                        ! climatological tropopause pressures
 
@@ -1182,7 +1182,7 @@ contains
     ncol  = pstate%ncol
 
     ! Find the tropopause using the default algorithm backed by the climatology.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,  & ! in
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,  & ! in
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ)   ! out / optional out
     
     tropPdf(:,:) = 0._r8
@@ -1205,7 +1205,7 @@ contains
     
     
     ! Find the tropopause using just the primary algorithm.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,  & ! in
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,  & ! in
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,   &  ! out / optional out
          backup=TROP_ALG_NONE)  ! optional in
 
@@ -1229,7 +1229,7 @@ contains
     call outfld('TROPP_FD',  tropFound(:ncol),  ncol, lchnk)
     
     ! Find the tropopause using just the cold point algorithm.
-    call tropopause_find(lchnk,ncol,pstate%pint,pstate%pmid,pstate%t,pstate%zm,pstate%zi,  & ! in
+    call tropopause_find(lchnk,ncol,pstate%pmid,pstate%pint,pstate%t,pstate%zm,pstate%zi,  & ! in
          tropLev,tropP=tropP,tropT=tropT,tropZ=tropZ,  &  ! out / optional out
          primary=TROP_ALG_CPP,backup=TROP_ALG_NONE) ! optional in
 
