@@ -385,6 +385,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                          tauxar, wa, ga, fa)
    ! calculates aerosol sw radiative properties
 
+  use mam_support, only : min_max_bound
   use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
                               specname_amode, spechygro, & 
                               sigmag_amode, lspectype_amode, lmassptr_amode, &
@@ -765,10 +766,10 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                else
                   pext(i) = 1.5_r8/(radsurf(i,k)*rhoh2o) ! geometric optics
                endif
-
                ! convert from m2/kg water to m2/kg aerosol
                specpext(i) = pext(i)
                pext(i) = pext(i)*wetvol(i)*rhoh2o
+ 
                pabs(i) = 0.5_r8*cabs(i,1)
                pasm(i) = 0.5_r8*casm(i,1)
                do nc = 2, ncoef
@@ -776,25 +777,23 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                   pasm(i) = pasm(i) + cheb(nc,i,k)*casm(i,nc)
                enddo
                pabs(i) = pabs(i)*wetvol(i)*rhoh2o
-               pabs(i) = max(0._r8,pabs(i))
-               pabs(i) = min(pext(i),pabs(i))
+               pabs(i) = min_max_bound(0._r8, pext(i), pabs(i))
 
-               palb(i) = 1._r8-pabs(i)/max(pext(i),1.e-40_r8)
                palb(i) = 1._r8-pabs(i)/max(pext(i),1.e-40_r8)
 
                dopaer(i) = pext(i)*mass(i,k)
-            end do
+            enddo
 
             if (savaeruv) then
                do i = 1, ncol
                   aoduv(i) = aoduv(i) + dopaer(i)
-               end do
-            end if
+               enddo
+            endif
 
             if (savaernir) then
                do i = 1, ncol
                   aodnir(i) = aodnir(i) + dopaer(i)
-               end do
+               enddo
             endif
 
             ! Save aerosol optical depth at longest visible wavelength
