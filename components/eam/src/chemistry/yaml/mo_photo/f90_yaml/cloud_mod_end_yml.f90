@@ -6,9 +6,9 @@
 
      !start writing data
      
-        call write_var(unit_output,'eff_alb',eff_alb(yaml%lev_print))
-        call write_var(unit_output,'cld_mult',cld_mult(yaml%lev_print))
-
+        call write_var(unit_output,'eff_alb',eff_alb)
+        call write_var(unit_output,'cld_mult',cld_mult)
+     
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
      !call write_output_aerosol_mmr_from_stateq(unit_output, fld_name, field, aer_num_only, inp_out_str)
@@ -22,6 +22,10 @@
 ! This part of the code is for finding the best lat/lon and n_calls.
 
 ! find lag/lon/y_nstep/y_k
+!if(masterproc .and. line_work) then
+!  write(101,*)'phys_debug_lat = ',get_lat(y_lchnk, y_i), &
+!  ' phys_debug_lon = ', get_lon(y_lchnk, y_i), get_nstep(), y_i, yaml%col_print
+!endif
 !if(masterproc .and. get_nstep()==yaml%nstep_print) then
 !  write(101,*)'phys_debug_lat = ',get_lat(y_lchnk, y_i), &
 !  ' phys_debug_lon = ', get_lon(y_lchnk, y_i), y_i, yaml%col_print

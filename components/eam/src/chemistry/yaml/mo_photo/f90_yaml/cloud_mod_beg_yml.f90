@@ -30,7 +30,7 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 51       !level
-  yaml%nstep_print = 355 !time step
+  yaml%nstep_print = 353 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
