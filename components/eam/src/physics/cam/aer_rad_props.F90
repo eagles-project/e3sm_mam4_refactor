@@ -772,7 +772,7 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
 
   !Logic:
   !Update taus, tau_w, tau_w_g and tau_w_f with the read in volcanic
-  !aerosol extinction (1/km), single scattering albedo and asymmetry factors.
+  !aerosol extinction (1/km, converted to 1/m), single scattering albedo and asymmetry factors.
 
   !Above the tropopause, the read in values from the file include both the stratospheric
   !and volcanic aerosols. Therefore, we need to zero out taus above the tropopause
