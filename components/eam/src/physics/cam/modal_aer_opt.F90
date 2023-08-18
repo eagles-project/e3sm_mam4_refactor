@@ -386,8 +386,8 @@ end subroutine modal_aer_opt_init
 
 !===============================================================================
 
-subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  &
-                         tauxar, wa, ga, fa)
+subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
+                         tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
   use mam_support, only : min_max_bound
@@ -557,8 +557,8 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
-           dgnumdry_m=dgnumdry_m)
+   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., & ! in
+           dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
                                   cldn, dgnumdry_m, & ! in
@@ -1102,9 +1102,9 @@ subroutine calc_parameterized (ncol, ncoef, coef, cheb_k, & ! in
 
 end subroutine calc_parameterized
 !===============================================================================
-subroutine calc_diag_spec ( ncol, specmmr_k, mass_k, & ! in
-                        vol, specrefr, specrefi, hygro_aer, & ! in
-                        burden_s, scat_s, abs_s, hygro_s) ! out
+subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
+                            vol, specrefr, specrefi, hygro_aer, & ! in
+                            burden_s, scat_s, abs_s, hygro_s    ) ! out
    ! calculate some diagnostics for a species
    implicit none
    integer,  intent(in) :: ncol
@@ -1131,10 +1131,10 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k, & ! in
 end subroutine calc_diag_spec
 
 !===============================================================================
-subroutine update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
-                           hygro_s, palb, dopaer, & ! in
-                           scat_s, abs_s, aod_s ) ! inout
+subroutine update_aod_spec ( icol, scath2o, absh2o,     & ! in
+                             sumhygro, sumscat, sumabs, & ! in
+                             hygro_s, palb, dopaer,     & ! in
+                             scat_s, abs_s, aod_s       ) ! inout
    ! update aerosol optical depth from scattering and absorption
 
    implicit none
@@ -1156,7 +1156,7 @@ end subroutine update_aod_spec
 
 !===============================================================================
 subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
-                extinct, tropopause_m ) ! inout/out
+                         extinct, tropopause_m ) ! inout/out
    ! calculate contributions from volcanic aerosol extinction
 
    implicit none
@@ -1186,7 +1186,7 @@ end subroutine calc_volc_ext
 
 !===============================================================================
 subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
-                qaerwat_kk, specvol, specrefindex,            & ! in
+                qaerwat_kk, specvol, specrefindex,          & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
     !-------------------------------------------------------------------
     ! calculate complex refractive index 
@@ -1246,10 +1246,10 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
 end subroutine calc_refin_complex
 
 !===================================================================
-subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx, & ! in
+subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx,   & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
                         specdens, specrefindex, specvol, & ! in
-                        nerr_dopaer, & ! inout
+                        nerr_dopaer,   & ! inout
                         pext, specpext ) ! optional in
     !------------------------------------------------------------
     ! check and writeout error and warning message
