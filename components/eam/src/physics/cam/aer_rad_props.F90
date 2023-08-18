@@ -194,11 +194,14 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
    integer  :: trop_level(pcols), icol
    real(r8), pointer :: ext_cmip6_sw(:,:,:)
    real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of 1/m
+   real(r8) :: zi(pcols,pver+1)
+   real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
 
    !-----------------------------------------------------------------------------
 
    ncol  = state%ncol
    lchnk = state%lchnk
+   zi = state%zi
 
    ! compute mixing ratio to mass conversion
    do k = 1, pver
@@ -239,8 +242,15 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
       !converting it from 1/km to 1/m
 
       call pbuf_get_field(pbuf, idx_ext_sw, ext_cmip6_sw)
+
       call outfld('extinct_sw_inp',ext_cmip6_sw(:,:,idx_sw_diag), pcols, lchnk)
       ext_cmip6_sw_inv_m = ext_cmip6_sw * km_inv_to_m_inv !convert from 1/km to 1/m
+
+  !Obtain read in values for ssa and asymmetry factor (af) from the
+  !volcanic input file
+      call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
+      call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
+
 
       !Find tropopause as extinction should be applied only above tropopause
       !trop_level has value for tropopause for each column
@@ -271,7 +281,8 @@ subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6
 
    if (is_cmip6_volc) then
       !update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
-      call volcanic_cmip_sw(state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, tau_w, tau_w_g, tau_w_f)
+      call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
+           tau, tau_w, tau_w_g, tau_w_f)  ! inout
    endif
 
    ! Contributions from bulk aerosols.
@@ -737,14 +748,15 @@ end subroutine get_volcanic_radius_rad_props
 
 !==============================================================================
 
-subroutine volcanic_cmip_sw (state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, tau_w, tau_w_g, tau_w_f)
+subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
+           tau, tau_w, tau_w_g, tau_w_f)  ! inout
 
   !Intent-in
-  type(physics_state), intent(in), target :: state
-  type(physics_buffer_desc), pointer :: pbuf(:)
-
-  integer,  intent(in) :: trop_level(pcols)
-  real(r8), intent(in) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)
+  integer,  intent(in) :: ncol       ! Number of columns
+  real(r8), intent(in) :: zi(:,:)    ! Height above surface at interfaces [m]
+  integer,  intent(in) :: trop_level(pcols)  ! tropopause level index
+  real(r8), intent(in) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)  ! short wave extinction [m^{-1}]
+  real(r8), intent(in) :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
 
   !Intent-inout
   real(r8), intent(inout) :: tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
@@ -753,23 +765,14 @@ subroutine volcanic_cmip_sw (state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, t
   real(r8), intent(inout) :: tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * tau * w
 
   !Local variables
-  integer   :: ncol, icol, ipver, ilev_tropp
-  real(r8)  :: lyr_thk, ext_unitless(nswbands), asym_unitless(nswbands)
+  integer   :: icol, ipver, ilev_tropp
+  real(r8)  :: lyr_thk   !  thickness between level interfaces [m]
+  real(r8)  :: ext_unitless(nswbands), asym_unitless(nswbands)
   real(r8)  :: ext_ssa(nswbands),ext_ssa_asym(nswbands)
-
-  real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
-
-  ncol = state%ncol
 
   !Logic:
   !Update taus, tau_w, tau_w_g and tau_w_f with the read in volcanic
-  !aerosol extinction (1/km), single scattering albedo and asymmtry factors.
-
-  !Obtain read in values for ssa and asymmetry factor (af) from the
-  !volcanic input file
-
-  call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
-  call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
+  !aerosol extinction (1/km, converted to 1/m), single scattering albedo and asymmetry factors.
 
   !Above the tropopause, the read in values from the file include both the stratospheric
   !and volcanic aerosols. Therefore, we need to zero out taus above the tropopause
@@ -781,8 +784,7 @@ subroutine volcanic_cmip_sw (state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, t
   !First handle the case of tropopause layer itself:
   do icol = 1, ncol
      ilev_tropp = trop_level(icol) !tropopause level
-
-     lyr_thk = state%zi(icol,ilev_tropp) - state%zi(icol,ilev_tropp+1)
+     lyr_thk = zi(icol,ilev_tropp) - zi(icol,ilev_tropp+1)
 
      ext_unitless(:)  = lyr_thk * ext_cmip6_sw_inv_m(icol,ilev_tropp,:)
      asym_unitless(:) = af_cmip6_sw (icol,ilev_tropp,:)
@@ -802,7 +804,7 @@ subroutine volcanic_cmip_sw (state, pbuf, trop_level, ext_cmip6_sw_inv_m, tau, t
         ilev_tropp = trop_level(icol) !tropopause level
         if (ipver < ilev_tropp) then !BALLI: see if this is right!
 
-           lyr_thk = state%zi(icol,ipver) - state%zi(icol,ipver+1)
+           lyr_thk = zi(icol,ipver) - zi(icol,ipver+1)
 
            ext_unitless(:)  = lyr_thk * ext_cmip6_sw_inv_m(icol,ipver,:)
            asym_unitless(:) = af_cmip6_sw(icol,ipver,:)
