@@ -469,7 +469,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: ssavis(pcols)
    real(r8) :: dustvol(pcols)              ! volume concentration of dust in aerosol mode (m3/kg)
 
-   real(r8) :: burden(pcols)
+   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode
    real(r8) :: burdendust(pcols), burdenso4(pcols), burdenbc(pcols), &
                burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols)
    real(r8) :: burdenmom(pcols)
@@ -539,11 +539,11 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    fa(1:ncol,0,:)      = 0.7225_r8
 
    ! diagnostics for visible band summed over modes
-   extinct(1:ncol,:)     = 0.0_r8
-   absorb(1:ncol,:)      = 0.0_r8
-   aodvis(1:ncol)        = 0.0_r8
-   aodall(1:ncol)        = 0.0_r8
-   aodabs(1:ncol)        = 0.0_r8
+   extinct(:ncol,:)      = 0.0_r8
+   absorb(:ncol,:)       = 0.0_r8
+   aodvis(:ncol)         = 0.0_r8
+   aodall(:ncol)         = 0.0_r8
+   aodabs(:ncol)         = 0.0_r8
    burdendust(:ncol)     = 0.0_r8
    burdenso4(:ncol)      = 0.0_r8
    burdenpom(:ncol)      = 0.0_r8
@@ -552,7 +552,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    burdenseasalt(:ncol)  = 0.0_r8
    burdenmom(:ncol)      = 0.0_r8
    momaod(:ncol)         = 0.0_r8
-   ssavis(1:ncol)        = 0.0_r8
+   ssavis(:ncol)         = 0.0_r8
 
    aodabsbc(:ncol)       = 0.0_r8
    dustaod(:ncol)        = 0.0_r8
@@ -561,7 +561,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    soaaod(:ncol)         = 0.0_r8
    bcaod(:ncol)          = 0.0_r8
    seasaltaod(:ncol)     = 0.0_r8
-
 
    ! diags for other bands
    aoduv(:ncol)          = 0.0_r8
@@ -582,7 +581,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    do m = 1, ntot_amode
 
       ! diagnostics for visible band for each mode
-      burden(:ncol)       = 0._r8
+      burdenmode(1:ncol)  = 0.0_r8
       aodmode(1:ncol)     = 0.0_r8
       dustaodmode(1:ncol) = 0.0_r8
 
@@ -594,7 +593,8 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       sigma_logr_aer = sigmag_amode(m)
 
       ! calc size parameter for all columns
-      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, logradsurf, cheb)
+      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+                                 radsurf,  logradsurf, cheb      ) ! out
 
 
       allocate(specvol(ncol,nspec),stat=istat)
@@ -605,15 +605,12 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       if (istat /= 0) call endrun("Unable to allocate specrefindex: "//errmsg(__FILE__,__LINE__) )
 
       do isw = 1, nswbands
-         savaervis = (isw .eq. idx_sw_diag)
-         savaeruv  = (isw .eq. idx_uv_diag)
-         savaernir = (isw .eq. idx_nir_diag)
+         savaervis = (isw == idx_sw_diag)
+         savaeruv  = (isw == idx_uv_diag)
+         savaernir = (isw == idx_nir_diag)
 
          do k = top_lev, pver
 
-            ! form bulk refractive index
-            crefin(:ncol) = (0._r8, 0._r8)
-            dryvol(:ncol) = 0._r8
             dustvol(:ncol) = 0._r8
 
             scatdust(:ncol)     = 0._r8
@@ -634,9 +631,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             scatseasalt(:ncol)  = 0._r8
             absseasalt(:ncol)   = 0._r8
             hygroseasalt(:ncol) = 0._r8
-            scatmom(:ncol)  = 0._r8
-            absmom(:ncol)   = 0._r8
-            hygromom(:ncol) = 0._r8
+            scatmom(:ncol)      = 0._r8
+            absmom(:ncol)       = 0._r8
+            hygromom(:ncol)     = 0._r8
 
             ! aerosol species loop
             do l = 1, nspec
@@ -649,10 +646,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                specrefindex(l,:) = specrefndxsw(:,lspectype_amode(l,m))
                specvol(:,l) = specmmr(:,k)/specdens(l)
 
-!               do i = 1, ncol
- !                 vol(i)      = specmmr(i,k)/specdens(l)
-  !             end do
-
                ! compute some diagnostics for visible band only
                if (savaervis) then
 
@@ -660,7 +653,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                   specrefi = aimag(specrefindex(l,isw))
 
                   do i = 1, ncol
-                     burden(i) = burden(i) + specmmr(i,k)*mass(i,k)
+                     burdenmode(i) = burdenmode(i) + specmmr(i,k)*mass(i,k)
                   enddo
 
                   if (trim(spectype) == 'dust') then
@@ -862,7 +855,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
          enddo
 
          write(outname,'(a,i1)') 'BURDEN', m
-         call outfld(trim(outname), burden, pcols, lchnk)
+         call outfld(trim(outname), burdenmode, pcols, lchnk)
 
          write(outname,'(a,i1)') 'AODMODE', m
          call outfld(trim(outname), aodmode, pcols, lchnk)
