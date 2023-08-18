@@ -796,9 +796,12 @@ subroutine volcanic_cmip_sw (ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6
      tau_w_g(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_g(icol,ilev_tropp,:) + ext_ssa_asym(:))
      tau_w_f(icol,ilev_tropp,:) = 0.5_r8 * ( tau_w_f(icol,ilev_tropp,:) + ext_ssa_asym(:) * asym_unitless(:))
   enddo
-  do icol = 1, ncol
-     ilev_tropp = trop_level(icol) !tropopause level
-     do ipver = 1 , pver
+
+  !As it will be more efficient for FORTRAN to loop over levels and then columns, the following loops
+  !are nested keeping that in mind
+  do ipver = 1 , pver
+     do icol = 1, ncol
+        ilev_tropp = trop_level(icol) !tropopause level
         if (ipver < ilev_tropp) then !BALLI: see if this is right!
 
            lyr_thk = zi(icol,ipver) - zi(icol,ipver+1)
