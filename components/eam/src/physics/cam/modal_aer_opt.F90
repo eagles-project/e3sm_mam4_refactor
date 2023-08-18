@@ -32,6 +32,12 @@ use cam_logfile,       only: iulog
 use perf_mod,          only: t_startf, t_stopf
 use cam_abortutils,        only: endrun
 
+use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
+                            specname_amode, spechygro, &
+                            sigmag_amode, lspectype_amode, lmassptr_amode, &
+                            specrefndxlw, refrtablw, refitablw, absplw, &
+                            specrefndxsw, refrtabsw, refitabsw, extpsw, abspsw, asmpsw
+
 use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
 use modal_aero_calcsize,    only: modal_aero_calcsize_diag,modal_aero_calcsize_sub
 use shr_log_mod ,           only: errmsg => shr_log_errmsg
@@ -121,7 +127,6 @@ subroutine modal_aer_opt_init()
 
    use ioFileMod,        only: getfil
    use phys_control,     only: phys_getopts
-   use shr_log_mod ,     only: errmsg => shr_log_errmsg
 
    ! Local variables
 
@@ -386,10 +391,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    ! calculates aerosol sw radiative properties
 
   use mam_support, only : min_max_bound
-  use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
-                              specname_amode, spechygro, & 
-                              sigmag_amode, lspectype_amode, lmassptr_amode, &
-                              specrefndxsw, refrtabsw, refitabsw, extpsw, abspsw, asmpsw
 
    real(r8),            intent(in) :: dt             !timestep (s)
    type(physics_state), intent(in), target :: state          ! state variables
@@ -926,11 +927,6 @@ end subroutine modal_aero_sw
 !===============================================================================
 subroutine modal_aero_lw(dt, state, pbuf, & ! in
                         tauxar            ) ! out
-
-  use shr_log_mod ,     only: errmsg => shr_log_errmsg
-  use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
-                              sigmag_amode, lspectype_amode, lmassptr_amode, &
-                              specrefndxlw, refrtablw, refitablw, absplw
 
    ! calculates aerosol lw radiative properties
 
