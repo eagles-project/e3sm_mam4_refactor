@@ -419,6 +419,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: air_density(pcols,pver) ! (kg/m3)
 
    real(r8),    pointer :: state_q(:,:,:)      ! state%q
+   real(r8),    pointer :: state_zm(:,:)       ! state%zm [m]
    real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
    real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio
@@ -426,8 +427,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8)             :: hygro_aer           !
 
    real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
-   real(r8), pointer :: dgnumwet(:,:)     ! number mode wet diameter
-   real(r8), pointer :: qaerwat(:,:)      ! aerosol water (g/g)
 
    real(r8) :: sigma_logr_aer         ! geometric standard deviation of number distribution
    real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
@@ -466,37 +465,28 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    real(r8) :: aodabsbc(pcols)             ! absorption optical depth of BC
 
-   real(r8) :: ssavis(pcols)
+   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode
+   real(r8) :: aodmode(pcols)
+
+   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode
    real(r8) :: dustvol(pcols)              ! volume concentration of dust in aerosol mode (m3/kg)
 
-   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode
    real(r8) :: burdendust(pcols), burdenso4(pcols), burdenbc(pcols), &
-               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols)
-   real(r8) :: burdenmom(pcols)
-
-   real(r8) :: aodmode(pcols)
-   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode
-
-   real(r8) :: specrefr, specrefi
+               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols), burdenmom(pcols)
    real(r8) :: scatdust(pcols), scatso4(pcols), scatbc(pcols), &
-               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols)
-   real(r8) :: scatmom(pcols)
+               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols), scatmom(pcols)
    real(r8) :: absdust(pcols), absso4(pcols), absbc(pcols), &
-               abspom(pcols), abssoa(pcols), absseasalt(pcols)
-   real(r8) :: absmom(pcols)
+               abspom(pcols), abssoa(pcols), absseasalt(pcols), absmom(pcols)
    real(r8) :: hygrodust(pcols), hygroso4(pcols), hygrobc(pcols), &
-               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols)
-   real(r8) :: hygromom(pcols)
+               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols), hygromom(pcols)
 
+   real(r8) :: ssavis(pcols)
+   real(r8) :: specrefr, specrefi
    real(r8) :: scath2o, absh2o, sumscat, sumabs, sumhygro
-   real(r8) :: aodc                        ! aod of component
 
    ! total species AOD
    real(r8) :: dustaod(pcols), so4aod(pcols), bcaod(pcols), &
-               pomaod(pcols), soaaod(pcols), seasaltaod(pcols)
-   real(r8) :: momaod(pcols)
-
-
+               pomaod(pcols), soaaod(pcols), seasaltaod(pcols), momaod(pcols)
 
    logical :: savaervis ! true if visible wavelength (0.55 micron)
    logical :: savaernir ! true if near ir wavelength (~0.88 micron)
@@ -505,17 +495,15 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: aoduv(pcols)               ! extinction optical depth in uv
    real(r8) :: aodnir(pcols)              ! extinction optical depth in nir
 
-
    character(len=32) :: outname
 
    ! debug output
-   integer, parameter :: nerrmax_dopaer=1000
    integer  :: nerr_dopaer = 0
-   character(len=*), parameter :: subname = 'modal_aero_sw'
    !----------------------------------------------------------------------------
    lchnk = state%lchnk
    ncol  = state%ncol
    state_q      => state%q
+   state_zm     => state%zm
    temperature  => state%t
    pmid         => state%pmid
 
@@ -585,15 +573,12 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       aodmode(1:ncol)     = 0.0_r8
       dustaodmode(1:ncol) = 0.0_r8
 
-      dgnumwet => dgnumwet_m(:,:,m)
-      qaerwat  => qaerwat_m(:,:,m)
-
       ! get mode info
       nspec = nspec_amode(m)
       sigma_logr_aer = sigmag_amode(m)
 
       ! calc size parameter for all columns
-      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet_m(:,:,m), & ! in
                                  radsurf,  logradsurf, cheb      ) ! out
 
 
@@ -697,7 +682,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             enddo ! species loop l
 
             call calc_refin_complex ('sw', ncol, isw,          & ! in
-                   qaerwat(:,k), specvol, specrefindex,           & ! in
+                   qaerwat_m(:,k,m), specvol, specrefindex,           & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! call t_startf('binterp')
@@ -872,7 +857,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    !Add contributions from volcanic aerosols directly read in extinction
    if(is_cmip6_volc) then
-        call calc_volc_ext(ncol, trop_level, state%zm, ext_cmip6_sw, & ! in
+        call calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
                 extinct, tropopause_m ) ! inout/out
    endif
 
@@ -964,9 +949,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    integer :: istat
    integer :: itim_old           ! index
 
-   real(r8), pointer :: dgnumwet(:,:)  ! wet number mode diameter [m]
-   real(r8), pointer :: qaerwat(:,:)   ! aerosol water [g/g]
-
    real(r8) :: sigma_logr_aer          ! geometric standard deviation of number distribution
    real(r8) :: alnsg_amode
    real(r8) :: cheby(ncoef,pcols,pver) ! chebychef polynomials
@@ -1030,9 +1012,6 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    ! loop over all aerosol modes
    do mm = 1, ntot_amode
 
-      dgnumwet => dgnumwet_m(:,:,mm)
-      qaerwat  => qaerwat_m(:,:,mm)
-
       ! get mode info
       nspec = nspec_amode(mm)
       sigma_logr_aer = sigmag_amode(mm)
@@ -1040,7 +1019,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
       ! calc size parameter for all columns
       ! FORTRAN refactoring: ismethod2 is tempararily used to ensure BFB test. 
       ! can be removed when porting to C++
-      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
+      call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet_m(:,:,mm), & ! in
                                  radsurf, logradsurf, cheby, ismethod2=.true.) 
 
       allocate(specvol(ncol,nspec),stat=istat)
@@ -1063,7 +1042,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
             ! calculate complex refractive index
             call calc_refin_complex('lw', ncol, ilw, & ! in
-                   qaerwat(:,kk), specvol, specrefindex,   & ! in
+                   qaerwat_m(:,kk,mm), specvol, specrefindex,   & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! interpolate coefficients linear in refractive index
