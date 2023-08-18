@@ -434,7 +434,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: logradsurf(pcols,pver) ! log(aerosol surface mode radius)
    real(r8) :: cheb(ncoef,pcols,pver)
 
-   real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specvol(:,:)        ! volume concentration of aerosol specie (m3/kg)
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
    complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
 
@@ -442,7 +442,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8)    :: refi(pcols)     ! imaginary part of refractive index
    complex(r8) :: crefin(pcols)   ! complex refractive index
 
-   real(r8) :: vol(pcols)      ! volume concentration of aerosol specie (m3/kg)
+!   real(r8) :: vol(pcols)      ! volume concentration of aerosol specie (m3/kg)
    real(r8) :: dryvol(pcols)   ! volume concentration of aerosol mode (m3/kg)
    real(r8) :: watervol(pcols) ! volume concentration of water in each mode (m3/kg)
    real(r8) :: wetvol(pcols)   ! volume concentration of wet mode (m3/kg)
@@ -597,8 +597,8 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, radsurf, logradsurf, cheb)
 
 
-      allocate(volf(ncol,nspec),stat=istat)
-      if (istat /= 0) call endrun("Unable to allocate volf: "//errmsg(__FILE__,__LINE__) )
+      allocate(specvol(ncol,nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specvol: "//errmsg(__FILE__,__LINE__) )
       allocate(specdens(nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specdens: "//errmsg(__FILE__,__LINE__) )
       allocate(specrefindex(nspec,nswbands),stat=istat)
@@ -647,11 +647,11 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                hygro_aer = spechygro(lspectype_amode(l,m))
                specdens(l) = specdens_amode(lspectype_amode(l,m))
                specrefindex(l,:) = specrefndxsw(:,lspectype_amode(l,m))
-               volf(:,l) = specmmr(:,k)/specdens(l)
+               specvol(:,l) = specmmr(:,k)/specdens(l)
 
-               do i = 1, ncol
-                  vol(i)      = specmmr(i,k)/specdens(l)
-               end do
+!               do i = 1, ncol
+ !                 vol(i)      = specmmr(i,k)/specdens(l)
+  !             end do
 
                ! compute some diagnostics for visible band only
                if (savaervis) then
@@ -665,38 +665,38 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
                   if (trim(spectype) == 'dust') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdendust, scatdust, absdust, hygrodust) ! out
-                        dustvol(:)    = vol(:)
+                        dustvol(:)    = specvol(:,l)
                   endif
                   if (trim(spectype) == 'sulfate') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdenso4, scatso4, absso4, hygroso4) ! out
                   endif
                   if (trim(spectype) == 'black-c') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdenbc, scatbc, absbc, hygrobc) ! out
                   endif
                   if (trim(spectype) == 'p-organic') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdenpom, scatpom, abspom, hygropom) ! out
                   endif
                   if (trim(spectype) == 's-organic') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdensoa, scatsoa, abssoa, hygrosoa) ! out
                   endif
                   if (trim(spectype) == 'seasalt') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdenseasalt, scatseasalt, absseasalt, hygroseasalt) ! out
                   endif
                   if (trim(spectype) == 'm-organic') then
                         call calc_diag_spec ( ncol, specmmr(:,k), mass(:,k), & ! in
-                                        vol, specrefr, specrefi, hygro_aer, & ! in
+                                        specvol(:,l), specrefr, specrefi, hygro_aer, & ! in
                                         burdenmom, scatmom, absmom, hygromom) ! out
                   endif
 
@@ -704,7 +704,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             enddo ! species loop l
 
             call calc_refin_complex ('sw', ncol, isw,          & ! in
-                   qaerwat(:,k), volf, specrefindex,           & ! in
+                   qaerwat(:,k), specvol, specrefindex,           & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! call t_startf('binterp')
@@ -838,7 +838,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             do i = 1, ncol
                 call check_error_warning('sw', i, k, m, isw, nspec,list_idx, & ! in
                         dopaer(i), pabs(i), dryvol, wetvol, watervol, crefin,cabs,& ! in
-                        specdens, specrefindex, volf, & ! in
+                        specdens, specrefindex, specvol, & ! in
                         nerr_dopaer, & ! inout
                         pext(i), specpext(i) ) ! optional in
 
@@ -871,7 +871,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
          call outfld(trim(outname), dustaodmode, pcols, lchnk)
       endif
 
-      deallocate(volf)
+      deallocate(specvol)
       deallocate(specdens)
       deallocate(specrefindex)
 
@@ -982,7 +982,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    real(r8) :: mass(pcols,pver) ! layer mass
 
-   real(r8),allocatable :: volf(:,:)           ! volume fraction of insoluble aerosol
+   real(r8),allocatable :: specvol(:,:)        ! volume concentration of aerosol specie [m3/kg]
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
    complex(r8),allocatable :: specrefindex(:,:)     ! species refractive index
 
@@ -1050,8 +1050,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
                                  radsurf, logradsurf, cheby, ismethod2=.true.) 
 
-      allocate(volf(ncol,nspec),stat=istat)
-      if (istat /= 0) call endrun("Unable to allocate volf: "//errmsg(__FILE__,__LINE__) )
+      allocate(specvol(ncol,nspec),stat=istat)
+      if (istat /= 0) call endrun("Unable to allocate specvol: "//errmsg(__FILE__,__LINE__) )
       allocate(specdens(nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specdens: "//errmsg(__FILE__,__LINE__) )
       allocate(specrefindex(nspec,nlwbands),stat=istat)
@@ -1065,12 +1065,12 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
                specmmr => state_q(:,:,lmassptr_amode(ll,mm))
                specdens(ll) = specdens_amode(lspectype_amode(ll,mm))
                specrefindex(ll,:) = specrefndxlw(:,lspectype_amode(ll,mm))
-               volf(:,ll) = specmmr(:,kk)/specdens(ll)
+               specvol(:,ll) = specmmr(:,kk)/specdens(ll)
             enddo
 
             ! calculate complex refractive index
             call calc_refin_complex('lw', ncol, ilw, & ! in
-                   qaerwat(:,kk), volf, specrefindex,   & ! in
+                   qaerwat(:,kk), specvol, specrefindex,   & ! in
                    dryvol, wetvol, watervol, crefin, refr, refi) ! out
 
             ! interpolate coefficients linear in refractive index
@@ -1091,7 +1091,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
                ! FORTRAN refactor: check and writeout error/warning message
                call check_error_warning('lw', icol, kk,mm, ilw, nspec, list_idx,& ! in
                         dopaer, pabs(icol), dryvol, wetvol, watervol, crefin,cabs,& ! in
-                        specdens, specrefindex, volf, & ! in
+                        specdens, specrefindex, specvol, & ! in
                         nerr_dopaer) ! inout
 
                ! update absorption optical depth
@@ -1102,7 +1102,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
       enddo  ! nlwbands
 
-      deallocate(volf)
+      deallocate(specvol)
       deallocate(specdens)
       deallocate(specrefindex)
 
@@ -1218,7 +1218,7 @@ end subroutine calc_volc_ext
 
 !===============================================================================
 subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
-                qaerwat_kk,  volf, specrefindex,            & ! in
+                qaerwat_kk, specvol, specrefindex,            & ! in
                 dryvol, wetvol, watervol, crefin, refr, refi) ! out
     !-------------------------------------------------------------------
     ! calculate complex refractive index 
@@ -1229,7 +1229,7 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
     character(len=2), intent(in) :: lwsw   ! indicator if this is lw or sw
     integer,  intent(in) :: ncol, ilwsw       
     real(r8), intent(in) :: qaerwat_kk(:)   ! aerosol water at level kk [g/g]
-    real(r8), intent(in) :: volf(:,:)       ! volume fraction of insoluble aerosol [fraction]
+    real(r8), intent(in) :: specvol(:,:)    ! volume concentration of aerosol specie [m3/kg]
     complex(r8), intent(in) :: specrefindex(:,:)     ! species refractive index
 
     real(r8),intent(out) :: dryvol(pcols)    ! volume concentration of aerosol mode [m3/kg]
@@ -1247,8 +1247,8 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
     dryvol(:ncol) = 0._r8
 
     do icol = 1, ncol
-       dryvol(icol) = sum(volf(icol,:))
-       crefin(icol) = sum(volf(icol,:)*specrefindex(:,ilwsw))
+       dryvol(icol) = sum(specvol(icol,:))
+       crefin(icol) = sum(specvol(icol,:)*specrefindex(:,ilwsw))
 
        watervol(icol) = qaerwat_kk(icol)/rhoh2o
        wetvol(icol)   = watervol(icol) + dryvol(icol)
@@ -1280,7 +1280,7 @@ end subroutine calc_refin_complex
 !===================================================================
 subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx, & ! in
                         dopaer, pabs, dryvol, wetvol, watervol, crefin,cabs,& ! in
-                        specdens, specrefindex, volf, & ! in
+                        specdens, specrefindex, specvol, & ! in
                         nerr_dopaer, & ! inout
                         pext, specpext ) ! optional in
     !------------------------------------------------------------
@@ -1297,8 +1297,8 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx, & ! in
    real(r8),intent(in) :: watervol(:)  ! volume concentration of water in each mode [m3/kg]
    complex(r8),intent(in) :: crefin(:) ! complex refractive index
    real(r8),intent(in) :: cabs(:,:)
-   real(r8),intent(in) :: volf(:,:)   ! volume fraction of insoluble aerosol [fraction]
-   real(r8),intent(in) :: specdens(:) ! species density [kg/m3]
+   real(r8),intent(in) :: specvol(:,:) ! volume concentration of aerosol specie [m3/kg]
+   real(r8),intent(in) :: specdens(:)  ! species density [kg/m3]
    complex(r8), intent(in) :: specrefindex(:, :)     ! species refractive index
    integer, intent(inout) :: nerr_dopaer    ! total number of error times
    real(r8),intent(in),optional :: pext         ! only write out for sw
@@ -1331,7 +1331,7 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx, & ! in
         write(iulog,*) 'crefin=', crefin(icol)
         write(iulog,*) 'nspec=', nspec
         do ll = 1,nspec
-            write(iulog,*) 'll=',ll,'vol(l)=',volf(icol,ll)
+            write(iulog,*) 'll=',ll,'vol(l)=',specvol(icol,ll)
             if (lwsw=='lw') then
                write(iulog,*) 'ilw=',ilwsw,' specrefindex(ilw)=',specrefindex(ll,ilwsw)
             elseif (lwsw=='sw') then
