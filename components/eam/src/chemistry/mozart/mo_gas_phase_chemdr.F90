@@ -210,7 +210,6 @@ contains
     use cam_history,       only : outfld
     use wv_saturation,     only : qsat
     use constituents,      only : cnst_mw
-    use mo_drydep,         only : has_drydep
     use time_manager,      only : get_ref_date
     use mo_ghg_chem,       only : ghg_chem_set_rates, ghg_chem_set_flbc
     use mo_sad,            only : sad_strat_calc
@@ -900,9 +899,9 @@ contains
     prect(:ncol) = precc(:ncol) + precl(:ncol)
 
     call t_startf('drydep')
-    call drydep_xactive( lchnk, ncol, latndx, lonndx, &                                                 ! in
+    call drydep_xactive( lchnk, ncol, latndx, &                                                 ! in
                          ncdate, ts, tfld(:,pver), tvs, ps, pmid(:,pver), &                             ! in
-                         qh2o(:,pver), relhum(:,pver:pver), wind_speed, prect, snowhland, fsds, mmr, &  ! in
+                         qh2o(:,pver), wind_speed, prect, snowhland, fsds, mmr, &  ! in
                          depvel, &                                                                      ! out
                          sflx)                                                                          ! inout
     call t_stopf('drydep')

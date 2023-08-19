@@ -9,19 +9,20 @@ module mo_drydep
   use shr_kind_mod, only : r8 => shr_kind_r8, shr_kind_cl
   use chem_mods,    only : gas_pcnst
   use pmgrid,       only : plev, plevp
-  use spmd_utils,   only : masterproc, iam
+  use spmd_utils,   only : masterproc
   use ppgrid,       only : pcols, begchunk, endchunk
-  use mo_tracname,  only : solsym
   use cam_abortutils,   only : endrun
   use ioFileMod,    only : getfil
 #ifdef SPMD
   use mpishorthand, only : mpicom, mpir8, mpiint, mpilog
 #endif
-  use pio
+  use pio, only : pio_inq_dimid, pio_inq_dimlen, pio_inq_varid, & 
+                  pio_get_var, pio_closefile, file_desc_t, var_desc_t, &
+                  PIO_NOWRITE
   use cam_pio_utils,only : cam_pio_openfile
   use cam_logfile,  only : iulog
   use dyn_grid,     only : get_dyn_grid_parm, get_horiz_grid_d
-  use scamMod,      only:  single_column
+
 
   use seq_drydep_mod, only : nddvels =>  n_drydep, drydep_list, mapping
   use physconst,    only : karman
@@ -31,7 +32,7 @@ module mo_drydep
   save
 
   private
-  public :: drydep_inti_xactive, drydep_xactive,  has_drydep
+  public :: drydep_inti_xactive, drydep_xactive
   public :: n_land_type, fraction_landuse, drydep_srf_file
 
   real(r8)              :: dels
@@ -44,34 +45,21 @@ module mo_drydep
   integer :: nspecies                       ! number of depvel species in input file
 
   integer :: o3_ndx, ch4_ndx,  &
-             co_ndx, h2_ndx
+             co_ndx
   integer :: soa_ndx, so4_ndx
   logical :: soa_dd, so4_dd
 
   logical :: o3_dd, ch4_dd,&
-             co_dd, &
-             h2_dd
+             co_dd
 
   integer :: so2_ndx
 
-  integer :: o3a_ndx
-  logical :: o3a_dd
-
-
-
-  integer :: &
-       o3_tab_ndx = -1, &
-       co_tab_ndx = -1
-  logical :: &
-       o3_in_tab = .false., &
-       co_in_tab = .false.
 
   real(r8), parameter    :: small_value = 1.e-36_r8
   real(r8), parameter    :: large_value = 1.e36_r8
   real(r8), parameter    :: diffm       = 1.789e-5_r8
   real(r8), parameter    :: diffk       = 1.461e-5_r8
   real(r8), parameter    :: difft       = 2.060e-5_r8
-  real(r8), parameter    :: vonkar      = karman
   real(r8), parameter    :: ric         = 0.2_r8
   real(r8), parameter    :: r           = 287.04_r8
   real(r8), parameter    :: cp          = 1004._r8
@@ -218,7 +206,6 @@ contains
     ! 	... get species indices
     !-------------------------------------------------------------------------------------
     ch4_ndx      = get_spc_ndx( 'CH4' )
-    h2_ndx       = get_spc_ndx( 'H2' )
     co_ndx       = get_spc_ndx( 'CO' )
     if( o3_ndx < 0 ) then
        o3_ndx  = get_spc_ndx( 'O3' )
@@ -357,13 +344,6 @@ contains
        wetland(:,:)          = .01_r8 * wetland(:,:)
        lake(:,:)             = .01_r8 * lake(:,:)
        urban(:,:)            = .01_r8 * urban(:,:)
-#ifdef DEBUG
-       if(masterproc) then
-          write(iulog,*) 'minmax vegetation_map ',minval(vegetation_map),maxval(vegetation_map)
-          write(iulog,*) 'minmax wetland        ',minval(wetland),maxval(wetland)
-          write(iulog,*) 'minmax landmask       ',minval(landmask),maxval(landmask)
-       end if
-#endif
        !---------------------------------------------------------------------------
        ! 	... define lat-lon of vegetation map (1x1)
        !---------------------------------------------------------------------------
@@ -597,37 +577,6 @@ contains
     jl = 1
     ju = plon
 
-    if (single_column) then
-       if (use_replay) then
-          call getfil (ncdata, ncdata_loc)
-          call cam_pio_openfile (piofile, trim(ncdata_loc), PIO_NOWRITE)
-          call shr_scam_getCloseLatLon(piofile,scmlat,scmlon,closelat,closelon,latidx,lonidx)
-          call pio_closefile ( piofile)
-          ploniop=size(loniop)
-          platiop=size(latiop)
-       else 
-          latidx=1
-          lonidx=1
-          ploniop=1
-          platiop=1
-       end if
-      
-       lon_edge(1) = loniop(lonidx) * r2d - .5_r8*(loniop(2) - loniop(1)) * r2d
-
-       if (lonidx.lt.ploniop) then
-          lon_edge(2) = loniop(lonidx+1) * r2d - .5_r8*(loniop(2) - loniop(1)) * r2d
-       else
-          lon_edge(2) = lon_edge(1) + (loniop(2) - loniop(1)) * r2d
-       end if
-
-       lat_edge(1) = latiop(latidx) * r2d - .5_r8*(latiop(2) - latiop(1)) * r2d
-
-       if (latidx.lt.platiop) then
-          lat_edge(2) = latiop(latidx+1) * r2d - .5_r8*(latiop(2) - latiop(1)) * r2d
-       else
-          lat_edge(2) = lat_edge(1) + (latiop(2) - latiop(1)) * r2d
-       end if       
-    else
        do i = 1,plon
           lon_edge(i) = lam(i) * r2d - .5_r8*(lam(2) - lam(1)) * r2d
        end do
@@ -642,7 +591,7 @@ contains
           end do
           lat_edge(plat+1) = lat_edge(plat) + (phi(2) - phi(1)) * r2d
        end if
-    end if
+    
     do j = 1,plat+1
        lat_edge(j) = min( lat_edge(j), 90._r8 )
        lat_edge(j) = max( lat_edge(j),-90._r8 )
@@ -663,11 +612,6 @@ contains
        lon_veg_edge_ext(i) = lon_veg_edge(i-nlon_veg) + 360._r8
        mapping_ext     (i) =              i-nlon_veg
     end do
-#ifdef DEBUG
-    write(iulog,*) 'interp_map : lon_edge ',lon_edge
-    write(iulog,*) 'interp_map : lat_edge ',lat_edge
-    write(iulog,*) 'interp_map : mapping_ext ',mapping_ext
-#endif
     do j = 1,plon+1
        lon1 = lon_edge(j) 
        do i = -veg_ext,nlon_veg+veg_ext
@@ -798,9 +742,9 @@ contains
   
   !-------------------------------------------------------------------------------------
   !-------------------------------------------------------------------------------------
-  subroutine drydep_xactive( lchnk, ncol, latndx, lonndx, &                                 ! in
+  subroutine drydep_xactive( lchnk, ncol, latndx,  &                                 ! in
                              ncdate, sfc_temp, air_temp, tv, pressure_sfc, pressure_10m, &  ! in
-                             spec_hum, rh, wind_speed, rain, snow, solar_flux, mmr, &       ! in
+                             spec_hum, wind_speed, rain, snow, solar_flux, mmr, &       ! in
                              dvel, &                                                        ! out
                              dflx)                                                          ! inout
   
@@ -834,8 +778,7 @@ contains
     !-------------------------------------------------------------------------------------
     integer, intent(in) :: lchnk                      ! chunk number
     integer, intent(in) :: ncol
-    integer, intent(in) :: latndx(pcols)              ! chunk latitude indicies
-    integer, intent(in) :: lonndx(pcols)              ! chunk longitude indicies 
+    integer, intent(in) :: latndx(pcols)              ! chunk latitude indicies 
     integer, intent(in) :: ncdate                     ! present date (yyyymmdd)
     real(r8), intent(in) :: sfc_temp(pcols)           ! surface temperature [K]
     real(r8), intent(in) :: air_temp(pcols)           ! surface air temperature [K]   
@@ -843,7 +786,6 @@ contains
     real(r8), intent(in) :: pressure_sfc(pcols)       ! surface pressure [Pa]
     real(r8), intent(in) :: pressure_10m(pcols)       ! 10 meter pressure [Pa]
     real(r8), intent(in) :: spec_hum(pcols)           ! specific humidity [kg/kg]
-    real(r8), intent(in) :: rh(ncol,1)                ! relative humidity
     real(r8), intent(in) :: wind_speed(pcols)         ! 10 meter wind speed [m/s]
     real(r8), intent(in) :: rain(pcols)              
     real(r8), intent(in) :: snow(pcols)               ! snow height [m]
@@ -1040,7 +982,7 @@ contains
     enddo
 
 
-    call calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, & ! in
+    call calculate_uustar(ncol, index_season, fr_lnduse, & ! in
                               unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
                               uustar)                                    ! out
 
@@ -1078,11 +1020,9 @@ contains
                                              rsmx, rlux, rclx, rgsx, rdc, &                                  ! in
                                              dvel, dflx)                                                     ! out
 
-    if ( beglt > 1 ) return
-
   end subroutine drydep_xactive
 
-  subroutine calculate_uustar(ncol, beglt, endlt, index_season, fr_lnduse, & ! in
+  subroutine calculate_uustar(ncol, index_season, fr_lnduse, & ! in
                               unstable, lcl_frc_landuse, va, zl, ribn, &      ! in
                               uustar)                                        ! out
 
@@ -1090,8 +1030,6 @@ contains
 
     ! input
     integer, intent(in) :: ncol
-    integer, intent(in) :: beglt
-    integer, intent(in) :: endlt
     integer, intent(in) :: index_season(ncol,n_land_type)
     logical, intent(in) :: fr_lnduse(ncol, n_land_type)
     logical, intent(in) :: unstable(ncol)
@@ -1130,7 +1068,7 @@ contains
     !-------------------------------------------------------------------------------------
     do icol = 1,ncol
        z0b(icol) = exp( z0b(icol) )
-       cvarb     = vonkar/log( zl(icol)/z0b(icol) )
+       cvarb     = karman/log( zl(icol)/z0b(icol) )
        !-------------------------------------------------------------------------------------
        ! unstable and stable cases
        !-------------------------------------------------------------------------------------
@@ -1178,11 +1116,11 @@ contains
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
              if( unstable(icol) ) then
-                cvar(icol,lt)  = vonkar/log( zl(icol)/z0(index_season(icol,lt),lt) )
+                cvar(icol,lt)  = karman/log( zl(icol)/z0(index_season(icol,lt),lt) )
                 bycp(icol,lt)  = 9.4_r8*(cvar(icol,lt)**2)* sqrt( abs(ribn(icol))*zl(icol)/z0(index_season(icol,lt),lt) )
                 ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)*sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 7.4_r8*bycp(icol,lt))) ) )
              else
-                cvar(icol,lt)  = vonkar/log( zl(icol)/z0(index_season(icol,lt),lt) )
+                cvar(icol,lt)  = karman/log( zl(icol)/z0(index_season(icol,lt),lt) )
                 ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)/(1._r8 + 4.7_r8*ribn(icol)) )
              endif
           endif
@@ -1197,12 +1135,12 @@ contains
        if( fr_lnduse(icol,lt) ) then
           if( unstable(icol) ) then
              z0water        = (.016_r8*(ustar(icol,lt)**2)/grav) + diffk/(9.1_r8*ustar(icol,lt))
-             cvar(icol,lt)  = vonkar/(log( zl(icol)/z0water ))
+             cvar(icol,lt)  = karman/(log( zl(icol)/z0water ))
              bycp(icol,lt)  = 9.4_r8*(cvar(icol,lt)**2)*sqrt( abs(ribn(icol))*zl(icol)/z0water )
              ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)* sqrt( 1._r8 - (9.4_r8*ribn(icol)/(1._r8+ 7.4_r8*bycp(icol,lt))) ) )
           else
              z0water        = (.016_r8*(ustar(icol,lt)**2)/grav) + diffk/(9.1_r8*ustar(icol,lt))
-             cvar(icol,lt)  = vonkar/(log(zl(icol)/z0water))
+             cvar(icol,lt)  = karman/(log(zl(icol)/z0water))
              ustar(icol,lt) = sqrt( cvar(icol,lt)*uustar(icol)/(1._r8 + 4.7_r8*ribn(icol)) )
           endif
        endif
@@ -1248,7 +1186,7 @@ contains
              else
                 h = hvar/((1._r8+4.7_r8*ribn(icol))**2)
              endif
-             obklen(icol,lt) = thg(icol) * ustar(icol,lt) * ustar(icol,lt) / (vonkar * grav * h)
+             obklen(icol,lt) = thg(icol) * ustar(icol,lt) * ustar(icol,lt) / (karman * grav * h)
           endif
        enddo
     enddo
@@ -1290,8 +1228,8 @@ contains
                 zeta = min( 1._r8, zeta )
                 psih = -5._r8 * zeta
              endif
-             dep_ra (icol,lt) = (vonkar - psih*cvar(icol,lt))/(ustar(icol,lt)*vonkar*cvar(icol,lt))
-             dep_rb (icol,lt) = (2._r8/(vonkar*ustar(icol,lt))) * crb
+             dep_ra (icol,lt) = (karman - psih*cvar(icol,lt))/(ustar(icol,lt)*karman*cvar(icol,lt))
+             dep_rb (icol,lt) = (2._r8/(karman*ustar(icol,lt))) * crb
           endif
        enddo
     enddo
@@ -1332,7 +1270,7 @@ contains
              do icol = 1,ncol
                 if( fr_lnduse(icol,lt) ) then
                    sndx = index_season(icol,lt)
-                   if( ispec == o3_ndx .or. ispec == o3a_ndx .or. ispec == so2_ndx ) then
+                   if( ispec == o3_ndx .or. ispec == so2_ndx ) then
                       rmx = 0._r8
                    else
                       rmx = 1._r8/(heff(icol,idx_drydep)/3000._r8 + 100._r8*foxd(idx_drydep))
@@ -1491,7 +1429,7 @@ contains
     do ispec = 1,gas_pcnst
        idx_drydep = map_dvel(ispec)
        if( has_dvel(ispec) ) then
-          if( ispec /= o3_ndx .and. ispec /= o3a_ndx .and. ispec /= so2_ndx ) then
+          if( ispec /= o3_ndx .and. ispec /= so2_ndx ) then
              do lt = beglt,endlt
                 if( lt /= 7 ) then
                    do icol = 1,ncol
@@ -1548,6 +1486,7 @@ contains
                                                 rsmx, rlux, rclx, rgsx, rdc, &                                     ! in
                                                 dvel, dflx)                                                        ! out
     use seq_drydep_mod, only: rac
+    use mo_tracname,  only : solsym
 
     ! input
     integer, intent(in) :: ncol
