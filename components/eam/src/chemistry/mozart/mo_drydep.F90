@@ -35,27 +35,13 @@ module mo_drydep
   public :: drydep_inti_xactive, drydep_xactive
   public :: n_land_type, fraction_landuse, drydep_srf_file
 
-  real(r8)              :: dels
-  real(r8), allocatable :: days(:)          ! day of year for soilw
   real(r8), allocatable :: dvel(:,:,:,:)    ! depvel array interpolated to model grid
-  real(r8), allocatable :: dvel_interp(:,:,:) ! depvel array interpolated to grid and time
-  integer :: last, next                     ! day indicies
   integer :: ndays                          ! # of days in soilw file
   integer :: map(gas_pcnst)                 ! indices for drydep species
-  integer :: nspecies                       ! number of depvel species in input file
-
-  integer :: o3_ndx, ch4_ndx,  &
-             co_ndx
-  integer :: soa_ndx, so4_ndx
-  logical :: soa_dd, so4_dd
-
-  logical :: o3_dd, ch4_dd,&
-             co_dd
 
   integer :: so2_ndx
 
 
-  real(r8), parameter    :: small_value = 1.e-36_r8
   real(r8), parameter    :: large_value = 1.e36_r8
   real(r8), parameter    :: diffm       = 1.789e-5_r8
   real(r8), parameter    :: diffk       = 1.461e-5_r8
@@ -205,18 +191,7 @@ contains
     !-------------------------------------------------------------------------------------
     ! 	... get species indices
     !-------------------------------------------------------------------------------------
-    ch4_ndx      = get_spc_ndx( 'CH4' )
-    co_ndx       = get_spc_ndx( 'CO' )
-    if( o3_ndx < 0 ) then
-       o3_ndx  = get_spc_ndx( 'O3' )
-    end if
     so2_ndx     = get_spc_ndx( 'SO2' )
-    soa_ndx     = get_spc_ndx( 'SOA' )
-    so4_ndx     = get_spc_ndx( 'SO4' )
-
-    soa_dd     = has_drydep( 'SOA' )
-    so4_dd     = has_drydep( 'SO4' )
-
 
     do i=1,nddvels
        if ( mapping(i) > 0 ) then
@@ -270,110 +245,13 @@ contains
        write(iulog,*) 'dvel_inti: failed to allocate index_season_lai_j; error = ',astat
        call endrun
     end if
-    if(dycore_is('UNSTRUCTURED') ) then
-       call get_landuse_and_soilw_from_file(do_soilw)
-       allocate( index_season_lai(plon,12),stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate index_season_lai; error = ',astat
-          call endrun
-       end if
-    else
-       allocate( index_season_lai(plat,12),stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate index_season_lai; error = ',astat
-          call endrun
-       end if
-       !---------------------------------------------------------------------------
-       ! 	... read landuse map
-       !---------------------------------------------------------------------------
-       call getfil (depvel_lnd_file, locfn, 0)
-       call cam_pio_openfile (piofile, trim(locfn), PIO_NOWRITE)
-       !---------------------------------------------------------------------------
-       ! 	... get the dimensions
-       !---------------------------------------------------------------------------
-       ierr = pio_inq_dimid( piofile, 'lon', dimid )
-       ierr = pio_inq_dimlen( piofile, dimid, nlon_veg )
-       ierr = pio_inq_dimid( piofile, 'lat', dimid )
-       ierr = pio_inq_dimlen( piofile, dimid, nlat_veg )
-       ierr = pio_inq_dimid( piofile, 'pft', dimid )
-       ierr = pio_inq_dimlen( piofile, dimid, npft_veg )
-       !---------------------------------------------------------------------------
-       ! 	... allocate arrays
-       !---------------------------------------------------------------------------
-       allocate( vegetation_map(nlon_veg,nlat_veg,npft_veg), work(nlon_veg,nlat_veg), stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate vegation_map; error = ',astat
-          call endrun
-       end if
-       allocate( urban(nlon_veg,nlat_veg), lake(nlon_veg,nlat_veg), &
-            landmask(nlon_veg,nlat_veg), wetland(nlon_veg,nlat_veg), stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate vegation_map; error = ',astat
-          call endrun
-       end if
-       allocate( lon_veg(nlon_veg), lat_veg(nlat_veg), &
-            lon_veg_edge(nlon_veg+1), lat_veg_edge(nlat_veg+1), stat=astat )
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate vegation lon, lat arrays; error = ',astat
-          call endrun
-       end if
-       !---------------------------------------------------------------------------
-       ! 	... read the vegetation map and landmask
-       !---------------------------------------------------------------------------
-       ierr = pio_inq_varid( piofile, 'PCT_PFT', vid )
-       ierr = pio_get_var( piofile, vid, vegetation_map )
-
-       ierr = pio_inq_varid( piofile, 'LANDMASK', vid )
-       ierr = pio_get_var( piofile, vid, landmask )
-
-       ierr = pio_inq_varid( piofile, 'PCT_URBAN', vid )
-       ierr = pio_get_var( piofile, vid, urban )
-
-       ierr = pio_inq_varid( piofile, 'PCT_LAKE', vid )
-       ierr = pio_get_var( piofile, vid, lake )
-
-       ierr = pio_inq_varid( piofile, 'PCT_WETLAND', vid )
-       ierr = pio_get_var( piofile, vid, wetland )
-
-       call pio_closefile( piofile )
-
-       !---------------------------------------------------------------------------
-       ! scale vegetation, urban, lake, and wetland to fraction
-       !---------------------------------------------------------------------------
-       vegetation_map(:,:,:) = .01_r8 * vegetation_map(:,:,:)
-       wetland(:,:)          = .01_r8 * wetland(:,:)
-       lake(:,:)             = .01_r8 * lake(:,:)
-       urban(:,:)            = .01_r8 * urban(:,:)
-       !---------------------------------------------------------------------------
-       ! 	... define lat-lon of vegetation map (1x1)
-       !---------------------------------------------------------------------------
-       lat_veg(:)      = (/ (-89.5_r8 + (i-1),i=1,nlat_veg  ) /)
-       lon_veg(:)      = (/ (  0.5_r8 + (i-1),i=1,nlon_veg  ) /)
-       lat_veg_edge(:) = (/ (-90.0_r8 + (i-1),i=1,nlat_veg+1) /)
-       lon_veg_edge(:) = (/ (  0.0_r8 + (i-1),i=1,nlon_veg+1) /)
-       !---------------------------------------------------------------------------
-       ! 	... read soilw table if necessary
-       !---------------------------------------------------------------------------
-
-       !---------------------------------------------------------------------------
-       ! 	... regrid to model grid
-       !---------------------------------------------------------------------------
-
-       call interp_map( plon, plat, nlon_veg, nlat_veg, npft_veg, lat_veg, lat_veg_edge, &
-            lon_veg, lon_veg_edge, landmask, urban, lake, &
-            wetland, vegetation_map, soilw_map, do_soilw )
-
-       deallocate( vegetation_map, work, stat=astat )
-       deallocate( lon_veg, lat_veg, lon_veg_edge, lat_veg_edge, stat=astat )
-       deallocate( landmask, urban, lake, wetland, stat=astat )
-       if( do_soilw ) then
-          deallocate( soilw_map, stat=astat )
-       end if
-    endif  ! Unstructured grid
-
-    if (drydep_method == DD_XLND) then
-       return
-    endif
+       
+    call get_landuse_and_soilw_from_file(do_soilw)
+    allocate( index_season_lai(plon,12),stat=astat )
+    if( astat /= 0 ) then
+       write(iulog,*) 'dvel_inti: failed to allocate index_season_lai; error = ',astat
+       call endrun
+    end if
 
     !---------------------------------------------------------------------------
     ! 	... read LAI based season indeces
@@ -407,19 +285,13 @@ contains
     call pio_closefile( piofile )
 
 
-    if(dycore_is('UNSTRUCTURED') ) then
-       ! For unstructured grids plon is the 1d horizontal grid size and plat=1
-       ! So this code averages at the latitude of each grid point - not an ideal solution
-       allocate(clat(plon))
-       call get_horiz_grid_d(plon, clat_d_out=clat)
-       jl = 1
-       ju = plon
-    else
-       allocate(clat(plat))
-       call get_horiz_grid_d(plat, clat_d_out=clat)
-       jl = 1
-       ju = plat
-    end if
+    ! For unstructured grids plon is the 1d horizontal grid size and plat=1
+    ! So this code averages at the latitude of each grid point - not an ideal solution
+    allocate(clat(plon))
+    call get_horiz_grid_d(plon, clat_d_out=clat)
+    jl = 1
+    ju = plon
+
     imin = 1
     do j = 1,ju
        diff_min = 10._r8
@@ -438,11 +310,8 @@ contains
           write(iulog,'(1p,10g12.5)') lat_lai(:)
           call endrun
        end if
-       if(dycore_is('UNSTRUCTURED') ) then
-          imin=1
-       else
-          imin = pos_min
-       end if
+
+       imin=1
        index_season_lai_j(:,:) = wk_lai(pos_min,:,:)
 
        !---------------------------------------------------------------------------
@@ -507,238 +376,6 @@ contains
     end if ! aqua_planet
   end subroutine get_landuse_and_soilw_from_file
 
-  !-------------------------------------------------------------------------------------
-  subroutine interp_map( plon, plat, nlon_veg, nlat_veg, npft_veg, lat_veg, lat_veg_edge, &
-                         lon_veg, lon_veg_edge, landmask, urban, lake, &
-                         wetland, vegetation_map, soilw_map, do_soilw )
-
-    use mo_constants, only : r2d
-    use scamMod, only : latiop,loniop,scmlat,scmlon,use_replay
-    use shr_scam_mod  , only: shr_scam_getCloseLatLon  ! Standardized system subroutines
-    use filenames, only: ncdata
-    use dycore, only : dycore_is
-    use phys_grid, only : scatter_field_to_chunk
-    implicit none
-
-    !-------------------------------------------------------------------------------------
-    ! 	... dummy arguments
-    !-------------------------------------------------------------------------------------
-    integer, intent(in)      ::  plon, plat, nlon_veg, nlat_veg, npft_veg
-    real(r8), pointer            :: soilw_map(:,:,:)
-    real(r8), intent(in)         :: landmask(nlon_veg,nlat_veg)
-    real(r8), intent(in)         :: urban(nlon_veg,nlat_veg)
-    real(r8), intent(in)         :: lake(nlon_veg,nlat_veg)
-    real(r8), intent(in)         :: wetland(nlon_veg,nlat_veg)
-    real(r8), intent(in)         :: vegetation_map(nlon_veg,nlat_veg,npft_veg)
-    real(r8), intent(in)         :: lon_veg(nlon_veg)
-    real(r8), intent(in)         :: lon_veg_edge(nlon_veg+1)
-    real(r8), intent(in)         :: lat_veg(nlat_veg)
-    real(r8), intent(in)         :: lat_veg_edge(nlat_veg+1)
-    logical,  intent(in)         :: do_soilw
-
-    !-------------------------------------------------------------------------------------
-    ! 	... local variables
-    !-------------------------------------------------------------------------------------
-    real(r8) :: closelat,closelon
-    integer :: latidx,lonidx
-
-    integer, parameter           :: veg_ext = 20
-    type(file_desc_t)            :: piofile
-    integer                      :: i, j, ii, jj, jl, ju, i_ndx, n
-    integer, dimension(plon+1)   :: ind_lon
-    integer, dimension(plat+1)  :: ind_lat
-    real(r8)                         :: total_land
-    real(r8), dimension(plon+1)      :: lon_edge
-    real(r8), dimension(plat+1)     :: lat_edge
-    real(r8)                         :: lat1, lat2, lon1, lon2
-    real(r8)                         :: x1, x2, y1, y2, dx, dy
-    real(r8)                         :: area, total_area
-    real(r8), dimension(npft_veg+3)  :: fraction
-    real(r8)                         :: total_soilw_area
-    real(r8)                         :: fraction_soilw
-    real(r8)                         :: total_soilw(12)
-    
-    real(r8),    dimension(-veg_ext:nlon_veg+veg_ext) :: lon_veg_edge_ext
-    integer, dimension(-veg_ext:nlon_veg+veg_ext) :: mapping_ext
-
-    real(r8), allocatable :: lam(:), phi(:), garea(:)
-
-    logical, parameter :: has_npole = .true.
-    integer :: ploniop,platiop
-    character(len=shr_kind_cl) :: ncdata_loc
-    real(r8) :: tmp_frac_lu(plon,n_land_type,plat), tmp_soilw_3d(plon,12,plat)
-
-    allocate(lam(plon), phi(plat))
-    call get_horiz_grid_d(plon, clon_d_out=lam)
-    call get_horiz_grid_d(plat, clat_d_out=phi)
-
-
-
-    jl = 1
-    ju = plon
-
-       do i = 1,plon
-          lon_edge(i) = lam(i) * r2d - .5_r8*(lam(2) - lam(1)) * r2d
-       end do
-       lon_edge(plon+1) = lon_edge(plon) + (lam(2) - lam(1)) * r2d
-       if( .not. has_npole ) then
-          do j = 1,plat+1
-             lat_edge(j) = phi(j) * r2d - .5_r8*(phi(2) - phi(1)) * r2d
-          end do
-       else
-          do j = 1,plat
-             lat_edge(j) = phi(j) * r2d - .5_r8*(phi(2) - phi(1)) * r2d
-          end do
-          lat_edge(plat+1) = lat_edge(plat) + (phi(2) - phi(1)) * r2d
-       end if
-    
-    do j = 1,plat+1
-       lat_edge(j) = min( lat_edge(j), 90._r8 )
-       lat_edge(j) = max( lat_edge(j),-90._r8 )
-    end do
-
-    !-------------------------------------------------------------------------------------
-    ! wrap around the longitudes
-    !-------------------------------------------------------------------------------------
-    do i = -veg_ext,0
-       lon_veg_edge_ext(i) = lon_veg_edge(nlon_veg+i) - 360._r8
-       mapping_ext     (i) =              nlon_veg+i
-    end do
-    do i = 1,nlon_veg
-       lon_veg_edge_ext(i) = lon_veg_edge(i)
-       mapping_ext     (i) =              i
-    end do
-    do i = nlon_veg+1,nlon_veg+veg_ext
-       lon_veg_edge_ext(i) = lon_veg_edge(i-nlon_veg) + 360._r8
-       mapping_ext     (i) =              i-nlon_veg
-    end do
-    do j = 1,plon+1
-       lon1 = lon_edge(j) 
-       do i = -veg_ext,nlon_veg+veg_ext
-          dx = lon_veg_edge_ext(i  ) - lon1
-          dy = lon_veg_edge_ext(i+1) - lon1
-          if( dx*dy <= 0._r8 ) then
-             ind_lon(j) = i
-             exit
-          end if
-       end do
-    end do
-
-    do j = 1,plat+1
-       lat1 = lat_edge(j)
-       do i = 1,nlat_veg
-          dx = lat_veg_edge(i  ) - lat1
-          dy = lat_veg_edge(i+1) - lat1
-          if( dx*dy <= 0._r8 ) then
-             ind_lat(j) = i
-             exit
-          end if
-       end do
-    end do
-#ifdef DEBUG
-    write(iulog,*) 'interp_map : ind_lon ',ind_lon
-    write(iulog,*) 'interp_map : ind_lat ',ind_lat
-#endif
-    lat_loop : do j = 1,plat
-       lon_loop : do i = 1,plon
-          total_area       = 0._r8
-          fraction         = 0._r8
-          total_soilw(:)   = 0._r8
-          total_soilw_area = 0._r8
-          do jj = ind_lat(j),ind_lat(j+1)
-             y1 = max( lat_edge(j),lat_veg_edge(jj) )
-             y2 = min( lat_edge(j+1),lat_veg_edge(jj+1) ) 
-             dy = (y2 - y1)/(lat_veg_edge(jj+1) - lat_veg_edge(jj))
-             do ii =ind_lon(i),ind_lon(i+1)
-                i_ndx = mapping_ext(ii)
-                x1 = max( lon_edge(i),lon_veg_edge_ext(ii) )
-                x2 = min( lon_edge(i+1),lon_veg_edge_ext(ii+1) ) 
-                dx = (x2 - x1)/(lon_veg_edge_ext(ii+1) - lon_veg_edge_ext(ii))
-                area = dx * dy
-                total_area = total_area + area
-                !-----------------------------------------------------------------
-                ! 	... special case for ocean grid point 
-                !-----------------------------------------------------------------
-                if( nint(landmask(i_ndx,jj)) == 0 ) then
-                   fraction(npft_veg+1) = fraction(npft_veg+1) + area
-                else
-                   do n = 1,npft_veg
-                      fraction(n) = fraction(n) + vegetation_map(i_ndx,jj,n) * area
-                   end do
-                   fraction(npft_veg+1) = fraction(npft_veg+1) + area * lake   (i_ndx,jj)
-                   fraction(npft_veg+2) = fraction(npft_veg+2) + area * wetland(i_ndx,jj)
-                   fraction(npft_veg+3) = fraction(npft_veg+3) + area * urban  (i_ndx,jj)
-                   !-----------------------------------------------------------------
-                   ! 	... check if land accounts for the whole area.
-                   !           If not, the remaining area is in the ocean
-                   !-----------------------------------------------------------------
-                   total_land = sum(vegetation_map(i_ndx,jj,:)) &
-                              + urban  (i_ndx,jj) &
-                              + lake   (i_ndx,jj) &
-                              + wetland(i_ndx,jj)
-                   if( total_land < 1._r8 ) then
-                      fraction(npft_veg+1) = fraction(npft_veg+1) + (1._r8 - total_land) * area
-                   end if
-                   !-------------------------------------------------------------------------------------
-                   ! 	... compute weighted average of soilw over grid (non-water only)
-                   !-------------------------------------------------------------------------------------
-                   if( do_soilw ) then
-                      fraction_soilw = total_land  - (lake(i_ndx,jj) + wetland(i_ndx,jj))
-                      total_soilw_area = total_soilw_area + fraction_soilw * area
-                      total_soilw(:)   = total_soilw(:) + fraction_soilw * area * soilw_map(i_ndx,jj,:)
-                   end if
-                end if
-             end do
-          end do
-          !-------------------------------------------------------------------------------------
-          ! 	... divide by total area of grid box
-          !-------------------------------------------------------------------------------------
-          fraction(:) = fraction(:)/total_area
-          !-------------------------------------------------------------------------------------
-          ! 	... make sure we don't have too much or too little
-          !-------------------------------------------------------------------------------------
-          if( abs( sum(fraction) - 1._r8) > .001_r8 ) then
-             fraction(:) = fraction(:)/sum(fraction)
-          end if
-          !-------------------------------------------------------------------------------------
-          ! 	... map to Wesely land classification
-          !-------------------------------------------------------------------------------------
-
-          
-
-
-          tmp_frac_lu(i, 1, j) =     fraction(20)
-          tmp_frac_lu(i, 2, j) = sum(fraction(16:17))
-          tmp_frac_lu(i, 3, j) = sum(fraction(13:15))
-          tmp_frac_lu(i, 4, j) = sum(fraction( 5: 9))
-          tmp_frac_lu(i, 5, j) = sum(fraction( 2: 4))
-          tmp_frac_lu(i, 6, j) =     fraction(19)
-          tmp_frac_lu(i, 7, j) =     fraction(18)
-          tmp_frac_lu(i, 8, j) =     fraction( 1)
-          tmp_frac_lu(i, 9, j) = 0._r8
-          tmp_frac_lu(i,10, j) = 0._r8
-          tmp_frac_lu(i,11, j) = sum(fraction(10:12))
-          if( do_soilw ) then
-             if( total_soilw_area > 0._r8 ) then
-                tmp_soilw_3d(i,:,j) = total_soilw(:)/total_soilw_area
-             else
-                tmp_soilw_3d(i,:,j) = -99._r8
-             end if
-          end if
-       end do lon_loop
-    end do lat_loop
-    !-------------------------------------------------------------------------------------
-    ! 	... reshape according to lat-lon blocks
-    !-------------------------------------------------------------------------------------
-    call scatter_field_to_chunk(1,n_land_type,1,plon,tmp_frac_lu,fraction_landuse)
-    if(do_soilw) call scatter_field_to_chunk(1,12,1,plon,tmp_soilw_3d,soilw_3d)
-    !-------------------------------------------------------------------------------------
-    ! 	... make sure there are no out of range values
-    !-------------------------------------------------------------------------------------
-    where (fraction_landuse < 0._r8) fraction_landuse = 0._r8
-    where (fraction_landuse > 1._r8) fraction_landuse = 1._r8
-
-  end subroutine interp_map
   
   !-------------------------------------------------------------------------------------
   !-------------------------------------------------------------------------------------
@@ -1270,7 +907,7 @@ contains
              do icol = 1,ncol
                 if( fr_lnduse(icol,lt) ) then
                    sndx = index_season(icol,lt)
-                   if( ispec == o3_ndx .or. ispec == so2_ndx ) then
+                   if( ispec == so2_ndx ) then
                       rmx = 0._r8
                    else
                       rmx = 1._r8/(heff(icol,idx_drydep)/3000._r8 + 100._r8*foxd(idx_drydep))
@@ -1429,7 +1066,7 @@ contains
     do ispec = 1,gas_pcnst
        idx_drydep = map_dvel(ispec)
        if( has_dvel(ispec) ) then
-          if( ispec /= o3_ndx .and. ispec /= so2_ndx ) then
+          if( ispec /= so2_ndx ) then
              do lt = beglt,endlt
                 if( lt /= 7 ) then
                    do icol = 1,ncol
