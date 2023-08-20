@@ -80,6 +80,10 @@ real(r8), allocatable, target :: dgnumwet_m(:,:,:) ! number mode wet diameter fo
 real(r8), allocatable, target :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all modes
 !$OMP THREADPRIVATE(dgnumdry_m, dgnumwet_m, qaerwat_m)
 
+! small values treated as zero
+real(r8), parameter :: small_value_40 = 1.e-40_r8
+real(r8), parameter :: small_value_60 = 1.e-60_r8
+
 
 !===============================================================================
 CONTAINS
@@ -723,7 +727,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                pabs(i) = pabs(i)*wetvol(i)*rhoh2o
 
                pabs(i) = min_max_bound(0._r8, pext(i), pabs(i))
-               palb(i) = 1._r8-pabs(i)/max(pext(i),1.e-40_r8)
+               palb(i) = 1._r8-pabs(i)/max(pext(i), small_value_40)
                dopaer(i) = pext(i)*mass(i,k)
 
             enddo
@@ -753,7 +757,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                   aodmode(i)   = aodmode(i) + dopaer(i)
                   ssavis(i)    = ssavis(i) + dopaer(i)*palb(i)
 
-                  if (wetvol(i) > 1.e-40_r8) then
+                  if (wetvol(i) > small_value_40) then
 
                      dustaodmode(i) = dustaodmode(i) + dopaer(i)*dustvol(i)/wetvol(i)
 
@@ -1233,10 +1237,10 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
        ! some different treatments for lw and sw
        if (lwsw=='lw') then
           crefin(icol) = crefin(icol) + watervol(icol)*crefwlw(ilwsw)
-          if (wetvol(icol) > 1.e-40_r8) crefin(icol) = crefin(icol)/wetvol(icol)
+          if (wetvol(icol) > small_value_40) crefin(icol) = crefin(icol)/wetvol(icol)
        elseif (lwsw=='sw') then
           crefin(icol) = crefin(icol) + watervol(icol)*crefwsw(ilwsw)
-          crefin(icol) = crefin(icol)/max(wetvol(icol),1.e-60_r8)
+          crefin(icol) = crefin(icol)/max(wetvol(icol), small_value_60)
        endif
 
        refr(icol) = real(crefin(icol))
@@ -1274,13 +1278,14 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx,   & ! 
 
    integer :: ll
    integer, parameter :: nerrmax_dopaer=1000
+   integer, parameter :: small_value_neg = -1.e-10_r8
 
     if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) call endrun()
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
-    if ((dopaer <= -1.e-10_r8) .or. (dopaer >= 20._r8)) then
+    if ((dopaer <= small_value_neg) .or. (dopaer >= 20._r8)) then
 
-        if (dopaer <= -1.e-10_r8) then
+        if (dopaer <= small_value_neg) then
             write(iulog,*) "ERROR: Negative aerosol optical depth &
                           &in this layer."
         else
@@ -1309,7 +1314,7 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx,   & ! 
         enddo
 
         nerr_dopaer = nerr_dopaer + 1
-        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer < -1.e-10_r8) then
+        if (nerr_dopaer >= nerrmax_dopaer .or. dopaer < small_value_neg) then
              write(iulog,*) '*** halting after nerr_dopaer =', nerr_dopaer
              call endrun()
          endif
