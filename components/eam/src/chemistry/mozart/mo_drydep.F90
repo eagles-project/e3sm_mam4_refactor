@@ -86,7 +86,6 @@ contains
   subroutine dvel_inti_fromlnd
     use mo_chem_utls,         only : get_spc_ndx
     use cam_abortutils,           only : endrun
-    use chem_mods,            only : adv_mass
     use seq_drydep_mod,       only : dfoxd
 
     implicit none
@@ -120,9 +119,7 @@ contains
     !-------------------------------------------------------------------------------------
     ! 	... intialize interactive drydep
     !-------------------------------------------------------------------------------------
-    use dycore,        only : dycore_is
     use mo_constants,  only : r2d
-    use chem_mods,     only : adv_mass
     use mo_chem_utls,  only : get_spc_ndx
     use seq_drydep_mod,only : drydep_method, DD_XATM, DD_XLND
     use phys_control,  only : phys_getopts
@@ -379,9 +376,9 @@ contains
   
   !-------------------------------------------------------------------------------------
   !-------------------------------------------------------------------------------------
-  subroutine drydep_xactive( lchnk, ncol, latndx,  &                                 ! in
+  subroutine drydep_xactive( lchnk, ncol, latndx,  &                                        ! in
                              ncdate, sfc_temp, air_temp, tv, pressure_sfc, pressure_10m, &  ! in
-                             spec_hum, wind_speed, rain, snow, solar_flux, mmr, &       ! in
+                             spec_hum, wind_speed, rain, snow, solar_flux, mmr, &           ! in
                              dvel, &                                                        ! out
                              dflx)                                                          ! inout
   
@@ -404,8 +401,7 @@ contains
     ! modified by JFL to be used in MOZART-2 (October 2002)
     !-------------------------------------------------------------------------------------
 
-    use seq_drydep_mod, only: z0, rgso, rgss, ri, rclo, rcls, rlu, rac
-    use seq_drydep_mod, only: seq_drydep_setHCoeff, foxd, drat
+    use seq_drydep_mod, only: seq_drydep_setHCoeff
     use physconst,      only: tmelt
 
     implicit none
@@ -437,15 +433,11 @@ contains
     !-------------------------------------------------------------------------------------
     ! 	... local variables
     !-------------------------------------------------------------------------------------
-    real(r8), parameter :: scaling_to_cm_per_s = 100._r8
     real(r8), parameter :: rain_threshold      = 1.e-7_r8  ! of the order of 1cm/day expressed in m/s
 
     integer :: icol, ispec, lt
     integer :: month
 
-    real(r8) :: slope = 0._r8
-    real(r8) :: psih          ! stability correction factor
-    real(r8) :: rs            ! constant for calculating rsmx
     real(r8) :: tc(ncol)      ! temperature in celsius [C]
     real(r8) :: cts(ncol)     ! correction to rlu rcl and rgs for frost
 
@@ -462,13 +454,12 @@ contains
     real(r8), dimension(ncol) :: thg      ! ground virtual potential temperature [K]
     real(r8), dimension(ncol) :: zl       ! height of lowest level [m]
     real(r8), dimension(ncol) :: va       ! magnitude of v on cross points [m/s]
-    real(r8), dimension(ncol) :: ribn     ! richardson number
+    real(r8), dimension(ncol) :: ribn     ! richardson number [unitless]
     real(r8), dimension(ncol) :: qs       ! saturation specific humidity [kg/kg]
     real(r8), dimension(ncol) :: crs      ! multiplier to calculate rs
     real(r8), dimension(ncol) :: rdc      ! part of lower canopy resistance [s/m]
     real(r8), dimension(ncol) :: uustar   ! u*ustar (assumed constant over grid) [m^2/s^2]
     real(r8), dimension(ncol) :: term     ! work array
-    real(r8), dimension(ncol) :: lnd_frc  ! work array
     logical,  dimension(ncol) :: unstable
     logical,  dimension(ncol) :: has_rain
     logical,  dimension(ncol) :: has_dew
@@ -488,7 +479,6 @@ contains
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rclx  ! lower canopy resistance [s/m]
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rlux  ! vegetative resistance (upper canopy) [s/m]
     real(r8), dimension(ncol,n_land_type,gas_pcnst) :: rgsx  ! ground resistance [s/m]
-    real(r8) :: rc                                           ! combined surface resistance [s/m]
     logical  :: fr_lnduse(ncol,n_land_type)                  ! wrking array
 
     real(r8) :: lcl_frc_landuse(ncol,n_land_type) 
@@ -601,7 +591,7 @@ contains
        !-------------------------------------------------------------------------------------
        ! rdc (lower canopy res)
        !-------------------------------------------------------------------------------------
-       rdc(icol) = 100._r8*(1._r8 + 1000._r8/(solar_flux(icol) + 10._r8))/(1._r8 + 1000._r8*slope)
+       rdc(icol) = 100._r8*(1._r8 + 1000._r8/(solar_flux(icol) + 10._r8))
     enddo col_loop
 
     !-------------------------------------------------------------------------------------
