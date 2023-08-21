@@ -71,6 +71,8 @@
         call write_var(unit_input,unit_output,'is',is)
         call write_var(unit_input,unit_output,'iv',iv)
         call write_var(unit_input,unit_output,'ial',ial)
+        call write_var(unit_input,unit_output,'shape_rsf_tab',[67,1,2,2,2])
+
 
 allocate(rsf_tab_1d(67*2*2*2))  ! only write out part of the array to reduce size
        rsf_tab_1d(:) = reshape(rsf_tab(:,iz, is:isp1, iv:ivp1, ial:ialp1),&

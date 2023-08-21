@@ -86,17 +86,18 @@
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'temper',temper(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'col_dens',col_dens(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'zen_angle',zen_angle(yaml%col_print))
-        call write_var(unit_input,unit_output,'srf_alb',srf_alb(yaml%col_print))
-        call write_var(unit_input,unit_output,'lwc',lwc(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'clouds',clouds(yaml%col_print,yaml%lev_print))
+        call write_var(unit_input,unit_output,'pmid',pmid(:,:))
+        call write_var(unit_input,unit_output,'pdel',pdel(:,:))
+        call write_var(unit_input,unit_output,'temper',temper(:,:))
+        call write_var(unit_input,unit_output,'col_dens_1',col_dens(:,:,1))
+        call write_var(unit_input,unit_output,'zen_angle',zen_angle(:))
+        call write_var(unit_input,unit_output,'srf_alb',srf_alb(:))
+        call write_var(unit_input,unit_output,'lwc',lwc(:,:))
+        call write_var(unit_input,unit_output,'clouds',clouds(:,:))
         call write_var(unit_input,unit_output,'esfact',esfact)
         call write_var(unit_input,unit_output,'ncol',ncol)
-
+        call write_var(unit_input,unit_output,'pht_alias_mult',pht_alias_mult)
+        call write_var(unit_input,unit_output,'lng_indexer',lng_indexer)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
