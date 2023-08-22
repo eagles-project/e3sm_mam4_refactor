@@ -586,7 +586,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                                  radsurf,  logradsurf, cheb      ) ! out
 
 
-      allocate(specvol(ncol,nspec),stat=istat)
+      allocate(specvol(pcols,nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specvol: "//errmsg(__FILE__,__LINE__) )
       allocate(specdens(nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specdens: "//errmsg(__FILE__,__LINE__) )
