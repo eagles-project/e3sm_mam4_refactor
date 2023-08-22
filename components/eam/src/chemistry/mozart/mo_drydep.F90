@@ -41,25 +41,20 @@ module mo_drydep
 
   integer :: so2_ndx
 
-
+  ! Note for C++ port: constant rair and grav are defined locally.
+  ! Use shared ones from physconst will result in NBFB
   real(r8), parameter    :: large_value = 1.e36_r8
   real(r8), parameter    :: diffm       = 1.789e-5_r8
   real(r8), parameter    :: diffk       = 1.461e-5_r8
   real(r8), parameter    :: difft       = 2.060e-5_r8
   real(r8), parameter    :: ric         = 0.2_r8
-  real(r8), parameter    :: r           = 287.04_r8
-  real(r8), parameter    :: cp          = 1004._r8
+  real(r8), parameter    :: rair        = 287.04_r8 
   real(r8), parameter    :: grav        = 9.81_r8
-  real(r8), parameter    :: p00         = 100000._r8
-  real(r8), parameter    :: wh2o        = 18.0153_r8
-  real(r8), parameter    :: ph          = 1.e-5_r8
-  real(r8), parameter    :: ph_inv      = 1._r8/ph
-  real(r8), parameter    :: rovcp = r/cp
 
   integer, pointer :: index_season_lai(:,:)
 
-  logical, public :: has_dvel(gas_pcnst) = .false.
-  integer         :: map_dvel(gas_pcnst) = 0
+  logical :: has_dvel(gas_pcnst) = .false.
+  integer :: map_dvel(gas_pcnst) = 0
   integer, parameter :: lt_for_water = 7
 
 
@@ -69,7 +64,7 @@ module mo_drydep
   integer, parameter :: n_land_type = 11
 
   integer, allocatable :: spc_ndx(:) ! nddvels
-  real(r8), public :: crb 
+  real(r8) :: crb 
 
   type lnd_dvel_type
      real(r8), pointer :: dvel(:,:)   ! deposition velocity over land (cm/s)
@@ -538,7 +533,7 @@ contains
        !-------------------------------------------------------------------------------------
        ! height of 1st level
        !-------------------------------------------------------------------------------------
-       zl(icol) = - r/grav * air_temp(icol) * (1._r8 + .61_r8*spec_hum(icol)) * log(pressure_10m(icol)/pressure_sfc(icol))
+       zl(icol) = - rair/grav * air_temp(icol) * (1._r8 + .61_r8*spec_hum(icol)) * log(pressure_10m(icol)/pressure_sfc(icol))
        !-------------------------------------------------------------------------------------
        ! wind speed
        !-------------------------------------------------------------------------------------
@@ -625,7 +620,7 @@ contains
                                    rlux)                                                             ! out
 
 
-    term(:ncol) = 1.e-2_r8 * pressure_10m(:ncol) / (r*tv(:ncol))
+    term(:ncol) = 1.e-2_r8 * pressure_10m(:ncol) / (rair*tv(:ncol))
     call  calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, & ! in
                                              mmr, dep_ra(:,:,lchnk), dep_rb(:,:,lchnk), term, &              ! in
                                              rsmx, rlux, rclx, rgsx, rdc, &                                  ! in
@@ -1179,7 +1174,11 @@ contains
     real(r8), intent(in) :: pressure
     real(r8), intent(in) :: specific_humidity   
     real(r8) :: theta 
-   
+
+    real(r8), parameter :: p00 = 100000._r8
+    real(r8), parameter :: cp = 1004._r8  
+    real(r8), parameter :: rovcp = rair/cp
+ 
     theta = temperature * (p00/pressure)**rovcp * (1._r8 + .61_r8*specific_humidity)
 
   end function get_potential_temperature
