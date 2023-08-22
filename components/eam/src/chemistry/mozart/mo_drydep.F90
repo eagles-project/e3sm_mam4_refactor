@@ -60,9 +60,8 @@ module mo_drydep
 
   logical, public :: has_dvel(gas_pcnst) = .false.
   integer         :: map_dvel(gas_pcnst) = 0
-  real(r8) , allocatable            :: soilw_3d(:,:,:)
+  integer, parameter :: lt_for_water = 7
 
-  logical, parameter :: dyn_soilw = .false.
 
   real(r8), allocatable  :: fraction_landuse(:,:,:)
   real(r8), allocatable, dimension(:,:,:) :: dep_ra ! [s/m] aerodynamic resistance
@@ -165,7 +164,6 @@ contains
     character(len=32) :: test_name
     type(file_desc_t) :: piofile
     type(var_desc_t) :: vid
-    logical :: do_soilw
 
     character(len=shr_kind_cl) :: locfn
     logical :: prog_modal_aero
@@ -217,22 +215,10 @@ contains
        call endrun
     end if
 
-    if (drydep_method == DD_XLND .and. (.not.prog_modal_aero)) then
-       return
-    endif
-
-    do_soilw = .not. dyn_soilw .and. (has_drydep( 'H2' ) .or. has_drydep( 'CO' ))
     allocate( fraction_landuse(pcols,n_land_type, begchunk:endchunk),stat=astat )
     if( astat /= 0 ) then
        write(iulog,*) 'dvel_inti: failed to allocate fraction_landuse; error = ',astat
        call endrun
-    end if
-    if(do_soilw) then
-       allocate(soilw_3d(pcols,12,begchunk:endchunk),stat=astat)
-       if( astat /= 0 ) then
-          write(iulog,*) 'dvel_inti: failed to allocate soilw_3d error = ',astat
-          call endrun
-       end if
     end if
 
     plon = get_dyn_grid_parm('plon')
@@ -243,7 +229,7 @@ contains
        call endrun
     end if
        
-    call get_landuse_and_soilw_from_file(do_soilw)
+    call get_landuse_and_soilw_from_file()
     allocate( index_season_lai(plon,12),stat=astat )
     if( astat /= 0 ) then
        write(iulog,*) 'dvel_inti: failed to allocate index_season_lai; error = ',astat
@@ -343,34 +329,30 @@ contains
   end subroutine drydep_inti_xactive
 
   !-------------------------------------------------------------------------------------
-  subroutine get_landuse_and_soilw_from_file(do_soilw)
+  subroutine get_landuse_and_soilw_from_file()
     use cam_pio_utils, only : cam_pio_openfile
     use ncdio_atm, only : infld
     use cam_control_mod, only: aqua_planet
-    logical, intent(in) :: do_soilw
+
     logical :: readvar
     
     type(file_desc_t) :: piofile
     character(len=shr_kind_cl) :: locfn
     logical :: lexist
     
-    if (aqua_planet) then
-      fraction_landuse = 0.
-    else
 
-      call getfil (drydep_srf_file, locfn, 1, lexist)
-      if(lexist) then
-         call cam_pio_openfile(piofile, locfn, PIO_NOWRITE)
+    call getfil (drydep_srf_file, locfn, 1, lexist)
+    if(lexist) then
+       call cam_pio_openfile(piofile, locfn, PIO_NOWRITE)
 
-         call infld('fraction_landuse', piofile, 'ncol','class',' ',1,pcols,1,n_land_type, begchunk,endchunk, &
+       call infld('fraction_landuse', piofile, 'ncol','class',' ',1,pcols,1,n_land_type, begchunk,endchunk, &
               fraction_landuse, readvar, gridname='physgrid')
 
-         call pio_closefile(piofile)
-      else
-         call endrun('Unstructured grids require drydep_srf_file ')
-      end if
+       call pio_closefile(piofile)
+    else
+       call endrun('Unstructured grids require drydep_srf_file ')
+    endif
     
-    end if ! aqua_planet
   end subroutine get_landuse_and_soilw_from_file
 
   
@@ -434,6 +416,7 @@ contains
     ! 	... local variables
     !-------------------------------------------------------------------------------------
     real(r8), parameter :: rain_threshold      = 1.e-7_r8  ! of the order of 1cm/day expressed in m/s
+    real(r8), parameter :: temp_highbound      = 313.15_r8
 
     integer :: icol, ispec, lt
     integer :: month
@@ -506,7 +489,8 @@ contains
     !-------------------------------------------------------------------------------------
     ! define species-dependent parameters (temperature dependent)
     !-------------------------------------------------------------------------------------
-    call seq_drydep_setHCoeff( ncol, sfc_temp, heff )
+    call seq_drydep_setHCoeff( ncol, sfc_temp, & ! in
+                               heff )            ! out
 
     do lt = 1,n_land_type
        dep_ra (:,lt,lchnk)   = 0._r8
@@ -548,8 +532,8 @@ contains
        !-------------------------------------------------------------------------------------
        ! potential temperature
        !-------------------------------------------------------------------------------------
-       tha(icol) = get_potential_temperature(air_temp(icol), pressure_10m(icol), spec_hum(icol))       
-       thg(icol) = get_potential_temperature(sfc_temp(icol), pressure_sfc(icol), spec_hum(icol))
+       tha(icol) = get_potential_temperature(air_temp(icol), pressure_10m(icol), spec_hum(icol))  ! in     
+       thg(icol) = get_potential_temperature(sfc_temp(icol), pressure_sfc(icol), spec_hum(icol))  ! in
 
        !-------------------------------------------------------------------------------------
        ! height of 1st level
@@ -570,7 +554,7 @@ contains
        !-------------------------------------------------------------------------------------
        ! saturation specific humidity
        !-------------------------------------------------------------------------------------
-       qs(icol) = get_saturation_specific_humidity(sfc_temp(icol), pressure_sfc(icol))
+       qs(icol) = get_saturation_specific_humidity(sfc_temp(icol), pressure_sfc(icol)) ! in
      
        has_dew(icol) = .false.
        if( qs(icol) <= spec_hum(icol) ) then
@@ -583,7 +567,7 @@ contains
        ! constant in determining rs
        !-------------------------------------------------------------------------------------
        tc(icol) = sfc_temp(icol) - tmelt
-       if( sfc_temp(icol) > tmelt .and. sfc_temp(icol) < 313.15_r8 ) then
+       if( sfc_temp(icol) > tmelt .and. sfc_temp(icol) < temp_highbound ) then
           crs(icol) = (1._r8 + (200._r8/(solar_flux(icol) + .1_r8))**2) * (400._r8/(tc(icol)*(40._r8 - tc(icol))))
        else
           crs(icol) = large_value
@@ -757,7 +741,7 @@ contains
     !-------------------------------------------------------------------------------------
     ! revise calculation of friction velocity and z0 over water
     !-------------------------------------------------------------------------------------
-    lt = 7
+    lt = lt_for_water
     do icol = 1,ncol
        if( fr_lnduse(icol,lt) ) then
           if( unstable(icol) ) then
@@ -802,18 +786,18 @@ contains
     ! local variables
     integer :: icol, lt
     real(r8) :: hvar    ! constant to compute monin-obukhov length
-    real(r8) :: h       ! constant to compute monin-obukhov length
+    real(r8) :: htmp    ! constant to compute monin-obukhov length
 
     do lt = beglt,endlt
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
              hvar = (va(icol)/0.74_r8) * (tha(icol) - thg(icol)) * (cvar(icol,lt)**2)
              if( unstable(icol) ) then                      ! unstable
-                h = hvar*(1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 5.3_r8*bycp(icol,lt))))
+                htmp = hvar*(1._r8 - (9.4_r8*ribn(icol)/(1._r8 + 5.3_r8*bycp(icol,lt))))
              else
-                h = hvar/((1._r8+4.7_r8*ribn(icol))**2)
+                htmp = hvar/((1._r8+4.7_r8*ribn(icol))**2)
              endif
-             obklen(icol,lt) = thg(icol) * ustar(icol,lt) * ustar(icol,lt) / (karman * grav * h)
+             obklen(icol,lt) = thg(icol) * ustar(icol,lt) * ustar(icol,lt) / (karman * grav * htmp)
           endif
        enddo
     enddo
@@ -905,7 +889,7 @@ contains
                    cts(icol) = 1000._r8*exp( - tc(icol) - 4._r8 )                 ! correction for frost
                    rgsx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,idx_drydep)/(1.e5_r8*rgss(sndx,lt))) + (foxd(idx_drydep)/rgso(sndx,lt)))
 
-                   if( lt == 7 ) then
+                   if( lt == lt_for_water ) then
                       rsmx(icol,lt,ispec) = large_value
                    else
                       rs = ri(sndx,lt)*crs(icol)
@@ -953,7 +937,7 @@ contains
                 if( fr_lnduse(icol,lt) ) then
                    sndx = index_season(icol,lt)
 
-                   if( lt == 7 ) then
+                   if( lt == lt_for_water ) then
                       rclx(icol,lt,ispec) = large_value
                    else
                       rclx(icol,lt,ispec) = cts(icol) + 1._r8/((heff(icol,idx_drydep)/(1.e5_r8*rcls(sndx,lt))) + (foxd(idx_drydep)/rclo(sndx,lt)))
@@ -968,7 +952,7 @@ contains
        if ( has_dvel(ispec) ) then
           if( ispec == so2_ndx ) then
              do lt = beglt,endlt
-                if( lt /= 7 ) then
+                if( lt /= lt_for_water ) then
                    do icol = 1,ncol
                       if( fr_lnduse(icol,lt) ) then
                          rclx(icol,lt,ispec) = cts(icol) + rcls(index_season(icol,lt),lt)
@@ -1020,7 +1004,7 @@ contains
                 if( fr_lnduse(icol,lt) ) then
                    sndx = index_season(icol,lt)
 
-                   if( lt == 7 ) then
+                   if( lt == lt_for_water ) then
                       rlux(icol,lt,ispec) = large_value
                    else
                       rlux(icol,lt,ispec) = cts(icol) + rlu(sndx,lt)/(1.e-5_r8*heff(icol,idx_drydep) + foxd(idx_drydep))
@@ -1032,7 +1016,7 @@ contains
     enddo
 
     do lt = beglt,endlt
-       if( lt /= 7 ) then
+       if( lt /= lt_for_water ) then
           do icol = 1,ncol
              if( fr_lnduse(icol,lt) ) then
                 sndx = index_season(icol,lt)
@@ -1058,7 +1042,7 @@ contains
        if( has_dvel(ispec) ) then
           if( ispec /= so2_ndx ) then
              do lt = beglt,endlt
-                if( lt /= 7 ) then
+                if( lt /= lt_for_water ) then
                    do icol = 1,ncol
                       if( fr_lnduse(icol,lt) ) then
                          !-------------------------------------------------------------------------------------
@@ -1076,7 +1060,7 @@ contains
              enddo
           else if( ispec == so2_ndx ) then
              do lt = beglt,endlt
-                if( lt /= 7 ) then
+                if( lt /= lt_for_water ) then
                    do icol = 1,ncol
                       if( fr_lnduse(icol,lt) ) then
                          !-------------------------------------------------------------------------------------
@@ -1164,7 +1148,7 @@ contains
              !-------------------------------------------------------------------------------------
              select case( solsym(ispec) )
              case( 'SO2' )
-                if( lt == 7 ) then
+                if( lt == lt_for_water ) then
                    where( fr_lnduse(:ncol,lt) )
                       ! assume no surface resistance for SO2 over water`
                       wrk(:) = wrk(:) + lnd_frc(:)/(dep_ra(:ncol,lt) + dep_rb(:ncol,lt))
