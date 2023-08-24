@@ -199,7 +199,14 @@
 
       real(r8) :: refrtablw(ntot_amode,refindex_real,nlwbands), &
                   refitablw(ntot_amode,refindex_im,nlwbands), &
-                  absplw(ntot_amode,coef_number,refindex_real,refindex_im,nlwbands)
+                  absplw(ntot_amode,coef_number,refindex_real,refindex_im,nlwbands), &
+                  refrtabsw(ntot_amode,refindex_real,nswbands), &
+                  refitabsw(ntot_amode,refindex_im,nswbands), &
+                  abspsw(ntot_amode,coef_number,refindex_real,refindex_im,nswbands), &
+                  extpsw(ntot_amode,coef_number,refindex_real,refindex_im,nswbands), &
+                  asmpsw(ntot_amode,coef_number,refindex_real,refindex_im,nswbands)
+
+
 
       complex(r8)                                     &   !
           specrefndxsw( nswbands, maxd_aspectype ),   &   !
