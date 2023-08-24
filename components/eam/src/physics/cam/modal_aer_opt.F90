@@ -59,8 +59,6 @@ character(shr_kind_cl)      :: water_refindex_file = unset_str ! full pathname f
 ! in terms of refractive index and wet radius
 integer, parameter :: ncoef=5, prefr=7, prefi=10
 
-real(r8) :: xrmin, xrmax
-
 ! refractive index for water read in read_water_refindex
 complex(r8) :: crefwsw(nswbands) ! complex refractive index for water visible
 complex(r8) :: crefwlw(nlwbands) ! complex refractive index for water infrared
@@ -82,8 +80,12 @@ real(r8), allocatable, target :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all
 
 ! small values treated as zero
 real(r8), parameter :: small_value_40 = 1.e-40_r8
-real(r8), parameter :: small_value_60 = 1.e-60_r8
 
+! min, max aerosol surface mode radius treated [m]
+real(r8), parameter :: rmmin = 0.01e-6_r8
+real(r8), parameter :: rmmax = 25.e-6_r8
+real(r8), parameter :: xrmin = log(rmmin)
+real(r8), parameter :: xrmax = log(rmmax)
 
 !===============================================================================
 CONTAINS
@@ -135,7 +137,6 @@ subroutine modal_aer_opt_init()
    ! Local variables
 
    integer  :: i, m
-   real(r8) :: rmmin, rmmax       ! min, max aerosol surface mode radius treated (m)
    character(len=256) :: locfile
 
    logical           :: history_amwg            ! output the variables used by the AMWG diag package
@@ -148,11 +149,6 @@ subroutine modal_aer_opt_init()
 
    character(len=*), parameter :: routine='modal_aer_opt_init'
    !----------------------------------------------------------------------------
-
-   rmmin = 0.01e-6_r8
-   rmmax = 25.e-6_r8
-   xrmin = log(rmmin)
-   xrmax = log(rmmax)
 
    ! set flags to check aerosol settings
    call rad_cnst_get_info(0, nmodes=nmodes)
@@ -403,7 +399,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    integer,             intent(in) :: nnite          ! number of night columns
    integer,             intent(in) :: idxnite(nnite) ! local column indices of night columns
    integer,             intent(in) :: trop_level(pcols)!tropopause level for each column
-   real(r8),            intent(in) :: ext_cmip6_sw(pcols,pver)
+   real(r8),            intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
    logical,             intent(in) :: is_cmip6_volc
 
    real(r8), intent(out) :: tauxar(pcols,0:pver,nswbands) ! layer extinction optical depth [1]
@@ -461,8 +457,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: palb(pcols)     ! parameterized single scattering albedo
 
    ! Diagnostics
-   real(r8) :: extinct(pcols,pver), tropopause_m(pcols)
-   real(r8) :: absorb(pcols,pver)
+   real(r8) :: tropopause_m(pcols)
+   real(r8) :: extinct(pcols,pver)         ! aerosol extinction [1/m]
+   real(r8) :: absorb(pcols,pver)          ! aerosol absorption [1/m]
    real(r8) :: aodvis(pcols)               ! extinction optical depth
    real(r8) :: aodall(pcols)               ! extinction optical depth
    real(r8) :: aodabs(pcols)               ! absorption optical depth
@@ -683,7 +680,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                   endif
 
                endif ! if (savaervis)
-            enddo ! species loop l
+            enddo ! species loop ll
 
             call calc_refin_complex ('sw', ncol, isw,          & ! in
                    qaerwat_m(:,kk,mm), specvol, specrefindex,  & ! in
@@ -769,46 +766,46 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
                                 hygrodust(icol) + hygroseasalt(icol) + &
                                 hygromom(icol)
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o,absh2o, sumhygro, sumscat, sumabs, & ! in
                            hygrodust(icol), palb(icol), dopaer(icol), & ! in
-                           scatdust, absdust, dustaod ) ! inout
+                           scatdust(icol), absdust(icol), dustaod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o,absh2o, sumhygro,sumscat, sumabs, & ! in
                            hygroso4(icol), palb(icol), dopaer(icol), & ! in
-                           scatso4, absso4, so4aod ) ! inout
+                           scatso4(icol), absso4(icol), so4aod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o,absh2o, sumhygro,sumscat, sumabs, & ! in
                            hygropom(icol), palb(icol), dopaer(icol), & ! in
-                           scatpom, abspom, pomaod ) ! inout
+                           scatpom(icol), abspom(icol), pomaod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o,absh2o, sumhygro,sumscat, sumabs, & ! in
                            hygrosoa(icol), palb(icol), dopaer(icol), & ! in
-                           scatsoa, abssoa, soaaod ) ! inout
+                           scatsoa(icol), abssoa(icol), soaaod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o,absh2o,sumhygro, sumscat,sumabs, & ! in
                            hygrobc(icol), palb(icol), dopaer(icol), & ! in
-                           scatbc, absbc, bcaod ) ! inout
+                           scatbc(icol), absbc(icol), bcaod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( &
+                           scath2o, absh2o,   sumhygro, sumscat, sumabs, & ! in
                            hygroseasalt(icol), palb(icol), dopaer(icol), & ! in
-                           scatseasalt, absseasalt, seasaltaod ) ! inout
+                           scatseasalt(icol), absseasalt(icol), seasaltaod(icol) ) ! inout
 
-                     call update_aod_spec ( icol, scath2o, absh2o, & ! in
-                           sumhygro, sumscat, sumabs, & ! in
+                     call update_aod_spec ( & 
+                           scath2o,absh2o, sumhygro,sumscat, sumabs, & ! in
                            hygromom(icol), palb(icol), dopaer(icol), & ! in
-                           scatmom, absmom, momaod ) ! inout
+                           scatmom(icol), absmom(icol), momaod(icol) ) ! inout
 
                      aodabsbc(icol) = aodabsbc(icol) + absbc(icol)*dopaer(icol)*(1.0_r8-palb(icol))
 
                   endif
 
-               enddo ! i
+               enddo ! icol
             endif
 
             do icol = 1, ncol
@@ -1128,26 +1125,25 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
 end subroutine calc_diag_spec
 
 !===============================================================================
-subroutine update_aod_spec ( icol, scath2o, absh2o,     & ! in
+subroutine update_aod_spec ( scath2o, absh2o,           & ! in
                              sumhygro, sumscat, sumabs, & ! in
                              hygro_s, palb, dopaer,     & ! in
                              scat_s, abs_s, aod_s       ) ! inout
    ! update aerosol optical depth from scattering and absorption
 
    implicit none
-   integer,  intent(in) :: icol
    real(r8), intent(in) :: scath2o, absh2o, sumscat, sumabs, sumhygro
    real(r8), intent(in) :: hygro_s, palb, dopaer
-   real(r8), intent(inout) :: scat_s(:), abs_s(:), aod_s(:)  ! scatering, absorption and aod for a species
+   real(r8), intent(inout) :: scat_s, abs_s, aod_s  ! scatering, absorption and aod for a species
    ! local variables
    real(r8) :: aodc  ! aod component
 
-   scat_s(icol)     = (scat_s(icol) + scath2o*hygro_s/sumhygro)/sumscat
-   abs_s(icol)      = (abs_s(icol) + absh2o*hygro_s/sumhygro)/sumabs
+   scat_s     = (scat_s + scath2o*hygro_s/sumhygro)/sumscat
+   abs_s      = (abs_s + absh2o*hygro_s/sumhygro)/sumabs
 
-   aodc           = (abs_s(icol)*(1.0_r8 - palb) + palb*scat_s(icol))*dopaer
+   aodc           = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
 
-   aod_s(icol)      = aod_s(icol) + aodc
+   aod_s      = aod_s + aodc
 
 end subroutine update_aod_spec
 
@@ -1160,8 +1156,8 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
    integer,  intent(in) :: ncol
    integer,  intent(in) :: trop_level(pcols)!tropopause level for each column
    real(r8), intent(in) :: state_zm(:,:) ! state%zm [m]
-   real(r8), intent(in) :: ext_cmip6_sw(pcols,pver)
-   real(r8), intent(inout) :: extinct(pcols,pver)
+   real(r8), intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
+   real(r8), intent(inout) :: extinct(pcols,pver) ! aerosol extinction [1/m]
    real(r8), intent(out)   :: tropopause_m(pcols)
 
    ! local variables
@@ -1205,8 +1201,12 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
     complex(r8),intent(out) :: crefin(pcols) ! complex refractive index
 
     integer :: icol
+    real(r8), parameter :: small_value_60 = 1.e-60_r8
 
-    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) call endrun()
+    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) then
+        write(err_msg,*)'calc_refin_complex is called with ', lwsw, ', it should be called with either lw or sw'
+        call endrun()
+    endif
 
     crefin(:ncol) = (0._r8, 0._r8)
     dryvol(:ncol) = 0._r8
@@ -1273,7 +1273,10 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx,   & ! 
    integer, parameter :: nerrmax_dopaer=1000
    integer, parameter :: small_value_neg = -1.e-10_r8
 
-    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) call endrun()
+    if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) then
+        write(err_msg,*)'check_error_warning is called with ', lwsw, ', it should be called with either lw or sw'
+        call endrun()
+    endif
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
     if ((dopaer <= small_value_neg) .or. (dopaer >= 20._r8)) then
