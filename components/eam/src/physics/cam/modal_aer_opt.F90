@@ -1204,8 +1204,7 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
     real(r8), parameter :: small_value_60 = 1.e-60_r8
 
     if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) then
-        write(err_msg,*)'calc_refin_complex is called with ', lwsw, ', it should be called with either lw or sw'
-        call endrun()
+        call endrun('calc_refin_complex is called with '// lwsw// ', it should be called with either lw or sw')
     endif
 
     crefin(:ncol) = (0._r8, 0._r8)
@@ -1274,8 +1273,7 @@ subroutine check_error_warning(lwsw, icol, kk, mm, ilwsw, nspec,list_idx,   & ! 
    integer, parameter :: small_value_neg = -1.e-10_r8
 
     if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) then
-        write(err_msg,*)'check_error_warning is called with ', lwsw, ', it should be called with either lw or sw'
-        call endrun()
+        call endrun('check_error_warning is called with '// lwsw// ', it should be called with either lw or sw')
     endif
 
     ! FORTRAN refactor: This if condition is never met in testing run ...
