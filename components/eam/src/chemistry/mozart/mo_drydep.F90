@@ -8,7 +8,7 @@ module mo_drydep
 
   use shr_kind_mod, only : r8 => shr_kind_r8, shr_kind_cl
   use chem_mods,    only : gas_pcnst
-  use pmgrid,       only : plev, plevp
+  use pmgrid,       only : plev
   use spmd_utils,   only : masterproc
   use ppgrid,       only : pcols, begchunk, endchunk
   use cam_abortutils,   only : endrun
@@ -36,18 +36,12 @@ module mo_drydep
   public :: n_land_type, fraction_landuse, drydep_srf_file
 
   real(r8), allocatable :: dvel(:,:,:,:)    ! depvel array interpolated to model grid
-  integer :: ndays                          ! # of days in soilw file
-  integer :: map(gas_pcnst)                 ! indices for drydep species
 
   integer :: so2_ndx
 
   ! Note for C++ port: constant rair and grav are defined locally.
   ! Use shared ones from physconst will result in NBFB
   real(r8), parameter    :: large_value = 1.e36_r8
-  real(r8), parameter    :: diffm       = 1.789e-5_r8
-  real(r8), parameter    :: diffk       = 1.461e-5_r8
-  real(r8), parameter    :: difft       = 2.060e-5_r8
-  real(r8), parameter    :: ric         = 0.2_r8
   real(r8), parameter    :: rair        = 287.04_r8 
   real(r8), parameter    :: grav        = 9.81_r8
 
@@ -84,6 +78,8 @@ contains
 
     implicit none
 
+    real(r8), parameter    :: diffm       = 1.789e-5_r8
+    real(r8), parameter    :: difft       = 2.060e-5_r8
     integer :: ispc, l
 
     allocate(spc_ndx(nddvels))
@@ -412,6 +408,7 @@ contains
     !-------------------------------------------------------------------------------------
     real(r8), parameter :: rain_threshold      = 1.e-7_r8  ! of the order of 1cm/day expressed in m/s
     real(r8), parameter :: temp_highbound      = 313.15_r8
+    real(r8), parameter :: ric         = 0.2_r8
 
     integer :: icol, ispec, lt
     integer :: month
@@ -714,6 +711,7 @@ contains
     ! local variables
     integer :: icol, lt
     real(r8) :: z0water ! revised z0 over water
+    real(r8), parameter    :: diffk       = 1.461e-5_r8
 
     !-------------------------------------------------------------------------------------
     ! calculate the friction velocity for each land type u_i=uustar/u*_i
@@ -1201,26 +1199,5 @@ contains
 
   end function get_saturation_specific_humidity
 
-  !-------------------------------------------------------------------------------------
-  !-------------------------------------------------------------------------------------
-  function has_drydep( name )
-
-    implicit none
-
-    character(len=*), intent(in) :: name
-
-    logical :: has_drydep
-    integer :: i
-
-    has_drydep = .false.
-
-    do i=1,nddvels
-       if ( trim(name) == trim(drydep_list(i)) ) then
-         has_drydep = .true.
-         exit
-       endif
-    enddo
-
-  endfunction has_drydep
 
 end module mo_drydep
