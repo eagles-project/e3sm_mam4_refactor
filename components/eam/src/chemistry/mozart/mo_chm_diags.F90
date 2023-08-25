@@ -1,4 +1,5 @@
 module mo_chm_diags
+#include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods,    only : gas_pcnst
@@ -278,6 +279,7 @@ contains
 
     logical :: history_aerosol      ! output aerosol variables
     logical :: history_verbose      ! produce verbose history output
+#include "../yaml/mo_chm_diags/f90_yaml/chm_diags_beg_yml.f90"
 
     !-----------------------------------------------------------------------
 
@@ -454,6 +456,7 @@ contains
     call outfld( 'DF_NOY', df_noy(:ncol), ncol ,lchnk )
     call outfld( 'DF_SOX', df_sox(:ncol), ncol ,lchnk )
     call outfld( 'DF_NHX', df_nhx(:ncol), ncol ,lchnk )
+#include "../yaml/mo_chm_diags/f90_yaml/chm_diags_end_yml.f90"
 
 
   end subroutine chm_diags
@@ -474,6 +477,7 @@ contains
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
     integer  :: mm, kk
     real(r8) :: wght(ncol)
+#include "../yaml/mo_chm_diags/f90_yaml/het_diags_beg_yml.f90"
     !
     ! output integrated wet deposition field
     !
@@ -494,7 +498,7 @@ contains
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
-
+       ! wrk_wd_mm(:ncol,mm) = wrk_wd  ! only use for testing files
        call outfld( wetdep_name(mm), wrk_wd(:ncol),         ncol, lchnk )
        call outfld( wtrate_name(mm), het_rates(:ncol,:,mm), ncol, lchnk )
 
@@ -507,8 +511,8 @@ contains
     call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+#include "../yaml/mo_chm_diags/f90_yaml/het_diags_end_yml.f90"
 
   end subroutine het_diags
-
 !========================================================================
 end module mo_chm_diags

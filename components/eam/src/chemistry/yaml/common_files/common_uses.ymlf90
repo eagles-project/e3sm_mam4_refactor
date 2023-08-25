@@ -65,6 +65,9 @@ use spmd_utils,   only : masterproc
 ! mo_jlong
 !#define YAML_JLONG
 
+! mo_chm_diags
+!#define YAML_CHMDIAGS
+
 !aerosol drydep
 !#define YAML_AERO_DRYDEP
 
