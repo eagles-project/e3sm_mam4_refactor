@@ -592,6 +592,9 @@ contains
     call calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
                          ustar, cvar, bycp)                                                          ! out
   
+    call calculate_ustar_over_water(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
+                                    ustar, cvar, bycp)                                                          ! inout
+
     call calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, & ! in
                                   obklen)                                                                           ! out 
 
@@ -710,8 +713,6 @@ contains
 
     ! local variables
     integer :: icol, lt
-    real(r8) :: z0water ! revised z0 over water
-    real(r8), parameter    :: diffk       = 1.461e-5_r8
 
     !-------------------------------------------------------------------------------------
     ! calculate the friction velocity for each land type u_i=uustar/u*_i
@@ -730,7 +731,32 @@ contains
           endif
        enddo
     enddo
+  end subroutine calculate_ustar
 
+  subroutine calculate_ustar_over_water(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, & ! in
+                             ustar, cvar, bycp)                                                                    ! inout
+
+    ! input
+    integer, intent(in) :: ncol
+    integer, intent(in) :: beglt
+    integer, intent(in) :: endlt
+    integer, intent(in) :: index_season(ncol,n_land_type)
+    logical, intent(in) :: fr_lnduse(ncol, n_land_type)
+    logical, intent(in) :: unstable(ncol)
+    real(r8), intent(in) :: zl(ncol)                      ! height of lowest level [m]
+    real(r8), intent(in) :: uustar(ncol)                  ! u*ustar (assumed constant over grid) [m^2/s^2]
+    real(r8), intent(in) :: ribn(ncol)                    ! richardson number [unitless]
+
+    ! output
+    real(r8), intent(inout) :: ustar(ncol,n_land_type)      ! friction velocity [m/s]
+    real(r8), intent(inout) :: cvar(ncol, n_land_type)      ! height parameter
+    real(r8), intent(inout) :: bycp(ncol, n_land_type)      ! buoyancy parameter for unstable conditions
+
+    ! local variables
+    integer :: icol, lt
+    real(r8) :: z0water ! revised z0 over water
+    real(r8), parameter    :: diffk       = 1.461e-5_r8
+ 
     !-------------------------------------------------------------------------------------
     ! revise calculation of friction velocity and z0 over water
     !-------------------------------------------------------------------------------------
@@ -749,7 +775,7 @@ contains
           endif
        endif
     enddo
-  end subroutine calculate_ustar
+  end subroutine calculate_ustar_over_water
 
 
   subroutine  calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, &  ! in
@@ -942,18 +968,16 @@ contains
     enddo
 
     do ispec = 1,gas_pcnst
-       if ( has_dvel(ispec) ) then
-          if( ispec == so2_ndx ) then
-             do lt = beglt,endlt
-                if( lt /= lt_for_water ) then
-                   do icol = 1,ncol
-                      if( fr_lnduse(icol,lt) ) then
-                         rclx(icol,lt,ispec) = cts(icol) + rcls(index_season(icol,lt),lt)
-                      endif
-                   enddo
-                endif
-             enddo
-          endif
+       if ( has_dvel(ispec) .and. ispec == so2_ndx ) then
+          do lt = beglt,endlt
+             if( lt /= lt_for_water ) then
+                do icol = 1,ncol
+                   if( fr_lnduse(icol,lt) ) then
+                      rclx(icol,lt,ispec) = cts(icol) + rcls(index_season(icol,lt),lt)
+                   endif
+                enddo
+             endif
+          enddo
        endif
     enddo
 
@@ -1032,55 +1056,48 @@ contains
 
     do ispec = 1,gas_pcnst
        idx_drydep = map_dvel(ispec)
-       if( has_dvel(ispec) ) then
-          if( ispec /= so2_ndx ) then
-             do lt = beglt,endlt
-                if( lt /= lt_for_water ) then
-                   do icol = 1,ncol
-                      if( fr_lnduse(icol,lt) ) then
-                         !-------------------------------------------------------------------------------------
-                         ! no effect if sfc_temp < O C
-                         !-------------------------------------------------------------------------------------
-                         if( sfc_temp(icol) > tmelt ) then
-                            if( has_dew(icol) ) then
-                               rlux(icol,lt,ispec) = 1._r8/((1._r8/(3._r8*rlux(icol,lt,ispec))) &
-                                    + 1.e-7_r8*heff(icol,idx_drydep) + foxd(idx_drydep)/rlux_o3(icol,lt))
-                            endif
+       if( has_dvel(ispec) .and. ispec /= so2_ndx ) then
+          do lt = beglt,endlt
+             if( lt /= lt_for_water ) then
+                do icol = 1,ncol
+                   if( fr_lnduse(icol,lt) .and. sfc_temp(icol) > tmelt .and. has_dew(icol) ) then
+                      !-------------------------------------------------------------------------------------
+                      ! no effect if sfc_temp < O C
+                      !-------------------------------------------------------------------------------------
+                      rlux(icol,lt,ispec) = 1._r8/((1._r8/(3._r8*rlux(icol,lt,ispec))) &
+                                       + 1.e-7_r8*heff(icol,idx_drydep) + foxd(idx_drydep)/rlux_o3(icol,lt))
+                        
+                   endif
+                enddo
+             endif
+          enddo
+       else if( ispec == so2_ndx ) then
+          do lt = beglt,endlt
+             if( lt /= lt_for_water ) then
+                do icol = 1,ncol
+                   if( fr_lnduse(icol,lt) ) then
+                      !-------------------------------------------------------------------------------------
+                      ! no effect if sfc_temp < O C
+                      !-------------------------------------------------------------------------------------
+                      if( sfc_temp(icol) > tmelt ) then
+                         if( qs(icol) <= spec_hum(icol) ) then
+                            rlux(icol,lt,ispec) = 100._r8
+                         endif
+                         if( has_rain(icol) ) then     
+                            rlux(icol,lt,ispec) = 15._r8*rlu(index_season(icol,lt),lt)/(5._r8 + 3.e-3_r8*rlu(index_season(icol,lt),lt))
                          endif
                       endif
-                   enddo
-                endif
-             enddo
-          else if( ispec == so2_ndx ) then
-             do lt = beglt,endlt
-                if( lt /= lt_for_water ) then
-                   do icol = 1,ncol
-                      if( fr_lnduse(icol,lt) ) then
-                         !-------------------------------------------------------------------------------------
-                         ! no effect if sfc_temp < O C
-                         !-------------------------------------------------------------------------------------
-                         if( sfc_temp(icol) > tmelt ) then
-                            if( qs(icol) <= spec_hum(icol) ) then
-                               rlux(icol,lt,ispec) = 100._r8
-                            end if
-                            if( has_rain(icol) ) then
-                              
-                               rlux(icol,lt,ispec) = 15._r8*rlu(index_season(icol,lt),lt)/(5._r8 + 3.e-3_r8*rlu(index_season(icol,lt),lt))
-                            end if
-                         end if
-                         rlux(icol,lt,ispec) = cts(icol) + rlux(icol,lt,ispec)
-
-                      endif
-                   enddo
-                endif
-             enddo
-             do icol = 1,ncol
-                if( fr_lnduse(icol,1) .and. (has_dew(icol) .or. has_rain(icol)) ) then
-                   rlux(icol,1,ispec) = 50._r8
-                endif
-             enddo
-          endif
-       endif
+                      rlux(icol,lt,ispec) = cts(icol) + rlux(icol,lt,ispec)
+                   endif
+                enddo
+             endif
+          enddo
+          do icol = 1,ncol
+             if( fr_lnduse(icol,1) .and. (has_dew(icol) .or. has_rain(icol)) ) then
+                rlux(icol,1,ispec) = 50._r8
+             endif
+          enddo
+       endif       
     enddo
 
   end subroutine calculate_resistance_rlux
@@ -1118,7 +1135,7 @@ contains
     real(r8) :: resc(ncol)
     real(r8) :: lnd_frc(ncol)    
     real(r8) :: wrk(ncol)
-    real(r8), parameter :: scaling_to_cm_per_s = 100._r8
+    real(r8), parameter :: m_to_cm_per_s = 100._r8
 
     do ispec = 1, gas_pcnst
        if ( has_dvel(ispec) ) then
@@ -1158,7 +1175,7 @@ contains
              end select
           enddo
 
-          dvel(:ncol,ispec) = wrk(:ncol) * scaling_to_cm_per_s
+          dvel(:ncol,ispec) = wrk(:ncol) * m_to_cm_per_s
           dflx(:ncol,ispec) = term(:ncol) * dvel(:ncol,ispec) * mmr(:ncol,plev,ispec)
        endif
     enddo
