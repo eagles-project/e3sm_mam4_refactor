@@ -149,8 +149,8 @@ contains
 
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
-    call modal_aero_sw(0, dt, state, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
-         trop_level, tau, tau_w, tau_w_g, tau_w_f)
+    call modal_aero_sw(dt, state, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
+         trop_level, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
     call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
@@ -345,7 +345,8 @@ contains
 
     !Local variables
     integer   :: icol, ipver, ilev_tropp
-    real(r8)  :: lyr_thk, ext_unitless(nswbands), asym_unitless(nswbands)
+    real(r8)  :: lyr_thk ! thickness between level interfaces [m]
+    real(r8)  :: ext_unitless(nswbands), asym_unitless(nswbands)
     real(r8)  :: ext_ssa(nswbands),ext_ssa_asym(nswbands)
 
     !Logic:
