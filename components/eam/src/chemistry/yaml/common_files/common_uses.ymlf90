@@ -71,5 +71,8 @@ use spmd_utils,   only : masterproc
 ! zenith in orbit.F90
 !#define YAML_ZENITH
 
+! linoz stratospheric chemistry
+!#define YAML_LINSTRAT
+
 use yaml_input_file_io
 
