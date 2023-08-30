@@ -200,7 +200,7 @@ contains
     use mo_lightning,      only : prod_no
     use mo_setext,         only : setext
     use mo_sethet,         only : sethet
-    use mo_drydep,         only : drydep, set_soilw
+    use mo_drydep,         only : drydep_xactive
     use seq_drydep_mod,    only : DD_XLND, DD_XATM, DD_TABL, drydep_method
     use mo_fstrat,         only : set_fstrat_vals, set_fstrat_h2o
     use mo_flbc,           only : flbc_set
@@ -209,7 +209,6 @@ contains
     use cam_history,       only : outfld
     use wv_saturation,     only : qsat
     use constituents,      only : cnst_mw
-    use mo_drydep,         only : has_drydep
     use time_manager,      only : get_ref_date
     use mo_ghg_chem,       only : ghg_chem_set_rates, ghg_chem_set_flbc
     use mo_sad,            only : sad_strat_calc
@@ -859,26 +858,11 @@ contains
     prect(:ncol) = precc(:ncol) + precl(:ncol)
 
     call t_startf('drydep')
-    if ( drydep_method == DD_XLND ) then
-       soilw = -99
-       call drydep( ocnfrac, icefrac, ncdate, ts, ps,  &
-            wind_speed, qh2o(:,pver), tfld(:,pver), pmid(:,pver), prect, &
-            snowhland, fsds, depvel, sflx, mmr, &
-            tvs, soilw, relhum(:,pver:pver), ncol, lonndx, latndx, lchnk )
-    else if ( drydep_method == DD_XATM ) then
-       table_soilw = has_drydep( 'H2' ) .or. has_drydep( 'CO' )
-       if( .not. dyn_soilw .and. table_soilw ) then
-          call set_soilw( soilw, lchnk, calday )
-       end if
-       call drydep( ncdate, ts, ps,  &
-            wind_speed, qh2o(:,pver), tfld(:,pver), pmid(:,pver), prect, &
-            snowhland, fsds, depvel, sflx, mmr, &
-            tvs, soilw, relhum(:,pver:pver), ncol, lonndx, latndx, lchnk )
-    else if ( drydep_method == DD_TABL ) then
-       call drydep( calday, ts, zen_angle, &
-            depvel, sflx, mmr, pmid(:,pver), &
-            tvs, ncol, icefrac, ocnfrac, lchnk )
-    endif
+    call drydep_xactive( lchnk, ncol, latndx, &                                                 ! in
+                         ncdate, ts, tfld(:,pver), tvs, ps, pmid(:,pver), &                             ! in
+                         qh2o(:,pver), wind_speed, prect, snowhland, fsds, mmr, &  ! in
+                         depvel, &                                                                      ! out
+                         sflx)                                                                          ! inout
     call t_stopf('drydep')
 
     drydepflx(:,:) = 0._r8

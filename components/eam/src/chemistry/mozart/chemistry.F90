@@ -1334,7 +1334,6 @@ end function chem_is_active
     use camsrfexch,          only : cam_in_t, cam_out_t     
     use perf_mod,            only : t_startf, t_stopf
     use tropopause,          only : tropopause_find, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
-    use mo_drydep,           only : drydep_update
     use mo_neu_wetdep,       only : neu_wetdep_tend, do_neu_wetdep
     use aerodep_flx,         only : aerodep_flx_prescribed
     
@@ -1395,8 +1394,6 @@ end function chem_is_active
 
     call physics_ptend_init(ptend, state%psetcols, 'chemistry', lq=lq)
     
-    call drydep_update( state, cam_in )
-
 !-----------------------------------------------------------------------
 ! get current calendar day of year
 !-----------------------------------------------------------------------
