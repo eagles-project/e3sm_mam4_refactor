@@ -1484,7 +1484,7 @@ subroutine tphysac (ztodt,   cam_in,  &
 
     integer :: lchnk                                ! chunk identifier
     integer :: ncol                                 ! number of atmospheric columns
-    integer i,k,m                 ! Longitude, level indices
+    integer :: i,k,m, icnst                 ! Longitude, level indices, constituent indices
     integer :: yr, mon, day, tod       ! components of a date
     integer :: ixcldice, ixcldliq      ! constituent indices for cloud liquid and ice water.
 
@@ -1724,8 +1724,8 @@ if (l_tracer_aero) then
 
     !  aerosol dry deposition processes
     call t_startf('aero_drydep')
-    do i = 16, pcnst
-      qqcw(i)%fld => qqcw_get_field(pbuf,i,lchnk)
+    do icnst = 16, pcnst
+      qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
     enddo
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 

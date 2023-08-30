@@ -14,6 +14,11 @@ module mam_support
   !explicitly declare public functions/variables
   public :: min_max_bound
   public :: assign_la_lc
+  public :: ptr2d_t
+
+  type ptr2d_t
+  real(r8), pointer :: fld(:,:)
+  end type ptr2d_t
 
 contains
 !===============================================================================

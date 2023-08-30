@@ -13,6 +13,7 @@ module aer_rad_props
 
   use radconstants,     only: nswbands
   use cam_history,      only: addfld, horiz_only, outfld, add_default
+  use mam_support,       only: ptr2d_t
 
   implicit none
   private
@@ -76,7 +77,7 @@ contains
   !==============================================================================
 
   subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6_volc, &
-       tau, tau_w, tau_w_g, tau_w_f)
+       qqcw, tau, tau_w, tau_w_g, tau_w_f)
 
     use modal_aer_opt,    only: modal_aero_sw
     use radconstants,     only: nswbands, idx_sw_diag
@@ -93,6 +94,7 @@ contains
     logical,             intent(in) :: is_cmip6_volc        ! true if cmip6 style volcanic file is read otherwise false
     real(r8),            intent(in) :: dt                   ! time step (s)
 
+    type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
     real(r8), intent(out) :: tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
     real(r8), intent(out) :: tau_w  (pcols,0:pver,nswbands) ! aerosol single scattering albedo * tau
     real(r8), intent(out) :: tau_w_g(pcols,0:pver,nswbands) ! aerosol assymetry parameter * tau * w
@@ -150,7 +152,7 @@ contains
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
     call modal_aero_sw(dt, state, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
-         trop_level, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
+         trop_level, qqcw, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
     call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
@@ -164,7 +166,7 @@ contains
 
   !==============================================================================
   subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state, pbuf, &!in
-     odap_aer) !out
+     qqcw, odap_aer) !out
 
     use modal_aer_opt,    only: modal_aero_lw
     use radconstants,     only: nlwbands, idx_lw_diag
@@ -182,6 +184,7 @@ contains
     real(r8), intent(in) :: temperature(:,:) ! temperature [K]
     real(r8), intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
     real(r8), intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
+    type(ptr2d_t), intent(inout)   :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
     type(physics_state), intent(in), target :: state
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -197,7 +200,8 @@ contains
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
-    call modal_aero_lw(dt, state, pbuf, odap_aer)
+    call modal_aero_lw(dt, state, pbuf, &! in
+            qqcw, odap_aer) !inout/out
 
     !Obtain read in values for ext from the volcanic input file
     ext_cmip6_lw => null(); call pbuf_get_field(pbuf, idx_ext_lw, ext_cmip6_lw)

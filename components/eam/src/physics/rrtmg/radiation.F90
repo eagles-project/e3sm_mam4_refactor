@@ -879,6 +879,9 @@ end function radiation_nextsw_cday
     use rrtmg_state, only: rrtmg_state_create, rrtmg_state_update, rrtmg_state_destroy, rrtmg_state_t, num_rrtmg_levs
     use orbit,            only: zenith
     use output_aerocom_aie , only: do_aerocom_ind3
+    use modal_aero_data,   only: qqcw_get_field
+    use constituents,       only: pcnst
+    use mam_support,        only: ptr2d_t
 
     ! Arguments
     logical,  intent(in)    :: is_cmip6_volc    ! true if cmip6 style volcanic file is read otherwise false 
@@ -904,6 +907,7 @@ end function radiation_nextsw_cday
 
     logical :: dosw, dolw
     integer nstep                       ! current timestep number
+    integer :: icnst                    ! constituent indices
     real(r8) britemp(pcols,pnf_msu)     ! Microwave brightness temperature
     real(r8) tb_ir(pcols,pnb_hirs)      ! Infrared brightness temperature
     real(r8) ts(pcols)                  ! surface temperature
@@ -1064,6 +1068,7 @@ end function radiation_nextsw_cday
 
 
     character(*), parameter :: name = 'radiation_tend'
+    type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
 !----------------------------------------------------------------------
 
     call t_startf ('radiation_tend_init')
@@ -1140,6 +1145,11 @@ end function radiation_nextsw_cday
     dolw     = radiation_do('lw')      ! do longwave heating calc this timestep?
 
     if (dosw .or. dolw) then
+
+      !Get cloudborne aerosols mmrs
+      do icnst = 16, pcnst
+         qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
+       enddo
 
        ! construct an RRTMG state object
        r_state => rrtmg_state_create( state, cam_in )
@@ -1305,7 +1315,7 @@ end function radiation_nextsw_cday
                   call  rrtmg_state_update( state, pbuf, icall, r_state )
 
                   call aer_rad_props_sw( icall, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, &
-                                         aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
+                                         qqcw, aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 
                   call t_startf ('rad_rrtmg_sw')
                   call rad_rrtmg_sw( &
@@ -1458,7 +1468,7 @@ end function radiation_nextsw_cday
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
 
                   call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state, pbuf, & ! in
-                    aer_lw_abs) !out
+                    qqcw, aer_lw_abs) !out
                   
                   call t_startf ('rad_rrtmg_lw')
                   call rad_rrtmg_lw( &

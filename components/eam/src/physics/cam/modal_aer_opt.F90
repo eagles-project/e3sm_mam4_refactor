@@ -41,6 +41,7 @@ use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
 use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
 use modal_aero_calcsize,    only: modal_aero_calcsize_diag,modal_aero_calcsize_sub
 use shr_log_mod ,           only: errmsg => shr_log_errmsg
+use mam_support,            only: ptr2d_t
 
 implicit none
 private
@@ -387,7 +388,7 @@ end subroutine modal_aer_opt_init
 !===============================================================================
 
 subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
-                         tauxar, wa, ga, fa) ! out
+                         qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
   use mam_support, only : min_max_bound
@@ -402,6 +403,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8),            intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
    logical,             intent(in) :: is_cmip6_volc
 
+   type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    real(r8), intent(out) :: tauxar(pcols,0:pver,nswbands) ! layer extinction optical depth [1]
    real(r8), intent(out) :: wa(pcols,0:pver,nswbands)     ! layer single-scatter albedo [1]
    real(r8), intent(out) :: ga(pcols,0:pver,nswbands)     ! asymmetry factor [1]
@@ -557,7 +559,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., & ! in
+   call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
            dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
@@ -920,7 +922,7 @@ end subroutine modal_aero_sw
 
 !===============================================================================
 subroutine modal_aero_lw(dt, state, pbuf, & ! in
-                        tauxar            ) ! out
+                        qqcw, tauxar            ) ! out
 
    ! calculates aerosol lw radiative properties
 
@@ -928,6 +930,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    type(physics_state), intent(in), target :: state    ! state variables
    type(physics_buffer_desc), pointer :: pbuf(:)
 
+   type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
@@ -987,7 +990,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
 
 
-   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
+   call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
