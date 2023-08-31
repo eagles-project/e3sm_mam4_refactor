@@ -559,7 +559,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
+   call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
            dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
@@ -990,7 +990,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
 
 
-   call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
+   call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in

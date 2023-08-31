@@ -492,8 +492,7 @@ function extract_cnst_name(spec_name) result(spec_cnst_name)
 end function extract_cnst_name
 
 !===============================================================================
-
-subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_in, &
+subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, ptend, do_adjust_in, &
    do_aitacc_transfer_in, list_idx_in, update_mmr_in, dgnumdry_m, caller)
 
   implicit none
@@ -514,8 +513,10 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_i
    !-----------------------------------------------------------------------
 
    ! arguments
-   type(physics_state), target, intent(in)    :: state       ! Physics state variables
-   type(physics_buffer_desc),   pointer       :: pbuf(:)     ! physics buffer
+   integer,                     intent(in)    :: ncol
+   integer,                     intent(in)    :: lchnk
+   real(r8),                    intent(in)    :: pdel(:,:)
+   real(r8),                    intent(in) :: state_q(:,:,:) 
    real(r8),                    intent(in)    :: deltat      ! model time-step size (s)
    type(ptr2d_t),               intent(inout) :: qqcw(:)     ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    type(physics_ptend), target, optional, intent(inout) :: ptend       ! indivdual parameterization tendencies
@@ -540,16 +541,13 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_i
    logical :: do_aitacc_transfer
    logical :: update_mmr
 
-   integer  :: lchnk                ! chunk identifier
-   integer  :: ncol                 ! number of columns
    integer  :: list_idx_local       !list idx local to this subroutine
    integer  :: ilist
 
    real(r8), parameter :: close_to_one = 1.0_r8 + 1.0e-15_r8
    real(r8), parameter :: seconds_in_a_day = 86400.0_r8
 
-   real(r8), pointer :: state_q(:,:,:), dqdt(:,:,:)
-   real(r8), pointer :: pdel(:,:)   ! pressure thickness of levels
+   real(r8), pointer :: dqdt(:,:,:)
 
    real(r8), pointer :: dgncur_a(:,:,:)
 
@@ -668,20 +666,12 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_i
    endif
 
    !if(present(caller) .and. masterproc) write(iulog,*)'modal_aero_calcsize_sub has been called by ', trim(caller)
-
-   pdel     => state%pdel !Only required if update_mmr = .true.
-   state_q  => state%q    !BSINGH - it is okay to use state_q for num mmr but not for specie mmr (as diagnostic call may miss some species)
-
    !----------------------------------------------------------------------------
    ! tadj = adjustment time scale for number, surface when they are prognosed
    !----------------------------------------------------------------------------
    tadj    = max( seconds_in_a_day, deltat )
    tadjinv = 1.0_r8/(tadj*close_to_one)
    fracadj = max( 0.0_r8, min( 1.0_r8, deltat*tadjinv ) )
-
-   !grid parameters
-   ncol  = state%ncol  !# of columns
-   lchnk = state%lchnk !chunk #
 
    !inverse of time step
    deltatinv = 1.0_r8/(deltat*close_to_one)

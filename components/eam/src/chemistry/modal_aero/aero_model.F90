@@ -831,7 +831,7 @@ contains
     enddo
     !get the dry diameter from pbuf
     call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
-    call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, ptend, dgnumdry_m=dgncur_a)
+    call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, ptend, dgnumdry_m=dgncur_a)
     call t_stopf('calcsize')
     
     ! Aerosol water uptake
