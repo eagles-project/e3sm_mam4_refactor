@@ -76,7 +76,7 @@ contains
 
   !==============================================================================
 
-  subroutine aer_rad_props_sw(list_idx, dt, state, pbuf,  nnite, idxnite, is_cmip6_volc, &
+  subroutine aer_rad_props_sw(list_idx, dt, lchnk, ncol, zi, pmid, pint, temperature, zm, state_q, pdel, pdeldry, pbuf,  nnite, idxnite, is_cmip6_volc, &
        qqcw, tau, tau_w, tau_w_g, tau_w_f)
 
     use modal_aer_opt,    only: modal_aero_sw
@@ -86,7 +86,17 @@ contains
 
     ! Arguments
     integer,             intent(in) :: list_idx      ! index of the climate or a diagnostic list
-    type(physics_state), intent(in), target :: state
+    integer,  intent(in) :: lchnk            ! number of chunks
+    integer,  intent(in) :: ncol             ! number of columns
+    real(r8), intent(in) :: pmid(:,:)        ! midpoint pressure [Pa]
+    real(r8), intent(in) :: pint(:,:)        ! interface pressure [Pa]
+    real(r8), intent(in) :: temperature(:,:) ! temperature [K]
+    real(r8), intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
+    real(r8), intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
+    real(r8), target, intent(in) :: state_q(:,:,:)
+    real(r8),         intent(in) :: pdel(:,:)
+    real(r8),         intent(in) :: pdeldry(:,:)
+
 
     type(physics_buffer_desc), pointer :: pbuf(:)
     integer,             intent(in) :: nnite                ! number of night columns
@@ -102,21 +112,13 @@ contains
 
     ! Local variables
 
-    integer :: ncol
-    integer :: lchnk
-
     ! for cmip6 style volcanic file
     integer  :: trop_level(pcols), icol
     real(r8), pointer :: ext_cmip6_sw(:,:,:)
-    real(r8) :: zi(pcols,pverp)
     real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
     real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of [1/m]
 
     !-----------------------------------------------------------------------------
-
-    ncol  = state%ncol
-    lchnk = state%lchnk
-    zi = state%zi
 
     !Obtain read in values for ssa and asymmetry factor (af) from the
     !volcanic input file
@@ -147,11 +149,11 @@ contains
     ext_cmip6_sw_inv_m = ext_cmip6_sw * km_inv_to_m_inv
 
     !Find tropopause (or quit simulation if not found) as extinction should be applied only above tropopause
-    trop_level(1:pcols) = tropopause_or_quit(lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi)
+    trop_level(1:pcols) = tropopause_or_quit(lchnk, ncol, pmid, pint, temperature, zm, zi)
 
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
-    call modal_aero_sw(dt, state%lchnk, state%ncol, state%q, state%zm, state%t, state%pmid, state%pdel,state%pdeldry, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
+    call modal_aero_sw(dt, lchnk, ncol, state_q, zm, temperature, pmid, pdel,pdeldry, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
          trop_level, qqcw, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
@@ -165,7 +167,7 @@ contains
   end subroutine aer_rad_props_sw
 
   !==============================================================================
-  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state, pbuf, &!in
+  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, pbuf, &!in
      qqcw, odap_aer) !out
 
     use modal_aer_opt,    only: modal_aero_lw
@@ -184,8 +186,10 @@ contains
     real(r8), intent(in) :: temperature(:,:) ! temperature [K]
     real(r8), intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
     real(r8), intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
+    real(r8), target, intent(in) :: state_q(:,:,:)
+    real(r8),         intent(in) :: pdel(:,:)
+    real(r8),         intent(in) :: pdeldry(:,:)
     type(ptr2d_t), intent(inout)   :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
-    type(physics_state), intent(in), target :: state
     type(physics_buffer_desc), pointer :: pbuf(:)
 
     !intent-outs
@@ -200,7 +204,7 @@ contains
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
-    call modal_aero_lw(dt, lchnk, ncol, state%q, temperature, pmid, state%pdel, state%pdeldry, pbuf, &! in
+    call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, pbuf, &! in
             qqcw, odap_aer) !inout/out
 
     !Obtain read in values for ext from the volcanic input file

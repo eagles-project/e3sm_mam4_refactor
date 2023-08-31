@@ -1314,7 +1314,7 @@ end function radiation_nextsw_cday
                   ! update the concentrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state )
 
-                  call aer_rad_props_sw( icall, dt, state, pbuf, nnite, idxnite, is_cmip6_volc, &
+                  call aer_rad_props_sw( icall, dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, pbuf, nnite, idxnite, is_cmip6_volc, &
                                          qqcw, aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 
                   call t_startf ('rad_rrtmg_sw')
@@ -1467,7 +1467,7 @@ end function radiation_nextsw_cday
                   ! update the conctrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
 
-                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state, pbuf, & ! in
+                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, pbuf, & ! in
                     qqcw, aer_lw_abs) !out
                   
                   call t_startf ('rad_rrtmg_lw')
