@@ -829,7 +829,9 @@ contains
     do icnst = 16, pcnst
       qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
     enddo
-    call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, ptend)
+    !get the dry diameter from pbuf
+    call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
+    call modal_aero_calcsize_sub(state, dt, pbuf, qqcw, ptend, dgnumdry_m=dgncur_a)
     call t_stopf('calcsize')
     
     ! Aerosol water uptake

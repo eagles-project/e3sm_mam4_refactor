@@ -524,7 +524,8 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_i
    logical,  optional, intent(in) :: do_aitacc_transfer_in
    logical,  optional, intent(in) :: update_mmr_in
    integer,  optional, intent(in) :: list_idx_in       ! diagnostic list index
-   real(r8), optional, intent(inout), allocatable, target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
+   !real(r8), optional, intent(inout), allocatable, target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
+   real(r8), optional, intent(inout), target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
 
    !This subroutine is called from various places in the code
    !"caller" optional variable can hold the name of the subroutine
@@ -616,21 +617,12 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, qqcw, ptend, do_adjust_i
    list_idx_local  = 0
    if(present(list_idx_in)) then
       list_idx_local  = list_idx_in
-      if (.not. present(dgnumdry_m)) &
-           call endrun('list_idx_in is present but dgnumdry_m is missing'//errmsg(__FILE__,__LINE__))
-
-      if(.not. allocated(dgnumdry_m)) &
-           call endrun('list_idx_in is present but dgnumdry_m is not allocated'//errmsg(__FILE__,__LINE__))
-      dgncur_a => dgnumdry_m(:,:,:)
-
       !update_mmr should be true ONLY for list_idx = 0
       if(list_idx_local > 0 .and. update_mmr) then
          call endrun('update_mmr should be FLASE for list_idx>0'//errmsg(__FILE__,__LINE__))
       endif
-   else
-      call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
    endif
-
+   dgncur_a => dgnumdry_m(:,:,:)
 
    !For adjusting aerosol sizes
    do_adjust = do_adjust_allowed
