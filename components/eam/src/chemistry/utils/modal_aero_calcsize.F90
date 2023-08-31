@@ -516,7 +516,7 @@ subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, pte
    integer,                     intent(in)    :: ncol
    integer,                     intent(in)    :: lchnk
    real(r8),                    intent(in)    :: pdel(:,:)
-   real(r8),                    intent(in) :: state_q(:,:,:) 
+   real(r8),                    intent(in)    :: state_q(:,:,:) 
    real(r8),                    intent(in)    :: deltat      ! model time-step size (s)
    type(ptr2d_t),               intent(inout) :: qqcw(:)     ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    type(physics_ptend), target, optional, intent(inout) :: ptend       ! indivdual parameterization tendencies

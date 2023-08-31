@@ -151,7 +151,7 @@ contains
 
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
-    call modal_aero_sw(dt, state, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
+    call modal_aero_sw(dt, state%lchnk, state%ncol, state%q, state%zm, state%t, state%pmid, state%pdel,state%pdeldry, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
          trop_level, qqcw, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
@@ -200,7 +200,7 @@ contains
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
-    call modal_aero_lw(dt, state, pbuf, &! in
+    call modal_aero_lw(dt, lchnk, ncol, state%q, temperature, pmid, state%pdel, state%pdeldry, pbuf, &! in
             qqcw, odap_aer) !inout/out
 
     !Obtain read in values for ext from the volcanic input file

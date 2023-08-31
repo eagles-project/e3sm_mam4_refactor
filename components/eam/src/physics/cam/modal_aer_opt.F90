@@ -386,15 +386,22 @@ subroutine modal_aer_opt_init()
 end subroutine modal_aer_opt_init
 
 !===============================================================================
-
-subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
+subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
                          qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
   use mam_support, only : min_max_bound
 
-   real(r8),            intent(in) :: dt             !timestep [s]
-   type(physics_state), intent(in), target :: state          ! state variables
+   real(r8),         intent(in) :: dt               !timestep [s]
+   integer,          intent(in) :: lchnk            ! chunk id
+   integer,          intent(in) :: ncol             ! number of active columns in the chunk
+   real(r8), target, intent(in) :: state_q(:,:,:)
+   real(r8),         intent(in) :: state_zm(:,:)
+   real(r8),         intent(in) :: temperature(:,:)
+   real(r8),         intent(in) :: pmid(:,:)
+   real(r8),         intent(in) :: pdel(:,:)
+   real(r8),         intent(in) :: pdeldry(:,:)
+
    type(physics_buffer_desc), pointer :: pbuf(:)
 
    integer,             intent(in) :: nnite          ! number of night columns
@@ -411,9 +418,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Local variables
    integer :: icol, jj, isw, kk, ll, mm    ! indices
-   integer :: list_idx                 ! index of the climate or a diagnostic list
-   integer :: lchnk                    ! chunk id
-   integer :: ncol                     ! number of active columns in the chunk
+   integer :: list_idx                 ! index of the climate or a diagnostic list                    
    integer :: nspec
    integer :: istat
    integer :: itim_old           ! index
@@ -421,10 +426,6 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: mass(pcols,pver)        ! layer mass [kg]
    real(r8) :: air_density(pcols,pver) ! [kg/m3]
 
-   real(r8),    pointer :: state_q(:,:,:)      ! state%q [kg/kg]
-   real(r8),    pointer :: state_zm(:,:)       ! state%zm [m]
-   real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
-   real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [kg/kg]
    character*32         :: spectype            ! species type
    real(r8)             :: hygro_aer           ! hygroscopicity [1]
@@ -503,15 +504,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    ! debug output
    integer  :: nerr_dopaer = 0
    !----------------------------------------------------------------------------
-   lchnk = state%lchnk
-   ncol  = state%ncol
-   state_q      => state%q
-   state_zm     => state%zm
-   temperature  => state%t
-   pmid         => state%pmid
 
-   mass(:ncol,:)        = state%pdeldry(:ncol,:)*rga
-   air_density(:ncol,:) = state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
+   mass(:ncol,:)        = pdeldry(:ncol,:)*rga
+   air_density(:ncol,:) = pmid(:ncol,:)/(rair*temperature(:ncol,:))
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
@@ -559,7 +554,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
            dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
@@ -921,13 +916,20 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(dt, state, pbuf, & ! in
+subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, pbuf, & ! in
                         qqcw, tauxar            ) ! out
 
    ! calculates aerosol lw radiative properties
 
-   real(r8),            intent(in)  :: dt       ! time step [s]
-   type(physics_state), intent(in), target :: state    ! state variables
+   real(r8),         intent(in)  :: dt       ! time step [s]
+   integer,          intent(in) :: lchnk            ! chunk id
+   integer,          intent(in) :: ncol             ! number of active columns in the chunk
+   real(r8), target, intent(in) :: state_q(:,:,:)
+   real(r8),         intent(in) :: temperature(:,:)
+   real(r8),         intent(in) :: pmid(:,:)
+   real(r8),         intent(in) :: pdel(:,:)
+   real(r8),         intent(in) :: pdeldry(:,:)
+
    type(physics_buffer_desc), pointer :: pbuf(:)
 
    type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
@@ -935,9 +937,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    ! Local variables
    integer :: icol, ilw, kk, ll, mm
-   integer :: lchnk
    integer :: list_idx                 ! index of the climate or a diagnostic list
-   integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
    integer :: istat
    integer :: itim_old           ! index
@@ -960,10 +960,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: state_q(:,:,:)     ! state%q
    real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
-   real(r8), pointer :: temperature(:,:)   ! temperatures [K]
-   real(r8), pointer :: pmid(:,:)          ! layer pressure [Pa]
    real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    integer  :: itab(pcols), jtab(pcols)
@@ -976,13 +973,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
 
    !----------------------------------------------------------------------------
 
-   ncol  = state%ncol
-   lchnk = state%lchnk
-   state_q      => state%q
-   temperature  => state%t
-   pmid         => state%pmid
    ! dry mass in each cell
-   mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
+   mass(:ncol,:) = pdeldry(:ncol,:)*rga
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
@@ -990,7 +982,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
 
 
-   call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
            dgnumdry_m=dgnumdry_m)
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
