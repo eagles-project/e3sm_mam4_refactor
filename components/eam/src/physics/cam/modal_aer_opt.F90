@@ -22,7 +22,6 @@ use rad_constituents,  only: n_diag, rad_cnst_get_call_list, rad_cnst_get_info, 
                              rad_cnst_get_aer_props, rad_cnst_get_mode_props
 use physics_types,     only: physics_state
 
-use physics_buffer, only : pbuf_get_index,physics_buffer_desc,pbuf_get_field,pbuf_old_tim_idx
 use pio,               only: file_desc_t, var_desc_t, pio_inq_dimlen, pio_inq_dimid, pio_inq_varid, &
                              pio_get_var, pio_nowrite, pio_closefile
 use cam_pio_utils,     only: cam_pio_openfile
@@ -63,11 +62,6 @@ integer, parameter :: ncoef=5, prefr=7, prefi=10
 ! refractive index for water read in read_water_refindex
 complex(r8) :: crefwsw(nswbands) ! complex refractive index for water visible
 complex(r8) :: crefwlw(nlwbands) ! complex refractive index for water infrared
-
-! physics buffer indices
-integer :: cld_idx      = 0
-integer :: dgnumwet_idx = -1
-integer :: qaerwat_idx  = -1
 
 character(len=4) :: diag(0:n_diag) = (/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 ', &
                                        '_d6 ','_d7 ','_d8 ','_d9 ','_d10'/)
@@ -173,21 +167,6 @@ subroutine modal_aer_opt_init()
          end do
       end if
    end do
-
-   cld_idx        = pbuf_get_index('CLD')
-
-
-   ! Initialize physics buffer indices for dgnumwet and qaerwat.  Note the implicit assumption
-   ! that the loops over modes in the optics calculations will use the values for dgnumwet and qaerwat
-   ! that are set in the aerosol_wet_intr code.
-   dgnumwet_idx = pbuf_get_index('DGNUMWET',errcode)
-   if (errcode < 0) then
-      call endrun(routine//' ERROR: cannot find physics buffer field DGNUMWET')
-   end if
-   qaerwat_idx  = pbuf_get_index('QAERWAT')
-   if (errcode < 0) then
-      call endrun(routine//' ERROR: cannot find physics buffer field QAERWAT')
-   end if
 
    call getfil(water_refindex_file, locfile)
    call read_water_refindex(locfile)
@@ -386,7 +365,7 @@ subroutine modal_aer_opt_init()
 end subroutine modal_aer_opt_init
 
 !===============================================================================
-subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
+subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, cldn, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
                          qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
@@ -402,7 +381,7 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
    real(r8),         intent(in) :: pdel(:,:)
    real(r8),         intent(in) :: pdeldry(:,:)
 
-   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8), target, intent(in) :: cldn(:,:)         ! layer cloud fraction [fraction]
 
    integer,             intent(in) :: nnite          ! number of night columns
    integer,             intent(in) :: idxnite(nnite) ! local column indices of night columns
@@ -429,8 +408,6 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [kg/kg]
    character*32         :: spectype            ! species type
    real(r8)             :: hygro_aer           ! hygroscopicity [1]
-
-   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    real(r8) :: sigma_logr_aer         ! geometric standard deviation of number distribution
    real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
@@ -510,9 +487,7 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
+   
    ! initialize output variables
    tauxar(:ncol,:,:) = 0._r8
    wa(:ncol,:,:)     = 0._r8
@@ -916,23 +891,20 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, pbuf, & ! in
+subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, & ! in
                         qqcw, tauxar            ) ! out
 
    ! calculates aerosol lw radiative properties
 
-   real(r8),         intent(in)  :: dt       ! time step [s]
-   integer,          intent(in) :: lchnk            ! chunk id
-   integer,          intent(in) :: ncol             ! number of active columns in the chunk
-   real(r8), target, intent(in) :: state_q(:,:,:)
-   real(r8),         intent(in) :: temperature(:,:)
-   real(r8),         intent(in) :: pmid(:,:)
-   real(r8),         intent(in) :: pdel(:,:)
-   real(r8),         intent(in) :: pdeldry(:,:)
-   real(r8),  target,      intent(in) :: cldn(:,:)        ! layer cloud fraction [fraction]
-
-
-   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8),          intent(in)  :: dt       ! time step [s]
+   integer,           intent(in) :: lchnk            ! chunk id
+   integer,           intent(in) :: ncol             ! number of active columns in the chunk
+   real(r8), target,  intent(in) :: state_q(:,:,:)
+   real(r8),          intent(in) :: temperature(:,:)
+   real(r8),          intent(in) :: pmid(:,:)
+   real(r8),          intent(in) :: pdel(:,:)
+   real(r8),          intent(in) :: pdeldry(:,:)
+   real(r8),  target, intent(in) :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth

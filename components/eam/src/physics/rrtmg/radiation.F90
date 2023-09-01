@@ -60,6 +60,10 @@ integer :: ld_idx       = 0
 integer :: cldfsnow_idx = 0 
 integer :: cld_idx      = 0 
 integer :: concld_idx   = 0
+integer :: idx_ext_lw   = 0
+integer :: idx_ssa_sw   = 0
+integer :: idx_ext_sw   = 0 
+integer :: idx_af_sw    = 0 
 
 ! Default values for namelist variables
 
@@ -802,6 +806,10 @@ end function radiation_nextsw_cday
     cldfsnow_idx = pbuf_get_index('CLDFSNOW',errcode=err)
     cld_idx      = pbuf_get_index('CLD')
     concld_idx   = pbuf_get_index('CONCLD')
+    idx_ext_lw   = pbuf_get_index('ext_earth')
+    idx_ssa_sw   = pbuf_get_index('omega_sun',ierr)
+    idx_ext_sw   = pbuf_get_index('ext_sun',ierr)
+    idx_af_sw    = pbuf_get_index('g_sun',ierr)
 
     if (cldfsnow_idx > 0) then
        ! CLDFSNOW output every call, does not need the sampling_seq flag
@@ -980,7 +988,11 @@ end function radiation_nextsw_cday
     real(r8) :: cldfprime(pcols,pver)             ! combined cloud fraction (snow plus regular)
     real(r8), pointer, dimension(:,:) :: concld   ! convective cloud fraction
     real(r8), pointer, dimension(:,:) :: qrs      ! shortwave radiative heating rate 
-    real(r8), pointer, dimension(:,:) :: qrl      ! longwave  radiative heating rate 
+    real(r8), pointer, dimension(:,:) :: qrl      ! longwave  radiative heating rate
+    real(r8), pointer, dimension(:,:,:) :: ssa_cmip6_sw
+    real(r8), pointer, dimension(:,:,:) :: af_cmip6_sw
+    real(r8), pointer, dimension(:,:,:) :: ext_cmip6_sw
+    real(r8), pointer, dimension(:,:,:) :: ext_cmip6_lw !long wave extinction in the units of [1/km] 
     real(r8) :: qrsc(pcols,pver)                  ! clearsky shortwave radiative heating rate 
     real(r8) :: qrlc(pcols,pver)                  ! clearsky longwave  radiative heating rate 
 
@@ -1315,7 +1327,18 @@ end function radiation_nextsw_cday
                   ! update the concentrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state )
 
-                  call aer_rad_props_sw( icall, dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, pbuf, nnite, idxnite, is_cmip6_volc, &
+                  !Obtain read in values for ssa and asymmetry factor (af) from the
+                  !volcanic input file
+                  call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
+                  call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
+
+                  !Get extinction so as to supply to modal_aero_sw routine for computing EXTINCT variable
+                  ext_cmip6_sw => null()
+                  call pbuf_get_field(pbuf, idx_ext_sw, ext_cmip6_sw)
+
+                  itim_old    =  pbuf_old_tim_idx()
+                  call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+                  call aer_rad_props_sw( icall, dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw, nnite, idxnite, is_cmip6_volc, &
                                          qqcw, aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 
                   call t_startf ('rad_rrtmg_sw')
@@ -1469,7 +1492,9 @@ end function radiation_nextsw_cday
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
                   itim_old    =  pbuf_old_tim_idx()
                   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
-                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, cldn, pbuf, & ! in
+                  !Obtain read in values for ext from the volcanic input file
+                  ext_cmip6_lw => null(); call pbuf_get_field(pbuf, idx_ext_lw, ext_cmip6_lw)
+                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, cldn, ext_cmip6_lw, & ! in
                     qqcw, aer_lw_abs) !out
                   
                   call t_startf ('rad_rrtmg_lw')

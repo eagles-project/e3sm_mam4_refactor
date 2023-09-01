@@ -9,11 +9,9 @@ module aer_rad_props
   use ppgrid,           only: pcols, pver, pverp
   use physics_types,    only: physics_state
 
-  use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
-
   use radconstants,     only: nswbands
   use cam_history,      only: addfld, horiz_only, outfld, add_default
-  use mam_support,       only: ptr2d_t
+  use mam_support,      only: ptr2d_t
 
   implicit none
   private
@@ -26,7 +24,6 @@ module aer_rad_props
 
   ! Private data
   real(r8), parameter :: km_inv_to_m_inv = 0.001_r8      !1/km to 1/m
-  integer  :: idx_ext_sw, idx_ssa_sw, idx_af_sw, idx_ext_lw !pbuf indices for volcanic cmip6 file
   !==============================================================================
 contains
   !==============================================================================
@@ -66,17 +63,11 @@ contains
        call add_default ('AEROD_v', 1, ' ')
     endif
 
-    idx_ext_sw = pbuf_get_index('ext_sun',ierr)
-    idx_ssa_sw = pbuf_get_index('omega_sun',ierr)
-    idx_af_sw  = pbuf_get_index('g_sun',ierr)
-
-    idx_ext_lw = pbuf_get_index('ext_earth',ierr)
-
   end subroutine aer_rad_props_init
 
   !==============================================================================
 
-  subroutine aer_rad_props_sw(list_idx, dt, lchnk, ncol, zi, pmid, pint, temperature, zm, state_q, pdel, pdeldry, pbuf,  nnite, idxnite, is_cmip6_volc, &
+  subroutine aer_rad_props_sw(list_idx, dt, lchnk, ncol, zi, pmid, pint, temperature, zm, state_q, pdel, pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw,  nnite, idxnite, is_cmip6_volc, &
        qqcw, tau, tau_w, tau_w_g, tau_w_f)
 
     use modal_aer_opt,    only: modal_aero_sw
@@ -96,9 +87,11 @@ contains
     real(r8), target, intent(in) :: state_q(:,:,:)
     real(r8),         intent(in) :: pdel(:,:)
     real(r8),         intent(in) :: pdeldry(:,:)
+    real(r8),         intent(in) :: cldn(:,:)
+    real(r8),         intent(in) :: ext_cmip6_sw(:,:,:)
+    real(r8),         intent(in) :: ssa_cmip6_sw(:,:,:)
+    real(r8),         intent(in) :: af_cmip6_sw(:,:,:)
 
-
-    type(physics_buffer_desc), pointer :: pbuf(:)
     integer,             intent(in) :: nnite                ! number of night columns
     integer,             intent(in) :: idxnite(:)           ! local column indices of night columns
     logical,             intent(in) :: is_cmip6_volc        ! true if cmip6 style volcanic file is read otherwise false
@@ -114,20 +107,10 @@ contains
 
     ! for cmip6 style volcanic file
     integer  :: trop_level(pcols), icol
-    real(r8), pointer :: ext_cmip6_sw(:,:,:)
-    real(r8), pointer :: ssa_cmip6_sw(:,:,:),af_cmip6_sw(:,:,:)
     real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of [1/m]
 
     !-----------------------------------------------------------------------------
 
-    !Obtain read in values for ssa and asymmetry factor (af) from the
-    !volcanic input file
-    call pbuf_get_field(pbuf, idx_ssa_sw, ssa_cmip6_sw)
-    call pbuf_get_field(pbuf, idx_af_sw,  af_cmip6_sw)
-
-    !Get extinction so as to supply to modal_aero_sw routine for computing EXTINCT variable
-    ext_cmip6_sw => null()
-    call pbuf_get_field(pbuf, idx_ext_sw, ext_cmip6_sw)
     call outfld('extinct_sw_inp',ext_cmip6_sw(:,:,idx_sw_diag), pcols, lchnk)
 
     !FORTRAN REFACTOR: This is done to fill invalid values in columns where pcols>ncol
@@ -153,7 +136,7 @@ contains
 
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
-    call modal_aero_sw(dt, lchnk, ncol, state_q, zm, temperature, pmid, pdel,pdeldry, pbuf, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
+    call modal_aero_sw(dt, lchnk, ncol, state_q, zm, temperature, pmid, pdel,pdeldry, cldn, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
          trop_level, qqcw, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
@@ -167,7 +150,7 @@ contains
   end subroutine aer_rad_props_sw
 
   !==============================================================================
-  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, cldn, pbuf, &!in
+  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, cldn, ext_cmip6_lw, &!in
      qqcw, odap_aer) !out
 
     use modal_aer_opt,    only: modal_aero_lw
@@ -190,8 +173,8 @@ contains
     real(r8),         intent(in) :: pdel(:,:)
     real(r8),         intent(in) :: pdeldry(:,:)
     real(r8),         intent(in) :: cldn(:,:)
+    real(r8),         intent(in) :: ext_cmip6_lw(:,:,:) !long wave extinction in the units of [1/km] 
     type(ptr2d_t), intent(inout)   :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
-    type(physics_buffer_desc), pointer :: pbuf(:)
 
     !intent-outs
     real(r8),            intent(out) :: odap_aer(pcols,pver,nlwbands) ! [fraction] absorption optical depth, per layer [unitless]
@@ -200,16 +183,14 @@ contains
     !For cmip6 volcanic file
     integer  :: trop_level(pcols), icol, ilev_tropp, ipver
     real(r8) :: lyr_thk                      ![m]
-    real(r8), pointer :: ext_cmip6_lw(:,:,:) !long wave extinction in the units of [1/km]
     real(r8) :: ext_cmip6_lw_inv_m(pcols,pver,nlwbands)!long wave extinction in the units of [1/m]
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
-    call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, pbuf, &! in
+    call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, &! in
             qqcw, odap_aer) !inout/out
 
-    !Obtain read in values for ext from the volcanic input file
-    ext_cmip6_lw => null(); call pbuf_get_field(pbuf, idx_ext_lw, ext_cmip6_lw)
+    !write out ext from the volcanic input file
     call outfld('extinct_lw_inp',ext_cmip6_lw(:,:,idx_lw_diag), pcols, lchnk)
 
     !convert from 1/km to 1/m
