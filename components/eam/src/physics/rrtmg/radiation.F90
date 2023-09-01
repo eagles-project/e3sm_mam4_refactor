@@ -975,6 +975,7 @@ end function radiation_nextsw_cday
 
     integer itim_old, ifld
     real(r8), pointer, dimension(:,:) :: cld      ! cloud fraction
+    real(r8), pointer, dimension(:,:) :: cldn     ! layer cloud fraction [fraction]
     real(r8), pointer, dimension(:,:) :: cldfsnow ! cloud fraction of just "snow clouds- whatever they are"
     real(r8) :: cldfprime(pcols,pver)             ! combined cloud fraction (snow plus regular)
     real(r8), pointer, dimension(:,:) :: concld   ! convective cloud fraction
@@ -1466,8 +1467,9 @@ end function radiation_nextsw_cday
 
                   ! update the conctrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
-
-                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, pbuf, & ! in
+                  itim_old    =  pbuf_old_tim_idx()
+                  call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
+                  call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, cldn, pbuf, & ! in
                     qqcw, aer_lw_abs) !out
                   
                   call t_startf ('rad_rrtmg_lw')

@@ -167,7 +167,7 @@ contains
   end subroutine aer_rad_props_sw
 
   !==============================================================================
-  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, pbuf, &!in
+  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, cldn, pbuf, &!in
      qqcw, odap_aer) !out
 
     use modal_aer_opt,    only: modal_aero_lw
@@ -189,6 +189,7 @@ contains
     real(r8), target, intent(in) :: state_q(:,:,:)
     real(r8),         intent(in) :: pdel(:,:)
     real(r8),         intent(in) :: pdeldry(:,:)
+    real(r8),         intent(in) :: cldn(:,:)
     type(ptr2d_t), intent(inout)   :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -204,7 +205,7 @@ contains
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
-    call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, pbuf, &! in
+    call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, pbuf, &! in
             qqcw, odap_aer) !inout/out
 
     !Obtain read in values for ext from the volcanic input file

@@ -916,7 +916,7 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, pbuf, & ! in
+subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, pbuf, & ! in
                         qqcw, tauxar            ) ! out
 
    ! calculates aerosol lw radiative properties
@@ -929,6 +929,8 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    real(r8),         intent(in) :: pmid(:,:)
    real(r8),         intent(in) :: pdel(:,:)
    real(r8),         intent(in) :: pdeldry(:,:)
+   real(r8),  target,      intent(in) :: cldn(:,:)        ! layer cloud fraction [fraction]
+
 
    type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -961,8 +963,7 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
    real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
-   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
-
+   
    integer  :: itab(pcols), jtab(pcols)
    real(r8) :: ttab(pcols), utab(pcols)
    real(r8) :: cabs(pcols,ncoef)
@@ -978,8 +979,6 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
 
 
    call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
