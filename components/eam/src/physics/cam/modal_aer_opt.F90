@@ -11,8 +11,7 @@ module modal_aer_opt
 
 
 use shr_kind_mod,      only: r8 => shr_kind_r8, shr_kind_cl
-use ppgrid,            only: pcols, pver, pverp
-use constituents,      only: pcnst
+use ppgrid,            only: pcols, pver
 use spmd_utils,        only: masterproc
 use phys_control,      only: cam_chempkg_is
 use ref_pres,          only: top_lev => clim_modal_aero_top_lev
@@ -20,16 +19,15 @@ use physconst,         only: rhoh2o, rga, rair
 use radconstants,      only: nswbands, nlwbands, idx_sw_diag, idx_uv_diag, idx_nir_diag
 use rad_constituents,  only: n_diag, rad_cnst_get_call_list, rad_cnst_get_info, rad_cnst_get_aer_mmr, &
                              rad_cnst_get_aer_props, rad_cnst_get_mode_props
-use physics_types,     only: physics_state
 
 use pio,               only: file_desc_t, var_desc_t, pio_inq_dimlen, pio_inq_dimid, pio_inq_varid, &
                              pio_get_var, pio_nowrite, pio_closefile
 use cam_pio_utils,     only: cam_pio_openfile
-use cam_history,       only:  addfld, horiz_only, add_default, outfld
-use cam_history_support, only: fillvalue
+use cam_history,       only: addfld, horiz_only, add_default, outfld
+use cam_history_support,   only: fillvalue
 use cam_logfile,       only: iulog
 use perf_mod,          only: t_startf, t_stopf
-use cam_abortutils,        only: endrun
+use cam_abortutils,    only: endrun
 
 use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
                             specname_amode, spechygro, &
@@ -38,9 +36,9 @@ use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
                             specrefndxsw, refrtabsw, refitabsw, extpsw, abspsw, asmpsw
 
 use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
-use modal_aero_calcsize,    only: modal_aero_calcsize_diag,modal_aero_calcsize_sub
+use modal_aero_calcsize,    only: modal_aero_calcsize_sub
 use shr_log_mod ,           only: errmsg => shr_log_errmsg
-use mam_support,            only: ptr2d_t
+use mam_support,            only: ptr2d_t, min_max_bound
 
 implicit none
 private
@@ -52,7 +50,6 @@ public :: modal_aer_opt_readnl, modal_aer_opt_init, modal_aero_sw, modal_aero_lw
 character(len=*), parameter :: unset_str = 'UNSET'
 
 ! Namelist variables:
-character(shr_kind_cl)      :: modal_optics_file = unset_str   ! full pathname for modal optics dataset
 character(shr_kind_cl)      :: water_refindex_file = unset_str ! full pathname for water refractive index dataset
 
 ! Dimension sizes in coefficient arrays used to parameterize aerosol radiative properties
@@ -368,8 +365,6 @@ end subroutine modal_aer_opt_init
 subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, cldn, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
                          qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
-
-  use mam_support, only : min_max_bound
 
    real(r8),         intent(in) :: dt               !timestep [s]
    integer,          intent(in) :: lchnk            ! chunk id
@@ -1351,8 +1346,6 @@ end subroutine read_water_refindex
 subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
                                  radsurf, logradsurf, cheb,      & ! out
                                  ismethod2 ) ! optional in
-
-   use mam_support, only : min_max_bound
 
    integer,  intent(in)  :: ncol
    real(r8), intent(in)  :: sigma_logr_aer  ! geometric standard deviation of number distribution
