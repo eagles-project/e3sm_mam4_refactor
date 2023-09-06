@@ -135,7 +135,7 @@ module dust_model
 
        soil_erod(icol) = soil_erodibility( icol, lchnk )
 
-       if( soil_erod(icol) .lt. soil_erod_threshold ) soil_erod(icol) = 0._r8
+       if( soil_erod(icol) < soil_erod_threshold ) soil_erod(icol) = 0._r8
 
        ! rebin and adjust dust emissons..
        do ibin = 1,dust_nbin
