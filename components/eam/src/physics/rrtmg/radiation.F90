@@ -1338,7 +1338,7 @@ end function radiation_nextsw_cday
 
                   itim_old    =  pbuf_old_tim_idx()
                   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-                  call aer_rad_props_sw( icall, dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw, nnite, idxnite, is_cmip6_volc, &
+                  call aer_rad_props_sw( dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw, nnite, idxnite, is_cmip6_volc, &
                                          qqcw, aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 
                   call t_startf ('rad_rrtmg_sw')

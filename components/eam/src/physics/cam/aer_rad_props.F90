@@ -6,8 +6,7 @@ module aer_rad_props
   !------------------------------------------------------------------------------------------------
 
   use shr_kind_mod,     only: r8 => shr_kind_r8
-  use ppgrid,           only: pcols, pver, pverp
-  use physics_types,    only: physics_state
+  use ppgrid,           only: pcols, pver
 
   use radconstants,     only: nswbands
   use cam_history,      only: addfld, horiz_only, outfld, add_default
@@ -32,10 +31,8 @@ contains
     use phys_control, only: phys_getopts
 
     !Local variables
-    integer                    :: ierr
     logical                    :: history_amwg         ! output the variables used by the AMWG diag package
     logical                    :: history_aero_optics  ! Output aerosol optics diagnostics
-    logical                    :: prog_modal_aero      ! Prognostic modal aerosols present
 
     !----------------------------------------------------------------------------
 
@@ -67,23 +64,24 @@ contains
 
   !==============================================================================
 
-  subroutine aer_rad_props_sw(list_idx, dt, lchnk, ncol, zi, pmid, pint, temperature, zm, state_q, pdel, pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw,  nnite, idxnite, is_cmip6_volc, &
-       qqcw, tau, tau_w, tau_w_g, tau_w_f)
+  subroutine aer_rad_props_sw(dt, lchnk, ncol, zi, pmid, pint, & !in
+       temperature, zm, state_q, pdel, pdeldry, cldn, ssa_cmip6_sw, & !in
+       af_cmip6_sw, ext_cmip6_sw,  nnite, idxnite, is_cmip6_volc, & !in
+       qqcw, tau, tau_w, tau_w_g, tau_w_f) !out
 
     use modal_aer_opt,    only: modal_aero_sw
-    use radconstants,     only: nswbands, idx_sw_diag
+    use radconstants,     only: idx_sw_diag
 
     ! Return bulk layer tau, omega, g, f for all spectral intervals.
 
     ! Arguments
-    integer,             intent(in) :: list_idx      ! index of the climate or a diagnostic list
-    integer,  intent(in) :: lchnk            ! number of chunks
-    integer,  intent(in) :: ncol             ! number of columns
-    real(r8), intent(in) :: pmid(:,:)        ! midpoint pressure [Pa]
-    real(r8), intent(in) :: pint(:,:)        ! interface pressure [Pa]
-    real(r8), intent(in) :: temperature(:,:) ! temperature [K]
-    real(r8), intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
-    real(r8), intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
+    integer,          intent(in) :: lchnk            ! number of chunks
+    integer,          intent(in) :: ncol             ! number of columns
+    real(r8),         intent(in) :: pmid(:,:)        ! midpoint pressure [Pa]
+    real(r8),         intent(in) :: pint(:,:)        ! interface pressure [Pa]
+    real(r8),         intent(in) :: temperature(:,:) ! temperature [K]
+    real(r8),         intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
+    real(r8),         intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
     real(r8), target, intent(in) :: state_q(:,:,:)
     real(r8),         intent(in) :: pdel(:,:)
     real(r8),         intent(in) :: pdeldry(:,:)
@@ -92,21 +90,20 @@ contains
     real(r8),         intent(in) :: ssa_cmip6_sw(:,:,:)
     real(r8),         intent(in) :: af_cmip6_sw(:,:,:)
 
-    integer,             intent(in) :: nnite                ! number of night columns
-    integer,             intent(in) :: idxnite(:)           ! local column indices of night columns
-    logical,             intent(in) :: is_cmip6_volc        ! true if cmip6 style volcanic file is read otherwise false
-    real(r8),            intent(in) :: dt                   ! time step (s)
+    integer,          intent(in) :: nnite                ! number of night columns
+    integer,          intent(in) :: idxnite(:)           ! local column indices of night columns
+    logical,          intent(in) :: is_cmip6_volc        ! true if cmip6 style volcanic file is read otherwise false
+    real(r8),         intent(in) :: dt                   ! time step (s)
 
-    type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
-    real(r8), intent(out) :: tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
-    real(r8), intent(out) :: tau_w  (pcols,0:pver,nswbands) ! aerosol single scattering albedo * tau
-    real(r8), intent(out) :: tau_w_g(pcols,0:pver,nswbands) ! aerosol assymetry parameter * tau * w
-    real(r8), intent(out) :: tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * tau * w
+    type(ptr2d_t),    intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    real(r8),         intent(out) :: tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
+    real(r8),         intent(out) :: tau_w  (pcols,0:pver,nswbands) ! aerosol single scattering albedo * tau
+    real(r8),         intent(out) :: tau_w_g(pcols,0:pver,nswbands) ! aerosol assymetry parameter * tau * w
+    real(r8),         intent(out) :: tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * tau * w
 
     ! Local variables
-
     ! for cmip6 style volcanic file
-    integer  :: trop_level(pcols), icol
+    integer  :: trop_level(pcols)
     real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of [1/m]
 
     !-----------------------------------------------------------------------------
@@ -114,7 +111,7 @@ contains
     call outfld('extinct_sw_inp',ext_cmip6_sw(:,:,idx_sw_diag), pcols, lchnk)
 
     !FORTRAN REFACTOR: This is done to fill invalid values in columns where pcols>ncol
-    !C++ port can ignosre this as C++ model is a single column model
+    !C++ port can ignore this as C++ model is a single column model
     ! initialize to conditions that would cause failure
     tau     (:,:,:) = -100._r8
     tau_w   (:,:,:) = -100._r8
@@ -136,8 +133,10 @@ contains
 
     !Special treatment for CMIP6 volcanic aerosols, where extinction, ssa
     !and af are directly read from the prescribed volcanic aerosol file
-    call modal_aero_sw(dt, lchnk, ncol, state_q, zm, temperature, pmid, pdel,pdeldry, cldn, nnite, idxnite, .true., ext_cmip6_sw_inv_m(:,:,idx_sw_diag), &
-         trop_level, qqcw, tau, tau_w, tau_w_g, tau_w_f) !BALLI- in and out???
+    call modal_aero_sw(dt, lchnk, ncol, state_q, zm, temperature, pmid, pdel, & !in
+         pdeldry, cldn, nnite, idxnite, .true., & !in
+         ext_cmip6_sw_inv_m(:,:,idx_sw_diag), trop_level, & !in
+         qqcw, tau, tau_w, tau_w_g, tau_w_f) !out
 
     !Update tau, tau_w, tau_w_g, and tau_w_f with the read in values of extinction, ssa and asymmetry factors
     call volcanic_cmip_sw(ncol, zi, trop_level, ext_cmip6_sw_inv_m, ssa_cmip6_sw, af_cmip6_sw, & ! in
@@ -145,13 +144,14 @@ contains
 
     ! Diagnostic output of total aerosol optical properties
     ! currently implemented for climate list only
-    call aer_vis_diag_out(lchnk, ncol, nnite, idxnite, tau(:,:,idx_sw_diag))
+    call aer_vis_diag_out(lchnk, ncol, nnite, idxnite, tau(:,:,idx_sw_diag)) !in
 
   end subroutine aer_rad_props_sw
 
   !==============================================================================
-  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, temperature, zm, zi, state_q, pdel, pdeldry, cldn, ext_cmip6_lw, &!in
-     qqcw, odap_aer) !out
+  subroutine aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, pmid, pint, & !in
+       temperature, zm, zi, state_q, pdel, pdeldry, cldn, ext_cmip6_lw, &    !in
+       qqcw, odap_aer) !out
 
     use modal_aer_opt,    only: modal_aero_lw
     use radconstants,     only: nlwbands, idx_lw_diag
@@ -160,35 +160,34 @@ contains
     ! emissivity calculations
 
     !Intent-ins
-    logical,  intent(in) :: is_cmip6_volc    ! flag for using cmip6 style volc emissions
-    real(r8), intent(in) :: dt               ! time step[s]
-    integer,  intent(in) :: lchnk            ! number of chunks
-    integer,  intent(in) :: ncol             ! number of columns
-    real(r8), intent(in) :: pmid(:,:)        ! midpoint pressure [Pa]
-    real(r8), intent(in) :: pint(:,:)        ! interface pressure [Pa]
-    real(r8), intent(in) :: temperature(:,:) ! temperature [K]
-    real(r8), intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
-    real(r8), intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
+    logical,          intent(in) :: is_cmip6_volc    ! flag for using cmip6 style volc emissions
+    real(r8),         intent(in) :: dt               ! time step[s]
+    integer,          intent(in) :: lchnk            ! number of chunks
+    integer,          intent(in) :: ncol             ! number of columns
+    real(r8),         intent(in) :: pmid(:,:)        ! midpoint pressure [Pa]
+    real(r8),         intent(in) :: pint(:,:)        ! interface pressure [Pa]
+    real(r8),         intent(in) :: temperature(:,:) ! temperature [K]
+    real(r8),         intent(in) :: zm(:,:)          ! geopotential height above surface at midpoints [m]
+    real(r8),         intent(in) :: zi(:,:)          ! geopotential height above surface at interfaces [m]
     real(r8), target, intent(in) :: state_q(:,:,:)
     real(r8),         intent(in) :: pdel(:,:)
     real(r8),         intent(in) :: pdeldry(:,:)
     real(r8),         intent(in) :: cldn(:,:)
     real(r8),         intent(in) :: ext_cmip6_lw(:,:,:) !long wave extinction in the units of [1/km] 
-    type(ptr2d_t), intent(inout)   :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    type(ptr2d_t),    intent(inout) :: qqcw(:)   ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
     !intent-outs
-    real(r8),            intent(out) :: odap_aer(pcols,pver,nlwbands) ! [fraction] absorption optical depth, per layer [unitless]
+    real(r8),         intent(out) :: odap_aer(pcols,pver,nlwbands) ! [fraction] absorption optical depth, per layer [unitless]
 
     ! Local variables
     !For cmip6 volcanic file
-    integer  :: trop_level(pcols), icol, ilev_tropp, ipver
-    real(r8) :: lyr_thk                      ![m]
+    integer  :: trop_level(pcols)
     real(r8) :: ext_cmip6_lw_inv_m(pcols,pver,nlwbands)!long wave extinction in the units of [1/m]
     !-----------------------------------------------------------------------------
 
     !Compute contributions from the modal aerosols.
     call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, &! in
-            qqcw, odap_aer) !inout/out
+         qqcw, odap_aer) !inout/out
 
     !write out ext from the volcanic input file
     call outfld('extinct_lw_inp',ext_cmip6_lw(:,:,idx_lw_diag), pcols, lchnk)
