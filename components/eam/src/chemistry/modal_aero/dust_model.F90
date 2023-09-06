@@ -21,18 +21,10 @@ module dust_model
   integer, parameter :: dust_nbin = 2
   integer, parameter :: dust_nnum = 2
 
-#if  ( defined MODAL_AERO_3MODE || defined MODAL_AERO_4MODE || defined MODAL_AERO_4MODE_MOM )
   character(len=6), parameter :: dust_names(dust_nbin+dust_nnum) = (/ 'dst_a1', 'dst_a3', 'num_a1', 'num_a3' /)
   real(r8),         parameter :: dust_dmt_grd(dust_nbin+1) = (/ 0.1e-6_r8, 1.0e-6_r8, 10.0e-6_r8/)
-! Zender03: fractions of bin (0.1-1) and bin (1-10) in size 0.1-10
-!  real(r8),         parameter :: dust_emis_sclfctr(dust_nbin) = (/ 0.032_r8,0.968_r8 /)
 ! Kok11: fractions of bin (0.1-1) and bin (1-10) in size 0.1-10
   real(r8),         parameter :: dust_emis_sclfctr(dust_nbin) = (/ 0.011_r8,0.989_r8 /)
-#elif ( defined MODAL_AERO_7MODE || defined MODAL_AERO_9MODE )
-  character(len=6), parameter :: dust_names(dust_nbin+dust_nnum) = (/ 'dst_a5', 'dst_a7', 'num_a5', 'num_a7' /)
-  real(r8),         parameter :: dust_dmt_grd(dust_nbin+1) = (/ 0.1e-6_r8, 2.0e-6_r8, 10.0e-6_r8/)
-  real(r8),         parameter :: dust_emis_sclfctr(dust_nbin) = (/ 0.13_r8, 0.87_r8 /)
-#endif
 
   integer  :: dust_indices(dust_nbin+dust_nnum)
   real(r8) :: dust_dmt_vwr(dust_nbin)
@@ -113,7 +105,9 @@ module dust_model
 
   !===============================================================================
   !===============================================================================
-  subroutine dust_emis( ncol, lchnk, dust_flux_in, cflx, soil_erod )
+  subroutine dust_emis( ncol, lchnk, dust_flux_in, &  ! in
+                        cflx, &                       ! inout
+                        soil_erod )                   ! out
     use soil_erod_mod, only : soil_erod_fact
     use soil_erod_mod, only : soil_erodibility
     use mo_constants,  only : dust_density
@@ -126,39 +120,41 @@ module dust_model
     real(r8), intent(out)   :: soil_erod(:)
 
   ! local vars
-    integer :: i, m, idst, inum
+    integer :: icol, ibin, idx_dst, inum
     real(r8) :: x_mton
-    real(r8),parameter :: soil_erod_threshold = 0.1_r8
+    real(r8), parameter :: soil_erod_threshold = 0.1_r8
+    real(r8) :: dst_mass_to_num(dust_nbin)
+    
+    do ibin = 1, dust_nbin
+       dst_mass_to_num(ibin) = 6._r8 / (pi * dust_density * (dust_dmt_vwr(ibin)**3._r8))
+    enddo
 
     ! set dust emissions
 
-    col_loop: do i =1,ncol
+    col_loop: do icol =1,ncol
 
-       soil_erod(i) = soil_erodibility( i, lchnk )
+       soil_erod(icol) = soil_erodibility( icol, lchnk )
 
-       if( soil_erod(i) .lt. soil_erod_threshold ) soil_erod(i) = 0._r8
+       if( soil_erod(icol) .lt. soil_erod_threshold ) soil_erod(icol) = 0._r8
 
        ! rebin and adjust dust emissons..
-       do m = 1,dust_nbin
+       do ibin = 1,dust_nbin
 
-          idst = dust_indices(m)
+          idx_dst = dust_indices(ibin)
 
        ! Correct the dust input flux calculated by CLM, which uses size distribution in Zender03
        ! to calculate fraction of bin (0.1-10um) in range (0.1-20um) = 0.87
        ! based on Kok11, that fraction is 0.73
-!          cflx(i,idst) = sum( -dust_flux_in(i,:) ) &
-          cflx(i,idst) = sum( -dust_flux_in(i,:) ) * 0.73_r8/0.87_r8 &
-               * dust_emis_sclfctr(m)*soil_erod(i)/soil_erod_fact*1.15_r8
+          cflx(icol,idx_dst) = sum( -dust_flux_in(icol,:) ) * 0.73_r8/0.87_r8 &
+                             * dust_emis_sclfctr(ibin)*soil_erod(icol)/soil_erod_fact*1.15_r8
 
-          x_mton = 6._r8 / (pi * dust_density * (dust_dmt_vwr(m)**3._r8))                
+          inum = dust_indices(ibin+dust_nbin)
 
-          inum = dust_indices(m+dust_nbin)
-
-          cflx(i,inum) = cflx(i,idst)*x_mton
+          cflx(icol,inum) = cflx(icol,idx_dst)*dst_mass_to_num(ibin)
 
        enddo
 
-    end do col_loop
+    enddo col_loop
 
   end subroutine dust_emis
 
