@@ -1600,7 +1600,9 @@ lphase_jnmw_conditional: &
 
     if (dust_active) then
 
-       call dust_emis( ncol, lchnk, cam_in%dstflx, cam_in%cflx, soil_erod_tmp )
+       call dust_emis( ncol, lchnk, cam_in%dstflx, & ! in
+                       cam_in%cflx, &                ! inout
+                       soil_erod_tmp )               ! out
 
        ! some dust emis diagnostics ...
        sflx(:)=0._r8

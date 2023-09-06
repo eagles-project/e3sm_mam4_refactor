@@ -115,9 +115,9 @@ module dust_model
 
   ! args
     integer,  intent(in)    :: ncol, lchnk
-    real(r8), intent(in)    :: dust_flux_in(:,:)
-    real(r8), intent(inout) :: cflx(:,:)
-    real(r8), intent(out)   :: soil_erod(:)
+    real(r8), intent(in)    :: dust_flux_in(:,:) ! dust emission fluxes in four bins from land [kg/m^2/s]
+    real(r8), intent(inout) :: cflx(:,:)         ! emission fluxes in MAM modes [kg/m^2/s or #/m^2/s]
+    real(r8), intent(out)   :: soil_erod(:)      ! soil erodibility factor [unitless]
 
   ! local vars
     integer :: icol, ibin, idx_dst, inum
