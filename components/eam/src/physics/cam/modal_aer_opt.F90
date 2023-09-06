@@ -530,8 +530,9 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., & ! in
-           dgnumdry_m=dgnumdry_m) ! out
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, & ! in
+                list_idx_in=list_idx, update_mmr_in = .false., & ! in
+                dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
                                   cldn, dgnumdry_m, & ! in
@@ -598,12 +599,12 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
             do ll = 1, nspec
 
                ! get aerosol properties and save for each species
-               specmmr => state_q(:,:,lmassptr_amode(ll,mm))
-               spectype = specname_amode(lspectype_amode(ll,mm))
-               hygro_aer = spechygro(lspectype_amode(ll,mm))
-               specdens(ll) = specdens_amode(lspectype_amode(ll,mm))
+               specmmr          => state_q(:,:,lmassptr_amode(ll,mm))
+               spectype         = specname_amode(lspectype_amode(ll,mm))
+               hygro_aer        = spechygro(lspectype_amode(ll,mm))
+               specdens(ll)     = specdens_amode(lspectype_amode(ll,mm))
                specrefindex(ll,:) = specrefndxsw(:,lspectype_amode(ll,mm))
-               specvol(:,ll) = specmmr(:,kk)/specdens(ll)
+               specvol(:,ll)    = specmmr(:,kk)/specdens(ll)
 
                ! compute some diagnostics for visible band only
                if (savaervis) then
@@ -954,8 +955,9 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    list_idx = 0   ! index of the climate or a diagnostic list
 
 
-   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, list_idx_in=list_idx, update_mmr_in = .false., &
-           dgnumdry_m=dgnumdry_m)
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, & ! in
+                list_idx_in=list_idx, update_mmr_in = .false., & ! in
+                dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
                                   cldn, dgnumdry_m, & ! in
@@ -977,7 +979,8 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
       ! FORTRAN refactoring: ismethod2 is tempararily used to ensure BFB test. 
       ! can be removed when porting to C++
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet_m(:,:,mm), & ! in
-                                 radsurf, logradsurf, cheby, ismethod2=.true.) 
+                                 radsurf, logradsurf, cheby, & ! out
+                                 ismethod2=.true.) ! optional in
 
       allocate(specvol(ncol,nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specvol: "//errmsg(__FILE__,__LINE__) )
@@ -1085,7 +1088,7 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
    do icol = 1, ncol
        burden_s(icol) = burden_s(icol) + specmmr_k(icol)*mass_k(icol)
        scat_s(icol)   = vol(icol)*specrefr
-       abs_s(icol)    = -vol(icol)*specrefi
+       abs_s(icol)    = - vol(icol)*specrefi
        hygro_s(icol)  = vol(icol)*hygro_aer
    enddo
 
@@ -1108,7 +1111,7 @@ subroutine update_aod_spec ( scath2o, absh2o,           & ! in
    scat_s     = (scat_s + scath2o*hygro_s/sumhygro)/sumscat
    abs_s      = (abs_s + absh2o*hygro_s/sumhygro)/sumabs
 
-   aodc           = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
+   aodc       = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
 
    aod_s      = aod_s + aodc
 
@@ -1405,7 +1408,7 @@ end subroutine modal_size_parameters
 
 
 subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &! in
-     itab, jtab, ttab, utab, coef) !inout/out
+                        itab, jtab, ttab, utab, coef) !inout/out
 
   !------------------------------------------------------------------------------
   ! Bilinear interpolation along the refractive index dimensions
@@ -1464,8 +1467,8 @@ end subroutine binterp
 
 
 subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
-     ix, tt, & !out
-     do_print) !in-optional
+                           ix, tt, & !out
+                           do_print) !in-optional
 
   ! Compute factors for the real or imaginary parts
   implicit none
