@@ -362,19 +362,20 @@ subroutine modal_aer_opt_init()
 end subroutine modal_aer_opt_init
 
 !===============================================================================
-subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, cldn, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
+subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, & ! in
+                         cldn, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
                          qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
    real(r8),         intent(in) :: dt               !timestep [s]
    integer,          intent(in) :: lchnk            ! chunk id
    integer,          intent(in) :: ncol             ! number of active columns in the chunk
-   real(r8), target, intent(in) :: state_q(:,:,:)
-   real(r8),         intent(in) :: state_zm(:,:)
-   real(r8),         intent(in) :: temperature(:,:)
-   real(r8),         intent(in) :: pmid(:,:)
-   real(r8),         intent(in) :: pdel(:,:)
-   real(r8),         intent(in) :: pdeldry(:,:)
+   real(r8), target, intent(in) :: state_q(:,:,:)   ! water and tracers (state%q) in state [kg/kg] 
+   real(r8),         intent(in) :: state_zm(:,:)    ! mid-point height (state%zm) [m]
+   real(r8),         intent(in) :: temperature(:,:) ! temperature [K]
+   real(r8),         intent(in) :: pmid(:,:)        ! mid-point pressure [Pa]
+   real(r8),         intent(in) :: pdel(:,:)        ! pressure interval [Pa]
+   real(r8),         intent(in) :: pdeldry(:,:)     ! dry mass pressure interval [Pa]
 
    real(r8), target, intent(in) :: cldn(:,:)         ! layer cloud fraction [fraction]
 
@@ -397,8 +398,8 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
    integer :: istat
    integer :: itim_old           ! index
 
-   real(r8) :: mass(pcols,pver)        ! layer mass [kg]
-   real(r8) :: air_density(pcols,pver) ! [kg/m3]
+   real(r8) :: mass(pcols,pver)        ! layer dry mass [kg/m2]
+   real(r8) :: air_density(pcols,pver) ! dry air density [kg/m3]
 
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [kg/kg]
    character*32         :: spectype            ! species type
@@ -421,18 +422,18 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
    real(r8) :: watervol(pcols) ! volume concentration of water in each mode [m3/kg]
    real(r8) :: wetvol(pcols)   ! volume concentration of wet mode [m3/kg]
 
-   integer  :: itab(pcols), jtab(pcols)
-   real(r8) :: ttab(pcols), utab(pcols)
-   real(r8) :: cext(pcols,ncoef), cabs(pcols,ncoef), casm(pcols,ncoef)
+   integer  :: itab(pcols), jtab(pcols)  ! index for Bilinear interpolation
+   real(r8) :: ttab(pcols), utab(pcols)  ! coef for Bilinear interpolation
+   real(r8) :: cext(pcols,ncoef), cabs(pcols,ncoef), casm(pcols,ncoef)  ! coefficient for extinction, absoption, and asymmetry [unitless] 
    real(r8) :: pext(pcols)     ! parameterized specific extinction [m2/kg]
    real(r8) :: specpext(pcols) ! specific extinction [m2/kg]
-   real(r8) :: dopaer(pcols)   ! aerosol optical depth in layer
+   real(r8) :: dopaer(pcols)   ! aerosol optical depth in layer [1]
    real(r8) :: pabs(pcols)     ! parameterized specific absorption [m2/kg]
-   real(r8) :: pasm(pcols)     ! parameterized asymmetry factor
-   real(r8) :: palb(pcols)     ! parameterized single scattering albedo
+   real(r8) :: pasm(pcols)     ! parameterized asymmetry factor [unitless?]
+   real(r8) :: palb(pcols)     ! parameterized single scattering albedo [unitless]
 
    ! Diagnostics
-   real(r8) :: tropopause_m(pcols)
+   real(r8) :: tropopause_m(pcols)         ! tropopause height [m]
    real(r8) :: extinct(pcols,pver)         ! aerosol extinction [1/m]
    real(r8) :: absorb(pcols,pver)          ! aerosol absorption [1/m]
    real(r8) :: aodvis(pcols)               ! extinction optical depth
@@ -441,24 +442,29 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
 
    real(r8) :: aodabsbc(pcols)             ! absorption optical depth of BC
 
-   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode
-   real(r8) :: aodmode(pcols)
+   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode [kg/m2]
+   real(r8) :: aodmode(pcols)              ! aerosol optical depth for each mode [1]
 
-   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode
+   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode [1]
    real(r8) :: dustvol(pcols)              ! volume concentration of dust in aerosol mode (m3/kg)
 
    real(r8) :: burdendust(pcols), burdenso4(pcols), burdenbc(pcols), &
-               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols), burdenmom(pcols)
+               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols), &
+               burdenmom(pcols)  ! burden for each aerosol species [kg/m2]
    real(r8) :: scatdust(pcols), scatso4(pcols), scatbc(pcols), &
-               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols), scatmom(pcols)
+               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols), &
+               scatmom(pcols)  ! scattering albedo (?) for each aerosol species [unitless]
    real(r8) :: absdust(pcols), absso4(pcols), absbc(pcols), &
-               abspom(pcols), abssoa(pcols), absseasalt(pcols), absmom(pcols)
+               abspom(pcols), abssoa(pcols), absseasalt(pcols), &
+               absmom(pcols)   ! absoprtion for each aerosol species [unit?] 
    real(r8) :: hygrodust(pcols), hygroso4(pcols), hygrobc(pcols), &
-               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols), hygromom(pcols)
+               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols), &
+               hygromom(pcols)  ! hygroscopicity for each aerosol species [unitless]
 
-   real(r8) :: ssavis(pcols)
-   real(r8) :: specrefr, specrefi
-   real(r8) :: scath2o, absh2o, sumscat, sumabs, sumhygro
+   real(r8) :: ssavis(pcols)    ! Aerosol singel-scatter albedo [unitless]
+   real(r8) :: specrefr, specrefi  ! real and imag parts of specref
+   real(r8) :: scath2o, absh2o   ! scattering and absorption of h2o
+   real(r8) :: sumscat, sumabs, sumhygro ! sum of scattering , absoprtion and hygroscopicity
 
    ! total species AOD
    real(r8) :: dustaod(pcols), so4aod(pcols), bcaod(pcols), &
@@ -894,11 +900,11 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    real(r8),          intent(in)  :: dt       ! time step [s]
    integer,           intent(in) :: lchnk            ! chunk id
    integer,           intent(in) :: ncol             ! number of active columns in the chunk
-   real(r8), target,  intent(in) :: state_q(:,:,:)
-   real(r8),          intent(in) :: temperature(:,:)
-   real(r8),          intent(in) :: pmid(:,:)
-   real(r8),          intent(in) :: pdel(:,:)
-   real(r8),          intent(in) :: pdeldry(:,:)
+   real(r8), target,  intent(in) :: state_q(:,:,:)   ! water and tracers (state%q) in state [kg/kg]
+   real(r8),          intent(in) :: temperature(:,:) ! temperature [K]
+   real(r8),          intent(in) :: pmid(:,:)        ! mid-point pressure [Pa]
+   real(r8),          intent(in) :: pdel(:,:)        ! pressure interval [Pa]
+   real(r8),          intent(in) :: pdeldry(:,:)     ! dry mass pressure interval [Pa]
    real(r8),  target, intent(in) :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
@@ -917,7 +923,7 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    real(r8) :: radsurf(pcols,pver)     ! aerosol surface mode radius
    real(r8) :: logradsurf(pcols,pver)  ! log(aerosol surface mode radius)
 
-   real(r8) :: mass(pcols,pver) ! layer mass
+   real(r8) :: mass(pcols,pver) ! layer mass [kg/m2]
 
    real(r8),allocatable :: specvol(:,:)        ! volume concentration of aerosol specie [m3/kg]
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
@@ -931,11 +937,11 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    complex(r8) :: crefin(pcols) ! complex refractive index
    real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
    
-   integer  :: itab(pcols), jtab(pcols)
-   real(r8) :: ttab(pcols), utab(pcols)
-   real(r8) :: cabs(pcols,ncoef)
+   integer  :: itab(pcols), jtab(pcols) ! index for Bilinear interpolation
+   real(r8) :: ttab(pcols), utab(pcols) ! coef for Bilinear interpolation
+   real(r8) :: cabs(pcols,ncoef) ! coefficient for absorption [unitless]
    real(r8) :: pabs(pcols)      ! parameterized specific absorption [m2/kg]
-   real(r8) :: dopaer    ! aerosol optical depth in layer
+   real(r8) :: dopaer    ! aerosol optical depth in layer [1]
 
    integer  :: nerr_dopaer = 0
 
@@ -1063,15 +1069,15 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
    ! calculate some diagnostics for a species
    implicit none
    integer,  intent(in) :: ncol
-   real(r8), intent(in),  pointer :: specmmr_k(:)
-   real(r8), intent(in) :: mass_k(:)
+   real(r8), intent(in),  pointer :: specmmr_k(:)  ! mmr at level kk [kg/kg]
+   real(r8), intent(in) :: mass_k(:)        ! mass at layer kk [kg/m2]
    real(r8), intent(in) :: vol(:) ! volume concentration of aerosol species [m3/kg]
    real(r8), intent(in) :: specrefr, specrefi  ! real and image part of specrefindex
-   real(r8), intent(in) :: hygro_aer        ! aerosol hygroscopicity
-   real(r8), intent(out) :: burden_s(pcols) ! aerosol burden of species
-   real(r8), intent(out) :: scat_s(pcols)   ! scattering of species
-   real(r8), intent(out) :: abs_s(pcols)    ! absorption of species
-   real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species
+   real(r8), intent(in) :: hygro_aer        ! aerosol hygroscopicity [unitless]
+   real(r8), intent(out) :: burden_s(pcols) ! aerosol burden of species [kg/m2]
+   real(r8), intent(out) :: scat_s(pcols)   ! scattering of species [unitless]
+   real(r8), intent(out) :: abs_s(pcols)    ! absorption of species [unit?]
+   real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species [unitless]
    
    integer :: icol
 
@@ -1119,7 +1125,7 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
    real(r8), intent(in) :: state_zm(:,:) ! state%zm [m]
    real(r8), intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
    real(r8), intent(inout) :: extinct(pcols,pver) ! aerosol extinction [1/m]
-   real(r8), intent(out)   :: tropopause_m(pcols)
+   real(r8), intent(out)   :: tropopause_m(pcols) ! tropopause height [m]
 
    ! local variables
    integer :: icol, kk_tropp
