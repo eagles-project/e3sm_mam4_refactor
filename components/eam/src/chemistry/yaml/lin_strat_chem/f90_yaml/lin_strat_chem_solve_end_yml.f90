@@ -5,8 +5,32 @@
      call write_output_header(unit_output)
 
      !start writing data
+
+     if(multicol) then
      
+        call write_var(unit_output,'o3_vmr',o3_vmr(:,yaml%lev_print))
+
+     !write data sent to outfld
+
+        call write_var(unit_output,'do3_linoz',do3_linoz(:,yaml%lev_print))
+        call write_var(unit_output,'do3_linoz_psc',do3_linoz_psc(:,yaml%lev_print))
+        call write_var(unit_output,'ss_o3',ss_o3(:,yaml%lev_print))
+        call write_var(unit_output,'o3col_du_diag',o3col_du_diag(:,yaml%lev_print))
+        call write_var(unit_output,'o3clim_linoz_diag',o3clim_linoz_diag(:,yaml%lev_print))
+
+     else
+
         call write_var(unit_output,'o3_vmr',o3_vmr(yaml%col_print,yaml%lev_print))
+
+     !write data sent to outfld
+
+        call write_var(unit_output,'do3_linoz',do3_linoz(yaml%col_print,yaml%lev_print))
+        call write_var(unit_output,'do3_linoz_psc',do3_linoz_psc(yaml%col_print,yaml%lev_print))
+        call write_var(unit_output,'ss_o3',ss_o3(yaml%col_print,yaml%lev_print))
+        call write_var(unit_output,'o3col_du_diag',o3col_du_diag(yaml%col_print,yaml%lev_print))
+        call write_var(unit_output,'o3clim_linoz_diag',o3clim_linoz_diag(yaml%col_print,yaml%lev_print))
+
+     endif
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only

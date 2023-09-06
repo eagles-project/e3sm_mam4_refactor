@@ -17,8 +17,11 @@
   !-----------------------------------------------------------------------------------------
   ! This is used when multiple sets of yaml output is needed
   !to cover different options (e.g., true and false)
-  ! character(len=200) :: ext_str
+  character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
+  logical :: multicol = .false.
+  !logical :: multicol = .true.
+
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
@@ -64,6 +67,7 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
+     ext_str = 'multicol'
      !-----------------------------------------------------------------------------------------
 
 
@@ -88,9 +92,15 @@
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('lin_strat_sfcsink', &  !intent-in
+        if(multicol) then
+           call open_files('lin_strat_sfcsink', &  !intent-in
+        !     unit_input, unit_output) !intent-out
+            unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+        else
+           call open_files('lin_strat_sfcsink', &  !intent-in
              unit_input, unit_output) !intent-out
         !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+        endif
 
 
         !start by adding an input string
@@ -99,12 +109,20 @@
              'lin_strat_sfcsink',y_nstep, yaml%lev_print)
 
         ! add code for writing data here
-        
-        call write_var(unit_input,unit_output,'ncol',ncol)
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
-        call write_var(unit_input,unit_output,'delta_t',delta_t)
-        call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'o3l_vmr',o3l_vmr(yaml%col_print,yaml%lev_print))
+        if(multicol) then
+        ! writing all vertical levels in multicol case because one output diagnostic is a vertical integral
+           call write_var(unit_input,unit_output,'ncol',ncol)
+           call write_var(unit_input,unit_output,'lchnk',lchnk)
+           call write_var(unit_input,unit_output,'delta_t',delta_t)
+           call write_var(unit_input,unit_output,'pdel',pdel(:,:))
+           call write_var(unit_input,unit_output,'o3l_vmr',o3l_vmr(:,:))
+        else
+           call write_var(unit_input,unit_output,'ncol',ncol)
+           call write_var(unit_input,unit_output,'lchnk',lchnk)
+           call write_var(unit_input,unit_output,'delta_t',delta_t)
+           call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'o3l_vmr',o3l_vmr(yaml%col_print,yaml%lev_print))
+        endif
 
         ! below are external module variables used in lin_strat_sfcsink
 

@@ -35,6 +35,12 @@ input.chlorine_loading=[[  0.32864836736409750E+001],]
 input.do_lin_stratchem=[[         1],]
 input.radians_to_degrees=[[  0.57295779513082323E+002],]
 input.chlorine_loading_bgnd=[[  0.00000000000000000E+000],]
+input.psc_T=[[  0.19750000000000000E+003],]
 # Output data is stored here.
 output = Object()
 output.o3_vmr=[[  0.42961260697408378E-006],]
+output.do3_linoz=[[  0.52166642289103826E-015],]
+output.do3_linoz_psc=[[  0.00000000000000000E+000],]
+output.ss_o3=[[  0.47812600591665082E-006],]
+output.o3col_du_diag=[[  0.24688895575587955E+003],]
+output.o3clim_linoz_diag=[[  0.48783283898034547E-006],]

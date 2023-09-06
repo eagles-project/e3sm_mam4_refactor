@@ -28,3 +28,4 @@ input:
     do_lin_stratchem: [         1]
     radians_to_degrees: [  0.57295779513082323E+002]
     chlorine_loading_bgnd: [  0.00000000000000000E+000]
+    psc_T: [  0.19750000000000000E+003]

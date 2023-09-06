@@ -17,8 +17,11 @@
   !-----------------------------------------------------------------------------------------
   ! This is used when multiple sets of yaml output is needed
   !to cover different options (e.g., true and false)
-  ! character(len=200) :: ext_str
+  character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
+  logical :: multicol = .false.
+!  logical :: multicol = .true.
+
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
@@ -65,6 +68,7 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
+     ext_str = 'multicol'
      !-----------------------------------------------------------------------------------------
 
 
@@ -89,10 +93,15 @@
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('lin_strat_chem_solve', &  !intent-in
+        if(multicol) then
+           call open_files('lin_strat_chem_solve', &  !intent-in
+        !     unit_input, unit_output) !intent-out
+            unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+        else
+           call open_files('lin_strat_chem_solve', &  !intent-in
              unit_input, unit_output) !intent-out
         !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
-
+        endif
 
         !start by adding an input string
         !Use current timestep, given by y_nstep, to form name of input / output files
@@ -100,25 +109,46 @@
              'lin_strat_chem_solve',y_nstep, yaml%lev_print)
 
         ! add code for writing data here
-        
-        call write_var(unit_input,unit_output,'ncol',ncol)
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
-        call write_var(unit_input,unit_output,'o3col',o3col(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'temp',temp(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'sza',sza(yaml%col_print))
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'delta_t',delta_t)
-        call write_var(unit_input,unit_output,'rlats',rlats(yaml%col_print))
-        call write_var(unit_input,unit_output,'ltrop',ltrop(yaml%col_print))
-        call write_var(unit_input,unit_output,'linoz_o3_clim',linoz_o3_clim(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_t_clim',linoz_t_clim(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_o3col_clim',linoz_o3col_clim(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_PmL_clim',linoz_PmL_clim(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_dPmL_dO3',linoz_dPmL_dO3(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_dPmL_dT',linoz_dPmL_dT(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_dPmL_dO3col',linoz_dPmL_dO3col(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'linoz_cariolle_psc',linoz_cariolle_psc(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'o3_vmr',o3_vmr(yaml%col_print,yaml%lev_print))
+        if(multicol) then
+           call write_var(unit_input,unit_output,'ncol',ncol)
+           call write_var(unit_input,unit_output,'lchnk',lchnk)
+           call write_var(unit_input,unit_output,'o3col',o3col(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'temp',temp(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'sza',sza(:))
+           call write_var(unit_input,unit_output,'pmid',pmid(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'delta_t',delta_t)
+           call write_var(unit_input,unit_output,'rlats',rlats(:))
+           call write_var(unit_input,unit_output,'ltrop',ltrop(:))
+           call write_var(unit_input,unit_output,'linoz_o3_clim',linoz_o3_clim(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_t_clim',linoz_t_clim(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_o3col_clim',linoz_o3col_clim(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_PmL_clim',linoz_PmL_clim(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3',linoz_dPmL_dO3(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dT',linoz_dPmL_dT(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3col',linoz_dPmL_dO3col(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_cariolle_psc',linoz_cariolle_psc(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'o3_vmr',o3_vmr(:,yaml%lev_print))
+        else
+           call write_var(unit_input,unit_output,'ncol',ncol)
+           call write_var(unit_input,unit_output,'lchnk',lchnk)
+           call write_var(unit_input,unit_output,'o3col',o3col(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'temp',temp(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'sza',sza(yaml%col_print))
+           call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'delta_t',delta_t)
+           call write_var(unit_input,unit_output,'rlats',rlats(yaml%col_print))
+           call write_var(unit_input,unit_output,'ltrop',ltrop(yaml%col_print))
+           call write_var(unit_input,unit_output,'linoz_o3_clim',linoz_o3_clim(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_t_clim',linoz_t_clim(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_o3col_clim',linoz_o3col_clim(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_PmL_clim',linoz_PmL_clim(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3',linoz_dPmL_dO3(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dT',linoz_dPmL_dT(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3col',linoz_dPmL_dO3col(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_cariolle_psc',linoz_cariolle_psc(yaml%col_print,yaml%lev_print))
+           call write_var(unit_input,unit_output,'o3_vmr',o3_vmr(yaml%col_print,yaml%lev_print))
+        endif
+
 
         ! below are external module variables used in lin_strat_chem_solve
 
@@ -131,6 +161,10 @@
         call write_var(unit_input,unit_output,'do_lin_stratchem',do_lin_strat_chem)
         call write_var(unit_input,unit_output,'radians_to_degrees',radians_to_degrees)
         call write_var(unit_input,unit_output,'chlorine_loading_bgnd',chlorine_loading_bgnd)
+
+        ! below are internal module variables used by dependencies of lin_strat_chem_solve
+        
+        call write_var(unit_input,unit_output,'psc_T',psc_T)
         
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

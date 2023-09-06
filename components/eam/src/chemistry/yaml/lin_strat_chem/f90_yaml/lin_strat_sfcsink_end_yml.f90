@@ -5,8 +5,14 @@
      call write_output_header(unit_output)
 
      !start writing data
-     
-        call write_var(unit_output,'o3l_vmr',o3l_vmr(yaml%col_print,yaml%lev_print))
+     if(multicol) then
+     ! note that in multicol case we are also outputing vertical integrated outfld quantity, so for 3D fields showing all vertical levels
+        call write_var(unit_output,'o3l_vmr',o3l_vmr(:,:))
+     !write data that is sent to outfld, note that this is a vertical integral
+        call write_var(unit_output,'o3l_sfcsink',o3l_sfcsink(:))
+     else
+        call write_var(unit_output,'o3l_vmr',o3l_vmr(yaml%col_print,yaml%lev_print)) 
+     endif
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
