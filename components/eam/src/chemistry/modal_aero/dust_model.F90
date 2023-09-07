@@ -121,7 +121,6 @@ module dust_model
 
   ! local vars
     integer :: icol, ibin, idx_dst, inum
-    real(r8) :: x_mton
     real(r8), parameter :: soil_erod_threshold = 0.1_r8
     real(r8) :: dst_mass_to_num(dust_nbin)
     
