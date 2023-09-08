@@ -8,15 +8,15 @@
 
      if(multicol) then
      
-        call write_var(unit_output,'o3_vmr',o3_vmr(:,yaml%lev_print))
+        call write_var(unit_output,'o3_vmr',o3_vmr(:,:))
 
      !write data sent to outfld
 
-        call write_var(unit_output,'do3_linoz',do3_linoz(:,yaml%lev_print))
-        call write_var(unit_output,'do3_linoz_psc',do3_linoz_psc(:,yaml%lev_print))
-        call write_var(unit_output,'ss_o3',ss_o3(:,yaml%lev_print))
-        call write_var(unit_output,'o3col_du_diag',o3col_du_diag(:,yaml%lev_print))
-        call write_var(unit_output,'o3clim_linoz_diag',o3clim_linoz_diag(:,yaml%lev_print))
+        call write_var(unit_output,'do3_linoz',do3_linoz(:,:))
+        call write_var(unit_output,'do3_linoz_psc',do3_linoz_psc(:,:))
+        call write_var(unit_output,'ss_o3',ss_o3(:,:))
+        call write_var(unit_output,'o3col_du_diag',o3col_du_diag(:,:))
+        call write_var(unit_output,'o3clim_linoz_diag',o3clim_linoz_diag(:,:))
 
      else
 

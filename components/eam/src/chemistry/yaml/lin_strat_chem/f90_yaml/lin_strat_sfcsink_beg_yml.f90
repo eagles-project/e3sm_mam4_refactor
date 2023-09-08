@@ -19,8 +19,8 @@
   !to cover different options (e.g., true and false)
   character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
-  logical :: multicol = .false.
-  !logical :: multicol = .true.
+  !logical :: multicol = .false.
+  logical :: multicol = .true.
 
 
   type(yaml_vars) :: yaml

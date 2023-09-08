@@ -19,8 +19,8 @@
   !to cover different options (e.g., true and false)
   character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
-  logical :: multicol = .false.
-!  logical :: multicol = .true.
+!  logical :: multicol = .false.
+  logical :: multicol = .true.
 
 
   type(yaml_vars) :: yaml
@@ -112,22 +112,22 @@
         if(multicol) then
            call write_var(unit_input,unit_output,'ncol',ncol)
            call write_var(unit_input,unit_output,'lchnk',lchnk)
-           call write_var(unit_input,unit_output,'o3col',o3col(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'temp',temp(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'o3col',o3col(:,:))
+           call write_var(unit_input,unit_output,'temp',temp(:,:))
            call write_var(unit_input,unit_output,'sza',sza(:))
-           call write_var(unit_input,unit_output,'pmid',pmid(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'pmid',pmid(:,:))
            call write_var(unit_input,unit_output,'delta_t',delta_t)
            call write_var(unit_input,unit_output,'rlats',rlats(:))
            call write_var(unit_input,unit_output,'ltrop',ltrop(:))
-           call write_var(unit_input,unit_output,'linoz_o3_clim',linoz_o3_clim(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_t_clim',linoz_t_clim(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_o3col_clim',linoz_o3col_clim(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_PmL_clim',linoz_PmL_clim(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_dPmL_dO3',linoz_dPmL_dO3(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_dPmL_dT',linoz_dPmL_dT(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_dPmL_dO3col',linoz_dPmL_dO3col(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'linoz_cariolle_psc',linoz_cariolle_psc(:,yaml%lev_print))
-           call write_var(unit_input,unit_output,'o3_vmr',o3_vmr(:,yaml%lev_print))
+           call write_var(unit_input,unit_output,'linoz_o3_clim',linoz_o3_clim(:,:))
+           call write_var(unit_input,unit_output,'linoz_t_clim',linoz_t_clim(:,:))
+           call write_var(unit_input,unit_output,'linoz_o3col_clim',linoz_o3col_clim(:,:))
+           call write_var(unit_input,unit_output,'linoz_PmL_clim',linoz_PmL_clim(:,:))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3',linoz_dPmL_dO3(:,:))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dT',linoz_dPmL_dT(:,:))
+           call write_var(unit_input,unit_output,'linoz_dPmL_dO3col',linoz_dPmL_dO3col(:,:))
+           call write_var(unit_input,unit_output,'linoz_cariolle_psc',linoz_cariolle_psc(:,:))
+           call write_var(unit_input,unit_output,'o3_vmr',o3_vmr(:,:))
         else
            call write_var(unit_input,unit_output,'ncol',ncol)
            call write_var(unit_input,unit_output,'lchnk',lchnk)
