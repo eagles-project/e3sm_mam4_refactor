@@ -37,9 +37,16 @@
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   ! used with phys_debug_lat = 39.0553303768561, phys_debug_lon = 262.904774388088
 
-  yaml%lev_print = 30       !print level above tropopause
-  yaml%nstep_print = 1417 !time step
-  nstep_print_lo = 1400
+!  yaml%lev_print = 30       !print level above tropopause
+!  yaml%nstep_print = 1417 !time step
+!  nstep_print_lo = 1400
+!  yaml%col_print = icolprnt(lchnk)                !column to write data
+
+  ! used with phys_debug_lat = 40.1837635770142, phys_debug_lon = 223.838476568273
+
+  yaml%lev_print = 22       !print level above tropopause
+  yaml%nstep_print = 592    !time step
+  nstep_print_lo = 588
   yaml%col_print = icolprnt(lchnk)                !column to write data
 
   !current_time step
