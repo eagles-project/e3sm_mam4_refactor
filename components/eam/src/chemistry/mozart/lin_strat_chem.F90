@@ -9,8 +9,9 @@
 !      9 Dec 2008 -- Philip Cameron-Smith, LLNL, -- added ltrop
 !      4 Jul 2019 -- Qi Tang (LLNL), Juno Hsu (UCI), -- added sfcsink
 !--------------------------------------------------------------------
-module lin_strat_chem
 
+module lin_strat_chem
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod, only : r8 => shr_kind_r8
   use physics_types,only : physics_state
   use cam_logfile,  only : iulog
@@ -176,6 +177,7 @@ contains
        linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
        linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
        o3_vmr) !in-out
+
     !
     ! this subroutine updates the ozone mixing ratio in the stratosphere
     ! using linearized chemistry
@@ -216,6 +218,9 @@ contains
 
     !parameters
     real(r8), parameter :: convert_to_du = 1._r8/(2.687e16_r8)      ! convert ozone column from [mol/cm^2] to [DU]
+
+#include "../yaml/lin_strat_chem/f90_yaml/lin_strat_chem_solve_beg_yml.f90"
+
 
     ! skip if no ozone field available
     if ( .not. do_lin_strat_chem ) return
@@ -273,7 +278,7 @@ contains
     call outfld( 'LINOZ_O3COL'  , o3col_du_diag          , ncol, lchnk )
     call outfld( 'LINOZ_O3CLIM' , o3clim_linoz_diag      , ncol, lchnk )
     call outfld( 'LINOZ_SZA'    ,(sza*radians_to_degrees), ncol, lchnk )
-
+#include "../yaml/lin_strat_chem/f90_yaml/lin_strat_chem_solve_end_yml.f90"
     return
   end subroutine lin_strat_chem_solve
 
@@ -395,6 +400,7 @@ contains
     real(r8) :: o3l_old, o3l_new, efactor, do3
     real(r8), dimension(ncol)  :: do3mass, o3l_sfcsink
     integer icol, kk
+#include "../yaml/lin_strat_chem/f90_yaml/lin_strat_sfcsink_beg_yml.f90"
 
     if ( .not. do_lin_strat_chem ) return
 
@@ -429,7 +435,7 @@ contains
     o3l_sfcsink(:ncol) = do3mass(:ncol)/delta_t * KgtoTg * peryear ! saved in Tg/yr/m2 unit
 
     call outfld('LINOZ_SFCSINK', o3l_sfcsink, ncol, lchnk)
-
+#include "../yaml/lin_strat_chem/f90_yaml/lin_strat_sfcsink_end_yml.f90"
     return
 
   end subroutine lin_strat_sfcsink

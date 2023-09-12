@@ -1,0 +1,31 @@
+# Data at [lat=   39.0553303768561      , lon=   262.904774388088      , k=          30 , time step=        1412 ] 
+mam4xx:
+  function: lin_strat_chem_solve
+input:
+  fixed:
+    dt:    0.00
+    ncol: [         4]
+    lchnk: [       137]
+    o3col: [  0.66702255235695186E+019]
+    temp: [  0.21476768879996740E+003]
+    sza: [  0.91463610329521494E+000]
+    pmid: [  0.13368217993210610E+005]
+    delta_t: [  0.36000000000000000E+004]
+    rlats: [  0.68518123468168590E+000]
+    ltrop: [        35]
+    linoz_o3_clim: [  0.48792057110331303E-006]
+    linoz_t_clim: [  0.21560875472429348E+003]
+    linoz_o3col_clim: [  0.28127771723899241E+003]
+    linoz_PmL_clim: [ -0.43244599070652433E-015]
+    linoz_dPmL_dO3: [ -0.10757116465251414E-007]
+    linoz_dPmL_dT: [ -0.10507793985899740E-015]
+    linoz_dPmL_dO3col: [ -0.62351069255438370E-017]
+    linoz_cariolle_psc: [  0.28506880653600129E-007]
+    o3_vmr: [  0.44290348302611330E-006]
+    pcols: [         4]
+    pver: [        72]
+    chlorine_loading: [  0.32864836736409750E+001]
+    do_lin_stratchem: [         1]
+    radians_to_degrees: [  0.57295779513082323E+002]
+    chlorine_loading_bgnd: [  0.00000000000000000E+000]
+    psc_T: [  0.19750000000000000E+003]
