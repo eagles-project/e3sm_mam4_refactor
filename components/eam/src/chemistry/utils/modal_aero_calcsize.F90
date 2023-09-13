@@ -493,7 +493,7 @@ end function extract_cnst_name
 
 !===============================================================================
 subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, ptend, do_adjust_in, &
-   do_aitacc_transfer_in, list_idx_in, update_mmr_in, dgnumdry_m, caller)
+   do_aitacc_transfer_in, list_idx_in, update_mmr_in, dgnumdry_m)
 
   implicit none
    !-----------------------------------------------------------------------
@@ -526,11 +526,6 @@ subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, pte
    logical,  optional, intent(in) :: update_mmr_in
    integer,  optional, intent(in) :: list_idx_in       ! diagnostic list index
    real(r8), optional, intent(inout), target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
-
-   !This subroutine is called from various places in the code
-   !"caller" optional variable can hold the name of the subroutine
-   !which called this subroutine (for debugging only)
-   character(len=*), optional     :: caller
 
 #ifdef MODAL_AERO
 
@@ -663,8 +658,6 @@ subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, pte
       dqqcwdt(:,:,:)  = r8_huge
       qsrflx(:,:,:,:) = r8_huge
    endif
-
-   !if(present(caller) .and. masterproc) write(iulog,*)'modal_aero_calcsize_sub has been called by ', trim(caller)
    !----------------------------------------------------------------------------
    ! tadj = adjustment time scale for number, surface when they are prognosed
    !----------------------------------------------------------------------------
