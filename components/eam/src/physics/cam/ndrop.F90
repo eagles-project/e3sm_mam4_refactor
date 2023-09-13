@@ -40,7 +40,7 @@ module ndrop
   save
 
   public ndrop_init, dropmixnuc, activate_modal
-  public ptr2d_t, mam_idx, ncnst_tot  !needed by microp_aero to extract dropmixnuc input fields from pbuf
+  public mam_idx, ncnst_tot  !needed by microp_aero to extract dropmixnuc input fields from pbuf
 
   real(r8), allocatable :: alogsig(:)     ! natl log of geometric standard dev of aerosol
   real(r8), allocatable :: exp45logsig(:)
@@ -84,12 +84,6 @@ module ndrop
 
   ! Indices for MAM species in the ptend%q array.  Needed for prognostic aerosol case.
   integer, allocatable :: mam_cnst_idx(:,:)
-
-
-  ! ptr2d_t is used to create arrays of pointers to 2D fields
-  type ptr2d_t
-     real(r8), pointer :: fld(:,:)
-  end type ptr2d_t
 
   ! modal aerosols
   logical :: prog_modal_aero     ! true when modal aerosols are prognostic
@@ -307,7 +301,7 @@ contains
     ! doesn't distinguish between warm, cold clouds
 
     use modal_aero_data,   only: qqcw_get_field, maxd_aspectype
-    use mam_support, only: min_max_bound
+    use mam_support,       only: min_max_bound, ptr2d_t
 
     ! input arguments
     integer, intent(in)  :: lchnk               ! chunk identifier

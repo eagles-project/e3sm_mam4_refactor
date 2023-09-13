@@ -21,11 +21,7 @@ module modal_aero_drydep
   implicit none
   private
 
-  public :: aero_model_drydep, ptr2d_t
-
-  type ptr2d_t
-      real(r8), pointer :: fld(:,:)
-  end type ptr2d_t
+  public :: aero_model_drydep
 
 contains
   
@@ -42,6 +38,7 @@ contains
     use modal_aero_data,   only: cnst_name_cw, ntot_amode, alnsg_amode, sigmag_amode, nspec_amode, &
       numptr_amode, numptrcw_amode, lmassptr_amode, lmassptrcw_amode
     use modal_aero_deposition, only: set_srf_drydep
+    use mam_support,            only: ptr2d_t
 
     ! Arguments
     integer,                intent(in)    :: lchnk         ! chunk identifier

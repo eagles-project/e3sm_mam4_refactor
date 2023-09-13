@@ -26,7 +26,8 @@ use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 
 use modal_aero_data, only: ntot_amode, numptr_amode, modename_amode
 use modal_aero_data,  only: numptrcw_amode, mprognum_amode, qqcw_get_field, &
-     modeptr_accum, modeptr_aitken, ntot_aspectype, cnst_name_cw
+     modeptr_accum, modeptr_aitken, ntot_aspectype, cnst_name_cw, lmassptr_amode
+use mam_support,        only: ptr2d_t
 
 #endif
 !---------------------------------------------------------------------------------------------------------
@@ -491,9 +492,8 @@ function extract_cnst_name(spec_name) result(spec_cnst_name)
 end function extract_cnst_name
 
 !===============================================================================
-
-subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
-   do_aitacc_transfer_in, list_idx_in, update_mmr_in, dgnumdry_m, caller)
+subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, ptend, do_adjust_in, &
+   do_aitacc_transfer_in, list_idx_in, update_mmr_in, dgnumdry_m)
 
   implicit none
    !-----------------------------------------------------------------------
@@ -513,21 +513,19 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    !-----------------------------------------------------------------------
 
    ! arguments
-   type(physics_state), target, intent(in)    :: state       ! Physics state variables
-   type(physics_buffer_desc),   pointer       :: pbuf(:)     ! physics buffer
+   integer,                     intent(in)    :: ncol
+   integer,                     intent(in)    :: lchnk
+   real(r8),                    intent(in)    :: pdel(:,:)
+   real(r8),                    intent(in)    :: state_q(:,:,:) 
    real(r8),                    intent(in)    :: deltat      ! model time-step size (s)
+   type(ptr2d_t),               intent(inout) :: qqcw(:)     ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    type(physics_ptend), target, optional, intent(inout) :: ptend       ! indivdual parameterization tendencies
 
    logical,  optional, intent(in) :: do_adjust_in
    logical,  optional, intent(in) :: do_aitacc_transfer_in
    logical,  optional, intent(in) :: update_mmr_in
    integer,  optional, intent(in) :: list_idx_in       ! diagnostic list index
-   real(r8), optional, intent(inout), allocatable, target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
-
-   !This subroutine is called from various places in the code
-   !"caller" optional variable can hold the name of the subroutine
-   !which called this subroutine (for debugging only)
-   character(len=*), optional     :: caller
+   real(r8), optional, intent(inout), target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
 
 #ifdef MODAL_AERO
 
@@ -537,16 +535,13 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    logical :: do_aitacc_transfer
    logical :: update_mmr
 
-   integer  :: lchnk                ! chunk identifier
-   integer  :: ncol                 ! number of columns
    integer  :: list_idx_local       !list idx local to this subroutine
    integer  :: ilist
 
    real(r8), parameter :: close_to_one = 1.0_r8 + 1.0e-15_r8
    real(r8), parameter :: seconds_in_a_day = 86400.0_r8
 
-   real(r8), pointer :: state_q(:,:,:), dqdt(:,:,:)
-   real(r8), pointer :: pdel(:,:)   ! pressure thickness of levels
+   real(r8), pointer :: dqdt(:,:,:)
 
    real(r8), pointer :: dgncur_a(:,:,:)
 
@@ -614,21 +609,12 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    list_idx_local  = 0
    if(present(list_idx_in)) then
       list_idx_local  = list_idx_in
-      if (.not. present(dgnumdry_m)) &
-           call endrun('list_idx_in is present but dgnumdry_m is missing'//errmsg(__FILE__,__LINE__))
-
-      if(.not. allocated(dgnumdry_m)) &
-           call endrun('list_idx_in is present but dgnumdry_m is not allocated'//errmsg(__FILE__,__LINE__))
-      dgncur_a => dgnumdry_m(:,:,:)
-
       !update_mmr should be true ONLY for list_idx = 0
       if(list_idx_local > 0 .and. update_mmr) then
          call endrun('update_mmr should be FLASE for list_idx>0'//errmsg(__FILE__,__LINE__))
       endif
-   else
-      call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
    endif
-
+   dgncur_a => dgnumdry_m(:,:,:)
 
    !For adjusting aerosol sizes
    do_adjust = do_adjust_allowed
@@ -672,22 +658,12 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
       dqqcwdt(:,:,:)  = r8_huge
       qsrflx(:,:,:,:) = r8_huge
    endif
-
-   !if(present(caller) .and. masterproc) write(iulog,*)'modal_aero_calcsize_sub has been called by ', trim(caller)
-
-   pdel     => state%pdel !Only required if update_mmr = .true.
-   state_q  => state%q    !BSINGH - it is okay to use state_q for num mmr but not for specie mmr (as diagnostic call may miss some species)
-
    !----------------------------------------------------------------------------
    ! tadj = adjustment time scale for number, surface when they are prognosed
    !----------------------------------------------------------------------------
    tadj    = max( seconds_in_a_day, deltat )
    tadjinv = 1.0_r8/(tadj*close_to_one)
    fracadj = max( 0.0_r8, min( 1.0_r8, deltat*tadjinv ) )
-
-   !grid parameters
-   ncol  = state%ncol  !# of columns
-   lchnk = state%lchnk !chunk #
 
    !inverse of time step
    deltatinv = 1.0_r8/(deltat*close_to_one)
@@ -723,12 +699,12 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
       !
       !Volume = sum_over_components{ component_mass mixrat / density }
       !----------------------------------------------------------------------
-      call compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, dryvol_a, dryvol_c, list_idx_local)
+      call compute_dry_volume(top_lev, ncol, lchnk, imode, nspec, state_q, qqcw, dryvol_a, dryvol_c, list_idx_local)
 
 
       ! do size adjustment based on computed dry diameter values and update the diameters
       call size_adjustment(list_idx_local, top_lev, ncol, lchnk, imode, dryvol_a, state_q, & !input
-           dryvol_c, pdel, do_adjust, update_mmr, do_aitacc_transfer, deltatinv, fracadj, pbuf,  & !input
+           dryvol_c, pdel, do_adjust, update_mmr, do_aitacc_transfer, deltatinv, fracadj, qqcw,  & !input
            dgncur_a, dgncur_c, v2ncur_a, v2ncur_c,                                               & !output
            drv_a_accsv, drv_c_accsv, drv_a_aitsv, drv_c_aitsv, drv_a_sv, drv_c_sv,               & !output
            num_a_accsv, num_c_accsv, num_a_aitsv, num_c_aitsv, num_a_sv, num_c_sv,               & !output
@@ -748,8 +724,8 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
 
    if ( do_aitacc_transfer ) then
       call aitken_accum_exchange(ncol, lchnk, list_idx_local, update_mmr, tadjinv, &
-           deltat, pdel, state_q, state, &
-           pbuf, &
+           deltat, pdel, state_q, &
+           qqcw, &
            drv_a_aitsv, num_a_aitsv, drv_c_aitsv, num_c_aitsv, &
            drv_a_accsv,num_a_accsv, drv_c_accsv, num_c_accsv,  &
            dgncur_a, v2ncur_a, dgncur_c, v2ncur_c, dotend, dotendqqcw, &
@@ -766,7 +742,7 @@ subroutine modal_aero_calcsize_sub(state, deltat, pbuf, ptend, do_adjust_in, &
    if(update_mmr .and. list_idx_local == 0) then
 
       !update cld brn aerosols
-      call update_cld_brn_mmr(list_idx_local, top_lev, ncol, lchnk, pcnst, deltat, pbuf, dotendqqcw, dqqcwdt)
+      call update_cld_brn_mmr(list_idx_local, top_lev, ncol, lchnk, pcnst, deltat, qqcw, dotendqqcw, dqqcwdt)
 
       !----------------------------------------------------------------------
       ! do outfld calls
@@ -893,7 +869,7 @@ end subroutine set_initial_sz_and_volumes
 
 !---------------------------------------------------------------------------------------------
 
-subroutine compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, &
+subroutine compute_dry_volume(top_lev, ncol, lchnk, imode, nspec, state_q, qqcw,&
      dryvol_a, dryvol_c, list_idx_in)
 
   !-----------------------------------------------------------------------------
@@ -910,19 +886,20 @@ subroutine compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, &
 
   !inputs
   integer,  intent(in) :: top_lev !for model level loop
+  integer,  intent(in) :: lchnk         !chunk identifier       
   integer,  intent(in) :: ncol          !# of columns
   integer,  intent(in) :: imode         !mode index
   integer,  intent(in) :: nspec         !# of species in mode "imode"
   integer,  intent(in) :: list_idx_in
-  type(physics_state), target, intent(in)    :: state       ! Physics state variables
-  type(physics_buffer_desc),   pointer       :: pbuf(:)     ! physics buffer
+  real(r8), intent(in), target :: state_q(:,:,:)
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !in-outs
   real(r8), intent(inout) :: dryvol_a(:,:)                    ! interstital aerosol dry
   real(r8), intent(inout) :: dryvol_c(:,:)                    ! interstital aerosol dry
 
   !local vars
-  integer  :: ispec, icol, klev, lchnk, idx_cw
+  integer  :: ispec, icol, klev, idx_cw
   real(r8) :: specdens  !specie density
   real(r8) :: dummwdens !density inverse
   real(r8), pointer :: specmmr(:,:)  !specie mmr (interstitial)
@@ -932,16 +909,15 @@ subroutine compute_dry_volume(top_lev, ncol, imode, nspec, state, pbuf, &
 
 #include "../yaml/modal_aero_calcsize/f90_yaml/calcsize_compute_dry_volume_beg.ymlf90"
 
-  lchnk = state%lchnk !get chunk info for retrieving cloud borne aerosols mmr
-
   do ispec = 1, nspec
      ! need qmass*dummwdens = (kg/kg-air) * [1/(kg/m3)] = m3/kg-air
 
      !Get mmr for the interstitial specie
-     call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'a', state, pbuf, specmmr)
-     !Get mmr for the cloud borne species
-     call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'c', state, pbuf, specmmr_cld)
+     specmmr => state_q(:,:,lmassptr_amode(ispec,imode))
 
+     !Get mmr for the cloud borne species
+     specmmr_cld => qqcw(lmassptr_amode(ispec,imode))%fld(:,:)
+   
      !get density of the aerosol specie
      call rad_cnst_get_aer_props(list_idx_in, imode, ispec, density_aer=specdens)
      dummwdens = 1.0_r8 / specdens !inverse of density
@@ -963,7 +939,7 @@ end subroutine compute_dry_volume
 !---------------------------------------------------------------------------------------------
 
 subroutine size_adjustment(list_idx, top_lev, ncol, lchnk, imode, dryvol_a, state_q, & !input
-     dryvol_c, pdel, do_adjust, update_mmr, do_aitacc_transfer, deltatinv, fracadj, pbuf,  & !input
+     dryvol_c, pdel, do_adjust, update_mmr, do_aitacc_transfer, deltatinv, fracadj, qqcw,  & !input
      dgncur_a, dgncur_c, v2ncur_a, v2ncur_c, &
      drv_a_accsv, drv_c_accsv, drv_a_aitsv, drv_c_aitsv, drv_a_sv, drv_c_sv, &
      num_a_accsv, num_c_accsv, num_a_aitsv, num_c_aitsv, num_a_sv, num_c_sv, &
@@ -993,7 +969,7 @@ subroutine size_adjustment(list_idx, top_lev, ncol, lchnk, imode, dryvol_a, stat
   real(r8), intent(in) :: state_q(:,:,:)
 
   logical, intent(in) :: do_adjust, update_mmr, do_aitacc_transfer
-  type(physics_buffer_desc),   pointer       :: pbuf(:)     ! physics buffer
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !outputs
   real(r8), intent(inout) :: dgncur_a(:,:,:) ! TODO: Add comments here!
@@ -1048,7 +1024,7 @@ subroutine size_adjustment(list_idx, top_lev, ncol, lchnk, imode, dryvol_a, stat
 
   !pointer to cloud borne number mmr for mode imode
   !(it is okay to use qqcw_get_field to get number mixing ratios for diagnostic calls)
-  fldcw => qqcw_get_field(pbuf,num_cldbrn_mode_idx,lchnk,.true.)
+  fldcw => qqcw(num_cldbrn_mode_idx)%fld(:,:)
 
   !Compute a common factor for size computations
   call rad_cnst_get_mode_props(list_idx, imode, sigmag=sigmag, dgnumhi=dgnumhi, dgnumlo=dgnumlo)
@@ -1390,8 +1366,8 @@ end subroutine update_dgn_voltonum
 !---------------------------------------------------------------------------------------------
 
 subroutine  aitken_accum_exchange(ncol, lchnk, list_idx, update_mmr, tadjinv, &
-     deltat, pdel, state_q, state, &
-     pbuf, &
+     deltat, pdel, state_q, &
+     qqcw, &
      drv_a_aitsv, num_a_aitsv, drv_c_aitsv, num_c_aitsv,     &
      drv_a_accsv,num_a_accsv, drv_c_accsv, num_c_accsv,      &
      dgncur_a, v2ncur_a, dgncur_c, v2ncur_c, dotend, dotendqqcw, &
@@ -1420,8 +1396,7 @@ subroutine  aitken_accum_exchange(ncol, lchnk, list_idx, update_mmr, tadjinv, &
   real(r8), intent(in) :: drv_a_accsv(:,:), num_a_accsv(:,:)
   real(r8), intent(in) :: drv_c_aitsv(:,:), num_c_aitsv(:,:)
   real(r8), intent(in) :: drv_c_accsv(:,:), num_c_accsv(:,:)
-  type(physics_state), intent(in)    :: state       ! Physics state variables
-  type(physics_buffer_desc), pointer :: pbuf(:)     ! physics buffer
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !outputs
   real(r8), intent(inout) :: dgncur_a(:,:,:) !TODO: Add comments here!
@@ -1558,7 +1533,7 @@ subroutine  aitken_accum_exchange(ncol, lchnk, list_idx, update_mmr, tadjinv, &
         !    portion in what follows
         !----------------------------------------------------------------------------------------
         call compute_coef_acc_ait_transfer(iait, iacc, icol, klev, list_idx, lchnk, v2n_geomean, & !input
-             tadjinv, state, pbuf, drv_a_accsv(icol,klev), drv_c_accsv (icol, klev),       & !input
+             tadjinv, state_q, qqcw, drv_a_accsv(icol,klev), drv_c_accsv (icol, klev),       & !input
              num_a_accsv(icol,klev), num_c_accsv(icol,klev), noxf_acc2ait, voltonumb_ait,  & !input
              drv_a_noxf, drv_c_noxf, ixfer_acc2ait, xfercoef_num_acc2ait,                  & !output
              xfercoef_vol_acc2ait, xfertend_num)                                             !output
@@ -1656,7 +1631,7 @@ subroutine  aitken_accum_exchange(ncol, lchnk, list_idx, update_mmr, tadjinv, &
               if(ixfer_ait2acc > 0) then
                  jmode = 1
                  call update_tends_flx(icol, klev, jmode, list_idx, lchnk , lspecfrma_csizxf, lspectooa_csizxf, &
-                      lspecfrmc_csizxf, lspectooc_csizxf, xfertend_num, xfercoef_vol_ait2acc, state_q, pbuf, &
+                      lspecfrmc_csizxf, lspectooc_csizxf, xfertend_num, xfercoef_vol_ait2acc, state_q, qqcw, &
                       pdel_fac, dqdt, dqqcwdt, qsrflx)
               endif
 
@@ -1666,7 +1641,7 @@ subroutine  aitken_accum_exchange(ncol, lchnk, list_idx, update_mmr, tadjinv, &
                  !suboutine (update_tends_flx) is called but lspectooa and lspecfrma are switched and
                  !xfercoef_vol_acc2ait is also used instead xfercoef_vol_ait2acc for accum->aitken transfer
                  call update_tends_flx(icol, klev, jmode, list_idx, lchnk , lspectooa_csizxf, lspecfrma_csizxf, &
-                      lspectooc_csizxf, lspecfrmc_csizxf, xfertend_num, xfercoef_vol_acc2ait, state_q, pbuf, &
+                      lspectooc_csizxf, lspecfrmc_csizxf, xfertend_num, xfercoef_vol_acc2ait, state_q, qqcw, &
                       pdel_fac, dqdt, dqqcwdt, qsrflx)
               endif
            endif !update_mmr
@@ -1752,7 +1727,7 @@ end subroutine compute_coef_ait_acc_transfer
 !---------------------------------------------------------------------------------------------
 
 subroutine compute_coef_acc_ait_transfer( iait, iacc, icol, klev, list_idx, lchnk,     &
-     v2n_geomean, tadjinv, state, pbuf, drv_a_accsv, drv_c_accsv, num_a_accsv,      &
+     v2n_geomean, tadjinv, state_q, qqcw, drv_a_accsv, drv_c_accsv, num_a_accsv,      &
      num_c_accsv, noxf_acc2ait, voltonumb_ait,                                &
      drv_a_noxf, drv_c_noxf, ixfer_acc2ait, xfercoef_num_acc2ait, &
      xfercoef_vol_acc2ait, xfertend_num)
@@ -1765,8 +1740,8 @@ subroutine compute_coef_acc_ait_transfer( iait, iacc, icol, klev, list_idx, lchn
   real(r8), intent(in) :: num_a_accsv, num_c_accsv, voltonumb_ait
   logical,  intent(in) :: noxf_acc2ait(:)
 
-  type(physics_state), intent(in)    :: state       ! Physics state variables
-  type(physics_buffer_desc), pointer :: pbuf(:)     ! physics buffer
+  real(r8), target, intent(in) :: state_q(:,:,:)
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !intent - outs
   integer,  intent(inout) :: ixfer_acc2ait
@@ -1804,10 +1779,10 @@ subroutine compute_coef_acc_ait_transfer( iait, iacc, icol, klev, list_idx, lchn
               call rad_cnst_get_aer_props(list_idx, iacc, ispec_acc, density_aer=specdens)    !get density
               ! need qmass*dummwdens = (kg/kg-air) * [1/(kg/m3)] = m3/kg-air
               dummwdens = 1.0_r8 / specdens
-              call rad_cnst_get_aer_mmr(list_idx, iacc, ispec_acc, 'a', state, pbuf, specmmr) !get mmr
+              specmmr =>state_q(:,:,lmassptr_amode(ispec_acc,iacc)) !get mmr
               drv_a_noxf = drv_a_noxf + max(0.0_r8,specmmr(icol,klev))*dummwdens
 
-              call rad_cnst_get_aer_mmr(list_idx, iacc, ispec_acc, 'c', state, pbuf, specmmr) !get mmr
+              specmmr => qqcw(lmassptr_amode(ispec_acc,iacc))%fld(:,:) !get mmr
               drv_c_noxf = drv_c_noxf + max(0.0_r8,specmmr(icol,klev))*dummwdens
            end if
         end do
@@ -1902,7 +1877,7 @@ end subroutine compute_new_sz_after_transfer
 
 
 subroutine update_tends_flx(icol, klev, jmode, list_idx, lchnk , frm_spec_a, to_spec_a, &
-     frm_spec_c, to_spec_c, xfertend_num, xfercoef, state_q, pbuf, &
+     frm_spec_c, to_spec_c, xfertend_num, xfercoef, state_q, qqcw, &
      pdel_fac, dqdt, dqqcwdt, qsrflx)
 
   implicit none
@@ -1919,7 +1894,7 @@ subroutine update_tends_flx(icol, klev, jmode, list_idx, lchnk , frm_spec_a, to_
   real(r8), intent(in) :: state_q(:,:,:)
   real(r8), intent(in) :: pdel_fac
 
-  type(physics_buffer_desc), pointer :: pbuf(:)     ! physics buffer
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !intent -inout
   real(r8), intent(inout) :: dqdt(:,:,:), dqqcwdt(:,:,:), qsrflx(:,:,:,:)
@@ -1975,7 +1950,7 @@ subroutine update_tends_flx(icol, klev, jmode, list_idx, lchnk , frm_spec_a, to_
      lsfrm = frm_spec_c(iq,list_idx)
      lstoo = to_spec_c(iq,list_idx)
      if((lsfrm > 0) .and. (lstoo > 0)) then
-        fldcw => qqcw_get_field(pbuf,lsfrm,lchnk)
+        fldcw => qqcw(lsfrm)%fld(:,:)
         xfertend = max(0.0_r8,fldcw(icol,klev))*xfercoef
         dqqcwdt(icol,klev,lsfrm) = dqqcwdt(icol,klev,lsfrm) - xfertend
         dqqcwdt(icol,klev,lstoo) = dqqcwdt(icol,klev,lstoo) + xfertend
@@ -2010,7 +1985,7 @@ end subroutine update_num_tends
 
 !---------------------------------------------------------------------------------------------
 
-subroutine update_cld_brn_mmr(list_idx, top_lev, ncol, lchnk, pcnst, deltat, pbuf, dotendqqcw, dqqcwdt)
+subroutine update_cld_brn_mmr(list_idx, top_lev, ncol, lchnk, pcnst, deltat, qqcw, dotendqqcw, dqqcwdt)
 
   !-----------------------------------------------------------------------------
   !Purpose: updates mmr of cloud borne aerosols
@@ -2032,7 +2007,7 @@ subroutine update_cld_brn_mmr(list_idx, top_lev, ncol, lchnk, pcnst, deltat, pbu
 
   logical,  intent(in) :: dotendqqcw(:)
 
-  type(physics_buffer_desc), pointer :: pbuf(:)     ! physics buffer
+  type(ptr2d_t), target, intent(in) :: qqcw(:)  ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
   !output
   real(r8), intent(inout) :: dqqcwdt(:,:,:)
@@ -2052,7 +2027,7 @@ subroutine update_cld_brn_mmr(list_idx, top_lev, ncol, lchnk, pcnst, deltat, pbu
   do icnst = 1, pcnst
      lc = icnst
      if ( lc>0 .and. dotendqqcw(lc) ) then
-        fldcw=> qqcw_get_field(pbuf,icnst,lchnk)
+        fldcw=> qqcw(icnst)%fld(:,:)
         do klev = top_lev, pver
            do icol = 1, ncol
               fldcw(icol,klev) = max( 0.0_r8, (fldcw(icol,klev) + dqqcwdt(icol,klev,lc)*deltat) )

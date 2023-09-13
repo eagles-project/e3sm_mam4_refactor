@@ -665,15 +665,16 @@ contains
        pbuf,                                                                    & ! Pointer
        ptend                                                                    ) ! out
 
-    use modal_aero_deposition, only: set_srf_wetdep
-    use wetdep,                only: wetdepa_v2, wetdep_inputs_set, &
+    use modal_aero_deposition,  only: set_srf_wetdep
+    use wetdep,                 only: wetdepa_v2, wetdep_inputs_set, &
                                      wetdep_inputs_unset, wetdep_inputs_t
-    use modal_aero_data,       only: ntot_amode, nspec_amode,modeptr_coarse, &
+    use modal_aero_data,        only: ntot_amode, nspec_amode,modeptr_coarse, &
                                      lmassptr_amode, lptr_dust_a_amode, lptr_nacl_a_amode, &
                                      mmtoo_prevap_resusp, maxd_aspectype,qqcw_get_field
-    use modal_aero_calcsize,   only: modal_aero_calcsize_sub
-    use modal_aero_wateruptake,only: modal_aero_wateruptake_dr
-    use modal_aero_convproc,   only: ma_convproc_intr
+    use modal_aero_calcsize,    only: modal_aero_calcsize_sub
+    use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
+    use modal_aero_convproc,    only: ma_convproc_intr
+    use mam_support,            only: ptr2d_t, get_cldbrn_mmr
 
     implicit none
     ! args
@@ -752,7 +753,7 @@ contains
     real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
     real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
     real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
-    integer :: itim_old           ! index
+    integer :: itim_old          ! index
 
     ! args for wetdepa_v2
     real(r8) :: iscavt(pcols, pver)  ! incloud scavenging tends [kg/kg/s]
@@ -787,7 +788,8 @@ contains
     real(r8), pointer :: icwmrsh(:,:)    ! in cloud water mixing ratio, deep convection [kg/kg]
     real(r8), pointer :: sh_frac(:,:)    ! Shallow convective cloud fraction [fraction]
     real(r8), pointer :: dp_frac(:,:)    ! Deep convective cloud fraction [fraction]
-
+    
+    type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
 
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -824,7 +826,13 @@ contains
     ! for prognostic modal aerosols the transfer of mass between aitken and 
     ! accumulation modes is done in conjunction with the dry radius calculation
     call t_startf('calcsize')
-    call modal_aero_calcsize_sub(state, dt, pbuf, ptend)
+    !get mmr of cloud borne aerosols
+    call get_cldbrn_mmr(lchnk, pbuf, &! in
+      qqcw) !out
+
+    !get the dry diameter from pbuf
+    call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
+    call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, ptend, dgnumdry_m=dgncur_a)
     call t_stopf('calcsize')
     
     ! Aerosol water uptake

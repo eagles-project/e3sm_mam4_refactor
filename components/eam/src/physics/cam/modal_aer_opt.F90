@@ -11,8 +11,7 @@ module modal_aer_opt
 
 
 use shr_kind_mod,      only: r8 => shr_kind_r8, shr_kind_cl
-use ppgrid,            only: pcols, pver, pverp
-use constituents,      only: pcnst
+use ppgrid,            only: pcols, pver
 use spmd_utils,        only: masterproc
 use phys_control,      only: cam_chempkg_is
 use ref_pres,          only: top_lev => clim_modal_aero_top_lev
@@ -20,17 +19,15 @@ use physconst,         only: rhoh2o, rga, rair
 use radconstants,      only: nswbands, nlwbands, idx_sw_diag, idx_uv_diag, idx_nir_diag
 use rad_constituents,  only: n_diag, rad_cnst_get_call_list, rad_cnst_get_info, rad_cnst_get_aer_mmr, &
                              rad_cnst_get_aer_props, rad_cnst_get_mode_props
-use physics_types,     only: physics_state
 
-use physics_buffer, only : pbuf_get_index,physics_buffer_desc,pbuf_get_field,pbuf_old_tim_idx
 use pio,               only: file_desc_t, var_desc_t, pio_inq_dimlen, pio_inq_dimid, pio_inq_varid, &
                              pio_get_var, pio_nowrite, pio_closefile
 use cam_pio_utils,     only: cam_pio_openfile
-use cam_history,       only:  addfld, horiz_only, add_default, outfld
-use cam_history_support, only: fillvalue
+use cam_history,       only: addfld, horiz_only, add_default, outfld
+use cam_history_support,   only: fillvalue
 use cam_logfile,       only: iulog
 use perf_mod,          only: t_startf, t_stopf
-use cam_abortutils,        only: endrun
+use cam_abortutils,    only: endrun
 
 use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
                             specname_amode, spechygro, &
@@ -39,8 +36,9 @@ use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &
                             specrefndxsw, refrtabsw, refitabsw, extpsw, abspsw, asmpsw
 
 use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
-use modal_aero_calcsize,    only: modal_aero_calcsize_diag,modal_aero_calcsize_sub
+use modal_aero_calcsize,    only: modal_aero_calcsize_sub
 use shr_log_mod ,           only: errmsg => shr_log_errmsg
+use mam_support,            only: ptr2d_t, min_max_bound
 
 implicit none
 private
@@ -52,7 +50,6 @@ public :: modal_aer_opt_readnl, modal_aer_opt_init, modal_aero_sw, modal_aero_lw
 character(len=*), parameter :: unset_str = 'UNSET'
 
 ! Namelist variables:
-character(shr_kind_cl)      :: modal_optics_file = unset_str   ! full pathname for modal optics dataset
 character(shr_kind_cl)      :: water_refindex_file = unset_str ! full pathname for water refractive index dataset
 
 ! Dimension sizes in coefficient arrays used to parameterize aerosol radiative properties
@@ -62,11 +59,6 @@ integer, parameter :: ncoef=5, prefr=7, prefi=10
 ! refractive index for water read in read_water_refindex
 complex(r8) :: crefwsw(nswbands) ! complex refractive index for water visible
 complex(r8) :: crefwlw(nlwbands) ! complex refractive index for water infrared
-
-! physics buffer indices
-integer :: cld_idx      = 0
-integer :: dgnumwet_idx = -1
-integer :: qaerwat_idx  = -1
 
 character(len=4) :: diag(0:n_diag) = (/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 ', &
                                        '_d6 ','_d7 ','_d8 ','_d9 ','_d10'/)
@@ -172,21 +164,6 @@ subroutine modal_aer_opt_init()
          end do
       end if
    end do
-
-   cld_idx        = pbuf_get_index('CLD')
-
-
-   ! Initialize physics buffer indices for dgnumwet and qaerwat.  Note the implicit assumption
-   ! that the loops over modes in the optics calculations will use the values for dgnumwet and qaerwat
-   ! that are set in the aerosol_wet_intr code.
-   dgnumwet_idx = pbuf_get_index('DGNUMWET',errcode)
-   if (errcode < 0) then
-      call endrun(routine//' ERROR: cannot find physics buffer field DGNUMWET')
-   end if
-   qaerwat_idx  = pbuf_get_index('QAERWAT')
-   if (errcode < 0) then
-      call endrun(routine//' ERROR: cannot find physics buffer field QAERWAT')
-   end if
 
    call getfil(water_refindex_file, locfile)
    call read_water_refindex(locfile)
@@ -385,16 +362,22 @@ subroutine modal_aer_opt_init()
 end subroutine modal_aer_opt_init
 
 !===============================================================================
-
-subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
-                         tauxar, wa, ga, fa) ! out
+subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, pdel, pdeldry, & ! in
+                         cldn, nnite, idxnite, is_cmip6_volc, ext_cmip6_sw, trop_level,  & ! in
+                         qqcw, tauxar, wa, ga, fa) ! out
    ! calculates aerosol sw radiative properties
 
-  use mam_support, only : min_max_bound
+   real(r8),         intent(in) :: dt               !timestep [s]
+   integer,          intent(in) :: lchnk            ! chunk id
+   integer,          intent(in) :: ncol             ! number of active columns in the chunk
+   real(r8), target, intent(in) :: state_q(:,:,:)   ! water and tracers (state%q) in state [kg/kg] 
+   real(r8),         intent(in) :: state_zm(:,:)    ! mid-point height (state%zm) [m]
+   real(r8),         intent(in) :: temperature(:,:) ! temperature [K]
+   real(r8),         intent(in) :: pmid(:,:)        ! mid-point pressure [Pa]
+   real(r8),         intent(in) :: pdel(:,:)        ! pressure interval [Pa]
+   real(r8),         intent(in) :: pdeldry(:,:)     ! dry mass pressure interval [Pa]
 
-   real(r8),            intent(in) :: dt             !timestep [s]
-   type(physics_state), intent(in), target :: state          ! state variables
-   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8), target, intent(in) :: cldn(:,:)         ! layer cloud fraction [fraction]
 
    integer,             intent(in) :: nnite          ! number of night columns
    integer,             intent(in) :: idxnite(nnite) ! local column indices of night columns
@@ -402,6 +385,7 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8),            intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
    logical,             intent(in) :: is_cmip6_volc
 
+   type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    real(r8), intent(out) :: tauxar(pcols,0:pver,nswbands) ! layer extinction optical depth [1]
    real(r8), intent(out) :: wa(pcols,0:pver,nswbands)     ! layer single-scatter albedo [1]
    real(r8), intent(out) :: ga(pcols,0:pver,nswbands)     ! asymmetry factor [1]
@@ -409,25 +393,17 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Local variables
    integer :: icol, jj, isw, kk, ll, mm    ! indices
-   integer :: list_idx                 ! index of the climate or a diagnostic list
-   integer :: lchnk                    ! chunk id
-   integer :: ncol                     ! number of active columns in the chunk
+   integer :: list_idx                 ! index of the climate or a diagnostic list                    
    integer :: nspec
    integer :: istat
    integer :: itim_old           ! index
 
-   real(r8) :: mass(pcols,pver)        ! layer mass [kg]
-   real(r8) :: air_density(pcols,pver) ! [kg/m3]
+   real(r8) :: mass(pcols,pver)        ! layer dry mass [kg/m2]
+   real(r8) :: air_density(pcols,pver) ! dry air density [kg/m3]
 
-   real(r8),    pointer :: state_q(:,:,:)      ! state%q [kg/kg]
-   real(r8),    pointer :: state_zm(:,:)       ! state%zm [m]
-   real(r8),    pointer :: temperature(:,:)    ! temperatures [K]
-   real(r8),    pointer :: pmid(:,:)           ! layer pressure [Pa]
    real(r8),    pointer :: specmmr(:,:)        ! species mass mixing ratio [kg/kg]
    character*32         :: spectype            ! species type
    real(r8)             :: hygro_aer           ! hygroscopicity [1]
-
-   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
 
    real(r8) :: sigma_logr_aer         ! geometric standard deviation of number distribution
    real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
@@ -446,18 +422,18 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    real(r8) :: watervol(pcols) ! volume concentration of water in each mode [m3/kg]
    real(r8) :: wetvol(pcols)   ! volume concentration of wet mode [m3/kg]
 
-   integer  :: itab(pcols), jtab(pcols)
-   real(r8) :: ttab(pcols), utab(pcols)
-   real(r8) :: cext(pcols,ncoef), cabs(pcols,ncoef), casm(pcols,ncoef)
+   integer  :: itab(pcols), jtab(pcols)  ! index for Bilinear interpolation
+   real(r8) :: ttab(pcols), utab(pcols)  ! coef for Bilinear interpolation
+   real(r8) :: cext(pcols,ncoef), cabs(pcols,ncoef), casm(pcols,ncoef)  ! coefficient for extinction, absoption, and asymmetry [unitless] 
    real(r8) :: pext(pcols)     ! parameterized specific extinction [m2/kg]
    real(r8) :: specpext(pcols) ! specific extinction [m2/kg]
-   real(r8) :: dopaer(pcols)   ! aerosol optical depth in layer
+   real(r8) :: dopaer(pcols)   ! aerosol optical depth in layer [1]
    real(r8) :: pabs(pcols)     ! parameterized specific absorption [m2/kg]
-   real(r8) :: pasm(pcols)     ! parameterized asymmetry factor
-   real(r8) :: palb(pcols)     ! parameterized single scattering albedo
+   real(r8) :: pasm(pcols)     ! parameterized asymmetry factor [unitless?]
+   real(r8) :: palb(pcols)     ! parameterized single scattering albedo [unitless]
 
    ! Diagnostics
-   real(r8) :: tropopause_m(pcols)
+   real(r8) :: tropopause_m(pcols)         ! tropopause height [m]
    real(r8) :: extinct(pcols,pver)         ! aerosol extinction [1/m]
    real(r8) :: absorb(pcols,pver)          ! aerosol absorption [1/m]
    real(r8) :: aodvis(pcols)               ! extinction optical depth
@@ -466,24 +442,29 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    real(r8) :: aodabsbc(pcols)             ! absorption optical depth of BC
 
-   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode
-   real(r8) :: aodmode(pcols)
+   real(r8) :: burdenmode(pcols)           ! aerosol burden for each mode [kg/m2]
+   real(r8) :: aodmode(pcols)              ! aerosol optical depth for each mode [1]
 
-   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode
+   real(r8) :: dustaodmode(pcols)          ! dust aod in aerosol mode [1]
    real(r8) :: dustvol(pcols)              ! volume concentration of dust in aerosol mode (m3/kg)
 
    real(r8) :: burdendust(pcols), burdenso4(pcols), burdenbc(pcols), &
-               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols), burdenmom(pcols)
+               burdenpom(pcols), burdensoa(pcols), burdenseasalt(pcols), &
+               burdenmom(pcols)  ! burden for each aerosol species [kg/m2]
    real(r8) :: scatdust(pcols), scatso4(pcols), scatbc(pcols), &
-               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols), scatmom(pcols)
+               scatpom(pcols), scatsoa(pcols), scatseasalt(pcols), &
+               scatmom(pcols)  ! scattering albedo (?) for each aerosol species [unitless]
    real(r8) :: absdust(pcols), absso4(pcols), absbc(pcols), &
-               abspom(pcols), abssoa(pcols), absseasalt(pcols), absmom(pcols)
+               abspom(pcols), abssoa(pcols), absseasalt(pcols), &
+               absmom(pcols)   ! absoprtion for each aerosol species [unit?] 
    real(r8) :: hygrodust(pcols), hygroso4(pcols), hygrobc(pcols), &
-               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols), hygromom(pcols)
+               hygropom(pcols), hygrosoa(pcols), hygroseasalt(pcols), &
+               hygromom(pcols)  ! hygroscopicity for each aerosol species [unitless]
 
-   real(r8) :: ssavis(pcols)
-   real(r8) :: specrefr, specrefi
-   real(r8) :: scath2o, absh2o, sumscat, sumabs, sumhygro
+   real(r8) :: ssavis(pcols)    ! Aerosol singel-scatter albedo [unitless]
+   real(r8) :: specrefr, specrefi  ! real and imag parts of specref
+   real(r8) :: scath2o, absh2o   ! scattering and absorption of h2o
+   real(r8) :: sumscat, sumabs, sumhygro ! sum of scattering , absoprtion and hygroscopicity
 
    ! total species AOD
    real(r8) :: dustaod(pcols), so4aod(pcols), bcaod(pcols), &
@@ -501,21 +482,13 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
    ! debug output
    integer  :: nerr_dopaer = 0
    !----------------------------------------------------------------------------
-   lchnk = state%lchnk
-   ncol  = state%ncol
-   state_q      => state%q
-   state_zm     => state%zm
-   temperature  => state%t
-   pmid         => state%pmid
 
-   mass(:ncol,:)        = state%pdeldry(:ncol,:)*rga
-   air_density(:ncol,:) = state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
+   mass(:ncol,:)        = pdeldry(:ncol,:)*rga
+   air_density(:ncol,:) = pmid(:ncol,:)/(rair*temperature(:ncol,:))
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-
+   
    ! initialize output variables
    tauxar(:ncol,:,:) = 0._r8
    wa(:ncol,:,:)     = 0._r8
@@ -557,8 +530,9 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 
    ! Calculate aerosol size distribution parameters and aerosol water uptake
    !For prognostic aerosols
-   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., & ! in
-           dgnumdry_m=dgnumdry_m) ! out
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, & ! in
+                list_idx_in=list_idx, update_mmr_in = .false., & ! in
+                dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in 
                                   cldn, dgnumdry_m, & ! in
@@ -625,12 +599,12 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
             do ll = 1, nspec
 
                ! get aerosol properties and save for each species
-               specmmr => state_q(:,:,lmassptr_amode(ll,mm))
-               spectype = specname_amode(lspectype_amode(ll,mm))
-               hygro_aer = spechygro(lspectype_amode(ll,mm))
-               specdens(ll) = specdens_amode(lspectype_amode(ll,mm))
+               specmmr          => state_q(:,:,lmassptr_amode(ll,mm))
+               spectype         = specname_amode(lspectype_amode(ll,mm))
+               hygro_aer        = spechygro(lspectype_amode(ll,mm))
+               specdens(ll)     = specdens_amode(lspectype_amode(ll,mm))
                specrefindex(ll,:) = specrefndxsw(:,lspectype_amode(ll,mm))
-               specvol(:,ll) = specmmr(:,kk)/specdens(ll)
+               specvol(:,ll)    = specmmr(:,kk)/specdens(ll)
 
                ! compute some diagnostics for visible band only
                if (savaervis) then
@@ -919,22 +893,27 @@ subroutine modal_aero_sw(dt, state, pbuf, nnite, idxnite, is_cmip6_volc, ext_cmi
 end subroutine modal_aero_sw
 
 !===============================================================================
-subroutine modal_aero_lw(dt, state, pbuf, & ! in
-                        tauxar            ) ! out
+subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, & ! in
+                        qqcw, tauxar            ) ! out
 
    ! calculates aerosol lw radiative properties
 
-   real(r8),            intent(in)  :: dt       ! time step [s]
-   type(physics_state), intent(in), target :: state    ! state variables
-   type(physics_buffer_desc), pointer :: pbuf(:)
+   real(r8),          intent(in)  :: dt       ! time step [s]
+   integer,           intent(in) :: lchnk            ! chunk id
+   integer,           intent(in) :: ncol             ! number of active columns in the chunk
+   real(r8), target,  intent(in) :: state_q(:,:,:)   ! water and tracers (state%q) in state [kg/kg]
+   real(r8),          intent(in) :: temperature(:,:) ! temperature [K]
+   real(r8),          intent(in) :: pmid(:,:)        ! mid-point pressure [Pa]
+   real(r8),          intent(in) :: pdel(:,:)        ! pressure interval [Pa]
+   real(r8),          intent(in) :: pdeldry(:,:)     ! dry mass pressure interval [Pa]
+   real(r8),  target, intent(in) :: cldn(:,:)        ! layer cloud fraction [fraction]
 
+   type(ptr2d_t), intent(inout) :: qqcw(:)               ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
    real(r8), intent(out) :: tauxar(pcols,pver,nlwbands) ! layer absorption optical depth
 
    ! Local variables
    integer :: icol, ilw, kk, ll, mm
-   integer :: lchnk
    integer :: list_idx                 ! index of the climate or a diagnostic list
-   integer :: ncol                     ! number of active columns in the chunk
    integer :: nspec
    integer :: istat
    integer :: itim_old           ! index
@@ -945,7 +924,7 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: radsurf(pcols,pver)     ! aerosol surface mode radius
    real(r8) :: logradsurf(pcols,pver)  ! log(aerosol surface mode radius)
 
-   real(r8) :: mass(pcols,pver) ! layer mass
+   real(r8) :: mass(pcols,pver) ! layer mass [kg/m2]
 
    real(r8),allocatable :: specvol(:,:)        ! volume concentration of aerosol specie [m3/kg]
    real(r8),allocatable :: specdens(:)         ! species density for all species [kg/m3]
@@ -957,38 +936,28 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
    real(r8) :: refr(pcols)      ! real part of refractive index
    real(r8) :: refi(pcols)      ! imaginary part of refractive index
    complex(r8) :: crefin(pcols) ! complex refractive index
-   real(r8), pointer :: state_q(:,:,:)     ! state%q
    real(r8), pointer :: specmmr(:,:)       ! species mass mixing ratio [g/g]
-   real(r8), pointer :: temperature(:,:)   ! temperatures [K]
-   real(r8), pointer :: pmid(:,:)          ! layer pressure [Pa]
-   real(r8), pointer :: cldn(:,:)        ! layer cloud fraction [fraction]
-
-   integer  :: itab(pcols), jtab(pcols)
-   real(r8) :: ttab(pcols), utab(pcols)
-   real(r8) :: cabs(pcols,ncoef)
+   
+   integer  :: itab(pcols), jtab(pcols) ! index for Bilinear interpolation
+   real(r8) :: ttab(pcols), utab(pcols) ! coef for Bilinear interpolation
+   real(r8) :: cabs(pcols,ncoef) ! coefficient for absorption [unitless]
    real(r8) :: pabs(pcols)      ! parameterized specific absorption [m2/kg]
-   real(r8) :: dopaer    ! aerosol optical depth in layer
+   real(r8) :: dopaer    ! aerosol optical depth in layer [1]
 
    integer  :: nerr_dopaer = 0
 
    !----------------------------------------------------------------------------
 
-   ncol  = state%ncol
-   lchnk = state%lchnk
-   state_q      => state%q
-   temperature  => state%t
-   pmid         => state%pmid
    ! dry mass in each cell
-   mass(:ncol,:) = state%pdeldry(:ncol,:)*rga
+   mass(:ncol,:) = pdeldry(:ncol,:)*rga
 
    !FORTRAN refactoring: For prognostic aerosols only, other options are removed
    list_idx = 0   ! index of the climate or a diagnostic list
-   itim_old    =  pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
 
 
-   call modal_aero_calcsize_sub(state, dt, pbuf, list_idx_in=list_idx, update_mmr_in = .false., &
-           dgnumdry_m=dgnumdry_m)
+   call modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, dt, qqcw, & ! in
+                list_idx_in=list_idx, update_mmr_in = .false., & ! in
+                dgnumdry_m=dgnumdry_m) ! out
 
    call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
                                   cldn, dgnumdry_m, & ! in
@@ -1010,7 +979,8 @@ subroutine modal_aero_lw(dt, state, pbuf, & ! in
       ! FORTRAN refactoring: ismethod2 is tempararily used to ensure BFB test. 
       ! can be removed when porting to C++
       call modal_size_parameters(ncol, sigma_logr_aer, dgnumwet_m(:,:,mm), & ! in
-                                 radsurf, logradsurf, cheby, ismethod2=.true.) 
+                                 radsurf, logradsurf, cheby, & ! out
+                                 ismethod2=.true.) ! optional in
 
       allocate(specvol(ncol,nspec),stat=istat)
       if (istat /= 0) call endrun("Unable to allocate specvol: "//errmsg(__FILE__,__LINE__) )
@@ -1102,15 +1072,15 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
    ! calculate some diagnostics for a species
    implicit none
    integer,  intent(in) :: ncol
-   real(r8), intent(in),  pointer :: specmmr_k(:)
-   real(r8), intent(in) :: mass_k(:)
+   real(r8), intent(in),  pointer :: specmmr_k(:)  ! mmr at level kk [kg/kg]
+   real(r8), intent(in) :: mass_k(:)        ! mass at layer kk [kg/m2]
    real(r8), intent(in) :: vol(:) ! volume concentration of aerosol species [m3/kg]
    real(r8), intent(in) :: specrefr, specrefi  ! real and image part of specrefindex
-   real(r8), intent(in) :: hygro_aer        ! aerosol hygroscopicity
-   real(r8), intent(out) :: burden_s(pcols) ! aerosol burden of species
-   real(r8), intent(out) :: scat_s(pcols)   ! scattering of species
-   real(r8), intent(out) :: abs_s(pcols)    ! absorption of species
-   real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species
+   real(r8), intent(in) :: hygro_aer        ! aerosol hygroscopicity [unitless]
+   real(r8), intent(out) :: burden_s(pcols) ! aerosol burden of species [kg/m2]
+   real(r8), intent(out) :: scat_s(pcols)   ! scattering of species [unitless]
+   real(r8), intent(out) :: abs_s(pcols)    ! absorption of species [unit?]
+   real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species [unitless]
    
    integer :: icol
 
@@ -1118,7 +1088,7 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
    do icol = 1, ncol
        burden_s(icol) = burden_s(icol) + specmmr_k(icol)*mass_k(icol)
        scat_s(icol)   = vol(icol)*specrefr
-       abs_s(icol)    = -vol(icol)*specrefi
+       abs_s(icol)    = - vol(icol)*specrefi
        hygro_s(icol)  = vol(icol)*hygro_aer
    enddo
 
@@ -1141,7 +1111,7 @@ subroutine update_aod_spec ( scath2o, absh2o,           & ! in
    scat_s     = (scat_s + scath2o*hygro_s/sumhygro)/sumscat
    abs_s      = (abs_s + absh2o*hygro_s/sumhygro)/sumabs
 
-   aodc           = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
+   aodc       = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
 
    aod_s      = aod_s + aodc
 
@@ -1158,7 +1128,7 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
    real(r8), intent(in) :: state_zm(:,:) ! state%zm [m]
    real(r8), intent(in) :: ext_cmip6_sw(pcols,pver) ! aerosol shortwave extinction [1/m]
    real(r8), intent(inout) :: extinct(pcols,pver) ! aerosol extinction [1/m]
-   real(r8), intent(out)   :: tropopause_m(pcols)
+   real(r8), intent(out)   :: tropopause_m(pcols) ! tropopause height [m]
 
    ! local variables
    integer :: icol, kk_tropp
@@ -1386,8 +1356,6 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
                                  radsurf, logradsurf, cheb,      & ! out
                                  ismethod2 ) ! optional in
 
-   use mam_support, only : min_max_bound
-
    integer,  intent(in)  :: ncol
    real(r8), intent(in)  :: sigma_logr_aer  ! geometric standard deviation of number distribution
    real(r8), intent(in)  :: dgnumwet(:,:)   ! aerosol wet number mode diameter [m]
@@ -1440,7 +1408,7 @@ end subroutine modal_size_parameters
 
 
 subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &! in
-     itab, jtab, ttab, utab, coef) !inout/out
+                        itab, jtab, ttab, utab, coef) !inout/out
 
   !------------------------------------------------------------------------------
   ! Bilinear interpolation along the refractive index dimensions
@@ -1499,8 +1467,8 @@ end subroutine binterp
 
 
 subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
-     ix, tt, & !out
-     do_print) !in-optional
+                           ix, tt, & !out
+                           do_print) !in-optional
 
   ! Compute factors for the real or imaginary parts
   implicit none

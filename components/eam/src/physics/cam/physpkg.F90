@@ -1435,7 +1435,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use tracers,            only: tracers_timestep_tend
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o, latvap,latice, rga
-    use modal_aero_drydep,  only: aero_model_drydep, ptr2d_t
+    use modal_aero_drydep,  only: aero_model_drydep
     use check_energy,       only: check_energy_chng, check_water, & 
                                   check_prect, check_qflx , &
                                   check_tracers_data, check_tracers_init, &
@@ -1455,7 +1455,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
     use co2_cycle,          only: co2_cycle_set_ptend
-    use modal_aero_data,   only: qqcw_get_field
+    use mam_support,        only: ptr2d_t, get_cldbrn_mmr
 
     implicit none
 
@@ -1484,7 +1484,7 @@ subroutine tphysac (ztodt,   cam_in,  &
 
     integer :: lchnk                                ! chunk identifier
     integer :: ncol                                 ! number of atmospheric columns
-    integer i,k,m                 ! Longitude, level indices
+    integer :: i,k,m                ! Longitude, level indices, constituent indices
     integer :: yr, mon, day, tod       ! components of a date
     integer :: ixcldice, ixcldliq      ! constituent indices for cloud liquid and ice water.
 
@@ -1724,9 +1724,10 @@ if (l_tracer_aero) then
 
     !  aerosol dry deposition processes
     call t_startf('aero_drydep')
-    do i = 16, pcnst
-      qqcw(i)%fld => qqcw_get_field(pbuf,i,lchnk)
-    enddo
+    !get mmr of cloud borne aerosols
+    call get_cldbrn_mmr(lchnk, pbuf, &! in
+      qqcw) !out
+
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
 
