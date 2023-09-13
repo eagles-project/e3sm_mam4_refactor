@@ -525,7 +525,6 @@ subroutine modal_aero_calcsize_sub(ncol, lchnk, state_q, pdel, deltat, qqcw, pte
    logical,  optional, intent(in) :: do_aitacc_transfer_in
    logical,  optional, intent(in) :: update_mmr_in
    integer,  optional, intent(in) :: list_idx_in       ! diagnostic list index
-   !real(r8), optional, intent(inout), allocatable, target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
    real(r8), optional, intent(inout), target :: dgnumdry_m(:,:,:) ! interstital aerosol dry number mode radius (m)
 
    !This subroutine is called from various places in the code

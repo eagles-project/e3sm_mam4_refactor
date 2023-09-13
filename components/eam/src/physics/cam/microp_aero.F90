@@ -412,9 +412,9 @@ end subroutine microp_aero_readnl
 subroutine microp_aero_run ( &
    state, ptend, deltatin, pbuf, liqcldfo )
    
-   use mam_support, only: min_max_bound
+   use mam_support,       only: min_max_bound, ptr2d_t
    use modal_aero_data,   only: qqcw_get_field, nspec_amode, numptrcw_amode, lmassptrcw_amode, maxd_aspectype, ntot_amode
-   use ndrop,             only: ptr2d_t, mam_idx, ncnst_tot
+   use ndrop,             only: mam_idx, ncnst_tot
   
    ! input arguments
    type(physics_state), target, intent(in)    :: state

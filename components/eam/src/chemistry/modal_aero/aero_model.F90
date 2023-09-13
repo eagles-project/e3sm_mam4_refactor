@@ -674,7 +674,7 @@ contains
     use modal_aero_calcsize,    only: modal_aero_calcsize_sub
     use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
     use modal_aero_convproc,    only: ma_convproc_intr
-    use mam_support,            only: ptr2d_t
+    use mam_support,            only: ptr2d_t, get_cldbrn_mmr
 
     implicit none
     ! args
@@ -753,7 +753,7 @@ contains
     real(r8), pointer :: dgncur_a(:,:,:)  ! aerosol particle diameter [m]
     real(r8), pointer :: wetdens(:,:,:)   ! wet aerosol density [kg/m3]
     real(r8), pointer :: qaerwat(:,:,:)   ! aerosol water [kg/kg]
-    integer :: itim_old, icnst           ! index
+    integer :: itim_old          ! index
 
     ! args for wetdepa_v2
     real(r8) :: iscavt(pcols, pver)  ! incloud scavenging tends [kg/kg/s]
@@ -826,9 +826,10 @@ contains
     ! for prognostic modal aerosols the transfer of mass between aitken and 
     ! accumulation modes is done in conjunction with the dry radius calculation
     call t_startf('calcsize')
-    do icnst = 16, pcnst
-      qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
-    enddo
+    !get mmr of cloud borne aerosols
+    call get_cldbrn_mmr(lchnk, pbuf, &! in
+      qqcw) !out
+
     !get the dry diameter from pbuf
     call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
     call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, ptend, dgnumdry_m=dgncur_a)

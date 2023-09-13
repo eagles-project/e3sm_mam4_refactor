@@ -889,7 +889,7 @@ end function radiation_nextsw_cday
     use output_aerocom_aie , only: do_aerocom_ind3
     use modal_aero_data,   only: qqcw_get_field
     use constituents,       only: pcnst
-    use mam_support,        only: ptr2d_t
+    use mam_support,        only: ptr2d_t, get_cldbrn_mmr
 
     ! Arguments
     logical,  intent(in)    :: is_cmip6_volc    ! true if cmip6 style volcanic file is read otherwise false 
@@ -1160,9 +1160,8 @@ end function radiation_nextsw_cday
     if (dosw .or. dolw) then
 
       !Get cloudborne aerosols mmrs
-      do icnst = 16, pcnst
-         qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
-       enddo
+      call get_cldbrn_mmr(lchnk, pbuf, &! in
+      qqcw) !out
 
        ! construct an RRTMG state object
        r_state => rrtmg_state_create( state, cam_in )
