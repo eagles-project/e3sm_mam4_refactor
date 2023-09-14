@@ -59,7 +59,7 @@ main () {
     newline && time_elapsed_min
 
     #see if the exe has been created
-    if_file_not_present_then_exit $bld_dir/$executable " Please look into bldlogs to see what went wrong"
+    if_file_not_present_then_exit $bld_dir/$executable " (Please look into bldlogs to see what went wrong or) issue ./case.build && ./case.submit to rebuild the model"
 
     newline && time_elapsed_min
 

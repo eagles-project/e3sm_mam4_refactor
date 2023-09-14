@@ -21,6 +21,11 @@ module mam_support
      real(r8), pointer :: fld(:,:)
   end type ptr2d_t
 
+  interface min_max_bound
+     module procedure min_max_bound_cell
+     module procedure min_max_bound_array
+  end interface min_max_bound
+
 contains
   !===============================================================================
   subroutine assign_la_lc( imode,      ispec,          & ! in
@@ -66,7 +71,7 @@ contains
   end subroutine assign_la_lc
 
   !===============================================================================
-  pure function min_max_bound(minlim, maxlim, input) result(bounded)
+  pure function min_max_bound_cell(minlim, maxlim, input) result(bounded)
     !Bound a quantity between a min limit and a max limit
     real(r8), intent(in) :: minlim, maxlim
     real(r8), intent(in) :: input
@@ -76,9 +81,27 @@ contains
 
     bounded = max(min(maxlim, input), minlim)
 
-  end function min_max_bound
-  !===============================================================================
+  end function min_max_bound_cell
 
+  !===============================================================================
+  pure function min_max_bound_array(minlim, maxlim, input,len_arr) result(bounded)
+    !Bound a quantity between a min limit and a max limit
+    integer, intent(in)  :: len_arr
+    real(r8), intent(in) :: minlim, maxlim
+    real(r8), intent(in) :: input(len_arr)
+
+    !return value
+    real(r8) :: bounded(len_arr)
+
+    !local
+    integer :: ii
+
+    do ii = 1, len_arr
+       bounded(ii) = min_max_bound_cell(minlim, maxlim, input(ii))
+    enddo
+
+  end function min_max_bound_array
+  !===============================================================================
   subroutine get_cldbrn_mmr(lchnk, pbuf, qqcw)
     !Get MMR for cloud borne aerosols using qqcw_get_field function
     use constituents,    only: pcnst
@@ -95,13 +118,11 @@ contains
     !local
     integer :: icnst
 
-    integer, parameter :: AER_START_IND = 16 ! starting index of aerosols in MAM4
-
-    do icnst = AER_START_IND, pcnst
-       qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk)
+    do icnst = 1, pcnst
+       !errorhandle=.true. allows users to handles errors themselves, so it
+       !let the simulation run even if qqcw field is unassociated (e.g. for water specie indices)
+       qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk, errorhandle=.true.)
     enddo
 
   end subroutine get_cldbrn_mmr
-  !===============================================================================
-
 end module mam_support

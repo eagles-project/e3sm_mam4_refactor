@@ -300,7 +300,7 @@ contains
     ! assume cloud presence controlled by cloud fraction
     ! doesn't distinguish between warm, cold clouds
 
-    use modal_aero_data,   only: qqcw_get_field, maxd_aspectype
+    use modal_aero_data,   only: maxd_aspectype
     use mam_support,       only: min_max_bound, ptr2d_t
 
     ! input arguments
@@ -620,7 +620,7 @@ contains
     real(r8), intent(in) :: temp_col_in(:)   ! temperature [K]
     real(r8), intent(in) :: cs_col_in(:)     ! air density at actual level kk [kg/m^3]
     real(r8), intent(in) :: state_q_col_in(:,:) ! aerosol mmrs [kg/kg]
-    
+
     real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
     real(r8), intent(inout) :: nsource_col_out(:)   ! droplet number mixing ratio source tendency [#/kg/s]
     real(r8), intent(inout) :: raercol_nsav(:,:)   ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
@@ -693,7 +693,7 @@ contains
           call get_activate_frac(state_q_col_in(kk,:), cs_col_in(kk), cs_col_in(kk), & ! in
                wtke_col_in(kk), temp_col_in(kk), & ! in
                fn, fm, fluxn, fluxm, flux_fullact) ! out
- 
+
           !  store for output activation fraction of aerosol
           factnum_col_out(kk,:) = fn
 
