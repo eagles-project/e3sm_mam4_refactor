@@ -61,7 +61,7 @@ contains
        WRITE(UNIT=string, FMT='(I2.2)') mm
        extfrc_name(mm) = 'extfrc_'// trim(string)
        call addfld( extfrc_name(mm), (/ 'lev' /), 'I', ' ', 'ext frcing' )
-    end do
+    enddo
 
     do nn = 1,rxt_tag_cnt
        tag_names(nn) = trim(rxt_tag_lst(nn))
@@ -126,8 +126,8 @@ contains
        if ( inv_ndx_cnst_o3 < 1 ) then
           call endrun('ERROR: chem_name = '//trim(chem_name)//&
                ' requies cnst_O3 fixed oxidant field. Use cnst_O3:O3 in namelist tracer_cnst_specifier')
-       end if
-    end if
+       endif
+    endif
 
   end subroutine gas_phase_chemdr_inti
 
@@ -332,7 +332,7 @@ contains
        zintr(:ncol,kk) = m2km * zi(:ncol,kk)
        zmid(:ncol,kk) = m2km * (zm(:ncol,kk) + zsurf(:ncol))
        zint(:ncol,kk) = m2km * (zi(:ncol,kk) + zsurf(:ncol))
-    end do
+    enddo
     zint(:ncol,pver+1) = m2km * (zi(:ncol,pver+1) + zsurf(:ncol))
     zintr(:ncol,pver+1)= m2km *  zi(:ncol,pver+1)
 
@@ -343,8 +343,8 @@ contains
        nn = map2chm(mm)
        if( nn > 0 ) then
           mmr(:ncol,:,nn) = state_q(:ncol,:,mm)
-       end if
-    end do
+       endif
+    enddo
 
     !-----------------------------------------------------------------------      
     !        ... Set atmosphere mean mass
@@ -394,7 +394,7 @@ contains
     do kk = 1,pver
        relhum(:,kk) = .622_r8 * h2ovmr(:,kk) / satq(:,kk)
        relhum(:,kk) = min_max_bound(0._r8, 1._r8,relhum(:,kk),size(relhum(:,kk)))
-    end do
+    enddo
 
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
@@ -454,10 +454,10 @@ contains
        if( mm /= synoz_ndx ) then
           do kk = 1,pver
              extfrc(:ncol,kk,mm) = extfrc(:ncol,kk,mm) / invariants(:ncol,kk,indexm)
-          end do
+          enddo
        endif
        call outfld( extfrc_name(mm), extfrc(:ncol,:,mm), ncol, lchnk )
-    end do
+    enddo
 
     !-----------------------------------------------------------------------
     !        ... Form the washout rates
@@ -554,8 +554,8 @@ contains
        nn = map2chm(mm)
        if( nn > 0 ) then
           qtend(:ncol,:,mm) = qtend(:ncol,:,mm) + mmr_tend(:ncol,:,nn) 
-       end if
-    end do
+       endif
+    enddo
 
     tvs(:ncol) = tfld(:ncol,pver) * (1._r8 + qh2o(:ncol,pver))
 
@@ -582,7 +582,7 @@ contains
           cflx(:ncol,mm)      = cflx(:ncol,mm) - sflx(:ncol,nn)
           drydepflx(:ncol,mm) = sflx(:ncol,nn)
        endif
-    end do
+    enddo
 
     call t_startf('chemdr_diags')
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &       !intent-in
