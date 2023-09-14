@@ -33,7 +33,7 @@ module mo_chm_diags
 
 contains
 
-!========================================================================
+  !========================================================================
   subroutine chm_diags_inti
     !--------------------------------------------------------------------
     !	... initialize utility routine
@@ -63,8 +63,8 @@ contains
     !-----------------------------------------------------------------------
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
-                       history_amwg_out    = history_amwg,  &
-                       history_verbose_out = history_verbose)
+         history_amwg_out    = history_amwg,  &
+         history_verbose_out = history_verbose)
 
     id_o3      = get_spc_ndx( 'O3' )
 
@@ -97,9 +97,9 @@ contains
     sox_species = (/ id_so2, id_so4, id_h2so4 /)
     bulkaero_species(:) = -1
     bulkaero_species(1:20) = (/ id_dst01, id_dst02, id_dst03, id_dst04, &
-                                id_sslt01, id_sslt02, id_sslt03, id_sslt04, &
-                                id_soa, id_so4, id_oc1, id_oc2, id_cb1, id_cb2, id_nh4no3, &
-                                id_soam,id_soai,id_soat,id_soab,id_soax /)
+         id_sslt01, id_sslt02, id_sslt03, id_sslt04, &
+         id_soa, id_so4, id_oc1, id_oc2, id_cb1, id_cb2, id_nh4no3, &
+         id_soam,id_soai,id_soat,id_soab,id_soax /)
 
     aer_species(:) = -1
     n = 1
@@ -153,7 +153,7 @@ contains
 
        call addfld( wetdep_name(m),   horiz_only,    'A', 'kg/s', spc_name//' wet deposition' )
        call addfld( wtrate_name(m),   (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
-       
+
        if (spc_name(1:3) == 'num') then
           unit_basename = ' 1'
        else
@@ -173,7 +173,7 @@ contains
              call add_default( spc_name, 1, ' ' )
           endif
           call add_default( trim(spc_name)//'_SRF', 1, ' ' )
-       endif 
+       endif
        if (history_amwg) then
           call add_default( trim(spc_name)//'_SRF', 1, ' ' )
        endif
@@ -226,20 +226,20 @@ contains
 
   end subroutine chm_diags_inti
 
-!========================================================================
+  !========================================================================
   subroutine chm_diags( lchnk, ncol, vmr, mmr, depvel, depflx, mmr_tend, pdel, pdeldry, qqcw, ltrop ) !intent-ins
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
-    
+
     use cam_history,  only : outfld
     use constituents, only : pcnst
     use phys_grid,    only : get_area_all_p, pcols
     use physconst,    only : mwdry            ! molecular weight of dry air
     use modal_aero_data,  only : cnst_name_cw ! for calculate sum of aerosol masses
     use phys_control, only: phys_getopts
-    use mam_support,  only: ptr2d_cw
-    
+    use mam_support,  only: ptr2d_t
+
     implicit none
 
     !--------------------------------------------------------------------
@@ -255,7 +255,7 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
     real(r8), intent(in)  :: pdeldry(ncol,pver)
     integer,  intent(in)  :: ltrop(pcols)  ! index of the lowest stratospheric level
-    type(ptr2d_cw), target, intent(in) :: qqcw(:)                 ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    type(ptr2d_t), target, intent(in) :: qqcw(:)                 ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
 
     !--------------------------------------------------------------------
     !	... local variables
@@ -265,7 +265,7 @@ contains
     real(r8)    :: ozone_col(ncol)          ! vertical integration of ozone [DU]
     real(r8)    :: ozone_trop(ncol)         ! vertical integration of ozone in troposphere [DU]
     real(r8)    :: ozone_strat(ncol)        ! vertical integration of ozone in stratosphere [DU]
-    
+
     real(r8), dimension(ncol,pver) :: vmr_nox, vmr_noy, vmr_clox, vmr_cloy, vmr_tcly, vmr_brox, vmr_broy, vmr_toth
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
     real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx
@@ -282,7 +282,7 @@ contains
     !-----------------------------------------------------------------------
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
-                       history_verbose_out = history_verbose )
+         history_verbose_out = history_verbose )
     !--------------------------------------------------------------------
     !	... "diagnostic" groups
     !--------------------------------------------------------------------
@@ -359,32 +359,32 @@ contains
 
     do mm = 1,gas_pcnst
 
-      ! other options of species are not used, only use weight=1
+       ! other options of species are not used, only use weight=1
        wgt = 1._r8
 
        if ( any( sox_species == mm ) ) then
           mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,mm)
        endif
-       
+
        if ( any( aer_species == mm ) ) then
           call outfld( solsym(mm), mmr(:ncol,:,mm), ncol ,lchnk )
           call outfld( trim(solsym(mm))//'_SRF', mmr(:ncol,pver,mm), ncol ,lchnk )
           if (history_aerosol .and. .not. history_verbose) then
              select case (trim(solsym(mm)))
              case ('bc_a1','bc_a3','bc_a4')
-                  mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,mm)
+                mass_bc(:ncol,:) = mass_bc(:ncol,:) + mmr(:ncol,:,mm)
              case ('dst_a1','dst_a3')
-                  mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,mm)
+                mass_dst(:ncol,:) = mass_dst(:ncol,:) + mmr(:ncol,:,mm)
              case ('mom_a1','mom_a2','mom_a3','mom_a4')
-                  mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,mm)
+                mass_mom(:ncol,:) = mass_mom(:ncol,:) + mmr(:ncol,:,mm)
              case ('ncl_a1','ncl_a2','ncl_a3')
-                  mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,mm)
+                mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + mmr(:ncol,:,mm)
              case ('pom_a1','pom_a3','pom_a4')
-                  mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,mm)
+                mass_pom(:ncol,:) = mass_pom(:ncol,:) + mmr(:ncol,:,mm)
              case ('so4_a1','so4_a2','so4_a3')
-                  mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,mm)
+                mass_so4(:ncol,:) = mass_so4(:ncol,:) + mmr(:ncol,:,mm)
              case ('soa_a1','soa_a2','soa_a3')
-                  mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,mm)
+                mass_soa(:ncol,:) = mass_soa(:ncol,:) + mmr(:ncol,:,mm)
              endselect
           endif
        else
@@ -415,20 +415,20 @@ contains
           fldcw => qqcw(nn)%fld(:,:)
           if(associated(fldcw)) then
              select case (trim(cnst_name_cw(nn)))
-                case ('bc_c1','bc_c3','bc_c4')
-                     mass_bc(:ncol,:) = mass_bc(:ncol,:) + fldcw(:ncol,:)
-                case ('dst_c1','dst_c3')
-                     mass_dst(:ncol,:) = mass_dst(:ncol,:) + fldcw(:ncol,:)
-                case ('mom_c1','mom_c2','mom_c3','mom_c4')
-                     mass_mom(:ncol,:) = mass_mom(:ncol,:) + fldcw(:ncol,:)
-                case ('ncl_c1','ncl_c2','ncl_c3')
-                     mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + fldcw(:ncol,:)
-                case ('pom_c1','pom_c3','pom_c4')
-                     mass_pom(:ncol,:) = mass_pom(:ncol,:) + fldcw(:ncol,:)
-                case ('so4_c1','so4_c2','so4_c3')
-                     mass_so4(:ncol,:) = mass_so4(:ncol,:) + fldcw(:ncol,:)
-                case ('soa_c1','soa_c2','soa_c3')
-                     mass_soa(:ncol,:) = mass_soa(:ncol,:) + fldcw(:ncol,:)
+             case ('bc_c1','bc_c3','bc_c4')
+                mass_bc(:ncol,:) = mass_bc(:ncol,:) + fldcw(:ncol,:)
+             case ('dst_c1','dst_c3')
+                mass_dst(:ncol,:) = mass_dst(:ncol,:) + fldcw(:ncol,:)
+             case ('mom_c1','mom_c2','mom_c3','mom_c4')
+                mass_mom(:ncol,:) = mass_mom(:ncol,:) + fldcw(:ncol,:)
+             case ('ncl_c1','ncl_c2','ncl_c3')
+                mass_ncl(:ncol,:) = mass_ncl(:ncol,:) + fldcw(:ncol,:)
+             case ('pom_c1','pom_c3','pom_c4')
+                mass_pom(:ncol,:) = mass_pom(:ncol,:) + fldcw(:ncol,:)
+             case ('so4_c1','so4_c2','so4_c3')
+                mass_so4(:ncol,:) = mass_so4(:ncol,:) + fldcw(:ncol,:)
+             case ('soa_c1','soa_c2','soa_c3')
+                mass_soa(:ncol,:) = mass_soa(:ncol,:) + fldcw(:ncol,:)
              endselect
           endif
        enddo
@@ -459,7 +459,7 @@ contains
 
   end subroutine chm_diags
 
-!========================================================================
+  !========================================================================
   subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol )
 
     use cam_history,  only : outfld
@@ -505,12 +505,12 @@ contains
        endif
 
     enddo
-    
+
     call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
     call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
 #include "../yaml/mo_chm_diags/f90_yaml/het_diags_end_yml.f90"
 
   end subroutine het_diags
-!========================================================================
+  !========================================================================
 end module mo_chm_diags

@@ -52,7 +52,7 @@ contains
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
          convproc_do_aer_out = convproc_do_aer ) 
-   
+
     ndx_h2so4 = get_spc_ndx('H2SO4')
     o3_ndx    = get_spc_ndx('O3')
     synoz_ndx = get_extfrc_ndx( 'SYNOZ' )
@@ -115,38 +115,38 @@ contains
     call chm_diags_inti()
     call rate_diags_init()
 
-!-----------------------------------------------------------------------
-! get fixed oxidant (troposphere) index for Linoz_MAM
-!-----------------------------------------------------------------------
-   
-     inv_ndx_cnst_o3 = get_inv_ndx( 'cnst_O3' ) ! prescribed O3 oxidant field
-     
-     if ( chem_name == 'linoz_mam3'.or.chem_name == 'linoz_mam4_resus'.or.chem_name == 'linoz_mam4_resus_mom' &
+    !-----------------------------------------------------------------------
+    ! get fixed oxidant (troposphere) index for Linoz_MAM
+    !-----------------------------------------------------------------------
+
+    inv_ndx_cnst_o3 = get_inv_ndx( 'cnst_O3' ) ! prescribed O3 oxidant field
+
+    if ( chem_name == 'linoz_mam3'.or.chem_name == 'linoz_mam4_resus'.or.chem_name == 'linoz_mam4_resus_mom' &
          .or.chem_name == 'linoz_mam4_resus_soag'.or.chem_name == 'linoz_mam4_resus_mom_soag') then
        if ( inv_ndx_cnst_o3 < 1 ) then
           call endrun('ERROR: chem_name = '//trim(chem_name)//&
-          ' requies cnst_O3 fixed oxidant field. Use cnst_O3:O3 in namelist tracer_cnst_specifier')
+               ' requies cnst_O3 fixed oxidant field. Use cnst_O3:O3 in namelist tracer_cnst_specifier')
        end if
-     end if
+    end if
 
   end subroutine gas_phase_chemdr_inti
 
 
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
+  !-----------------------------------------------------------------------
+  !-----------------------------------------------------------------------
   subroutine gas_phase_chemdr(lchnk, ncol, imozart, state_q, &
-                              phis, zm, zi, calday, &
-                              tfld, pmid, pdel, pdeldry, pint,  &
-                              cldw, troplev, &
-                              ncldwtr, ufld, vfld,  &
-                              prain, cldfr, cmfdqr, nevapr, &
-                              delt, ps, linoz_o3_clim, linoz_t_clim, &
-                              linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, &
-                              linoz_dPmL_dT, linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
-                              fsds, ts, asdir, &
-                              precc, precl, snowhland, pblh, &
-                              drydepflx, cflx, qtend, pbuf, qqcw, &
-                              dgnum, dgnumwet, wetdens         ) ! inout
+       phis, zm, zi, calday, &
+       tfld, pmid, pdel, pdeldry, pint,  &
+       cldw, troplev, &
+       ncldwtr, ufld, vfld,  &
+       prain, cldfr, cmfdqr, nevapr, &
+       delt, ps, linoz_o3_clim, linoz_t_clim, &
+       linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, &
+       linoz_dPmL_dT, linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
+       fsds, ts, asdir, &
+       precc, precl, snowhland, pblh, &
+       drydepflx, cflx, qtend, pbuf, qqcw, &
+       dgnum, dgnumwet, wetdens         ) ! inout
     !-----------------------------------------------------------------------
     !     ... Chem_solver advances the volumetric mixing ratio
     !         forward one time step via a combination of explicit,
@@ -164,7 +164,7 @@ contains
     use mo_negtrc,         only : negtrc
     use mo_setext,         only : setext
     use mo_sethet,         only : sethet
-    use mo_drydep,         only : drydep
+    use mo_drydep,         only : drydep_xactive
     use phys_grid,         only : get_rlat_all_p, get_rlon_all_p, get_lat_all_p, get_lon_all_p
     use mo_mean_mass,      only : set_mean_mass
     use cam_history,       only : outfld
@@ -180,15 +180,15 @@ contains
     use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr
     use orbit,             only : zenith
     use mam_support,       only : min_max_bound
-!
-! LINOZ
-!
+    !
+    ! LINOZ
+    !
     use lin_strat_chem,    only : lin_strat_chem_solve, lin_strat_sfcsink
-!
-! for aqueous chemistry and aerosol growth
-!
+    !
+    ! for aqueous chemistry and aerosol growth
+    !
     use aero_model,        only : aero_model_gasaerexch
-    use mam_support,       only : ptr2d_cw
+    use mam_support,       only : ptr2d_t
 
     implicit none
 
@@ -239,7 +239,7 @@ contains
     real(r8),       intent(inout) :: qtend(pcols,pver,pcnst)        ! species tendencies (kg/kg/s)
     real(r8),       intent(inout) :: cflx(pcols,pcnst)              ! constituent surface flux (kg/m^2/s)
     real(r8),       intent(out)   :: drydepflx(pcols,pcnst)         ! dry deposition flux (kg/m^2/s)
-    type(ptr2d_cw), intent(inout), target :: qqcw(:)                ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
+    type(ptr2d_t), intent(inout), target :: qqcw(:)                ! Cloud borne aerosols mixing ratios [kg/kg or 1/kg]
     real(r8),       intent(inout), target    :: dgnum(:,:,:)                   ! aerosol diameter [m]
     real(r8),       intent(inout), target    :: dgnumwet(:,:,:)                ! aerosol wet diameter [m]
     real(r8),       intent(inout), target    :: wetdens(:,:,:)                 ! aerosol wet density [kg/m3] 
@@ -296,7 +296,7 @@ contains
     real(r8) :: qh2o(pcols,pver)               ! specific humidity (kg/kg)
     real(r8) :: delta
 
-  ! for aerosol formation....  
+    ! for aerosol formation....  
     real(r8) :: del_h2so4_gasprod(ncol,pver)
     real(r8) :: vmr0(ncol,pver,gas_pcnst)
     call t_startf('chemdr_init')
@@ -310,14 +310,14 @@ contains
     !-----------------------------------------------------------------------      
     call get_rlat_all_p( lchnk, ncol, rlats )
     call get_rlon_all_p( lchnk, ncol, rlons )
-    
+
     !-----------------------------------------------------------------------      
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
     call zenith( calday, rlats, rlons, & !in
-      zen_angle, &!out
-      ncol ) !in
+         zen_angle, &!out
+         ncol ) !in
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg
@@ -356,35 +356,35 @@ contains
     !        ... Xform from mmr to vmr
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr, & !in
-    vmr, & !in-out
-     mbar, ncol ) !in
+         vmr, & !in-out
+         mbar, ncol ) !in
 
-    
+
     qh2o(:ncol,:) = state_q(:ncol,:,1)
     !-----------------------------------------------------------------------      
     !        ... Xform water vapor from mmr to vmr and set upper bndy values
     !-----------------------------------------------------------------------      
     call h2o_to_vmr( state_q(:,:,1), & !in
-    h2ovmr, &!in-out
-    mbar, ncol ) !in
+         h2ovmr, &!in-out
+         mbar, ncol ) !in
 
     !-----------------------------------------------------------------------      
     !        ... Set the "invariants"
     !-----------------------------------------------------------------------  
     call setinv( invariants, &! out
-    tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf ) !in
+         tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf ) !in
 
     !-----------------------------------------------------------------------      
     !        ... Set the column densities at the upper boundary
     !-----------------------------------------------------------------------      
     call set_ub_col( col_delta, & ! out
-                vmr, invariants, pdel, ncol, lchnk) ! in
+         vmr, invariants, pdel, ncol, lchnk) ! in
 
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
     !-----------------------------------------------------------------------      
     call setrxt( reaction_rates, & ! inout
-                 tfld, ncol )  ! in
+         tfld, ncol )  ! in
 
     !-----------------------------------------------------------------
     !	... compute the relative humidity
@@ -395,11 +395,11 @@ contains
        relhum(:,kk) = .622_r8 * h2ovmr(:,kk) / satq(:,kk)
        relhum(:,kk) = min_max_bound(0._r8, 1._r8,relhum(:,kk),size(relhum(:,kk)))
     end do
-    
+
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
     call usrrxt( reaction_rates, &  ! inout
-                 tfld, invariants, invariants(:,:,indexm), ncol ) ! in
+         tfld, invariants, invariants(:,:,indexm), ncol ) ! in
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 
@@ -409,7 +409,7 @@ contains
     enddo
 
     call adjrxt( reaction_rates, & ! inout
-                 invariants, invariants(1,1,indexm), ncol )  ! in
+         invariants, invariants(1,1,indexm), ncol )  ! in
 
     !-----------------------------------------------------------------------
     !        ... Compute the photolysis rates at time = t(n+1)
@@ -418,7 +418,7 @@ contains
     !     	... Set the column densities
     !-----------------------------------------------------------------------      
     call setcol(  col_delta, & ! in
-                  col_dens ) ! out
+         col_dens ) ! out
 
     !-----------------------------------------------------------------------      
     !     	... Calculate the photodissociation rates
@@ -429,15 +429,15 @@ contains
          delta, esfact ) !out
 
 
-       !-----------------------------------------------------------------
-       !	... lookup the photolysis rates from table
-       !-----------------------------------------------------------------
-       ! FORTRAN refactor notes: it looks that reaction_rates is reset in this
-       ! subroutine, and does not depend on how it was calculated before
-       call table_photo( reaction_rates, & ! out
-                         pmid, pdel, tfld, & ! in
-                         col_dens, zen_angle, asdir, cwat, cldfr, & ! in
-                         esfact,  ncol ) ! in
+    !-----------------------------------------------------------------
+    !	... lookup the photolysis rates from table
+    !-----------------------------------------------------------------
+    ! FORTRAN refactor notes: it looks that reaction_rates is reset in this
+    ! subroutine, and does not depend on how it was calculated before
+    call table_photo( reaction_rates, & ! out
+         pmid, pdel, tfld, & ! in
+         col_dens, zen_angle, asdir, cwat, cldfr, & ! in
+         esfact,  ncol ) ! in
 
     do ii = 1,phtcnt
        call outfld( pht_names(ii), reaction_rates(:ncol,:,ii), ncol, lchnk )
@@ -448,7 +448,7 @@ contains
     !        ... Compute the extraneous frcing at time = t(n+1)
     !-----------------------------------------------------------------------      
     call setext( extfrc,            & ! out
-                 lchnk, ncol, zintr ) ! in
+         lchnk, ncol, zintr ) ! in
 
     do mm = 1,extcnt
        if( mm /= synoz_ndx ) then
@@ -463,15 +463,15 @@ contains
     !        ... Form the washout rates
     !-----------------------------------------------------------------------      
     call sethet( het_rates, pmid, zmid, phis, tfld, &
-                  cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
-                  vmr, ncol, lchnk )
+         cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
+         vmr, ncol, lchnk )
 
     do ii = phtcnt+1,rxt_tag_cnt
        call outfld( tag_names(ii), reaction_rates(:ncol,:,rxt_tag_map(ii)), ncol, lchnk )
     enddo
 
     ltrop_sol(:ncol) = 0 ! apply solver to all levels
-    
+
     ! save h2so4 before gas phase chem (for later new particle nucleation)
     del_h2so4_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4)
 
@@ -489,7 +489,7 @@ contains
     !
     call t_startf('imp_sol')
     call imp_sol( vmr, reaction_rates, het_rates, extfrc, delt, &
-                  invariants(1,1,indexm), ncol, lchnk, ltrop_sol(:ncol) )
+         invariants(1,1,indexm), ncol, lchnk, ltrop_sol(:ncol) )
     call t_stopf('imp_sol')
 
     if(convproc_do_aer) then 
@@ -504,9 +504,9 @@ contains
        del_h2so4_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_gasprod(1:ncol,:)
     endif
 
-!
-! Aerosol processes ...
-!
+    !
+    ! Aerosol processes ...
+    !
     !-----------------------------------------------------------------------      
     !        ... Get chunck latitudes and longitudes
     !-----------------------------------------------------------------------      
@@ -515,22 +515,22 @@ contains
 
     call t_startf('aero_model_gasaerexch')
     call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, & !in
-                                tfld, pmid, pdel, mbar, zm,  qh2o, cwat,      & !in
-                                cldfr, ncldwtr, invariants(:,:,indexm), vmr0, & !in
-                                pblh,                                         & !in
-                                vmr, qqcw, dgnum, dgnumwet, wetdens         ) ! inout
+         tfld, pmid, pdel, mbar, zm,  qh2o, cwat,      & !in
+         cldfr, ncldwtr, invariants(:,:,indexm), vmr0, & !in
+         pblh,                                         & !in
+         vmr, qqcw, dgnum, dgnumwet, wetdens         ) ! inout
     call t_stopf('aero_model_gasaerexch')
 
-!
-! LINOZ
-!
+    !
+    ! LINOZ
+    !
     call lin_strat_chem_solve( ncol, lchnk, col_dens(:,:,1), tfld, zen_angle, pmid, delt, rlats, troplev, & !in
-       linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
-       linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
-       vmr(:,:,o3_ndx) ) !in-out
-      
+         linoz_o3_clim, linoz_t_clim, linoz_o3col_clim, linoz_PmL_clim, linoz_dPmL_dO3, linoz_dPmL_dT, & !in
+         linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
+         vmr(:,:,o3_ndx) ) !in-out
+
     call   lin_strat_sfcsink (ncol, lchnk, delt, pdel(:ncol,:), & !in
-       vmr(:,:,o3_ndx)) !in-outs
+         vmr(:,:,o3_ndx)) !in-outs
 
     !-----------------------------------------------------------------------      
     !         ... Check for negative values and reset to zero
@@ -567,28 +567,28 @@ contains
 
     call t_startf('drydep')
 
-       !drydep_method == DD_XATM 
-       call drydep( ncdate, ts, ps,  &
-            wind_speed, qh2o(:,pver), tfld(:,pver), pmid(:,pver), prect, &
-            snowhland, fsds, depvel, sflx, mmr, &
-            tvs, soilw, relhum(:,pver:pver), ncol, lonndx, latndx, lchnk )
-
+    !drydep_method == DD_XATM 
+    call drydep_xactive( lchnk, ncol, latndx, &                                         ! in
+         ncdate, ts, tfld(:,pver), tvs, ps, pmid(:,pver), &                             ! in
+         qh2o(:,pver), wind_speed, prect, snowhland, fsds, mmr, &                       ! in
+         depvel, &                                                                      ! out
+         sflx)                                                                          ! inout
     call t_stopf('drydep')
 
     drydepflx(:,:) = 0._r8
     do mm = 1,pcnst
        nn = map2chm( mm )
        if ( nn > 0 ) then
-         cflx(:ncol,mm)      = cflx(:ncol,mm) - sflx(:ncol,nn)
-         drydepflx(:ncol,mm) = sflx(:ncol,nn)
+          cflx(:ncol,mm)      = cflx(:ncol,mm) - sflx(:ncol,nn)
+          drydepflx(:ncol,mm) = sflx(:ncol,nn)
        endif
     end do
 
     call t_startf('chemdr_diags')
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &       !intent-in
-                    depvel(:ncol,:),  sflx(:ncol,:), &                       !intent-in
-                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pdeldry(:ncol,:), &  !intent-in
-                    qqcw, troplev(:ncol)  )                                  !intent-in
+         depvel(:ncol,:),  sflx(:ncol,:), &                       !intent-in
+         mmr_tend(:ncol,:,:), pdel(:ncol,:), pdeldry(:ncol,:), &  !intent-in
+         qqcw, troplev(:ncol)  )                                  !intent-in
 
     call rate_diags_calc( reaction_rates(:,:,:), &! inout
          vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk ) !in

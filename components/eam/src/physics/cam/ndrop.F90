@@ -34,7 +34,6 @@ module ndrop
   use cam_logfile,      only: iulog
   use modal_aero_data,   only: lmassptrcw_amode, numptrcw_amode, lmassptr_amode, numptr_amode, &
        lspectype_amode, specdens_amode, spechygro
-  use mam_support,      only: ptr2d_cw
 
   implicit none
   private
@@ -301,7 +300,7 @@ contains
     ! assume cloud presence controlled by cloud fraction
     ! doesn't distinguish between warm, cold clouds
 
-    use modal_aero_data,   only: qqcw_get_field, maxd_aspectype
+    use modal_aero_data,   only: maxd_aspectype
     use mam_support,       only: min_max_bound, ptr2d_t
 
     ! input arguments
@@ -323,7 +322,7 @@ contains
     real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step [fraction]
 
     ! inout arguments
-    type(ptr2d_cw), intent(inout) :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
+    type(ptr2d_t), intent(inout) :: qqcw(:)     ! cloud-borne aerosol mass, number mixing ratios [#/kg or kg/kg]
 
     ! output arguments
     type(physics_ptend), intent(out)   :: ptend
@@ -621,7 +620,7 @@ contains
     real(r8), intent(in) :: temp_col_in(:)   ! temperature [K]
     real(r8), intent(in) :: cs_col_in(:)     ! air density at actual level kk [kg/m^3]
     real(r8), intent(in) :: state_q_col_in(:,:) ! aerosol mmrs [kg/kg]
-    
+
     real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
     real(r8), intent(inout) :: nsource_col_out(:)   ! droplet number mixing ratio source tendency [#/kg/s]
     real(r8), intent(inout) :: raercol_nsav(:,:)   ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
@@ -694,7 +693,7 @@ contains
           call get_activate_frac(state_q_col_in(kk,:), cs_col_in(kk), cs_col_in(kk), & ! in
                wtke_col_in(kk), temp_col_in(kk), & ! in
                fn, fm, fluxn, fluxm, flux_fullact) ! out
- 
+
           !  store for output activation fraction of aerosol
           factnum_col_out(kk,:) = fn
 
