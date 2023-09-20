@@ -75,6 +75,7 @@
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'sigma_logr_aer',sigma_logr_aer)
         call write_var(unit_input,unit_output,'dgnumwet',dgnumwet(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'top_lev',top_lev)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

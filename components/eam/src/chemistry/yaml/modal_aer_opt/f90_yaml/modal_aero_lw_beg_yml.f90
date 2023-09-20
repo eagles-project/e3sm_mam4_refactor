@@ -116,10 +116,16 @@
         call write_var(unit_input,unit_output,'qqcw',qqcw_in(:,:))
         deallocate(qqcw_in)
 
+        ! other module variables
+        call write_var(unit_input,unit_output,'top_lev',top_lev)
         call write_var(unit_input,unit_output,'nlwbands',nlwbands)
-
         call write_var(unit_input,unit_output,'absplw',reshape(absplw,(/size(absplw)/)))
         call write_var(unit_input,unit_output,'shape_of_absplw', shape(absplw))
+        call write_var(unit_input,unit_output,'specrefndxlw_real',real(specrefndxlw))
+        call write_var(unit_input,unit_output,'specrefndxlw_imag',aimag(specrefndxlw))
+        call write_var(unit_input,unit_output,'refrtablw',reshape(refrtablw,(/size(refrtablw)/)))
+        call write_var(unit_input,unit_output,'refitablw',reshape(refitablw,(/size(refitablw)/)))
+
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

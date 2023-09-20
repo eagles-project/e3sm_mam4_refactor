@@ -118,14 +118,22 @@
         call write_var(unit_input,unit_output,'qqcw',qqcw_in)
         deallocate(qqcw_in)
 
+        ! module variables
+        call write_var(unit_input,unit_output,'top_lev',top_lev)
         call write_var(unit_input,unit_output,'nswbands',nswbands)
-
         call write_var(unit_input,unit_output,'extpsw',reshape(extpsw,(/size(extpsw)/)))
         call write_var(unit_input,unit_output,'shape_of_extpsw', shape(extpsw))
         call write_var(unit_input,unit_output,'abspsw',reshape(abspsw,(/size(abspsw)/)))
         call write_var(unit_input,unit_output,'shape_of_abspsw', shape(abspsw))
         call write_var(unit_input,unit_output,'asmpsw',reshape(asmpsw,(/size(asmpsw)/)))
         call write_var(unit_input,unit_output,'shape_of_asmpsw', shape(asmpsw))
+        call write_var(unit_input,unit_output,'specrefndxsw_real',real(specrefndxsw))
+        call write_var(unit_input,unit_output,'specrefndxsw_imag',aimag(specrefndxsw))
+        call write_var(unit_input,unit_output,'refrtabsw',reshape(refrtabsw,(/size(refrtabsw)/)))
+        call write_var(unit_input,unit_output,'refitabsw',reshape(refitabsw,(/size(refitabsw)/)))
+        call write_var(unit_input,unit_output,'crefwsw_real',real(crefwsw))
+        call write_var(unit_input,unit_output,'crefwsw_imag',aimag(crefwsw))
+
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
