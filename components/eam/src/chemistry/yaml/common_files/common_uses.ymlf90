@@ -77,5 +77,8 @@ use spmd_utils,   only : masterproc
 ! linoz stratospheric chemistry
 !#define YAML_LINSTRAT
 
+! modal_aer_opt in physics/cam
+!#define YAML_OPT
+
 use yaml_input_file_io
 

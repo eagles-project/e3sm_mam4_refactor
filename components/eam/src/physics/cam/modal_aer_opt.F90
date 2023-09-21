@@ -1,5 +1,6 @@
 
 module modal_aer_opt
+#include "../../chemistry/yaml/common_files/common_uses.ymlf90"
 
 ! parameterizes aerosol coefficients using chebychev polynomial
 ! parameterize aerosol radiative properties in terms of
@@ -482,6 +483,7 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
    ! debug output
    integer  :: nerr_dopaer = 0
    !----------------------------------------------------------------------------
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_aero_sw_beg_yml.f90"
 
    mass(:ncol,:)        = pdeldry(:ncol,:)*rga
    air_density(:ncol,:) = pmid(:ncol,:)/(rair*temperature(:ncol,:))
@@ -889,6 +891,7 @@ subroutine modal_aero_sw(dt, lchnk, ncol, state_q, state_zm, temperature, pmid, 
       call outfld('AODSS',         seasaltaod,    pcols, lchnk)
       call outfld('AODMOM',        momaod,        pcols, lchnk)
    endif  !  if (list_idx == 0)
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_aero_sw_end_yml.f90"
 
 end subroutine modal_aero_sw
 
@@ -945,6 +948,7 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
    real(r8) :: dopaer    ! aerosol optical depth in layer [1]
 
    integer  :: nerr_dopaer = 0
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_aero_lw_beg_yml.f90"
 
    !----------------------------------------------------------------------------
 
@@ -1039,6 +1043,7 @@ subroutine modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdel
       deallocate(specrefindex)
 
    enddo ! mm = 1, ntot_amode
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_aero_lw_end_yml.f90"
 
 end subroutine modal_aero_lw
 
@@ -1058,11 +1063,14 @@ subroutine calc_parameterized (ncol, ncoef, coef, cheb_k, & ! in
     real(r8), intent(out):: para(pcols)
 
     integer :: nc
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_parameterized_beg_yml.f90"
 
     para(:ncol) = 0.5_r8*coef(:ncol,1)
     do nc = 2, ncoef
         para(:ncol) = para(:ncol) + cheb_k(nc,:ncol)*coef(:ncol,nc)
     enddo
+
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_parameterized_end_yml.f90"
 
 end subroutine calc_parameterized
 !===============================================================================
@@ -1083,6 +1091,7 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
    real(r8), intent(out) :: hygro_s(pcols)  ! hygroscopicity of species [unitless]
    
    integer :: icol
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_diag_spec_beg_yml.f90"
 
    burden_s(:ncol) = 0._r8
    do icol = 1, ncol
@@ -1091,6 +1100,7 @@ subroutine calc_diag_spec ( ncol, specmmr_k, mass_k,            & ! in
        abs_s(icol)    = - vol(icol)*specrefi
        hygro_s(icol)  = vol(icol)*hygro_aer
    enddo
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_diag_spec_end_yml.f90"
 
 end subroutine calc_diag_spec
 
@@ -1107,6 +1117,7 @@ subroutine update_aod_spec ( scath2o, absh2o,           & ! in
    real(r8), intent(inout) :: scat_s, abs_s, aod_s  ! scatering, absorption and aod for a species
    ! local variables
    real(r8) :: aodc  ! aod component
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/update_aod_spec_beg_yml.f90"
 
    scat_s     = (scat_s + scath2o*hygro_s/sumhygro)/sumscat
    abs_s      = (abs_s + absh2o*hygro_s/sumhygro)/sumabs
@@ -1114,6 +1125,7 @@ subroutine update_aod_spec ( scath2o, absh2o,           & ! in
    aodc       = (abs_s*(1.0_r8 - palb) + palb*scat_s)*dopaer
 
    aod_s      = aod_s + aodc
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/update_aod_spec_end_yml.f90"
 
 end subroutine update_aod_spec
 
@@ -1132,6 +1144,7 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
 
    ! local variables
    integer :: icol, kk_tropp
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_volc_ext_beg_yml.f90"
 
    do icol = 1, ncol
       kk_tropp = trop_level(icol)
@@ -1145,6 +1158,7 @@ subroutine calc_volc_ext(ncol, trop_level, state_zm, ext_cmip6_sw, & ! in
       extinct(icol, 1:kk_tropp-1) = ext_cmip6_sw(icol, 1:kk_tropp-1)
    enddo
 
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_volc_ext_end_yml.f90"
 end subroutine calc_volc_ext
 
 !===============================================================================
@@ -1172,6 +1186,7 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
 
     integer :: icol
     real(r8), parameter :: small_value_60 = 1.e-60_r8
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_refin_complex_beg_yml.f90"
 
     if ((lwsw /= 'lw') .and. (lwsw /= 'sw')) then
         call endrun('calc_refin_complex is called with '// lwsw// ', it should be called with either lw or sw')
@@ -1208,6 +1223,7 @@ subroutine calc_refin_complex (lwsw, ncol, ilwsw,           & ! in
        refr(icol) = real(crefin(icol))
        refi(icol) = aimag(crefin(icol))
     enddo
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/calc_refin_complex_end_yml.f90"
 
 end subroutine calc_refin_complex
 
@@ -1371,6 +1387,7 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
    real(r8) :: explnsigma
    real(r8) :: xrad ! normalized aerosol radius
    !-------------------------------------------------------------------------------
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_size_parameters_beg_yml.f90"
 
    alnsg_amode = log(sigma_logr_aer)
    explnsigma = exp(2.0_r8*alnsg_amode*alnsg_amode)
@@ -1401,6 +1418,7 @@ subroutine modal_size_parameters(ncol, sigma_logr_aer, dgnumwet, & ! in
          enddo
       enddo
    enddo
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/modal_size_parameters_end_yml.f90"
 
 end subroutine modal_size_parameters
 
@@ -1436,6 +1454,7 @@ subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &!
   !local
   integer  :: ip1, jp1, icoef, ic
   real(r8) :: tu(pcols), tuc(pcols),tcu(pcols), tcuc(pcols)
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/binterp_beg_yml.f90"
 
   if(itab(1) <= 0) then
 
@@ -1463,6 +1482,7 @@ subroutine binterp(table, ncol, ref_real, ref_img, ref_real_tab, ref_img_tab, &!
              tcu(ic) * table(icoef,itab(ic),jp1)
      enddo
   enddo
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/binterp_end_yml.f90"
 end subroutine binterp
 
 
@@ -1490,6 +1510,7 @@ subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
   real(r8) :: dx
 
   real(r8), parameter :: threshold = 1.e-20_r8
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/compute_factors_beg_yml.f90"
 
   ix(:ncol) = 1
   tt(:ncol) = 0._r8
@@ -1512,6 +1533,7 @@ subroutine compute_factors(prefri, ncol, ref_ind, ref_table, & !in
         endif
      enddo   
   endif
+#include "../../chemistry/yaml/modal_aer_opt/f90_yaml/compute_factors_end_yml.f90"
 end subroutine compute_factors
 
 end module modal_aer_opt
