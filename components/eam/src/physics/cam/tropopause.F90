@@ -16,6 +16,7 @@
 ! Created: April, 2009
 
 module tropopause
+#include "../../chemistry/yaml/common_files/common_uses.ymlf90"
   !---------------------------------------------------------------
   ! ... variables for the tropopause module
   !---------------------------------------------------------------
@@ -496,6 +497,7 @@ contains
     real(r8)     :: trop_output(pcols,pver)        !For output purposes only.
     real(r8)     :: trop_linoz_output(pcols,pver)  !For output purposes only.
     real(r8)     :: trop_trop_output(pcols,pver)   !For output purposes only.
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_hybridstobie_beg_yml.f90"
 
     ltrop_linoz(:) = 1  ! Initialize to default value.
     ltrop_trop(:) = 1   ! Initialize to default value.
@@ -552,7 +554,7 @@ contains
     call outfld( 'hstobie_trop',   trop_output(:ncol,:),       ncol, lchnk )
     call outfld( 'hstobie_linoz',  trop_linoz_output(:ncol,:), ncol, lchnk )
     call outfld( 'hstobie_tropop', trop_trop_output(:ncol,:),  ncol, lchnk )
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_hybridstobie_end_yml.f90"
   endsubroutine tropopause_hybridstobie
   
   ! This routine is an implementation of Reichler et al. [2003] done by
@@ -804,6 +806,7 @@ contains
     integer       :: tropLevVal               ! tropLevVal at a particular column
     integer       :: tropLevValp1             ! tropLevVal at a particular column at level + 1
     integer       :: tropLevValm1             ! tropLevVal at a particular column at level - 1
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_cpp_beg_yml.f90"
 
     ! Iterate over all of the columns.
     do icol = 1, ncol
@@ -900,6 +903,7 @@ contains
       endif    ! if (tropLev(icol) == NOTFOUND)
 
     enddo
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_cpp_end_yml.f90"
     
     return
   end subroutine tropopause_cpp

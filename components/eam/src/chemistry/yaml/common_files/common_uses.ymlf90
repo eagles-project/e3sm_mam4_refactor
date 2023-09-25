@@ -83,5 +83,8 @@ use spmd_utils,   only : masterproc
 ! aer_rad_props in physics/cam
 !#define YAML_AER_RAD
 
+! tropopause find subroutines
+!#define YAML_TROPFIND
+
 use yaml_input_file_io
 
