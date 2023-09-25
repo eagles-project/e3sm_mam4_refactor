@@ -80,5 +80,8 @@ use spmd_utils,   only : masterproc
 ! modal_aer_opt in physics/cam
 !#define YAML_OPT
 
+! aer_rad_props in physics/cam
+!#define YAML_AER_RAD
+
 use yaml_input_file_io
 
