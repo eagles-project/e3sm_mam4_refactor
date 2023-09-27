@@ -3,7 +3,6 @@ mam4xx:
   function: compute_factors
 input:
   fixed:
-    dt:    0.00
     prefri: [         7]
     ncol: [         4]
     ref_ind: [  0.14927671566442187E+001,  0.14977990581258016E+001,  0.14979918561451162E+001,  0.14733067874363983E+001]

@@ -8,7 +8,7 @@
         if (allocated(qqcw_out)) deallocate(qqcw_out)
         allocate(qqcw_out(size(qqcw),pver))
         do imm=1,size(qqcw)
-           if (size(qqcw(imm)%fld,1) > 10000) then
+           if (imm<=15) then
                 qqcw_out(imm,:) = -9999.9
            else
                 qqcw_out(imm,:) = qqcw(imm)%fld(yaml%col_print,:)

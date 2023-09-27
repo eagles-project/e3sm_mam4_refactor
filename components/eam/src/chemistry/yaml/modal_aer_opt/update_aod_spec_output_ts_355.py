@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.scath2o=[[  0.82311147606397293E-012],]
 input.absh2o=[[ -0.10111904763559041E-020],]
 input.sumhygro=[[  0.27168163535835007E-012],]

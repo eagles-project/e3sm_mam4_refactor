@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.ncol=[[         4],]
 input.specmmr_k=[[  0.45244286569388789E-009],]
 input.mass_k=[[  0.34389585824000443E+003],]
