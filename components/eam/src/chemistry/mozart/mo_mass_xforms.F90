@@ -1,5 +1,5 @@
 module mo_mass_xforms
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use ppgrid,       only : pcols, pver
   use shr_kind_mod, only : r8 => shr_kind_r8
 
@@ -24,8 +24,8 @@ contains
     !-----------------------------------------------------------------
     !	... Xfrom from mass to volume mixing ratio
     !-----------------------------------------------------------------
-
     use chem_mods, only : adv_mass, gas_pcnst
+
 
     implicit none
 
@@ -41,7 +41,7 @@ contains
     !	... Local variables
     !-----------------------------------------------------------------
     integer :: kk, mm   ! indices for vertical level and  gas constituent
-
+#include "../yaml/mo_mass_xforms/f90_yaml/mmr2vmr_beg_yml.f90"
     do mm = 1,gas_pcnst
        if( adv_mass(mm) /= 0._r8 ) then
           do kk = 1,pver
@@ -49,7 +49,7 @@ contains
           enddo
        endif
     enddo
-
+#include "../yaml/mo_mass_xforms/f90_yaml/mmr2vmr_end_yml.f90"
   end subroutine mmr2vmr
 
   subroutine vmr2mmr( vmr, mmr, mbar, ncol )
@@ -109,11 +109,12 @@ contains
     !	... Local variables
     !-----------------------------------------------------------------------
     integer ::   kk  ! vertical level index
+#include "../yaml/mo_mass_xforms/f90_yaml/h2o_to_vmr_beg_yml.f90"
 
     do kk = 1,pver
        h2o_vmr(:ncol,kk) = mbar(:ncol,kk) * h2o_mmr(:ncol,kk) / adv_mass_h2o
     enddo
-
+#include "../yaml/mo_mass_xforms/f90_yaml/h2o_to_vmr_end_yml.f90"
   end subroutine h2o_to_vmr
 
 end module mo_mass_xforms
