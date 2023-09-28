@@ -1,4 +1,5 @@
 module aer_rad_props
+#include "../../chemistry/yaml/common_files/common_uses.ymlf90"
 
   !------------------------------------------------------------------------------------------------
   ! Converts aerosol masses to bulk optical properties for sw and lw radiation
@@ -105,6 +106,7 @@ contains
     ! for cmip6 style volcanic file
     integer  :: trop_level(pcols)
     real(r8) :: ext_cmip6_sw_inv_m(pcols,pver,nswbands)! short wave extinction in the units of [1/m]
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_rad_props_sw_beg_yml.f90"
 
     !-----------------------------------------------------------------------------
 
@@ -145,6 +147,7 @@ contains
     ! Diagnostic output of total aerosol optical properties
     ! currently implemented for climate list only
     call aer_vis_diag_out(lchnk, ncol, nnite, idxnite, tau(:,:,idx_sw_diag)) !in
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_rad_props_sw_end_yml.f90"
 
   end subroutine aer_rad_props_sw
 
@@ -184,6 +187,7 @@ contains
     integer  :: trop_level(pcols)
     real(r8) :: ext_cmip6_lw_inv_m(pcols,pver,nlwbands)!long wave extinction in the units of [1/m]
     !-----------------------------------------------------------------------------
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_rad_props_lw_beg_yml.f90"
 
     !Compute contributions from the modal aerosols.
     call modal_aero_lw(dt, lchnk, ncol, state_q, temperature, pmid, pdel, pdeldry, cldn, &! in
@@ -211,6 +215,7 @@ contains
 
     call outfld('extinct_lw_bnd7',odap_aer(:,:,idx_lw_diag), pcols, lchnk)
 
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_rad_props_lw_end_yml.f90"
   end subroutine aer_rad_props_lw
 
   !=============================================================================================
@@ -233,6 +238,7 @@ contains
     !local
     integer :: icol, ilev_tropp
     real(r8) :: lyr_thk !layer thickness [m]
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/compute_odap_volcanic_at_troplayer_lw_beg_yml.f90"
 
     do icol = 1, ncol
        ilev_tropp = trop_level(icol) !tropopause level
@@ -242,6 +248,7 @@ contains
        !and 50% from the existing model computed values at the tropopause layer
        odap_aer(icol,ilev_tropp,:) = 0.5_r8*( odap_aer(icol,ilev_tropp,:) + (lyr_thk * ext_cmip6_lw_inv_m(icol,ilev_tropp,:)) )
     enddo
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/compute_odap_volcanic_at_troplayer_lw_end_yml.f90"
   end subroutine compute_odap_volcanic_at_troplayer_lw
 
   !==============================================================================
@@ -265,6 +272,7 @@ contains
     !local
     integer :: ipver, icol, ilev_tropp
     real(r8) :: lyr_thk !layer thickness [m]
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/compute_odap_volcanic_above_troplayer_lw_beg_yml.f90"
 
     !As it will be more efficient for FORTRAN to loop over levels and then columns, the following loops
     !are nested keeping that in mind
@@ -277,6 +285,7 @@ contains
           endif
        enddo
     enddo
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/compute_odap_volcanic_above_troplayer_lw_end_yml.f90"
   end subroutine compute_odap_volcanic_above_troplayer_lw
 
   !==============================================================================
@@ -337,6 +346,7 @@ contains
     real(r8)  :: lyr_thk ! thickness between level interfaces [m]
     real(r8)  :: ext_unitless(nswbands), asym_unitless(nswbands)
     real(r8)  :: ext_ssa(nswbands),ext_ssa_asym(nswbands)
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/volcanic_cmip_sw_beg_yml.f90"
 
     !Logic:
     !Update taus, tau_w, tau_w_g and tau_w_f with the read in volcanic
@@ -388,6 +398,7 @@ contains
        enddo
     enddo
 
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/volcanic_cmip_sw_end_yml.f90"
   end subroutine volcanic_cmip_sw
 
   !==============================================================================
@@ -407,6 +418,7 @@ contains
     integer  :: ii
     real(r8) :: tmp(pcols)
     !-----------------------------------------------------------------------------
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_vis_diag_out_beg_yml.f90"
 
     ! currently only implemented for climate calc
 
@@ -418,6 +430,7 @@ contains
     enddo
 
     call outfld('AEROD_v', tmp, pcols, lchnk)
+#include "../../chemistry/yaml/aer_rad_props/f90_yaml/aer_vis_diag_out_end_yml.f90"
 
   end subroutine aer_vis_diag_out
 
