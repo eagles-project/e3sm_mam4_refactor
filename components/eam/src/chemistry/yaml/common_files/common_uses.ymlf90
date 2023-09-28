@@ -84,7 +84,7 @@ use spmd_utils,   only : masterproc
 !#define YAML_TROPFIND
 
 ! _2_vmr subroutines
-#define YAML_TOVMR
+! #define YAML_TOVMR
 
 use yaml_input_file_io
 
