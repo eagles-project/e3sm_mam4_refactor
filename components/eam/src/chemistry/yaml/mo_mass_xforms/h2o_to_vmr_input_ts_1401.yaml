@@ -1,0 +1,12 @@
+# Data at [lat=   39.0553303768561      , lon=   262.904774388088      , k=          54 , time step=        1401 ] 
+mam4xx:
+  function: h2o_to_vmr
+input:
+  fixed:
+    dt:    0.00
+    h2o_mmr: [  0.11391377628679497E-002]
+    mbar: [  0.28966000000000001E+002]
+    ncol: [         4]
+    pcols: [         4]
+    pver: [        72]
+    adv_mass_h2o: [  0.18000000000000000E+002]
