@@ -84,12 +84,17 @@
              'calc_refin_complex',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
-        
+        if (lwsw=='lw' ) then
+                call write_var(unit_input,unit_output,'lwsw', 0)
+        else
+                call write_var(unit_input,unit_output,'lwsw', 1)
+        endif
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'ilwsw',ilwsw)
         call write_var(unit_input,unit_output,'qaerwat_kk',qaerwat_kk(yaml%col_print))
         call write_var(unit_input,unit_output,'specvol',specvol(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'specrefindex',specrefindex(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'specrefindex_real',real(specrefindex))
+        call write_var(unit_input,unit_output,'specrefindex_imag',aimag(specrefindex))
         call write_var(unit_input,unit_output,'crefwsw_real',real(crefwsw))
         call write_var(unit_input,unit_output,'crefwsw_imag',aimag(crefwsw))
         call write_var(unit_input,unit_output,'crefwlw_real',real(crefwlw))

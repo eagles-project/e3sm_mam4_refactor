@@ -3,7 +3,6 @@ mam4xx:
   function: calc_diag_spec
 input:
   fixed:
-    dt:    0.00
     ncol: [         4]
     specmmr_k: [  0.45244286569388789E-009]
     mass_k: [  0.34389585824000443E+003]

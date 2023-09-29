@@ -63,6 +63,8 @@ module yaml_input_file_io
      module procedure write_1d_var_logical
      module procedure write_1d_var_complex_drv
      module procedure write_1d_var_complex
+     module procedure write_1d_var_char_drv
+     module procedure write_1d_var_char
      module procedure write_2d_var_int_drv
      module procedure write_2d_var_int
      module procedure write_2d_var_real_drv
@@ -80,6 +82,8 @@ module yaml_input_file_io
      module procedure write_1d_output_var_real
      module procedure write_1d_output_var_complex_drv
      module procedure write_1d_output_var_complex
+     module procedure write_1d_output_var_char_drv
+     module procedure write_1d_output_var_char
      module procedure write_2d_output_var_int_drv
      module procedure write_2d_output_var_int
      module procedure write_2d_output_var_real_drv
@@ -261,21 +265,16 @@ contains
   !-------------------------- * Write headers * -----------------------------------
   !================================================================================
 
-  subroutine write_input_output_header(unit_input, unit_output,lchunk, icol, subr_name, nstep, lev, dt)
+  subroutine write_input_output_header(unit_input, unit_output,lchunk, icol, subr_name, nstep, lev)
     !------------------------------------------------------------------
     !Purpose: Write input header for the YAML input and the output files
     !------------------------------------------------------------------
     integer,  intent(in) :: unit_input, unit_output, lchunk, icol, nstep, lev
-    real(r8), intent(in), optional :: dt !time step
 
     character(len = *), intent(in) :: subr_name
 
     !local
     character(len = 2000) :: meta_msg
-    real(r8) :: time_step
-
-    time_step = 0.0_r8 !defaut time step
-    if (present(dt)) time_step = dt
 
 
     !check if file is open to write or not
@@ -292,7 +291,6 @@ contains
     write(unit_input,'(A,A)')'  function: ',trim(adjustl(subr_name))
     write(unit_input,'(A)')'input:'
     write(unit_input,'(A)' )'  fixed:'
-    write(unit_input,'(A,F8.2)')'    dt:', time_step
 
     !write header for the output file
     write(unit_output,'(A)')adjustl(trim(meta_msg))
@@ -309,7 +307,6 @@ contains
     write(unit_output,'(A)')'settings = Object()'
     write(unit_output,'(A)')'# Input is stored here.'
     write(unit_output,'(A)')'input = Object()'
-    write(unit_output,'(A,F8.2,A)')'input.dt = [',time_step,', ]'
 
   end subroutine write_input_output_header
 
@@ -1204,6 +1201,124 @@ contains
     write(unit_output,'(A)')'],]'
 
   end subroutine write_1d_output_var_complex
+
+  !================================================================================
+
+  subroutine write_1d_var_char_drv(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    character(len=*), intent(in)  :: field(:)        ! field values in r8
+
+    call write_1d_var_char(unit_input, unit_output,fld_name,size(field),field)
+
+  end subroutine write_1d_var_char_drv
+
+  !================================================================================
+
+  subroutine write_1d_var_char(unit_input, unit_output, fld_name,dim,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    character(len=*), intent(in)  :: field(:)        ! field values in r8
+
+    integer :: k
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in string
+10  format(A)
+11  format(A, A)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+    write(unit_input,10,advance="no")trim(field(lbound(field,1)))
+
+    do k = lbound(field,1)+1, ubound(field,1)
+       write(unit_input,11,advance="no")',', trim(field(k))
+    enddo
+
+    write(unit_input,'(A)')']'
+
+    call write_1d_output_var_char(unit_output, fld_name, dim, field, "input")
+
+  end subroutine write_1d_var_char
+
+  !================================================================================
+
+  subroutine write_1d_output_var_char_drv(unit_output, fld_name, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    character(len=*), intent(in)  :: field(:)        ! field values in r8
+
+    call write_1d_output_var_char(unit_output, fld_name, size(field), field)
+
+  end subroutine write_1d_output_var_char_drv
+
+  !================================================================================
+  subroutine write_1d_output_var_char(unit_output, fld_name, dim, field,inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    character(len=*), intent(in)  :: field(:)        ! field values in r8
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format,
+    !this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: k
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write as string
+12  format(A,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do k = lbound(field,1), ubound(field,1)
+       write(unit_output,12,advance="no"),trim(field(k)),','
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_1d_output_var_char
 
   !================================================================================
 

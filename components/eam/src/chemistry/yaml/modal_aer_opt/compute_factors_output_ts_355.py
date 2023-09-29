@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.prefri=[[         7],]
 input.ncol=[[         4],]
 input.ref_ind=[[  0.14927671566442187E+001,  0.14977990581258016E+001,  0.14979918561451162E+001,  0.14733067874363983E+001,],]

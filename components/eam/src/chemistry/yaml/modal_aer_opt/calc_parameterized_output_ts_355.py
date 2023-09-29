@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.ncol=[[         4],]
 input.ncoef=[[         5],]
 input.coef=[[  0.10900927581965057E+002, -0.27866016477117478E+000, -0.95264002849610707E+000, -0.50121062362733115E+000,  0.20039082901914285E+000,],]

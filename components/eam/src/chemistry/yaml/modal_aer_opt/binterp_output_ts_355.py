@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.ncoef=[[         5],]
 input.prefr=[[         7],]
 input.prefi=[[        10],]

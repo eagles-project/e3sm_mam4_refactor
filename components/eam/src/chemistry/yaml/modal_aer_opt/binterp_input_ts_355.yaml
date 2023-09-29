@@ -3,7 +3,6 @@ mam4xx:
   function: binterp
 input:
   fixed:
-    dt:    0.00
     ncoef: [         5]
     prefr: [         7]
     prefi: [        10]

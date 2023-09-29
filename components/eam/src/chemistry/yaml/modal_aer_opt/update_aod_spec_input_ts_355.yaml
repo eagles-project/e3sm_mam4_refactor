@@ -3,7 +3,6 @@ mam4xx:
   function: update_aod_spec
 input:
   fixed:
-    dt:    0.00
     scath2o: [  0.82311147606397293E-012]
     absh2o: [ -0.10111904763559041E-020]
     sumhygro: [  0.27168163535835007E-012]

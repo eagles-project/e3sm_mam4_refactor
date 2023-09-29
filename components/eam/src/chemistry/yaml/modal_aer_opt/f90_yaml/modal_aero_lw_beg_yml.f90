@@ -125,7 +125,11 @@
         call write_var(unit_input,unit_output,'specrefndxlw_imag',aimag(specrefndxlw))
         call write_var(unit_input,unit_output,'refrtablw',reshape(refrtablw,(/size(refrtablw)/)))
         call write_var(unit_input,unit_output,'refitablw',reshape(refitablw,(/size(refitablw)/)))
-
+        call write_var(unit_input,unit_output,'crefwsw_real',real(crefwsw))
+        call write_var(unit_input,unit_output,'crefwsw_imag',aimag(crefwsw))
+        call write_var(unit_input,unit_output,'crefwlw_real',real(crefwlw))
+        call write_var(unit_input,unit_output,'crefwlw_imag',aimag(crefwlw))
+        call write_var(unit_input,unit_output,'sigmag_amode',sigmag_amode)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

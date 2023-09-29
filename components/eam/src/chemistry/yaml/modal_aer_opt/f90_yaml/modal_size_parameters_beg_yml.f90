@@ -25,7 +25,7 @@
 
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
-
+  integer :: is_method2
 
 
   !-----------------------------------------------------------------------------------------
@@ -47,8 +47,10 @@
      !-----------------------------------------------------------------------------------------
      if (present(ismethod2) .and. ismethod2) then
         ext_str = 'ismethod2_true'
+        is_method2 = 1
      else
         ext_str = 'ismethod2_false'
+        is_method2 = 0
      endif
 
 
@@ -76,6 +78,7 @@
         call write_var(unit_input,unit_output,'sigma_logr_aer',sigma_logr_aer)
         call write_var(unit_input,unit_output,'dgnumwet',dgnumwet(yaml%col_print,:))
         call write_var(unit_input,unit_output,'top_lev',top_lev)
+        call write_var(unit_input,unit_output,'ismethod2', is_method2)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
