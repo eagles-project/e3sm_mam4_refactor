@@ -521,14 +521,6 @@ subroutine microp_aero_run ( &
       end do
    end do
 
-   lchnk_zb = lchnk - begchunk
-   ! save copy of cloud borne aerosols for use in heterogeneous freezing\
-   do ispec = 1, ncnst
-      call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)      
-      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
-      aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
-   enddo
-
    ! note for C++ porting, the following variables that are obtained using pbuf
    ! should be obtained from AD for the previous time step
    itim_old = pbuf_old_tim_idx()
@@ -678,11 +670,20 @@ subroutine microp_aero_run ( &
       enddo
    enddo
 
+   
+   lchnk_zb = lchnk - begchunk
+   ! save copy of cloud borne aerosols for use in heterogeneous freezing\
+   do ispec = 1, ncnst
+      call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)      
+      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
+      aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
+   enddo
+   
    ! The following variable obtained using pbuf is used
    ! for vertical mixing in the activation subroutine dropmixnuc
+   
 
    call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
-
    call t_startf('dropmixnuc')
    call dropmixnuc( &
          lchnk,ncol,psetcols,deltatin,temperature,pmid,pint,pdel,rpdel,zm, &  ! in
