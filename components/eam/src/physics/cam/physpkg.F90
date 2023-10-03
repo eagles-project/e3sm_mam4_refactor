@@ -2434,115 +2434,50 @@ contains
        call sslt_rebin_adv(pbuf,  state)
 
     end if
+    ! Start co-substepping of macrophysics and microphysics
+    cld_macmic_ztodt = ztodt/cld_macmic_num_steps
 
+    ! Clear precip fields that should accumulate.
+    prec_sed_macmic = 0._r8
+    snow_sed_macmic = 0._r8
+    prec_pcw_macmic = 0._r8
+    snow_pcw_macmic = 0._r8
 
-    if( microp_scheme == 'RK' ) then
+    do macmic_it = 1, cld_macmic_num_steps
+       !=====================================================
+       !   CLUBB call (PBL, shallow convection, macrophysics)
+       !=====================================================  
+       call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
+            cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
+            dlf, det_s, det_ice, lcldo)
 
-       if (l_st_mac.or.l_st_mic) then
-          !===================================================
-          ! Calculate stratiform tendency (sedimentation, detrain, cloud fraction and microphysics )
-          !===================================================
-          call t_startf('stratiform_tend')
+       call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
+       call physics_update(state, ptend, ztodt, tend)
 
-          call stratiform_tend(state, ptend, pbuf, ztodt, &
-               cam_in%icefrac, cam_in%landfrac, cam_in%ocnfrac, &
-               cam_in%snowhland, & ! sediment
-               dlf, dlf2, & ! detrain
-               rliq  , & ! check energy after detrain
-               cmfmc,   cmfmc2, &
-               cam_in%ts,      cam_in%sst,        zdu)
+       !===================================================
+       ! Calculate cloud microphysics 
+       !===================================================
+       call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo) !<<<AEROSOLS
 
-          call physics_update(state, ptend, ztodt, tend)
-          call check_energy_chng(state, tend, "cldwat_tend", nstep, ztodt, zero, prec_str(:ncol), snow_str(:ncol), zero)
+       call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
+       call physics_ptend_sum(ptend_aero, ptend, ncol)
+       call physics_ptend_dealloc(ptend_aero)
+       call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
+       call physics_update (state, ptend, ztodt, tend)
 
-          call t_stopf('stratiform_tend')
-       end if !l_st_mac
+       prec_sed_macmic(:ncol) = prec_sed_macmic(:ncol) + prec_sed(:ncol)
+       snow_sed_macmic(:ncol) = snow_sed_macmic(:ncol) + snow_sed(:ncol)
+       prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
+       snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
-    elseif( microp_scheme == 'MG' ) then
-       ! Start co-substepping of macrophysics and microphysics
-       cld_macmic_ztodt = ztodt/cld_macmic_num_steps
+    end do ! end substepping over macrophysics/microphysics
 
-       ! Clear precip fields that should accumulate.
-       prec_sed_macmic = 0._r8
-       snow_sed_macmic = 0._r8
-       prec_pcw_macmic = 0._r8
-       snow_pcw_macmic = 0._r8
-
-       do macmic_it = 1, cld_macmic_num_steps
-
-
-          !===================================================
-          ! Calculate macrophysical tendency (sedimentation, detrain, cloud fraction)
-          !===================================================
-
-
-          ! =====================================================
-          !    CLUBB call (PBL, shallow convection, macrophysics)
-          ! =====================================================  
-
-          call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
-               cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
-               dlf, det_s, det_ice, lcldo)
-
-          !  Since we "added" the reserved liquid back in this routine, we need 
-          !    to account for it in the energy checker
-          flx_cnd(:ncol) = -1._r8*rliq(:ncol) 
-          flx_heat(:ncol) = cam_in%shf(:ncol) + det_s(:ncol)
-
-          ! Unfortunately, physics_update does not know what time period
-          ! "tend" is supposed to cover, and therefore can't update it
-          ! with substeps correctly. For now, work around this by scaling
-          ! ptend down by the number of substeps, then applying it for
-          ! the full time (ztodt).
-          call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
-          !    Update physics tendencies and copy state to state_eq, because that is 
-          !      input for microphysics              
-          call physics_update(state, ptend, ztodt, tend)
-          call check_energy_chng(state, tend, "clubb_tend", nstep, ztodt, &
-               cam_in%cflx(:,1)/cld_macmic_num_steps, flx_cnd/cld_macmic_num_steps, &
-               det_ice/cld_macmic_num_steps, flx_heat/cld_macmic_num_steps)
-
-
-          !===================================================
-          ! Calculate cloud microphysics 
-          !===================================================
-
-
-
-          call t_startf('microp_aero_run')
-          call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo)
-          call t_stopf('microp_aero_run')
-
-
-
-
-          call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
-          ! combine aero and micro tendencies for the grid
-          call physics_ptend_sum(ptend_aero, ptend, ncol)
-          call physics_ptend_dealloc(ptend_aero)
-
-          ! Have to scale and apply for full timestep to get tend right
-          ! (see above note for macrophysics).
-          call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
-
-          call physics_update (state, ptend, ztodt, tend)
-
-
-          prec_sed_macmic(:ncol) = prec_sed_macmic(:ncol) + prec_sed(:ncol)
-          snow_sed_macmic(:ncol) = snow_sed_macmic(:ncol) + snow_sed(:ncol)
-          prec_pcw_macmic(:ncol) = prec_pcw_macmic(:ncol) + prec_pcw(:ncol)
-          snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
-
-       end do ! end substepping over macrophysics/microphysics
-
-       prec_sed(:ncol) = prec_sed_macmic(:ncol)/cld_macmic_num_steps
-       snow_sed(:ncol) = snow_sed_macmic(:ncol)/cld_macmic_num_steps
-       prec_pcw(:ncol) = prec_pcw_macmic(:ncol)/cld_macmic_num_steps
-       snow_pcw(:ncol) = snow_pcw_macmic(:ncol)/cld_macmic_num_steps
-       prec_str(:ncol) = prec_pcw(:ncol) + prec_sed(:ncol)
-       snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
-
-    end if !microp_scheme
+    prec_sed(:ncol) = prec_sed_macmic(:ncol)/cld_macmic_num_steps
+    snow_sed(:ncol) = snow_sed_macmic(:ncol)/cld_macmic_num_steps
+    prec_pcw(:ncol) = prec_pcw_macmic(:ncol)/cld_macmic_num_steps
+    snow_pcw(:ncol) = snow_pcw_macmic(:ncol)/cld_macmic_num_steps
+    prec_str(:ncol) = prec_pcw(:ncol) + prec_sed(:ncol)
+    snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
     if (l_tracer_aero) then
        if ( .not. deep_scheme_does_scav_trans() ) then
