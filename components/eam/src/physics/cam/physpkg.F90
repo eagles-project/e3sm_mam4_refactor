@@ -2460,6 +2460,7 @@ contains
        call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo) !<<<AEROSOLS
 
        call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
+       
        call physics_ptend_sum(ptend_aero, ptend, ncol)
        call physics_ptend_dealloc(ptend_aero)
        call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
