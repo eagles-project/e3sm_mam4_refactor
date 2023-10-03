@@ -89,6 +89,10 @@ integer :: tke_idx = -1
 integer :: wp2_idx = -1
 integer :: ast_idx = -1
 integer :: alst_idx = -1
+integer :: aist_idx = -1
+
+integer :: cldo_idx = -1
+integer :: dgnumwet_idx = -1
 integer :: dgnum_idx = -1
 
 integer :: naai_idx
@@ -235,6 +239,7 @@ subroutine microp_aero_init
 
    ast_idx      = pbuf_get_index('AST')
    alst_idx      = pbuf_get_index('ALST')
+   aist_idx      = pbuf_get_index('AIST')
    
    do ispec = 1, ncnst
       hetfrz_aer_spec_idx(ispec) = pbuf_get_index(hetfrz_aer_specname(ispec))
@@ -247,6 +252,9 @@ subroutine microp_aero_init
    call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    if (clim_modal_aero) then
+
+      cldo_idx     = pbuf_get_index('CLDO')
+      dgnumwet_idx = pbuf_get_index('DGNUMWET')
       dgnum_idx    = pbuf_get_index('DGNUM' )      
 
       call ndrop_init()
@@ -429,7 +437,8 @@ subroutine microp_aero_run ( &
 
    ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
-   real(r8), pointer :: alst(:,:)          
+   real(r8), pointer :: alst(:,:)        
+   real(r8), pointer :: aist(:,:)        
 
    real(r8), pointer :: npccn(:,:)      ! number of CCN (liquid activated)
 
@@ -438,6 +447,9 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: wp2(:,:)        ! CLUBB vertical velocity variance
 
    real(r8), pointer :: cldn(:,:)       ! cloud fraction
+   real(r8), pointer :: cldo(:,:)       ! old cloud fraction
+
+   real(r8), pointer :: dgnumwet(:,:,:) ! aerosol mode diameter
    real(r8), pointer :: dgnum(:,:,:)
 
    ! naai and naai_hom are the outputs from nucleate_ice_cam_calc shared with the microphysics
@@ -453,6 +465,7 @@ subroutine microp_aero_run ( &
 
    real(r8), pointer :: ptr2d(:,:)
 
+   real(r8)          :: icecldf(pcols,pver)    ! ice cloud fraction   
    real(r8)          :: liqcldf(pcols,pver)    ! liquid cloud fraction
 
    real(r8) :: rho(pcols,pver)     ! air density (kg m-3)
@@ -499,13 +512,8 @@ subroutine microp_aero_run ( &
       rpdel    => state%rpdel,          &
       zm       => state%zm             )
 
-   ! save copy of cloud borne aerosols for use in heterogeneous freezing
-   lchnk_zb = lchnk - begchunk
-   do ispec = 1, ncnst
-      call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)
-      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
-   enddo
-  
+
+   
    ! initialize time-varying parameters
    do kk = top_lev, pver
       do icol = 1, ncol
@@ -513,17 +521,54 @@ subroutine microp_aero_run ( &
       end do
    end do
 
+   lchnk_zb = lchnk - begchunk
+   ! save copy of cloud borne aerosols for use in heterogeneous freezing\
    do ispec = 1, ncnst
+      call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)      
+      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
       aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
    enddo
 
+   ! note for C++ porting, the following variables that are obtained using pbuf
+   ! should be obtained from AD for the previous time step
+   itim_old = pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
+   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
+
+   ! note for C++ porting, the following variables that are obtained using pbuf
+   ! should be obtained from AD
+   call pbuf_get_field(pbuf, npccn_idx, npccn) 
+   call rad_cnst_get_info(0, nmodes=nmodes)
+   call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
+   call pbuf_get_field(pbuf, dgnum_idx, dgnum) 
+ 
+   call pbuf_get_field(pbuf, naai_idx, naai)
+   call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
+
+   ! frzimm, frzcnt, frzdep are the outputs of hetfrz_classnuc_cam_calc used by the microphysics
+   call pbuf_get_field(pbuf, frzimm_idx, frzimm)
+   call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
+   call pbuf_get_field(pbuf, frzdep_idx, frzdep)
+
+   liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
+   icecldf(:ncol,:pver) = aist(:ncol,:pver)
+
+   allocate(factnum(pcols,pver,nmodes))
+
+
+   ! initialize output
+   npccn(1:ncol,1:pver)    = 0._r8  
+
+   
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! More refined computation of sub-grid vertical velocity 
    ! Set to be zero at the surface by initialization.
 
    allocate(tke(pcols,pverp))
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
    tke(:ncol,:) = (3._r8/2._r8)*wp2(:ncol,:)
 
    !PMA no longer needs the minimum value that is designed for CAM5-UW scheme which 
@@ -589,11 +634,8 @@ subroutine microp_aero_run ( &
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    !ICE Nucleation
-   call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, dgnum_idx, dgnum)
-   call pbuf_get_field(pbuf, naai_idx, naai)
-   call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
 
+   call t_startf('nucleate_ice_cam_calc')
    call nucleate_ice_cam_calc(ncol, lchnk, temperature, state_q, pmid, &      ! input
                               rho, wsubice, ast, dgnum, &                     ! input
                               naai, naai_hom)                                 ! output
@@ -606,8 +648,6 @@ subroutine microp_aero_run ( &
    ! for modal aerosol
 
    ! partition cloud fraction into liquid water part
-   call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   liqcldf(:ncol,:pver) = alst(:ncol,:pver)
    lcldn = 0._r8
    lcldo = 0._r8
    do kk = top_lev, pver
@@ -642,31 +682,26 @@ subroutine microp_aero_run ( &
    ! for vertical mixing in the activation subroutine dropmixnuc
 
    call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
-   call rad_cnst_get_info(0, nmodes=nmodes)
-   allocate(factnum(pcols,pver,nmodes))
 
+   call t_startf('dropmixnuc')
    call dropmixnuc( &
          lchnk,ncol,psetcols,deltatin,temperature,pmid,pint,pdel,rpdel,zm, &  ! in
          state_q,nc,kvh,wsub,lcldn, lcldo, &  ! in
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum)  !out
-
+   call t_stopf('dropmixnuc')
    deallocate(qqcw) 
 
-   call pbuf_get_field(pbuf, npccn_idx, npccn)
-   npccn(1:ncol,1:pver)    = 0._r8  
    npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 
 
    ! heterogeneous freezing
-   ! frzimm, frzcnt, frzdep are the outputs of hetfrz_classnuc_cam_calc used by the microphysics
-   call pbuf_get_field(pbuf, frzimm_idx, frzimm)
-   call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
-   call pbuf_get_field(pbuf, frzdep_idx, frzdep)
+   call t_startf('hetfrz_classnuc_cam_calc')
    call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, &   ! in
                                  qc, nc, state_q, aer_cb(:,:,:,lchnk_zb), deltatin, factnum, & ! in
                                  frzimm, frzcnt, frzdep)                       ! out
-   
+   call t_stopf('hetfrz_classnuc_cam_calc')
+
    deallocate(factnum)
 
    end associate
