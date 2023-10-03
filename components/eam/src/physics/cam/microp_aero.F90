@@ -445,8 +445,6 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: kvh(:,:)        ! vertical eddy diff coef (m2 s-1)
    real(r8), pointer :: tke(:,:)        ! TKE from the UW PBL scheme (m2 s-2)
    real(r8), pointer :: wp2(:,:)        ! CLUBB vertical velocity variance
-
-   real(r8), pointer :: cldn(:,:)       ! cloud fraction
    real(r8), pointer :: cldo(:,:)       ! old cloud fraction
 
    real(r8), pointer :: dgnumwet(:,:,:) ! aerosol mode diameter
@@ -527,7 +525,6 @@ subroutine microp_aero_run ( &
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, ast_idx,  cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
    call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
 
