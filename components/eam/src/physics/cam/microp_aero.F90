@@ -502,23 +502,6 @@ subroutine microp_aero_run ( &
       rpdel    => state%rpdel,          &
       zm       => state%zm             )
 
-
-   
-   ! initialize time-varying parameters
-   rho(:,:) = -999.0_r8
-   do kk = top_lev, pver
-      do icol = 1, ncol
-         rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
-      end do
-   end do
-
-   ! note for C++ porting, the following variables that are obtained using pbuf
-   ! should be obtained from AD for the previous time step
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
-
    ! note for C++ porting, the following variables that are obtained using pbuf
    ! should be obtained from AD
    call pbuf_get_field(pbuf, npccn_idx, npccn) 
@@ -532,9 +515,7 @@ subroutine microp_aero_run ( &
    ! frzimm, frzcnt, frzdep are the outputs of hetfrz_classnuc_cam_calc used by the microphysics
    call pbuf_get_field(pbuf, frzimm_idx, frzimm)
    call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
-   call pbuf_get_field(pbuf, frzdep_idx, frzdep)
-
-   liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
+   call pbuf_get_field(pbuf, frzdep_idx, frzdep) 
 
    allocate(factnum(pcols,pver,nmodes))
 
@@ -548,6 +529,10 @@ subroutine microp_aero_run ( &
    ! Set to be zero at the surface by initialization.
 
    allocate(tke(pcols,pverp))
+   !Note for C++ porting, the following variables that are obtained using pbuf
+   !should be obtained from AD for the previous time step
+   itim_old = pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/)) 
    tke(:ncol,:) = (3._r8/2._r8)*wp2(:ncol,:)
 
    !PMA no longer needs the minimum value that is designed for CAM5-UW scheme which 
@@ -559,13 +544,10 @@ subroutine microp_aero_run ( &
 
    do kk = top_lev, pver
       do icol = 1, ncol
-
          wsub(icol,kk)  = sqrt(0.5_r8*(tke(icol,kk) + tke(icol,kk+1))*(2._r8/3._r8))      
          wsig(icol,kk)  = min_max_bound(0.001_r8, 10._r8, wsub(icol,kk))        
          wsubi(icol,kk) = min_max_bound(0.2_r8, 10._r8, wsub(icol,kk))
-
          wsub(icol,kk)  = max(wsubmin, wsub(icol,kk))
-
       end do
    end do
 
@@ -581,9 +563,10 @@ subroutine microp_aero_run ( &
    !!  Convert from omega to w 
    !!  Negative omega means rising motion
    !!.......................................................... 
-
+   rho(:,:) = -999.0_r8
    do kk = top_lev, pver
       do icol = 1, ncol
+         rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
          w0(icol,kk) = -1._r8*omega(icol,kk)/(rho(icol,kk)*gravit)
       enddo
    enddo
@@ -611,12 +594,10 @@ subroutine microp_aero_run ( &
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    !ICE Nucleation
-
-   call t_startf('nucleate_ice_cam_calc')
+   call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call nucleate_ice_cam_calc(ncol, lchnk, temperature, state_q, pmid, &      ! input
                               rho, wsubice, ast, dgnum, &                     ! input
                               naai, naai_hom)                                 ! output
-   call t_stopf('nucleate_ice_cam_calc')
 
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -625,6 +606,8 @@ subroutine microp_aero_run ( &
    ! for modal aerosol
 
    ! partition cloud fraction into liquid water part
+   call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   liqcldf(:ncol,:pver) = alst(:ncol,:pver)  
    lcldn = 0._r8
    lcldo = 0._r8
    do kk = top_lev, pver
