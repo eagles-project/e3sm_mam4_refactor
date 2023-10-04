@@ -470,7 +470,6 @@ contains
     associate( &
          lchnk => state%lchnk,             &
          ncol  => state%ncol,              &
-         psetcols  => state%psetcols,      &
          temperature     => state%t,       &
          state_q         => state%q,       &
          qc    => state%q(:pcols,:pver,cldliq_idx), &
@@ -585,7 +584,7 @@ contains
     ! for vertical mixing in the activation subroutine dropmixnuc
     call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
     allocate(factnum(pcols, pver, ntot_amode))
-    call dropmixnuc(lchnk, ncol, psetcols, deltatin, temperature, pmid, pint, pdel, rpdel, zm, &  ! in
+    call dropmixnuc(lchnk, ncol, deltatin, temperature, pmid, pint, pdel, rpdel, zm, &  ! in
          state_q, nc, kvh, wsub, lcldn, lcldo, &  ! in
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum)  !out
