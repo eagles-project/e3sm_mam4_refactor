@@ -89,9 +89,7 @@ integer :: tke_idx = -1
 integer :: wp2_idx = -1
 integer :: ast_idx = -1
 integer :: alst_idx = -1
-integer :: aist_idx = -1
 
-integer :: cldo_idx = -1
 integer :: dgnumwet_idx = -1
 integer :: dgnum_idx = -1
 
@@ -239,7 +237,6 @@ subroutine microp_aero_init
 
    ast_idx      = pbuf_get_index('AST')
    alst_idx      = pbuf_get_index('ALST')
-   aist_idx      = pbuf_get_index('AIST')
    
    do ispec = 1, ncnst
       hetfrz_aer_spec_idx(ispec) = pbuf_get_index(hetfrz_aer_specname(ispec))
@@ -252,8 +249,6 @@ subroutine microp_aero_init
    call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
    if (clim_modal_aero) then
-
-      cldo_idx     = pbuf_get_index('CLDO')
       dgnumwet_idx = pbuf_get_index('DGNUMWET')
       dgnum_idx    = pbuf_get_index('DGNUM' )      
 
@@ -438,14 +433,12 @@ subroutine microp_aero_run ( &
    ! pbuf pointers 
    real(r8), pointer :: ast(:,:)        
    real(r8), pointer :: alst(:,:)        
-   real(r8), pointer :: aist(:,:)        
 
    real(r8), pointer :: npccn(:,:)      ! number of CCN (liquid activated)
 
    real(r8), pointer :: kvh(:,:)        ! vertical eddy diff coef (m2 s-1)
    real(r8), pointer :: tke(:,:)        ! TKE from the UW PBL scheme (m2 s-2)
    real(r8), pointer :: wp2(:,:)        ! CLUBB vertical velocity variance
-   real(r8), pointer :: cldo(:,:)       ! old cloud fraction
 
    real(r8), pointer :: dgnumwet(:,:,:) ! aerosol mode diameter
    real(r8), pointer :: dgnum(:,:,:)
@@ -462,8 +455,7 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: frzdep(:,:)
 
    real(r8), pointer :: ptr2d(:,:)
-
-   real(r8)          :: icecldf(pcols,pver)    ! ice cloud fraction   
+ 
    real(r8)          :: liqcldf(pcols,pver)    ! liquid cloud fraction
 
    real(r8) :: rho(pcols,pver)     ! air density (kg m-3)
@@ -513,6 +505,7 @@ subroutine microp_aero_run ( &
 
    
    ! initialize time-varying parameters
+   rho(:,:) = -999.0_r8
    do kk = top_lev, pver
       do icol = 1, ncol
          rho(icol,kk) = pmid(icol,kk)/(rair*temperature(icol,kk))
@@ -524,8 +517,6 @@ subroutine microp_aero_run ( &
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, aist_idx,     aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-   call pbuf_get_field(pbuf, cldo_idx, cldo, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))  
 
    ! note for C++ porting, the following variables that are obtained using pbuf
@@ -544,7 +535,6 @@ subroutine microp_aero_run ( &
    call pbuf_get_field(pbuf, frzdep_idx, frzdep)
 
    liqcldf(:ncol,:pver) = alst(:ncol,:pver) 
-   icecldf(:ncol,:pver) = aist(:ncol,:pver)
 
    allocate(factnum(pcols,pver,nmodes))
 
@@ -617,8 +607,6 @@ subroutine microp_aero_run ( &
    call outfld('WLARGE', w0, pcols, lchnk)
    call outfld('WSUBI2', w2, pcols, lchnk)
 
-
-
    if (trim(eddy_scheme) == 'CLUBB_SGS') deallocate(tke)
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -672,7 +660,7 @@ subroutine microp_aero_run ( &
    ! save copy of cloud borne aerosols for use in heterogeneous freezing\
    do ispec = 1, ncnst
       call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)      
-      aer_cb(:,:,ispec,lchnk_zb) = ptr2d
+      aer_cb(:ncol,:,ispec,lchnk_zb) = ptr2d
       aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
    enddo
    
