@@ -604,6 +604,7 @@ contains
     integer                                 :: level   ! size of temp1d array
     integer                                 :: icount, jj
     integer                                 :: kk      ! vertical level index
+#include "../../chemistry/yaml/tropopause/f90_yaml/twmo_beg_yml.f90"
     
 
     trp=-99.0_r8                           ! negative means not valid
@@ -669,7 +670,7 @@ contains
       trp = ptph
       exit main_loop
     enddo main_loop
-    
+#include "../../chemistry/yaml/tropopause/f90_yaml/twmo_end_yml.f90"    
   end subroutine twmo
   
   subroutine get_dtdz(pm,pmk,pmid1d_up,pmid1d_down,temp1d_up,temp1d_down,    & ! in
@@ -688,6 +689,7 @@ contains
 
     real(r8)                                :: a1, b1
     real(r8)                                :: dtdp     ! temperature lapse rate vs pressure [K/Pa]
+#include "../../chemistry/yaml/tropopause/f90_yaml/get_dtdz_beg_yml.f90"
 
 
     a1 = (temp1d_up-temp1d_down)/(pmid1d_up**cnst_kap-pmid1d_down**cnst_kap)
@@ -695,7 +697,7 @@ contains
     tm = a1 * pmk + b1
     dtdp = a1 * cnst_kap * (pm**cnst_ka1)
     dtdz = cnst_faktor*dtdp*pm/tm
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/get_dtdz_end_yml.f90"
   end subroutine get_dtdz
 
   ! This routine uses an implementation of Reichler et al. [2003] done by
@@ -727,7 +729,7 @@ contains
     integer       :: tropLevVal               ! tropLevVal at a particular column
     integer       :: tropLevValp1             ! tropLevVal at a particular column at level + 1
     integer       :: tropLevValm1             ! tropLevVal at a particular column at level - 1
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_twmo_beg_yml.f90"
 
     ! Iterate over all of the columns.
     do icol = 1, ncol
@@ -738,7 +740,7 @@ contains
         ! Use the routine from Reichler.
         call twmo(temp(icol, :), pmid(icol, :), plimu, pliml, gam, &  ! in
              tP)  ! out
-     
+
         ! if successful, store of the results and find the level and temperature.
         if (tP > 0) then
         
@@ -770,7 +772,7 @@ contains
         endif
       endif
     enddo
-    
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_twmo_end_yml.f90"   
     return
   end subroutine tropopause_twmo
   
