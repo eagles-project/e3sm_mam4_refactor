@@ -1102,7 +1102,6 @@ end subroutine clubb_init_cnst
    use cldfrc2m,                  only: aist_vector
    use cam_history,               only: outfld
    use trb_mtn_stress,            only: compute_tms
-   use macrop_driver,             only: ice_macro_tend
 
    use parameters_tunable,        only: mu
    use clubb_api_module, only: &
@@ -1677,54 +1676,7 @@ end subroutine clubb_init_cnst
                            !  from moments since it has not been added yet
    endif
 
-   if (micro_do_icesupersat) then
-
-     ! -------------------------------------- !
-     ! Ice Saturation Adjustment Computation  !
-     ! -------------------------------------- !
-
-     lq2(:)  = .FALSE.
-     lq2(1)  = .TRUE.
-     lq2(ixcldice) = .TRUE.
-     lq2(ixnumice) = .TRUE.
-
-     latsub = latvap + latice
-
-     call physics_ptend_init(ptend_loc, state%psetcols, 'iceadj', ls=.true., lq=lq2 )
-
-     stend(:ncol,:)=0._r8
-     qvtend(:ncol,:)=0._r8
-     qitend(:ncol,:)=0._r8
-     initend(:ncol,:)=0._r8
-
-     call t_startf('ice_macro_tend')
-     call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
-        state1%pmid(:ncol,top_lev:pver),state1%q(:ncol,top_lev:pver,1),state1%q(:ncol,top_lev:pver,ixcldice),&
-        state1%q(:ncol,top_lev:pver,ixnumice),latsub,hdtime,&
-        stend(:ncol,top_lev:pver),qvtend(:ncol,top_lev:pver),qitend(:ncol,top_lev:pver),&
-        initend(:ncol,top_lev:pver))
-     call t_stopf('ice_macro_tend')
-
-     ! update local copy of state with the tendencies
-     ptend_loc%q(:ncol,top_lev:pver,1)=qvtend(:ncol,top_lev:pver)
-     ptend_loc%q(:ncol,top_lev:pver,ixcldice)=qitend(:ncol,top_lev:pver)
-     ptend_loc%q(:ncol,top_lev:pver,ixnumice)=initend(:ncol,top_lev:pver)
-     ptend_loc%s(:ncol,top_lev:pver)=stend(:ncol,top_lev:pver)
-
-    ! Add the ice tendency to the output tendency
-     call physics_ptend_sum(ptend_loc, ptend_all, ncol)
-
-    ! ptend_loc is reset to zero by this call
-     call physics_update(state1, ptend_loc, hdtime)
-
-    !Write output for tendencies:
-    !        oufld: QVTENDICE,QITENDICE,NITENDICE
-     call outfld( 'TTENDICE',  stend/cpair, pcols, lchnk )
-     call outfld( 'QVTENDICE', qvtend, pcols, lchnk )
-     call outfld( 'QITENDICE', qitend, pcols, lchnk )
-     call outfld( 'NITENDICE', initend, pcols, lchnk )
-
-   endif
+   
 
    !  Determine CLUBB time step and make it sub-step friendly
    !  For now we want CLUBB time step to be 5 min since that is

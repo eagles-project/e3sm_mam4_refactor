@@ -127,7 +127,6 @@ contains
     use stratiform,         only: stratiform_register
     use microp_driver,      only: microp_driver_register
     use microp_aero,        only: microp_aero_register
-    use macrop_driver,      only: macrop_driver_register
     use clubb_intr,         only: clubb_register_cam
     use conv_water,         only: conv_water_register
     use physconst,          only: mwdry, cpair, mwh2o, cpwv
@@ -219,7 +218,6 @@ contains
        if( microp_scheme == 'RK' ) then
           call stratiform_register()
        elseif( microp_scheme == 'MG' ) then
-          if (.not. do_clubb_sgs) call macrop_driver_register()
           call microp_aero_register()
           call microp_driver_register()
        end if
@@ -707,7 +705,6 @@ contains
     use wv_saturation,      only: wv_sat_init
     use microp_driver,      only: microp_driver_init
     use microp_aero,        only: microp_aero_init
-    use macrop_driver,      only: macrop_driver_init
     use conv_water,         only: conv_water_init
     use tracers,            only: tracers_init
     use aoa_tracers,        only: aoa_tracers_init
@@ -882,7 +879,6 @@ contains
     if( microp_scheme == 'RK' ) then
        call stratiform_init()
     elseif( microp_scheme == 'MG' ) then 
-       if (.not. do_clubb_sgs) call macrop_driver_init(pbuf2d)
        call microp_aero_init()
        call microp_driver_init(pbuf2d)
        call conv_water_init
@@ -1935,7 +1931,6 @@ contains
     use stratiform,      only: stratiform_tend
     use microp_driver,   only: microp_driver_tend
     use microp_aero,     only: microp_aero_run
-    use macrop_driver,   only: macrop_driver_tend
     use physics_types,   only: physics_state, physics_tend, physics_ptend, &
          physics_ptend_init, physics_ptend_sum, physics_state_check, physics_ptend_scale
     use cam_diagnostics, only: diag_conv_tend_ini, diag_phys_writeout, diag_conv, diag_export, diag_state_b4_phys_write
