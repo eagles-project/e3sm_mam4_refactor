@@ -1417,8 +1417,8 @@ contains
        tfld, pmid, pdel, mbar,         & ! in
        zm,  qh2o, cwat, cldfr, cldnum, & ! in
        airdens, vmr0, pblh,            & ! in
-       vmr, qqcw, dgnum,               & ! inout
-       dgnumwet, wetdens               ) ! inout
+       vmr, qqcw,                      & ! inout
+       dgnum, dgnumwet, wetdens        ) ! in
     !-----------------------------------------------------------------------
     ! interface to gas-aerosol exchange
     !-----------------------------------------------------------------------
@@ -1469,6 +1469,7 @@ contains
     real(r8), pointer :: fldcw(:,:)             ! mass mixing ratio [kg/kg]
 
     !-----------------------------------------------------------------------
+#include "../yaml/aero_model/f90_yaml/aero_model_gasaerexch_beg_yml.f90"
 
     do imode=1,ntot_amode
        call outfld(dgnum_name(imode),dgnumwet(1:ncol,1:pver,imode), ncol, lchnk )
@@ -1547,8 +1548,8 @@ contains
          vmr,                vmrcw,               & ! inout
          vmr0,                                    & ! in
          vmr_pregas,         vmr_precld,          & ! in
-         dgnum,              dgnumwet,            & ! inout
-         wetdens                                  ) ! inout
+         dgnum,              dgnumwet,            & ! in
+         wetdens                                  ) ! in
     call t_stopf('modal_aero_amicphys')
 
     ! calculate cloudborne aerosols after exchange
@@ -1566,6 +1567,7 @@ contains
           call outfld( cnst_name_cw(mm), fldcw(:,:), pcols, lchnk )
        endif
     enddo
+#include "../yaml/aero_model/f90_yaml/aero_model_gasaerexch_end_yml.f90"
 
   end subroutine aero_model_gasaerexch
 
@@ -2185,6 +2187,7 @@ contains
     !	... Local variables
     !-----------------------------------------------------------------
     integer  :: kk, mm
+#include "../yaml/aero_model/f90_yaml/qqcw2vmr_beg_yml.f90"
 
     vmr(:,:,:) = 0.0_r8
     do mm=1,gas_pcnst
@@ -2194,6 +2197,7 @@ contains
           enddo
        endif
     enddo
+#include "../yaml/aero_model/f90_yaml/qqcw2vmr_end_yml.f90"
   end subroutine qqcw2vmr
 
 
@@ -2221,6 +2225,7 @@ contains
     !	... Local variables
     !-----------------------------------------------------------------
     integer  :: kk, mm
+#include "../yaml/aero_model/f90_yaml/vmr2qqcw_beg_yml.f90"
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
@@ -2232,6 +2237,7 @@ contains
           enddo
        endif
     enddo
+#include "../yaml/aero_model/f90_yaml/vmr2qqcw_end_yml.f90"
 
   end subroutine vmr2qqcw
 
