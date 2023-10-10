@@ -13,9 +13,9 @@ module microp_aero
   ! Based on code from: Hugh Morrison, Xiaohong Liu and Steve Ghan
   ! May 2010
   ! Description in: Morrison and Gettelman, 2008. J. Climate (MG2008)
-  !                 Gettelman et al., 2010 J. Geophys. Res. - Atmospheres (G2010)         
+  !                 Gettelman et al., 2010 J. Geophys. Res. - Atmospheres (G2010)
   ! for questions contact Andrew Gettelman  (andrew@ucar.edu)
-  ! Modifications: A. Gettelman Nov 2010  - changed to support separation of 
+  ! Modifications: A. Gettelman Nov 2010  - changed to support separation of
   !                  microphysics and macrophysics and concentrate aerosol information here
   !                B. Eaton, Sep 2014 - Refactored to move CAM interface code into the CAM
   !                  interface modules and preserve just the driver layer functionality here.
@@ -144,13 +144,13 @@ contains
   !=========================================================================================
 
   subroutine microp_aero_register
-    !----------------------------------------------------------------------- 
-    ! 
-    ! Purpose: 
+    !-----------------------------------------------------------------------
+    !
+    ! Purpose:
     ! Register pbuf fields for aerosols needed by microphysics
-    ! 
+    !
     ! Author: Cheryl Craig October 2012
-    ! 
+    !
     !-----------------------------------------------------------------------
     use ppgrid,         only: pcols
     use physics_buffer, only: pbuf_add_field, dtype_r8
@@ -161,7 +161,7 @@ contains
     call pbuf_add_field('NACON',      'physpkg',dtype_r8,(/pcols,pver,4/), nacon_idx)
 
     call pbuf_add_field('NAAI',     'physpkg', dtype_r8, (/pcols,pver/), naai_idx)
-    call pbuf_add_field('NAAI_HOM', 'physpkg', dtype_r8, (/pcols,pver/), naai_hom_idx)   
+    call pbuf_add_field('NAAI_HOM', 'physpkg', dtype_r8, (/pcols,pver/), naai_hom_idx)
 
     ! pbuf fields provided by hetfrz_classnuc
     call pbuf_add_field('FRZIMM', 'physpkg', dtype_r8, (/pcols,pver/), frzimm_idx)
@@ -174,13 +174,13 @@ contains
 
   subroutine microp_aero_init
 
-    !----------------------------------------------------------------------- 
-    ! 
-    ! Purpose: 
+    !-----------------------------------------------------------------------
+    !
+    ! Purpose:
     ! Initialize constants for aerosols needed by microphysics
-    ! 
+    !
     ! Author: Andrew Gettelman May 2010
-    ! 
+    !
     !-----------------------------------------------------------------------
 
     ! local variables
@@ -196,10 +196,10 @@ contains
     call phys_getopts(eddy_scheme_out          = eddy_scheme, &
          history_amwg_out = history_amwg, &
          micro_do_icesupersat_out = micro_do_icesupersat, &
-         liqcf_fix_out    = liqcf_fix,    & 
-         demott_ice_nuc_out = dem_in      ) 
+         liqcf_fix_out    = liqcf_fix,    &
+         demott_ice_nuc_out = dem_in      )
 
-    if(masterproc)write(iulog,*)'DEMOTT is:', dem_in 
+    if(masterproc)write(iulog,*)'DEMOTT is:', dem_in
 
     hetfrz_aer_specname(1:ncnst) = (/'so4_c1  ', 'bc_c1   ', 'pom_c1  ', 'soa_c1  ', &
          'dst_c1  ', 'ncl_c1  ', 'mom_c1  ', 'num_c1  ', &
@@ -218,7 +218,7 @@ contains
 
     select case(trim(eddy_scheme))
     case ('diag_TKE')
-       tke_idx      = pbuf_get_index('tke')   
+       tke_idx      = pbuf_get_index('tke')
     case ('CLUBB_SGS')
        wp2_idx = pbuf_get_index('WP2_nadv')
     case default
@@ -244,7 +244,7 @@ contains
     call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
 
     if (clim_modal_aero) then
-       dgnum_idx    = pbuf_get_index('DGNUM' )      
+       dgnum_idx    = pbuf_get_index('DGNUM' )
 
        call ndrop_init()
 
@@ -275,14 +275,14 @@ contains
           case ('fine_dust')
              mode_fine_dst_idx = m
           case ('primary_carbon')
-             mode_pcarbon_idx  = m            
+             mode_pcarbon_idx  = m
           end select
        end do
 
        ! check if coarse dust is in separate mode
        separate_dust = mode_coarse_dst_idx > 0
 
-       ! for 3-mode 
+       ! for 3-mode
        if ( mode_coarse_dst_idx<0 ) mode_coarse_dst_idx = mode_coarse_idx
        if ( mode_coarse_slt_idx<0 ) mode_coarse_slt_idx = mode_coarse_idx
 
@@ -422,9 +422,9 @@ contains
     integer :: imode   ! aerosol mode index
     integer :: icnst   ! tracer index
 
-    ! pbuf pointers 
-    real(r8), pointer :: ast(:,:)        
-    real(r8), pointer :: alst(:,:)        
+    ! pbuf pointers
+    real(r8), pointer :: ast(:,:)
+    real(r8), pointer :: alst(:,:)
 
     real(r8), pointer :: npccn(:,:)      ! number of CCN (liquid activated)
 
@@ -460,7 +460,7 @@ contains
     real(r8) :: wsubice(pcols,pver) ! final updraft velocity for ice nucleation (m/s)
     real(r8) :: wsig(pcols,pver)    ! diagnosed standard deviation of vertical velocity ~ f(TKE)
 
-    real(r8) :: w0(pcols,pver)      ! large scale velocity (m/s) 
+    real(r8) :: w0(pcols,pver)      ! large scale velocity (m/s)
     real(r8) :: w2(pcols,pver)      ! subgrid mean updraft velocity, Gaussian PDF, stddev=f(tke)
 
 
@@ -482,10 +482,10 @@ contains
          rpdel    => state%rpdel,          &
          zm       => state%zm             )
 
-      !!.......................................................... 
-      !!  Convert from omega to w 
+      !!..........................................................
+      !!  Convert from omega to w
       !!  Negative omega means rising motion
-      !!.......................................................... 
+      !!..........................................................
     w0(1:ncol,1:pver) = 0._r8
     rho(:,:) = -999.0_r8
     do kk = top_lev, pver
@@ -499,10 +499,10 @@ contains
     !Note for C++ porting, the following variables that are obtained using pbuf
     !should be obtained from AD for the previous time step
     itim_old = pbuf_old_tim_idx()
-    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/)) 
+    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))
     tke(:ncol,:) = (3._r8/2._r8)*wp2(:ncol,:)
 
-    ! More refined computation of sub-grid vertical velocity 
+    ! More refined computation of sub-grid vertical velocity
     ! Set to be zero at the surface by initialization.
     wsub(:ncol,:top_lev-1)  = wsubmin
     wsubi(:ncol,:top_lev-1) = 0.001_r8
@@ -510,8 +510,8 @@ contains
 
     do kk = top_lev, pver
        do icol = 1, ncol
-          wsub(icol,kk)  = sqrt(0.5_r8*(tke(icol,kk) + tke(icol,kk+1))*(2._r8/3._r8))      
-          wsig(icol,kk)  = min_max_bound(0.001_r8, 10._r8, wsub(icol,kk))        
+          wsub(icol,kk)  = sqrt(0.5_r8*(tke(icol,kk) + tke(icol,kk+1))*(2._r8/3._r8))
+          wsig(icol,kk)  = min_max_bound(0.001_r8, 10._r8, wsub(icol,kk))
           wsubi(icol,kk) = min_max_bound(0.2_r8, 10._r8, wsub(icol,kk))
           wsub(icol,kk)  = max(wsubmin, wsub(icol,kk))
        end do
@@ -542,7 +542,7 @@ contains
     ! Droplet Activation
     ! partition cloud fraction into liquid water part
     call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-    liqcldf(:ncol,:pver) = alst(:ncol,:pver)  
+    liqcldf(:ncol,:pver) = alst(:ncol,:pver)
     lcldn = 0._r8
     lcldo = 0._r8
     do kk = top_lev, pver
@@ -558,7 +558,7 @@ contains
 
     ! Init qqcw (a flat 1d pointer array) to mode number and species mass mixing ratios for
     ! cloud borne phases
-    allocate(qqcw(ncnst_tot)) 
+    allocate(qqcw(ncnst_tot))
     do imode = 1, ntot_amode
        do lspec = 0, nspec_amode(imode)  ! loop through all species for mode 'imode'
           mm = mam_idx(imode,lspec)
@@ -567,7 +567,7 @@ contains
           else ! aerosol mass
              icnst = lmassptrcw_amode(lspec,imode)
           endif
-          qqcw(mm)%fld => qqcw_get_field(pbuf,icnst,lchnk,.true.) 
+          qqcw(mm)%fld => qqcw_get_field(pbuf,icnst,lchnk,.true.)
        enddo
     enddo
 
@@ -575,7 +575,7 @@ contains
     ! save copy of cloud borne aerosols for use in heterogeneous freezing before
     !we change it in dropmixnuc
     do ispec = 1, ncnst
-       call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)      
+       call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)
        aer_cb(:ncol,:,ispec,lchnk_zb) = ptr2d
        aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
     enddo
@@ -589,9 +589,9 @@ contains
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum)  !out
 
-    deallocate(qqcw) 
+    deallocate(qqcw)
 
-    call pbuf_get_field(pbuf, npccn_idx, npccn) 
+    call pbuf_get_field(pbuf, npccn_idx, npccn)
     npccn(1:ncol,1:pver)    = 0._r8  ! initialize output
     npccn(:ncol,:) = nctend_mixnuc(:ncol,:)
 
@@ -600,7 +600,7 @@ contains
     ! frzimm, frzcnt, frzdep are the outputs of hetfrz_classnuc_cam_calc used by the microphysics
     call pbuf_get_field(pbuf, frzimm_idx, frzimm)
     call pbuf_get_field(pbuf, frzcnt_idx, frzcnt)
-    call pbuf_get_field(pbuf, frzdep_idx, frzdep) 
+    call pbuf_get_field(pbuf, frzdep_idx, frzdep)
     call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, &   ! in
          qc, nc, state_q, aer_cb(:,:,:,lchnk_zb), deltatin, factnum, & ! in
          frzimm, frzcnt, frzdep)                       ! out
@@ -616,34 +616,34 @@ end subroutine microp_aero_run
 subroutine subgrid_mean_updraft(ncol, w0, wsig, ww)
 
   !---------------------------------------------------------------------------------
-  ! Purpose: Calculate the mean updraft velocity inside a GCM grid assuming the 
-  !          vertical velocity distribution is Gaussian and peaks at the 
-  !          GCM resolved large-scale vertical velocity. 
-  !          When icenul_wsub_scheme = 2, the model uses the mean updraft velocity as the 
-  !          characteristic updraft velocity to calculate the ice nucleation rate. 
-  ! Author:  Kai Zhang (kai.zhang@pnnl.gov) 
-  ! Last Modified: Oct, 2015 
+  ! Purpose: Calculate the mean updraft velocity inside a GCM grid assuming the
+  !          vertical velocity distribution is Gaussian and peaks at the
+  !          GCM resolved large-scale vertical velocity.
+  !          When icenul_wsub_scheme = 2, the model uses the mean updraft velocity as the
+  !          characteristic updraft velocity to calculate the ice nucleation rate.
+  ! Author:  Kai Zhang (kai.zhang@pnnl.gov)
+  ! Last Modified: Oct, 2015
   !---------------------------------------------------------------------------------
 
-  !! interface 
+  !! interface
 
-  integer,  intent(in) :: ncol              ! number of cols 
+  integer,  intent(in) :: ncol              ! number of cols
   real(r8), intent(in) :: wsig(pcols,pver ) ! standard deviation (m/s)
-  real(r8), intent(in) :: w0(pcols,pver ) ! large scale vertical velocity (m/s) 
+  real(r8), intent(in) :: w0(pcols,pver ) ! large scale vertical velocity (m/s)
   real(r8), intent(out):: ww(pcols,pver) ! mean updraft velocity(m/s) -> characteristic w*
 
-  !! local 
+  !! local
   integer, parameter :: nbin = 50
 
   real(r8) :: wlarge,sigma
-  real(r8) :: xx, yy 
-  real(r8) :: zz(nbin) 
-  real(r8) :: wa(nbin) 
-  integer  :: kp(nbin) 
+  real(r8) :: xx, yy
+  real(r8) :: zz(nbin)
+  real(r8) :: wa(nbin)
+  integer  :: kp(nbin)
   integer  :: icol, kk
   integer  :: ibin
 
-  !! program begins 
+  !! program begins
 
   do kk = 1, pver
      do icol = 1, ncol
@@ -656,25 +656,25 @@ subroutine subgrid_mean_updraft(ncol, w0, wsig, ww)
         do ibin = 1, nbin
            yy = wlarge - 3._r8*sigma + 0.5*xx
            yy = yy + (ibin-1)*xx
-           !! wbar = integrator < w * f(w) * dw > 
+           !! wbar = integrator < w * f(w) * dw >
            zz(ibin) = yy * exp(-1.*(yy-wlarge)**2/(2*sigma**2))/(sigma*sqrt(2*pi))*xx
         end do
 
-        kp(:) = 0 
-        wa(:) = 0._r8 
+        kp(:) = 0
+        wa(:) = 0._r8
 
-        where(zz.gt.0._r8) 
-           kp = 1 
+        where(zz.gt.0._r8)
+           kp = 1
            wa = zz
-        elsewhere 
-           kp = 0 
-           wa = 0._r8 
+        elsewhere
+           kp = 0
+           wa = 0._r8
         end where
 
-        if(sum(kp).gt.0) then 
-           !! wbar = integrator < w * f(w) * dw > 
+        if(sum(kp).gt.0) then
+           !! wbar = integrator < w * f(w) * dw >
            ww(icol,kk) = sum(wa)
-        else 
+        else
            ww(icol,kk) = 0.001_r8
         end if
      end do
