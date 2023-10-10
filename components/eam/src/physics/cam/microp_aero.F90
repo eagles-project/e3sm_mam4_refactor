@@ -640,16 +640,16 @@ subroutine subgrid_mean_updraft(ncol, w0, wsig, ww)
   real(r8) :: zz(nbin) 
   real(r8) :: wa(nbin) 
   integer  :: kp(nbin) 
-  integer  :: i, k
+  integer  :: icol, kk
   integer  :: ibin
 
   !! program begins 
 
-  do k = 1, pver
-     do i = 1, ncol
+  do kk = 1, pver
+     do icol = 1, ncol
 
-        sigma  = max(0.001_r8, wsig(i,k))
-        wlarge = w0(i,k)
+        sigma  = max(0.001_r8, wsig(icol,kk))
+        wlarge = w0(icol,kk)
 
         xx = 6._r8 * sigma / nbin
 
@@ -673,13 +673,10 @@ subroutine subgrid_mean_updraft(ncol, w0, wsig, ww)
 
         if(sum(kp).gt.0) then 
            !! wbar = integrator < w * f(w) * dw > 
-           ww(i,k) = sum(wa)
+           ww(icol,kk) = sum(wa)
         else 
-           ww(i,k) = 0.001_r8
+           ww(icol,kk) = 0.001_r8
         end if
-
-        !!write(6,*) 'i, k, w0, wsig, ww : ', i, k, w0(i,k), wsig(i,k), ww(i,k) 
-
      end do
   end do
 

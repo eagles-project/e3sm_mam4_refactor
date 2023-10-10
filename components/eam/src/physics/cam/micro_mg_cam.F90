@@ -312,15 +312,6 @@ subroutine micro_mg_cam_readnl(nlfile)
 
      ! Verify that version numbers are valid.
      select case (micro_mg_version)
-     case (1)
-        select case (micro_mg_sub_version)
-        case(0)
-           ! MG version 1.0
-        case(5)
-           ! MG version 1.5 - MG2 development
-        case default
-           call bad_version_endrun()
-        end select
      case (2)
         select case (micro_mg_sub_version)
         case(0)
