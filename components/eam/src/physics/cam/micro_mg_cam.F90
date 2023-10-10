@@ -656,22 +656,6 @@ subroutine micro_mg_cam_init(pbuf2d)
    end if
 
    select case (micro_mg_version)
-   case (1)
-      ! Set constituent number for later loops.
-      ncnst = 4
-
-      select case (micro_mg_sub_version)
-      case (0)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, ice_sed_ai, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-      case (5)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, ice_sed_ai, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-      end select
    case (2)
       ! Set constituent number for later loops.
       ncnst = 8
@@ -1755,10 +1739,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call physics_ptend_init(ptend, psetcols, "cldwat_mic", ls=.true., lq=lq)
 
    select case (micro_mg_version)
-   case (1)
-      select case (micro_mg_sub_version)
-      case (5)
-      end select
    case (2)
       call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
            state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
@@ -2053,11 +2033,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
       end if
 
       select case (micro_mg_version)
-      case (1)
-         select case (micro_mg_sub_version)
-         case (0)
-         case (5)
-         end select
       case(2)
          select case (micro_mg_sub_version)
          case (0)
