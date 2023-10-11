@@ -291,7 +291,7 @@ contains
   !===============================================================================
 
   subroutine dropmixnuc( &
-       lchnk,ncol,psetcols,dtmicro,temp,pmid,pint,pdel,rpdel,zm,   &  ! in
+       lchnk,ncol,dtmicro,temp,pmid,pint,pdel,rpdel,zm,   &  ! in
        state_q,ncldwtr,kvh,wsub,cldn,cldo, &  ! in
        qqcw, & ! inout
        ptend, tendnd, factnum)  !out
@@ -306,7 +306,6 @@ contains
     ! input arguments
     integer, intent(in)  :: lchnk               ! chunk identifier
     integer, intent(in)  :: ncol                ! number of columns
-    integer, intent(in)  :: psetcols            ! maximum number of columns
     real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
     real(r8), intent(in) :: temp(:,:)    ! temperature [K]
     real(r8), intent(in) :: pmid(:,:)    ! mid-level pressure [Pa]
@@ -383,7 +382,7 @@ contains
     !-------------------------------------------------------------------------------
 
     ! aerosol tendencies
-    call physics_ptend_init(ptend, psetcols, 'ndrop_aero', lq=lq)
+    call physics_ptend_init(ptend, pcols, 'ndrop_aero', lq=lq)
 
     !  Allocate / define local variables
 

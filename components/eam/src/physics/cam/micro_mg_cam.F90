@@ -312,15 +312,6 @@ subroutine micro_mg_cam_readnl(nlfile)
 
      ! Verify that version numbers are valid.
      select case (micro_mg_version)
-     case (1)
-        select case (micro_mg_sub_version)
-        case(0)
-           ! MG version 1.0
-        case(5)
-           ! MG version 1.5 - MG2 development
-        case default
-           call bad_version_endrun()
-        end select
      case (2)
         select case (micro_mg_sub_version)
         case(0)
@@ -616,8 +607,6 @@ end subroutine micro_mg_cam_init_cnst
 subroutine micro_mg_cam_init(pbuf2d)
    use time_manager,   only: is_first_step
    use micro_mg_utils, only: micro_mg_utils_init
-   use micro_mg1_0, only: micro_mg_init1_0 => micro_mg_init
-   use micro_mg1_5, only: micro_mg_init1_5 => micro_mg_init
    use micro_mg2_0, only: micro_mg_init2_0 => micro_mg_init
 
    !-----------------------------------------------------------------------
@@ -667,36 +656,6 @@ subroutine micro_mg_cam_init(pbuf2d)
    end if
 
    select case (micro_mg_version)
-   case (1)
-      ! Set constituent number for later loops.
-      ncnst = 4
-
-      select case (micro_mg_sub_version)
-      case (0)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, ice_sed_ai, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-
-         call micro_mg_init1_0( &
-              r8, gravit, rair, rh2o, cpair, &
-              rhoh2o, tmelt, latvap, latice, &
-              rhmini, micro_mg_dcs, micro_mg_dcs_tdep, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
-      case (5)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, ice_sed_ai, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-
-         call micro_mg_init1_5( &
-              r8, gravit, rair, rh2o, cpair, &
-              tmelt, latvap, latice, rhmini, &
-              micro_mg_dcs,                  &
-              micro_mg_dcs_tdep,             &
-              microp_uniform, do_cldice, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
-      end select
    case (2)
       ! Set constituent number for later loops.
       ncnst = 8
@@ -1071,11 +1030,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
         qsmall, mincld
 
    use micro_mg_data, only: MGPacker, MGPostProc, accum_null, accum_mean
-
-   use micro_mg1_0, only: micro_mg_tend1_0 => micro_mg_tend, &
-        micro_mg_get_cols1_0 => micro_mg_get_cols
-   use micro_mg1_5, only: micro_mg_tend1_5 => micro_mg_tend, &
-        micro_mg_get_cols1_5 => micro_mg_get_cols
    use micro_mg2_0, only: micro_mg_tend2_0 => micro_mg_tend, &
         micro_mg_get_cols2_0 => micro_mg_get_cols
 
@@ -1785,15 +1739,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call physics_ptend_init(ptend, psetcols, "cldwat_mic", ls=.true., lq=lq)
 
    select case (micro_mg_version)
-   case (1)
-      select case (micro_mg_sub_version)
-      case (0)
-         call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      case (5)
-         call micro_mg_get_cols1_5(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      end select
    case (2)
       call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
            state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
@@ -2088,69 +2033,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
       end if
 
       select case (micro_mg_version)
-      case (1)
-         select case (micro_mg_sub_version)
-         case (0)
-
-            call t_startf('micro_mg_tend1')
-            call micro_mg_tend1_0( &
-                 microp_uniform, mgncol, nlev, mgncol, 1, dtime/num_steps, &
-                 packed_t, packed_q, packed_qc, packed_qi, packed_nc,     &
-                 packed_ni, packed_p, packed_pdel, packed_cldn, packed_liqcldf,&
-                 packed_relvar, packed_accre_enhan,                             &
-                 packed_icecldf, packed_rate1ord_cw2pr_st, packed_naai, packed_npccn,                 &
-                 packed_rndst, packed_nacon, packed_tlat, packed_qvlat, packed_qctend,                &
-                 packed_qitend, packed_nctend, packed_nitend, packed_rel, rel_fn_dum,      &
-                 packed_rei, packed_prect, packed_preci, packed_nevapr, packed_evapsnow, &
-                 packed_prain, packed_prodsnow, packed_cmeout, packed_dei, packed_mu,                &
-                 packed_lambdac, packed_qsout, packed_des, packed_rflx, packed_sflx,                 &
-                 packed_qrout, reff_rain_dum, reff_snow_dum, packed_qcsevap, packed_qisevap,   &
-                 packed_qvres, packed_cmei, packed_vtrmc, packed_vtrmi, packed_qcsedten,          &
-                 packed_qisedten, packed_pra, packed_prc, packed_mnuccc, packed_mnucct,          &
-                 packed_msacwi, packed_psacws, packed_bergs, packed_berg, packed_melt,          &
-                 packed_homo, packed_qcres, packed_prci, packed_prai, packed_qires,             &
-                 packed_mnuccr, packed_pracs, packed_meltsdt, packed_frzrdt, packed_mnuccd,       &
-                 packed_nrout, packed_nsout, packed_refl, packed_arefl, packed_areflz,               &
-                 packed_frefl, packed_csrfl, packed_acsrfl, packed_fcsrfl, packed_rercld,            &
-                 packed_ncai, packed_ncal, packed_qrout2, packed_qsout2, packed_nrout2,              &
-                 packed_nsout2, drout_dum, dsout2_dum, packed_freqs,packed_freqr,            &
-                 packed_nfice, packed_prer_evap, do_cldice, errstring,                      &
-                 packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
-                 packed_frzimm, packed_frzcnt, packed_frzdep)
-            call t_stopf('micro_mg_tend1')
-
-         case (5)
-
-            call t_startf('micro_mg_tend1_5')
-            call micro_mg_tend1_5( &
-                 mgncol,   nlev,     dtime/num_steps,    &
-                 packed_t,       packed_q,                     &
-                 packed_qc,      packed_qi,    &
-                 packed_nc,      packed_ni,    &
-                 packed_relvar,             packed_accre_enhan,                            &
-                 packed_p,     packed_pdel,     packed_pint,     &
-                 packed_cldn,                packed_liqcldf,           packed_icecldf,           &
-                 packed_rate1ord_cw2pr_st,           packed_naai,     packed_npccn,    packed_rndst,    packed_nacon,    &
-                 packed_tlat,     packed_qvlat,    packed_qctend,    packed_qitend,    packed_nctend,    packed_nitend,    &
-                 packed_rel,      rel_fn_dum,   packed_rei,                packed_prect,    packed_preci,    &
-                 packed_nevapr,   packed_evapsnow, packed_prain,    packed_prodsnow, packed_cmeout,   packed_dei,      &
-                 packed_mu,       packed_lambdac,  packed_qsout,    packed_des,      packed_rflx,     packed_sflx,     &
-                 packed_qrout,              reff_rain_dum,          reff_snow_dum,          &
-                 packed_qcsevap,  packed_qisevap,  packed_qvres,    packed_cmei,  packed_vtrmc,   packed_vtrmi,    &
-                 packed_qcsedten, packed_qisedten, packed_pra,     packed_prc,     packed_mnuccc,  packed_mnucct,  &
-                 packed_msacwi,  packed_psacws,  packed_bergs,   packed_berg,    packed_melt,    packed_homo,    &
-                 packed_qcres,             packed_prci,    packed_prai,    packed_qires,             &
-                 packed_mnuccr,  packed_pracs,   packed_meltsdt,  packed_frzrdt,   packed_mnuccd,            &
-                 packed_nrout,   packed_nsout,    packed_refl,     packed_arefl,    packed_areflz,   packed_frefl,    &
-                 packed_csrfl,    packed_acsrfl,   packed_fcsrfl,             packed_rercld,             &
-                 packed_ncai,     packed_ncal,     packed_qrout2,   packed_qsout2,   packed_nrout2,   packed_nsout2,   &
-                 drout_dum,   dsout2_dum,   packed_freqs,    packed_freqr,    packed_nfice,    packed_qcrat,    &
-                 errstring, &
-                 packed_tnd_qsnow,          packed_tnd_nsnow,          packed_re_ice, packed_prer_evap,             &
-                 packed_frzimm, packed_frzcnt, packed_frzdep)
-            call t_stopf('micro_mg_tend1_5')
-
-         end select
       case(2)
          select case (micro_mg_sub_version)
          case (0)
