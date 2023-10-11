@@ -576,7 +576,7 @@ contains
     !we change it in dropmixnuc
     do ispec = 1, ncnst
        call pbuf_get_field(pbuf, hetfrz_aer_spec_idx(ispec), ptr2d)
-       aer_cb(:ncol,:,ispec,lchnk_zb) = ptr2d
+       aer_cb(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:)
        aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
     enddo
 
