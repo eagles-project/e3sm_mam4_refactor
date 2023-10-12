@@ -371,7 +371,7 @@ contains
     integer       :: tropLevVal               ! tropLevVal at a particular column
     integer       :: tropLevValp1             ! tropLevVal at a particular column at level + 1
     integer       :: tropLevValm1             ! tropLevVal at a particular column at level - 1
- 
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_climate_beg_yml.f90" 
 
 
     ! If any columns remain to be indentified, the nget the current
@@ -451,7 +451,7 @@ contains
         endif
       enddo
     endif        
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_climate_end_yml.f90"
     return    
   end subroutine tropopause_climate
   
@@ -582,7 +582,6 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine twmo(temp1d, pmid1d, plimu, pliml, gam, &  ! in
              trp)   ! out
-
     real(r8), intent(in), dimension(:)      :: temp1d   !  temperature in column [K]
     real(r8), intent(in), dimension(:)      :: pmid1d   !  midpoint pressure in column [Pa]
     real(r8), intent(in)                    :: plimu    ! upper limit of tropopause pressure [Pa]
@@ -616,7 +615,6 @@ contains
     pm = pmk**(1/cnst_kap)               
     call get_dtdz(pm,pmk,pmid1d(level-1),pmid1d(level),temp1d(level-1),temp1d(level),  & ! in
          dtdz,tm)  ! out
-
     main_loop: do kk=level-1,2,-1
       pm0 = pm
       pmk0 = pmk
@@ -675,7 +673,6 @@ contains
   
   subroutine get_dtdz(pm,pmk,pmid1d_up,pmid1d_down,temp1d_up,temp1d_down,    & ! in
              dtdz,tm)   ! out
-
     implicit none
 
     real(r8), intent(in)                    :: pm      ! mean pressure [Pa]
@@ -740,7 +737,6 @@ contains
         ! Use the routine from Reichler.
         call twmo(temp(icol, :), pmid(icol, :), plimu, pliml, gam, &  ! in
              tP)  ! out
-
         ! if successful, store of the results and find the level and temperature.
         if (tP > 0) then
         
