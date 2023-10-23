@@ -757,7 +757,7 @@ contains
           if (present(tropT)) then
             tropT(icol) = tropopause_interpolateT(pmid(icol,tropLevVal),pmid(icol,tropLevValp1),   &
                             pmid(icol,tropLevValm1),temp(icol,tropLevVal),temp(icol,tropLevValp1), &
-                            temp(icol,tropLevValm1),tropLevVal,tP)
+                            temp(icol,tropLevValm1),tropLevVal,tP)  
           endif
 
           if (present(tropZ)) then
@@ -935,6 +935,7 @@ contains
     ! Local Variable
     integer       :: primAlg            ! Primary algorithm  
     integer       :: backAlg            ! Backup algorithm  
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_find_beg_yml.f90"
   
     ! Initialize the results to a missing value, so that the algorithms will
     ! attempt to find the tropopause for all of them.
@@ -966,7 +967,7 @@ contains
       call tropopause_findUsing(lchnk,ncol,pmid,pint,temp,zm,zi,backAlg, & ! in
            tropLev, tropP, tropT, tropZ)  ! inout
     endif
-    
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_find_end_yml.f90"    
     return
   end subroutine tropopause_find
   
@@ -992,7 +993,7 @@ contains
     real(r8), optional, intent(inout)   :: tropP(pcols)              ! tropopause pressure [Pa]  
     real(r8), optional, intent(inout)   :: tropT(pcols)              ! tropopause temperature [K]
     real(r8), optional, intent(inout)   :: tropZ(pcols)              ! tropopause height [m]
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_findUsing_beg_yml.f90"
     ! Dispatch the request to the appropriate routine.
     select case(algorithm)
 
@@ -1012,7 +1013,7 @@ contains
         write(iulog, *) 'tropopause: Invalid detection algorithm (',  algorithm, ') specified.'
         call endrun
     end select
-    
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_findUsing_end_yml.f90"    
     return
   end subroutine tropopause_findUsing
 
@@ -1029,13 +1030,13 @@ contains
     real(r8),          intent(in)       :: zm_p1    ! midpoint geopotential height above the surface at level + 1 [m]
     real(r8),          intent(in)       :: zm_m1    ! midpoint geopotential height above the surface at level - 1 [m]
     integer, intent(in)                 :: tropLev  ! tropopause level index   
-    real(r8), optional, intent(in)      :: tropZ    ! tropopause height [m]
+    real(r8),intent(in)                 :: tropZ    ! tropopause height [m]
     real(r8)                            :: tropopause_interpolateP   ! function output tropopause pressure [Pa]
     
     ! Local Variables
     real(r8)   :: tropP              ! tropopause pressure [Pa]
     real(r8)   :: dlogPdZ            ! dlog(p)/dZ
-
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateP_beg_yml.f90"
 
     ! Interpolate the temperature linearly against log(P)
     
@@ -1062,12 +1063,13 @@ contains
     endif
     
     tropopause_interpolateP = tropP
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateP_end_yml.f90"
   end function tropopause_interpolateP
 
   ! This routine interpolates the temperatures in the physics state to
   ! find the temperature at the specified tropopause pressure.
   function tropopause_interpolateT(pmid,pmid_p1,pmid_m1,temp,temp_p1,temp_m1,tropLev,tropP)
- 
+
     implicit none
 
     real(r8),          intent(in)       :: pmid               ! midpoint pressure [Pa]
@@ -1077,14 +1079,15 @@ contains
     real(r8),          intent(in)       :: temp_p1            ! temperature at level + 1 [K]
     real(r8),          intent(in)       :: temp_m1            ! temperature at level - 1 [K]
     integer, intent(in)                 :: tropLev            ! tropopause level index   
-    real(r8), optional, intent(in)      :: tropP              ! tropopause pressure [Pa]
+    real(r8), intent(in)                :: tropP              ! tropopause pressure [Pa]
     real(r8)                            :: tropopause_interpolateT  ! function output tropopause temperature [K]
     
     ! Local Variables
     real(r8)   :: tropT              ! tropopause temperature [K]
     real(r8)   :: dTdlogP            ! dT/dlog(P)
-    
-    ! Intrepolate the temperature linearly against log(P)
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateT_beg_yml.f90"
+ 
+    ! Interpolate the temperature linearly against log(P)
 
     ! Is the tropopause at the midpoint?
     if (tropP == pmid) then
@@ -1109,6 +1112,7 @@ contains
     endif
     
     tropopause_interpolateT = tropT
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateT_end_yml.f90"
   end function tropopause_interpolateT
 
   
@@ -1124,13 +1128,14 @@ contains
     real(r8),          intent(in)       :: zm       ! midpoint geopotential height above the surface [m]
     real(r8),          intent(in)       :: zi       ! interface geopotential height above sfc [m]
     real(r8),          intent(in)       :: zi_p1    ! interface geopotential height above sfc at level + 1 [m]
-    real(r8), optional, intent(in)      :: tropP              ! tropopause pressure [Pa]
+    real(r8),          intent(in)       :: tropP    ! tropopause pressure [Pa]
     real(r8)                            :: tropopause_interpolateZ  ! function output tropopause geopotential height [m]
     
     ! Local Variables
     real(r8)   :: tropZ              ! tropopause geopotential height [m]
     real(r8)   :: dZdlogP            ! dZ/dlog(P)
-    
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateZ_beg_yml.f90"
+
     ! Intrepolate the geopotential height linearly against log(P)
 
     ! Is the tropoause at the midpoint?
@@ -1152,6 +1157,7 @@ contains
     endif
     
     tropopause_interpolateZ = tropZ
+#include "../../chemistry/yaml/tropopause/f90_yaml/tropopause_interpolateZ_end_yml.f90"
   end function tropopause_interpolateZ
 
   
