@@ -63,6 +63,8 @@ module yaml_input_file_io
      module procedure write_1d_var_logical
      module procedure write_1d_var_complex_drv
      module procedure write_1d_var_complex
+     module procedure write_1d_var_character_drv
+     module procedure write_1d_var_character
      module procedure write_2d_var_int_drv
      module procedure write_2d_var_int
      module procedure write_2d_var_real_drv
@@ -80,6 +82,8 @@ module yaml_input_file_io
      module procedure write_1d_output_var_real
      module procedure write_1d_output_var_complex_drv
      module procedure write_1d_output_var_complex
+     module procedure write_1d_output_var_character_drv
+     module procedure write_1d_output_var_character
      module procedure write_2d_output_var_int_drv
      module procedure write_2d_output_var_int
      module procedure write_2d_output_var_real_drv
@@ -1204,6 +1208,126 @@ contains
     write(unit_output,'(A)')'],]'
 
   end subroutine write_1d_output_var_complex
+
+  !================================================================================
+
+  subroutine write_1d_var_character_drv(unit_input, unit_output, fld_name,field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    character(len=*), intent(in) :: field(:) ! field values in character
+
+    call write_1d_var_character(unit_input, unit_output, fld_name, size(field), field)
+
+  end subroutine write_1d_var_character_drv
+
+  !================================================================================
+
+  subroutine write_1d_var_character(unit_input, unit_output, fld_name, dim, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    character(len=*), intent(in) :: field(:) ! field values in character
+
+    integer :: k
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write as int
+10  format(A,A16)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    write(unit_input,10,advance="no") '"',field(lbound(field,1))
+
+    do k = lbound(field,1)+1, ubound(field,1)
+       write(unit_input,10,advance="no")'","',field(k)
+    enddo
+
+    write(unit_input,'(A)')'"]'
+
+    call write_1d_output_var_character(unit_output, fld_name, dim, field, "input")
+
+  end subroutine write_1d_var_character
+
+  !================================================================================
+
+  subroutine write_1d_output_var_character_drv(unit_output, fld_name, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    character(len=*), intent(in) :: field(:) ! field values in character
+
+    call write_1d_output_var_character(unit_output, fld_name, size(field), field)
+
+  end subroutine write_1d_output_var_character_drv  
+
+  !================================================================================
+ 
+  subroutine write_1d_output_var_character(unit_output, fld_name, dim, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 1D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    character(len=*), intent(in) :: field(:) ! field values in character
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format,
+    !this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: k
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write as int
+12  format(A,A16)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A,A16)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[[ "',&
+                                          field(lbound(field,1))
+
+    do k = lbound(field,1)+1, ubound(field,1)
+       write(unit_output,12,advance="no") '","',field(k)
+    enddo
+
+    write(unit_output,'(A)')'"],]'
+
+  end subroutine write_1d_output_var_character
 
   !================================================================================
 

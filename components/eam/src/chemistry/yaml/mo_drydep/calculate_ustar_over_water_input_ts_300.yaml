@@ -1,0 +1,16 @@
+# Data at [lat=  -4.98879105856447      , lon=   28.0026147968828      , k=          72 , time step=         300 ] 
+mam4xx:
+  function: calculate_ustar_over_water
+input:
+  fixed:
+    dt:    0.00
+    ncol: [         4]
+    beglt: [         1]
+    endlt: [        11]
+    index_season: [         1,         1,         1,         1,         1,         1,         1,         1,         1,         1,         1]
+    fr_lnduse: [         1,         1,         1,         1,         0,         1,         1,         1,         0,         0,         1]
+    unstable: [         1]
+    zl: [  0.13505708784823883E+002]
+    uustar: [  0.33955944153772161E+000]
+    ribn: [ -0.12100418490932332E+001]
+    diffk: [  0.14610000000000001E-004]

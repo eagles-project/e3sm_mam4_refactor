@@ -378,6 +378,7 @@ contains
 
     use seq_drydep_mod, only: seq_drydep_setHCoeff
     use physconst,      only: tmelt
+    use yaml_input_file_io
 
     implicit none
 
@@ -461,6 +462,7 @@ contains
     real(r8) :: lcl_frc_landuse(ncol,n_land_type) 
 
     integer :: beglt, endlt
+
 #include "../yaml/mo_drydep/f90_yaml/drydep_xactive_beg_yml.f90"
 
   
