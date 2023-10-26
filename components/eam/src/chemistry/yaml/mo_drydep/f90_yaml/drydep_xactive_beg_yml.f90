@@ -17,7 +17,7 @@
   !-----------------------------------------------------------------------------------------
   ! This is used when multiple sets of yaml output is needed
   !to cover different options (e.g., true and false)
-  ! character(len=200) :: ext_str
+  character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
 
   type(yaml_vars) :: yaml
@@ -27,10 +27,13 @@
   integer,save :: n_calls=0
 
 
+  call seq_drydep_setHCoeff( ncol, sfc_temp, & ! in
+                               heff )            ! out
+
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-  yaml%nstep_print = 100 !time step
+  yaml%nstep_print = 1000 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
@@ -41,6 +44,14 @@
   yaml%flag_print = .false. !(**remove these if generating data for a dependent subroutines**)
 
   !if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+
+  !do icol = 1, ncol
+  !   if (snow(icol) > .02_r8 .and. y_nstep == 300) then
+  !      write(102,*)'phys_debug_lat = ',get_lat(y_lchnk, icol), &
+  !                  ' phys_debug_lon = ', get_lon(y_lchnk, icol), &
+  !                  ' snow = ', snow(icol)
+  !   endif
+  !enddo
 
   !-----------------------------------------------------------------------------------------
   !In the case of y_i or y_k are not passed as arguments, use the following if condition:
@@ -58,6 +69,7 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
+     ext_str = "loc3_over_water"
      !-----------------------------------------------------------------------------------------
 
 
@@ -76,8 +88,7 @@
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
         call open_files('drydep_xactive', &  !intent-in
-             unit_input, unit_output) !intent-out
-        !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+             unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
 
         !start by adding an input string
@@ -101,7 +112,10 @@
         call write_var(unit_input,unit_output,'snow',snow(yaml%col_print))
         call write_var(unit_input,unit_output,'solar_flux',solar_flux(yaml%col_print))
         call write_var(unit_input,unit_output,'mmr',mmr(yaml%col_print,yaml%lev_print,:))
-
+        call write_var(unit_input,unit_output,'rain_threshold',rain_threshold)
+        call write_var(unit_input,unit_output,'temp_highbound',temp_highbound)
+        call write_var(unit_input,unit_output,'ric',ric)
+        call write_var(unit_input,unit_output,'heff',heff(yaml%col_print,:))
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
