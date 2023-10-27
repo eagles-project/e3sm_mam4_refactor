@@ -92,6 +92,7 @@
            write(mm_str,'(I2)') mm
            call write_var(unit_input,unit_output,'forcings'//trim(adjustl(mm_str))//'_frc_ndx',forcings(mm)%frc_ndx)
            call write_var(unit_input,unit_output,'forcings'//trim(adjustl(mm_str))//'_nsectors',forcings(mm)%nsectors)
+           call write_var(unit_input,unit_output,'forcings'//trim(adjustl(mm_str))//'_file_alt_data',forcings(mm)%file%alt_data)
            do isec = 1,forcings(mm)%nsectors
                 write(isec_str,'(I2)') isec
                 call write_var(unit_input,unit_output,'forcings'//trim(adjustl(mm_str))//'_fields'//trim(adjustl(isec_str))//'_data', &
