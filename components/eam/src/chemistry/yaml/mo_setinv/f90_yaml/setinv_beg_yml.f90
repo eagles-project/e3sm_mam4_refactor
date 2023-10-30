@@ -28,8 +28,13 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
   integer,save :: y_nstep_old=0
+
+  ! variable used to store fields from pbuf that are used as input
   real(r8) :: cnst_offline_yaml(ncol,pver,num_tracer_cnst)
 
+  ! variable used to store data referenced by string array pointer tracer_cnst_flds
+  ! then add quotes to put in python friendly format 
+  character(len=18) :: tracer_cnst_flds_in(num_tracer_cnst)
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
@@ -126,10 +131,16 @@
         call write_var(unit_input,unit_output,'o2_ndx',o2_ndx)
         call write_var(unit_input,unit_output,'has_h2o',has_h2o)
         call write_var(unit_input,unit_output,'h2o_ndx',h2o_ndx)
-        call write_var(unit_input,unit_output,'tracer_cnst_flds',tracer_cnst_flds(:))
 
-!  The following code replicates the later usage of input field pbuf in this subroutine.
-!  The fields extracted from pbuf needed by the output are put into duplicate variables here, and sent to the data files.
+
+        !  Add quotes to input string array elements before writing to data
+        do icnst=1,num_tracer_cnst
+           tracer_cnst_flds_in(icnst) = "'" // tracer_cnst_flds(icnst) // "'"
+        enddo
+        call write_var(unit_input,unit_output,'tracer_cnst_flds_in',tracer_cnst_flds_in)
+
+        !  The following code replicates the later usage of input field pbuf in this subroutine.
+        !  The fields extracted from pbuf needed by the output are put into duplicate variables here, and sent to the data files.
 
         do icnst = 1,num_tracer_cnst
             call get_cnst_data( tracer_cnst_flds(icnst), cnst_offline_yaml(:,:,icnst),  ncol, lchnk, pbuf )

@@ -29,7 +29,7 @@ input.has_o2=[[         1],]
 input.o2_ndx=[[         3],]
 input.has_h2o=[[         1],]
 input.h2o_ndx=[[         4],]
-input.tracer_cnst_flds=[[cnst_O3,OH,NO3,HO2,],]
+input.tracer_cnst_flds_in=[['cnst_O3         ','OH              ','NO3             ','HO2             ',],]
 input.cnst_offline_yaml=[[  0.61320876472786837E-006,  0.77508501827847750E-013,  0.21730032760682282E-012,  0.65636828980380159E-012,],]
 # Output data is stored here.
 output = Object()

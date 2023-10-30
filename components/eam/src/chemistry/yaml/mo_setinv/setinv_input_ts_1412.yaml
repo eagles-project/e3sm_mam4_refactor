@@ -22,5 +22,5 @@ input:
     o2_ndx: [         3]
     has_h2o: [         1]
     h2o_ndx: [         4]
-    tracer_cnst_flds: [cnst_O3,OH,NO3,HO2]
+    tracer_cnst_flds_in: ['cnst_O3         ','OH              ','NO3             ','HO2             ']
     cnst_offline_yaml: [  0.61309934453728714E-006,  0.77579012727946161E-013,  0.21733147356632355E-012,  0.65651376236093162E-012]
