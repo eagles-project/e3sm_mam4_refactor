@@ -1,5 +1,5 @@
 module mo_gas_phase_chemdr
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod,     only : r8 => shr_kind_r8
   use shr_const_mod,    only : pi => shr_const_pi
   use constituents,     only : pcnst
@@ -299,6 +299,7 @@ contains
     ! for aerosol formation....  
     real(r8) :: del_h2so4_gasprod(ncol,pver)
     real(r8) :: vmr0(ncol,pver,gas_pcnst)
+#include "../yaml/mo_gas_phase_chemdr/f90_yaml/gas_phase_chemdr_beg_yml.f90"
     call t_startf('chemdr_init')
 
     ! initialize to NaN to hopefully catch user defined rxts that go unset
@@ -593,7 +594,7 @@ contains
     call rate_diags_calc( reaction_rates(:,:,:), &! inout
          vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk ) !in
     call t_stopf('chemdr_diags')
-
+#include "../yaml/mo_gas_phase_chemdr/f90_yaml/gas_phase_chemdr_end_yml.f90"
   end subroutine gas_phase_chemdr
 
 end module mo_gas_phase_chemdr

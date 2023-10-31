@@ -90,5 +90,11 @@ use spmd_utils,   only : masterproc
 ! _2_vmr subroutines
 ! #define YAML_TOVMR
 
+! gas_phase_chemdr
+!#define YAML_CHEMDR
+
+! setinv
+!#define YAML_SETINV
+
 use yaml_input_file_io
 

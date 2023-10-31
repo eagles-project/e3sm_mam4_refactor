@@ -1,6 +1,6 @@
 
 module mo_setinv
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
   use chem_mods,    only : inv_lst, nfs, gas_pcnst
@@ -59,7 +59,8 @@ contains
       
   end subroutine setinv_inti
 
-  subroutine setinv( invariants, tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf )
+  subroutine setinv( invariants, & ! out
+          tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf )  ! in
     !-----------------------------------------------------------------
     !        ... set the invariant densities (molecules/cm**3)
     !-----------------------------------------------------------------
@@ -89,11 +90,11 @@ contains
     !-----------------------------------------------------------------
     !        .. local variables
     !-----------------------------------------------------------------
-    integer :: k, i, ndx
+    integer :: kk, icnst, ndx, ifs
     real(r8), parameter ::  Pa_xfac = 10._r8                 ! Pascals to dyne/cm^2
     real(r8) :: sum1(ncol)
     real(r8) :: tmp_out(ncol,pver)
-
+#include "../yaml/mo_setinv/f90_yaml/setinv_beg_yml.f90"
     !-----------------------------------------------------------------
     !        note: invariants are in cgs density units.
     !              the pmid array is in pascals and must be
@@ -103,51 +104,41 @@ contains
     !-----------------------------------------------------------------
     !	... set m, n2, o2, and h2o densities
     !-----------------------------------------------------------------
-    do k = 1,pver
-       invariants(:ncol,k,m_ndx) = Pa_xfac * pmid(:ncol,k) / (boltz_cgs*tfld(:ncol,k))
+    do kk = 1,pver
+       invariants(:ncol,kk,m_ndx) = Pa_xfac * pmid(:ncol,kk) / (boltz_cgs*tfld(:ncol,kk))
     end do
 
     if( has_n2 ) then
-       if ( has_var_o2 ) then
-          do k = 1,pver
-             sum1(:ncol) = (vmr(:ncol,k,id_o) + vmr(:ncol,k,id_o2) + vmr(:ncol,k,id_h))
-             invariants(:ncol,k,n2_ndx) = (1._r8 - sum1(:)) * invariants(:ncol,k,m_ndx)
-          end do
-       else
-          do k = 1,pver
-             invariants(:ncol,k,n2_ndx) = .79_r8 * invariants(:ncol,k,m_ndx)
-          end do
-       endif
-    end if
+       do kk = 1,pver
+          invariants(:ncol,kk,n2_ndx) = .79_r8 * invariants(:ncol,kk,m_ndx)
+       end do
+    endif
     if( has_o2 ) then
-       do k = 1,pver
-          invariants(:ncol,k,o2_ndx) = .21_r8 * invariants(:ncol,k,m_ndx)
-       end do
-    end if
-    if( has_h2o ) then
-       do k = 1,pver
-          invariants(:ncol,k,h2o_ndx) = h2ovmr(:ncol,k) * invariants(:ncol,k,m_ndx)
-       end do
-    end if
-
-    do i = 1,num_tracer_cnst
-
-       call get_cnst_data( tracer_cnst_flds(i), cnst_offline,  ncol, lchnk, pbuf )
-       ndx =  get_inv_ndx( tracer_cnst_flds(i) )
-
-       do k = 1,pver
-          invariants(:ncol,k,ndx) = cnst_offline(:ncol,k)*invariants(:ncol,k,m_ndx)
+       do kk = 1,pver
+          invariants(:ncol,kk,o2_ndx) = .21_r8 * invariants(:ncol,kk,m_ndx)
        enddo
+    endif
+    if( has_h2o ) then
+       do kk = 1,pver
+          invariants(:ncol,kk,h2o_ndx) = h2ovmr(:ncol,kk) * invariants(:ncol,kk,m_ndx)
+       enddo
+    endif
 
+    do icnst = 1,num_tracer_cnst
+       call get_cnst_data( tracer_cnst_flds(icnst), cnst_offline,  ncol, lchnk, pbuf )
+       ndx =  get_inv_ndx( tracer_cnst_flds(icnst) )
+       do kk = 1,pver
+          invariants(:ncol,kk,ndx) = cnst_offline(:ncol,kk)*invariants(:ncol,kk,m_ndx)
+       enddo
     enddo
 
-    do i = 1,nfs
-      tmp_out(:ncol,:) =  invariants(:ncol,:,i) 
-      call outfld( trim(inv_lst(i))//'_dens', tmp_out(:ncol,:), ncol, lchnk )
-      tmp_out(:ncol,:) =  invariants(:ncol,:,i) / invariants(:ncol,:,m_ndx)
-      call outfld( trim(inv_lst(i))//'_vmr',  tmp_out(:ncol,:), ncol, lchnk )
+    do ifs = 1,nfs
+      tmp_out(:ncol,:) =  invariants(:ncol,:,ifs) 
+      call outfld( trim(inv_lst(ifs))//'_dens', tmp_out(:ncol,:), ncol, lchnk )
+      tmp_out(:ncol,:) =  invariants(:ncol,:,ifs) / invariants(:ncol,:,m_ndx)
+      call outfld( trim(inv_lst(ifs))//'_vmr',  tmp_out(:ncol,:), ncol, lchnk )
     enddo
-
+#include "../yaml/mo_setinv/f90_yaml/setinv_end_yml.f90"
   end subroutine setinv
 
 end module mo_setinv
