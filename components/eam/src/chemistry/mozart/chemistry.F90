@@ -1069,7 +1069,8 @@ contains
     enddo
 
     ! aerosol emissions ...
-    call aero_model_emissions( state, cam_in )
+    call aero_model_emissions( state, & ! in
+                               cam_in ) ! out
 
     ! MEGAN emissions ...
 
