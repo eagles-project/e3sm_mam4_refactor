@@ -6,7 +6,7 @@
 
      !start writing data
      
-        call write_var(unit_output,'frcing',frcing(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_output,'frcing',frcing(yaml%col_print,:,:))
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
