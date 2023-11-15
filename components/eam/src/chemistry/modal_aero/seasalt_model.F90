@@ -347,7 +347,7 @@ subroutine ocean_data_readnl(nlfile)
 end subroutine ocean_data_readnl
 
   !=============================================================================
-subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, & ! in
+subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
                         cflx)                                                  ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -355,10 +355,9 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, & !
     ! input
     integer, intent(in)  :: lchnk
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: u10cubed(pcols)   ! 3.41 power of 10m wind 
-    real(r8), intent(in) :: srf_temp(pcols)   ! sea surface temperature [K]
-    real(r8), intent(in) :: ocnfrc(pcols)     ! ocean fraction [unitless]
-    real(r8), intent(in) :: emis_scale        ! sea salt emission tuning factor [unitless]
+    real(r8), intent(in) :: fi(pcols, nsections)   ! sea salt number fluxes in each size bin [#/m2/s]
+    real(r8), intent(in) :: ocnfrc(pcols)          ! ocean fraction [unitless]
+    real(r8), intent(in) :: emis_scale             ! sea salt emission tuning factor [unitless]
 
     ! output
     real(r8), intent(inout) :: cflx(:,:)      ! mass and number emission fluxes for aerosols [kg/m2/s or #/m2/s]
@@ -366,13 +365,10 @@ subroutine seasalt_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, & !
     ! local vars
     integer  :: ispec, ibin
     integer  :: mass_mode_idx, num_mode_idx
-    real(r8) :: fi(pcols,nsections)           ! sea salt number fluxes in each size bin [#/m2/s]
     real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
    
     integer, parameter :: num_flx_flag  = 0
     integer, parameter :: mass_flx_flag = 1
-
-    fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
     ! calculate seasalt number emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, num_flx_flag, &  ! in
@@ -443,7 +439,7 @@ subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
 end subroutine seasalt_emisflx_calc
 
 
-subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_scale, &  ! in
+subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
                                cflx)                                                   ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -452,8 +448,7 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
     ! input
     integer, intent(in)  :: lchnk
     integer, intent(in)  :: ncol
-    real(r8), intent(in) :: u10cubed(pcols)    ! 3.41 power of 10m wind
-    real(r8), intent(in) :: srf_temp(pcols)    ! sea surface temperature [K]
+    real(r8), intent(in) :: fi(pcols, nsections)        ! sea salt number fluxes in each size bin [#/m2/s]
     real(r8), intent(in) :: ocnfrc(pcols)      ! ocean fraction [unitless] 
     real(r8), intent(in) :: emis_scale         ! sea salt emission tuning factor [unitless]
     
@@ -462,7 +457,6 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
 
     ! local vars
     integer  :: ifld
-    real(r8) :: fi(pcols,nsections)            ! sea salt number fluxes in each size bin [#/m2/s]
 
    real(r8), pointer :: chla(:)          ! for Gantt et al. (2011) organic mass fraction
    real(r8), pointer :: mpoly(:)         ! for Burrows et al. (2014) organic mass fraction
@@ -474,9 +468,6 @@ subroutine marine_organic_emis(lchnk, ncol, u10cubed, srf_temp, ocnfrc, emis_sca
    real(r8) :: mass_frac_bub_section(pcols, n_org_max, nsections)
    real(r8) :: om_ssa(pcols, nsections)
 
-
-
-   fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
 
    nullify(chla)
    nullify(mpoly)

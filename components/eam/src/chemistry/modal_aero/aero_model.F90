@@ -1573,9 +1573,11 @@ contains
 
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_emissions( state, cam_in )
+  subroutine aero_model_emissions( state, & ! in
+                                   cam_in ) ! inout
     use seasalt_model, only: seasalt_emis, marine_organic_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin, &
-         has_mam_mom, nslt_om
+                             nslt_om
+    use sslt_sections, only: nsections
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
 
     ! Arguments:
@@ -1586,74 +1588,61 @@ contains
     ! local vars
 
     integer :: lchnk, ncol
-    integer :: m, mm
+    integer :: ispec, spec_idx
     real(r8) :: soil_erod_tmp(pcols)
     real(r8) :: sflx(pcols)   ! accumulate over all bins for output
-    real(r8) :: u10cubed(pcols)
-    real(r8) :: u10(pcols)               ! Needed in Gantt et al. calculation of organic mass fraction
+    real(r8) :: srf_temp(pcols)   ! sea surface temperature [K]
+    real(r8) :: fi(pcols, nsections)        ! sea salt number fluxes in each size bin [#/m2/s]
 
-    real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
 
     lchnk = state%lchnk
     ncol = state%ncol
+    srf_temp = cam_in%sst
 
-    if (dust_active) then
+    call dust_emis( ncol, lchnk, cam_in%dstflx, & ! in
+                    cam_in%cflx, &                ! inout
+                    soil_erod_tmp )               ! out
 
-       call dust_emis( ncol, lchnk, cam_in%dstflx, & ! in
-            cam_in%cflx, &                ! inout
-            soil_erod_tmp )               ! out
+    ! some dust emis diagnostics ...
+    sflx(:)=0._r8
+    do ispec = 1, dust_nbin+dust_nnum
+       spec_idx = dust_indices(ispec)
+       if (ispec<=dust_nbin) sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,spec_idx)
+       call outfld(trim(dust_names(ispec))//'SF',cam_in%cflx(:,spec_idx),pcols, lchnk)
+    enddo
+    call outfld('DSTSFMBL',sflx(:),pcols,lchnk)
+    call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
 
-       ! some dust emis diagnostics ...
-       sflx(:)=0._r8
-       do m=1,dust_nbin+dust_nnum
-          mm = dust_indices(m)
-          if (m<=dust_nbin) sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-          call outfld(trim(dust_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
-       enddo
-       call outfld('DSTSFMBL',sflx(:),pcols,lchnk)
-       call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
-    endif
+    call calculate_seasalt_numflux_in_bins(ncol, cam_in%sst, state%u(:ncol,pver), state%v(:ncol,pver),  state%zm(:ncol,pver), & ! in
+                                           fi) ! out
 
-    if (seasalt_active) then
-       u10(:ncol)=sqrt(state%u(:ncol,pver)**2+state%v(:ncol,pver)**2)
-       ! move the winds to 10m high from the midpoint of the gridbox:
-       ! follows Tie and Seinfeld and Pandis, p.859 with math.
+    sflx(:)=0._r8
 
-       u10cubed(:ncol)=u10(:ncol)*log(10._r8/z0)/log(state%zm(:ncol,pver)/z0)
+    call seasalt_emis(lchnk, ncol, fi, cam_in%ocnfrac, seasalt_emis_scale, &  ! in
+                      cam_in%cflx)                                                              ! inout
 
-       ! we need them to the 3.41 power, according to Gong et al., 1997:
-       u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
+    call marine_organic_emis(lchnk, ncol, fi, cam_in%ocnfrac, seasalt_emis_scale, & ! in
+                             cam_in%cflx)                                                             ! inout
 
-       sflx(:)=0._r8
+    ! Write out salt mass fluxes to history files
+    do ispec = 1, seasalt_nbin-nslt_om
+       spec_idx = seasalt_indices(ispec)
+       sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,spec_idx)
+       call outfld(trim(seasalt_names(ispec))//'SF',cam_in%cflx(:,spec_idx),pcols,lchnk)
+    enddo
+    ! accumulated flux
+    call outfld('SSTSFMBL',sflx(:),pcols,lchnk)
 
-       call seasalt_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, &  ! in
-            cam_in%cflx)                                                              ! inout
+    ! Write out marine organic mass fluxes to history files
+    sflx(:)=0._r8
+    do ispec = seasalt_nbin-nslt_om+1, seasalt_nbin
+       spec_idx = seasalt_indices(ispec)
+       sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,spec_idx)
+       call outfld(trim(seasalt_names(ispec))//'SF',cam_in%cflx(:,spec_idx),pcols,lchnk)
+    enddo
 
-       call marine_organic_emis(lchnk, ncol, u10cubed, cam_in%sst, cam_in%ocnfrac, seasalt_emis_scale, & ! in
-            cam_in%cflx)                                                             ! inout
-
-       ! Write out salt mass fluxes to history files
-       do m=1,seasalt_nbin-nslt_om
-          mm = seasalt_indices(m)
-          sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-          call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
-       enddo
-       ! accumulated flux
-       call outfld('SSTSFMBL',sflx(:),pcols,lchnk)
-
-       ! Write out marine organic mass fluxes to history files
-       sflx(:)=0._r8
-       do m=seasalt_nbin-nslt_om+1,seasalt_nbin
-          mm = seasalt_indices(m)
-          sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-          call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
-       enddo
-
-       ! accumulated flux
-       call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
-
-
-    endif
+    ! accumulated flux
+    call outfld('SSTSFMBL_OM',sflx(:),pcols,lchnk)
 
   end subroutine aero_model_emissions
 
@@ -1663,6 +1652,34 @@ contains
 
   !===============================================================================
   !===============================================================================
+  subroutine calculate_seasalt_numflux_in_bins(ncol, srf_temp, ubot, vbot, zbot, fi)
+    use sslt_sections, only: nsections, fluxes
+
+    integer, intent(in) :: ncol
+    real(r8), intent(in) :: srf_temp(:)   ! sea surface temperature [K]
+    real(r8), intent(in) :: ubot(:)
+    real(r8), intent(in) :: vbot(:)
+    real(r8), intent(in) :: zbot(:)
+    real(r8), intent(out) :: fi(pcols, nsections)        ! sea salt number fluxes in each size bin [#/m2/s]
+
+    ! local vars
+    real(r8) :: u10cubed(pcols)   ! 3.41 power of 10m wind
+    real(r8) :: u10(pcols)               ! Needed in Gantt et al. calculation of organic mass fraction
+    real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
+
+    u10(:ncol)=sqrt(ubot(:ncol)**2+vbot(:ncol)**2)
+    ! move the winds to 10m high from the midpoint of the gridbox:
+    ! follows Tie and Seinfeld and Pandis, p.859 with math.
+
+    u10cubed(:ncol)=u10(:ncol)*log(10._r8/z0)/log(zbot(:ncol)/z0)
+
+    ! we need them to the 3.41 power, according to Gong et al., 1997:
+    u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
+
+    fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
+
+  end subroutine calculate_seasalt_numflux_in_bins
+
   subroutine modal_aero_bcscavcoef_init
     !-----------------------------------------------------------------------
     !
