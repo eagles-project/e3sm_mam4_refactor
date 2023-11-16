@@ -1,6 +1,6 @@
 
       module mo_negtrc
-
+#include "../yaml/common_files/common_uses.ymlf90"
       private
       public :: negtrc
 
@@ -29,16 +29,17 @@
 !-----------------------------------------------------------------------
       integer :: icnst
       integer :: nneg                       ! flag counter
-
+#include "../yaml/mo_negtrc/f90_yaml/negtrc_beg_yml.f90"
       do icnst  = 1, gas_pcnst
          nneg = count( fld(:,:,icnst) < 0._r8 )
 	 if( nneg > 0 ) then
+
             where( fld(:,:,icnst) < 0._r8 )
 	       fld(:,:,icnst) = 0._r8
 	    endwhere
 	 endif
       enddo
-
+#include "../yaml/mo_negtrc/f90_yaml/negtrc_end_yml.f90"
       end subroutine negtrc
 
       end module mo_negtrc

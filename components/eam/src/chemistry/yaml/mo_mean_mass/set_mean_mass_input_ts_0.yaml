@@ -1,0 +1,8 @@
+# Data at [lat=   39.0553303768561      , lon=   274.307569375767      , k=          72 , time step=        1417 ] 
+mam4xx:
+  function: set_mean_mass
+input:
+  fixed:
+    ncol: [         4]
+    pver: [        72]
+    mwdry: [  0.28966000000000001E+002]

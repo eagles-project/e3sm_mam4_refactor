@@ -73,7 +73,7 @@ contains
     !	... Local variables
     !-----------------------------------------------------------------
     integer :: kk, mm ! indices for vertical level and  gas constituent
-
+#include "../yaml/mo_mass_xforms/f90_yaml/vmr2mmr_beg_yml.f90"
     !-----------------------------------------------------------------
     !	... The non-group species
     !-----------------------------------------------------------------
@@ -84,7 +84,7 @@ contains
           end do
        end if
     end do
-
+#include "../yaml/mo_mass_xforms/f90_yaml/vmr2mmr_end_yml.f90"
   end subroutine vmr2mmr
 
   subroutine h2o_to_vmr( h2o_mmr, h2o_vmr, mbar, ncol )
