@@ -1,6 +1,6 @@
 
 module mo_mean_mass
-
+#include "../yaml/common_files/common_uses.ymlf90"
   implicit none
 
   private
@@ -24,12 +24,12 @@ contains
     !-----------------------------------------------------------------
     integer, intent(in)   ::      ncol                 ! number of columns
     real(r8), intent(out) ::      mbar(:,:)            ! atmos mean atomic mass [g/mol or amu]
-
+#include "../yaml/mo_mean_mass/f90_yaml/set_mean_mass_beg_yml.f90"
     !-----------------------------------------------------------------
     !	... use CAM meam molecular weight 
     !-----------------------------------------------------------------
     mbar(:ncol,:pver) = mwdry  
-
+#include "../yaml/mo_mean_mass/f90_yaml/set_mean_mass_end_yml.f90"
   end subroutine set_mean_mass
 
 end module mo_mean_mass

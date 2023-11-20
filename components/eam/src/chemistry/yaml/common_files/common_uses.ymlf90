@@ -88,7 +88,7 @@ use spmd_utils,   only : masterproc
 !#define YAML_TROPFIND
 
 ! _2_vmr subroutines
-! #define YAML_TOVMR
+!#define YAML_TOVMR
 
 ! gas_phase_chemdr
 !#define YAML_CHEMDR
@@ -96,5 +96,11 @@ use spmd_utils,   only : masterproc
 ! setinv
 !#define YAML_SETINV
 
+! mean_mass
+!#define YAML_MEANMASS
+
+! negtrc
+!#define YAML_NEGTRC
 use yaml_input_file_io
+
 
