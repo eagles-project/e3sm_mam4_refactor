@@ -1,4 +1,3 @@
-#!/bin/sh
 
 
 main() {
@@ -7,24 +6,24 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=calc_het_rates
+    sub_name=calculate_gas_drydep_vlc_and_flux
 
     #ins and in-outs variables
     #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
-    ins='satf,     rain,  xhen,   tmp_hetrates, work1, work2'
+    ins='ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, mmr, dep_ra, dep_rb, term, rsmx, rlux, rclx, rgsx, rdc, rac, solsym'
 
     #outs and in-outs variables
     #(a comma seprated string, same as above)
-    outs='het_rates'
+    outs='dvel, dflx'
 
     #module name
-    module_name=mo_sethet
+    module_name=mo_drydep
 
     #file path
     dir_path=components/eam/src/chemistry/mozart/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_SETHET
+    cpp_directive=YAML_GAS_DRYDEP
 
     #-------------------------
     #USER INPUT ENDS

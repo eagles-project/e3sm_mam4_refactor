@@ -101,6 +101,10 @@ use spmd_utils,   only : masterproc
 
 ! negtrc
 !#define YAML_NEGTRC
+
+! gas drydep
+! #define YAML_GAS_DRYDEP
+
 use yaml_input_file_io
 
 

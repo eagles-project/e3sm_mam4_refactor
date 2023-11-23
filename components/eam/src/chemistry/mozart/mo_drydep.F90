@@ -1,4 +1,5 @@
 module mo_drydep
+#include "../yaml/common_files/common_uses.ymlf90"
 
   !---------------------------------------------------------------------
   !       ... Dry deposition velocity input data and code for netcdf input
@@ -460,6 +461,7 @@ contains
 
     integer :: beglt, endlt
 
+#include "../yaml/mo_drydep/f90_yaml/drydep_xactive_beg_yml.f90"
 
   
     beglt = 1
@@ -586,8 +588,8 @@ contains
 
 
     call calculate_uustar(ncol, index_season, fr_lnduse, & ! in
-                              unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
-                              uustar)                                    ! out
+                          unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
+                          uustar)                                     ! out
 
     call calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
                          ustar, cvar, bycp)                                                          ! out
@@ -609,8 +611,8 @@ contains
     ! compute rsmx = 1/(rs+rm) : multiply by 3 if surface is wet
     !-------------------------------------------------------------------------------------
     call calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
-                                                tc, heff, crs, &                                               ! in
-                                                cts, rgsx, rsmx)                                               ! out
+                                            tc, heff, crs, &                                               ! in
+                                            cts, rgsx, rsmx)                                               ! out
    
     call calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, & ! in
                                    rclx)                                                     ! out
@@ -625,11 +627,12 @@ contains
                                              mmr, dep_ra(:,:,lchnk), dep_rb(:,:,lchnk), term, &              ! in
                                              rsmx, rlux, rclx, rgsx, rdc, &                                  ! in
                                              dvel, dflx)                                                     ! out
-
+  
+#include "../yaml/mo_drydep/f90_yaml/drydep_xactive_end_yml.f90"
   end subroutine drydep_xactive
 
-  subroutine calculate_uustar(ncol, index_season, fr_lnduse, & ! in
-                              unstable, lcl_frc_landuse, va, zl, ribn, &      ! in
+  subroutine calculate_uustar(ncol, index_season, fr_lnduse, &               ! in
+                              unstable, lcl_frc_landuse, va, zl, ribn, &     ! in
                               uustar)                                        ! out
 
     use seq_drydep_mod, only: z0
@@ -654,7 +657,7 @@ contains
     real(r8) :: ustarb
     real(r8) :: cvarb
     real(r8) :: bb   
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_uustar_beg_yml.f90"
     !-------------------------------------------------------------------------------------
     ! find grid averaged z0: z0bar (the roughness length)
     ! z_o=exp[S(f_i*ln(z_oi))]
@@ -686,7 +689,7 @@ contains
        endif
        uustar(icol) = va(icol)*ustarb
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_uustar_end_yml.f90"
   end subroutine calculate_uustar
 
 
@@ -713,7 +716,7 @@ contains
 
     ! local variables
     integer :: icol, lt
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_ustar_beg_yml.f90"
     !-------------------------------------------------------------------------------------
     ! calculate the friction velocity for each land type u_i=uustar/u*_i
     !-------------------------------------------------------------------------------------
@@ -731,10 +734,11 @@ contains
           endif
        enddo
     enddo
+#include "../yaml/mo_drydep/f90_yaml/calculate_ustar_end_yml.f90"
   end subroutine calculate_ustar
 
   subroutine calculate_ustar_over_water(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, & ! in
-                             ustar, cvar, bycp)                                                                    ! inout
+                                        ustar, cvar, bycp)                                                         ! inout
 
     ! input
     integer, intent(in) :: ncol
@@ -756,7 +760,7 @@ contains
     integer :: icol, lt
     real(r8) :: z0water ! revised z0 over water
     real(r8), parameter    :: diffk       = 1.461e-5_r8
- 
+#include "../yaml/mo_drydep/f90_yaml/calculate_ustar_over_water_beg_yml.f90" 
     !-------------------------------------------------------------------------------------
     ! revise calculation of friction velocity and z0 over water
     !-------------------------------------------------------------------------------------
@@ -775,6 +779,7 @@ contains
           endif
        endif
     enddo
+#include "../yaml/mo_drydep/f90_yaml/calculate_ustar_over_water_end_yml.f90"
   end subroutine calculate_ustar_over_water
 
 
@@ -806,7 +811,7 @@ contains
     integer :: icol, lt
     real(r8) :: hvar    ! constant to compute monin-obukhov length
     real(r8) :: htmp    ! constant to compute monin-obukhov length
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_obukhov_length_beg_yml.f90"
     do lt = beglt,endlt
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
@@ -820,12 +825,12 @@ contains
           endif
        enddo
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_obukhov_length_end_yml.f90"
   end subroutine  calculate_obukhov_length
 
 
   subroutine calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, zl, obklen, ustar, cvar, &  ! in
-                                                               dep_ra, dep_rb)                                           ! out
+                                                               dep_ra, dep_rb)                                            ! out
 
     ! input
     integer, intent(in) :: ncol
@@ -845,7 +850,7 @@ contains
     integer :: icol, lt
     real(r8) :: psih    ! stability correction factor [unitless]
     real(r8) :: zeta    ! dimensionless height scale z/L [unitless]
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_aerodynamic_and_quasilaminar_resistance_beg_yml.f90"
     do lt = beglt,endlt
        do icol = 1,ncol
           if( fr_lnduse(icol,lt) ) then
@@ -863,7 +868,7 @@ contains
           endif
        enddo
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_aerodynamic_and_quasilaminar_resistance_end_yml.f90"
   end subroutine calculate_aerodynamic_and_quasilaminar_resistance
 
   subroutine calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, & ! in
@@ -892,7 +897,7 @@ contains
     ! local variables
     integer :: icol, lt, ispec, idx_drydep, sndx
     real(r8) :: rmx, dewm, rs
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rgsx_and_rsmx_beg_yml.f90"
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
           idx_drydep = map_dvel(ispec)
@@ -924,13 +929,14 @@ contains
           enddo
        endif
     enddo
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rgsx_and_rsmx_end_yml.f90"
   end subroutine calculate_resistance_rgsx_and_rsmx
 
 
   subroutine calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, &   ! in
                                        rclx)                                                       ! out
 
-    use seq_drydep_mod, only: rclo, rcls, rlu, foxd
+    use seq_drydep_mod, only: rclo, rcls, foxd
 
     ! input
     integer, intent(in) :: ncol
@@ -946,7 +952,7 @@ contains
 
     ! local variables
     integer :: icol, lt, ispec, idx_drydep, sndx
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_beg_yml.f90"
     
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
@@ -980,7 +986,7 @@ contains
           enddo
        endif
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_end_yml.f90"
   end subroutine calculate_resistance_rclx
 
   subroutine calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
@@ -1011,7 +1017,7 @@ contains
     ! local variables
     integer :: icol, lt, ispec, idx_drydep, sndx
     real(r8), dimension(ncol,n_land_type) :: rlux_o3  ! vegetative resistance (upper canopy) [s/m]
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rlux_beg_yml.f90"
     rlux = 0._r8
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
@@ -1099,7 +1105,7 @@ contains
           enddo
        endif       
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rlux_end_yml.f90"
   end subroutine calculate_resistance_rlux
 
   subroutine calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, &    ! in
@@ -1136,7 +1142,7 @@ contains
     real(r8) :: lnd_frc(ncol)    
     real(r8) :: wrk(ncol)
     real(r8), parameter :: m_to_cm_per_s = 100._r8
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_gas_drydep_vlc_and_flux_beg_yml.f90"
     do ispec = 1, gas_pcnst
        if ( has_dvel(ispec) ) then
           wrk(:) = 0._r8
@@ -1179,7 +1185,7 @@ contains
           dflx(:ncol,ispec) = term(:ncol) * dvel(:ncol,ispec) * mmr(:ncol,plev,ispec)
        endif
     enddo
-
+#include "../yaml/mo_drydep/f90_yaml/calculate_gas_drydep_vlc_and_flux_end_yml.f90"
   end subroutine calculate_gas_drydep_vlc_and_flux
 
   pure function get_potential_temperature(temperature, pressure, specific_humidity) result(theta)
