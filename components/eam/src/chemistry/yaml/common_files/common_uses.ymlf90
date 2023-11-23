@@ -103,7 +103,7 @@ use spmd_utils,   only : masterproc
 !#define YAML_NEGTRC
 
 ! gas drydep
-#define YAML_GAS_DRYDEP
+! #define YAML_GAS_DRYDEP
 
 use yaml_input_file_io
 

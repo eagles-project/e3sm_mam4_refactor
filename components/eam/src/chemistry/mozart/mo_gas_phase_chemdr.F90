@@ -573,7 +573,6 @@ contains
          ncdate, ts, tfld(:,pver), tvs, ps, pmid(:,pver), &                             ! in
          qh2o(:,pver), wind_speed, prect, snowhland, fsds, mmr, &                       ! in
          depvel, &                                                                      ! out
-         lchnk, &
          sflx)                                                                          ! inout
     call t_stopf('drydep')
 

@@ -354,7 +354,6 @@ contains
                              ncdate, sfc_temp, air_temp, tv, pressure_sfc, pressure_10m, &  ! in
                              spec_hum, wind_speed, rain, snow, solar_flux, mmr, &           ! in
                              dvel, &                                                        ! out
-                             y_lchnk, &
                              dflx)                                                          ! inout
   
     !-------------------------------------------------------------------------------------
@@ -378,7 +377,6 @@ contains
 
     use seq_drydep_mod, only: seq_drydep_setHCoeff
     use physconst,      only: tmelt
-    use yaml_input_file_io
 
     implicit none
 
@@ -590,24 +588,19 @@ contains
 
 
     call calculate_uustar(ncol, index_season, fr_lnduse, & ! in
-                              unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
-                              lchnk, &
-                              uustar)                                    ! out
+                          unstable, lcl_frc_landuse, va, zl, ribn, &  ! in
+                          uustar)                                     ! out
 
     call calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
-                         lchnk, &
                          ustar, cvar, bycp)                                                          ! out
   
     call calculate_ustar_over_water(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, &  ! in
-                                    lchnk, &
                                     ustar, cvar, bycp)                                                          ! inout
 
     call calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, & ! in
-                                  lchnk, &
                                   obklen)                                                                           ! out 
 
     call calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, zl, obklen, ustar, cvar, &  ! in
-                                                           lchnk, &
                                                            dep_ra(:,:,lchnk), dep_rb(:,:,lchnk))                      ! out
 
     !-------------------------------------------------------------------------------------
@@ -619,16 +612,13 @@ contains
     !-------------------------------------------------------------------------------------
     call calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
                                             tc, heff, crs, &                                               ! in
-                                            lchnk, &    
                                             cts, rgsx, rsmx)                                               ! out
    
     call calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, & ! in
-                                   lchnk, &
                                    rclx)                                                     ! out
 
     call calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, & ! in
                                    sfc_temp, qs, spec_hum, heff, cts, &                              ! in
-                                   lchnk, &
                                    rlux)                                                             ! out
 
 
@@ -636,15 +626,13 @@ contains
     call  calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, & ! in
                                              mmr, dep_ra(:,:,lchnk), dep_rb(:,:,lchnk), term, &              ! in
                                              rsmx, rlux, rclx, rgsx, rdc, &                                  ! in
-                                             lchnk, &
-                                             dvel, dflx)        ! out
+                                             dvel, dflx)                                                     ! out
   
 #include "../yaml/mo_drydep/f90_yaml/drydep_xactive_end_yml.f90"
   end subroutine drydep_xactive
 
-  subroutine calculate_uustar(ncol, index_season, fr_lnduse, & ! in
-                              unstable, lcl_frc_landuse, va, zl, ribn, &      ! in
-                              y_lchnk, &
+  subroutine calculate_uustar(ncol, index_season, fr_lnduse, &               ! in
+                              unstable, lcl_frc_landuse, va, zl, ribn, &     ! in
                               uustar)                                        ! out
 
     use seq_drydep_mod, only: z0
@@ -706,7 +694,6 @@ contains
 
 
   subroutine calculate_ustar(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, & ! in
-                             y_lchnk, &
                              ustar, cvar, bycp)                                                         ! out
 
     use seq_drydep_mod, only: z0
@@ -751,7 +738,6 @@ contains
   end subroutine calculate_ustar
 
   subroutine calculate_ustar_over_water(ncol, beglt, endlt, index_season, fr_lnduse, unstable, zl, uustar, ribn, & ! in
-                                        y_lchnk, &
                                         ustar, cvar, bycp)                                                         ! inout
 
     ! input
@@ -798,7 +784,6 @@ contains
 
 
   subroutine  calculate_obukhov_length(ncol, beglt, endlt, fr_lnduse, unstable, tha, thg, ustar, cvar, va, bycp, ribn, &  ! in
-                                       y_lchnk, &
                                        obklen)                                                                            ! out
 
     !-------------------------------------------------------------------------------------
@@ -845,8 +830,7 @@ contains
 
 
   subroutine calculate_aerodynamic_and_quasilaminar_resistance(ncol, beglt, endlt, fr_lnduse, zl, obklen, ustar, cvar, &  ! in
-                                                               y_lchnk, &
-                                                               dep_ra, dep_rb)                                           ! out
+                                                               dep_ra, dep_rb)                                            ! out
 
     ! input
     integer, intent(in) :: ncol
@@ -889,7 +873,6 @@ contains
 
   subroutine calculate_resistance_rgsx_and_rsmx(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, & ! in
                                                 tc, heff, crs, &                                                  ! in
-                                                y_lchnk, &
                                                 cts, rgsx, rsmx)                                                  ! out
 
     use seq_drydep_mod, only: ri, rgso, rgss, foxd, drat
@@ -951,7 +934,6 @@ contains
 
 
   subroutine calculate_resistance_rclx(ncol, beglt, endlt, index_season, fr_lnduse, heff, cts, &   ! in
-                                       y_lchnk, &
                                        rclx)                                                       ! out
 
     use seq_drydep_mod, only: rclo, rcls, foxd
@@ -970,7 +952,7 @@ contains
 
     ! local variables
     integer :: icol, lt, ispec, idx_drydep, sndx
-include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_beg_yml.f90"
+#include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_beg_yml.f90"
     
     do ispec = 1,gas_pcnst
        if( has_dvel(ispec) ) then
@@ -1009,7 +991,6 @@ include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_beg_yml.f90"
 
   subroutine calculate_resistance_rlux(ncol, beglt, endlt, index_season, fr_lnduse, has_rain, has_dew, &  ! in
                                        sfc_temp, qs, spec_hum, heff, cts, &                               ! in
-                                       y_lchnk, &
                                        rlux)                                                              ! out
   
     use seq_drydep_mod, only: rclo, rcls, rlu, foxd
@@ -1130,7 +1111,6 @@ include "../yaml/mo_drydep/f90_yaml/calculate_resistance_rclx_beg_yml.f90"
   subroutine calculate_gas_drydep_vlc_and_flux( ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, &    ! in
                                                 mmr, dep_ra, dep_rb, term, &                                       ! in
                                                 rsmx, rlux, rclx, rgsx, rdc, &                                     ! in
-                                                y_lchnk, &
                                                 dvel, dflx)                                                        ! out
     use seq_drydep_mod, only: rac
     use mo_tracname,  only : solsym
