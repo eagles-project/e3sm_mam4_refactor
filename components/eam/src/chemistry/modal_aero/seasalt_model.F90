@@ -2,6 +2,7 @@
 ! Seasalt for Modal Aerosol Model
 !===============================================================================
 module seasalt_model
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use ppgrid,         only: pcols
   use cam_abortutils, only: endrun
@@ -348,6 +349,7 @@ end subroutine ocean_data_readnl
 
   !=============================================================================
 subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
+                        y_lchnk, &
                         cflx)                                                  ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -365,11 +367,10 @@ subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
     ! local vars
     integer  :: ispec, ibin
     integer  :: mass_mode_idx, num_mode_idx
-    real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
    
     integer, parameter :: num_flx_flag  = 0
     integer, parameter :: mass_flx_flag = 1
-
+#include "../yaml/seasalt_model/f90_yaml/seasalt_emis_beg_yml.f90"
     ! calculate seasalt number emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, num_flx_flag, &  ! in
                               cflx)                                          ! inout
@@ -377,7 +378,7 @@ subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
     ! calculate seasalt mass emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, mass_flx_flag, & ! in
                               cflx)                                          ! inout
-
+#include "../yaml/seasalt_model/f90_yaml/seasalt_emis_end_yml.f90"
 end subroutine seasalt_emis
 
 
@@ -440,6 +441,7 @@ end subroutine seasalt_emisflx_calc
 
 
 subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
+                               y_lchnk, &
                                cflx)                                                   ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -458,7 +460,6 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
     ! local vars
     integer  :: ifld
 
-   real(r8), pointer :: chla(:)          ! for Gantt et al. (2011) organic mass fraction
    real(r8), pointer :: mpoly(:)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), pointer :: mprot(:)         ! for Burrows et al. (2014) organic mass fraction
    real(r8), pointer :: mlip(:)          ! for Burrows et al. (2014) organic mass fraction
@@ -467,17 +468,14 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
 
    real(r8) :: mass_frac_bub_section(pcols, n_org_max, nsections)
    real(r8) :: om_ssa(pcols, nsections)
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_emis_beg_yml.f90"
 
-
-   nullify(chla)
    nullify(mpoly)
    nullify(mprot)
    nullify(mlip)
 
    fldloop: do ifld = 1, n_ocean_data
       select case (trim(fields(ifld)%fldnam))
-         case ("chla")
-             chla   => fields(ifld)%data(:ncol,1,lchnk)
          case ("mpoly")
              mpoly  => fields(ifld)%data(:ncol,1,lchnk)
          case ("mprot")
@@ -518,7 +516,7 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
     call marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                      mass_frac_bub_section, emit_this_mode, & ! in
                                      cflx)                                    ! inout
-
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_emis_end_yml.f90"
 end subroutine marine_organic_emis
 
 

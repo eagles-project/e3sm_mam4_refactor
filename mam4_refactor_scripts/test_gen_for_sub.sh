@@ -6,24 +6,24 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=calculate_gas_drydep_vlc_and_flux
+    sub_name=marine_organic_emis
 
     #ins and in-outs variables
     #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
-    ins='ncol, beglt, endlt, index_season, fr_lnduse, lcl_frc_landuse, mmr, dep_ra, dep_rb, term, rsmx, rlux, rclx, rgsx, rdc, rac, solsym'
+    ins='lchnk, ncol, fi, ocnfrc, emis_scale'
 
     #outs and in-outs variables
     #(a comma seprated string, same as above)
-    outs='dvel, dflx'
+    outs='cflx'
 
     #module name
-    module_name=mo_drydep
+    module_name=seasalt_model
 
     #file path
-    dir_path=components/eam/src/chemistry/mozart/
+    dir_path=components/eam/src/chemistry/modal_aero/
 
     #CPP directive to turn on file writing
-    cpp_directive=YAML_GAS_DRYDEP
+    cpp_directive=YAML_DUST_SSLT_EM
 
     #-------------------------
     #USER INPUT ENDS

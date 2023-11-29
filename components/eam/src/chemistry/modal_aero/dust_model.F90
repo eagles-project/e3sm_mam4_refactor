@@ -2,6 +2,7 @@
 ! Dust for Modal Aerosol Model
 !===============================================================================
 module dust_model 
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod, only: r8 => shr_kind_r8, cl => shr_kind_cl
   use spmd_utils,   only: masterproc
   use cam_abortutils,   only: endrun
@@ -106,6 +107,7 @@ module dust_model
   !===============================================================================
   !===============================================================================
   subroutine dust_emis( ncol, lchnk, dust_flux_in, &  ! in
+                        y_lchnk, &
                         cflx, &                       ! inout
                         soil_erod )                   ! out
     use soil_erod_mod, only : soil_erod_fact
@@ -123,7 +125,7 @@ module dust_model
     integer :: icol, ibin, idx_dst, inum
     real(r8), parameter :: soil_erod_threshold = 0.1_r8
     real(r8) :: dst_mass_to_num(dust_nbin)
-    
+#include "../yaml/dust_model/f90_yaml/dust_emis_beg_yml.f90"    
     do ibin = 1, dust_nbin
        dst_mass_to_num(ibin) = 6._r8 / (pi * dust_density * (dust_dmt_vwr(ibin)**3._r8))
     enddo
@@ -154,7 +156,7 @@ module dust_model
        enddo
 
     enddo col_loop
-
+#include "../yaml/dust_model/f90_yaml/dust_emis_end_yml.f90"
   end subroutine dust_emis
 
 end module dust_model
