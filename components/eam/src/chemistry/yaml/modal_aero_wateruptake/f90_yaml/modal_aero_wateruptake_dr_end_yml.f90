@@ -6,9 +6,9 @@
 
      !start writing data
      
-        call write_var(unit_output,'dgncur_awet',dgncur_awet(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_output,'qaerwat',qaerwat(yaml%col_print,yaml%lev_print,:))
-        if (present(wetdens)) call write_var(unit_output,'wetdens',wetdens(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_output,'dgncur_awet',dgncur_awet(yaml%col_print,:,:))
+        call write_var(unit_output,'qaerwat',qaerwat(yaml%col_print,:,:))
+        if (present(wetdens)) call write_var(unit_output,'wetdens',wetdens(yaml%col_print,:,:))
 
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only

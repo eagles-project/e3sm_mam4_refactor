@@ -30,7 +30,7 @@
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
-  yaml%lev_print = 51       !level
+  yaml%lev_print = 0       !level
   yaml%nstep_print = 355 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
@@ -92,15 +92,15 @@
         ! add code for writing data here
         
         call write_var(unit_input,unit_output,'ncol',ncol)
-        call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'temperature',temperature(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'cldn',cldn(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'dgncur_a',dgncur_a(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'dgncur_awet',dgncur_awet(yaml%col_print,yaml%lev_print,:))
-        call write_var(unit_input,unit_output,'qaerwat',qaerwat(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'temperature',temperature(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'cldn',cldn(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'dgncur_a',dgncur_a(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'dgncur_awet',dgncur_awet(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'qaerwat',qaerwat(yaml%col_print,:,:))
         if (present(list_idx_in)) call write_var(unit_input,unit_output,'list_idx_in',list_idx_in)
-        if (present(wetdens)) call write_var(unit_input,unit_output,'wetdens',wetdens(yaml%col_print,yaml%lev_print,:))
+        if (present(wetdens)) call write_var(unit_input,unit_output,'wetdens',wetdens(yaml%col_print,:,:))
 
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
