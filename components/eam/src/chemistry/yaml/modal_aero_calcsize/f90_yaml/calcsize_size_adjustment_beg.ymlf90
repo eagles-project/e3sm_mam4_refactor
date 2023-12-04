@@ -27,7 +27,6 @@
      call write_var(unit_input, unit_output, 'dryvol_a',dryvol_a(yaml%col_print, yaml%lev_print))
      call write_var(unit_input, unit_output, 'dryvol_c',dryvol_c(yaml%col_print, yaml%lev_print))
 
-!!!!     call write_aerosol_mmr(unit_input, unit_output,'interstitial_num',&
      call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial_num',&
           state_q(yaml%col_print,yaml%lev_print,:),.true.)! last arg .ture. for printing aerosol numbers only
 
@@ -38,11 +37,9 @@
      !fldcw_wrt array will carry species at yaml%col_print and yaml%lev_print, initialize it with huge values
      fldcw_wrt(:) = huge(fldcw_wrt)
      do ispec = 16, 40 ! ensure that the loop starts from 16, as aerosols starts at 16th index
-!!!!!        tmp_arr => qqcw_get_field(pbuf,ispec,yaml%lchnk_print)
         tmp_arr => qqcw(numptrcw_amode(imode))%fld(:,:)
         fldcw_wrt(ispec) = tmp_arr(yaml%col_print,yaml%lev_print)
      enddo
-!!!!     call write_aerosol_mmr(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only
      call write_aerosol_mmr_from_stateq(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only
      close(unit_input)
      call freeunit(unit_input)
