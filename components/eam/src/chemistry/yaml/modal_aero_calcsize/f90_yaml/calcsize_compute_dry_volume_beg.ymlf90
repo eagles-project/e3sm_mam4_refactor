@@ -1,5 +1,5 @@
 #ifdef YAML_CALC
-  type(yaml_vars), intent(in) :: yaml
+  type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output
   character(len=2000):: fname
   logical:: printed(4) = .false.
@@ -22,10 +22,12 @@
      call write_var(unit_input, unit_output, 'nspec',nspec)
      call write_var(unit_input, unit_output,'list_idx_in',list_idx_in)
      do ispec = 1, nspec
-        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'a', state, pbuf, specmmr)
-        qprint(ispec) = specmmr(yaml%col_print,yaml%lev_print)
-        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'c', state, pbuf, specmmr_cld)
-        qcprint(ispec) = specmmr_cld(yaml%col_print,yaml%lev_print)
+!!!!        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'a', state, pbuf, specmmr)
+!!!!        qprint(ispec) = specmmr(yaml%col_print,yaml%lev_print)
+        qprint(ispec) = state_q(yaml%col_print,yaml%lev_print,lmassptr_amode(ispec,imode))
+!!!!        call rad_cnst_get_aer_mmr(list_idx_in, imode, ispec, 'c', state, pbuf, specmmr_cld)
+!!!!        qcprint(ispec) = specmmr_cld(yaml%col_print,yaml%lev_print)
+        qcprint(ispec) = qqcw(lmassptr_amode(ispec,imode))%fld(yaml%col_print,yaml%lev_print)
         call rad_cnst_get_aer_props(list_idx_in, imode, ispec, density_aer=specdens)
         dprint(ispec) = specdens
      end do ! nspec loop

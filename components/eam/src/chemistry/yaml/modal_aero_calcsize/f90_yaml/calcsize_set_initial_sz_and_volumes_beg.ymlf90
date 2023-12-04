@@ -1,5 +1,5 @@
 #ifdef YAML_CALC
-  type(yaml_vars), intent(in) :: yaml
+  type(yaml_vars)  :: yaml
   integer  :: unit_input, unit_output
   character(len=2000):: fname
   logical:: printed(4) = .false.

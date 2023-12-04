@@ -6,13 +6,22 @@
      call write_output_header(unit_output)
 
      !start writing data
-     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend',dqdt(yaml%col_print,yaml%lev_print,:))
-     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend_num',dqdt(yaml%col_print,yaml%lev_print,:),.true.)
+!!!!     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend',dqdt(yaml%col_print,yaml%lev_print,:))
+!  Use below to output whole column
+     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend',dqdt(yaml%col_print,:,:))
+!!!!     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend_num',dqdt(yaml%col_print,yaml%lev_print,:),.true.)
+!  Use below to output whole column
+     call write_output_aerosol_mmr_from_stateq(unit_output,'interstitial_ptend_num',dqdt(yaml%col_print,:,:),.true.)
 
-     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend',dqqcwdt(yaml%col_print,yaml%lev_print,:))
-     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend_num',dqqcwdt(yaml%col_print,yaml%lev_print,:),.true.)
-
-     call write_1d_output_var(unit_output, 'diameter', 4, dgncur_a(yaml%col_print,yaml%lev_print,:))
+!!!!     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend',dqqcwdt(yaml%col_print,yaml%lev_print,:))
+!  Use below to output whole column
+     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend',dqqcwdt(yaml%col_print,:,:))
+!!!!     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend_num',dqqcwdt(yaml%col_print,yaml%lev_print,:),.true.)
+!  Use below to output whole column
+     call write_output_aerosol_mmr_from_stateq(unit_output,'cloud_borne_ptend_num',dqqcwdt(yaml%col_print,:,:),.true.)
+!!!!     call write_1d_output_var(unit_output, 'diameter', 4, dgncur_a(yaml%col_print,yaml%lev_print,:))
+!  Use below to output whole column
+     call write_2d_output_var(unit_output, 'diameter', size(dgncur_a,2), 4, dgncur_a(yaml%col_print,:,:))
      !close the output file
      close(unit_output)
      call freeunit(unit_output)
