@@ -6,11 +6,11 @@ main() {
     #-------------------------
 
     #subroutine name
-    sub_name=marine_organic_emis
+    sub_name=seasalt_emisflx_calc
 
     #ins and in-outs variables
     #(a comma seprated string, like 'var1, var2, var3'- remember the quotes around the list of variables)
-    ins='lchnk, ncol, fi, ocnfrc, emis_scale'
+    ins='ncol, fi, ocnfrc, emis_scale, flx_type'
 
     #outs and in-outs variables
     #(a comma seprated string, same as above)

@@ -22,7 +22,7 @@
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
-
+  real(r8) :: dust_flux_in_tmp
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
 
@@ -30,7 +30,7 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-  yaml%nstep_print = 300 !time step
+  yaml%nstep_print = 1350 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
@@ -39,6 +39,16 @@
 
   !Flag to decide to write or not to write data
   yaml%flag_print = .false. !(**remove these if generating data for a dependent subroutines**)
+
+  !do icol = 1, ncol
+  !   dust_flux_in_tmp = sum( -dust_flux_in(icol,:) )
+  !   if ( dust_flux_in_tmp .ne. 0.0_r8 .and.  soil_erodibility(icol,y_lchnk) .ge. soil_erod_threshold) then
+  !      write(102,*)'phys_debug_lat = ',get_lat(y_lchnk, icol), &
+  !                  ' phys_debug_lon = ', get_lon(y_lchnk, icol), &
+  !                  ' nstep = ', y_nstep, &
+  !                  ' dust_flux_in = ', dust_flux_in_tmp 
+  !   endif
+  !enddo
 
   !if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
 

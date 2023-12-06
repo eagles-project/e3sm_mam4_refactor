@@ -373,16 +373,19 @@ subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
 #include "../yaml/seasalt_model/f90_yaml/seasalt_emis_beg_yml.f90"
     ! calculate seasalt number emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, num_flx_flag, &  ! in
+                              y_lchnk, &
                               cflx)                                          ! inout
  
     ! calculate seasalt mass emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, mass_flx_flag, & ! in
+                              y_lchnk, &
                               cflx)                                          ! inout
 #include "../yaml/seasalt_model/f90_yaml/seasalt_emis_end_yml.f90"
 end subroutine seasalt_emis
 
 
 subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
+                                y_lchnk, &
                                 cflx)                                     ! inout
    
     use sslt_sections, only: nsections, fluxes, Dg, rdry
@@ -403,7 +406,7 @@ subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
     integer  :: mode_idx
     real(r8) :: cflx_tmp1(pcols)              ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
     integer  :: num_idx_append
-
+#include "../yaml/seasalt_model/f90_yaml/seasalt_emisflx_calc_beg_yml.f90"
     num_idx_append = 0
 
     if (flx_type == 0) num_idx_append = nslt+nslt_om
@@ -436,7 +439,7 @@ subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
           enddo          
        endif       
     enddo
-
+#include "../yaml/seasalt_model/f90_yaml/seasalt_emisflx_calc_end_yml.f90"
 end subroutine seasalt_emisflx_calc
 
 
@@ -494,6 +497,7 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
 
    ! Calculate marine organic aerosol mass fraction based on Burrows et al., ACP (2013)
    call calc_om_ssa(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &      ! in
+                    y_lchnk, &
                     mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :)) ! inout
 
 
@@ -511,10 +515,12 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
    
     call marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in 
                                     om_ssa, emit_this_mode, &        ! in
+                                    y_lchnk, &
                                     cflx)                            ! inout
 
     call marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                      mass_frac_bub_section, emit_this_mode, & ! in
+                                     y_lchnk, &
                                      cflx)                                    ! inout
 #include "../yaml/seasalt_model/f90_yaml/marine_organic_emis_end_yml.f90"
 end subroutine marine_organic_emis
@@ -522,6 +528,7 @@ end subroutine marine_organic_emis
 
 subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
                                       om_ssa, emit_this_mode, &        ! in
+                                      y_lchnk, &
                                       cflx)                            ! inout
 
     use sslt_sections, only: nsections, Dg
@@ -542,7 +549,7 @@ subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
     integer  :: num_mode_idx
     integer  :: om_num_idx
     real(r8) :: cflx_tmp1(pcols)               ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
-
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_numflx_calc_beg_yml.f90"
     if (size(om_num_ind) .eq. 1) then
        call endrun( "Error: om_num_ind is a scalar, but attempting to calculate MOM. &
                      Something bad happened!!  We should never get here!")
@@ -568,12 +575,13 @@ subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
           enddo
        endif
     enddo
-
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_numflx_calc_end_yml.f90"
 end subroutine marine_organic_numflx_calc
 
 
 subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                        mass_frac_bub_section, emit_this_mode, & ! in
+                                       y_lchnk, &
                                        cflx)                                    ! inout
 
     use sslt_sections, only: nsections, Dg, rdry
@@ -595,7 +603,7 @@ subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  
     integer  :: ispec, ibin, iorg
     integer  :: mass_mode_idx
     real(r8) :: cflx_tmp1(pcols)               ! temp array for calculating emission fluxes [kg/m2/s or #/m2/s]
-
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_massflx_calc_beg_yml.f90"
 
     do ispec=1,nslt_om
        mass_mode_idx = seasalt_indices(nslt+ispec)
@@ -622,11 +630,12 @@ subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  
           enddo
        endif
     enddo
-
+#include "../yaml/seasalt_model/f90_yaml/marine_organic_massflx_calc_end_yml.f90"
 end subroutine marine_organic_massflx_calc
 
 
 subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
+                       y_lchnk, &
                        mass_frac_bub_section, om_ssa)       ! inout
 
    !----------------------------------------------------------------------- 
@@ -667,7 +676,7 @@ subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
    integer  :: iorg
    !
    !-----------------------------------------------------------------------
-
+#include "../yaml/seasalt_model/f90_yaml/calc_om_ssa_beg_yml.f90"
    ! Initialize arrays to zero for safety.
    theta(:,:)              = 0.0_r8
    theta_help(:,:)         = 0.0_r8
@@ -737,7 +746,7 @@ subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
       call omfrac_accu_aitk(mass_frac_bub(:, iorg), & ! in
                             mass_frac_bub_section(:, iorg, :)) ! inout
    enddo
-
+#include "../yaml/seasalt_model/f90_yaml/calc_om_ssa_end_yml.f90"
 end subroutine calc_om_ssa
 
 

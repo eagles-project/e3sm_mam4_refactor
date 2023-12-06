@@ -40,7 +40,7 @@
   !Flag to decide to write or not to write data
   yaml%flag_print = .false. !(**remove these if generating data for a dependent subroutines**)
 
-  !if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  ! if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
 
   !-----------------------------------------------------------------------------------------
   !In the case of y_i or y_k are not passed as arguments, use the following if condition:
@@ -75,24 +75,30 @@
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('marine_organic_emis', &  !intent-in
+        call open_files('marine_organic_numflx_calc', &  !intent-in
              unit_input, unit_output) !intent-out
         !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'marine_organic_emis',yaml%nstep_print, yaml%lev_print)
+             'marine_organic_numflx_calc',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'fi',fi(yaml%col_print,:))
         call write_var(unit_input,unit_output,'ocnfrc',ocnfrc(yaml%col_print))
         call write_var(unit_input,unit_output,'emis_scale',emis_scale)
-        call write_var(unit_input,unit_output,'nsections',nsections)
+        call write_var(unit_input,unit_output,'om_ssa',om_ssa(yaml%col_print,:))
         call write_var(unit_input,unit_output,'emit_this_mode',emit_this_mode)
+        call write_var(unit_input,unit_output,'nsections',nsections)
+        call write_var(unit_input,unit_output,'Dg',Dg)
+        call write_var(unit_input,unit_output,'om_num_ind',om_num_ind)
+        call write_var(unit_input,unit_output,'om_num_modes',om_num_modes)
+        call write_var(unit_input,unit_output,'seasalt_indices',seasalt_indices)
+        call write_var(unit_input,unit_output,'sst_sz_range_lo',sst_sz_range_lo)
+        call write_var(unit_input,unit_output,'sst_sz_range_hi',sst_sz_range_hi)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

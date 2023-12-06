@@ -75,24 +75,34 @@
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('marine_organic_emis', &  !intent-in
+        call open_files('calc_om_ssa', &  !intent-in
              unit_input, unit_output) !intent-out
         !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'marine_organic_emis',yaml%nstep_print, yaml%lev_print)
+             'calc_om_ssa',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
         call write_var(unit_input,unit_output,'ncol',ncol)
-        call write_var(unit_input,unit_output,'fi',fi(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'ocnfrc',ocnfrc(yaml%col_print))
-        call write_var(unit_input,unit_output,'emis_scale',emis_scale)
+        call write_var(unit_input,unit_output,'mpoly_in',mpoly_in(yaml%col_print))
+        call write_var(unit_input,unit_output,'mprot_in',mprot_in(yaml%col_print))
+        call write_var(unit_input,unit_output,'mlip_in',mlip_in(yaml%col_print))
         call write_var(unit_input,unit_output,'nsections',nsections)
-        call write_var(unit_input,unit_output,'emit_this_mode',emit_this_mode)
+        call write_var(unit_input,unit_output,'omfrac_max',omfrac_max)
+        call write_var(unit_input,unit_output,'liter_to_m3',liter_to_m3)
+        call write_var(unit_input,unit_output,'OM_to_OC_in',OM_to_OC_in)
+        call write_var(unit_input,unit_output,'alpha_org',alpha_org)
+        call write_var(unit_input,unit_output,'mw_org',mw_org)
+        call write_var(unit_input,unit_output,'dens_srf_org',dens_srf_org)   
+        call write_var(unit_input,unit_output,'mw_carbon',mw_carbon)
+        call write_var(unit_input,unit_output,'dens_vol_NaCl_in_seawat',dens_vol_NaCl_in_seawat)
+        call write_var(unit_input,unit_output,'l_bub',l_bub)
+        call write_var(unit_input,unit_output,'n_org_max',n_org_max)
+        call write_var(unit_input,unit_output,'n_org',n_org)
+        call write_var(unit_input,unit_output,'small_oceanorg',small_oceanorg)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

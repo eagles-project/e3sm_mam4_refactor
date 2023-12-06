@@ -17,7 +17,7 @@
   !-----------------------------------------------------------------------------------------
   ! This is used when multiple sets of yaml output is needed
   !to cover different options (e.g., true and false)
-  ! character(len=200) :: ext_str
+  character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
 
   type(yaml_vars) :: yaml
@@ -56,15 +56,18 @@
      !-----------------------------------------------------------------------------------------
      ! Set "ext_str" if there are multiple sets of yaml output to be written out
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
-     ! write(ext_str,'(I2)') flag
-     ! ext_str = 'flag_'//adjustl(ext_str)
+     if ( flx_type == 0 ) then
+        ext_str="numflx"
+     else if ( flx_type == 1) then
+        ext_str="massflx"
+     end if
      !-----------------------------------------------------------------------------------------
 
 
      !Record number of calls that can output yaml file if you only need to write one set of input/output
      n_calls = n_calls+1
 
-     if (n_calls==1) then ! output at the first call only, modify this if condition (see below) if writing out other calls
+     if (n_calls==1 .or. n_calls==2) then ! output at the first call only, modify this if condition (see below) if writing out other calls
 
      !if ((n_calls==1 .and. flag==0) .or. (n_calls==3 .and. flag==1) .or. (n_calls==5 .and. flag==2)) then
 
@@ -75,24 +78,31 @@
 
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
-        call open_files('marine_organic_emis', &  !intent-in
-             unit_input, unit_output) !intent-out
-        !    unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+        call open_files('seasalt_emisflx_calc', &  !intent-in
+             unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
 
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'marine_organic_emis',yaml%nstep_print, yaml%lev_print)
+             'seasalt_emisflx_calc',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
         
-        call write_var(unit_input,unit_output,'lchnk',lchnk)
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'fi',fi(yaml%col_print,:))
         call write_var(unit_input,unit_output,'ocnfrc',ocnfrc(yaml%col_print))
         call write_var(unit_input,unit_output,'emis_scale',emis_scale)
+        call write_var(unit_input,unit_output,'flx_type',flx_type)
         call write_var(unit_input,unit_output,'nsections',nsections)
-        call write_var(unit_input,unit_output,'emit_this_mode',emit_this_mode)
+        call write_var(unit_input,unit_output,'Dg',Dg)
+        call write_var(unit_input,unit_output,'rdry',rdry)
+        call write_var(unit_input,unit_output,'dns_aer_sst',dns_aer_sst)
+        call write_var(unit_input,unit_output,'pi',pi)
+        call write_var(unit_input,unit_output,'nslt',nslt)
+        call write_var(unit_input,unit_output,'nslt_om',nslt_om)
+        call write_var(unit_input,unit_output,'seasalt_indices',seasalt_indices)
+        call write_var(unit_input,unit_output,'sst_sz_range_lo',sst_sz_range_lo)
+        call write_var(unit_input,unit_output,'sst_sz_range_hi',sst_sz_range_hi)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

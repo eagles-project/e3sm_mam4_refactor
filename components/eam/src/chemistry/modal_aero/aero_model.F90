@@ -1615,6 +1615,7 @@ contains
     call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
 
     call calculate_seasalt_numflux_in_bins(ncol, cam_in%sst, state%u(:ncol,pver), state%v(:ncol,pver),  state%zm(:ncol,pver), & ! in
+                                           lchnk, &
                                            fi) ! out
 
     sflx(:)=0._r8
@@ -1655,7 +1656,9 @@ contains
 
   !===============================================================================
   !===============================================================================
-  subroutine calculate_seasalt_numflux_in_bins(ncol, srf_temp, ubot, vbot, zbot, fi)
+  subroutine calculate_seasalt_numflux_in_bins(ncol, srf_temp, ubot, vbot, zbot, & ! in
+                                               y_lchnk, &
+                                               fi) ! out
     use sslt_sections, only: nsections, fluxes
 
     integer, intent(in) :: ncol
@@ -1669,7 +1672,7 @@ contains
     real(r8) :: u10cubed(pcols)   ! 3.41 power of 10m wind
     real(r8) :: u10(pcols)               ! Needed in Gantt et al. calculation of organic mass fraction
     real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
-
+#include "../yaml/aero_model/f90_yaml/calculate_seasalt_numflux_in_bins_beg_yml.f90"
     u10(:ncol)=sqrt(ubot(:ncol)**2+vbot(:ncol)**2)
     ! move the winds to 10m high from the midpoint of the gridbox:
     ! follows Tie and Seinfeld and Pandis, p.859 with math.
@@ -1680,7 +1683,7 @@ contains
     u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
 
     fi(:ncol,:nsections) = fluxes( srf_temp, u10cubed, ncol )
-
+#include "../yaml/aero_model/f90_yaml/calculate_seasalt_numflux_in_bins_end_yml.f90"
   end subroutine calculate_seasalt_numflux_in_bins
 
   subroutine modal_aero_bcscavcoef_init
