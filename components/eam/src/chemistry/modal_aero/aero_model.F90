@@ -1079,16 +1079,16 @@ contains
     call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
     call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
-    call t_startf('ma_convproc')
-    call ma_convproc_intr( state, dt,                         & ! in
-         dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
-         sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
-         dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
-         nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr,           & ! in
-         mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
-         ideep, lengath,  species_class,                   & ! in
-         ptend, aerdepwetis                                ) ! inout
-    call t_stopf('ma_convproc')
+    !call t_startf('ma_convproc')
+    !call ma_convproc_intr( state, dt,                         & ! in
+    !     dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
+    !     sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
+    !     dlf, dlf2, cmfmc2, sh_e_ed_ratio,                 & ! in
+    !     nsrflx_mzaer2cnvpr, qsrflx_mzaer2cnvpr,           & ! in
+    !     mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
+    !     ideep, lengath,  species_class,                   & ! in
+    !     ptend, aerdepwetis                                ) ! inout
+    !call t_stopf('ma_convproc')
 
     call wetdep_inputs_unset(dep_inputs)
 
