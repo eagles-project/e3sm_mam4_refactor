@@ -2,19 +2,29 @@
   type(yaml_vars) :: yaml
   integer,save  :: print_time_step=0
   integer  :: unit_input, unit_output, ispec, nstep
-!!!!!!!  real(r8), allocatable :: fldcw_wrt(:)
-!  Use below to output whole column
   real(r8), allocatable :: fldcw_wrt(:,:)
   real(r8), pointer :: tmp_arr(:,:)           !specie mmr (cloud borne)
+  logical :: writecol
+  logical, allocatable :: dotend_yaml(:)
+  real(r8),allocatable :: dqdt_yaml(:,:,:)
 
+  writecol = .true.
 
   yaml%lev_print = 68 !level
   yaml%nstep_print = 379 !time step
   
   if(allocated(fldcw_wrt)) deallocate(fldcw_wrt)
-!!!!!!  allocate(fldcw_wrt(40)) 
-!  Use below to output whole column
-  allocate(fldcw_wrt(size(state_q,2),40)) 
+  if(writecol) then
+     allocate(fldcw_wrt(size(state_q,2),size(qqcw))) 
+     if(allocated(dotend_yaml)) deallocate(dotend_yaml)
+     allocate(dotend_yaml(pcnst))
+     if(allocated(dqdt_yaml)) deallocate(dqdt_yaml)
+     allocate(dqdt_yaml(pcols,pver,pcnst))
+  else
+     allocate(fldcw_wrt(1,40)) 
+  endif
+
+ 
 
   !YAML file input generation code- DO NOT PORT to C++
   !print all inputs one-by-one at column "yaml%col_print"
@@ -26,51 +36,140 @@
   if(yaml%col_print > 0 .and. nstep==yaml%nstep_print) then ! if this column exists in lchnk
      yaml%lchnk_print=lchnk
      yaml%flag_print = .true.
-     !open I/O yaml files
-     if(present(irad)) then
-        if(irad == 1) then
-           call open_files('calcsize_sub_column_lw', &  !intent-in
-             unit_input, unit_output) !intent-out
-        elseif(irad == 2) then
-           call open_files('calcsize_sub_column_sw', &  !intent-in
-             unit_input, unit_output) !intent-out
-        endif        
-     else
-        call open_files('calcsize_sub_column_xx', &  !intent-in
-          unit_input, unit_output) !intent-out
-     endif
- 
-     !start by adding an input string
-     call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',nstep, yaml%lev_print)
-
-     !start writing data
-!!!!!     call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial',state_q(yaml%col_print,yaml%lev_print,:))
-!  Use below to output whole column
-     call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial',state_q(yaml%col_print,:,:))
-     call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial_num',&
-!!!!!          state_q(yaml%col_print,yaml%lev_print,:),.true.)! last arg .ture. for printing aerosol numbers only  
-!  Use below to output whole column
-          state_q(yaml%col_print,:,:),.true.)! last arg .ture. for printing aerosol numbers only  
 
      !fldcw_wrt array will carry species at yaml%col_print and yaml%lev_print, initialize it with huge values
-!!!!!     fldcw_wrt(:) = huge(fldcw_wrt)
-!  Use below to output whole column
+
      fldcw_wrt(:,:) = huge(fldcw_wrt)
-     do ispec = 16, 40 !ensure that the loop starts from 16, as aerosols starts at 16th index
-!        tmp_arr => qqcw_get_field(pbuf,ispec,lchnk)
-        tmp_arr => qqcw(ispec)%fld(:,:)
-!!!!!        fldcw_wrt(ispec) = tmp_arr(yaml%col_print,yaml%lev_print)
-!  Use below to output whole column
-        fldcw_wrt(:,ispec) = tmp_arr(yaml%col_print,:)
-     enddo
-     call write_aerosol_mmr_from_stateq(unit_input, unit_output,'cloud_borne',fldcw_wrt)
-     call write_aerosol_mmr_from_stateq(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only
+
+     if(writecol) then
+
+     !open I/O yaml files
+
+        if(present(irad)) then
+           if(irad == 1) then
+              call open_files('calcsize_sub_column_lw', &  !intent-in
+                unit_input, unit_output) !intent-out
+           elseif(irad == 2) then
+              call open_files('calcsize_sub_column_sw', &  !intent-in
+                unit_input, unit_output) !intent-out
+           endif        
+        else
+           call open_files('calcsize_sub_column_xx', &  !intent-in
+             unit_input, unit_output) !intent-out
+        endif
+ 
+     !start by adding an input string
+        call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'modal_aero_calcsize_sub',nstep, yaml%lev_print)
+
+     !start writing data
+
+        ! below are explicit input arguments to modal_aero_calcsize_sub
+
+        call write_var(unit_input,unit_output,'ncol',ncol)
+        call write_var(unit_input,unit_output,'lchnk',lchnk)
+        call write_var(unit_input,unit_output,'state_q',state_q(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'pdel',pdel(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'deltat',deltat)
+
+        !  qqcw is a pointer to the interstitial aerosol array; copy over into 2D (vertical index, species) structure for writing
+        do ispec = 16,40 !ensure that the loop starts from 16, as aerosols starts at 16th index
+           fldcw_wrt(:,ispec) = qqcw(ispec)%fld(yaml%col_print,:)
+        enddo
+        call write_var(unit_input,unit_output,'qqcw',fldcw_wrt(:,:))
+
+        if(present(do_adjust_in)) then
+           call write_var(unit_input,unit_output,'do_adjust_in',do_adjust_in)
+        endif
+        if(present(do_aitacc_transfer_in)) then
+           call write_var(unit_input,unit_output,'do_aitacc_transfer_in',do_aitacc_transfer_in)
+        endif
+        if(present(list_idx_in)) then
+           call write_var(unit_input,unit_output,'list_idx_in',list_idx_in)
+        endif
+        if(present(update_mmr_in)) then
+           call write_var(unit_input,unit_output,'update_mmr_in',update_mmr_in)
+        endif
+
+        if(present(dgnumdry_m)) then
+           call write_var(unit_input,unit_output,'dgnumdry_m',dgnumdry_m(yaml%col_print,:,:))
+        endif
+
+        ! ptend is passed as optional input to modal_aero_calcsize_sub.  The following extract the 
+        ! fields from ptend used as input and write them to the data files.
+       
+        if(present(ptend)) then
+           dotend_yaml = ptend%lq
+           call write_var(unit_input,unit_output,'dotend_yaml',dotend_yaml(:))
+           dqdt_yaml = ptend%q
+           call write_var(unit_input,unit_output,'dqdt_yaml',dqdt_yaml(yaml%col_print,:,:))
+        endif
+
+        ! below are external module inputs to modal_aero_calcsize_sub
+
+        call write_var(unit_input,unit_output,'top_lev',top_lev)
+        call write_var(unit_input,unit_output,'pcnst',pcnst)
+        call write_var(unit_input,unit_output,'pcols',pcols)
+        call write_var(unit_input,unit_output,'pver',pver)
+        call write_var(unit_input,unit_output,'ntot_amode',ntot_amode)
+        call write_var(unit_input,unit_output,'numptr_amode',numptr_amode(:))
+        call write_var(unit_input,unit_output,'numptrcw_amode',numptrcw_amode(:))
+        call write_var(unit_input,unit_output,'mprognum_amode',mprognum_amode(:))
+        call write_var(unit_input,unit_output,'cnst_name',cnst_name(:))
+        call write_var(unit_input,unit_output,'cnst_name_cw',cnst_name_cw(:))
+
+        ! below are internal module inputs to modal_aero_calcsize_sub    
+
+        call write_var(unit_input,unit_output,'maxpair_csizxf',maxpair_csizxf)
+        call write_var(unit_input,unit_output,'maxspec_csizxf',maxspec_csizxf)
+        call write_var(unit_input,unit_output,'nspecfrm_csizxf',nspecfrm_csizxf(:))
+        call write_var(unit_input,unit_output,'lspecfrma_csizxf',lspecfrma_csizxf(:,:))
+        call write_var(unit_input,unit_output,'lspectooa_csizxf',lspectooa_csizxf(:,:))
+        call write_var(unit_input,unit_output,'lspecfrmc_csizxf',lspecfrmc_csizxf(:,:))
+        call write_var(unit_input,unit_output,'lspectooc_csizxf',lspectooc_csizxf(:,:))
+
+     else    !  write original input fields at one vertical level
+
+     !open I/O yaml files
+
+        if(present(irad)) then
+           if(irad == 1) then
+              call open_files('calcsize_sub_lw', &  !intent-in
+                unit_input, unit_output) !intent-out
+           elseif(irad == 2) then
+              call open_files('calcsize_sub_sw', &  !intent-in
+                unit_input, unit_output) !intent-out
+           endif        
+        else
+           call open_files('calcsize_sub_xx', &  !intent-in
+             unit_input, unit_output) !intent-out
+        endif
+
+     !start by adding an input string
+        call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print,'compute_tendencies',nstep, yaml%lev_print)
+
+     !start writing data
+
+        call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial',state_q(yaml%col_print,yaml%lev_print,:))
+        call write_aerosol_mmr_from_stateq(unit_input, unit_output,'interstitial_num',&
+          state_q(yaml%col_print,yaml%lev_print,:),.true.)! last arg .ture. for printing aerosol numbers only
+        do ispec = 16, 40 !ensure that the loop starts from 16, as aerosols starts at 16th index
+           tmp_arr => qqcw(ispec)%fld(:,:)
+           fldcw_wrt(1,ispec) = tmp_arr(yaml%col_print,yaml%lev_print)
+        enddo
+
+        call write_aerosol_mmr_from_stateq(unit_input, unit_output,'cloud_borne',fldcw_wrt)
+        call write_aerosol_mmr_from_stateq(unit_input, unit_output,'cloud_borne_num',fldcw_wrt,.true.)! last arg .ture. for printing aerosol numbers only
+
+
+     endif
 
      close(unit_input)
      call freeunit(unit_input)
   endif
 
  deallocate(fldcw_wrt)
+ deallocate(dotend_yaml)
+ deallocate(dqdt_yaml)
 #endif
 
   !Following code was used to find out best grid cells for output:
