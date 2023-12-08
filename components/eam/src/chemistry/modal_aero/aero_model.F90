@@ -658,9 +658,7 @@ contains
 
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_wetdep(dt, dlf, dlf2, cmfmc2, state,                    & ! in
-       sh_e_ed_ratio, mu, md, du, eu, ed, dp, jt, maxg, ideep, lengath,         & ! in
-       species_class,                                                           & ! in
+  subroutine aero_model_wetdep(dt, dlf, state,                                  & ! in
        cam_out,                                                                 & ! inout
        pbuf,                                                                    & ! Pointer
        ptend                                                                    ) ! out
@@ -685,25 +683,7 @@ contains
 
     real(r8),            intent(in)    :: dt          ! time step [s]
     real(r8),            intent(in)    :: dlf(:,:)    ! shallow+deep convective detrainment [kg/kg/s]
-    real(r8),            intent(in)    :: dlf2(:,:)   ! Shal conv cldwtr detrainment [kg/kg/s]
-    real(r8),            intent(in)    :: cmfmc2(pcols,pverp) ! Shal conv mass flux [kg/m2/s]
-    real(r8),            intent(in)    :: sh_e_ed_ratio(pcols,pver)  ! shallow conv [ent/(ent+det)] ratio [fraction]
-    ! mu, md, ..., ideep, lengath are all deep conv variables
-    ! *** AND ARE GATHERED ***
-    ! eu, ed, du are "d(massflux)/dp" and are all positive
-    real(r8),            intent(in)    :: mu(pcols,pver)   ! Updraft mass flux (positive) [mb/s]
-    real(r8),            intent(in)    :: md(pcols,pver)   ! Downdraft mass flux (negative) [mb/s]
-    real(r8),            intent(in)    :: du(pcols,pver)   ! Mass detrain rate from updraft [1/s]
-    real(r8),            intent(in)    :: eu(pcols,pver)   ! Mass entrain rate into updraft [1/s]
-    real(r8),            intent(in)    :: ed(pcols,pver)   ! Mass entrain rate into downdraft [1/s]
-    real(r8),            intent(in)    :: dp(pcols,pver)   ! Delta pressure between interfaces [mb]
-
-    integer,             intent(in)    :: jt(pcols)         ! Index of cloud top for each column
-    integer,             intent(in)    :: maxg(pcols)       ! Index of cloud top for each column
-    integer,             intent(in)    :: ideep(pcols)      ! Gathering array
-    integer,             intent(in)    :: lengath           ! Gathered min lon indices over which to operate
-    integer,             intent(in)    :: species_class(:)  ! species index
-
+   
 
     ! local vars
     type(wetdep_inputs_t) :: dep_inputs ! wet deposition variables defined from wetdep_inputs_set
@@ -1074,10 +1054,10 @@ contains
        call set_srf_wetdep(aerdepwetis, aerdepwetcw, cam_out)
     endif
 
-    call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
-    call pbuf_get_field(pbuf, icwmrsh_idx,     icwmrsh )
-    call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
-    call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
+    !call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
+    !call pbuf_get_field(pbuf, icwmrsh_idx,     icwmrsh )
+    !call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
+    !call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
     !call t_startf('ma_convproc')
     !call ma_convproc_intr( state, dt,                         & ! in
