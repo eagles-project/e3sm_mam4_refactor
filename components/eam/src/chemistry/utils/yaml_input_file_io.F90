@@ -122,11 +122,15 @@ module yaml_input_file_io
 
   interface write_aerosol_mmr_from_stateq
      module procedure write_aerosol_mmr_from_stateq_real
+     module procedure write_1d_aerosol_mmr_from_stateq_real
+     module procedure write_1d_aerosol_mmr_from_stateq_real_drv
      module procedure write_aerosol_mmr_from_stateq_logical
   end interface write_aerosol_mmr_from_stateq
 
   interface write_output_aerosol_mmr_from_stateq
      module procedure write_output_aerosol_mmr_from_stateq_real
+     module procedure write_1d_output_aerosol_mmr_from_stateq_real
+     module procedure write_1d_output_aerosol_mmr_from_stateq_real_drv
      module procedure write_output_aerosol_mmr_from_stateq_logical
   end interface write_output_aerosol_mmr_from_stateq
 
@@ -381,6 +385,93 @@ contains
 
   !================================================================================
 
+  subroutine write_1d_aerosol_mmr_from_stateq_real_drv(unit_input, unit_output, fld_name,field,aer_num_only)
+    !------------------------------------------------------------------
+    !Purpose: write interstitial aerosols mmr from state%q vector
+    !Used for 1d spatial data, so field is 2d (num/species is second dimension)
+    !------------------------------------------------------------------
+    implicit none
+
+    integer,  intent(in)   :: unit_input      ! input stream unit number
+    integer,  intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:)        ! field values in r8
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only!to print only aerosol numbers
+
+    if(present(aer_num_only)) then
+       call write_1d_aerosol_mmr_from_stateq_real(unit_input, unit_output, fld_name,size(field,1),field,aer_num_only)
+    else
+       call write_1d_aerosol_mmr_from_stateq_real(unit_input, unit_output, fld_name,size(field,1),field)
+    endif
+
+  end subroutine write_1d_aerosol_mmr_from_stateq_real_drv
+
+  !================================================================================
+
+  subroutine write_1d_aerosol_mmr_from_stateq_real(unit_input, unit_output, fld_name, dim, field, aer_num_only)
+    !------------------------------------------------------------------
+    !Purpose: write interstitial aerosols mmr from state%q vector
+    !Used for 1d spatial data, so field is 2d (num/species is second dimension)
+    !------------------------------------------------------------------
+    implicit none
+
+    integer,  intent(in)   :: unit_input      ! input stream unit number
+    integer,  intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer,  intent(in)  :: dim             ! dimensions of field
+    real(r8), intent(in)  :: field(:,:)        ! field values in r8
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only!to print only aerosol numbers
+
+    integer :: ispec, aer_spec
+    logical :: mass_or_num
+
+    integer :: d1
+
+    !format statement to write in double precision
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E26.17E3)
+11  format(A,E26.17E3)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+    !In MAM4,first 15 species are non-aerosols, so we start with 16th species
+    !We store first specie mmr seprately to adjust comma(",") we need
+    !in the output array
+    aer_spec = 16
+    if(present(aer_num_only) .and. aer_num_only)aer_spec = 23 !23rd index is the first num aerosol
+    write(unit_input,10,advance="no")field(lbound(field,1),aer_spec)
+    do d1 = lbound(field,1)+1, ubound(field,1)
+       write(unit_input,11,advance="no")',', remove_nan_real(field(d1,aer_spec))
+    enddo
+
+    aer_spec = aer_spec + 1
+    do ispec = aer_spec, pcnst
+       !ignore species based on "aer_num_only" optional input
+       mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num')==0)
+       if(present(aer_num_only) .and. aer_num_only) mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
+
+       if(mass_or_num) then !ignore the aerosol number
+          do d1 = lbound(field,1), ubound(field,1)
+             write(unit_input,11,advance="no")',',remove_nan_real(field(d1,ispec))
+          enddo
+       endif
+
+    enddo
+    write(unit_input,'(A)')']'
+
+    if(present(aer_num_only)) then
+       call write_1d_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, dim, field, aer_num_only_in=aer_num_only, inp_out_str="input")
+    else
+       call write_1d_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, dim, field, inp_out_str="input")
+    endif
+
+  end subroutine write_1d_aerosol_mmr_from_stateq_real
+
+  !================================================================================
+
   subroutine write_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, field, aer_num_only, inp_out_str)
     !------------------------------------------------------------------
     !Purpose: Writes aerosol mmr from state%q or q vector for the input and the output yaml file
@@ -435,6 +526,93 @@ contains
     write(unit_output,'(A)')'],]'
 
   end subroutine write_output_aerosol_mmr_from_stateq_real
+
+  !================================================================================
+
+  subroutine write_1d_output_aerosol_mmr_from_stateq_real_drv(unit_output, fld_name,field,aer_num_only)
+    !------------------------------------------------------------------
+    !Purpose: write interstitial aerosols mmr from state%q vector
+    !Used for 1d spatial data, so field is 2d (num/species is second dimension)
+    !------------------------------------------------------------------
+    implicit none
+
+    integer,  intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:)        ! field values in r8
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only!to print only aerosol numbers
+
+    if(present(aer_num_only)) then
+       call write_1d_output_aerosol_mmr_from_stateq_real(unit_output, fld_name,size(field,1),field,aer_num_only_in=aer_num_only)
+    else
+       call write_1d_output_aerosol_mmr_from_stateq_real(unit_output, fld_name,size(field,1),field)
+    endif
+
+  end subroutine write_1d_output_aerosol_mmr_from_stateq_real_drv
+
+  !================================================================================
+
+  subroutine write_1d_output_aerosol_mmr_from_stateq_real(unit_output, fld_name, dim, field, aer_num_only_in, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes aerosol mmr from state%q or q vector for the input and the output yaml file
+    !Used for 1d spatial data, so field is 2d (num/species is second dimension)
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim             ! dimensions of the field
+    real(r8), intent(in)  :: field(:,:)      ! field values in r8
+
+    !optional input
+    logical,  intent(in), optional :: aer_num_only_in !to print only aerosol numbers
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: ispec, aer_spec
+    logical :: mass_or_num
+    character(len=20) :: object
+
+    integer :: d1
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E26.17E3,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    !In MAM4,first 15 species are non-aerosols, so we start with 16th species
+    aer_spec = 16
+
+    !if we need to print only aerosol number mixing ratios, we should start from 23rd species
+    if(present(aer_num_only_in) .and. aer_num_only_in)aer_spec = 23 !23rd index is the first num aerosol
+
+    do ispec = aer_spec, pcnst
+       !ignore species based on "aer_num_only" optional input
+       mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num')==0)
+       if(present(aer_num_only_in) .and. aer_num_only_in) &
+            mass_or_num = (index(trim(adjustl(cnst_name(ispec))),'num').ne.0) !if we need to print only aerosol numbers
+
+       if(mass_or_num) then !ignore the aerosol number
+          do d1 = lbound(field,1), ubound(field,1)
+             write(unit_output,12,advance="no"),remove_nan_real(field(d1,ispec)),','
+          enddo
+       endif
+
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_1d_output_aerosol_mmr_from_stateq_real
 
   !================================================================================
 
