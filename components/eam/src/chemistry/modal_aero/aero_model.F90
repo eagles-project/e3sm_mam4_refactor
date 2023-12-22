@@ -1600,7 +1600,6 @@ contains
     srf_temp = cam_in%sst
 
     call dust_emis( ncol, lchnk, cam_in%dstflx, & ! in
-                    lchnk, &
                     cam_in%cflx, &                ! inout
                     soil_erod_tmp )               ! out
 
@@ -1615,17 +1614,14 @@ contains
     call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
 
     call calculate_seasalt_numflux_in_bins(ncol, cam_in%sst, state%u(:ncol,pver), state%v(:ncol,pver),  state%zm(:ncol,pver), & ! in
-                                           lchnk, &
                                            fi) ! out
 
     sflx(:)=0._r8
 
     call seasalt_emis(lchnk, ncol, fi, cam_in%ocnfrac, seasalt_emis_scale, &  ! in
-                      lchnk, &
                       cam_in%cflx)                                                              ! inout
 
     call marine_organic_emis(lchnk, ncol, fi, cam_in%ocnfrac, seasalt_emis_scale, & ! in
-                             lchnk, &
                              cam_in%cflx)                                                             ! inout
 
     ! Write out salt mass fluxes to history files
@@ -1657,7 +1653,6 @@ contains
   !===============================================================================
   !===============================================================================
   subroutine calculate_seasalt_numflux_in_bins(ncol, srf_temp, ubot, vbot, zbot, & ! in
-                                               y_lchnk, &
                                                fi) ! out
     use sslt_sections, only: nsections, fluxes
 

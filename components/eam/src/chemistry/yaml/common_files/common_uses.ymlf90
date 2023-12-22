@@ -106,7 +106,7 @@ use spmd_utils,   only : masterproc
 ! #define YAML_GAS_DRYDEP
 
 ! dust and seasalt emission
-#define YAML_DUST_SSLT_EM
+! #define YAML_DUST_SSLT_EM
 
 use yaml_input_file_io
 

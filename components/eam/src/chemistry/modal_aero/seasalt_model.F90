@@ -349,7 +349,6 @@ end subroutine ocean_data_readnl
 
   !=============================================================================
 subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
-                        y_lchnk, &
                         cflx)                                                  ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -373,19 +372,16 @@ subroutine seasalt_emis(lchnk, ncol, fi, ocnfrc, emis_scale, & ! in
 #include "../yaml/seasalt_model/f90_yaml/seasalt_emis_beg_yml.f90"
     ! calculate seasalt number emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, num_flx_flag, &  ! in
-                              y_lchnk, &
                               cflx)                                          ! inout
  
     ! calculate seasalt mass emission fluxes
     call seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, mass_flx_flag, & ! in
-                              y_lchnk, &
                               cflx)                                          ! inout
 #include "../yaml/seasalt_model/f90_yaml/seasalt_emis_end_yml.f90"
 end subroutine seasalt_emis
 
 
 subroutine seasalt_emisflx_calc(ncol, fi, ocnfrc, emis_scale, flx_type, & ! in
-                                y_lchnk, &
                                 cflx)                                     ! inout
    
     use sslt_sections, only: nsections, fluxes, Dg, rdry
@@ -444,7 +440,6 @@ end subroutine seasalt_emisflx_calc
 
 
 subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
-                               y_lchnk, &
                                cflx)                                                   ! inout
 
     use sslt_sections, only: nsections, fluxes
@@ -497,7 +492,6 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
 
    ! Calculate marine organic aerosol mass fraction based on Burrows et al., ACP (2013)
    call calc_om_ssa(ncol, mpoly(:ncol), mprot(:ncol), mlip(:ncol), &      ! in
-                    y_lchnk, &
                     mass_frac_bub_section(:ncol, :, :), om_ssa(:ncol, :)) ! inout
 
 
@@ -515,12 +509,10 @@ subroutine marine_organic_emis(lchnk, ncol, fi, ocnfrc, emis_scale, &  ! in
    
     call marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in 
                                     om_ssa, emit_this_mode, &        ! in
-                                    y_lchnk, &
                                     cflx)                            ! inout
 
     call marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                      mass_frac_bub_section, emit_this_mode, & ! in
-                                     y_lchnk, &
                                      cflx)                                    ! inout
 #include "../yaml/seasalt_model/f90_yaml/marine_organic_emis_end_yml.f90"
 end subroutine marine_organic_emis
@@ -528,7 +520,6 @@ end subroutine marine_organic_emis
 
 subroutine marine_organic_numflx_calc(ncol, fi, ocnfrc, emis_scale, &  ! in
                                       om_ssa, emit_this_mode, &        ! in
-                                      y_lchnk, &
                                       cflx)                            ! inout
 
     use sslt_sections, only: nsections, Dg
@@ -581,7 +572,6 @@ end subroutine marine_organic_numflx_calc
 
 subroutine marine_organic_massflx_calc(ncol, fi, ocnfrc, emis_scale, om_ssa, &  ! in
                                        mass_frac_bub_section, emit_this_mode, & ! in
-                                       y_lchnk, &
                                        cflx)                                    ! inout
 
     use sslt_sections, only: nsections, Dg, rdry
@@ -635,7 +625,6 @@ end subroutine marine_organic_massflx_calc
 
 
 subroutine calc_om_ssa(ncol, mpoly_in, mprot_in, mlip_in, & ! in
-                       y_lchnk, &
                        mass_frac_bub_section, om_ssa)       ! inout
 
    !----------------------------------------------------------------------- 

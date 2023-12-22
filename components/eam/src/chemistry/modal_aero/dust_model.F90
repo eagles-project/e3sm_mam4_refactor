@@ -107,7 +107,6 @@ module dust_model
   !===============================================================================
   !===============================================================================
   subroutine dust_emis( ncol, lchnk, dust_flux_in, &  ! in
-                        y_lchnk, &
                         cflx, &                       ! inout
                         soil_erod )                   ! out
     use soil_erod_mod, only : soil_erod_fact
