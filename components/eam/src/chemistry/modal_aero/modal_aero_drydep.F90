@@ -123,8 +123,7 @@ contains
                   ram1in,       &! in: cam_in%ram1
                   fricvelin,    &! in: cam_in%fv
                   ram1,         &! out: aerodynamical resistance (s/m)
-                  fricvel       &! out: bulk friction velocity of a grid cell
-                  )
+                  fricvel )      ! out: bulk friction velocity of a grid cell
 
     call outfld( 'airFV', fricvel(:), pcols, lchnk )
     call outfld( 'RAM1',     ram1(:), pcols, lchnk )
@@ -506,6 +505,7 @@ contains
      integer :: ii
 
      real(r8), parameter :: lndfrc_threshold = 0.000000001_r8  ! fraction, unitless
+#include "../yaml/modal_aero_drydep/f90_yaml/calcram_beg_yml.f90"
 
      !---------------------------------------------------------------------------
      ! Friction velocity:
@@ -540,7 +540,6 @@ contains
         else
         ! If the grid cell has a land fraction smaller than the threshold,
         ! calculate aerodynamic resistence
-
 
            ! calculate psi, psi0, temp
 
@@ -585,7 +584,7 @@ contains
         endif  ! if grid cell has land fraction > threshold or not
 
      enddo ! loop over grid columns
-
+#include "../yaml/modal_aero_drydep/f90_yaml/calcram_end_yml.f90"
   end subroutine calcram
 
   !==========================================================================
