@@ -123,7 +123,7 @@ contains
                   ram1in,       &! in: cam_in%ram1
                   fricvelin,    &! in: cam_in%fv
                   ram1,         &! out: aerodynamical resistance (s/m)
-                  fricvel )     ! out: bulk friction velocity of a grid cell
+                  fricvel )      ! out: bulk friction velocity of a grid cell
 
     call outfld( 'airFV', fricvel(:), pcols, lchnk )
     call outfld( 'RAM1',     ram1(:), pcols, lchnk )
@@ -172,7 +172,7 @@ contains
        qq => qqcw(icnst)%fld
        call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
                                                rho, tair, pint, pmid, pdel,        &! in
-                                               dqdt_tmp, sflx )                    ! out
+                                               dqdt_tmp, sflx                      )! out
 
        aerdepdrycw(:ncol,icnst) = sflx(:ncol)
 
@@ -234,7 +234,7 @@ contains
           qq => state_q(:,:,icnst)
           call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
                                                   rho, tair, pint, pmid, pdel,        &! in
-                                                  dqdt_tmp, sflx )                    ! out
+                                                  dqdt_tmp, sflx                      )! out
 
           aerdepdryis(:ncol,icnst) = sflx(:ncol)
           ptend%lq(icnst) = .true.
@@ -544,9 +544,6 @@ contains
         else
         ! If the grid cell has a land fraction smaller than the threshold,
         ! calculate aerodynamic resistence
-           call get_rlat_all_p(y_lchnk, ncol, rlats)
-           call get_rlon_all_p(y_lchnk, ncol, rlons)
-!!!!!           write(102,*) 'ii,rlats,rlons:  ',ii,rlats(ii) * 180._r8 / pi, rlons(ii) * 180._r8 / pi
 
            ! calculate psi, psi0, temp
 
