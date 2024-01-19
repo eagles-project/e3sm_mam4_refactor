@@ -266,7 +266,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine sedimentation_solver_for_1_tracer( ncol, dt, sed_vel, qq_in,            &! in
                                                 rho, tair, pint, pmid, pdel,         &! in
-                                                dqdt_sed, sflx                       )! out
+                                                dqdt_sed, sflx )                     ! out
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
     use ppgrid,            only: pcols, pver, pverp
@@ -291,6 +291,8 @@ contains
     real(r8) :: dtmassflux(pcols,pverp)  ! dt * mass fluxes at layer interfaces (positive = down)
 
     integer  :: ii,kk
+
+#include "../yaml/modal_aero_drydep/f90_yaml/sedimentation_solver_for_1_tracer_beg_yml.f90"
 
     !---------------------------------------------------------------------------------------
     ! Set sedimentation velocity to zero at the top interface of the model domain.
@@ -349,6 +351,8 @@ contains
     ! Convert flux out the bottom to mass units [kg/m2/s]
     !-----------------------------------------------------------------------
     sflx(:ncol) = dtmassflux(:ncol,pverp) / (dt*gravit)
+
+#include "../yaml/modal_aero_drydep/f90_yaml/sedimentation_solver_for_1_tracer_end_yml.f90"
 
   end subroutine sedimentation_solver_for_1_tracer
 
