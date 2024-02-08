@@ -3,7 +3,7 @@
   !"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
-  integer, intent(in) :: y_lchnk
+  ! integer, intent(in) :: y_lchnk
   !-----------------------------------------------------------------------------------------
 
   !-----------------------------------------------------------------------------------------
@@ -33,9 +33,11 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-  yaml%nstep_print = 1000 !time step
+!  yaml%nstep_print = 1000 !time step
+!  yaml%nstep_print = 100 !time step
+  yaml%nstep_print = 300 !time step
 
-  yaml%col_print = icolprnt(y_lchnk)                !column to write data
+  yaml%col_print = icolprnt(lchnk)                !column to write data
 
   !current_time step
   y_nstep = get_nstep()
@@ -69,7 +71,8 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
-     ext_str = "loc3_over_water"
+     ! ext_str = "loc3_over_water"
+      ext_str = "loc2_has_snow"
      !-----------------------------------------------------------------------------------------
 
 
@@ -81,7 +84,7 @@
      !if ((n_calls==1 .and. flag==0) .or. (n_calls==3 .and. flag==1) .or. (n_calls==5 .and. flag==2)) then
 
         !(**remove these yaml% variables if generating data for a dependent subroutines**)
-        yaml%lchnk_print = y_lchnk
+        yaml%lchnk_print = lchnk
         yaml%flag_print  = .true.
 
 
@@ -89,6 +92,7 @@
         !(with an optional argument to pass a unique string to differentiate file names)
         call open_files('drydep_xactive', &  !intent-in
              unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+!             unit_input, unit_output) !intent-out
 
 
         !start by adding an input string
@@ -116,6 +120,10 @@
         call write_var(unit_input,unit_output,'temp_highbound',temp_highbound)
         call write_var(unit_input,unit_output,'ric',ric)
         call write_var(unit_input,unit_output,'heff',heff(yaml%col_print,:))
+
+        
+        call write_var(unit_input,unit_output,'fraction_landuse',fraction_landuse(yaml%col_print,:,lchnk))
+        call write_var(unit_input,unit_output,'n_land_type',n_land_type)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
