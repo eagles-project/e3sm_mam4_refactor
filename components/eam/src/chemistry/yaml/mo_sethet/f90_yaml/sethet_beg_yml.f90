@@ -3,7 +3,7 @@
   !"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
-  integer :: y_lchnk
+   integer :: y_lchnk
   !-----------------------------------------------------------------------------------------
 
   !-----------------------------------------------------------------------------------------
@@ -97,6 +97,16 @@
         call write_var(unit_input,unit_output,'xhnm',xhnm(yaml%col_print,:))
         call write_var(unit_input,unit_output,'qin',qin(yaml%col_print,:,:))
         call write_var(unit_input,unit_output,'ncol',ncol)
+
+        call write_var(unit_input,unit_output,'spc_h2o2_ndx',spc_h2o2_ndx)
+        call write_var(unit_input,unit_output,'spc_so2_ndx',spc_so2_ndx)
+        call write_var(unit_input,unit_output,'h2o2_ndx',h2o2_ndx)
+        call write_var(unit_input,unit_output,'so2_ndx',so2_ndx)
+        call write_var(unit_input,unit_output,'h2so4_ndx',h2so4_ndx)
+        call write_var(unit_input,unit_output,'gas_wetdep_cnt',gas_wetdep_cnt)
+        call write_var(unit_input,unit_output,'wetdep_map',wetdep_map(:))
+
+
 
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
