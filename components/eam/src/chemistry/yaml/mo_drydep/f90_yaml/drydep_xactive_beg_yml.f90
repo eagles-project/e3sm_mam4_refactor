@@ -33,9 +33,9 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-!  yaml%nstep_print = 1000 !time step
+  yaml%nstep_print = 1000 !time step
 !  yaml%nstep_print = 100 !time step
-  yaml%nstep_print = 300 !time step
+!  yaml%nstep_print = 300 !time step
 
   yaml%col_print = icolprnt(lchnk)                !column to write data
 
@@ -71,8 +71,8 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
-     ! ext_str = "loc3_over_water"
-      ext_str = "loc2_has_snow"
+      ext_str = "loc3_over_water"
+     ! ext_str = "loc2_has_snow"
      !-----------------------------------------------------------------------------------------
 
 
@@ -124,6 +124,7 @@
         
         call write_var(unit_input,unit_output,'fraction_landuse',fraction_landuse(yaml%col_print,:,lchnk))
         call write_var(unit_input,unit_output,'n_land_type',n_land_type)
+        call write_var(unit_input,unit_output,'index_season_lai',index_season_lai(:,:))
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
