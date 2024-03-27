@@ -26,6 +26,8 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
 
+  real(r8) ::  rlat_yaml(pcols)    ! latitude in radians for columns
+
    y_lchnk = lchnk
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
@@ -85,7 +87,14 @@
              'sethet',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
-        
+
+        ! rlat is an input to a child subroutine, but its value is obtained from a function call.
+        ! Here we mimic this function call but use a local variable, rlat_yaml, which is then written to the datafiles
+        ! under the name 'rlat'.
+
+        call get_rlat_all_p(lchnk, ncol, rlat_yaml)
+        call write_var(unit_input,unit_output,'rlat',rlat_yaml(yaml%col_print))        
+
         call write_var(unit_input,unit_output,'press',press(yaml%col_print,:))
         call write_var(unit_input,unit_output,'zmid',zmid(yaml%col_print,:))
         call write_var(unit_input,unit_output,'phis',phis(yaml%col_print))
