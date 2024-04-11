@@ -24,6 +24,7 @@ use spmd_utils,   only : masterproc
 ! aero_model.F90 
 !#define YAML_AERO_MODEL
 !#define YAML_AERO_MODEL_GASAEREXCH
+!#define YAML_AERO_MODEL_WETDEP
 
 ! ndrop.F90
 !#define YAML_NDROP
