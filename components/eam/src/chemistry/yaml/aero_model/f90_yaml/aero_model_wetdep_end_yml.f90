@@ -6,6 +6,16 @@
 
      !start writing data
 
+        call write_var(unit_output,'dgncur_a',dgncur_a(yaml%col_print,:,:))
+        call write_var(unit_output,'wetdens',wetdens(yaml%col_print,:,:))
+        call write_var(unit_output,'qaerwat',qaerwat(yaml%col_print,:,:))
+        call write_var(unit_output,'dgnumwet',dgnumwet(yaml%col_print,:,:))
+        call write_var(unit_output,'fracis',fracis(yaml%col_print,:,:))  
+
+        call write_var(unit_output,'aerdepwetis',aerdepwetis(yaml%col_print,:))
+        call write_var(unit_output,'aerdepwetcw',aerdepwetcw(yaml%col_print,:))
+
+
         ! write out fields that are set within intent-out structure 'cam_out'
 
         call write_var(unit_output,'cam_out_bcphiwet',cam_out%bcphiwet(yaml%col_print))
@@ -17,7 +27,7 @@
         call write_var(unit_output,'cam_out_dstwet3',cam_out%dstwet3(yaml%col_print))
         call write_var(unit_output,'cam_out_dstwet4',cam_out%dstwet4(yaml%col_print))
 
-        ! ptend is passed as intent-out to aero_model_wetdp, so only include as output data.
+        ! ptend is passed as intent-out to aero_model_wetdep, so only include as output data.
         ! The following extract the fields from ptend used as output and write them to the data files.
         ! Use -9999.9 to fill in unused portions of the constituent arrays
 
@@ -37,7 +47,7 @@
            endif
         enddo
         call write_var(unit_output,'ptend_lq',ptend_lq_1darr(:))
-        call write_var(unit_output,'ptend_lq',ptend_q_3darr(yaml%col_print,yaml%lev_print,:))
+        call write_var(unit_output,'ptend_lq',ptend_q_3darr(yaml%col_print,:,:))
         deallocate(ptend_lq_1darr)
         deallocate(ptend_q_3darr)
 

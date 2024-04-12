@@ -41,14 +41,30 @@
   real(r8), pointer :: rprdsh_yaml(:,:)
   real(r8), pointer :: evapcsh_yaml(:,:)
   real(r8), pointer :: evapcdp_yaml(:,:)
+  real(r8), pointer :: cldn_yaml(:,:)
+
+ 
+
+  real(r8), pointer :: inputs_cldt_yaml(:,:)
+  real(r8), pointer :: inputs_qme_yaml(:,:)
+  real(r8), pointer :: inputs_prain_yaml(:,:)
+  real(r8), pointer :: inputs_evapr_yaml(:,:)
+
+  real(r8), pointer :: p_icwmrdp_yaml(:,:)
+  real(r8), pointer :: p_icwmrsh_yaml(:,:)
+  real(r8), pointer :: p_sh_frac_yaml(:,:)
+  real(r8), pointer :: p_dp_frac_yaml(:,:)
 
   type(ptr2d_t) :: qqcw_yaml(pcnst)                 !cloud-borne aerosols mass and number mixing rations
   real(r8), allocatable :: qqcw_yaml_2darr(:,:)
   integer :: imm
 
+  !  below are scalars used by child subroutine 'wetdep_inputs_set' 
+  integer :: qme_idx,  prain_idx, nevapr_idx, itim
+
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
-  yaml%lev_print = 68       !level
+  yaml%lev_print = 68       !level, but all fields are actually output for the whole vertical column
   yaml%nstep_print = 379 !time step
 
   y_lchnk = state%lchnk
@@ -103,20 +119,31 @@
              'aero_model_wetdep',yaml%nstep_print, yaml%lev_print)
 
         ! add code for writing data here
+
+        ! below are external module inputs to aero_model_wetdep
+
+        call write_var(unit_input,unit_output,'pcnst',pcnst)
+        call write_var(unit_input,unit_output,'pver',pver)
+        call write_var(unit_input,unit_output,'pverp',pverp)
+        call write_var(unit_input,unit_output,'pcols',pcols)
+
+        ! below are internal module inputs to aero_model_wetdep
+
+        call write_var(unit_input,unit_output,'nmodes',nmodes)
         
         ! below are explicit input arguments to aero_model_wetdep
 
         call write_var(unit_input,unit_output,'dt',dt)
-        call write_var(unit_input,unit_output,'dlf',dlf(yaml%col_print,yaml%lev_print)) 
-        call write_var(unit_input,unit_output,'dlf2',dlf2(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'cmfmc2',cmfmc2(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'sh_e_ed_ratio',sh_e_ed_ratio(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'mu',mu(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'md',md(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'du',du(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'eu',eu(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'ed',ed(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'dp',dp(yaml%col_print,yaml%lev_print))
+        call write_var(unit_input,unit_output,'dlf',dlf(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'dlf2',dlf2(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'cmfmc2',cmfmc2(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'sh_e_ed_ratio',sh_e_ed_ratio(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'mu',mu(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'md',md(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'du',du(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'eu',eu(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'ed',ed(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'dp',dp(yaml%col_print,:))
         call write_var(unit_input,unit_output,'jt',jt(yaml%col_print))
         call write_var(unit_input,unit_output,'maxg',maxg(yaml%col_print))
         call write_var(unit_input,unit_output,'ideep',ideep(yaml%col_print))
@@ -129,14 +156,14 @@
 
         call write_var(unit_input,unit_output,'lchnk',y_lchnk) 
         call write_var(unit_input,unit_output,'ncol',state%ncol)
-        call write_var(unit_input,unit_output,'state_q',state%q(yaml%col_print,yaml%lev_print,:)) ! ??? distinct from state_q used later on?
-        call write_var(unit_input,unit_output,'temperature',state%t(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'pmid',state%pmid(yaml%col_print,yaml%lev_print))
-        call write_var(unit_input,unit_output,'pdel',state%pdel(yaml%col_print,yaml%lev_print)) 
+        call write_var(unit_input,unit_output,'state_q',state%q(yaml%col_print,:,:))
+        call write_var(unit_input,unit_output,'temperature',state%t(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'pmid',state%pmid(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'pdel',state%pdel(yaml%col_print,:)) 
 
         ! the following are input arguments that are fields within pbuf.  We thus need to duplicate the pbuf extraction subroutine calls in order to write out the fields.
 
-        call pbuf_get_field(pbuf, dgnum_idx,      dgncur_a_yaml )  ! note:  this is called again later on before passed into dgnumdry_m in modal_aero_calcsize_sub
+        call pbuf_get_field(pbuf, dgnum_idx,      dgncur_a_yaml )
         call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens_yaml)
         call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat_yaml)
         call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet_yaml, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
@@ -145,16 +172,19 @@
         call pbuf_get_field(pbuf, rprdsh_idx,      rprdsh_yaml  )
         call pbuf_get_field(pbuf, nevapr_shcu_idx, evapcsh_yaml )
         call pbuf_get_field(pbuf, nevapr_dpcu_idx, evapcdp_yaml )
+        itim_old    =  pbuf_old_tim_idx()
+        call pbuf_get_field(pbuf, cld_idx, cldn_yaml, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
-        call write_var(unit_input,unit_output,'dgncur_a',dgncur_a_yaml(yaml%col_print,yaml%lev_print,:)) 
-        call write_var(unit_input,unit_output,'wetdens',wetdens_yaml(yaml%col_print,yaml%lev_print,:))  
-        call write_var(unit_input,unit_output,'qaerwat',qaerwat_yaml(yaml%col_print,yaml%lev_print,:)) 
-        call write_var(unit_input,unit_output,'dgnumwet',dgnumwet_yaml(yaml%col_print,yaml%lev_print,:))  
-        call write_var(unit_input,unit_output,'fracis',fracis_yaml(yaml%col_print,yaml%lev_print,:)) 
-        call write_var(unit_input,unit_output,'rprddp',rprddp_yaml(:,:)) 
-        call write_var(unit_input,unit_output,'rprdsh',rprdsh_yaml(:,:)) 
-        call write_var(unit_input,unit_output,'evapcsh',evapcsh_yaml(:,:)) 
-        call write_var(unit_input,unit_output,'evapcdp',evapcdp_yaml(:,:)) 
+        call write_var(unit_input,unit_output,'dgncur_a',dgncur_a_yaml(yaml%col_print,:,:)) 
+        call write_var(unit_input,unit_output,'wetdens',wetdens_yaml(yaml%col_print,:,:))  
+        call write_var(unit_input,unit_output,'qaerwat',qaerwat_yaml(yaml%col_print,:,:)) 
+        call write_var(unit_input,unit_output,'dgnumwet',dgnumwet_yaml(yaml%col_print,:,:))  
+        call write_var(unit_input,unit_output,'fracis',fracis_yaml(yaml%col_print,:,:)) 
+        call write_var(unit_input,unit_output,'rprddp',rprddp_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'rprdsh',rprdsh_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'evapcsh',evapcsh_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'evapcdp',evapcdp_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'cldn',cldn_yaml(yaml%col_print,:)) 
 
         call get_cldbrn_mmr(lchnk, pbuf, &! in
          qqcw_yaml) !out      
@@ -172,6 +202,36 @@
         enddo
         call write_var(unit_input,unit_output,'qqcw',qqcw_yaml_2darr)
         deallocate(qqcw_yaml_2darr)
+
+        ! the following are input arguments to child subroutine 'wetdep_inputs_set' that are fields within pbuf.  
+        ! So we also need to duplicate those pbuf extraction subroutine calls in order to write out the input fields.
+        ! (Some input pbuf arguments to wetdep_inputs_set are also separately extracted in aero_model_wetdep, so
+        ! these appear above and are not reduplicated below.)
+
+        qme_idx             = pbuf_get_index('QME')    
+        prain_idx           = pbuf_get_index('PRAIN')  
+        nevapr_idx          = pbuf_get_index('NEVAPR') 
+        itim = pbuf_old_tim_idx()
+
+        call pbuf_get_field(pbuf, cld_idx,         inputs_cldt_yaml, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+        call pbuf_get_field(pbuf, qme_idx,         inputs_qme_yaml     )
+        call pbuf_get_field(pbuf, prain_idx,       inputs_prain_yaml   )
+        call pbuf_get_field(pbuf, nevapr_idx,      inputs_evapr_yaml   )
+
+        call pbuf_get_field(pbuf, icwmrdp_idx,     p_icwmrdp_yaml )
+        call pbuf_get_field(pbuf, icwmrsh_idx,     p_icwmrsh_yaml )
+        call pbuf_get_field(pbuf, sh_frac_idx,     p_sh_frac_yaml )
+        call pbuf_get_field(pbuf, dp_frac_idx,     p_dp_frac_yaml )
+
+        call write_var(unit_input,unit_output,'inputs_cldt',inputs_cldt_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'inputs_qme',inputs_qme_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'inputs_prain',inputs_prain_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'inputs_evapr',inputs_evapr_yaml(yaml%col_print,:)) 
+
+        call write_var(unit_input,unit_output,'p_icwmrdp',p_icwmrdp_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'p_icwmrsh',p_icwmrsh_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'p_sh_frac',p_sh_frac_yaml(yaml%col_print,:)) 
+        call write_var(unit_input,unit_output,'p_dp_frac',p_dp_frac_yaml(yaml%col_print,:)) 
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
