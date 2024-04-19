@@ -32,6 +32,7 @@ module nucleate_ice
 use wv_saturation,  only: svp_water, svp_ice
 use cam_logfile,    only: iulog
 use phys_control,   only: cam_chempkg_is 
+use yaml_input_file_io
 
 implicit none
 private
@@ -92,7 +93,7 @@ end subroutine nucleati_init
 subroutine nucleati(  &
    wbar, tair, pmid, relhum, cldn,      &
    rhoair, so4_num, dst3_num,  &
-   nuci, onihf, oniimm, onidep, onimey)
+   nuci, onihf, oniimm, onidep, onimey,print_out,kk)
 
    !---------------------------------------------------------------
    ! Purpose:
@@ -115,7 +116,8 @@ subroutine nucleati(  &
    real(r8), intent(in) :: rhoair      ! air density [kg/m3]
    real(r8), intent(in) :: so4_num     ! so4 aerosol number [#/cm^3]
    real(r8), intent(in) :: dst3_num     ! dust aerosol number [#/cm^3]
-
+   integer :: kk
+   logical :: print_out
    ! Output Arguments
    real(r8), intent(out) :: nuci       ! ice number nucleated [#/kg]
    real(r8), intent(out) :: onihf      ! nucleated number from homogeneous freezing of so4 [#/kg]
@@ -190,12 +192,18 @@ subroutine nucleati(  &
                else
 
                   call hf(regm-5._r8,wbar,relhum,so4_num,nihf)
+                  if(print_out .and. kk==63) then
+                     write(106,*)regm-5._r8,wbar,relhum,so4_num,nihf
+                  endif
                   call hetero(regm,wbar,dst3_num,niimm,nidep)
 
                   if (nihf <= (niimm+nidep)) then
                      n1 = nihf
                   else
                      n1=(niimm+nidep)*((niimm+nidep)/nihf)**((tc-regm)/5._r8)
+                     if(print_out .and. kk==63) then
+                        write(106,*)n1, niimm, nidep, nihf, tc, regm
+                     endif
                   endif
 
                end if

@@ -10,7 +10,8 @@ module ndrop
   !            affect the climate calculation.  This is implemented by using list
   !            index 0 in all the calls to rad_constituent interfaces.
   !---------------------------------------------------------------------------------
-
+use yaml_input_file_io
+use module_perturb
   use shr_kind_mod,     only: r8 => shr_kind_r8
   use spmd_utils,       only: masterproc
   use ppgrid,           only: pcols, pver, pverp
@@ -294,7 +295,7 @@ contains
        lchnk,ncol,dtmicro,temp,pmid,pint,pdel,rpdel,zm,   &  ! in
        state_q,ncldwtr,kvh,wsub,cldn,cldo, &  ! in
        qqcw, & ! inout
-       ptend, tendnd, factnum)  !out
+       ptend, tendnd, factnum,print_out)  !out
 
     ! vertical diffusion and nucleation of cloud droplets
     ! assume cloud presence controlled by cloud fraction
@@ -304,6 +305,7 @@ contains
     use mam_support,       only: min_max_bound, ptr2d_t
 
     ! input arguments
+    logical :: print_out
     integer, intent(in)  :: lchnk               ! chunk identifier
     integer, intent(in)  :: ncol                ! number of columns
     real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
@@ -479,6 +481,7 @@ contains
        do kk = top_lev, pver
           ndropmix(icol,kk) = (qcld(kk) - ncldwtr(icol,kk))*dtinv - nsource(icol,kk)
           tendnd(icol,kk)   = (max(qcld(kk), 1.e-6_r8) - ncldwtr(icol,kk))*dtinv
+          if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt) write(104,*)'tendnd:',tendnd(icol,kk),qcld(kk),ncldwtr(icol,kk),dtinv
           ndropcol(icol)   = ndropcol(icol) + ncldwtr(icol,kk)*pdel(icol,kk)
        enddo
        ndropcol(icol) = ndropcol(icol)/gravit

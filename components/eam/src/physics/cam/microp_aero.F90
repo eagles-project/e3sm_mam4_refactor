@@ -21,7 +21,9 @@ module microp_aero
   !                  interface modules and preserve just the driver layer functionality here.
   !
   !---------------------------------------------------------------------------------
-
+  use module_perturb
+  use prescribed_aero
+  use yaml_input_file_io
   use shr_kind_mod,     only: r8=>shr_kind_r8
   use spmd_utils,       only: masterproc
   use ppgrid,           only: pcols, pver, pverp, begchunk, endchunk
@@ -399,10 +401,11 @@ contains
   !=========================================================================================
 
   subroutine microp_aero_run ( &
-       state, ptend, deltatin, pbuf, liqcldfo )
+       state, ptend, deltatin, pbuf, liqcldfo, macmic_it )
 
     use mam_support,       only: min_max_bound, ptr2d_t
-    use modal_aero_data,   only: qqcw_get_field, nspec_amode, numptrcw_amode, lmassptrcw_amode, ntot_amode
+    use modal_aero_data,   only: qqcw_get_field, nspec_amode, numptrcw_amode, lmassptrcw_amode, ntot_amode, cnst_name_cw
+    use constituents
     use ndrop,             only: mam_idx, ncnst_tot
 
     ! input arguments
@@ -411,6 +414,7 @@ contains
     real(r8),                    intent(in)    :: deltatin     ! time step (s)
     real(r8),                    intent(in)    :: liqcldfo(pcols,pver)  ! old liquid cloud fraction
     type(physics_buffer_desc),   pointer       :: pbuf(:)
+    integer, intent(in) :: macmic_it
 
     ! local workspace
     ! all units mks unless otherwise stated
@@ -443,6 +447,7 @@ contains
     real(r8), pointer :: frzimm(:,:)
     real(r8), pointer :: frzcnt(:,:)
     real(r8), pointer :: frzdep(:,:)
+    integer ind
 
     real(r8), pointer :: ptr2d(:,:)
 
@@ -465,7 +470,12 @@ contains
 
 
     real(r8), allocatable :: factnum(:,:,:) ! activation fraction for aerosol number
+    integer :: tstep,ic
+    logical :: print_out
+    real(r8):: ptr2d_b(pcols,pver)
+    character(len=10) :: spec_a
     !-------------------------------------------------------------------------------
+   tstep = get_nstep()
 
     associate( &
          lchnk => state%lchnk,             &
@@ -481,7 +491,43 @@ contains
          pdel     => state%pdel,           &
          rpdel    => state%rpdel,          &
          zm       => state%zm             )
+   !Note for C++ porting, the following variables that are obtained using pbuf
+!should be obtained from AD for the previous time step
+    itim_old = pbuf_old_tim_idx()
+    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))
+    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+    call pbuf_get_field(pbuf, dgnum_idx, dgnum)
+    ! partition cloud fraction into liquid water part
+    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+    ! The following variable obtained using pbuf is used
+    ! for vertical mixing in the activation subroutine dropmixnuc
+    call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
 
+
+
+   print_out = (icolprnt(lchnk) > 0 .and. tstep == 6 .and. macmic_it==6)
+
+   if(print_out) then
+      write(105,'(A,72(E26.17E3,","),A)')'T_mid : [',temperature(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'qv : [',state_q(icolprnt(lchnk),:,1),']'
+      write(105,'(A,72(E26.17E3,","),A)')'qc : [',qc(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'qi : [',qi(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'nc : [',nc(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'omega : [',omega(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'p_mid : [',pmid(icolprnt(lchnk),:),']'
+      write(105,'(A,73(E26.17E3,","),A)')'p_int : [',pint(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'pseudo_density : [',pdel(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'zm : [',zm(icolprnt(lchnk),:),']'
+      write(105,'(A,73(E26.17E3,","),A)')'w_variance : [',wp2(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'cldfrac_tot : [',ast(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'cldfrac_liq : [',alst(icolprnt(lchnk),:),']'
+      write(105,'(A,72(E26.17E3,","),A)')'cldfrac_liq_prev : [',liqcldfo(icolprnt(lchnk),:),']'
+      write(105,'(A,73(E26.17E3,","),A)')'eddy_diff_heat : [',kvh(icolprnt(lchnk),:),']'
+      write(105,'(A,288(E26.17E3,","),A)')'dgnum : [',dgnum(icolprnt(lchnk),:,:),']'
+      do ic = 10, 40
+         write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name(ic)),' : [',state_q(icolprnt(lchnk),:,ic),']'
+      enddo
+   endif
       !!..........................................................
       !!  Convert from omega to w
       !!  Negative omega means rising motion
@@ -496,10 +542,7 @@ contains
     enddo
 
     allocate(tke(pcols,pverp))
-    !Note for C++ porting, the following variables that are obtained using pbuf
-    !should be obtained from AD for the previous time step
-    itim_old = pbuf_old_tim_idx()
-    call pbuf_get_field(pbuf, wp2_idx, wp2, start=(/1,1,itim_old/),kount=(/pcols,pverp,1/))
+    
     tke(:ncol,:) = (3._r8/2._r8)*wp2(:ncol,:)
 
     ! More refined computation of sub-grid vertical velocity
@@ -516,11 +559,11 @@ contains
           wsub(icol,kk)  = max(wsubmin, wsub(icol,kk))
        end do
     end do
-    deallocate(tke)
+    !deallocate(tke)
 
-    w2(1:ncol,1:pver) = 0._r8
-    call subgrid_mean_updraft(ncol, w0, wsig, &!in
-         w2) !out
+    !w2(1:ncol,1:pver) = 0._r8
+    !call subgrid_mean_updraft(ncol, w0, wsig, &!in
+    !     w2) !out
 
     wsubice(1:ncol,1:pver) = wsubi(1:ncol,1:pver)
 
@@ -528,20 +571,71 @@ contains
     call outfld('WSUBI',  wsubice, pcols, lchnk)
     call outfld('WSIG',   wsig, pcols, lchnk)
     call outfld('WLARGE', w0, pcols, lchnk)
-    call outfld('WSUBI2', w2, pcols, lchnk)
+    !call outfld('WSUBI2', w2, pcols, lchnk)
 
     !ICE Nucleation
-    call pbuf_get_field(pbuf, ast_idx,      ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-    call pbuf_get_field(pbuf, dgnum_idx, dgnum)
     call pbuf_get_field(pbuf, naai_idx, naai)
     call pbuf_get_field(pbuf, naai_hom_idx, naai_hom)
+
     call nucleate_ice_cam_calc(ncol, lchnk, temperature, state_q, pmid, &      ! input
          rho, wsubice, ast, dgnum, &                     ! input
-         naai, naai_hom)                                 ! output
+         naai, naai_hom, print_out)                                 ! output
 
     ! Droplet Activation
-    ! partition cloud fraction into liquid water part
-    call pbuf_get_field(pbuf, alst_idx,     alst, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
+   
+    if(print_out) then 
+      !inputs
+      write(103,*) '----- INPUT AT time step:',tstep, macmic_it
+      write(103,*)'pmid:',pmid(icolprnt(lchnk),kprnt)
+      write(103,*)'omega:',omega(icolprnt(lchnk),kprnt)
+      write(103,*)'T_mid:', temperature(icolprnt(lchnk),kprnt)
+      write(103,*)'dgnum:',dgnum(icolprnt(lchnk),kprnt,2)
+      write(103,*)'cldfrac_liq_prev:',liqcldfo(icolprnt(lchnk),kprnt)
+      write(103,*)'cldfrac_liq:',alst(icolprnt(lchnk),kprnt)
+      write(103,*)'w_variance:',wp2(icolprnt(lchnk),kprnt)
+      !write(103,*)rair, gravit, tstep, macmic_it
+
+      write(104,*) '----- OUPUT AT time step:',tstep, macmic_it
+      write(104,*)'wo',w0(icolprnt(lchnk),kprnt)
+      write(104,*)'rho:',rho(icolprnt(lchnk),kprnt)
+      !write(104,'(A,73(F24.17,","),A)')'const Real tke_b[73] = {',tke(icolprnt(lchnk),:),'};'
+      write(104,*)'TKE:',tke(icolprnt(lchnk),kprnt),tke(icolprnt(lchnk),kprnt+1)
+      write(104,*)'wsub:',wsub(icolprnt(lchnk),kprnt)
+      write(104,*)'wsubi:',wsubi(icolprnt(lchnk),kprnt)
+      write(104,*)'wsig:',wsig(icolprnt(lchnk),kprnt)
+      write(104,*)'dgnum_ait:',dgnum(icolprnt(lchnk),kprnt,2)
+      !write(104,'(A,72(E26.17E3,","),A)')'const Real dgnum_ait_e3sm : [',dgnum(icolprnt(lchnk),:,2),']'
+      write(104,*)'naai:',naai(icolprnt(lchnk),kprnt)
+      write(104,*)'naai_hom:',naai_hom(icolprnt(lchnk),kprnt)
+    endif
+    deallocate(tke)
+
+    do kk = top_lev, pver
+      do icol = 1, ncol
+        if(liqcldfo(icol,kk) > 0.1 .and. liqcldfo(icol,kk)<1.0 .and. &
+        alst(icol,kk)>0. .and. dgnum(icol,kk,2)>0. .and. wp2(icol,kk)>0 .and. &
+        naai(icol,kk).ne.0 .and. naai_hom(icol,kk).ne.0) then
+           write(102,*) '----- FINDING COLUMNS-----------'
+           write(102,*)'phys_debug_lat = ',get_lat(lchnk, icol)
+           write(102,*)'phys_debug_lon = ', get_lon(lchnk, icol)
+           write(102,*)'tstp:',get_nstep(), 'mit:',macmic_it, kk
+           write(102,*)'--INP for process----'
+           write(102,*)'pmid:',pmid(icol,kk)
+           write(102,*)'omega:',omega(icol,kk)
+           write(102,*)'T_mid:', temperature(icol,kk)
+           write(102,*)'dgnum:',dgnum(icol,kk,2)
+           write(102,*)'cldfrac_liq_prev:',liqcldfo(icol,kk)
+           write(102,*)'cldfrac_liq:',alst(icol,kk)
+           write(102,*)'w_variance:',wp2(icol,kk)
+
+           write(102,*)'--OUT for process----'
+           write(102,*)'naai:',naai(icol,kk)
+           write(102,*)'naai_hom:',naai_hom(icol,kk)
+         endif
+      enddo
+    enddo
+
+
     liqcldf(:ncol,:pver) = alst(:ncol,:pver)
     lcldn = 0._r8
     lcldo = 0._r8
@@ -568,8 +662,18 @@ contains
              icnst = lmassptrcw_amode(lspec,imode)
           endif
           qqcw(mm)%fld => qqcw_get_field(pbuf,icnst,lchnk,.true.)
+          if(print_out) then 
+            write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name_cw(icnst)),' : [',qqcw(mm)%fld(icolprnt(lchnk),:),']'
+         endif
        enddo
     enddo
+
+    
+   !if(print_out) then 
+      !do ic = 1,25
+         !write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name_cw(ic+15)),' : [',qqcw(ic)%fld(icolprnt(lchnk),:),']'
+      !enddo
+   !endif
 
     lchnk_zb = lchnk - begchunk
     ! save copy of cloud borne aerosols for use in heterogeneous freezing before
@@ -579,16 +683,34 @@ contains
        aer_cb(:ncol,:,ispec,lchnk_zb) = ptr2d(:ncol,:)
        aer_cb(:ncol,:,ispec,lchnk_zb) = aer_cb(:ncol,:,ispec,lchnk_zb) * rho(:ncol,:)
     enddo
+    if(print_out) then 
+      do ispec = 1, ncnst
+            call spec_c_to_a(trim(hetfrz_aer_specname(ispec)),spec_a)
+            call cnst_get_ind(trim(spec_a), ind)
+            ptr2d_b(:,:)= qqcw_get_field(pbuf,ind,lchnk,.true.)
+            write(104,*)'aer_cb: ',trim(hetfrz_aer_specname(ispec)),aer_cb(icolprnt(lchnk),kprnt,ispec,lchnk_zb),trim(cnst_name_cw(ind)),ptr2d_b(icolprnt(lchnk),kprnt)* rho(icolprnt(lchnk),kprnt)
+      enddo
+   endif
 
-    ! The following variable obtained using pbuf is used
-    ! for vertical mixing in the activation subroutine dropmixnuc
-    call pbuf_get_field(pbuf, kvh_idx_dropmixnuc, kvh)
+    
+    if(print_out) then 
+      write(103,*) 'eddy_diff_heat:',kvh(icolprnt(lchnk),kprnt),tstep, macmic_it
+    endif
     allocate(factnum(pcols, pver, ntot_amode))
     call dropmixnuc(lchnk, ncol, deltatin, temperature, pmid, pint, pdel, rpdel, zm, &  ! in
          state_q, nc, kvh, wsub, lcldn, lcldo, &  ! in
          qqcw, &  ! inout
-         ptend, nctend_mixnuc, factnum)  !out
-
+         ptend, nctend_mixnuc, factnum,print_out)  !out
+    if(print_out) then      
+      write(104,*)'factnum:',factnum(icolprnt(lchnk),kprnt,1),factnum(icolprnt(lchnk),kprnt,2),factnum(icolprnt(lchnk),kprnt,3),factnum(icolprnt(lchnk),kprnt,4)
+      write(104,*)'nctend_mixnuc:',nctend_mixnuc(icolprnt(lchnk),kprnt)
+      do ic = 10, 40
+         write(104,*)trim(cnst_name(ic)),'_tend:',ptend%q(icolprnt(lchnk),kprnt,ic)
+      enddo
+      do ic = 1,25
+         write(104,*)trim(cnst_name_cw(ic+15)),': ',qqcw(ic)%fld(icolprnt(lchnk),kprnt)
+      enddo
+    endif
     deallocate(qqcw)
 
     call pbuf_get_field(pbuf, npccn_idx, npccn)
@@ -603,7 +725,12 @@ contains
     call pbuf_get_field(pbuf, frzdep_idx, frzdep)
     call hetfrz_classnuc_cam_calc(ncol, lchnk, temperature, pmid, rho, ast, &   ! in
          qc, nc, state_q, aer_cb(:,:,:,lchnk_zb), deltatin, factnum, & ! in
-         frzimm, frzcnt, frzdep)                       ! out
+         frzimm, frzcnt, frzdep,print_out)                       ! out
+   if(print_out) then      
+      write(104,*)'frzimm:',frzimm(icolprnt(lchnk),kprnt)
+      write(104,*)'frzcnt:',frzcnt(icolprnt(lchnk),kprnt)
+      write(104,*)'frzdep:',frzdep(icolprnt(lchnk),kprnt)
+   endif
 
     deallocate(factnum)
 
@@ -682,5 +809,16 @@ subroutine subgrid_mean_updraft(ncol, w0, wsig, ww)
 
 end subroutine subgrid_mean_updraft
 !================================================================================================
+subroutine write_eamxx(lchnk, var_name, val)
+   integer, intent(in) :: lchnk
+   character(len=*), intent(in) :: var_name
+   real(r8), intent(in) :: val(:,:)
 
+   !local
+   integer :: time_step
+
+   time_step = get_nstep()
+   
+   if (icolprnt(lchnk)>0 .and. time_step == 5) write(102,*)trim(var_name),': ',val(icolprnt(lchnk),kprnt)
+end subroutine write_eamxx
 end module microp_aero

@@ -40,7 +40,7 @@ module prescribed_aero
   public :: has_prescribed_aero
   public :: prescribed_aero_register
   public :: init_prescribed_aero_restart
-  public :: prescribed_aero_readnl
+  public :: prescribed_aero_readnl, spec_c_to_a
 
   logical :: has_prescribed_aero = .false.
 

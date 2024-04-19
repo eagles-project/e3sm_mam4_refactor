@@ -2452,7 +2452,7 @@ contains
        !===================================================
        ! Calculate cloud microphysics 
        !===================================================
-       call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo) !<<<AEROSOLS
+       call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo, macmic_it) !<<<AEROSOLS
 
        call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
        

@@ -5,7 +5,8 @@ module hetfrz_classnuc_cam
 !  CAM Interfaces for hetfrz_classnuc module.
 !
 !---------------------------------------------------------------------------------
-
+   use module_perturb
+   use yaml_input_file_io
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
 use ppgrid,         only: pcols, pver, begchunk, endchunk
@@ -509,7 +510,7 @@ end subroutine hetfrz_classnuc_cam_init
 
 subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &   !in
                                      qc, nc, state_q, aer_cb, deltatin, factnum, & !in
-                                     frzimm, frzcnt, frzdep)                       !out
+                                     frzimm, frzcnt, frzdep, print_out)                       !out
 
    use modal_aero_data,   only: modeptr_accum, modeptr_coarse, modeptr_pcarbon, numptr_amode
    use modal_aero_data,   only: lptr_dust_a_amode, lptr_nacl_a_amode, lptr_so4_a_amode, &
@@ -517,6 +518,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
                                 lptr_mom_a_amode
 
    ! input
+   logical :: print_out
    integer, intent(in) :: ncol
    integer, intent(in) :: lchnk
    real(r8), intent(in) :: temperature(:,:)     ! input temperature [K]
@@ -670,7 +672,7 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
                                              total_interstitial_aer_num(icol,kk,:)) ! out
 
          call calculate_cloudborne_aer_num(ncnst, aer_cb(icol,kk,:), & ! in
-                                           total_cloudborne_aer_num(icol,kk,:)) ! out 
+                                           total_cloudborne_aer_num(icol,kk,:),print_out, icol, kk,lchnk) ! out 
 
          call calculate_mass_mean_radius(ncnst, aer(icol,kk,:,lchnk_zb), &         ! in
                                          total_interstitial_aer_num(icol,kk,:), &  ! in
@@ -770,6 +772,8 @@ subroutine hetfrz_classnuc_cam_calc( ncol, lchnk, temperature, pmid, rho, ast, &
             call handle_errmsg(errstring, subname="hetfrz_classnuc_calc")
 
             frzimm(icol,kk) = frzbcimm(icol,kk) + frzduimm(icol,kk)
+            if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt)write(104,*)'frzimm:',frzimm(icol,kk), frzbcimm(icol,kk), frzduimm(icol,kk)
+
             frzcnt(icol,kk) = frzbccnt(icol,kk) + frzducnt(icol,kk)
             frzdep(icol,kk) = frzbcdep(icol,kk) + frzdudep(icol,kk)
 
@@ -887,7 +891,7 @@ end subroutine calculate_interstitial_aer_num
 !====================================================================================================
 
 subroutine calculate_cloudborne_aer_num(ncnst, aer_cb, &
-                                        total_cloudborne_aer_num)
+                                        total_cloudborne_aer_num,print_out, icol, kk,lchnk)
 
    !***************************************************
    ! calculate cloudborne aerosol concentrations for
@@ -895,7 +899,8 @@ subroutine calculate_cloudborne_aer_num(ncnst, aer_cb, &
    !***************************************************
 
    ! input
-   integer,  intent(in) :: ncnst
+   logical :: print_out
+   integer,  intent(in) :: ncnst, icol, kk,lchnk
    real(r8), intent(in) :: aer_cb(ncnst) ! cloud borne aerosol concentrations [kg/m^3]
 
    ! output
@@ -922,6 +927,9 @@ subroutine calculate_cloudborne_aer_num(ncnst, aer_cb, &
    if (as_bc > 0._r8) then
       total_cloudborne_aer_num(1) = as_bc/(as_so4+as_bc+as_pom+as_soa+as_ss+as_du+as_mom)* &
                                     aer_cb(num_accum) * num_m3_to_cm3 ! #/cm^3
+      if(print_out .and. icol == icolprnt(lchnk) .and. kk == kprnt) then
+         write(104,*)'BC:',total_cloudborne_aer_num(1),as_bc, as_so4,as_pom,as_soa,as_ss,as_du,as_mom, aer_cb(num_accum),num_m3_to_cm3
+      endif
    endif
 
    if (as_du > 0._r8) then

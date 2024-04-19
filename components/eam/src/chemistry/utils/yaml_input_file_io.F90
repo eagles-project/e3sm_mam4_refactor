@@ -5,7 +5,7 @@ module yaml_input_file_io
   !and freeunit. It may be a bad practice but we are doing it here for temporary
   !refactoring work
 
-  use module_perturb, only: icolprnt
+  use module_perturb
   use units,          only: getunit, freeunit
   use time_manager,   only: get_nstep
 

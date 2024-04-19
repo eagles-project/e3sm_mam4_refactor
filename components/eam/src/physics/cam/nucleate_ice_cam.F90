@@ -338,7 +338,7 @@ end subroutine nucleate_ice_cam_init
 
 subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
                                   rho, wsubi, ast, dgnum, & 
-                                  naai, naai_hom)
+                                  naai, naai_hom,print_out)
 
    use modal_aero_data,   only: modeptr_accum, modeptr_aitken, modeptr_coarse
    use modal_aero_data,   only: numptr_amode, alnsg_amode
@@ -358,7 +358,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
 
    real(r8), intent(out) :: naai(:,:)           ! number of activated aerosol for ice nucleation [#/kg]
    real(r8), intent(out) :: naai_hom(:,:)       ! number of activated aerosol for ice nucleation (homogeneous freezing only) [#/kg]
- 
+   logical::print_out
    ! local workspace
    integer :: icol, kk, m
 
@@ -488,7 +488,7 @@ subroutine nucleate_ice_cam_calc( ncol, lchnk, temperature, state_q, pmid, &
             call nucleati( &
                wsubi(icol,kk), temperature(icol,kk), pmid(icol,kk), relhum(icol,kk), icldm(icol,kk),   &   ! input
                rho(icol,kk), so4_num, dst3_num,  &                                                         ! input
-               naai(icol,kk), nihf(icol,kk), niimm(icol,kk), nidep(icol,kk), nimey(icol,kk))               ! output
+               naai(icol,kk), nihf(icol,kk), niimm(icol,kk), nidep(icol,kk), nimey(icol,kk),print_out,kk)               ! output
 
 
             naai_hom(icol,kk) = nihf(icol,kk)
