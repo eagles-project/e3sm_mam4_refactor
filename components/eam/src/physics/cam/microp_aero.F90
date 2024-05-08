@@ -594,22 +594,9 @@ contains
       write(103,*)'cldfrac_liq:',alst(icolprnt(lchnk),kprnt)
       write(103,*)'w_variance:',wp2(icolprnt(lchnk),kprnt)
       !write(103,*)rair, gravit, tstep, macmic_it
-
-      write(104,*) '----- OUPUT AT time step:',tstep, macmic_it
-      write(104,*)'wo',w0(icolprnt(lchnk),kprnt)
-      write(104,*)'rho:',rho(icolprnt(lchnk),kprnt)
-      !write(104,'(A,73(F24.17,","),A)')'const Real tke_b[73] = {',tke(icolprnt(lchnk),:),'};'
-      write(104,*)'TKE:',tke(icolprnt(lchnk),kprnt),tke(icolprnt(lchnk),kprnt+1)
-      write(104,*)'wsub:',wsub(icolprnt(lchnk),kprnt)
-      write(104,*)'wsubi:',wsubi(icolprnt(lchnk),kprnt)
-      write(104,*)'wsig:',wsig(icolprnt(lchnk),kprnt)
-      write(104,*)'dgnum_ait:',dgnum(icolprnt(lchnk),kprnt,2)
-      !write(104,'(A,72(E26.17E3,","),A)')'const Real dgnum_ait_e3sm : [',dgnum(icolprnt(lchnk),:,2),']'
-      write(104,*)'naai:',naai(icolprnt(lchnk),kprnt)
-      write(104,*)'naai_hom:',naai_hom(icolprnt(lchnk),kprnt)
     endif
-    deallocate(tke)
 
+#if 0
     do kk = top_lev, pver
       do icol = 1, ncol
         if(liqcldfo(icol,kk) > 0.1 .and. liqcldfo(icol,kk)<1.0 .and. &
@@ -634,6 +621,7 @@ contains
          endif
       enddo
     enddo
+#endif
 
 
     liqcldf(:ncol,:pver) = alst(:ncol,:pver)
@@ -688,7 +676,8 @@ contains
             call spec_c_to_a(trim(hetfrz_aer_specname(ispec)),spec_a)
             call cnst_get_ind(trim(spec_a), ind)
             ptr2d_b(:,:)= qqcw_get_field(pbuf,ind,lchnk,.true.)
-            write(104,*)'aer_cb: ',trim(hetfrz_aer_specname(ispec)),aer_cb(icolprnt(lchnk),kprnt,ispec,lchnk_zb),trim(cnst_name_cw(ind)),ptr2d_b(icolprnt(lchnk),kprnt)* rho(icolprnt(lchnk),kprnt)
+            write(104,*)'aer_cb: ',trim(hetfrz_aer_specname(ispec)),aer_cb(icolprnt(lchnk),kprnt,ispec,lchnk_zb),&
+            trim(cnst_name_cw(ind)),ptr2d_b(icolprnt(lchnk),kprnt)* rho(icolprnt(lchnk),kprnt), ptr2d_b(icolprnt(lchnk),kprnt)
       enddo
    endif
 
@@ -701,17 +690,6 @@ contains
          state_q, nc, kvh, wsub, lcldn, lcldo, &  ! in
          qqcw, &  ! inout
          ptend, nctend_mixnuc, factnum,print_out)  !out
-    if(print_out) then      
-      write(104,*)'factnum:',factnum(icolprnt(lchnk),kprnt,1),factnum(icolprnt(lchnk),kprnt,2),factnum(icolprnt(lchnk),kprnt,3),factnum(icolprnt(lchnk),kprnt,4)
-      write(104,*)'nctend_mixnuc:',nctend_mixnuc(icolprnt(lchnk),kprnt)
-      do ic = 10, 40
-         write(104,*)trim(cnst_name(ic)),'_tend:',ptend%q(icolprnt(lchnk),kprnt,ic)
-      enddo
-      do ic = 1,25
-         write(104,*)trim(cnst_name_cw(ic+15)),': ',qqcw(ic)%fld(icolprnt(lchnk),kprnt)
-      enddo
-    endif
-    deallocate(qqcw)
 
     call pbuf_get_field(pbuf, npccn_idx, npccn)
     npccn(1:ncol,1:pver)    = 0._r8  ! initialize output
@@ -732,7 +710,73 @@ contains
       write(104,*)'frzdep:',frzdep(icolprnt(lchnk),kprnt)
    endif
 
+   do kk = top_lev, pver
+      do icol = 1, ncol
+        if( frzimm(icol,kk) .ne.0 .and. frzcnt(icol,kk) .ne.0 .and. frzdep(icol,kk) .ne.0) then
+           write(102,*) '----- FINDING COLUMNS-----------'
+           write(102,*)'phys_debug_lat = ',get_lat(lchnk, icol)
+           write(102,*)'phys_debug_lon = ', get_lon(lchnk, icol)
+           write(102,*)'tstp:',get_nstep(), 'mit:',macmic_it, kk
+
+           write(102,*)'--INP for process----'
+           write(102,*)'pmid:',pmid(icol,kk)
+           write(102,*)'omega:',omega(icol,kk)
+           write(102,*)'T_mid:', temperature(icol,kk)
+           write(102,*)'dgnum:',dgnum(icol,kk,2)
+           write(102,*)'cldfrac_liq_prev:',liqcldfo(icol,kk)
+           write(102,*)'cldfrac_liq:',alst(icol,kk)
+           write(102,*)'w_variance:',wp2(icol,kk)
+
+           write(102,*)'--OUT for process----'
+           write(102,*)'naai:',naai(icol,kk)
+           write(102,*)'naai_hom:',naai_hom(icol,kk)
+
+           write(102,*)'frzimm:',frzimm(icol,kk)
+           write(102,*)'frzcnt:',frzcnt(icol,kk)
+           write(102,*)'frzdep:',frzdep(icol,kk)
+         endif
+      enddo
+    enddo
+
+
+    if(print_out) then
+      write(104,*)'AT THE END OF MICROP_AERO------------------------------------------------------------------'
+      write(104,*) '----- OUPUT AT time step:',tstep, macmic_it
+      write(104,*)'wo',w0(icolprnt(lchnk),kprnt)
+      write(104,*)'rho:',rho(icolprnt(lchnk),kprnt)
+      !write(104,'(A,73(F24.17,","),A)')'const Real tke_b[73] = {',tke(icolprnt(lchnk),:),'};'
+      write(104,*)'TKE:',tke(icolprnt(lchnk),kprnt),tke(icolprnt(lchnk),kprnt+1)
+      write(104,*)'wsub:',wsub(icolprnt(lchnk),kprnt)
+      write(104,*)'wsubi:',wsubi(icolprnt(lchnk),kprnt)
+      write(104,*)'wsig:',wsig(icolprnt(lchnk),kprnt)
+      write(104,*)'dgnum_ait:',dgnum(icolprnt(lchnk),kprnt,2)
+      !write(104,'(A,72(E26.17E3,","),A)')'const Real dgnum_ait_e3sm : [',dgnum(icolprnt(lchnk),:,2),']'
+      write(104,*)'naai:',naai(icolprnt(lchnk),kprnt)
+      write(104,*)'naai_hom:',naai_hom(icolprnt(lchnk),kprnt)
+      write(104,*)'factnum:',factnum(icolprnt(lchnk),kprnt,1),factnum(icolprnt(lchnk),kprnt,2),factnum(icolprnt(lchnk),kprnt,3),factnum(icolprnt(lchnk),kprnt,4)
+      write(104,*)'nctend_mixnuc:',nctend_mixnuc(icolprnt(lchnk),kprnt)
+      do ic = 10, 40
+         write(104,*)trim(cnst_name(ic)),'_state:',state_q(icolprnt(lchnk),kprnt,ic)
+      enddo
+      do ic = 10, 40
+         write(104,*)trim(cnst_name(ic)),'_tend:',ptend%q(icolprnt(lchnk),kprnt,ic)
+      enddo
+      do imode = 1, ntot_amode
+         do lspec = 0, nspec_amode(imode)  ! loop through all species for mode 'imode'
+            mm = mam_idx(imode,lspec)
+            if (lspec == 0) then   ! number
+               icnst = numptrcw_amode(imode)
+            else ! aerosol mass
+               icnst = lmassptrcw_amode(lspec,imode)
+            endif
+            write(104,*)'At the end:',trim(cnst_name_cw(icnst)),qqcw(mm)%fld(icolprnt(lchnk),kprnt)
+         enddo
+      enddo
+    endif
+
     deallocate(factnum)
+    deallocate(qqcw)
+    deallocate(tke)
 
   end associate
 

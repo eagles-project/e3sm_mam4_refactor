@@ -459,7 +459,8 @@ contains
        call update_from_newcld(cldn(icol,:),cldo(icol,:),dtinv,     &   ! in
             wtke(icol,:),temp(icol,:),cs(icol,:),state_q(icol,:,:),  &  !in
             qcld(:),raercol(:,:,nsav),raercol_cw(:,:,nsav), &  ! inout
-            nsource(icol,:), factnum(icol,:,:))  ! inout
+            nsource(icol,:), factnum(icol,:,:), icol,lchnk,print_out)  ! inout
+            if(print_out .and. icol == icolprnt(lchnk)) write(104,*)'qqcw4:',raercol_cw(kprnt,1,1), raercol_cw(kprnt,1,2)
 
        !  PART II: changes in aerosol and cloud water from vertical profile of new cloud fraction
 
@@ -467,6 +468,7 @@ contains
             cs(icol,:),csbot_cscen(:),state_q(icol,:,:), & ! in
             raercol(:,:,nsav),raercol_cw(:,:,nsav), &  ! inout
             nsource(icol,:),qcld(:),factnum(icol,:,:),ekd(:),nact(:,:),mact(:,:))  !inout
+            if(print_out .and. icol == icolprnt(lchnk)) write(104,*)'qqcw3:',raercol_cw(kprnt,1,1), raercol_cw(kprnt,1,2)
 
        !  PART III:  perform explict integration of droplet/aerosol mixing using substepping
 
@@ -474,6 +476,7 @@ contains
 
        call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
             nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
+      if(print_out .and. icol == icolprnt(lchnk)) write(104,*)'qqcw2:',raercol_cw(kprnt,1,1), raercol_cw(kprnt,1,2)
 
        ! droplet number
 
@@ -498,6 +501,7 @@ contains
 
              qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(icol,top_lev:pver))*dtinv
              qqcw(mm)%fld(icol,:) = 0.0_r8
+             if(print_out .and. icol == icolprnt(lchnk) .and. mm==1) write(104,*)'qqcw1:',raercol_cw(kprnt,mm,nnew),nnew
              qqcw(mm)%fld(icol,top_lev:pver) = max(raercol_cw(top_lev:pver,mm,nnew),0.0_r8) ! update cloud-borne aerosol; HW: ensure non-negative
 
              if( lspec == 0 ) then
@@ -612,9 +616,11 @@ contains
   subroutine update_from_newcld(cldn_col_in,cldo_col_in,dtinv, & ! in
        wtke_col_in,temp_col_in,cs_col_in,state_q_col_in, & ! in
        qcld,raercol_nsav,raercol_cw_nsav, &      ! inout
-       nsource_col_out, factnum_col_out)              ! inout
+       nsource_col_out, factnum_col_out, icol, lchnk,print_out)             ! inout
 
     ! input arguments
+       integer:: icol,lchnk
+       logical:: print_out
     real(r8), intent(in) :: cldn_col_in(:)   ! cloud fraction [fraction]
     real(r8), intent(in) :: cldo_col_in(:)   ! cloud fraction on previous time step [fraction]
     real(r8), intent(in) :: dtinv     ! inverse time step for microphysics [s^{-1}]
@@ -675,7 +681,10 @@ contains
           do imode = 1, ntot_amode
              mm = mam_idx(imode,0)
              dact   = raercol_cw_nsav(kk,mm)*frac_delt_cld
+             if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt .and. mm==1) write(104,*)'update_from_newcld_1:',raercol_cw_nsav(kk,mm),dact,frac_delt_cld
              raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact   ! cloud-borne aerosol
+             if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt .and. mm==1) write(104,*)'update_from_newcld_2:',raercol_cw_nsav(kk,mm)
+             
              raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
              do lspec = 1, nspec_amode(imode)
                 mm = mam_idx(imode,lspec)
@@ -705,8 +714,11 @@ contains
              dact = delt_cld*fn(imode)*state_q_col_in(kk,num_idx) ! interstitial only
              qcld(kk) = qcld(kk) + dact
              nsource_col_out(kk) = nsource_col_out(kk) + dact*dtinv
+             if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt .and. mm==1) write(104,*)'update_from_newcld_3:',raercol_cw_nsav(kk,mm),dtinv
              raercol_cw_nsav(kk,mm) = raercol_cw_nsav(kk,mm) + dact  ! cloud-borne aerosol
+             if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt .and. mm==1) write(104,*)'update_from_newcld_4:',raercol_cw_nsav(kk,mm),dact
              raercol_nsav(kk,mm)    = raercol_nsav(kk,mm) - dact
+             if(print_out .and. icol == icolprnt(lchnk) .and. kk==kprnt .and. mm==1) write(104,*)'update_from_newcld_5:',raercol_cw_nsav(kk,mm),dact
              fm_delt_cld = delt_cld * fm(imode)
              do lspec = 1, nspec_amode(imode)
                 mm = mam_idx(imode,lspec)
