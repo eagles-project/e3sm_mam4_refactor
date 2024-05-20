@@ -51,6 +51,22 @@
         deallocate(ptend_lq_1darr)
         deallocate(ptend_q_3darr)
 
+
+ ! write out qqcw fields only over constituents that are set, for others set value to -9999.9
+ ! do upon output as these fields should have been changed via the fldclw pointer
+
+        if (allocated(qqcw_yaml_2darr)) deallocate(qqcw_yaml_2darr)
+        allocate(qqcw_yaml_2darr(size(qqcw_yaml),pver))
+        do imm=1,size(qqcw_yaml)
+           if (imm<=15) then
+                qqcw_yaml_2darr(imm,:) = -9999.9
+           else
+                qqcw_yaml_2darr(imm,:) = qqcw_yaml(imm)%fld(yaml%col_print,:)
+           endif
+        enddo
+        call write_var(unit_output,'qqcw',qqcw_yaml_2darr)
+        deallocate(qqcw_yaml_2darr)
+
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
      !call write_output_aerosol_mmr_from_stateq(unit_output, fld_name, field, aer_num_only, inp_out_str)
