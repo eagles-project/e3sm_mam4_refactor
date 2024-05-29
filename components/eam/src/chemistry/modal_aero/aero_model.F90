@@ -1081,6 +1081,8 @@ contains
     call pbuf_get_field(pbuf, sh_frac_idx,     sh_frac )
     call pbuf_get_field(pbuf, dp_frac_idx,     dp_frac )
 
+#include "../yaml/aero_model/f90_yaml/aero_model_wetdep_end_yml.f90"
+
     call t_startf('ma_convproc')
     call ma_convproc_intr( state, dt,                         & ! in
          dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
@@ -1094,7 +1096,6 @@ contains
 
     call wetdep_inputs_unset(dep_inputs)
 
-#include "../yaml/aero_model/f90_yaml/aero_model_wetdep_end_yml.f90"
 
   end subroutine aero_model_wetdep
 
