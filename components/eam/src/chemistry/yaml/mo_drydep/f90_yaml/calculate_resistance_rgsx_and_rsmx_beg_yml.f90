@@ -30,7 +30,7 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-  yaml%nstep_print = 1000 !time step
+  yaml%nstep_print = 300 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
@@ -58,7 +58,8 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
-     ext_str = "loc3_over_water"
+     ! ext_str = "loc3_over_water"
+      ext_str = "loc2_has_snow"
      !-----------------------------------------------------------------------------------------
 
 
@@ -78,6 +79,7 @@
         !(with an optional argument to pass a unique string to differentiate file names)
         call open_files('calculate_resistance_rgsx_and_rsmx', &  !intent-in
              unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+!             unit_input, unit_output) !intent-out
 
 
         !start by adding an input string
@@ -96,12 +98,29 @@
         call write_var(unit_input,unit_output,'tc',tc(yaml%col_print))
         call write_var(unit_input,unit_output,'heff',heff(yaml%col_print,:))
         call write_var(unit_input,unit_output,'crs',crs(yaml%col_print))
-        call write_var(unit_input,unit_output,'ri',ri)
-        call write_var(unit_input,unit_output,'rgso',rgso)
-        call write_var(unit_input,unit_output,'rgss',rgss)
-        call write_var(unit_input,unit_output,'foxd',foxd)
-        call write_var(unit_input,unit_output,'drat',drat)
+        call write_var(unit_input,unit_output,'ri',ri(:,:))
+        call write_var(unit_input,unit_output,'rgso',rgso(:,:))
+        call write_var(unit_input,unit_output,'rgss',rgss(:,:))
+        call write_var(unit_input,unit_output,'foxd',foxd(:))
+        call write_var(unit_input,unit_output,'drat',drat(:))
 
+        !  add additional input module fields here:
+
+        call write_var(unit_input,unit_output,'n_land_type',n_land_type)
+        call write_var(unit_input,unit_output,'gas_pcnst',gas_pcnst)
+        call write_var(unit_input,unit_output,'nddvels',nddvels)
+        call write_var(unit_input,unit_output,'so2_ndx',so2_ndx)
+        call write_var(unit_input,unit_output,'lt_for_water',lt_for_water)
+        call write_var(unit_input,unit_output,'large_value',large_value)
+        call write_var(unit_input,unit_output,'has_dvel',has_dvel(:))
+        call write_var(unit_input,unit_output,'map_dvel',map_dvel(:))
+
+        !  the following are intent(out) fields for this subroutine, so they are initialized to zero
+        !  here to facilitate testing when they are written as output.
+
+        cts(:) = 0._r8
+        rgsx(:,:,:) = 0._r8
+        rsmx(:,:,:) = 0._r8
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

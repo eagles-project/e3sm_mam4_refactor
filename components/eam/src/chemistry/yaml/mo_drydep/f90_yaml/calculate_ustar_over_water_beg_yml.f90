@@ -30,7 +30,7 @@
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 72       !level
-  yaml%nstep_print = 1000 !time step
+  yaml%nstep_print = 300 !time step
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
@@ -58,7 +58,8 @@
      ! Example:"flag" in the code can be 0, 1, or 2, we can update "ext_str" as:
      ! write(ext_str,'(I2)') flag
      ! ext_str = 'flag_'//adjustl(ext_str)
-     ext_str = "loc3_over_water"
+     !ext_str = "loc3_over_water"
+     ext_str = "loc2_has_snow"
      !-----------------------------------------------------------------------------------------
 
 
@@ -78,6 +79,7 @@
         !(with an optional argument to pass a unique string to differentiate file names)
         call open_files('calculate_ustar_over_water', &  !intent-in
              unit_input, unit_output, trim(ext_str)) !intent-out, with the use of ext_str
+        !     unit_input, unit_output) !intent-out, with the use of ext_str
 
 
         !start by adding an input string
@@ -96,6 +98,19 @@
         call write_var(unit_input,unit_output,'uustar',uustar(yaml%col_print))
         call write_var(unit_input,unit_output,'ribn',ribn(yaml%col_print))
         call write_var(unit_input,unit_output,'diffk',diffk)
+
+        !  add additional input module fields here:
+
+        call write_var(unit_input,unit_output,'n_land_type',n_land_type)
+        call write_var(unit_input,unit_output,'lt_for_water',lt_for_water)
+        call write_var(unit_input,unit_output,'karman',karman)
+        call write_var(unit_input,unit_output,'grav',grav)
+
+        !  The following are inout fields, though only the elements corresponding to 'lt_for_water' are modified.
+
+        call write_var(unit_input,unit_output,'ustar',ustar(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'cvar',cvar(yaml%col_print,:))
+        call write_var(unit_input,unit_output,'bycp',cvar(yaml%col_print,:))
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

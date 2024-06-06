@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.ncol=[[         4],]
 input.index_season=[[         4,         4,         4,         4,         4,         4,         4,         4,         4,         4,         4,],]
 input.fr_lnduse=[[         1,         0,         1,         1,         1,         1,         1,         1,         0,         0,         1,],]

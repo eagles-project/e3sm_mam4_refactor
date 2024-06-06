@@ -10,7 +10,6 @@ class Object(object):
 settings = Object()
 # Input is stored here.
 input = Object()
-input.dt = [    0.00, ]
 input.ncol=[[         4],]
 input.beglt=[[         1],]
 input.endlt=[[        11],]
