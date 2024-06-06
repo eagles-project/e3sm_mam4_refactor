@@ -3,7 +3,6 @@ mam4xx:
   function: calculate_aerodynamic_and_quasilaminar_resistance
 input:
   fixed:
-    dt:    0.00
     ncol: [         4]
     beglt: [         1]
     endlt: [        11]

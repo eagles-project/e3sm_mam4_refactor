@@ -3,7 +3,6 @@ mam4xx:
   function: calculate_uustar
 input:
   fixed:
-    dt:    0.00
     ncol: [         4]
     index_season: [         1,         1,         1,         1,         1,         1,         1,         1,         1,         1,         1]
     fr_lnduse: [         0,         0,         0,         0,         0,         0,         1,         0,         0,         0,         0]

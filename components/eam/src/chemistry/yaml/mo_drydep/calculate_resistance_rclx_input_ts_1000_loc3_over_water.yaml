@@ -3,7 +3,6 @@ mam4xx:
   function: calculate_resistance_rclx
 input:
   fixed:
-    dt:    0.00
     ncol: [         4]
     beglt: [         1]
     endlt: [        11]
