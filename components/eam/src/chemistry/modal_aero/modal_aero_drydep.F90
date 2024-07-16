@@ -1,20 +1,24 @@
 !===============================================================================
-! Calculations of 
+! Calculations of
 !  - changes in interstitial aerosol mixing ratios caused by
 !    gravitational settling and turbulent dry deposition of aerosol particles,
-!  - changes in cloud-borne aerosol mixing ratios caused by 
+!  - changes in cloud-borne aerosol mixing ratios caused by
 !    gravitational settling and turbulent dry deposition of cloud droplets.
 !===============================================================================
 module modal_aero_drydep
 #include "../yaml/common_files/common_uses.ymlf90"
 
   use shr_kind_mod,   only: r8 => shr_kind_r8
-  use modal_aero_data, only: pcnst 
+  use modal_aero_data, only: pcnst
   use ppgrid,         only: pcols, pver, pverp
   use modal_aero_data,only: ntot_amode
   use physconst,      only: gravit, rair, rhoh2o, pi, boltz
   use camsrfexch,     only: cam_out_t
   use physics_types,  only: physics_ptend, physics_ptend_init
+  use yaml_input_file_io
+  use module_perturb
+  use cam_abortutils, only: endrun
+  use mo_drydep,     only: n_land_type, fraction_landuse
 
   use cam_history,    only: outfld
 
@@ -24,7 +28,7 @@ module modal_aero_drydep
   public :: aero_model_drydep
 
 contains
-  
+
   !=============================================================================
   ! Main subroutine of aerosol dry deposition parameterization.
   ! Also serves as the interface routine called by EAM's physics driver.
@@ -100,15 +104,43 @@ contains
     real(r8) :: vlc_dry(pcols,pver,4)     ! dep velocity, sum of vlc_grv and vlc_trb [m/s]
 
     real(r8), pointer :: qq(:,:)            ! mixing ratio of a single tracer [kg/kg] or [1/kg]
+    integer :: tstep, ic, ib
+    logical:: print_out
 
 #include "../yaml/modal_aero_drydep/f90_yaml/aero_model_drydep_beg_yml.f90"
 
     rho(:ncol,:)=  pmid(:ncol,:)/(rair*tair(:ncol,:))
 
+    tstep=get_nstep()
+
+    ! a condition to tunr on the printing
+    print_out = (icolprnt(lchnk) > 0 .and. tstep == 6)
+    if(print_out) then
+       write(105,'(A,72(E26.17E3,","),A)')'T_mid : [',tair(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'p_mid : [',pmid(icolprnt(lchnk),:),']'
+       write(105,'(A,73(E26.17E3,","),A)')'p_int : [',pint(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'pseudo_density : [',pdel(icolprnt(lchnk),:),']'
+       write(105,'(A,288(E26.17E3,","),A)')'wetdens : [',wetdens(icolprnt(lchnk),:,:),']'
+       write(105,'(A,1(E26.17E3,","),A)')'Obukhov_length : [', obklen(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'friction_velocity : [', fricvelin(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'land_fraction : [',landfrac(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'ice_fraction : [', icefrac(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'ocean_fraction : [', ocnfrac(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'surface_friction_velocty : [',ustar(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'aerodynamical_resistance : [', ram1in(icolprnt(lchnk)),']'
+       write(105,'(A,1(E26.17E3,","),A)')'dt : [',dt,']'
+       write(105,'(A,288(E26.17E3,","),A)')'dgncur_awet : [',dgncur_awet(icolprnt(lchnk),:,:),']'
+       write(105,'(A,11(E26.17E3,","),A)')'fraction_landuse : [',fraction_landuse(icolprnt(lchnk),:,lchnk),']'
+       do ic = 10, 40
+         write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name(ic)),' : [',state_q(icolprnt(lchnk),:,ic),']'
+      enddo
+    endif
+
+
     call physics_ptend_init(ptend, psetcols, 'aero_model_drydep_ma', lq=drydep_lq)
 
     !--------------------------------------------------------------------------------
-    ! For turbulent dry deposition: calculate ram and fricvel over ocean and sea ice; 
+    ! For turbulent dry deposition: calculate ram and fricvel over ocean and sea ice;
     ! copy values over land
     !--------------------------------------------------------------------------------
     call calcram( ncol,         &! in: state%ncol
@@ -125,13 +157,28 @@ contains
                   ram1,         &! out: aerodynamical resistance (s/m)
                   fricvel )      ! out: bulk friction velocity of a grid cell
 
+    if(print_out) then
+      !write(102,*)'landfrac:',landfrac(icolprnt(lchnk))
+      !write(102,*)'icefrac:',icefrac(icolprnt(lchnk))
+      !write(102,*)'ocnfrac:',ocnfrac(icolprnt(lchnk))
+      !write(102,*)'obklen:',obklen(icolprnt(lchnk))
+      !write(102,*)'ustar:',ustar(icolprnt(lchnk))
+      !write(102,*)'tair(:,pver):',tair(icolprnt(lchnk),pver)
+      !write(102,*)'pmid(:,pver):',pmid(icolprnt(lchnk),pver)
+      !write(102,*)'pdel(:,pver):',pdel(icolprnt(lchnk),pver)
+      !write(102,*)'ram1in:',ram1in(icolprnt(lchnk))
+      !write(102,*)'fricvelin:',fricvelin(icolprnt(lchnk))
+      write(102,*)'RHO:',rho(icolprnt(lchnk), kprnt)
+      write(102,*)'ram1:',ram1(icolprnt(lchnk))
+      write(102,*)'fricvel:',fricvel(icolprnt(lchnk))
+    endif
     call outfld( 'airFV', fricvel(:), pcols, lchnk )
     call outfld( 'RAM1',     ram1(:), pcols, lchnk )
- 
+
     !======================
     ! cloud-borne aerosols
     !---------------------------------------------------------------------------------------
-    ! Calculate gravitational settling and dry deposition velocities for cloud droplets 
+    ! Calculate gravitational settling and dry deposition velocities for cloud droplets
     ! (and hence the cloud-borne aerosols therein).
     ! There is one set of velocities for number mixing ratios of all aerosol modes
     ! and one set of velocities for all mass mixing ratios of all modes.
@@ -155,6 +202,14 @@ contains
                                  vlc_dry(:,:,jvlc),                      &! out
                                  vlc_trb(:,  jvlc),                      &! out
                                  vlc_grv(:,:,jvlc)                       )! out
+    if(print_out) then
+      write(102,*)'vlc_trb3:',vlc_trb(icolprnt(lchnk), 3)
+      write(102,*)'vlc_trb4:',vlc_trb(icolprnt(lchnk), 4)
+      write(102,*)'vlc_grv3:',vlc_grv(icolprnt(lchnk), kprnt, 3)
+      write(102,*)'vlc_grv4:',vlc_grv(icolprnt(lchnk), kprnt, 4)
+      write(102,*)'vlc_dry3:',vlc_dry(icolprnt(lchnk), kprnt, 3)
+      write(102,*)'vlc_dry4:',vlc_dry(icolprnt(lchnk), kprnt, 4)
+    endif
 
     !----------------------------------------------------------------------------------
     ! Loop over all modes and all aerosol tracers (number + mass species).
@@ -170,6 +225,10 @@ contains
        endif
 
        qq => qqcw(icnst)%fld
+       if(print_out) then 
+            write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name_cw(icnst)),' : [',qqcw(icnst)%fld(icolprnt(lchnk),:),']'
+            write(102,*)'qq_bef:',qq(icolprnt(lchnk),kprnt)
+       endif
        call sedimentation_solver_for_1_tracer( ncol, dt, vlc_dry(:,:,jvlc), qq,    &! in
                                                rho, tair, pint, pmid, pdel,        &! in
                                                dqdt_tmp, sflx                      )! out
@@ -180,15 +239,49 @@ contains
        ! are stored in pbuf, not as part of the state variable
 
        qq(1:ncol,:) = qq(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+       if(print_out) then
+         write(102,*)'aerdepdrycw:',aerdepdrycw(icolprnt(lchnk),icnst),icnst
+         write(102,*)'qq:',qq(icolprnt(lchnk),kprnt), dqdt_tmp(icolprnt(lchnk),kprnt)
+       endif
 
        ! Get and save diagnostics
 
        call drydep_diags_for_1_tracer( lchnk, ncol, trim(cnst_name_cw(icnst)), &! in
                                        vlc_dry(:,:,jvlc), vlc_trb(:,jvlc),     &! in
                                        vlc_grv(:,:,jvlc), sflx                 )! in
+       do ib=1, ncol
+         if(abs(qq(ib,kprnt))>0.1) then
+            write(104,*)'phys_debug_lat = ',get_lat(lchnk, ib), 'phys_debug_lon = ', get_lon(lchnk, ib), get_nstep(), qq(ib,kprnt), ib, icnst
+         endif
+       enddo
 
     enddo ! loop over number + constituents
     enddo ! imode = 1, ntot_amode
+
+
+
+   do ib = 1, ncol
+   do imode = 1, ntot_amode         ! loop over aerosol modes
+    do lspec = 0, nspec_amode(imode) ! loop over number + constituents
+
+       if (lspec == 0) then   ! number
+           icnst = numptrcw_amode(imode) ; jvlc = 3
+       else ! aerosol mass
+           icnst = lmassptrcw_amode(lspec,imode) ; jvlc = 4
+       endif
+
+       if(abs(aerdepdrycw(ib,icnst))>0.1) then
+         write(103,*)'phys_debug_lat = ',get_lat(lchnk, ib), 'phys_debug_lon = ', get_lon(lchnk, ib), get_nstep(), aerdepdrycw(ib,icnst), ib,icnst
+       endif
+       
+       
+    enddo ! loop over number + constituents
+    enddo ! imode = 1, ntot_amode
+    write(103,*)''
+    enddo
+   !call endrun('BALLI')
+
+
 
     !=====================
     ! interstial aerosols
@@ -196,7 +289,7 @@ contains
     do imode = 1, ntot_amode   ! loop over aerosol modes
 
        !-----------------------------------------------------------------
-       ! Calculate gravitational settling and dry deposition velocities for 
+       ! Calculate gravitational settling and dry deposition velocities for
        ! interstitial aerosol particles in a single lognormal mode. Note:
        !  One set of velocities for number mixing ratio of the mode;
        !  One set of velocities for all mass mixing ratios of the mode.
@@ -211,6 +304,15 @@ contains
                                     vlc_dry(:,:,jvlc),                      &! out
                                     vlc_trb(:,  jvlc),                      &! out
                                     vlc_grv(:,:,jvlc)                       )! out
+       if(print_out) then
+         write(102,*)'tair:',tair(icolprnt(lchnk),pver)
+         write(102,*)'pmid',pmid(icolprnt(lchnk),pver)
+         write(102,*)'ram1',ram1(icolprnt(lchnk))
+         write(102,*)'fricvel', fricvel(icolprnt(lchnk))
+         write(102,*)'rad_aer',rad_aer(icolprnt(lchnk),pver)
+         write(102,*)'dens_aer',dens_aer(icolprnt(lchnk),pver)
+         write(102,*)'sg_aer:',sg_aer(icolprnt(lchnk),pver)
+       endif
 
        jvlc = 2  ; imnt = 3  ! interstitial aerosol volume/mass
        call modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel, &! in
@@ -218,9 +320,17 @@ contains
                                     vlc_dry(:,:,jvlc),                      &! out
                                     vlc_trb(:,  jvlc),                      &! out
                                     vlc_grv(:,:,jvlc)                       )! out
+      if(print_out) then
+         write(102,*)'->vlc_trb1:',vlc_trb(icolprnt(lchnk), 1)
+         write(102,*)'->vlc_trb2:',vlc_trb(icolprnt(lchnk), 2)
+         write(102,*)'->vlc_grv1:',vlc_grv(icolprnt(lchnk), kprnt, 1)
+         write(102,*)'->vlc_grv2:',vlc_grv(icolprnt(lchnk), kprnt, 2)
+         write(102,*)'->vlc_dry1:',vlc_dry(icolprnt(lchnk), kprnt, 1)
+         write(102,*)'->vlc_dry2:',vlc_dry(icolprnt(lchnk), kprnt, 2)
+      endif
 
        !-----------------------------------------------------------
-       ! Loop over number + mass species of the mode. 
+       ! Loop over number + mass species of the mode.
        ! Calculate drydep-induced tendencies; save to ptend.
        !-----------------------------------------------------------
        do lspec = 0, nspec_amode(imode)
@@ -248,7 +358,10 @@ contains
                                           ptend%q(:,:,icnst)                   )! in
 
           call outfld( trim(cnst_name(icnst))//'DDV', vlc_dry(:ncol,:,jvlc), pcols, lchnk )
-
+         if(print_out) then
+            write(102,*)'aerdepdryis:',aerdepdryis(icolprnt(lchnk),icnst),icnst
+            write(102,*)'ptend%q:',ptend%q(icolprnt(lchnk),kprnt,icnst), dqdt_tmp(icolprnt(lchnk),kprnt)
+         endif
        enddo ! lspec = 1, nspec_amode(m)
     enddo    ! imode = 1, ntot_amode
 
@@ -270,7 +383,7 @@ contains
 
     use shr_kind_mod,      only: r8 => shr_kind_r8
     use ppgrid,            only: pcols, pver, pverp
-    use mo_spitfire_transport, only: getflx 
+    use mo_spitfire_transport, only: getflx
 
     integer , intent(in) :: ncol
     real(r8), intent(in) :: dt
@@ -304,10 +417,10 @@ contains
 
     pvmzaer(:ncol,2:pverp) = sed_vel(:ncol,:)
 
-    ! Convert velocity from height coordinate to pressure coordinate; 
+    ! Convert velocity from height coordinate to pressure coordinate;
     ! units: convert from meters/sec to pascals/sec.
     ! (This was referred to as "Phil's method" in the code before refactoring.)
- 
+
     pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
     !------------------------------------------------------
@@ -324,7 +437,7 @@ contains
     ! Set values for the upper and lower boundaries
 
     do ii = 1,ncol
-       dtmassflux(ii,1)     = 0                                         ! no flux at model top 
+       dtmassflux(ii,1)     = 0                                         ! no flux at model top
        dtmassflux(ii,pverp) = qq_in(ii,pver) * pvmzaer(ii,pverp) * dt   ! surface flux by upwind scheme
     enddo
 
@@ -363,7 +476,7 @@ contains
   subroutine drydep_diags_for_1_tracer( lchnk, ncol, cnst_name_in, vlc_dry, vlc_trb, vlc_grv, sflx, dqdt_sed )
 
     integer, intent(in) :: lchnk  ! chunk index
-    integer, intent(in) :: ncol   ! # of active columns 
+    integer, intent(in) :: ncol   ! # of active columns
 
     character(len=*), intent(in) :: cnst_name_in  ! tracer name
 
@@ -403,14 +516,14 @@ contains
   ! Calculate deposition velocities caused by turbulent dry deposition and
   ! gravitational settling of aerosol particles
 
-  ! Reference: 
+  ! Reference:
   !  L. Zhang, S. Gong, J. Padro, and L. Barrie:
   !  A size-seggregated particle dry deposition scheme for an atmospheric aerosol module
   !  Atmospheric Environment, 35, 549-560, 2001.
   !
-  ! History: 
+  ! History:
   !  - Original version by X. Liu.
-  !  - Calculations for gravitational and turbulent dry deposition separated into 
+  !  - Calculations for gravitational and turbulent dry deposition separated into
   !    different subroutines by Hui Wan, 2023.
   !==========================================================================================
   subroutine modal_aero_depvel_part( ncol, lchnk, tair, pmid, ram1, fricvel,       &! in
@@ -420,7 +533,7 @@ contains
 
     integer,  intent(in) :: moment       ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
     integer,  intent(in) :: ncol         ! # of grid columns to do calculations for
-    integer,  intent(in) :: lchnk        ! chunk index 
+    integer,  intent(in) :: lchnk        ! chunk index
 
     real(r8), intent(in) :: tair(pcols,pver)    ! air temperature [K]
     real(r8), intent(in) :: pmid(pcols,pver)    ! air pressure [Pa]
@@ -462,14 +575,14 @@ contains
                                           sig_part(:,pver),                          &! in
                                           fricvel(:), ram1(:), vlc_grv(:,pver),      &! in
                                           vlc_trb(:), vlc_dry(:,pver)                )! out
-#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_depvel_part_end_yml.f90"                                    
+#include "../yaml/modal_aero_drydep/f90_yaml/modal_aero_depvel_part_end_yml.f90"
 
   end subroutine modal_aero_depvel_part
   !---------------------------------------------------------------------------------
-  ! !DESCRIPTION: 
-  !  
+  ! !DESCRIPTION:
+  !
   ! Calc aerodynamic resistance over oceans and sea ice from Seinfeld and Pandis, p.963.
-  !  
+  !
   ! Author: Natalie Mahowald
   ! Code refactor: Hui Wan, 2023
   !---------------------------------------------------------------------------------
@@ -560,8 +673,8 @@ contains
 
            ! special treatment for ice-dominant cells
 
-           if(icefrac(ii) > 0.5_r8) then 
-              if(obklen(ii).gt.0) then 
+           if(icefrac(ii) > 0.5_r8) then
+              if(obklen(ii).gt.0) then
                  psi0=min(max(zzsice/obklen(ii),-1.0_r8),1.0_r8)
               else
                  psi0=0.0_r8
@@ -602,8 +715,8 @@ contains
 
     integer,  intent(in) :: moment       ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
     integer,  intent(in) :: ncol         ! # of grid columns to do calculations for
-    integer,  intent(in) :: pcols        ! dimension size (# of columns) 
-    integer,  intent(in) :: nver         ! dimension size (# of model layers) 
+    integer,  intent(in) :: pcols        ! dimension size (# of columns)
+    integer,  intent(in) :: nver         ! dimension size (# of model layers)
 
     real(r8), intent(in) :: radius_max        ! upper bound of radius used for the calculation of deposition velocity [m]
 
@@ -631,7 +744,7 @@ contains
 
        radius_moment = radius_for_moment( moment,sig_part(ii,kk),radius_part(ii,kk),radius_max )
 
-       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), radius_moment ) 
+       slp_crc = slip_correction_factor( vsc_dyn_atm, pmid(ii,kk), tair(ii,kk), radius_moment )
 
        vlc_grv(ii,kk) = gravit_settling_velocity( radius_moment, density_part(ii,kk),   &
                                                   slp_crc, vsc_dyn_atm, sig_part(ii,kk) )
@@ -707,7 +820,7 @@ contains
     real(r8),parameter :: stickfrac_lowerbnd  = 1.0e-10_r8  ! lower bound of stick fraction
 
     ! exponent of schmidt number
-    real(r8),parameter :: gamma(11) = [0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &        
+    real(r8),parameter :: gamma(11) = [0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &
                0.56e+00_r8,  0.50e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.54e+00_r8, &
                0.54e+00_r8]
 
@@ -715,7 +828,7 @@ contains
     real(r8), parameter :: alpha(11)= [1.50e+00_r8,   1.20e+00_r8,  1.20e+00_r8,  0.80e+00_r8,  1.00e+00_r8, &
                0.80e+00_r8, 100.00e+00_r8, 50.00e+00_r8,  2.00e+00_r8,  1.20e+00_r8, &
               50.00e+00_r8]
-    
+
     ! radius (m) of surface collectors
     real(r8), parameter :: radius_collector(11) = [10.00e-03_r8,  3.50e-03_r8,  3.50e-03_r8,  5.10e-03_r8,  2.00e-03_r8, &
                            5.00e-03_r8, -1.00e+00_r8, -1.00e+00_r8, 10.00e-03_r8,  3.50e-03_r8, &
@@ -743,8 +856,8 @@ contains
        vlc_trb_wgtsum = 0._r8
        vlc_dry_wgtsum = 0._r8
 
-       ! Loop over different land surface types. Calculate deposition velocities of 
-       ! those different surface types. The overall deposition velocity of a grid cell 
+       ! Loop over different land surface types. Calculate deposition velocities of
+       ! those different surface types. The overall deposition velocity of a grid cell
        ! is the area-weighted average of those land-type-specific velocities.
 
        do lt = 1,n_land_type
@@ -759,7 +872,7 @@ contains
              brownian = shm_nbr**(-gamma(lt))
 
              !----------------------------------------------------------------------
-             ! Collection efficiency of deposition mechanism 2 - interception 
+             ! Collection efficiency of deposition mechanism 2 - interception
              !----------------------------------------------------------------------
              if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
                 interception = 2.0_r8*(radius_moment/radius_collector(lt))**2.0_r8
@@ -768,7 +881,7 @@ contains
              endif
 
              !----------------------------------------------------------------------
-             ! Collection efficiency of deposition mechanism 3 - impaction 
+             ! Collection efficiency of deposition mechanism 3 - impaction
              !----------------------------------------------------------------------
              if (radius_collector(lt) > 0.0_r8) then ! vegetated surface
                 stk_nbr = vlc_grv(ii) * fricvel(ii) / (gravit*radius_collector(lt))
@@ -828,7 +941,7 @@ contains
     real(r8),intent(in) :: radius_max    ! developer-specified upper bound of mean radius [m]
 
     real(r8) :: lnsig
-    
+
     lnsig = log(sig_part)
     radius_for_moment = min(radius_max,radius_part)*exp((float(moment)-1.5_r8)*lnsig*lnsig)
 
@@ -865,11 +978,11 @@ contains
   end function air_kinematic_viscosity
 
   !======================================================
-  ! Slip correction factor [unitless]. 
+  ! Slip correction factor [unitless].
   ! See, e.g., SeP97 p. 464 and Zhang L. et al. (2001),
   ! DOI: 10.1016/S1352-2310(00)00326-5, Eq. (3).
   !======================================================
-  real(r8) function slip_correction_factor( dyn_visc, pres, temp, particle_radius ) 
+  real(r8) function slip_correction_factor( dyn_visc, pres, temp, particle_radius )
 
     real(r8),intent(in) :: dyn_visc         ! dynamic viscosity of air [kg m-1 s-1]
     real(r8),intent(in) :: pres             ! air pressure [Pa]
@@ -901,15 +1014,15 @@ contains
     real(r8) :: dff_aer   ! Brownian diffusivity of particle [m2/s], see SeP97 p.474
 
     slp_crc = slip_correction_factor( vsc_dyn_atm, pres, temp, radius )
-    dff_aer = boltz * temp * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius) 
+    dff_aer = boltz * temp * slp_crc / (6.0_r8*pi*vsc_dyn_atm*radius)
 
     schmidt_number = vsc_knm_atm / dff_aer
 
   end function schmidt_number
 
   !=======================================================================================
-  ! Calculate the bulk gravitational settling velocity [m s-1] 
-  !  - using the terminal velocity of sphere falling in a fluid based on Stokes's law and 
+  ! Calculate the bulk gravitational settling velocity [m s-1]
+  !  - using the terminal velocity of sphere falling in a fluid based on Stokes's law and
   !  - taking into account the influces of size distribution.
   !=======================================================================================
   real(r8) function gravit_settling_velocity( particle_radius, particle_density,               &
@@ -925,7 +1038,7 @@ contains
     real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
                               ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
 
-    ! Calculate terminal velocity following, e.g., 
+    ! Calculate terminal velocity following, e.g.,
     !  -  Seinfeld and Pandis (1997),  p. 466
     !  - Zhang L. et al. (2001), DOI: 10.1016/S1352-2310(00)00326-5, Eq. 2.
 

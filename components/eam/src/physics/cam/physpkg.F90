@@ -1458,6 +1458,9 @@ contains
     use phys_control,       only: use_qqflx_fixer
     use co2_cycle,          only: co2_cycle_set_ptend
     use mam_support,        only: ptr2d_t, get_cldbrn_mmr
+      use yaml_input_file_io
+  use module_perturb
+  use modal_aero_data,   only: cnst_name_cw
 
     implicit none
 
@@ -1542,6 +1545,7 @@ contains
     logical :: l_rayleigh
     logical :: l_gw_drag
     logical :: l_ac_energy_chk
+    integer:: ib
 
     !
     !-----------------------------------------------------------------------
@@ -1745,11 +1749,22 @@ contains
 
        call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
        call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 
-
+       do ib = 16,pcnst
+         if(icolprnt(lchnk)>0 .and. nstep==6)write(106,*)'Before_state:',state%q(icolprnt(lchnk), kprnt, ib), cnst_name(ib)
+       enddo
+       do ib = 16,pcnst
+         if(icolprnt(lchnk)>0 .and. nstep==6)write(106,*)'Before_cld:',qqcw(ib)%fld(icolprnt(lchnk),kprnt), cnst_name_cw(ib)
+       enddo
        call aero_model_drydep( lchnk, ncol, state%psetcols, state%t, state%pmid, state%pint, state%pdel, &
             state%q, dgncur_awet, wetdens, qqcw, obklen, surfric, cam_in%landfrac, cam_in%icefrac, cam_in%ocnfrac, &
             cam_in%fv, cam_in%ram1, ztodt, cam_out, ptend )
        call physics_update(state, ptend, ztodt, tend)
+       do ib = 16,pcnst
+         if(icolprnt(lchnk)>0  .and. nstep==6)write(106,*)'After_state:',state%q(icolprnt(lchnk), kprnt,ib), cnst_name(ib)
+       enddo
+        do ib = 16,pcnst
+         if(icolprnt(lchnk)>0 .and. nstep==6)write(106,*)'After_cld:',qqcw(ib)%fld(icolprnt(lchnk),kprnt), cnst_name_cw(ib)
+       enddo
        call t_stopf('aero_drydep')
 
        !---------------------------------------------------------------------------------

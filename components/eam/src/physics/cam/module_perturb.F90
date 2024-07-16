@@ -4,7 +4,7 @@ module module_perturb
 
   implicit none
   
-  integer :: kprnt = 61
+  integer :: kprnt = 64
 contains
 
   function icolprnt(lchnk) result(icol)
