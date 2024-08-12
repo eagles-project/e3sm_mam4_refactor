@@ -3,7 +3,8 @@
   !"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
-  integer, intent(in) :: y_lchnk
+!  integer, intent(in) :: y_lchnk
+  integer :: y_lchnk
   !-----------------------------------------------------------------------------------------
 
   !-----------------------------------------------------------------------------------------
@@ -26,6 +27,7 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
 
+  y_lchnk = lchnk
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)

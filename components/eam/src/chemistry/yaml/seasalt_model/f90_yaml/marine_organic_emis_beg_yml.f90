@@ -3,7 +3,9 @@
   !"lchnk" is needed for the following code to work,
   ! temporarily pass it along from upper level subroutines
   ! as y_lchnk and uncomment the following code:
-  integer, intent(in) :: y_lchnk
+!  integer, intent(in) :: y_lchnk
+  integer :: y_lchnk
+
   !-----------------------------------------------------------------------------------------
 
   !-----------------------------------------------------------------------------------------
@@ -26,6 +28,15 @@
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
 
+
+  ! local variables to store data to be referenced by local pointers mpoly, mprot, mlip in subroutine
+  ! allocatable arrays are used to facilitate writing to data files
+
+  real(r8), allocatable :: mpoly_in(:)
+  real(r8), allocatable :: mprot_in(:)
+  real(r8), allocatable :: mlip_in(:)
+
+  y_lchnk = lchnk
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
@@ -93,6 +104,34 @@
         call write_var(unit_input,unit_output,'emis_scale',emis_scale)
         call write_var(unit_input,unit_output,'nsections',nsections)
         call write_var(unit_input,unit_output,'emit_this_mode',emit_this_mode)
+
+        if (allocated(mpoly_in)) deallocate(mpoly_in)
+        if (allocated(mprot_in)) deallocate(mprot_in)
+        if (allocated(mlip_in)) deallocate(mlip_in)
+
+        allocate(mpoly_in(pcols))
+        allocate(mprot_in(pcols))
+        allocate(mlip_in(pcols))
+
+   fldloopyaml: do ifld = 1, n_ocean_data
+      select case (trim(fields(ifld)%fldnam))
+         case ("mpoly")
+             mpoly_in  = fields(ifld)%data(:ncol,1,lchnk)
+         case ("mprot")
+             mprot_in  = fields(ifld)%data(:ncol,1,lchnk)
+         case ("mlip")
+             mlip_in   = fields(ifld)%data(:ncol,1,lchnk)
+         case default
+      end select
+   enddo fldloopyaml
+ 
+        call write_var(unit_input,unit_output,'mpoly',mpoly_in(yaml%col_print))
+        call write_var(unit_input,unit_output,'mprot',mprot_in(yaml%col_print))
+        call write_var(unit_input,unit_output,'mlip',mlip_in(yaml%col_print))
+
+        deallocate(mpoly_in)
+        deallocate(mprot_in)
+        deallocate(mlip_in)
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only

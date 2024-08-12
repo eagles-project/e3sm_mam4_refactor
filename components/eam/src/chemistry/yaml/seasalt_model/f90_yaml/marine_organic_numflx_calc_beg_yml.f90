@@ -99,6 +99,7 @@
         call write_var(unit_input,unit_output,'seasalt_indices',seasalt_indices)
         call write_var(unit_input,unit_output,'sst_sz_range_lo',sst_sz_range_lo)
         call write_var(unit_input,unit_output,'sst_sz_range_hi',sst_sz_range_hi)
+        call write_var(unit_input,unit_output,'cflx',cflx(yaml%col_print,:))
 
         !writes aerosol mmr from state%q or q vector (cloud borne and interstitial)
         !"aer_num_only" is .ture. if printing aerosol num only
