@@ -293,7 +293,7 @@ contains
     emis_loop : do m = 1,n_emis_species
 
        n = emissions(m)%spc_ndx
-
+       write(017,*)'srf_emiss:',m,n,n_emis_species
        flux(:) = 0._r8
        do isec = 1,emissions(m)%nsectors
           flux(:ncol) = flux(:ncol) + emissions(m)%fields(isec)%data(:ncol,1,lchnk)

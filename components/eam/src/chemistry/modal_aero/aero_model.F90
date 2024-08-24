@@ -314,6 +314,8 @@ contains
 
        dummy = 'RAM1'
        call addfld (dummy,horiz_only, 'A','frac','RAM1')
+       call addfld ('OBKLEN',horiz_only, 'A','frac','OBKLEN')
+       call add_default ('OBKLEN', 1, ' ')
        if ( history_aerosol ) then
           call add_default (dummy, 1, ' ')
        endif

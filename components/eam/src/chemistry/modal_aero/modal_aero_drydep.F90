@@ -174,6 +174,7 @@ contains
     endif
     call outfld( 'airFV', fricvel(:), pcols, lchnk )
     call outfld( 'RAM1',     ram1(:), pcols, lchnk )
+    call outfld( 'OBKLEN',     obklen(:), pcols, lchnk )
 
     !======================
     ! cloud-borne aerosols

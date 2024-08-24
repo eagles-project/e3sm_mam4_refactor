@@ -1101,6 +1101,7 @@ contains
     do m = 1,pcnst
        n = map2chm(m)
        if ( n /= h2o_ndx .and. n > 0 ) then
+          write(107,*)'Srf_emiss:', m, n, sflxnam(m),cnst_name(m)
           cam_in%cflx(:ncol,m) = cam_in%cflx(:ncol,m) + sflx(:ncol,n)
           call outfld( sflxnam(m), cam_in%cflx(:ncol,m), ncol,lchnk )
        endif
@@ -1464,6 +1465,7 @@ contains
     !-----------------------------------------------------------------------
     do n = 1,pcnst
        m = map2chm(n)
+       write(107,*)'BALLI:mapchm', n,m
        if( m > 0 ) then
           call outfld( srcnam(m), ptend%q(:,:,n), pcols, lchnk )
        end if

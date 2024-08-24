@@ -3120,6 +3120,7 @@ end subroutine clubb_init_cnst
     enddo
 
     rztodt                 = 1._r8/ztodt
+    write(110,*)'ztodt:',ztodt,rztodt
     ptend%q(:ncol,:pver,:) = state%q(:ncol,:pver,:)
     tmp1(:ncol)            = ztodt * gravit * state%rpdel(:ncol,pver)
 
