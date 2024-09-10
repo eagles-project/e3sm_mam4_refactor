@@ -524,7 +524,7 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
 
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1gridcell_beg_yml.f90"
 
 ! the q--4 values will be equal to q--3 values unless they get changed
       qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
@@ -699,7 +699,7 @@ main_jsub_loop: &
 
       end do main_jsub_loop
 
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1gridcell_end_yml.f90"
 
       return
       end subroutine mam_amicphys_1gridcell
@@ -820,6 +820,7 @@ main_jsub_loop: &
 !           beta, nmode, dgncur_awet, lnsg, uptkrate )
          call gas_aer_uptkrates_1box1gas( &
             accom_coef_gas(igas), gas_diffus(igas), gas_freepath(igas), &
+            i, k, lchnk, &
             0.0_r8, ntot_amode, dgn_awet, alnsg_aer, uptkrate )
 
          iaer = igas
@@ -1067,7 +1068,7 @@ main_jsub_loop: &
       real(r8) :: tmpa, tmpb, tmpc
 
       real(r8) :: tot_soa(ntot_soaspec)            ! g_soa + sum( a_soa(:) )
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_soaexch_1subarea_beg_yml.f90"
 
 ! calc ntot_soamode = "last" mode on which soa is allowed to condense
       ntot_soamode = 0
@@ -1280,7 +1281,7 @@ time_loop: &
          qgas_avg(igas) = max( 0.0_r8, qgas_avg(igas)/dtsum_qgas_avg )
       end do
 
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_soaexch_1subarea_end_yml.f90"
       return
       end subroutine mam_soaexch_1subarea
 
@@ -1983,6 +1984,7 @@ agepair_loop1: &
 !--------------------------------------------------------------------------------
       subroutine gas_aer_uptkrates_1box1gas( &
          accom, gasdiffus, gasfreepath, &
+         y_i, y_k, y_lchnk, &
          beta_inp, n_mode, dgncur_awet, lnsg, uptkrate )
 !
 !                         /
@@ -2036,10 +2038,10 @@ agepair_loop1: &
       real(r8) :: sumghq
       real(r8) :: tmpa
       real(r8), save :: xghq(nghq), wghq(nghq) ! quadrature abscissae and weights
+#include "../yaml/modal_aero_amicphys/f90_yaml/gas_aer_uptkrates_1box1gas_beg_yml.f90"
 
       data xghq / 0.70710678, -0.70710678 /
       data wghq / 0.88622693,  0.88622693 /
-
 
       accomxp283 = accom * 0.283_r8
       accomxp75  = accom * 0.75_r8
@@ -2087,6 +2089,7 @@ agepair_loop1: &
 
       end do   ! "do n = 1, ntot_soamode"
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/gas_aer_uptkrates_1box1gas_end_yml.f90"
 
       return
       end subroutine gas_aer_uptkrates_1box1gas

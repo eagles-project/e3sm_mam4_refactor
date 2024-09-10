@@ -5,6 +5,10 @@ use spmd_utils,   only : masterproc
 
 !module_aero_amicphys.F90
 !#define YAML_AMIC
+#define YAML_AMICPHYS_1GRIDCELL
+#define YAML_AMICPHYS_1SUBAREA
+#define YAML_SOAEXCH 
+#define YAML_GAS_UPTKRATE
 
 !module_aero_rename.F90
 !#define YAML_RENAME
