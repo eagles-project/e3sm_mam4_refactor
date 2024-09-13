@@ -109,6 +109,8 @@ use spmd_utils,   only : masterproc
 ! dust and seasalt emission
 ! #define YAML_DUST_SSLT_EM
 
+! newnuc subroutines
+! #define YAML_VEHPBLNUC
 use yaml_input_file_io
 
 
