@@ -8,6 +8,7 @@
 !
 ! !INTERFACE:
    module modal_aero_newnuc
+#include "../yaml/common_files/common_uses.ymlf90"
 #if (defined MODAL_AERO)
 
 ! !USES:
@@ -76,6 +77,7 @@
            isize_nuc, qnuma_del, qso4a_del, qnh4a_del,   &
            qh2so4_del, qnh3_del, dens_nh4so4a, ldiagaa,   &
            dnclusterdt )
+
 
           use mo_constants, only: rgas, &               ! Gas constant (J/K/kmol)
                                   avogad => avogadro    ! Avogadro's number (1/kmol)
@@ -240,6 +242,7 @@
         real(r8) wetvol_dryvol            ! grown particle (wet-volume)/(dry-volume)
         real(r8) wet_volfrac_so4a         ! grown particle (dry-volume-from-so4)/(wet-volume)
 
+#include "../yaml/modal_aero_newnuc/f90_yaml/mer07_veh02_nuc_mosaic_1box_beg_yml.f90"
 
 
 !
@@ -313,6 +316,7 @@
 ! if nucleation rate is less than 1e-6 #/cm3/s ~= 0.1 #/cm3/day,
 ! exit with new particle formation = 0
         if (rateloge  .le. -13.82_r8) return
+! REFACTOR NOTE:  if exit above, no yaml / python data written out
 !       if (ratenuclt .le. 1.0e-6) return
 
         ratenuclt = exp( rateloge )
@@ -490,7 +494,7 @@
 ! if adjusted nucleation rate is less than 1e-12 #/m3/s ~= 0.1 #/cm3/day,
 ! exit with new particle formation = 0
         if (freduce*ratenuclt_kk .le. 1.0e-12_r8) return
-
+! REFACTOR NOTE:  if exit above, no yaml / python data written out
 
 ! note:  suppose that at this point, freduce < 1.0 (no gas-available 
 !    constraints) and molenh4a_per_moleso4a < 2.0
@@ -530,7 +534,7 @@
 ! diagnostic output to fort.41
 ! (this should be commented-out or deleted in the wrf-chem version)
 !
-        if (ldiagaa <= 0) return
+        if (ldiagaa > 0) then  ! do following for diagnostic output if ldiagaa > 0 
 
         icase = icase + 1
         if (abs(tmpc) .gt. abs(reldiffmax)) then
@@ -627,7 +631,8 @@
         ' cs_pri_kk     nu_kk factor_kk ratenuclt',   &
         ' ratenu_kk' )
 
-
+        endif    !  branch if diagnostic output if ldiagaa > 0 
+#include "../yaml/modal_aero_newnuc/f90_yaml/mer07_veh02_nuc_mosaic_1box_end_yml.f90"
         return
         end subroutine mer07_veh02_nuc_mosaic_1box
 
@@ -670,7 +675,7 @@
         real(r8) :: tmp_rateloge, tmp_ratenucl
 
 ! executable
-
+#include "../yaml/modal_aero_newnuc/f90_yaml/pbl_nuc_wang2008_beg_yml.f90"
 
 ! nucleation rate
         if (newnuc_method_flagaa == 11) then
@@ -704,7 +709,7 @@
         cnum_tot = cnum_h2so4
         cnum_nh3 = 0.0_r8
 
-
+#include "../yaml/modal_aero_newnuc/f90_yaml/pbl_nuc_wang2008_end_yml.f90"
         return
         end subroutine pbl_nuc_wang2008
 
@@ -748,7 +753,7 @@
         real(r8) :: tmpa, tmpb
 
 ! executable
-
+#include "../yaml/modal_aero_newnuc/f90_yaml/binary_nuc_vehk2002_beg_yml.f90"
 
 ! calc sulfuric acid mole fraction in critical cluster
         crit_x = 0.740997_r8 - 0.00266379_r8 * temp   &
@@ -902,7 +907,7 @@
         radius_cluster = exp( -1.6524245_r8 + 0.42316402_r8*crit_x   &
                               + 0.3346648_r8*log(cnum_tot) )
       
-
+#include "../yaml/modal_aero_newnuc/f90_yaml/binary_nuc_vehk2002_end_yml.f90"
       return
       end subroutine binary_nuc_vehk2002
 
