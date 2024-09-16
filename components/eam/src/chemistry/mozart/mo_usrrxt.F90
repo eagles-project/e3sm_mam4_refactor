@@ -5,6 +5,8 @@ module mo_usrrxt
   use cam_logfile,  only : iulog
   use ppgrid,       only : pver, pcols
   use cam_abortutils,   only : endrun
+      use module_perturb
+  use time_manager
 
   implicit none
 
@@ -97,7 +99,7 @@ contains
   end subroutine usrrxt_inti
 
   subroutine usrrxt( rxt, & ! inout
-                    temp, invariants, mtot, ncol )  ! in
+                    temp, invariants, mtot, ncol, print_out,lchnk )  ! in
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
 !-----------------------------------------------------------------
@@ -109,7 +111,8 @@ contains
 !-----------------------------------------------------------------
 !        ... dummy arguments
 !-----------------------------------------------------------------
-    integer, intent(in)     :: ncol                       ! number of columns
+    logical, intent(in):: print_out
+    integer, intent(in)     :: ncol,lchnk                       ! number of columns
     real(r8), intent(in)    :: temp(pcols,pver)           ! neutral temperature [K]
     real(r8), intent(in)    :: mtot(ncol,pver)            ! total atm density [/cm^3]
     real(r8), intent(in)    :: invariants(ncol,pver,nfs)  ! invariants density [/cm^3]
@@ -150,6 +153,9 @@ contains
           fc(:) = 1._r8 + 1.4e-21_r8 * invariants(:,kk,inv_h2o_ndx) * exp_fac(:)
 
           rxt(:,kk,usr_HO2_HO2_ndx) = (ko(:) + kinf(:)) * fc(:)
+          if(print_out) then
+              !write(106,*)rxt(icolprnt(lchnk),kk,usr_HO2_HO2_ndx),ko(icolprnt(lchnk)), kinf(icolprnt(lchnk)), fc(icolprnt(lchnk)),tinv(icolprnt(lchnk)), temp(icolprnt(lchnk),kk)
+          endif
 
        endif
 

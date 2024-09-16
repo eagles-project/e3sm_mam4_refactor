@@ -18,6 +18,8 @@ module chemistry
   use mo_gas_phase_chemdr, only : map2chm
   use shr_megan_mod,    only : shr_megan_mechcomps, shr_megan_mechcomps_n 
   use tracer_data,      only : MAXTRCRS
+  use module_perturb
+  use time_manager
 
   implicit none
   private
@@ -1296,7 +1298,7 @@ contains
 
   end subroutine chem_timestep_init
 
-  subroutine chem_timestep_tend( state, ptend, cam_in, cam_out, dt, pbuf,  fh2o, fsds, qqcw, pblh, dgnum, &
+  subroutine chem_timestep_tend( print_out, state, ptend, cam_in, cam_out, dt, pbuf,  fh2o, fsds, qqcw, pblh, dgnum, &
        dgncur_awet, wetdens )
 
     !----------------------------------------------------------------------- 
@@ -1382,12 +1384,36 @@ contains
     real(r8), dimension(:,:), pointer :: linoz_dPmL_dO3col
     real(r8), dimension(:,:), pointer :: linoz_cariolle_psc
 
-    if ( .not. chem_step ) return
+    integer :: tstep, ic
+    logical, intent(in) :: print_out
 
-    chem_dt = chem_freq*dt
+    if ( .not. chem_step ) return
 
     lchnk = state%lchnk
     ncol  = state%ncol
+
+    tstep=get_nstep()
+
+    chem_dt = chem_freq*dt
+
+    if(print_out) then
+       write(105,*)'dt:',dt
+       write(105,*)'chem_dt:',chem_dt
+       write(105,'(A,72(E26.17E3,","),A)')'T_mid : [',state%t(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'p_mid : [',state%pmid(icolprnt(lchnk),:),']'
+       write(105,'(A,73(E26.17E3,","),A)')'p_int : [',state%pint(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'pseudo_density : [',state%pdel(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'omega : [',state%omega(icolprnt(lchnk),:),']'
+       write(105,'(A,72(E26.17E3,","),A)')'qv : [',state%q(icolprnt(lchnk),:,1),']'
+       write(105,'(A,72(E26.17E3,","),A)')'qi : [',state%q(icolprnt(lchnk),:,3),']'               
+       write(105,'(A,72(E26.17E3,","),A)')'ni : [',state%q(icolprnt(lchnk),:,5),']'
+       write(105,'(A,72(E26.17E3,","),A)')'qc : [',state%q(icolprnt(lchnk),:,2),']'
+       write(105,'(A,72(E26.17E3,","),A)')'nc : [',state%q(icolprnt(lchnk),:,4),']'
+       do ic = 10, 40
+         write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name(ic)),' : [',state%q(icolprnt(lchnk),:,ic),']'
+       enddo
+    endif
+
 
     ! associate the field pointers
     linoz_o3_clim      => fields(o3_clim_ndx)      %data(:,:,lchnk )
@@ -1423,6 +1449,7 @@ contains
     tim_ndx = pbuf_old_tim_idx()
     call pbuf_get_field(pbuf, ndx_prain,      prain,  start=(/1,1/), kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cld,        cldfr,  start=(/1,1,tim_ndx/), kount=(/ncol,pver,1/) )
+    if(print_out)write(105,'(A,72(E26.17E3,","),A)')'cldfrac_tot : [',cldfr(icolprnt(lchnk),:),']'
     call pbuf_get_field(pbuf, ndx_cmfdqr,     cmfdqr, start=(/1,1/),         kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_nevapr,     nevapr, start=(/1,1/),         kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cldtop,     cldtop )
@@ -1442,8 +1469,12 @@ contains
             ncldwtr(:ncol,k) = state%q(:ncol,k,ixndrop)
     end do
 
+
+
+
     call t_startf( 'chemdr' )
-    call gas_phase_chemdr(lchnk, ncol, imozart, state%q, &
+    write(103,*),'imozart:',imozart
+    call gas_phase_chemdr(print_out,lchnk, ncol, imozart, state%q, &
          state%phis, state%zm, state%zi, calday, &
          state%t, state%pmid, state%pdel, state%pdeldry, state%pint, &
          cldw, tropLev, ncldwtr, state%u, state%v, &

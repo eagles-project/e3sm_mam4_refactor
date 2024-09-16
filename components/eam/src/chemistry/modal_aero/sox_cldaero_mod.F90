@@ -20,6 +20,10 @@ module sox_cldaero_mod
   use cldaero_mod,     only : cldaero_uptakerate
   use chem_mods,       only : gas_pcnst
 use spmd_utils,   only : masterproc
+use yaml_input_file_io
+
+      use module_perturb
+  use time_manager
 
   implicit none
   private
@@ -89,17 +93,18 @@ contains
   end subroutine sox_cldaero_init
 
 !===================================================================================
-  function sox_cldaero_create_obj(cldfrc, qcw, lwc, cfact, ncol, loffset) result( conc_obj )
+  function sox_cldaero_create_obj(print_out,lchnk,cldfrc, qcw, lwc, cfact, ncol, loffset) result( conc_obj )
 !----------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------
     use cldaero_mod, only : cldaero_allocate
 
     ! input variables    
+    logical :: print_out
     real(r8), intent(in) :: cldfrc(:,:) ! cloud fraction [fraction]
     real(r8), intent(in) :: qcw(:,:,:)  ! cloud-borne aerosol [vmr]
     real(r8), intent(in) :: lwc(:,:)    ! cloud liquid water content [kg/kg]
     real(r8), intent(in) :: cfact(:,:)  ! total atms density [kg/L]
-    integer,  intent(in) :: ncol
+    integer,  intent(in) :: ncol, lchnk
     integer,  intent(in) :: loffset     ! # of tracers in the host model that are not part of MAM
     ! output variables
     type(cldaero_conc_t), pointer :: conc_obj
@@ -132,7 +137,7 @@ contains
     id_so4_2a = lptr_so4_cw_amode(2) - loffset
     id_so4_3a = lptr_so4_cw_amode(3) - loffset
     conc_obj%so4c(:ncol,:) = qcw(:,:,id_so4_1a) + qcw(:,:,id_so4_2a) + qcw(:,:,id_so4_3a)
-
+    if(print_out) write(106,*)'sox_cldaero_create_obj:',qcw(icolprnt(lchnk),kprnt,id_so4_1a),qcw(icolprnt(lchnk),kprnt,id_so4_2a),qcw(icolprnt(lchnk),kprnt,id_so4_3a),id_so4_1a,id_so4_2a, id_so4_3a, loffset
     ! for 3-mode, so4 is assumed to be nh4hso4
     ! the partial neutralization of so4 is handled by using a 
     !    -1 charge (instead of -2) in the electro-neutrality equation
@@ -146,7 +151,7 @@ contains
   end function sox_cldaero_create_obj
 
 !=================================================================================
-  subroutine sox_cldaero_update( ncol, lchnk, loffset,  & ! in
+  subroutine sox_cldaero_update( print_out,ncol, lchnk, loffset,  & ! in
                 dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, & ! in
                 delso4_hprxn, xh2so4, xso4, xso4_init, & ! in
                 qcw, qin ) ! inout
@@ -155,6 +160,7 @@ contains
 !----------------------------------------------------------------------------------
    
     ! args
+    logical::print_out
     integer,  intent(in) :: ncol
     integer,  intent(in) :: lchnk       ! chunk id
     integer,  intent(in) :: loffset     ! # of tracers in the host model that are not part of MAM
@@ -251,6 +257,7 @@ contains
                   dqdt_aq = dqdt_aqso4(icol,kk,ll) + dqdt_aqh2so4(icol,kk,ll)
                   dqdt_wr =  0.0_r8 ! don't have wet removal here
                   call update_tmr ( qcw(icol,kk,ll), dqdt_aq + dqdt_wr, dtime )
+                  if (abs(dqdt_aq + dqdt_wr) > 0._r8)write(102,*)'phys_debug_lat = ',get_lat(lchnk, icol), ' phys_debug_lon = ', get_lon(lchnk, icol), get_nstep(),kk, cldfrc(icol,kk)
                endif
             enddo
 
@@ -258,7 +265,6 @@ contains
             ! that essentially transforms the gas to a different species.
             ! Need to multiply both these parts by cldfrc
             ! Currently it assumes no wet removal here
-
             ! h2so4 (g)         
             qin(icol,kk,id_h2so4) = qin(icol,kk,id_h2so4) - dso4dt_gasuptk * dtime * cldfrc(icol,kk)
 ! FORTRAN refactor: The order of multiplying cldfrc makes the following call
@@ -273,6 +279,7 @@ contains
             dqdt_wr =  0.0_r8 ! don't have wet removal here
             dqdt_aq = -dso4dt_hprxn*cldfrc(icol,kk)
             call update_tmr ( qin(icol,kk,id_h2o2), dqdt_aq + dqdt_wr, dtime )
+            if (print_out .and. kk==kprnt) write(106,*)"sox_cldaero_update:", qin(icol,kk,id_h2o2), dqdt_aq , dqdt_wr, dtime, -dso4dt_hprxn,cldfrc(icol,kk)
 
             ! for SO4 from H2O2/O3 budgets
             dqdt_aqhprxn(icol,kk) = dso4dt_hprxn*cldfrc(icol,kk)

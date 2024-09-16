@@ -9,6 +9,9 @@ module mo_gas_phase_chemdr
   use dust_model,       only : dust_names, ndust => dust_nbin
   use ppgrid,           only : pcols, pver
   use phys_control,     only : phys_getopts
+    use module_perturb
+  use time_manager
+  use cam_abortutils,    only : endrun
 
   implicit none
   save
@@ -134,7 +137,7 @@ contains
 
   !-----------------------------------------------------------------------
   !-----------------------------------------------------------------------
-  subroutine gas_phase_chemdr(lchnk, ncol, imozart, state_q, &
+  subroutine gas_phase_chemdr(print_out, lchnk, ncol, imozart, state_q, &
        phis, zm, zi, calday, &
        tfld, pmid, pdel, pdeldry, pint,  &
        cldw, troplev, &
@@ -195,6 +198,7 @@ contains
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
     !-----------------------------------------------------------------------
+    logical, intent(in) :: print_out
     integer,        intent(in)    :: lchnk                          ! chunk index
     integer,        intent(in)    :: ncol                           ! number columns in chunk
     integer,        intent(in)    :: imozart                        ! gas phase start index in state_q
@@ -353,13 +357,24 @@ contains
     call set_mean_mass( ncol, & !in 
          mbar ) !out
 
+    do kk = 1, pver
+      do ii = 1, ncol
+         if(mbar(ii,kk) >  28.9670000000000)call endrun('BALLI - 1')
+         if(mbar(ii,kk) <  28.9650000000000)call endrun('BALLI - 2')
+    enddo
+    enddo
     !-----------------------------------------------------------------------      
     !        ... Xform from mmr to vmr
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr, & !in
          vmr, & !in-out
          mbar, ncol ) !in
-
+    if(print_out) then
+      write(106,*)'mbar:', mm, mbar(icolprnt(lchnk),kprnt)
+      do mm = 1, 31
+         write(106,'(A,2(ES24.15e2,","),I2)')'vmr-q-adv:', vmr(icolprnt(lchnk),kprnt,mm),mmr(icolprnt(lchnk),kprnt,mm)
+      enddo
+    endif
 
     qh2o(:ncol,:) = state_q(:ncol,:,1)
     !-----------------------------------------------------------------------      
@@ -383,10 +398,17 @@ contains
 
     !-----------------------------------------------------------------------      
     !       ...  Set rates for "tabular" and user specified reactions
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------
+    reaction_rates = -978654321.0_r8;      
     call setrxt( reaction_rates, & ! inout
          tfld, ncol )  ! in
-
+   if(print_out) then
+   do kk = kprnt , kprnt!pver
+      do mm = 1, rxntot
+           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+        enddo
+      enddo
+    endif
     !-----------------------------------------------------------------
     !	... compute the relative humidity
     !-----------------------------------------------------------------
@@ -400,7 +422,19 @@ contains
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
     call usrrxt( reaction_rates, &  ! inout
-         tfld, invariants, invariants(:,:,indexm), ncol ) ! in
+         tfld, invariants, invariants(:,:,indexm), ncol,print_out, lchnk ) ! in
+if(print_out) then
+   do kk = kprnt , kprnt!pver
+      do mm = 1, rxntot
+           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-usrrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+      enddo
+   enddo
+   do kk = kprnt , kprnt!pver
+   do mm = 1, rxntot
+        write(106,*)'invariants:', invariants(icolprnt(lchnk),kk,mm), invariants(icolprnt(lchnk),kk,indexm), mm, kk
+   enddo
+   enddo
+endif
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 
@@ -411,7 +445,13 @@ contains
 
     call adjrxt( reaction_rates, & ! inout
          invariants, invariants(1,1,indexm), ncol )  ! in
-
+    if(print_out) then
+      do kk = kprnt , kprnt!pver
+         do mm = 1, rxntot
+           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-adjrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
     !-----------------------------------------------------------------------
     !        ... Compute the photolysis rates at time = t(n+1)
     !-----------------------------------------------------------------------      
@@ -489,8 +529,38 @@ contains
     !-----------------------------------------------------------------------
     !
     call t_startf('imp_sol')
-    call imp_sol( vmr, reaction_rates, het_rates, extfrc, delt, &
+
+    if(print_out) then
+      do kk = kprnt , kprnt
+         do mm = 1, rxntot
+           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-bef_imp:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm),delt
+         enddo
+         do mm = 1, gas_pcnst
+           write(106,*)'het_rates-bef_imp:', mm, kk,het_rates(icolprnt(lchnk),kk,mm)
+         enddo
+         do mm = 1, extcnt
+            write(106,*)'extfrc-bef_imp:', mm, kk,extfrc(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
+
+   if(print_out) then
+      do kk = kprnt , kprnt!pver
+         do mm = 1, 3!gas_pcnst
+           write(106,*)'q-bef_imp:', kk,mm,vmr(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
+
+    call imp_sol( print_out, vmr, reaction_rates, het_rates, extfrc, delt, &
          invariants(1,1,indexm), ncol, lchnk, ltrop_sol(:ncol) )
+   if(print_out) then
+      do kk = kprnt , kprnt!pver
+         do mm = 1, 3!gas_pcnst
+           write(106,*)'q-aft_imp:', kk,vmr(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
     call t_stopf('imp_sol')
 
     if(convproc_do_aer) then 
@@ -505,6 +575,12 @@ contains
        del_h2so4_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_gasprod(1:ncol,:)
     endif
 
+    if(print_out) then
+      do kk = kprnt , kprnt!pver
+        write(106,*)'del_h2so4_gasprod:', kk,del_h2so4_gasprod(icolprnt(lchnk),kk)
+      enddo
+   endif
+
     !
     ! Aerosol processes ...
     !
@@ -515,7 +591,7 @@ contains
     call get_lon_all_p( lchnk, ncol, lonndx )
 
     call t_startf('aero_model_gasaerexch')
-    call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, & !in
+    call aero_model_gasaerexch( print_out, imozart-1, ncol, lchnk, delt, latndx, lonndx, & !in
          tfld, pmid, pdel, mbar, zm,  qh2o, cwat,      & !in
          cldfr, ncldwtr, invariants(:,:,indexm), vmr0, & !in
          pblh,                                         & !in
@@ -595,6 +671,11 @@ contains
          vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk ) !in
     call t_stopf('chemdr_diags')
 #include "../yaml/mo_gas_phase_chemdr/f90_yaml/gas_phase_chemdr_end_yml.f90"
+
+if(print_out) then
+   write(106,*)'zen_angle:', zen_angle(icolprnt(lchnk))
+endif
+
   end subroutine gas_phase_chemdr
 
 end module mo_gas_phase_chemdr

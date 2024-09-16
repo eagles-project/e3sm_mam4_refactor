@@ -102,15 +102,18 @@ contains
 
   end function min_max_bound_array
   !===============================================================================
-  subroutine get_cldbrn_mmr(lchnk, pbuf, qqcw)
+  subroutine get_cldbrn_mmr(lchnk, pbuf, print_out, qqcw)
     !Get MMR for cloud borne aerosols using qqcw_get_field function
     use constituents,    only: pcnst
     use physics_buffer,  only: physics_buffer_desc
     use modal_aero_data, only: qqcw_get_field
+    use modal_aero_data
+    use module_perturb
 
     !intent-ins
     integer, intent(in) :: lchnk
     type(physics_buffer_desc), pointer :: pbuf(:)
+    logical::print_out
 
     !intent - out
     type(ptr2d_t), intent(out) :: qqcw(pcnst) !cloud-borne aerosols mass and number mixing ratios
@@ -122,6 +125,7 @@ contains
        !errorhandle=.true. allows users to handles errors themselves, so it
        !let the simulation run even if qqcw field is unassociated (e.g. for water specie indices)
        qqcw(icnst)%fld => qqcw_get_field(pbuf,icnst,lchnk, errorhandle=.true.)
+       if(print_out .and. associated(qqcw(icnst)%fld))write(105,'(2A,72(E26.17E3,","),A)')trim(cnst_name_cw(icnst)),' : [',qqcw(icnst)%fld(icolprnt(lchnk),:),']'
     enddo
 
   end subroutine get_cldbrn_mmr

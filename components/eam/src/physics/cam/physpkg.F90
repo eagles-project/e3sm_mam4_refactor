@@ -12,7 +12,7 @@ module physpkg
   ! July 2015   B. Singh       Added code for unified convective transport
   !-----------------------------------------------------------------------
 
-
+  use module_perturb
   use shr_kind_mod,     only: i8 => shr_kind_i8, r8 => shr_kind_r8
   use spmd_utils,       only: masterproc
   use physconst,        only: latvap, latice, rh2o
@@ -1506,7 +1506,7 @@ contains
     real(r8), pointer, dimension(:) :: water_vap_ac_2d   ! Vertically integrated water vapor
 
     ! physics buffer fields for total energy and mass adjustment
-    integer itim_old, ifld
+    integer itim_old, ifld, tstep
 
     real(r8), pointer, dimension(:,:) :: tini
     real(r8), pointer, dimension(:,:) :: cld
@@ -1541,7 +1541,7 @@ contains
     logical :: l_vdiff
     logical :: l_rayleigh
     logical :: l_gw_drag
-    logical :: l_ac_energy_chk
+    logical :: l_ac_energy_chk, print_out
 
     !
     !-----------------------------------------------------------------------
@@ -1655,8 +1655,10 @@ contains
 
        ! Chemistry calculation
        if (chem_is_active()) then
+          tstep=get_nstep()
+          print_out = (icolprnt(lchnk) > 0 .and. tstep == 6)
           !get mmr of cloud borne aerosols
-          call get_cldbrn_mmr(lchnk, pbuf, &! in
+          call get_cldbrn_mmr(lchnk, pbuf, print_out, &! in
                qqcw) !out
 
           ! read additional variables from pbuf
@@ -1665,7 +1667,7 @@ contains
           call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
           call pbuf_get_field(pbuf, pblh_idx,       pblh)
 
-          call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, &
+          call chem_timestep_tend(print_out,state, ptend, cam_in, cam_out, ztodt, &
                pbuf,  fh2o, fsds, qqcw, pblh, dgnum, dgncur_awet, wetdens )
 
           call physics_update(state, ptend, ztodt, tend)
@@ -1740,7 +1742,7 @@ contains
        !  aerosol dry deposition processes
        call t_startf('aero_drydep')
        !get mmr of cloud borne aerosols
-       call get_cldbrn_mmr(lchnk, pbuf, &! in
+       call get_cldbrn_mmr(lchnk, pbuf, .false.,&! in
             qqcw) !out
 
        call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet, start=(/1,1,1/), kount=(/pcols,pver,nmodes/) ) 

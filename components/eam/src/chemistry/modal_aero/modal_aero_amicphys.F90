@@ -17,6 +17,9 @@ module modal_aero_amicphys
   use cam_logfile,     only:  iulog
   use ppgrid,          only:  pcols, pver
 
+      use module_perturb
+  use time_manager
+
   implicit none
   private
   public modal_aero_amicphys_intr, modal_aero_amicphys_init
@@ -25,7 +28,7 @@ module modal_aero_amicphys
 
 contains
 
-subroutine modal_aero_amicphys_intr(                             &
+subroutine modal_aero_amicphys_intr( print_out,                  &
                         mdo_gasaerexch,     mdo_rename,          &
                         mdo_newnuc,         mdo_coag,            &
                         lchnk,    ncol,     nstep,               &
@@ -102,6 +105,7 @@ use modal_aero_amicphys_diags, only: amicphys_diags_init &
 implicit none
 
 ! !PARAMETERS:
+   logical, intent(in) :: print_out
    integer,  intent(in)    :: mdo_gasaerexch, mdo_rename, mdo_newnuc, mdo_coag
    integer,  intent(in)    :: lchnk                ! chunk identifier
    integer,  intent(in)    :: ncol                 ! number of atmospheric columns in the chunk
@@ -253,7 +257,9 @@ implicit none
    call qsat( temp(1:ncol,1:pver), pmid(1:ncol,1:pver), &! in
               ev_sat(1:ncol,1:pver),                    &! out (but not used)
               qv_sat(1:ncol,1:pver)                     )! out
-
+   if (print_out) then
+      write(106,*)'QSAT:', qv_sat(icolprnt(lchnk),kprnt),qv(icolprnt(lchnk),kprnt), pmid(icolprnt(lchnk),kprnt), temp(icolprnt(lchnk),kprnt);
+   endif
    do kk = top_lev, pver
    do ii = 1, ncol
 
@@ -269,7 +275,9 @@ implicit none
       relhumgcm = min_max_bound( 0.0_r8, 1.0_r8, qv(ii,kk)/qv_sat(ii,kk) )
 
       call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
-
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,*)'amic1:', nsubarea, ncldy_subarea, jclea, jcldy, iscldy_subarea, afracsub,":",relhumsub
+      endif
       !-------------------------------
       ! Set aerosol water in subareas
       !-------------------------------
@@ -289,6 +297,14 @@ implicit none
          end do
       end if
 
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do jsub = 1, nsubarea
+         do icnst = 1 , ntot_amode_extd
+            write(106,*)'amic2:', qaerwatsub3(icnst,jsub),icnst,jsub,ntot_amode_extd,nsubarea
+         enddo
+         enddo
+      endif
+
       !-------------------------------------------------------------------------
       ! Set gases, interstitial aerosols, and cloud-borne aerosols in subareas
       !-------------------------------------------------------------------------
@@ -306,12 +322,24 @@ implicit none
          qqcwgcm3(icnst:) = max( 0.0_r8, qqcw(ii,kk,icnst) )
 
       end do
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do icnst = 1 , gas_pcnst
+            write(106,*)'amic2a:', qgcm1(icnst), qgcm2(icnst), qgcm3(icnst), icnst!, qqcwgcm2(icnst:), qqcwgcm3(icnst:)
+         enddo
+      endif
 
       ! Partition grid cell mean to subareas
-
-      call  set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
+      write(110,*)'lofset:',loffset
+      call  set_subarea_gases_and_aerosols( print_out, ii, kk, lchnk, loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
                                             qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
                                             qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do jsub = 1, maxsubarea
+         do icnst = 1 , gas_pcnst
+            write(106,'(A,5(ES24.15e2,","),2I2)')'amic3:', qsub1(icnst,jsub), qsub2(icnst,jsub), qqcwsub2(icnst,jsub), qsub3(icnst,jsub), qqcwsub3(icnst,jsub), icnst, jsub
+         enddo
+         enddo
+      endif
 
       !================================================================================
       ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
@@ -332,27 +360,62 @@ implicit none
       dgn_awet(1:ntot_amode) = dgncur_awet(ii,kk,1:ntot_amode)
       wetdens (1:ntot_amode) = max( 1000.0_r8, wetdens_host(ii,kk,1:ntot_amode) )
 
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do jsub = 1, ntot_amode
+            write(106,*)'dgn_a:',dgn_a(jsub)
+            write(106,*)'dgn_awet:',dgn_awet(jsub)
+            write(106,*)'wetdens:',wetdens(jsub)
+         enddo
+      endif
+
+
       misc_vars_aa%ncluster_tend_nnuc_1grid = ncluster_3dtend_nnuc(ii,kk)
 
       ! Calculate aerosol microphysics to get the updated mixing ratios in subareas
 
-      call mam_amicphys_1gridcell(                &
-         do_cond,             do_rename,          &
-         do_newnuc,           do_coag,            &
-         nstep,    lchnk,     ii,        kk,      &
-         latndx(ii),          lonndx(ii), iulog,  &
-         loffset,  deltat,                        &
-         nsubarea,  ncldy_subarea,                &
-         iscldy_subarea,      afracsub,           &
-         temp(ii,kk), pmid(ii,kk), pdel(ii,kk),   &
-         zm(ii,kk),  pblh(ii),   relhumsub,       &
-         dgn_a,    dgn_awet,  wetdens,            &
-         qsub1,                                   &
-         qsub2, qqcwsub2,                         &
-         qsub3, qqcwsub3, qaerwatsub3,            &
-         qsub4, qqcwsub4, qaerwatsub4,            &
-         qsub_tendaa, qqcwsub_tendaa,             &
-         misc_vars_aa                             )
+      call mam_amicphys_1gridcell( print_out,               &
+         do_cond,             do_rename,          & !in
+         do_newnuc,           do_coag,            & !in
+         nstep,    lchnk,     ii,        kk,      & !in
+         latndx(ii),          lonndx(ii), iulog,  & !in
+         loffset,  deltat,                        & !in
+         nsubarea,  ncldy_subarea,                & !in
+         iscldy_subarea,      afracsub,           & !in
+         temp(ii,kk), pmid(ii,kk), pdel(ii,kk),   & !in
+         zm(ii,kk),  pblh(ii),   relhumsub,       & !in
+         dgn_a,    dgn_awet,  wetdens,            & !inout
+         qsub1,                                   & !in
+         qsub2, qqcwsub2,                         & !in
+         qsub3, qqcwsub3,                         & !in
+         qaerwatsub3,                             & !inout
+         qsub4, qqcwsub4, qaerwatsub4,            & !inout
+         qsub_tendaa, qqcwsub_tendaa,             & !inout
+         misc_vars_aa                             ) !inout
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do jsub = 1, ntot_amode
+            write(106,*)'AFT:dgn_a:',dgn_a(jsub)
+            write(106,*)'AFT:dgn_awet:',dgn_awet(jsub)
+            write(106,*)'AFT:wetdens:',wetdens(jsub)
+         enddo
+         do jsub = 1, nsubarea
+            do icnst = 1 , gas_pcnst
+               write(106,'(A,2(ES24.15e2,","),2I2)')'amic4:', qsub4(icnst,jsub), qqcwsub4(icnst,jsub), icnst, jsub
+            enddo
+            do icnst = 1 , ntot_amode_extd
+               write(106,'(A,2(ES24.15e2,","),2I2)')'amic4:',qaerwatsub3(icnst,jsub), qaerwatsub4(icnst,jsub), icnst, jsub
+            enddo
+         enddo
+      endif
+      
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do jsub = 1, nsubarea
+         do icnst = 1 , ntot_amode_extd
+            write(106,*)'agrid_1:', qaerwatsub3(icnst,jsub),icnst,jsub,ntot_amode_extd,nsubarea
+         enddo
+         enddo
+      endif
 
       !=================================================================================================
       ! Aerosol microphysics calculations done for all subareas. Form new grid cell mean mixing ratios.
@@ -415,23 +478,24 @@ end subroutine modal_aero_amicphys_intr
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-subroutine mam_amicphys_1gridcell(          &
-         do_cond,            do_rename,           &
-         do_newnuc,          do_coag,             &
-         nstep,    lchnk,    i,        k,         &
-         latndx,   lonndx,   lund,                &
-         loffset,  deltat,                        &
-         nsubarea,  ncldy_subarea,                &
-         iscldy_subarea,     afracsub,            &
-         temp,     pmid,     pdel,                &
-         zmid,     pblh,     relhumsub,           &
-         dgn_a,    dgn_awet, wetdens,             &
-         qsub1,                                   &
-         qsub2, qqcwsub2,                         &
-         qsub3, qqcwsub3, qaerwatsub3,            &
-         qsub4, qqcwsub4, qaerwatsub4,            &
-         qsub_tendaa, qqcwsub_tendaa,             &
-         misc_vars_aa                             )
+subroutine mam_amicphys_1gridcell( print_out,         &
+         do_cond,            do_rename,           & !in
+         do_newnuc,          do_coag,             & !in
+         nstep,    lchnk,    i,        k,         & !in
+         latndx,   lonndx,   lund,                & !in
+         loffset,  deltat,                        & !in
+         nsubarea,  ncldy_subarea,                & !in
+         iscldy_subarea,     afracsub,            & !in
+         temp,     pmid,     pdel,                & !in
+         zmid,     pblh,     relhumsub,           & !in
+         dgn_a,    dgn_awet, wetdens,             & !inout
+         qsub1,                                   & !in
+         qsub2, qqcwsub2,                         & !in
+         qsub3, qqcwsub3,                         & !in
+         qaerwatsub3,                             &!inout
+         qsub4, qqcwsub4, qaerwatsub4,            &!inout
+         qsub_tendaa, qqcwsub_tendaa,             &!inout
+         misc_vars_aa                             )!inout
 !
 ! calculates changes to gas and aerosol sub-area TMRs (tracer mixing ratios)
 !    for the current grid cell (with indices = lchnk,i,k)
@@ -441,7 +505,7 @@ subroutine mam_amicphys_1gridcell(          &
   use modal_aero_amicphys_control
   use modal_aero_amicphys_diags,   only: nqtendaa, nqqcwtendaa
 
-      logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag
+      logical,  intent(in)    :: do_cond, do_rename, do_newnuc, do_coag, print_out
       logical,  intent(in)    :: iscldy_subarea(maxsubarea)
 
       integer,  intent(in)    :: nstep                 ! model time-step number
@@ -492,8 +556,8 @@ subroutine mam_amicphys_1gridcell(          &
       type ( misc_vars_aa_type ), intent(inout) :: misc_vars_aa
 
 ! local
-      integer :: iaer, igas
-      integer :: jsub
+      integer :: iaer, igas, endind, imode
+      integer :: jsub, icnst
       integer :: l
       integer :: n
       logical :: do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
@@ -524,6 +588,14 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
 
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
+
+   qnumcw2(:) = 999._r8
+   qnumcw3(:)=999._r8
+   qnumcw4(:) = 999._r8
+
+   qaercw2(:,:) = 888._r8
+   qaercw3(:,:) = 888._r8
+   qaercw4(:,:) = 888._r8
 
 
 ! the q--4 values will be equal to q--3 values unless they get changed
@@ -558,7 +630,7 @@ main_jsub_loop: &
 
 
 ! map incoming sub-area mix-ratios to gas/aer/num arrays
-
+      if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)"iscldy_subarea:",iscldy_subarea(jsub)
       qgas1(:) = 0.0_r8
       qgas2(:) = 0.0_r8
       qgas3(:) = 0.0_r8
@@ -571,6 +643,7 @@ main_jsub_loop: &
          qgas2(igas) = qsub2(l,jsub)*fcvt_gas(igas)
          qgas3(igas) = qsub3(l,jsub)*fcvt_gas(igas)
          qgas4(igas) = qgas3(igas)
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'qgas4:',qgas4(igas),qgas3(igas),qsub3(l,jsub),fcvt_gas(igas),l,igas,ngas,jsub
       end do
       end if
 
@@ -589,6 +662,7 @@ main_jsub_loop: &
          qnum4(n) = qnum3(n)
          do iaer = 1, naer
             l = lmap_aer(iaer,n)
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'lmap_aer:',iaer,n,l, naer
             if (l > 0) then
                qaer2(iaer,n) = qsub2(l,jsub)*fcvt_aer(iaer)
                qaer3(iaer,n) = qsub3(l,jsub)*fcvt_aer(iaer)
@@ -598,6 +672,18 @@ main_jsub_loop: &
          qwtr3(n) = qaerwatsub3(n,jsub)*fcvt_wtr
          qwtr4(n) = qwtr3(n)
       end do ! n
+      if (print_out .and. k==kprnt .and. i==icolprnt(lchnk)) then
+         do imode = 1, ntot_amode
+            write(106,'(A,7(ES24.15e2,","),I1)')'NUM_1:', qnum2(imode),qnum3(imode), qnum4(imode), qwtr3(imode), qwtr4(imode), fcvt_wtr, fcvt_num, imode
+            endind = naer;
+            if(imode == 2) endind = 4;
+            if(imode == 4) endind = 3;
+            do icnst = 1 , endind
+               write(106,'(A,4(ES24.15e2,","),2I1)')'qaer_1::',qaer2(icnst,imode), qaer3(icnst,imode), qaer4(icnst,imode), fcvt_aer(icnst),icnst, imode
+            enddo
+         enddo
+      endif
+
 
       if ( iscldy_subarea(jsub) .eqv. .true. ) then
 ! only do cloud-borne for cloudy
@@ -623,7 +709,19 @@ main_jsub_loop: &
       end do ! n
       end if
 
-      call mam_amicphys_1subarea(                    &
+      if (print_out .and. k==kprnt .and. i==icolprnt(lchnk)) then
+         do imode = 1, ntot_amode
+            write(106,'(A,3(ES24.15e2,","),I1)')'NUMCW_1:', qnumcw2(imode),qnumcw3(imode), qnumcw4(imode), imode
+            endind = naer;
+            if(imode == 2) endind = 4;
+            if(imode == 4) endind = 3;
+            do icnst = 1 , endind
+               write(106,'(A,3(ES24.15e2,","),2I2)')'qaerCW_1::',qaercw2(icnst,imode), qaercw3(icnst,imode), qaercw4(icnst,imode),icnst, imode
+            enddo
+         enddo
+      endif
+
+      call mam_amicphys_1subarea( print_out,                   &
          do_cond_sub,            do_rename_sub,      &
          do_newnuc_sub,          do_coag_sub,        &
          nstep,      lchnk,      i,        k,        &
@@ -665,6 +763,7 @@ main_jsub_loop: &
       do igas = 1, ngas
          l = lmap_gas(igas)
          qsub4(l,jsub) = qgas4(igas)/fcvt_gas(igas)
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'qsub4',qsub4(l,jsub),qgas4(igas),fcvt_gas(igas),l,jsub,igas,ngas
          qsub_tendaa(l,:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
       end do
       end if
@@ -711,7 +810,7 @@ main_jsub_loop: &
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_gasaerexch_1subarea(                           &
+      subroutine mam_gasaerexch_1subarea(print_out,                           &
          nstep,             lchnk,                                  &
          i,                 k,                jsub,                 &
          jtsubstep,         ntsubstep,                              &
@@ -733,6 +832,7 @@ main_jsub_loop: &
       implicit none
 
 ! arguments
+      logical :: print_out
       integer,  intent(in) :: nstep                 ! model time-step number
       integer,  intent(in) :: lchnk                 ! chunk identifier
       integer,  intent(in) :: i, k                  ! column and level indices
@@ -814,32 +914,62 @@ main_jsub_loop: &
          tmpb = mean_molecular_speed( temp, mw_gas(igas) )
 
          gas_freepath(igas) = 3.0_r8 * gas_diffus(igas) / tmpb
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+         write(106,'(A,8(ES24.15e2,","),I2)')"gas_freepath_igas:",gas_diffus(igas), tmpb, temp, mw_gas(igas), temp, tmpa, mw_gas(igas), vol_molar_gas(igas),igas
+         endif
 
 !        subr gas_aer_uptkrates_1box1gas( &
 !           accom, gasdiffus, gasfreepath, &
 !           beta, nmode, dgncur_awet, lnsg, uptkrate )
-         call gas_aer_uptkrates_1box1gas( &
-            accom_coef_gas(igas), gas_diffus(igas), gas_freepath(igas), &
-            0.0_r8, ntot_amode, dgn_awet, alnsg_aer, uptkrate )
-
+         
+         call gas_aer_uptkrates_1box1gas( i,k,lchnk, print_out,&
+            accom_coef_gas(igas), gas_diffus(igas), gas_freepath(igas), & !in
+            0.0_r8, ntot_amode, dgn_awet, alnsg_aer, & !in
+             uptkrate ) !out
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+                  write(106,'(A,3(ES24.15e2,","),2I2)')'gas_aer_uptkrates_1box1gas:',accom_coef_gas(igas), gas_diffus(igas), gas_freepath(igas), igas-1, ntot_amode
+         endif
+ 
          iaer = igas
          do n = 1, ntot_amode
             if ( lmap_aer(iaer,n) > 0 .or. &
                  mode_aging_optaa(n) > 0 ) then
                ! uptkrate is for number = 1 #/m3, so mult. by number conc. (#/m3)
                uptkaer(igas,n) = uptkrate(n) * (qnum_cur(n) * aircon)
+               if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+                  write(106,'(A,4(ES24.15e2,","),2I2)')'uptkaer:',uptkaer(igas,n),uptkrate(n),qnum_cur(n),aircon, igas,n
+               endif
             else
                ! mode does not contain this species
                uptkaer(igas,n) = 0.0_r8
             end if
          end do
       end do ! igas
-
+      if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
       do igas = 1, ngas
+      do n = 1, ntot_amode
+         write(106,'(A,6(ES24.15e2,","),5I2)')'uptkaer_BEF:',uptkaer(igas,n),uptkaer(igas_h2so4,n),uptkaer(igas_h2so4,n)*0.81, &
+         uptkaer(igas_h2so4,n)*0.81_r8,4.121689548405324E-04/uptkaer(igas_h2so4,n),   4.121689536273381E-04/uptkaer(igas_h2so4,n), igas, igas_h2so4, igas_nh3,nsoa, n
+      enddo
+      enddo
+      endif
+      do igas = 1, ngas
+      !BALLI: commented out following line, MAY BE NBFB!!!
          ! use cam5.1.00 uptake rates
          if (igas <= nsoa    ) uptkaer(igas,1:ntot_amode) = uptkaer(igas_h2so4,1:ntot_amode)*0.81
          if (igas == igas_nh3) uptkaer(igas,1:ntot_amode) = uptkaer(igas_h2so4,1:ntot_amode)*2.08
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            if (igas <= nsoa    ) uptkaer(igas,1:ntot_amode) = uptkaer(igas_h2so4,1:ntot_amode)*0.81_r8
+            if (igas == igas_nh3) uptkaer(igas,1:ntot_amode) = uptkaer(igas_h2so4,1:ntot_amode)*2.08_r8
+         endif
       end do ! igas
+      if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+       do igas = 1, ngas
+       do n = 1, ntot_amode
+         write(106,'(A,1(ES24.15e2,","),3I2)')'uptkaer_AFT:',uptkaer(igas,n),igas, igas_h2so4,n
+      enddo
+       enddo
+      endif
       uptkrate_h2so4 = sum( uptkaer(igas_h2so4,1:ntot_amode) )
 
 #if ( defined( CAMBOX_ACTIVATE_THIS ) )
@@ -1981,7 +2111,7 @@ agepair_loop1: &
 
 !--------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------
-      subroutine gas_aer_uptkrates_1box1gas( &
+      subroutine gas_aer_uptkrates_1box1gas(ii,kk,lchnk, print_out,&
          accom, gasdiffus, gasfreepath, &
          beta_inp, n_mode, dgncur_awet, lnsg, uptkrate )
 !
@@ -1999,10 +2129,11 @@ agepair_loop1: &
 !           ac = accomodation coefficient
 !
       implicit none
+      logical:: print_out
 
       integer, parameter :: r8 = 8
 
-      integer,  intent(in)  :: n_mode                ! number of modes
+      integer,  intent(in)  :: n_mode, kk, ii,lchnk                ! number of modes
 
       real(r8), intent(in)  :: accom                ! accomodation coefficient (--)
       real(r8), intent(in)  :: gasdiffus            ! gas diffusivity (m2/s)
@@ -2061,6 +2192,9 @@ agepair_loop1: &
                       ( knudsen*( knudsen + one + accomxp283 ) + accomxp75 )
             beta = one - knudsen*tmpa
             beta = max( one, min( two, beta ) )
+            if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+               write(106,'(A,7(ES24.15e2,","),I2)')"beta:",beta,knudsen,tmpa, accomxp283, accomxp75 ,gasfreepath, dp,n
+            endif
          else
             beta = beta_inp
          end if
@@ -2072,6 +2206,9 @@ agepair_loop1: &
          do iq = 1, nghq
             lndp = lndpgn + beta*lnsg(n)**2 + root2*lnsg(n)*xghq(iq)
             dp = exp(lndp)
+            if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+               write(106,'(A,7(ES24.15e2,","),2I2)')"dp:",dp, lndp, lndpgn, beta, lnsg(n), root2, xghq(iq),iq,n
+            endif
 
             knudsen = two*gasfreepath/dp
 
@@ -2082,6 +2219,9 @@ agepair_loop1: &
                   ( knudsen*( knudsen + one + accomxp283 ) + accomxp75 )
 
             sumghq = sumghq + wghq(iq)*dp*fuchs_sutugin/(dp**beta)
+            if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+               write(106,'(A,5(ES24.15e2,","),I2)')"sumghq:",sumghq,wghq(iq),dp,fuchs_sutugin,beta,n
+            endif
          end do
          uptkrate(n) = const * gasdiffus * sumghq
 
@@ -2350,6 +2490,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
          mw_gas(igas) = mwhost_gas(igas)
          if (igas <= nsoa) mw_gas(igas) = mwuse_soa(igas)
          fcvt_gas(igas) = mwhost_gas(igas)/mw_gas(igas)
+         !write(106,*)'fcvt:', igas, fcvt_gas(igas),mwhost_gas(igas),mw_gas(igas),nsoa, mwuse_soa(1), lmz
 
          if (igas <= nsoa) then
             vol_molar_gas(igas) = vol_molar_gas(igas_h2so4) * (mw_gas(igas)/98.0_r8)
@@ -2423,6 +2564,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
                end if
                lmapcc_all(lmz) = lmapcc_val_aer
                lmap_aer(iaer,n) = l - loffset
+               write(106,*)'lmap_aer:',n, l1, l, lmap_aer(iaer,n)
                lmapbb_aer(iaer,n) = l1
 
                dens_aer(iaer) = specdens2_amode(l1,n)
@@ -2470,6 +2612,8 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       sigmag_aer(:) = 1.8_r8
       sigmag_aer(1:ntot_amode) = sigmag_amode(1:ntot_amode)
       alnsg_aer(1:max_mode) = log(sigmag_aer(1:max_mode))
+      write(106,*)'alnsg_aer:',alnsg_aer(1:max_mode)
+      write(106,*)'sigmag_aer:',sigmag_aer(1:max_mode)
 
       dgnum_aer(:)   =  3.0e-9_r8
       dgnumlo_aer(:) =  1.0e-9_r8
@@ -2600,6 +2744,16 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
                      dens_aer(iaer), mass_2_vol(iaer), hygro_aer(iaer)
                   write(iulog,'(2i4,2x,a,2f10.4,1p,4e12.4)') &
                      iaer, lmap_aercw(iaer,n), name_aercw(iaer,n)
+               end if
+            end do
+         end do ! n
+
+
+         do n = 1, ntot_amode
+         write(iulog,*)'mode_aging_optaa',mode_aging_optaa(n),n, mode_aging_optaa(n+1)
+            do iaer = 1, naer
+               if (lmap_aer(iaer,n) > 0) then
+                  write(iulog,*)'fcvt_aer',n,iaer,naer,fcvt_aer(iaer)
                end if
             end do
          end do ! n

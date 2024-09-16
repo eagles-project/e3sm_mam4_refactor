@@ -2,6 +2,9 @@ module mo_imp_sol
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods, only : clscnt4, gas_pcnst, clsmap
   use cam_logfile, only : iulog
+  use module_perturb
+  use time_manager
+  use cam_abortutils,    only : endrun
 #include "../yaml/common_files/common_uses.ymlf90"
 
 !==================================================================================
@@ -107,7 +110,7 @@ contains
     enddo
   end subroutine imp_slv_inti
 !==================================================================================
-  subroutine imp_sol( base_sol,                 & ! inout
+  subroutine imp_sol( print_out, base_sol,                 & ! inout
                       reaction_rates, het_rates, extfrc, delt, & ! in
                       xhnm, ncol, lchnk, ltrop ) ! in
     !-----------------------------------------------------------------------
@@ -128,6 +131,7 @@ contains
     !-----------------------------------------------------------------------
     ! ... dummy args
     !-----------------------------------------------------------------------
+    logical,  intent(in) :: print_out 
     integer,  intent(in) :: ncol ! columns in chunck
     integer,  intent(in) :: lchnk ! chunk id
     real(r8), intent(in) :: delt ! time step [s]
@@ -200,6 +204,7 @@ contains
              !-----------------------------------------------------------------------
              do mm = 1,gas_pcnst
                 lsol(mm) = base_sol(icol,lev,mm)
+                if (print_out .and. lev==1 .and. mm==2)write(106,*)'Base_sol-top:',base_sol(icolprnt(lchnk),lev,mm), stp_con_cnt
              enddo
              !-----------------------------------------------------------------------
              ! ... transfer from base to class array
@@ -264,6 +269,7 @@ contains
              ! ... check for interval done
              !-----------------------------------------------------------------------
              interval_done = interval_done + dt
+             if (print_out .and. lev==1)write(106,*)'interval:',interval_done, dt
              if( abs( delt - interval_done ) <= .0001_r8 ) then
                 if( fail_cnt > 0 ) then
                    write(iulog,*) 'imp_sol : @ (lchnk,lev,col) = ',lchnk,lev,icol,' failed ',fail_cnt,' times'

@@ -4,6 +4,8 @@ module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
+  use module_perturb
+  use time_manager
 
   private
   public :: sox_inti, setsox
@@ -142,7 +144,7 @@ contains
   
 !-----------------------------------------------------------------------      
 !-----------------------------------------------------------------------      
-  subroutine setsox(   &
+  subroutine setsox( print_out,  &
        ncol,   lchnk,  loffset,   dtime,  & ! in
        press,  pdel,   tfld,      mbar,   & ! in
        lwc,    cldfrc, cldnum,            & ! in
@@ -175,7 +177,8 @@ contains
     !
     !-----------------------------------------------------------------------      
     !      ... Dummy arguments
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------  
+    logical :: print_out    
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
@@ -261,7 +264,7 @@ contains
     endif
 
     ! initialize species concentrations
-    cldconc => sox_cldaero_create_obj( cldfrc,qcw,lwc, cfact, ncol, loffset )
+    cldconc => sox_cldaero_create_obj( print_out, lchnk, cldfrc,qcw,lwc, cfact, ncol, loffset )
     xso4c => cldconc%so4c
 
     xso4(:,:)   = 0._r8
@@ -286,6 +289,7 @@ contains
 
              if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
                 xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
+                if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'cldbrn_calc_sox_aqueous:',xso4(icol,kk)
              endif
  
              call calc_ph_values(                      &
@@ -395,9 +399,10 @@ contains
           !       S(IV) + H2O2 = S(VI)
           !............................
           
-          if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED          
+          if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED  
+          if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'bef_calc_sox_aqueous:',xso4(icol,kk),xso4_init(icol,kk)       
 
-             call calc_sox_aqueous( modal_aerosols,     & ! in
+             call calc_sox_aqueous( print_out,kk,modal_aerosols,     & ! in
                 rah2o2, h2o2g, so2g,   o3g,   rao3,     & ! in
                 patm, dtime, t_factor, xlwc,  const0,   & ! in
                 xhnm(icol,kk), heo3(icol,kk), heso2(icol,kk),      & ! in
@@ -410,7 +415,7 @@ contains
        enddo col_loop1
     enddo ver_loop1
 
-    call sox_cldaero_update( &
+    call sox_cldaero_update( print_out,&
          ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, & ! in
          cldnum, cldfrc, cfact, cldconc%xlwc, & ! in
          xdelso4hp, xh2so4, xso4, xso4_init,  & ! in
@@ -652,7 +657,7 @@ contains
   end subroutine calc_ynetpos
 
 !===========================================================================
-  subroutine calc_sox_aqueous( modal_aerosols,         & ! in
+  subroutine calc_sox_aqueous( print_out, kk,modal_aerosols,         & ! in
                 rah2o2, h2o2g, so2g, o3g,      rao3,   & ! in
                 patm, dtime, t_factor, xlwc, const0,   & ! in
                 xhnm, heo3,  heso2,                    & ! in
@@ -671,8 +676,8 @@ contains
     !           (2) Benkovitz
     !-----------------------------------------------------------------
     implicit none
-
-    logical,  intent(in) :: modal_aerosols      ! if using MAM
+    integer :: kk
+    logical,  intent(in) :: modal_aerosols,print_out      ! if using MAM
     real(r8), intent(in) :: rah2o2      ! reaction rate with h2o2
     real(r8), intent(in) :: rao3        ! reaction rate with o3
     real(r8), intent(in) :: h2o2g, so2g, o3g    
@@ -734,6 +739,7 @@ contains
 
     if (modal_aerosols) then
        xdelso4hp_ik  =  xso4 - xso4_init
+       if (print_out .and. kk==kprnt)write(106,*)'xdelso4hp_ik:',xdelso4hp_ik,xso4,xso4_init
     endif
              !...........................
              !       S(IV) + O3 = S(VI)

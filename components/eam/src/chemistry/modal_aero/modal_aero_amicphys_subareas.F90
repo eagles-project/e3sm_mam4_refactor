@@ -13,6 +13,9 @@ module modal_aero_amicphys_subareas
   use shr_kind_mod, only: wp => shr_kind_r8
   use modal_aero_amicphys_control, only: ncnst=>gas_pcnst, maxsubarea
 
+        use module_perturb
+  use time_manager
+
   implicit none
 
   private
@@ -80,12 +83,15 @@ subroutine setup_subareas( cld,                                     &! in
   ! Set up a logical array to indicate whether the subareas are clear or cloudy
 
   iscldy_subarea(:) = .false.
+  !BCOMMENT: jcldy can be 1 or 2, so iscldy_subarea (1 or 2) is true
   if (jcldy>0) iscldy_subarea(jcldy) = .true.
 
   ! Save the area fractions to an array
 
   afracsub(:) = 0.0_wp
+  !BCOMMENT: jclea can only be 1, so afracsub (1) is set to fclea
   if (jclea>0) afracsub(jclea) = fclea
+  !BCOMMENT: jcldy can be 1 or 2, so afracsub (1 or 2) is set to fcldy
   if (jcldy>0) afracsub(jcldy) = fcldy
 
 end subroutine setup_subareas
@@ -106,20 +112,27 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
   real(wp), intent(out) :: relhumsub(maxsubarea) ! relative humidity in subareas [unitless]
 
   real(wp) :: relhum_tmp
-
+   !BCOMMENT: check if ncldy_subarea is ever negative
   if (ncldy_subarea <= 0) then
   ! Entire grid cell is cloud-free. RH in subarea = grid cell mean.
-
+     !BCOMMENT: This is clear cell, rehumsub (1,2 and 3) are avg relhum
      relhumsub(:) = relhumgcm
 
   else
      ! Grid cell has a cloudy subarea. Set RH in that part to 1.0.
+     !BCOMMENT: jcldy can be 1 or 2 here.
+     !If jcldy is 1: relhumsub(1) is 1.0 (fully cloudy cell)
+     !if jcldy is 2: relhumsub(2) is 1.0. In this case jclea is >0,
+     !               so relhumsub(1) is set in if condition below
+     
      relhumsub(jcldy) = 1.0_wp
 
      ! If the grid cell also has a clear portion, back out the subarea RH from 
      ! the grid-cell mean RH and cloud fraction.
 
      if (jclea > 0) then
+        !BCOMMENT: jclea is > 0 only for partly cloudy cell. In this case
+        !jclea is 1, so relhumsub(1) is set here.
         relhum_tmp = (relhumgcm - afracsub(jcldy))/afracsub(jclea)
         relhumsub(jclea) = min_max_bound( 0.0_wp, 1.0_wp, relhum_tmp )
      end if
@@ -127,7 +140,7 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
 
 end subroutine set_subarea_rh
 
-subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
+subroutine set_subarea_gases_and_aerosols( print_out, ii, kk, lchnk,loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
                                            qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
 !------------------------------------------------------------------------------------------------
@@ -137,7 +150,8 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   use cam_abortutils,              only: endrun
   use modal_aero_amicphys_control, only: lmapcc_all, lmapcc_val_gas
 
-  integer, intent(in) :: loffset         ! # of tracers in the host model that are not part of MAM
+  logical :: print_out
+  integer, intent(in) :: loffset,ii,kk , lchnk        ! # of tracers in the host model that are not part of MAM
   integer, intent(in) :: nsubarea        ! # of active subareas in the current grid cell
   integer, intent(in) :: jclea, jcldy    ! indices of the clear and cloudy subareas
   real(wp),intent(in) :: fclea, fcldy    ! area fractions of the clear and cloudy subareas [unitless]
@@ -211,7 +225,9 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   !*************************************************************************************************
   ! Category I: grid cell is either all clear or all cloudy. Copy the grid cell mean values.
   !*************************************************************************************************
-  if (grid_cell_has_only_clea_area.or.grid_cell_has_only_cldy_area) then
+  if (grid_cell_has_only_clea_area .or. grid_cell_has_only_cldy_area) then
+  !BCOMMENT: For fully clear and cloudy cells, we populate only 1st index of subarea for all output vars
+  ! Makes sense as there is only 1 subarea for this case. What to do with the other subarea, fill in NaNs????
 
      lcopy(1:ncnst) = lmapcc_all(1:ncnst) > 0     ! copy all gases and aerosols
 
@@ -232,7 +248,7 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
   !*************************************************************************************************
   else if ( gird_cell_is_partly_cldy ) then
-
+      !BCOMMENT: In this case jclea is 1 and jcldy is 2
      !===================================
      ! Set gas mixing ratios in subareas
      !===================================
@@ -242,17 +258,19 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! Before gas chemistry, gas mixing ratios are assumed to be the same in all subareas,
      ! i.e., they all equal the grid cell mean.
      !------------------------------------------------------------------------------------------
+     !BCOMMENT: For gases, assume both 1 and 2 subareas have grid mean values
      do jsub = 1,nsubarea
         where (cnst_is_gas) qsub1(:,jsub) = qgcm1(:)
      end do
-
+     !BCOMMENT:qsub1 is DONE for gasses
      !------------------------------------------------------------------------------------------
      ! After gas chemistry, still assume gas mixing ratios are the same in all subareas.
      !------------------------------------------------------------------------------------------
+     !BCOMMENT: For gases, assume both 1 and 2 subareas have grid mean values
      do jsub = 1,nsubarea
         where (cnst_is_gas) qsub2(:,jsub) = qgcm2(:)
      end do
-
+     !BCOMMENT:qsub2 is DONE for gasses
      !----------------------------------------------------------------------------------------
      ! After cloud chemistry, gas and aerosol mass mixing ratios in the clear subarea are 
      ! assumed to be the same as their values before cloud chemistry  (because by definition,
@@ -260,13 +278,17 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! subarea likely have changed.
      !----------------------------------------------------------------------------------------
      ! Gases in the clear subarea remain the same as their values before cloud chemistry.
+     !BCOMMENT: Here we populated qsub3 for index (:,1) as jclea is 1.
      where (cnst_is_gas) qsub3(:,jclea) = qsub2(:,jclea)
 
      ! Calculate the gas mixing ratios in the cloudy subarea using the grid-cell mean, 
      ! cloud fraction and the clear-sky values
 
+     !BCOMMENT: Here we populate qsub3 for index (:,2) and adjust index (:,1) if needed.
      call compute_qsub_from_gcm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
                                                            qsub3(:,jclea), qsub3(:,jcldy)    )! inout
+     !BCOMMENT:qsub3 is DONE for gasses
+     !BCOMMENT: At this point qsub3 both indices are populated.
 
      !=========================================================================
      ! Set AEROSOL mixing ratios in subareas.
@@ -277,13 +299,17 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! as they only exist in the cloudy subarea.)
      !----------------------------------------------------------------------------------------
      ! Partition mass and number before cloud chemistry
-
+     !BCOMMENT: In this case jclea is 1 and jcldy is 2
+     !BCOMMENT:Following call set qqcwsub2(:,1)=0 and qqcwsub2(:,2) to a value
      call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
+     !BCOMMENT:Following call set qqcwsub2(:,1)=0 and qqcwsub2(:,2) to a value
      call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm2, qqcwsub2 )
 
      ! Partition mass and number before cloud chemistry
 
+     !BCOMMENT:Following call set qqcwsub3(:,1)=0 and qqcwsub3(:,2) to a value
      call set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
+     !BCOMMENT:Following call set qqcwsub3(:,1)=0 and qqcwsub3(:,2) to a value
      call set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm3, qqcwsub3 )
 
      !----------------------------------------------------------------------------------------
@@ -291,22 +317,22 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! need to be partitioned.)
      !----------------------------------------------------------------------------------------
      ! Partition mass and number before cloud chemistry
-
+     !BCOMMENT:Following call set qsub2(:,1) and qsub2(:,2) to a value
      call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
                                                  qgcm2, qsub2                         )! in, inout
-
-     call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+     !BCOMMENT:Following call set qsub2(:,1) and qsub2(:,2) to a value
+     call set_subarea_qmass_for_intrst_aerosols( print_out, ii, kk, lchnk,loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
                                                  qgcm2, qsub2                         )! in, inout
 
      ! Partition mass and number before cloud chemistry
-
+     !BCOMMENT:Following call set qsub3(:,1) and qsub3(:,2) to a value
      call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
                                                  qgcm3, qsub3                         )! in, inout
-
-     call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
+     !BCOMMENT:Following call set qsub3(:,1) and qsub3(:,2) to a value
+     call set_subarea_qmass_for_intrst_aerosols( print_out, ii, kk, lchnk,loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
                                                  qgcm3, qsub3                         )! in, inout
 
@@ -471,7 +497,7 @@ subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 
 end subroutine set_subarea_qnumb_for_intrst_aerosols
 
-subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
+subroutine set_subarea_qmass_for_intrst_aerosols( print_out, ii, kk, lchnk,loffset, jclea, jcldy, fclea, fcldy, &
                                                   qgcm,  qqcwgcm, &
                                                   qgcmx, qsubx    )! inout
 !-----------------------------------------------------------------------------------------
@@ -484,7 +510,8 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 !-----------------------------------------------------------------------------------------
   use modal_aero_data, only: ntot_amode, nspec_amode, lmassptr_amode, lmassptrcw_amode
 
-  integer, intent(in) :: loffset        ! # of tracers in the host model that are not part of MAM
+   logical:: print_out
+  integer, intent(in) :: loffset, ii, kk , lchnk       ! # of tracers in the host model that are not part of MAM
   integer, intent(in) :: jclea, jcldy   ! subarea indices 
   real(wp),intent(in) :: fclea, fcldy   ! area fraction [unitless] of the clear and cloudy subareas
   real(wp),intent(in) :: qgcm   (ncnst) ! grid cell mean, interstitial constituents (unit does not matter)
@@ -516,6 +543,7 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
      qgcm_cldbrn = 0.0_wp
 
      do ispec = 1, nspec_amode(imode)
+        if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) write(106,*)'suareas:',imode, ispec, lmassptr_amode(ispec,imode),lmassptr_amode(ispec,imode) - loffset, nspec_amode(imode)
         qgcm_intrst = qgcm_intrst + qgcm( lmassptr_amode(ispec,imode) - loffset )
         qgcm_cldbrn = qgcm_cldbrn + qqcwgcm( lmassptrcw_amode(ispec,imode) - loffset )
      end do

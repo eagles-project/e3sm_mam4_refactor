@@ -25,6 +25,9 @@ module aero_model
 
   use modal_aero_data,only: cnst_name_cw, ntot_amode
 
+      use module_perturb
+  use time_manager
+
   implicit none
   private
 
@@ -829,7 +832,7 @@ contains
     ! accumulation modes is done in conjunction with the dry radius calculation
     call t_startf('calcsize')
     !get mmr of cloud borne aerosols
-    call get_cldbrn_mmr(lchnk, pbuf, &! in
+    call get_cldbrn_mmr(lchnk, pbuf, .false.,&! in
          qqcw) !out
 
     !get the dry diameter from pbuf
@@ -1417,7 +1420,7 @@ contains
   end subroutine calc_sfc_flux
   !=============================================================================
   !=============================================================================
-  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, delt,     & ! in
+  subroutine aero_model_gasaerexch( print_out,loffset, ncol, lchnk, delt,     & ! in
        latndx, lonndx,                 & ! in
        tfld, pmid, pdel, mbar,         & ! in
        zm,  qh2o, cwat, cldfr, cldnum, & ! in
@@ -1434,6 +1437,7 @@ contains
     use mam_support,           only : ptr2d_t
 
     !  dummy arguments
+    logical,  intent(in) :: print_out
     integer,  intent(in) :: loffset           ! offset applied to modal aero "pointers"
     integer,  intent(in) :: ncol              ! number columns in chunk
     integer,  intent(in) :: lchnk             ! chunk index
@@ -1508,18 +1512,31 @@ contains
     enddo
     ! calculate cloudborne aerosol volume mixing ratio
     call qqcw2vmr( vmrcw, mbar, fldcw_all )
-
+    if(print_out) then
+      do kk = kprnt, kprnt!pver
+         do mm = 1, gas_pcnst
+           write(106,*)'vmrcw,vmr-BEF_setsox:',vmrcw(icolprnt(lchnk),kk,mm), vmr(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
 
     ! assign mixing ratios values before gas chemistry and aqueous chemistry
     vmr_pregas(:ncol,:,:) = vmr(:ncol,:,:)
     vmr_precld(:ncol,:,:) = vmrcw(:ncol,:,:)
 
     ! aqueous chemistry ...
-    call setsox( ncol, lchnk, loffset,  & ! in
+    call setsox( print_out,ncol, lchnk, loffset,  & ! in
          delt, pmid, pdel, tfld,   & ! in
          mbar, cwat, cldfr,cldnum, & ! in
          airdens,      & ! in
          vmrcw,      vmr           ) ! inout
+    if(print_out) then
+      do kk = kprnt, kprnt!pver
+         do mm = 1, gas_pcnst
+           write(106,'(A,2(ES24.15e2,","),I2)')'vmrcw, vmr aft setsox:',vmrcw(icolprnt(lchnk),kk,mm), vmr(icolprnt(lchnk),kk,mm),mm
+         enddo
+      enddo
+   endif
 
     ! calculate and output column tendency due to aqueous chemistry
     ! before aqueous chemistry, and cannot be used to hold aq. chem. tendencies
@@ -1541,7 +1558,7 @@ contains
     ! note that:
     !     vmr0 holds vmr before gas-phase chemistry
     !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
-    call modal_aero_amicphys_intr(                   &
+    call modal_aero_amicphys_intr( print_out,                   &
          1,                  1,                   & ! in
          1,                  1,                   & ! in
          lchnk,     ncol,    nstep,               & ! in
@@ -1555,6 +1572,15 @@ contains
          vmr_pregas,         vmr_precld,          & ! in
          dgnum,              dgnumwet,            & ! in
          wetdens                                  ) ! in
+
+   if(print_out) then
+      do kk = kprnt, kprnt!pver
+         write(106,*)'others-aft_amicphys:',pblh(icolprnt(lchnk)), qh2o(icolprnt(lchnk),kk),cldfr(icolprnt(lchnk),kk),dgnum(icolprnt(lchnk),kk,:),":aa:",dgnumwet(icolprnt(lchnk),kk,:), ":bb:",wetdens(icolprnt(lchnk),kk,:)
+         do mm = 11, 13!gas_pcnst
+           write(106,*)'vmrcw,vmr-aft_amicphys:', kk,vmrcw(icolprnt(lchnk),kk,mm), vmr(icolprnt(lchnk),kk,mm)
+         enddo
+      enddo
+   endif
     call t_stopf('modal_aero_amicphys')
 
     ! calculate cloudborne aerosols after exchange

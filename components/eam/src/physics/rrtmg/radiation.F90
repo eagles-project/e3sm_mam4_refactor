@@ -1160,7 +1160,7 @@ end function radiation_nextsw_cday
     if (dosw .or. dolw) then
 
       !Get cloudborne aerosols mmrs
-      call get_cldbrn_mmr(lchnk, pbuf, &! in
+      call get_cldbrn_mmr(lchnk, pbuf, .false.,&! in
       qqcw) !out
 
        ! construct an RRTMG state object

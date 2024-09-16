@@ -26,7 +26,7 @@
 !  - new particle nucleation - because h2so4 gas conc. should be very low in cloudy air
 !  - coagulation - because cloud-borne aerosol would need to be included
 !--------------------------------------------------------------------------------
-subroutine mam_amicphys_1subarea(&
+subroutine mam_amicphys_1subarea(print_out,& 
                                  do_cond_sub,            do_rename_sub,      &
                                  do_newnuc_sub,          do_coag_sub,        &
                                  nstep,      lchnk,      ii,      kk,        &
@@ -58,7 +58,7 @@ subroutine mam_amicphys_1subarea(&
    use modal_aero_coag,   only: mam_coag_1subarea
    use modal_aero_rename, only: mam_rename_1subarea
 
-   logical,  intent(in)    :: do_cond_sub, do_rename_sub    ! true if the aero. microp. process is calculated in this subarea
+   logical,  intent(in)    :: do_cond_sub, do_rename_sub, print_out    ! true if the aero. microp. process is calculated in this subarea
    logical,  intent(in)    :: do_newnuc_sub, do_coag_sub    ! true if the aero.  microp. process is calculated in this subarea
    logical,  intent(in)    :: iscldy_subarea        ! true if sub-area is cloudy
    integer,  intent(in)    :: lchnk                 ! chunk identifier
@@ -172,7 +172,7 @@ subroutine mam_amicphys_1subarea(&
    ! Miscellaneous
 
    real(r8):: aircon                ! air molar density [kmol/m3]
-   integer :: igas                  ! gas index
+   integer :: igas, ib,jb, ig, im ,is                  ! gas index
    logical :: do_aging_in_subarea
 
    !---------------------------------------------------------------------------------------
@@ -193,6 +193,15 @@ subroutine mam_amicphys_1subarea(&
       qaercw_cur = qaercw3
    end if
 
+if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+     write(106,*)'qgas_cur1:',qgas_cur(1),qgas_cur(2),aircon
+     do ib = 1, max_mode
+      write(106,*)'qnum_cur:',qnum_cur(ib),qwtr_cur(ib), qnumcw_cur(ib),ib
+      do jb = 1, max_aer
+         write(106,*)'qaer_cur:',qaer_cur(jb,ib), qaercw_cur(jb,ib),jb, ib
+      enddo
+     enddo
+   endif
    !---------------------------------------------------------------------
    ! Diagnose net production rate of H2SO4 gas production
    ! cause by other processes (e.g., gas chemistry and cloud chemistry) 
@@ -217,6 +226,7 @@ subroutine mam_amicphys_1subarea(&
          end if
       end do ! igas
    end if
+   
    del_h2so4_gasprod = max( qgas3(igas_h2so4)-qgas1(igas_h2so4), 0.0_r8 )/ntsubstep
 
    !-----------------------------------
@@ -236,6 +246,15 @@ subroutine mam_amicphys_1subarea(&
    !***********************************
    dtsubstep = deltat/ntsubstep
 
+
+   if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+      write(106,*)'igas_h2so4:',igas_h2so4, del_h2so4_gasprod,max_agepair,do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
+
+      do igas = 1, ngas
+         write(106,*)"netprod:", igas, qgas_netprod_otrproc(igas),qgas_cur(igas), qgas3(igas), qgas1(igas), deltat
+      enddo
+   endif
+   
    jtsubstep_loop: do jtsubstep = 1, ntsubstep
 
       !======================
@@ -249,7 +268,7 @@ subroutine mam_amicphys_1subarea(&
          qnum_sv1 = qnum_cur
          qaer_sv1 = qaer_cur
 
-         call mam_gasaerexch_1subarea(                    &
+         call mam_gasaerexch_1subarea(print_out,                    &
            nstep,             lchnk,                      &
            ii,                kk,               jsubarea, &
            jtsubstep,         ntsubstep,                  &
@@ -264,6 +283,25 @@ subroutine mam_amicphys_1subarea(&
            qwtr_cur,                                      &
            dgn_a,             dgn_awet,         wetdens,  &
            uptkaer,           uptkrate_h2so4              )
+           if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) write(106,*)'qgas_cur3:',qgas_cur(1),qgas_cur(2), n_agepair
+           if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+               do ig = 1, ngas
+                  do im = 1, 4
+                     write(106,'(A,2(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_0:",uptkaer(ig,im),uptkrate_h2so4, ig-1,im-1
+                  enddo
+               enddo
+               do ig = 1, ngas
+                  write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1", qgas_cur(ig), qgas_avg(ig), ig-1
+               enddo
+               do im = 1, 4
+                  write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_2:", qnum_cur(im), qwtr_cur(im),im-1
+               enddo
+               do is = 1, max_aer
+                  do im = 1, 4
+                     write(106,'(A,1(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_3:",qaer_cur(is,im),is-1,im-1;
+                  enddo
+               enddo
+            endif
 
          qgas_delaa(:,iqtend_cond) = qgas_delaa(:,iqtend_cond) + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep)) 
 
@@ -353,6 +391,7 @@ subroutine mam_amicphys_1subarea(&
             qaer_cur,                                                  &
             qwtr_cur,                                                  &
             dnclusterdt_substep                                        )
+            if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) write(106,*)'qgas_cur4:',qgas_cur(1),qgas_cur(2)
 
          qgas_delaa(:,iqtend_nnuc) = qgas_delaa(:,iqtend_nnuc) + (qgas_cur - qgas_sv1)
          qnum_delaa(:,iqtend_nnuc) = qnum_delaa(:,iqtend_nnuc) + (qnum_cur - qnum_sv1)
@@ -396,7 +435,6 @@ subroutine mam_amicphys_1subarea(&
                             ( (.not.iscldy_subarea).or.(iscldy_subarea.and.do_cond_sub) )
 
       if (do_aging_in_subarea) then
-
          call mam_pcarbon_aging_1subarea(                          &
             dgn_a,             n_mode,                             &! input
             qnum_cur,          qnum_delsub_cond, qnum_delsub_coag, &! in-outs
