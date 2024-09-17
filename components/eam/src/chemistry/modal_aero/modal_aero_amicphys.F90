@@ -799,6 +799,7 @@ main_jsub_loop: &
       real(r8) :: tmp_qdel_cond
       real(r8) :: uptkrate(max_mode)
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_gasaerexch_1subarea_beg_yml.f90"
 
       qgas_avg(1:ngas) = 0.0_r8
 
@@ -954,6 +955,7 @@ main_jsub_loop: &
          end do
       end if
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_gasaerexch_1subarea_end_yml.f90"
 
       return
       end subroutine mam_gasaerexch_1subarea
@@ -1399,6 +1401,7 @@ time_loop: &
 
       character(len=1) :: tmpch1, tmpch2, tmpch3
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_newnuc_1subarea_beg_yml.f90"
 
 ! begin
       dnclusterdt = 0.0_r8
@@ -1708,6 +1711,7 @@ time_loop: &
 
 80000 continue
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_newnuc_1subarea_end_yml.f90"
 
       return
       end subroutine mam_newnuc_1subarea
