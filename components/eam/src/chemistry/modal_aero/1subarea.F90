@@ -194,11 +194,11 @@ subroutine mam_amicphys_1subarea(print_out,&
    end if
 
 if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
-     write(106,*)'qgas_cur1:',qgas_cur(1),qgas_cur(2),aircon
+     write(106,'(A,3(ES24.15e2,","))')'qgas_cur1:',qgas_cur(1),qgas_cur(2),aircon
      do ib = 1, max_mode
-      write(106,*)'qnum_cur:',qnum_cur(ib),qwtr_cur(ib), qnumcw_cur(ib),ib
+      write(106,'(A,3(ES24.15e2,","),I2)')'qnum_cur:',qnum_cur(ib),qwtr_cur(ib), qnumcw_cur(ib),ib
       do jb = 1, max_aer
-         write(106,*)'qaer_cur:',qaer_cur(jb,ib), qaercw_cur(jb,ib),jb, ib
+         write(106,'(A,2(ES24.15e2,","),2I2)')'qaer_cur:',qaer_cur(jb,ib), qaercw_cur(jb,ib),jb, ib
       enddo
      enddo
    endif
@@ -283,25 +283,8 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
            qwtr_cur,                                      &
            dgn_a,             dgn_awet,         wetdens,  &
            uptkaer,           uptkrate_h2so4              )
-           if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) write(106,*)'qgas_cur3:',qgas_cur(1),qgas_cur(2), n_agepair
-           if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
-               do ig = 1, ngas
-                  do im = 1, 4
-                     write(106,'(A,2(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_0:",uptkaer(ig,im),uptkrate_h2so4, ig-1,im-1
-                  enddo
-               enddo
-               do ig = 1, ngas
-                  write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1", qgas_cur(ig), qgas_avg(ig), ig-1
-               enddo
-               do im = 1, 4
-                  write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_2:", qnum_cur(im), qwtr_cur(im),im-1
-               enddo
-               do is = 1, max_aer
-                  do im = 1, 4
-                     write(106,'(A,1(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_3:",qaer_cur(is,im),is-1,im-1;
-                  enddo
-               enddo
-            endif
+           !if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) write(106,*)'qgas_cur3:',qgas_cur(1),qgas_cur(2), n_agepair
+           
 
          qgas_delaa(:,iqtend_cond) = qgas_delaa(:,iqtend_cond) + (qgas_cur - (qgas_sv1 + qgas_netprod_otrproc*dtsubstep)) 
 
@@ -311,12 +294,51 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          del_h2so4_aeruptk = qgas_cur(igas_h2so4) &
                            - (qgas_sv1(igas_h2so4) + qgas_netprod_otrproc(igas_h2so4)*dtsubstep)
 
+         if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+            do ig = 1, ngas
+               do im = 1, 4
+                  write(106,'(A,3(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_0:",uptkaer(ig,im),uptkrate_h2so4, del_h2so4_aeruptk, ig-1,im-1
+               enddo
+            enddo
+            do ig = 1, ngas
+               write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1", qgas_cur(ig), qgas_avg(ig), ig-1
+            enddo
+            do im = 1, 4
+               write(106,'(A,3(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_2:", qnum_cur(im), qwtr_cur(im),qnum_delsub_cond(im),im-1
+            enddo
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,2(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_3:",qaer_cur(is,im),qaer_delsub_cond(is,im),is-1,im-1;
+               enddo
+            enddo
+            do is = 1, ngas
+               do im = 1, iqtend_cond
+                  write(106,'(A,1(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_4:",qgas_delaa(is,im), is-1, im-1
+               enddo
+            enddo
+         endif
+
       else ! do_cond_sub
 
         qgas_avg(1:ngas) = qgas_cur(1:ngas)
         qaer_delsub_cond = 0.0_r8
         qnum_delsub_cond = 0.0_r8
         del_h2so4_aeruptk = 0.0_r8
+      if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+         do ig = 1, ngas
+         write(106,'(A,1(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1else",qgas_avg(ig), ig-1
+         enddo
+
+         do is = 1, max_aer
+            do im = 1, 4
+            write(106,'(A,1(ES24.15e2,","),2I2)')"mam_gasaerexch_1subarea_3else:",qaer_delsub_cond(is,im), is-1, im-1
+            enddo
+         enddo
+         do im = 1, 4
+            write(106,'(A,1(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_2else:", qnum_delsub_cond(im), im-1
+         enddo
+      endif
+
 
       end if !do_cond_sub
 
@@ -338,8 +360,14 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          if (iscldy_subarea) then 
             qaer_delsub_grow4rnam   = (qaer3 - qaer2)/ntsubstep  + qaer_delsub_grow4rnam
             qaercw_delsub_grow4rnam = (qaercw3 - qaercw2)/ntsubstep
+            if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+               do is = 1, max_aer
+                  do im = 1, 4
+                     write(106,'(A,2(ES24.15e2,","),2I2)')"rename_1:",qaer_delsub_grow4rnam(is,im),qaercw_delsub_grow4rnam(is,im), is-1, im-1
+                  enddo
+               enddo
+            endif
          end if
-
          !----------
          ! Renaming
          !----------
@@ -349,22 +377,62 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          qnumcw_sv1 = qnumcw_cur
          qaercw_sv1 = qaercw_cur
 
-         call mam_rename_1subarea(                          &
-            iscldy_subarea,                                 &
-            dest_mode_of_mode, n_mode,                      &
-            qnum_cur,   qaer_cur,    qaer_delsub_grow4rnam, &
-            qnumcw_cur, qaercw_cur, qaercw_delsub_grow4rnam )
+         call mam_rename_1subarea(print_out, lchnk, ii, kk,                          &
+            iscldy_subarea,                                 & !in
+            dest_mode_of_mode, n_mode,                      & !in
+            qnum_cur,   qaer_cur,    & !inout
+            qaer_delsub_grow4rnam, & !in
+            qnumcw_cur, qaercw_cur, & !inout
+            qaercw_delsub_grow4rnam ) !in
+
+            if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+               do im = 1, 4
+                  write(106,'(A,2(ES24.15e2,","),I2)')"mam_rename_1subarea_1:", qnum_cur(im), qnumcw_cur(im),im-1
+               enddo
+               do is = 1, max_aer
+                  do im = 1, 4
+                     write(106,'(A,2(ES24.15e2,","),2I2)')"mam_rename_1subarea_2:",qaer_cur(is,im),qaercw_cur(is,im),is-1,im-1;
+                  enddo
+               enddo
+            endif
 
          !------------------------
          ! Accumulate increments
          !------------------------
          qnum_delaa  (:,iqtend_rnam) = qnum_delaa  (:,iqtend_rnam) + (qnum_cur - qnum_sv1) 
-         qaer_delaa(:,:,iqtend_rnam) = qaer_delaa(:,:,iqtend_rnam) + (qaer_cur - qaer_sv1) 
+         qaer_delaa(:,:,iqtend_rnam) = qaer_delaa(:,:,iqtend_rnam) + (qaer_cur - qaer_sv1)
 
          if (iscldy_subarea) then
             qnumcw_delaa  (:,iqqcwtend_rnam) = qnumcw_delaa  (:,iqqcwtend_rnam) + (qnumcw_cur - qnumcw_sv1) 
             qaercw_delaa(:,:,iqqcwtend_rnam) = qaercw_delaa(:,:,iqqcwtend_rnam) + (qaercw_cur - qaercw_sv1)
          end if
+
+         if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+            do im = 1, 4
+               write(106,'(A,3(ES24.15e2,","),2I2)')"mam_rename_1subarea_3a:", qnum_delaa(im,iqtend_rnam),qnum_cur(im), qnum_sv1(im),im-1, iqtend_rnam-1
+            enddo
+            do is = 1, max_aer
+               do im = 1, 4
+                  !do ig = 1, iqtend_rnam
+                     write(106,'(A,1(ES24.15e2,","),3I2)')"mam_rename_1subarea_3b:",qaer_delaa(is,im,iqtend_rnam),is-1,im-1,iqtend_rnam-1;
+                  !enddo
+               enddo
+            enddo
+
+            do im = 1, 4
+               !do ig = 1, iqtend_rnam
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_rename_1subarea_4a:", qnumcw_delaa(im,iqtend_rnam),im-1, iqtend_rnam-1
+               !enddo
+            enddo
+            
+            do is = 1, max_aer
+               do im = 1, 4
+                  !do ig = 1, iqtend_rnam
+                     write(106,'(A,1(ES24.15e2,","),3I2)')"mam_rename_1subarea_4b:",qaercw_delaa(is,im,iqtend_rnam),is-1,im-1,iqtend_rnam-1;
+                  !enddo
+               enddo
+            enddo
+         endif
 
       end if !do_rename_sub
 

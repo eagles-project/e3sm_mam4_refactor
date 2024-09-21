@@ -990,7 +990,7 @@ main_jsub_loop: &
 
 
 ! do soa
-      call mam_soaexch_1subarea(                                    &
+      call mam_soaexch_1subarea(    print_out,                                &
          nstep,             lchnk,                                  &
          i,                 k,                jsub,                 &
          latndx,            lonndx,           lund,                 &
@@ -1002,6 +1002,22 @@ main_jsub_loop: &
          qnum_cur,                                                  &
          qwtr_cur,                                                  &
          uptkaer                                                    )
+      if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+       do igas = 1, ngas
+         write(106,'(A,2(ES24.15e2,","),1I2)')'After mam_soaexch_1subarea:',qgas_cur(igas), qgas_avg(igas),igas
+       enddo
+
+       do igas = 1, ntot_amode
+         write(106,'(A,2(ES24.15e2,","),1I2)')'After mam_soaexch_1subarea_n:',qnum_cur(igas), qwtr_cur(igas),igas
+       enddo
+
+       do n = 1, ntot_amode
+       do igas = 1, max_aer
+         write(106,'(A,1(ES24.15e2,","),2I2)')'After mam_soaexch_1subarea_n:',qaer_cur(igas,n),igas,n
+       enddo
+       enddo
+
+      endif
 
 
 ! do other gases (that are assumed non-volatile) with no time sub-stepping
@@ -1036,6 +1052,9 @@ main_jsub_loop: &
                       + tmp_pxt*(0.5_r8 - tmp_kxt/6.0_r8 + tmp_kxt2/24.0_r8)
             end if
             qgas_cur(igas) = tmp_q3
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+                  write(106,'(A,1(ES24.15e2,","),1I2)')'tmp_q3:',qgas_cur(igas), igas
+            endif
             tmp_qdel_cond = (tmp_q1 + tmp_pxt) - tmp_q3
             qgas_avg(igas) = tmp_q4
             do n = 1, n_mode
@@ -1066,6 +1085,9 @@ main_jsub_loop: &
             tmp_q3 = tmp_q1 + tmp_pxt
             tmp_q4 = tmp_q1 + tmp_pxt*0.5_r8
             qgas_cur(igas) = tmp_q3
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+                  write(106,'(A,1(ES24.15e2,","),1I2)')'tmp_q3_2:',qgas_cur(igas), igas
+            endif
             qgas_avg(igas) = tmp_q4
          end if
       end do ! igas
@@ -1091,7 +1113,7 @@ main_jsub_loop: &
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_soaexch_1subarea(                              &
+      subroutine mam_soaexch_1subarea(  print_out,                            &
          nstep,             lchnk,                                  &
          i,                 k,                jsub,                 &
          latndx,            lonndx,           lund,                 &
@@ -1117,6 +1139,7 @@ main_jsub_loop: &
       implicit none
 
 ! arguments
+logical :: print_out
       integer,  intent(in) :: nstep                 ! model time-step number
       integer,  intent(in) :: lchnk                 ! chunk identifier
       integer,  intent(in) :: i, k                  ! column and level indices
@@ -1162,7 +1185,8 @@ main_jsub_loop: &
 
       real(r8) :: uptkaer_soag_tmp(nsoa,max_mode)
 
-      real(r8), parameter :: a_min1 = 1.0e-20
+      !real(r8), parameter :: a_min1 = 1.0e-20 !BALLI NBFB change
+      real(r8) :: a_min1 = 1.0e-20
       real(r8), parameter :: g_min1 = 1.0e-20
       real(r8), parameter :: alpha_astem = 0.05_r8 ! parameter used in calc of time step
       real(r8), parameter :: dtsub_fixed = -1.0    ! fixed sub-step for time integration (s)
@@ -1225,8 +1249,17 @@ main_jsub_loop: &
 
 ! calc ambient equilibrium soa gas
       do ll = 1, ntot_soaspec
-         p0_soa(ll) = p0_soa_298(ll) * &
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then !NBFB
+            delh_vap_soa = 156.0e3_r8
+            p0_soa_298 = 1.0e-10_r8
+            p0_soa(ll) = p0_soa_298(ll) * &
+                  exp( -(delh_vap_soa(ll)/rgas)*((1.0_r8/temp)-(1.0_r8/298.0_r8)) )
+         else
+            delh_vap_soa = 156.0e3
+            p0_soa_298 = 1.0e-10
+            p0_soa(ll) = p0_soa_298(ll) * &
                   exp( -(delh_vap_soa(ll)/rgas)*((1.0/temp)-(1.0/298.0)) )
+         endif
          g0_soa(ll) = 1.01325e5*p0_soa(ll)/pmid
       end do
 
@@ -1240,6 +1273,10 @@ main_jsub_loop: &
       g_soa(:) = 0.0
       a_opoa(:) = 0.0
       a_soa(:,:) = 0.0
+
+      if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+         a_min1 = 1.0e-20_r8
+      endif
 
 !
 ! main integration loop -- does multiple substeps to reach dtfull
@@ -1290,6 +1327,9 @@ time_loop: &
 !
       do ll = 1, ntot_soaspec
          g_soa(ll) = max( qgas_prv(ll), 0.0_r8 )
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+             write(106,'(A,3(ES24.15e2,","),2I2)')'g_soa_1:',g_soa(ll), qgas_prv(ll), uptkaer_soag_tmp(ll,1), ntot_soamode, ll
+         endif
          tot_soa(ll) = g_soa(ll)
          do n = 1, ntot_soamode
             if ( skip_soamode(n) ) cycle
@@ -1299,10 +1339,24 @@ time_loop: &
       end do
 
       do n = 1, ntot_soamode
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            write(106,*)"Skip_soamode:",skip_soamode(n), n,ntot_soamode, ntot_poaspec,npca
+         endif
          if ( skip_soamode(n) ) cycle
          a_opoa(n) = 0.0_r8
          do ll = 1, ntot_poaspec
             a_opoa(n) = a_opoa(n) + opoa_frac(ll,n) * max( qaer_prv(iaer_pom+ll-1,n), 0.0_r8 )
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,3(ES24.15e2,","),4I2)')"a_opoa:",a_opoa(n), opoa_frac(ll,n), qaer_prv(iaer_pom+ll-1,n),iaer_pom+ll-1,iaer_pom,ll, n
+            endif
+         end do
+      end do
+
+      do iaer = 1, max_aer
+         do n = 1, 4
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,1(ES24.15e2,","),2I2)')"qaer_prv:",qaer_prv(iaer,n), iaer-1,n-1
+            endif
          end do
       end do
 
@@ -1312,6 +1366,9 @@ time_loop: &
       do n = 1, ntot_soamode
          if ( skip_soamode(n) ) cycle
          a_ooa_sum_tmp(n) = a_opoa(n) + sum( a_soa(1:ntot_soaspec,n) )
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,3(ES24.15e2,","),2I2)')"a_ooa_sum_tmp::",a_ooa_sum_tmp(n), a_opoa(n), a_soa(1,n),ntot_soaspec,n
+            endif
       end do
       do ll = 1, ntot_soaspec
          tmpb = 0.0  ! time integration parameter for a single soa species
@@ -1321,6 +1378,10 @@ time_loop: &
             g_star(ll,n) = sat(ll,n)*a_soa(ll,n)
             phi(ll,n) = (g_soa(ll) - g_star(ll,n))/max( g_soa(ll), g_star(ll,n), g_min1 )
             tmpb = tmpb + uptkaer_soag_tmp(ll,n)*abs(phi(ll,n))
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,11(ES24.15e2,","),2I2)')"tmpb:",tmpb,uptkaer_soag_tmp(ll,n), phi(ll,n), g_soa(ll), g_star(ll,n), &
+                 g_min1, sat(ll,n), a_soa(ll,n), g0_soa(ll), a_ooa_sum_tmp(n), a_min1, ll, n
+            endif
          end do
          tmpa = max( tmpa, tmpb )
       end do
@@ -1334,9 +1395,15 @@ time_loop: &
 ! here alpha_astem/tmpa >= dtmax, so this is final substep
             dtcur = dtmax
             tcur = dtfull
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,5(ES24.15e2,","))')"dtcur_1:",dtcur,dtmax, tmpa,alpha_astem,tcur
+            endif
          else
             dtcur = alpha_astem/tmpa
             tcur = tcur + dtcur
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+               write(106,'(A,4(ES24.15e2,","))')"dtcur_2:",dtcur,tmpa,alpha_astem,tcur
+            endif
          end if
       end if
 
@@ -1351,6 +1418,9 @@ time_loop: &
             ! first ll loop calcs a_soa_tmp(ll,n) & a_ooa_sum_tmp
             a_soa_tmp(ll,n) = a_soa(ll,n)
             beta(ll,n) = dtcur*uptkaer_soag_tmp(ll,n)
+            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+             write(106,'(A,3(ES24.15e2,","),2I2)')'beta:',beta(ll,n),dtcur, uptkaer_soag_tmp(ll,n), ll,n
+            endif
             del_g_soa_tmp(ll) = g_soa(ll) - g_star(ll,n)
             if (del_g_soa_tmp(ll) > 0.0_r8) then
                a_soa_tmp(ll,n) = a_soa(ll,n) + beta(ll,n)*del_g_soa_tmp(ll)
@@ -1380,6 +1450,9 @@ time_loop: &
 
          g_soa(ll) = (tot_soa(ll) - tmpa)/(1.0_r8 + tmpb)
          g_soa(ll) = max( 0.0_r8, g_soa(ll) )
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+             write(106,'(A,7(ES24.15e2,","),I2)')'g_soa_2:',g_soa(ll), tot_soa(ll), tmpa, tmpb, a_soa(ll,1), beta(ll,1), sat(ll,1), ll
+         endif
          do n = 1, ntot_soamode
             if ( skip_soamode(n) ) cycle
             a_soa(ll,n) = (a_soa(ll,n) + beta(ll,n)*g_soa(ll))/   &

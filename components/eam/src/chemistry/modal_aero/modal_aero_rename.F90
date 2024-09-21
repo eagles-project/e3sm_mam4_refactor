@@ -7,6 +7,9 @@ module modal_aero_rename
   use physconst,       only:  pi
   use shr_log_mod ,    only: errMsg => shr_log_errMsg
 
+  use module_perturb
+  use time_manager
+
   implicit none
 
   private
@@ -22,9 +25,11 @@ module modal_aero_rename
 contains
   !--------------------------------------------------------------------------------
   !--------------------------------------------------------------------------------
-  subroutine mam_rename_1subarea(iscldy, dest_mode_of_mode, nmode, &
-       qnum_cur, qaer_cur, qaer_del_grow4rnam, qnumcw_cur,         &
-       qaercw_cur,        qaercw_del_grow4rnam                    )
+  subroutine mam_rename_1subarea(print_out, lchnk, ii, kk,iscldy, dest_mode_of_mode, nmode, & !in
+       qnum_cur, qaer_cur, &!inout
+       qaer_del_grow4rnam, &!in
+       qnumcw_cur, qaercw_cur, &!inout
+       qaercw_del_grow4rnam                    ) !in
 
     use modal_aero_data, only: ntot_amode
 
@@ -42,9 +47,9 @@ contains
     !-------------------------------------------------------------------------------------
 
     !input
-    logical,  intent(in) :: iscldy                      !true if sub-area is cloudy
+    logical,  intent(in) :: iscldy, print_out                    !true if sub-area is cloudy
     integer,  intent(in) :: dest_mode_of_mode(max_mode) !destination mode of a mode
-    integer,  intent(in) :: nmode                       !number of modes
+    integer,  intent(in) :: nmode, lchnk, ii, kk                      !number of modes
     real(r8), intent(in) :: qaer_del_grow4rnam(1:max_aer, 1:max_mode)            !growth in aerosol molar mixing ratio [kmol/kmol-air]
     real(r8), intent(in), optional :: qaercw_del_grow4rnam(1:max_aer, 1:max_mode)!growth in aerosol molar mixing ratio (cld borne) [kmol/kmol-air]
 
@@ -55,7 +60,7 @@ contains
     real(r8), intent(inout), optional :: qaercw_cur(1:max_aer, 1:max_mode)!aerosol molar mixing ratio (cld borne) [kmol/kmol-air]
 
     ! local variables
-    integer :: npair !number of pairs in different modes for the transfer
+    integer :: npair,im !number of pairs in different modes for the transfer
 
     real(r8) :: deldryvol_a(ntot_amode)   !change in dry volume [m3/kmol-air]
     real(r8) :: deldryvol_c(ntot_amode)   !change in dry volume (cld borne)[m3/kmol-air]
@@ -82,7 +87,7 @@ contains
     !inter-mode transfer, number of pairs will be 1 and so on) which can participate in
     !inter-mode species transfer
 
-    call find_renaming_pairs (ntot_amode, dest_mode_of_mode, & !input
+    call find_renaming_pairs (print_out, lchnk, ii, kk,ntot_amode, dest_mode_of_mode, & !input
          npair, sz_factor, fmode_dist_tail_fac, v2nlorlx, &    !output
          v2nhirlx, ln_diameter, diameter_cutoff, &             !output
          lndiameter_cutoff, diameter_threshold)                !output
@@ -104,17 +109,22 @@ contains
     endif
 
     !Find fractions (mass and number) to transfer and complete the transfer
-    call do_inter_mode_transfer(ntot_amode, naer, dest_mode_of_mode, &                         !input
+    call do_inter_mode_transfer(print_out, lchnk, ii, kk,ntot_amode, naer, dest_mode_of_mode, &                         !input
          iscldy, v2nlorlx, v2nhirlx, dryvol_a, dryvol_c, deldryvol_a, deldryvol_c, &           !input
          sz_factor, fmode_dist_tail_fac, ln_diameter, lndiameter_cutoff, diameter_threshold, & !input
          qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur ) !output
+     if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          do im = 1, 4
+               write(106,'(A,4(ES24.15e2,","),I2)')"mam_rename_1subarea_last:", qnum_cur(im), qnumcw_cur(im),sz_factor(im),ln_diameter(im),im-1
+          enddo
+     endif
 #include "../yaml/modal_aero_rename/f90_yaml/mam_rename_1subarea_end.ymlf90"
   end subroutine mam_rename_1subarea
 
   !--------------------------------------------------------------------------------
   !--------------------------------------------------------------------------------
 
-  subroutine find_renaming_pairs (nmodes, dest_mode_of_mode, &  !input
+  subroutine find_renaming_pairs (print_out, lchnk, ii, kk,nmodes, dest_mode_of_mode, &  !input
        num_pairs, sz_factor, fmode_dist_tail_fac, v2n_lo_rlx, & !output
        v2n_hi_rlx, ln_diameter_tail_fac, diameter_cutoff, &     !output
        ln_dia_cutoff, diameter_threshold)    !output
@@ -129,7 +139,8 @@ contains
     !------------------------------------------------------------------------
 
     !arguments (intent-ins)
-    integer, intent(in) :: nmodes               !total number of modes
+    logical:: print_out
+    integer, intent(in) :: nmodes , lchnk, ii, kk              !total number of modes
     integer, intent(in) :: dest_mode_of_mode(:) !array carry info about the destination mode of a particular mode
 
     !intent-outs
@@ -179,7 +190,11 @@ contains
        ! We compute few factors below for the "src_mode", which will be used for inter-mode particle transfer
        !---------------------------------------------------------------------------------------------------------
 
-       fmode_dist_tail_fac(src_mode) = sqrt_half/alnsg_amode(src_mode) !factor for computing distribution tails of the  "src mode"
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then !NBFB BALLI
+          fmode_dist_tail_fac(src_mode) = sqrt(0.5_r8)/alnsg_amode(src_mode) !factor for computing distribution tails of the  "src mode"
+       else
+          fmode_dist_tail_fac(src_mode) = sqrt_half/alnsg_amode(src_mode) !factor for computing distribution tails of the  "src mode"
+       endif
 
        !compute volume to number high and low limits with relaxation coefficients (watch out for the repeated calculations)
        v2n_lo_rlx(src_mode) = vol_to_num_ratio(src_mode, dgnumlo_amode) * frelax
@@ -335,7 +350,7 @@ contains
   !----------------------------------------------------------------------
   !----------------------------------------------------------------------
 
-  subroutine do_inter_mode_transfer(nmode, nspec, dest_mode_of_mode, &
+  subroutine do_inter_mode_transfer(print_out, lchnk, ii, kk,nmode, nspec, dest_mode_of_mode, &
        iscldy, v2nlorlx, v2nhirlx, dryvol_a, dryvol_c, deldryvol_a, deldryvol_c, &
        sz_factor, fmode_dist_tail_fac, ln_diameter_tail_fac, ln_dia_cutoff, diameter_threshold, &
        qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur)
@@ -345,8 +360,8 @@ contains
     !-------------------------------------------------------------------------
 
     !intent-ins
-    integer,  intent(in) :: nmode, nspec, dest_mode_of_mode(:)
-    logical,  intent(in) :: iscldy !true if it is cloudy cell
+    integer,  intent(in) :: nmode, nspec, dest_mode_of_mode(:), lchnk, ii, kk
+    logical,  intent(in) :: iscldy, print_out !true if it is cloudy cell
     real(r8), intent(in) :: v2nlorlx(:), v2nhirlx(:) !volume to number relaxation limits [m^-3]
     real(r8), intent(in) :: dryvol_a(:), dryvol_c(:), deldryvol_a(:), deldryvol_c(:)!dryvolume and the change in dryvolume[m3/kmol-air]
     real(r8), intent(in) :: sz_factor(:), fmode_dist_tail_fac(:) !Some precomputed factors [unitless]
@@ -360,7 +375,7 @@ contains
     real(r8), intent(inout), optional :: qnumcw_cur(:)   !aerosol number mixing ratio (cld borne) [#/kmol-air]
 
     !local variables
-    integer :: src_mode, dest_mode, imode, ispec
+    integer :: src_mode, dest_mode, imode, ispec,im
     logical :: is_xfer_frac_zero
 
     !before growth dryvolumes [m3/kmol-air]
@@ -437,21 +452,39 @@ contains
             log_dia_tail_fac = ln_diameter_tail_fac(src_mode), & !optional input
             tail_fraction = aft_grwth_tail_fr_vol ) !output
 
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          write(106,'(A,2(ES24.15e2,","))')"bef_aft_num:", bef_grwth_tail_fr_num, aft_grwth_tail_fr_num
+          write(106,'(A,4(ES24.15e2,","))')"bef_aft_dia_num:", bef_grwth_diameter,aft_grwth_diameter,ln_dia_cutoff(src_mode), fmode_dist_tail_fac(src_mode)
+       endif
+
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          write(106,'(A,5(ES24.15e2,","))')"bef_aft_vol:", bef_grwth_tail_fr_vol, aft_grwth_tail_fr_vol, ln_diameter_tail_fac(src_mode),bef_grwth_dryvol, aft_grwth_dryvol
+       endif
+
        !compute transfer fraction (volume and mass) - if less than zero, cycle loop
        call compute_xfer_fractions(bef_grwth_dryvol, aft_grwth_dryvol, bef_grwth_tail_fr_vol, aft_grwth_tail_fr_vol, & !input
             aft_grwth_tail_fr_num, bef_grwth_tail_fr_num, &
             is_xfer_frac_zero, xfer_vol_frac, xfer_num_frac) !output
 
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          write(106,'(A,2(ES24.15e2,","))')"compute_xfer_fractions:",xfer_vol_frac, xfer_num_frac
+       endif
+
        if (is_xfer_frac_zero) cycle pair_loop
 
        !do the transfer for the interstitial species
-       call do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
-            qaer_cur, qnum_cur) !output
+       call do_num_and_mass_transfer(print_out, lchnk, ii, kk,nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+            qaer_cur, qnum_cur,1) !output
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          do im = 1, 4
+               write(106,'(A,(ES24.15e2,","),I2)')"do_inter_mode_transfer_end1:", qnum_cur(im),im-1
+          enddo
+       endif
 
        !do the traner for the cloud borne species
        if ( iscldy ) then
-          call do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
-               qaercw_cur, qnumcw_cur) !output
+          call do_num_and_mass_transfer(print_out, lchnk, ii, kk,nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+               qaercw_cur, qnumcw_cur,2) !output
        end if
 
     enddo pair_loop
@@ -628,13 +661,14 @@ contains
   !----------------------------------------------------------------------
   !----------------------------------------------------------------------
 
-  subroutine do_num_and_mass_transfer(nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
-       qaer, qnum) !output
+  subroutine do_num_and_mass_transfer(print_out, lchnk, ii, kk,nspec, src_mode, dest_mode, xfer_vol_frac, xfer_num_frac, & !input
+       qaer, qnum,inn) !output
 
     !Transfer species from source to destination model and update the mixing ratios
 
     !input
-    integer,  intent(in) :: nspec, src_mode, dest_mode
+    logical:: print_out
+    integer,  intent(in) :: nspec, src_mode, dest_mode, lchnk, ii, kk, inn
     real(r8), intent(in) :: xfer_vol_frac ![m3/kmol-air]
     real(r8), intent(in) :: xfer_num_frac ![#/kmol-air]
 
@@ -650,11 +684,22 @@ contains
     num_trans = qnum(src_mode)*xfer_num_frac
     qnum(src_mode) = qnum(src_mode) - num_trans
     qnum(dest_mode) = qnum(dest_mode) + num_trans
+    if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
+          write(106,'(A,2(ES24.15e2,","),2I2)')"do_inter_mode_transfer_end1:", qnum(src_mode),qnum(dest_mode), src_mode-1, dest_mode-1
+    endif
     do ispec = 1, nspec
        vol_trans = qaer(ispec,src_mode)*xfer_vol_frac
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
+          write(106,'(A,4(ES24.15e2,","),2I2)')"do_inter_mode_transfer_end2:", vol_trans, qaer(ispec,src_mode),qaer(ispec,dest_mode),xfer_vol_frac,ispec,src_mode
+       endif
        qaer(ispec,src_mode) = qaer(ispec,src_mode) - vol_trans
        qaer(ispec,dest_mode) = qaer(ispec,dest_mode) + vol_trans
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
+          write(106,'(A,4(ES24.15e2,","),2I2)')"do_inter_mode_transfer_end3:", vol_trans, qaer(ispec,src_mode),qaer(ispec,dest_mode),xfer_vol_frac,ispec,src_mode
+       endif
     enddo
-
+    if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
+      write(106,'(A,1(ES24.15e2,","))')"do_inter_mode_transfer_end4:", qaer(1,dest_mode)
+    endif
   end subroutine do_num_and_mass_transfer
 end module modal_aero_rename
