@@ -115,6 +115,9 @@ use spmd_utils,   only : masterproc
 ! vertical interpolation
 ! #define YAML_VINTERP
 
+! rebinning
+! #define YAML_REBIN
+
 use yaml_input_file_io
 
 
