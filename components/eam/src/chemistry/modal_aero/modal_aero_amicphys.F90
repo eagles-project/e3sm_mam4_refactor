@@ -201,7 +201,7 @@ implicit none
 
    ! Variables related to subareas
 
-   integer  :: jsub                 ! loop index for subarea
+   integer  :: jsub, iq                 ! loop index for subarea
    integer  :: jclea, jcldy         ! index of clear and cloudy subareas
    real(r8) :: fclea, fcldy         ! area fraction [unitless] of clear and cloudy subareas
    real(r8) :: afracsub(maxsubarea) ! area fraction [unitless] of each subarea
@@ -258,7 +258,7 @@ implicit none
               ev_sat(1:ncol,1:pver),                    &! out (but not used)
               qv_sat(1:ncol,1:pver)                     )! out
    if (print_out) then
-      write(106,*)'QSAT:', qv_sat(icolprnt(lchnk),kprnt),qv(icolprnt(lchnk),kprnt), pmid(icolprnt(lchnk),kprnt), temp(icolprnt(lchnk),kprnt);
+      !write(106,*)'QSAT:', qv_sat(icolprnt(lchnk),kprnt),qv(icolprnt(lchnk),kprnt), pmid(icolprnt(lchnk),kprnt), temp(icolprnt(lchnk),kprnt);
    endif
    do kk = top_lev, pver
    do ii = 1, ncol
@@ -276,7 +276,7 @@ implicit none
 
       call set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, relhumsub ) ! 5xin, 1xout
       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
-         write(106,*)'amic1:', nsubarea, ncldy_subarea, jclea, jcldy, iscldy_subarea, afracsub,":",relhumsub
+         !write(106,*)'amic1:', nsubarea, ncldy_subarea, jclea, jcldy, iscldy_subarea, afracsub,":",relhumsub
       endif
       !-------------------------------
       ! Set aerosol water in subareas
@@ -300,7 +300,7 @@ implicit none
       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
          do jsub = 1, nsubarea
          do icnst = 1 , ntot_amode_extd
-            write(106,*)'amic2:', qaerwatsub3(icnst,jsub),icnst,jsub,ntot_amode_extd,nsubarea
+            !write(106,*)'amic2:', qaerwatsub3(icnst,jsub),icnst,jsub,ntot_amode_extd,nsubarea
          enddo
          enddo
       endif
@@ -324,7 +324,7 @@ implicit none
       end do
       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
          do icnst = 1 , gas_pcnst
-            write(106,*)'amic2a:', qgcm1(icnst), qgcm2(icnst), qgcm3(icnst), icnst!, qqcwgcm2(icnst:), qqcwgcm3(icnst:)
+            !write(106,*)'amic2a:', qgcm1(icnst), qgcm2(icnst), qgcm3(icnst), icnst!, qqcwgcm2(icnst:), qqcwgcm3(icnst:)
          enddo
       endif
 
@@ -361,10 +361,10 @@ implicit none
       wetdens (1:ntot_amode) = max( 1000.0_r8, wetdens_host(ii,kk,1:ntot_amode) )
 
       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
-         do jsub = 1, ntot_amode
-            write(106,*)'dgn_a:',dgn_a(jsub)
-            write(106,*)'dgn_awet:',dgn_awet(jsub)
-            write(106,*)'wetdens:',wetdens(jsub)
+         do imode = 1, ntot_amode
+            write(106,'(A,(ES24.15e2,","),I2)')'dgn_a:',dgn_a(imode),imode
+            write(106,'(A,(ES24.15e2,","),I2)')'dgn_awet:',dgn_awet(imode),imode
+            write(106,'(A,(ES24.15e2,","),I2)')'wetdens:',wetdens(imode), imode
          enddo
       endif
 
@@ -393,28 +393,29 @@ implicit none
          misc_vars_aa                             ) !inout
 
       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
-         do jsub = 1, ntot_amode
-            write(106,*)'AFT:dgn_a:',dgn_a(jsub)
-            write(106,*)'AFT:dgn_awet:',dgn_awet(jsub)
-            write(106,*)'AFT:wetdens:',wetdens(jsub)
+         do imode = 1, ntot_amode
+            write(106,'(A,(ES24.15e2,","),I2)')'AFT:dgn_a:',dgn_a(imode), imode
+            write(106,'(A,(ES24.15e2,","),I2)')'AFT:dgn_awet:',dgn_awet(imode), imode
+            write(106,'(A,(ES24.15e2,","),I2)')'AFT:wetdens:',wetdens(imode), imode
          enddo
          do jsub = 1, nsubarea
             do icnst = 1 , gas_pcnst
-               write(106,'(A,2(ES24.15e2,","),2I2)')'amic4:', qsub4(icnst,jsub), qqcwsub4(icnst,jsub), icnst, jsub
+               write(106,'(A,2(ES24.15e2,","),2I2)')'amic_1:', qsub4(icnst,jsub), qqcwsub4(icnst,jsub), icnst, jsub
             enddo
             do icnst = 1 , ntot_amode_extd
-               write(106,'(A,2(ES24.15e2,","),2I2)')'amic4:',qaerwatsub3(icnst,jsub), qaerwatsub4(icnst,jsub), icnst, jsub
+               write(106,'(A,2(ES24.15e2,","),2I2)')'amic_2:',qaerwatsub3(icnst,jsub), qaerwatsub4(icnst,jsub), icnst, jsub
             enddo
          enddo
-      endif
-      
 
-      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
          do jsub = 1, nsubarea
-         do icnst = 1 , ntot_amode_extd
-            write(106,*)'agrid_1:', qaerwatsub3(icnst,jsub),icnst,jsub,ntot_amode_extd,nsubarea
+            do iq = 1, nqqcwtendaa
+               do icnst = 1 , gas_pcnst
+                  write(106,'(A,1(ES24.15e2,","),3I2)')'amic_3:', qqcwsub_tendaa(icnst,iq,jsub), icnst, iq, jsub
+               enddo
+            enddo
          enddo
-         enddo
+            
+
       endif
 
       !=================================================================================================
@@ -429,10 +430,23 @@ implicit none
          qsub4, qqcwsub4, qqcwgcm3,                      &! in
          qgcm4, qqcwgcm4                                 )! out
 
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do icnst = 1 , gas_pcnst
+            write(106,'(A,2(ES24.15e2,","),1I2)')'amic5_1:', qgcm4(icnst), qqcwgcm4(icnst), icnst
+         enddo   
+      endif
+
       ! Copy grid cell mean values to output arrays
 
       where (lmapcc_all(:) > 0)                 qq(ii,kk,:) = qgcm4(:)
       where (lmapcc_all(:) >= lmapcc_val_aer) qqcw(ii,kk,:) = qqcwgcm4(:)
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do icnst = 1 , gas_pcnst
+            write(106,'(A,2(ES24.15e2,","),1I2)')'amic6_1:', qq(ii,kk,icnst), qqcw(ii,kk,icnst), icnst
+         enddo   
+      endif
 
       !----------------------
       ! Aerosol water
@@ -441,6 +455,7 @@ implicit none
       ! depending on what subarea(s) exist in the grid cell.
 
       if ( update_qaerwat > 0 .and. present( qaerwat ) ) then
+      call endrun( 'BALLI----' )
          jsub = 1;  if (nsubarea>1) jsub = jclea
          qaerwat(ii,kk,1:ntot_amode) = qaerwatsub4(1:ntot_amode,jsub)
       end if
@@ -451,6 +466,19 @@ implicit none
       call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
                                              qgcm_tendaa, qqcwgcm_tendaa        )! out 
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         do iq = 1, nqtendaa
+            do icnst = 1 , gas_pcnst
+               write(106,'(A,(ES24.15e2,","),2I2)')'amic7_1:', qgcm_tendaa(icnst,iq),icnst, iq
+            enddo
+         enddo   
+         do iq = 1, nqqcwtendaa
+            do icnst = 1 , gas_pcnst
+               write(106,'(A,3(ES24.15e2,","),2I2)')'amic8_1:', qqcwgcm_tendaa(icnst,iq),afracsub(1), afracsub(2),icnst, iq
+            enddo
+         enddo   
+      endif
 
       call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
                                              qgcm_tendaa,         qqcwgcm_tendaa,         &! in
@@ -590,7 +618,7 @@ subroutine mam_amicphys_1gridcell( print_out,         &
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
 
    qnumcw2(:) = 999._r8
-   qnumcw3(:)=999._r8
+   qnumcw3(:) = 999._r8
    qnumcw4(:) = 999._r8
 
    qaercw2(:,:) = 888._r8
@@ -643,7 +671,7 @@ main_jsub_loop: &
          qgas2(igas) = qsub2(l,jsub)*fcvt_gas(igas)
          qgas3(igas) = qsub3(l,jsub)*fcvt_gas(igas)
          qgas4(igas) = qgas3(igas)
-         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'qgas4:',qgas4(igas),qgas3(igas),qsub3(l,jsub),fcvt_gas(igas),l,igas,ngas,jsub
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,4(ES24.15e2,","),4I2)')'qgas4:',qgas4(igas),qgas3(igas),qsub3(l,jsub),fcvt_gas(igas),l,igas,ngas,jsub
       end do
       end if
 
@@ -662,7 +690,7 @@ main_jsub_loop: &
          qnum4(n) = qnum3(n)
          do iaer = 1, naer
             l = lmap_aer(iaer,n)
-            if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'lmap_aer:',iaer,n,l, naer
+            !if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'lmap_aer:',iaer,n,l, naer
             if (l > 0) then
                qaer2(iaer,n) = qsub2(l,jsub)*fcvt_aer(iaer)
                qaer3(iaer,n) = qsub3(l,jsub)*fcvt_aer(iaer)
@@ -679,7 +707,7 @@ main_jsub_loop: &
             if(imode == 2) endind = 4;
             if(imode == 4) endind = 3;
             do icnst = 1 , endind
-               write(106,'(A,4(ES24.15e2,","),2I1)')'qaer_1::',qaer2(icnst,imode), qaer3(icnst,imode), qaer4(icnst,imode), fcvt_aer(icnst),icnst, imode
+               write(106,'(A,4(ES24.15e2,","),2I1)')'qaer_1:',qaer2(icnst,imode), qaer3(icnst,imode), qaer4(icnst,imode), fcvt_aer(icnst),icnst, imode
             enddo
          enddo
       endif
@@ -716,7 +744,7 @@ main_jsub_loop: &
             if(imode == 2) endind = 4;
             if(imode == 4) endind = 3;
             do icnst = 1 , endind
-               write(106,'(A,3(ES24.15e2,","),2I2)')'qaerCW_1::',qaercw2(icnst,imode), qaercw3(icnst,imode), qaercw4(icnst,imode),icnst, imode
+               write(106,'(A,3(ES24.15e2,","),2I2)')'qaerCW_1:',qaercw2(icnst,imode), qaercw3(icnst,imode), qaercw4(icnst,imode),icnst, imode
             enddo
          enddo
       endif
@@ -748,11 +776,6 @@ main_jsub_loop: &
       if ((nsubarea == 1) .or. (iscldy_subarea(jsub) .eqv. .false.)) then
          misc_vars_aa%ncluster_tend_nnuc_1grid = misc_vars_aa%ncluster_tend_nnuc_1grid &
                                                + misc_vars_aa_sub(jsub)%ncluster_tend_nnuc_1grid*afracsub(jsub)
-#if ( defined ( MOSAIC_SPECIES ) )
-         misc_vars_aa%cnvrg_fail_1grid      = misc_vars_aa_sub(jsub)%cnvrg_fail_1grid
-         misc_vars_aa%max_kelvin_iter_1grid = misc_vars_aa_sub(jsub)%max_kelvin_iter_1grid
-         misc_vars_aa%xnerr_astem_negative_1grid(1:5,1:4) = misc_vars_aa_sub(jsub)%xnerr_astem_negative_1grid(1:5,1:4)
-#endif
       end if
 
 
@@ -763,20 +786,31 @@ main_jsub_loop: &
       do igas = 1, ngas
          l = lmap_gas(igas)
          qsub4(l,jsub) = qgas4(igas)/fcvt_gas(igas)
-         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,*)'qsub4',qsub4(l,jsub),qgas4(igas),fcvt_gas(igas),l,jsub,igas,ngas
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,3(ES24.15e2,","),4I2)')'qsub4_0',qsub4(l,jsub),qgas4(igas),fcvt_gas(igas),l-1,jsub-1,igas-1,ngas
          qsub_tendaa(l,:,jsub) = qgas_delaa(igas,:)/(fcvt_gas(igas)*deltat)
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            write(106,'(A,4(ES24.15e2,","),2I2)')'qsub4_1',qsub_tendaa(l,1,jsub),qsub_tendaa(l,2,jsub),qsub_tendaa(l,3,jsub),qsub_tendaa(l,4,jsub),l-1, jsub-1
+         endif
       end do
       end if
 
       do n = 1, ntot_amode
          l = lmap_num(n)
          qsub4(l,jsub) = qnum4(n)/fcvt_num
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,1(ES24.15e2,","),2I2)')'qsub4_2',qsub4(l,jsub),l-1,jsub-1
          qsub_tendaa(l,:,jsub) = qnum_delaa(n,:)/(fcvt_num*deltat)
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            write(106,'(A,4(ES24.15e2,","),2I2)')'qsub4_3',qsub_tendaa(l,1,jsub),qsub_tendaa(l,2,jsub),qsub_tendaa(l,3,jsub),qsub_tendaa(l,4,jsub),l-1, jsub-1
+         endif
          do iaer = 1, naer
             l = lmap_aer(iaer,n)
             if (l > 0) then
                qsub4(l,jsub) = qaer4(iaer,n)/fcvt_aer(iaer)
+               if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,1(ES24.15e2,","),2I2)')'qsub4_4',qsub4(l,jsub),l-1,jsub-1
                qsub_tendaa(l,:,jsub) = qaer_delaa(iaer,n,:)/(fcvt_aer(iaer)*deltat)
+               if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            write(106,'(A,4(ES24.15e2,","),2I2)')'qsub4_5',qsub_tendaa(l,1,jsub),qsub_tendaa(l,2,jsub),qsub_tendaa(l,3,jsub),qsub_tendaa(l,4,jsub),l-1, jsub-1
+         endif
             end if
          end do
          qaerwatsub4(n,jsub) = qwtr4(n)/fcvt_wtr
@@ -784,12 +818,20 @@ main_jsub_loop: &
          if ( iscldy_subarea(jsub) ) then
          l = lmap_numcw(n)
          qqcwsub4(l,jsub) = qnumcw4(n)/fcvt_num
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,1(ES24.15e2,","),2I2)')'qsub4_6',qqcwsub4(l,jsub),l-1,jsub-1
          qqcwsub_tendaa(l,:,jsub) = qnumcw_delaa(n,:)/(fcvt_num*deltat)
+         if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+            write(106,'(A,(ES24.15e2,","),2I2)')'qsub4_7',qqcwsub_tendaa(l,1,jsub),l-1, jsub-1
+         endif
          do iaer = 1, naer
             l = lmap_aercw(iaer,n)
             if (l > 0) then
                qqcwsub4(l,jsub) = qaercw4(iaer,n)/fcvt_aer(iaer)
+               if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) write(106,'(A,1(ES24.15e2,","),2I2)')'qsub4_8',qqcwsub4(l,jsub),l-1,jsub-1
                qqcwsub_tendaa(l,:,jsub) = qaercw_delaa(iaer,n,:)/(fcvt_aer(iaer)*deltat)
+               if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
+                  write(106,'(A,(ES24.15e2,","),2I2)')'qsub4_9',qqcwsub_tendaa(l,1,jsub),l-1, jsub-1
+               endif
             end if
          end do
          end if
@@ -948,8 +990,7 @@ main_jsub_loop: &
       if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
       do igas = 1, ngas
       do n = 1, ntot_amode
-         write(106,'(A,6(ES24.15e2,","),5I2)')'uptkaer_BEF:',uptkaer(igas,n),uptkaer(igas_h2so4,n),uptkaer(igas_h2so4,n)*0.81, &
-         uptkaer(igas_h2so4,n)*0.81_r8,4.121689548405324E-04/uptkaer(igas_h2so4,n),   4.121689536273381E-04/uptkaer(igas_h2so4,n), igas, igas_h2so4, igas_nh3,nsoa, n
+         write(106,'(A,2(ES24.15e2,","),5I2)')'uptkaer_BEF:',uptkaer(igas,n),uptkaer(igas_h2so4,n), igas-1, igas_h2so4-1, igas_nh3-1, nsoa, n-1
       enddo
       enddo
       endif
@@ -1013,7 +1054,7 @@ main_jsub_loop: &
 
        do n = 1, ntot_amode
        do igas = 1, max_aer
-         write(106,'(A,1(ES24.15e2,","),2I2)')'After mam_soaexch_1subarea_n:',qaer_cur(igas,n),igas,n
+         write(106,'(A,1(ES24.15e2,","),2I2)')'After mam_soaexch_1subarea_a:',qaer_cur(igas,n),igas,n
        enddo
        enddo
 
@@ -1340,7 +1381,7 @@ time_loop: &
 
       do n = 1, ntot_soamode
          if(print_out .and. i==icolprnt(lchnk) .and. k==kprnt) then
-            write(106,*)"Skip_soamode:",skip_soamode(n), n,ntot_soamode, ntot_poaspec,npca
+            write(106,*)"N:", n,ntot_soamode, ntot_poaspec,npca
          endif
          if ( skip_soamode(n) ) cycle
          a_opoa(n) = 0.0_r8
@@ -1489,7 +1530,7 @@ time_loop: &
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_newnuc_1subarea(                               &
+      subroutine mam_newnuc_1subarea(print_out,                     &
          nstep,             lchnk,                                  &
          i,                 k,                jsub,                 &
          latndx,            lonndx,           lund,                 &
@@ -1521,7 +1562,7 @@ time_loop: &
          mer07_veh02_nuc_mosaic_1box, qh2so4_cutoff
 
       implicit none
-
+      logical :: print_out
 ! arguments
       integer,  intent(in) :: nstep                 ! model time-step number
       integer,  intent(in) :: lchnk                 ! chunk identifier
@@ -1651,7 +1692,9 @@ time_loop: &
          qh2so4_avg = qgas_avg(igas_h2so4)
          tmp_uptkrate = uptkrate_h2so4
       end if
-
+   if (print_out .and. k==kprnt .and. i==icolprnt(lchnk)) then
+      write(106,'(A,(ES24.15e2,","),3I2)')"merv0:",qh2so4_avg, igas_h2so4, newnuc_h2so4_conc_optaa, gaexch_h2so4_uptake_optaa
+   endif
       if (qh2so4_avg <= qh2so4_cutoff) goto 80000
 
       if (igas_nh3 > 0) then
@@ -1694,7 +1737,7 @@ time_loop: &
       end if ! (ldiag2 > 0)
 #endif
 
-      call mer07_veh02_nuc_mosaic_1box(   &
+      call mer07_veh02_nuc_mosaic_1box( print_out, i,k,lchnk,  &
            newnuc_method_flagaa,   &
            deltat, temp, relhumnn, pmid,   &
            zmid, pblh,   &
@@ -1704,6 +1747,9 @@ time_loop: &
            itmp, qnuma_del, qso4a_del, qnh4a_del,   &
            qh2so4_del, qnh3_del, dens_nh4so4a,   &
            ldiagveh02, dnclusterdt )
+           if (print_out .and. k==kprnt .and. i==icolprnt(lchnk)) then
+               write(106,'(A,6(ES24.15e2,","),I2)')"merv1:dels,dens,itmp:",qnuma_del, qso4a_del, qnh4a_del, qh2so4_del, qnh3_del, dens_nh4so4a, itmp
+           endif
 !----------------------------------------------------------------------
 !       subr mer07_veh02_nuc_mosaic_1box(   &
 !          newnuc_method_flagaa,   &
@@ -1918,7 +1964,7 @@ time_loop: &
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine mam_pcarbon_aging_1subarea(                        &
+      subroutine mam_pcarbon_aging_1subarea(print_out,ii,kk,lchnk,                        &
          dgn_a,             n_mode,                                 &
          qnum_cur,          qnum_del_cond,    qnum_del_coag,        &
          qaer_cur,          qaer_del_cond,    qaer_del_coag,        &
@@ -1933,7 +1979,8 @@ time_loop: &
       implicit none
 
 ! arguments
-      integer,  intent(in) :: n_mode                                      ! current number of modes (including temporary) [unitless]
+      logical :: print_out
+      integer,  intent(in) :: n_mode,ii,kk,lchnk                                      ! current number of modes (including temporary) [unitless]
       real(r8), intent(in), dimension( 1:max_mode ) :: dgn_a              ! dry geometric mean diameter of number distribution [m]
       real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_cur        ! aerosol number mixing ratio [#/kmol]
       real(r8), intent(inout), dimension( 1:max_mode ) :: qnum_del_cond   ! change of aerosol number mixing ratio due to condensation [#/kmol]
@@ -1961,9 +2008,12 @@ agepair_loop1: &
       nsrc  = modefrm_agepair(ipair)
       ndest = modetoo_agepair(ipair)
 
-      call mam_pcarbon_aging_frac(nsrc, ipair, dgn_a,  &  ! input
+      call mam_pcarbon_aging_frac(print_out,ii,kk,lchnk, nsrc, ipair, dgn_a,  &  ! input
             qaer_cur, qaer_del_cond, qaer_del_coag_in, &  ! in-outs
             xferfrac_pcage, frac_cond, frac_coag)         ! output
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,'(A,3(ES24.15e2,","),2I2)')"mam_pcarbon_aging_frac_end:",xferfrac_pcage,frac_cond, frac_coag, nsrc, ipair
+      endif
 
             do iaer = 1, naer
          if (lmap_aer(iaer,nsrc) > 0) then   ! MAM4 pcarbon mode only has pom, bc, mom, lmap only has index (>0) for these species
@@ -1994,7 +2044,7 @@ agepair_loop1: &
       end subroutine mam_pcarbon_aging_1subarea
 
 
-      subroutine mam_pcarbon_aging_frac(nsrc, ipair, &
+      subroutine mam_pcarbon_aging_frac(print_out,ii,kk,lchnk, nsrc, ipair, &
           dgn_a, qaer_cur, qaer_del_cond, qaer_del_coag_in, &
           xferfrac_pcage, frac_cond, frac_coag)
 
@@ -2010,7 +2060,8 @@ agepair_loop1: &
       implicit none
 
 ! arguments
-      integer,  intent(in)  :: nsrc      ! pcarbon mode index [unitless]
+   logical :: print_out
+      integer,  intent(in)  :: nsrc,ii,kk,lchnk      ! pcarbon mode index [unitless]
       integer,  intent(in)  :: ipair     ! aging pair index [unitless]
       real(r8), intent(in),    dimension( 1:max_mode ) :: dgn_a    ! dry geometric mean diameter of number distribution [m]
       real(r8), intent(inout), dimension( 1:max_aer, 1:max_mode ) :: qaer_cur            ! aerosol mass mixing ratio [mol/mol]
@@ -2039,7 +2090,9 @@ agepair_loop1: &
       qaer_del_coag_tmp = qaer_del_coag_in(iaer_so4,ipair)*mass_2_vol(iaer_so4) + &
                           qaer_del_coag_in(iaer_soa,ipair)*fac_m2v_eqvhyg_aer(iaer_soa)
 
-
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,'(A,3(ES24.15e2,","))')"mam_pcarbon_aging_frac_0:",vol_shell, qaer_del_cond_tmp, qaer_del_coag_tmp
+      endif
       qaer_del_cond_tmp = max( qaer_del_cond_tmp, 1.0e-35_r8 )
       frac_cond = qaer_del_cond_tmp/(qaer_del_cond_tmp + max( qaer_del_coag_tmp, 0.0_r8 ))
       frac_coag = 1.0_r8 - frac_cond
@@ -2048,8 +2101,13 @@ agepair_loop1: &
       do iaer = 1, naer
          ! for core volume, only include the mapped species
          !    which are primary and low hygroscopicity
-         if (lmap_aer(iaer,nsrc) > 0) &
-         vol_core = vol_core + qaer_cur(iaer,nsrc)*mass_2_vol(iaer)
+         if (lmap_aer(iaer,nsrc) > 0) then
+            vol_core = vol_core + qaer_cur(iaer,nsrc)*mass_2_vol(iaer)
+            if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+               write(106,'(A,3(ES24.15e2,","), 2I2)')"mam_pcarbon_aging_frac_1b:",vol_core, qaer_cur(iaer,nsrc),mass_2_vol(iaer),iaer,nsrc
+            end if
+         endif
+
       end do
 !   ratio1 = vol_shell/vol_core =
 !      actual hygroscopic-shell-volume/carbon-core-volume after gas uptake
@@ -2066,12 +2124,27 @@ agepair_loop1: &
       xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
 
       xferfrac_tmp1 = vol_shell*dgn_a(nsrc)*fac_volsfc
-      xferfrac_tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then !BALLI NBFB
+         xferfrac_tmp2 = max( 6.0_r8*4.76e-10_r8*8.0_r8*vol_core, 0.0_r8 )
+      else
+         xferfrac_tmp2 = max( 6.0_r8*dr_so4_monolayers_pcage*vol_core, 0.0_r8 )
+      endif
+
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,'(A,4(ES24.15e2,","))')"mam_pcarbon_aging_frac_1:",fac_volsfc, xferfrac_max, xferfrac_tmp1, xferfrac_tmp2
+         write(106,'(A,4(ES24.15e2,","))')"mam_pcarbon_aging_frac_1a:", xferfrac_tmp2, dr_so4_monolayers_pcage,vol_core
+      endif
       if (xferfrac_tmp1 >= xferfrac_tmp2) then
          xferfrac_pcage = xferfrac_max
       else
          xferfrac_pcage = min( xferfrac_tmp1/xferfrac_tmp2, xferfrac_max )
       end if
+
+      if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,'(A,(ES24.15e2,","))')"mam_pcarbon_aging_frac_2:",xferfrac_pcage
+      endif
 #include "../yaml/modal_aero_amicphys/f90_yaml/mam_pcarbon_aging_frac_end.ymlf90"
       return
       end subroutine mam_pcarbon_aging_frac
@@ -2637,7 +2710,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
                end if
                lmapcc_all(lmz) = lmapcc_val_aer
                lmap_aer(iaer,n) = l - loffset
-               write(106,*)'lmap_aer:',n, l1, l, lmap_aer(iaer,n)
+               !write(106,*)'lmap_aer:',n, l1, l, lmap_aer(iaer,n)
                lmapbb_aer(iaer,n) = l1
 
                dens_aer(iaer) = specdens2_amode(l1,n)
@@ -2685,8 +2758,8 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       sigmag_aer(:) = 1.8_r8
       sigmag_aer(1:ntot_amode) = sigmag_amode(1:ntot_amode)
       alnsg_aer(1:max_mode) = log(sigmag_aer(1:max_mode))
-      write(106,*)'alnsg_aer:',alnsg_aer(1:max_mode)
-      write(106,*)'sigmag_aer:',sigmag_aer(1:max_mode)
+      !write(106,*)'alnsg_aer:',alnsg_aer(1:max_mode)
+      !write(106,*)'sigmag_aer:',sigmag_aer(1:max_mode)
 
       dgnum_aer(:)   =  3.0e-9_r8
       dgnumlo_aer(:) =  1.0e-9_r8
@@ -2705,7 +2778,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
       else
          mw_nh4a_host = mw_so4a_host
       end if
-
+      !write(106,*)'mw_so4a_host:',mw_so4a_host, mw_nh4a_host, iaer_so4, iaer_nh4
 
       nacc = modeptr_accum
       nait = modeptr_aitken
@@ -2847,7 +2920,7 @@ dr_so4_monolayers_pcage = n_so4_monolayers_pcage * 4.76e-10
 
 
       if ( masterproc ) write(iulog,'(/a)') 'modal_aero_amicphys_init end'
-
+      !write(106,*)'n_agepair:',n_agepair, dr_so4_monolayers_pcage
       return
       end subroutine modal_aero_amicphys_init
 

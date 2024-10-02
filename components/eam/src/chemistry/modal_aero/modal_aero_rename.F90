@@ -96,14 +96,14 @@ contains
 
     !Interstitial aerosols: Compute initial (before growth) aerosol dry volume and
     !also the growth in dryvolume of the "src" mode
-    call compute_dryvol_change_in_src_mode(ntot_amode, naer, dest_mode_of_mode,  & !input
+    call compute_dryvol_change_in_src_mode(print_out, lchnk, ii, kk,ntot_amode, naer, dest_mode_of_mode,  & !input
          qaer_cur, qaer_del_grow4rnam, & !input
          dryvol_a, deldryvol_a                 ) !output
 
     !Cloudborne aerosols: Compute initial (before growth) aerosol dry volume and
     !also the growth in dryvolume of the "src" mode
     if (iscldy) then
-       call compute_dryvol_change_in_src_mode(ntot_amode, naer, dest_mode_of_mode,  & !input
+       call compute_dryvol_change_in_src_mode(print_out, lchnk, ii, kk,ntot_amode, naer, dest_mode_of_mode,  & !input
             qaercw_cur, qaercw_del_grow4rnam, & !input
             dryvol_c, deldryvol_c                     ) !output
     endif
@@ -115,7 +115,7 @@ contains
          qaer_cur, qnum_cur, qaercw_cur, qnumcw_cur ) !output
      if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
           do im = 1, 4
-               write(106,'(A,4(ES24.15e2,","),I2)')"mam_rename_1subarea_last:", qnum_cur(im), qnumcw_cur(im),sz_factor(im),ln_diameter(im),im-1
+               !write(106,'(A,4(ES24.15e2,","),I2)')"mam_rename_1subarea_last:", qnum_cur(im), qnumcw_cur(im),sz_factor(im),ln_diameter(im),im-1
           enddo
      endif
 #include "../yaml/modal_aero_rename/f90_yaml/mam_rename_1subarea_end.ymlf90"
@@ -259,7 +259,7 @@ contains
   !----------------------------------------------------------------------
   !----------------------------------------------------------------------
 
-  subroutine compute_dryvol_change_in_src_mode(nmode, nspec, dest_mode_of_mode, & !input
+  subroutine compute_dryvol_change_in_src_mode(print_out, lchnk, ii, kk,nmode, nspec, dest_mode_of_mode, & !input
        q_mmr, q_del_growth, & !input
        dryvol, deldryvol ) !output
 
@@ -268,7 +268,8 @@ contains
     !--------------------------------------------------------
 
     !inputs
-    integer,  intent(in):: nmode !total number of modes
+    logical, intent(in) :: print_out
+    integer,  intent(in):: nmode, lchnk, ii, kk !total number of modes
     integer,  intent(in):: nspec !total number of species in a mode
     integer,  intent(in):: dest_mode_of_mode(:) !destination mode for a mode
 
@@ -291,7 +292,7 @@ contains
        if (dest_mode <= 0) cycle
 
        !compute dry volumes (before growth) and its change for interstitial aerosols
-       call compute_dryvolume_change(imode, nspec, q_mmr, q_del_growth, & !input
+       call compute_dryvolume_change(print_out, lchnk, ii, kk,imode, nspec, q_mmr, q_del_growth, & !input
             dryvol(imode), deldryvol(imode)) !output
     end do
 #include "../yaml/modal_aero_rename/f90_yaml/compute_dryvol_change_in_src_mode_end_yml.f90"
@@ -300,7 +301,7 @@ contains
   !----------------------------------------------------------------------
   !----------------------------------------------------------------------
 
-  subroutine compute_dryvolume_change (imode, nspec, q_mmr, q_del_growth, &!input
+  subroutine compute_dryvolume_change (print_out, lchnk, ii, kk, imode, nspec, q_mmr, q_del_growth, &!input
        dryvol, deldryvol) !output
 
     !--------------------------------------------------------
@@ -308,7 +309,8 @@ contains
     !--------------------------------------------------------
 
     !intent-ins
-    integer,  intent(in) :: imode           !current mode number
+    logical :: print_out
+    integer,  intent(in) :: imode, lchnk, ii, kk           !current mode number
     integer,  intent(in) :: nspec           !number of species in the current mode
     real(r8), intent(in) :: q_mmr(:,:)        !molar mixing ratio [kmol/kmol-air]
     real(r8), intent(in) :: q_del_growth(:,:) !change (delta) in molar mixing ratio [kmol/kmol-air]
@@ -338,6 +340,9 @@ contains
     do ispec = s_spec_ind, e_spec_ind
        !Multiply by mass_2_vol[m3/kmol-species] to convert q_mmr[kmol-specie/kmol-air]) to volume units[m3/kmol-air]
        tmp_dryvol     = tmp_dryvol     + q_mmr(ispec,imode)*mass_2_vol(ispec)        !compute current dryvolume
+       if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+         write(106,'(A,3(ES24.15e2,","),2I2)')"compute_dryvolume_change_0:", tmp_dryvol, q_mmr(ispec,imode),mass_2_vol(ispec) , ispec, imode
+       endif
        !accumulate the "grwoth" in volume units as well
        tmp_del_dryvol = tmp_del_dryvol + q_del_growth(ispec,imode)*mass_2_vol(ispec) !compute dryvolume growth
     end do
@@ -406,6 +411,10 @@ contains
             qnum_cur, qnumcw_cur, v2nhirlx(src_mode), v2nlorlx(src_mode),        & !input
             bef_grwth_dryvol, bef_grwth_dryvolbnd, bef_grwth_numbnd)               !output
 
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+         write(106,'(A,6(ES24.15e2,","))')"befgrwth_dia_1:", dryvol_a(src_mode), dryvol_c(src_mode),qnum_cur(src_mode), qnumcw_cur(src_mode),v2nhirlx(src_mode),v2nlorlx(src_mode)
+       endif
+
        !change (delta) in dryvol
        dryvol_del = total_inter_cldbrn(iscldy, src_mode, deldryvol_a, deldryvol_c)
 
@@ -417,6 +426,9 @@ contains
 
        !compute before growth diameter
        bef_grwth_diameter = mode_diameter(bef_grwth_dryvolbnd, bef_grwth_numbnd, sz_factor(src_mode))
+       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+          write(106,'(A,3(ES24.15e2,","),I2)')"befgrwth_dia_2:", bef_grwth_diameter, bef_grwth_dryvolbnd, bef_grwth_numbnd, src_mode
+       endif
 
        !if the before growth diameter is more than the threshold (diameter_threshold), we restrict diameter
        !to the threshold and change dry volume accorindgly
@@ -477,7 +489,7 @@ contains
             qaer_cur, qnum_cur,1) !output
        if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
           do im = 1, 4
-               write(106,'(A,(ES24.15e2,","),I2)')"do_inter_mode_transfer_end1:", qnum_cur(im),im-1
+               !write(106,'(A,(ES24.15e2,","),I2)')"do_inter_mode_transfer_end1:", qnum_cur(im),im-1
           enddo
        endif
 
@@ -685,7 +697,7 @@ contains
     qnum(src_mode) = qnum(src_mode) - num_trans
     qnum(dest_mode) = qnum(dest_mode) + num_trans
     if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
-          write(106,'(A,2(ES24.15e2,","),2I2)')"do_inter_mode_transfer_end1:", qnum(src_mode),qnum(dest_mode), src_mode-1, dest_mode-1
+          !write(106,'(A,2(ES24.15e2,","),2I2)')"do_inter_mode_transfer_end1:", qnum(src_mode),qnum(dest_mode), src_mode-1, dest_mode-1
     endif
     do ispec = 1, nspec
        vol_trans = qaer(ispec,src_mode)*xfer_vol_frac
@@ -699,7 +711,7 @@ contains
        endif
     enddo
     if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt .and. inn==1) then
-      write(106,'(A,1(ES24.15e2,","))')"do_inter_mode_transfer_end4:", qaer(1,dest_mode)
+      !write(106,'(A,1(ES24.15e2,","))')"do_inter_mode_transfer_end4:", qaer(1,dest_mode)
     endif
   end subroutine do_num_and_mass_transfer
 end module modal_aero_rename

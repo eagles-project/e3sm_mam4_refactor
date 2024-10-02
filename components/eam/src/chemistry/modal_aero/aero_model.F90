@@ -1515,7 +1515,7 @@ contains
     if(print_out) then
       do kk = kprnt, kprnt!pver
          do mm = 1, gas_pcnst
-           write(106,*)'vmrcw,vmr-BEF_setsox:',vmrcw(icolprnt(lchnk),kk,mm), vmr(icolprnt(lchnk),kk,mm)
+           write(106,'(A,2(ES24.15e2,","), I2)')'vmrcw,vmr-BEF-setsox:',vmrcw(icolprnt(lchnk),kk,mm), vmr(icolprnt(lchnk),kk,mm),mm
          enddo
       enddo
    endif

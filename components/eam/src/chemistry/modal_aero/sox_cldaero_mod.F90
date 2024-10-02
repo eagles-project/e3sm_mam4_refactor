@@ -137,7 +137,7 @@ contains
     id_so4_2a = lptr_so4_cw_amode(2) - loffset
     id_so4_3a = lptr_so4_cw_amode(3) - loffset
     conc_obj%so4c(:ncol,:) = qcw(:,:,id_so4_1a) + qcw(:,:,id_so4_2a) + qcw(:,:,id_so4_3a)
-    if(print_out) write(106,*)'sox_cldaero_create_obj:',qcw(icolprnt(lchnk),kprnt,id_so4_1a),qcw(icolprnt(lchnk),kprnt,id_so4_2a),qcw(icolprnt(lchnk),kprnt,id_so4_3a),id_so4_1a,id_so4_2a, id_so4_3a, loffset
+    !if(print_out) write(106,*)'sox_cldaero_create_obj:',qcw(icolprnt(lchnk),kprnt,id_so4_1a),qcw(icolprnt(lchnk),kprnt,id_so4_2a),qcw(icolprnt(lchnk),kprnt,id_so4_3a),id_so4_1a,id_so4_2a, id_so4_3a, loffset
     ! for 3-mode, so4 is assumed to be nh4hso4
     ! the partial neutralization of so4 is handled by using a 
     !    -1 charge (instead of -2) in the electro-neutrality equation
@@ -279,7 +279,7 @@ contains
             dqdt_wr =  0.0_r8 ! don't have wet removal here
             dqdt_aq = -dso4dt_hprxn*cldfrc(icol,kk)
             call update_tmr ( qin(icol,kk,id_h2o2), dqdt_aq + dqdt_wr, dtime )
-            if (print_out .and. kk==kprnt) write(106,*)"sox_cldaero_update:", qin(icol,kk,id_h2o2), dqdt_aq , dqdt_wr, dtime, -dso4dt_hprxn,cldfrc(icol,kk)
+            !if (print_out .and. kk==kprnt) write(106,*)"sox_cldaero_update:", qin(icol,kk,id_h2o2), dqdt_aq , dqdt_wr, dtime, -dso4dt_hprxn,cldfrc(icol,kk)
 
             ! for SO4 from H2O2/O3 budgets
             dqdt_aqhprxn(icol,kk) = dso4dt_hprxn*cldfrc(icol,kk)

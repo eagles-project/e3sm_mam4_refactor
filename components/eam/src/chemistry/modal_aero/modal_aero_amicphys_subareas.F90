@@ -543,7 +543,7 @@ subroutine set_subarea_qmass_for_intrst_aerosols( print_out, ii, kk, lchnk,loffs
      qgcm_cldbrn = 0.0_wp
 
      do ispec = 1, nspec_amode(imode)
-        if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) write(106,*)'suareas:',imode, ispec, lmassptr_amode(ispec,imode),lmassptr_amode(ispec,imode) - loffset, nspec_amode(imode)
+        !if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) write(106,*)'suareas:',imode, ispec, lmassptr_amode(ispec,imode),lmassptr_amode(ispec,imode) - loffset, nspec_amode(imode)
         qgcm_intrst = qgcm_intrst + qgcm( lmassptr_amode(ispec,imode) - loffset )
         qgcm_cldbrn = qgcm_cldbrn + qqcwgcm( lmassptrcw_amode(ispec,imode) - loffset )
      end do

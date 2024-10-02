@@ -16,6 +16,8 @@
    use cam_logfile,   only:  iulog
    use mo_constants,  only:  pi
    use chem_mods,     only:  gas_pcnst
+         use module_perturb
+  use time_manager
 
   implicit none
   private
@@ -67,7 +69,7 @@
 
 !----------------------------------------------------------------------
 !-----------------------------------------------------------------------
-        subroutine mer07_veh02_nuc_mosaic_1box(   &
+        subroutine mer07_veh02_nuc_mosaic_1box(   print_out, ii,kk,lchnk,&
            newnuc_method_flagaa, dtnuc, temp_in, rh_in, press_in,   &
            zm_in, pblh_in,   &
            qh2so4_cur, qh2so4_avg, qnh3_cur, h2so4_uptkrate,   &
@@ -125,7 +127,7 @@
 !
 !.......................................................................
       implicit none
-
+logical :: print_out
 ! subr arguments (in)
         real(r8), intent(in) :: dtnuc             ! nucleation time step (s)
         real(r8), intent(in) :: temp_in           ! temperature, in k
@@ -144,7 +146,7 @@
 
         integer, intent(in) :: newnuc_method_flagaa     ! 1=merikanto et al (2007) ternary
                                                         ! 2=vehkamaki et al (2002) binary
-        integer, intent(in) :: nsize                    ! number of aerosol size bins
+        integer, intent(in) :: nsize, ii,kk,lchnk                    ! number of aerosol size bins
         integer, intent(in) :: maxd_asize               ! dimension for dplom_sect, ...
         real(r8), intent(in) :: dplom_sect(maxd_asize)  ! dry diameter at lower bnd of bin (m)
         real(r8), intent(in) :: dphim_sect(maxd_asize)  ! dry diameter at upper bnd of bin (m)
@@ -240,8 +242,9 @@
         real(r8) wetvol_dryvol            ! grown particle (wet-volume)/(dry-volume)
         real(r8) wet_volfrac_so4a         ! grown particle (dry-volume-from-so4)/(wet-volume)
 
-
-
+if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+        write(106,*)'rgas, avogad:', rgas,avogad 
+endif
 !
 ! if h2so4 vapor < qh2so4_cutoff
 ! exit with new particle formation = 0
@@ -269,10 +272,15 @@
 ! calc h2so4 in molecules/cm3 and nh3 in ppt
         cair = press_in/(temp_in*rgas)
         so4vol_in  = qh2so4_avg * cair * avogad * 1.0e-6_r8
+        if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+                write(106,'(A,7(ES24.15e2,","))')"nuc0:",so4vol_in, qh2so4_avg, cair, avogad, press_in, temp_in, rgas
+        endif        
         nh3ppt    = qnh3_cur * 1.0e12_r8
         ratenuclt = 1.0e-38_r8
         rateloge = log( ratenuclt )
-
+        if (print_out .and. kk==kprnt .and. ii==icolprnt(lchnk)) then
+                write(106,'(A,5(ES24.15e2,","))')"nuc1:", cair, so4vol_in, nh3ppt, ratenuclt, rateloge
+        endif
         if ( (newnuc_method_flagaa /=  2) .and. &
              (nh3ppt >= 0.1_r8) ) then
             newnuc_method_flagaa2 = 1

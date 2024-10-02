@@ -195,7 +195,7 @@ subroutine mam_amicphys_1subarea(print_out,&
 
 if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
      write(106,'(A,3(ES24.15e2,","))')'qgas_cur1:',qgas_cur(1),qgas_cur(2),aircon
-     do ib = 1, max_mode
+     do ib = 1, 4
       write(106,'(A,3(ES24.15e2,","),I2)')'qnum_cur:',qnum_cur(ib),qwtr_cur(ib), qnumcw_cur(ib),ib
       do jb = 1, max_aer
          write(106,'(A,2(ES24.15e2,","),2I2)')'qaer_cur:',qaer_cur(jb,ib), qaercw_cur(jb,ib),jb, ib
@@ -248,10 +248,10 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
 
 
    if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
-      write(106,*)'igas_h2so4:',igas_h2so4, del_h2so4_gasprod,max_agepair,do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
+      write(106,'(A,(ES24.15e2,","), 2I2, 4L2)')'igas_h2so4:', del_h2so4_gasprod,igas_h2so4,max_agepair,do_cond_sub, do_rename_sub, do_newnuc_sub, do_coag_sub
 
       do igas = 1, ngas
-         write(106,*)"netprod:", igas, qgas_netprod_otrproc(igas),qgas_cur(igas), qgas3(igas), qgas1(igas), deltat
+         write(106,'(A,5(ES24.15e2,","), I2)')"netprod:", qgas_netprod_otrproc(igas),qgas_cur(igas), qgas3(igas), qgas1(igas), deltat, igas
       enddo
    endif
    
@@ -301,7 +301,7 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
                enddo
             enddo
             do ig = 1, ngas
-               write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1", qgas_cur(ig), qgas_avg(ig), ig-1
+               write(106,'(A,2(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1:", qgas_cur(ig), qgas_avg(ig), ig-1
             enddo
             do im = 1, 4
                write(106,'(A,3(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_2:", qnum_cur(im), qwtr_cur(im),qnum_delsub_cond(im),im-1
@@ -326,7 +326,7 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
         del_h2so4_aeruptk = 0.0_r8
       if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          do ig = 1, ngas
-         write(106,'(A,1(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1else",qgas_avg(ig), ig-1
+         write(106,'(A,1(ES24.15e2,","),I2)')"mam_gasaerexch_1subarea_1else:",qgas_avg(ig), ig-1
          enddo
 
          do is = 1, max_aer
@@ -361,9 +361,12 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
             qaer_delsub_grow4rnam   = (qaer3 - qaer2)/ntsubstep  + qaer_delsub_grow4rnam
             qaercw_delsub_grow4rnam = (qaercw3 - qaercw2)/ntsubstep
             if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
+               do im = 1, 4
+                  write(106,'(A,1(ES24.15e2,","),I2)')"rename_0:", qnumcw_cur(im), im -1
+               enddo
                do is = 1, max_aer
                   do im = 1, 4
-                     write(106,'(A,2(ES24.15e2,","),2I2)')"rename_1:",qaer_delsub_grow4rnam(is,im),qaercw_delsub_grow4rnam(is,im), is-1, im-1
+                     write(106,'(A,3(ES24.15e2,","),2I2)')"rename_1:",qaer_delsub_grow4rnam(is,im),qaercw_delsub_grow4rnam(is,im), qaercw_cur(is,im),is-1, im-1
                   enddo
                enddo
             endif
@@ -413,23 +416,17 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
             enddo
             do is = 1, max_aer
                do im = 1, 4
-                  !do ig = 1, iqtend_rnam
                      write(106,'(A,1(ES24.15e2,","),3I2)')"mam_rename_1subarea_3b:",qaer_delaa(is,im,iqtend_rnam),is-1,im-1,iqtend_rnam-1;
-                  !enddo
                enddo
             enddo
 
             do im = 1, 4
-               !do ig = 1, iqtend_rnam
-                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_rename_1subarea_4a:", qnumcw_delaa(im,iqtend_rnam),im-1, iqtend_rnam-1
-               !enddo
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_rename_1subarea_4a:", qnumcw_delaa(im,iqqcwtend_rnam),im-1, iqqcwtend_rnam
             enddo
             
             do is = 1, max_aer
                do im = 1, 4
-                  !do ig = 1, iqtend_rnam
-                     write(106,'(A,1(ES24.15e2,","),3I2)')"mam_rename_1subarea_4b:",qaercw_delaa(is,im,iqtend_rnam),is-1,im-1,iqtend_rnam-1;
-                  !enddo
+                     write(106,'(A,1(ES24.15e2,","),3I2)')"mam_rename_1subarea_4b:",qaercw_delaa(is,im,iqqcwtend_rnam),is-1,im-1,iqqcwtend_rnam-1;
                enddo
             enddo
          endif
@@ -445,7 +442,7 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          qnum_sv1 = qnum_cur
          qaer_sv1 = qaer_cur
 
-         call mam_newnuc_1subarea(                                     &
+         call mam_newnuc_1subarea(  print_out,                                   &
             nstep,             lchnk,                                  &
             ii,                kk,               jsubarea,             &
             latndx,            lonndx,           lund,                 &
@@ -459,14 +456,42 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
             qaer_cur,                                                  &
             qwtr_cur,                                                  &
             dnclusterdt_substep                                        )
-            if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) write(106,*)'qgas_cur4:',qgas_cur(1),qgas_cur(2)
+            
 
          qgas_delaa(:,iqtend_nnuc) = qgas_delaa(:,iqtend_nnuc) + (qgas_cur - qgas_sv1)
          qnum_delaa(:,iqtend_nnuc) = qnum_delaa(:,iqtend_nnuc) + (qnum_cur - qnum_sv1)
          qaer_delaa(:,:,iqtend_nnuc) = qaer_delaa(:,:,iqtend_nnuc) + (qaer_cur - qaer_sv1)
 
          misc_vars_aa_sub%ncluster_tend_nnuc_1grid = &
-         misc_vars_aa_sub%ncluster_tend_nnuc_1grid + dnclusterdt_substep*(dtsubstep/deltat) 
+         misc_vars_aa_sub%ncluster_tend_nnuc_1grid + dnclusterdt_substep*(dtsubstep/deltat)
+
+         if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then  
+            write(106,'(A,2(ES24.15e2,","))')"mam_newnuc_1subarea_0:",dnclusterdt_substep, misc_vars_aa_sub%ncluster_tend_nnuc_1grid
+            do ig = 1, ngas
+               write(106,'(A,2(ES24.15e2,","),I2)')"mam_newnuc_1subarea_1:", qgas_cur(ig), qgas_avg(ig), ig-1
+            enddo
+            do im = 1, 4
+               write(106,'(A,2(ES24.15e2,","),I2)')"mam_newnuc_1subarea_2:", qnum_cur(im), qwtr_cur(im),im-1
+            enddo
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_newnuc_1subarea_3:",qaer_cur(is,im),is-1,im-1;
+               enddo
+            enddo
+            do is = 1, ngas
+               write(106,'(A,(ES24.15e2,","),I2)')"mam_newnuc_1subarea_4a:",qgas_delaa(is,iqtend_nnuc),is-1
+            enddo
+
+            do im = 1, 4
+               write(106,'(A,(ES24.15e2,","),I2)')"mam_newnuc_1subarea_4b:",qnum_delaa(im,iqtend_nnuc),im-1
+            enddo
+
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_newnuc_1subarea_4c:",qaer_delaa(is,im,iqtend_nnuc), is-1, im-1
+               enddo
+            enddo
+         endif
 
       end if
 
@@ -488,7 +513,32 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          qaer_delsub_coag = qaer_cur - qaer_sv1
 
          qnum_delaa  (:,iqtend_coag) = qnum_delaa  (:,iqtend_coag) + qnum_delsub_coag 
-         qaer_delaa(:,:,iqtend_coag) = qaer_delaa(:,:,iqtend_coag) + qaer_delsub_coag 
+         qaer_delaa(:,:,iqtend_coag) = qaer_delaa(:,:,iqtend_coag) + qaer_delsub_coag
+
+         if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then  
+            do im = 1, 4
+               write(106,'(A,2(ES24.15e2,","),I2)')"mam_coag_1subarea_2:", qnum_cur(im), qnum_sv1(im),im-1
+            enddo
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,2(ES24.15e2,","),2I2)')"mam_coag_1subarea_3:",qaer_cur(is,im),qaer_sv1(is,im),is-1,im-1;
+               enddo
+            enddo
+            do is = 1, max_aer
+               do im = 1, max_agepair
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_coag_1subarea_4a:",qaer_delsub_coag_in(is,im), is-1, im-1
+               enddo
+            enddo
+            do im = 1, 4
+               write(106,'(A,(ES24.15e2,","),I2)')"mam_coag_1subarea_4b:",qnum_delaa(im,iqtend_coag),im-1
+            enddo
+
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_coag_1subarea_4c:",qaer_delaa(is,im,iqtend_coag), is-1, im-1
+               enddo
+            enddo
+         endif
 
       else
          qaer_delsub_coag_in = 0.0_r8
@@ -503,7 +553,7 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
                             ( (.not.iscldy_subarea).or.(iscldy_subarea.and.do_cond_sub) )
 
       if (do_aging_in_subarea) then
-         call mam_pcarbon_aging_1subarea(                          &
+         call mam_pcarbon_aging_1subarea( print_out, ii, kk, lchnk,                         &
             dgn_a,             n_mode,                             &! input
             qnum_cur,          qnum_delsub_cond, qnum_delsub_coag, &! in-outs
             qaer_cur,          qaer_delsub_cond, qaer_delsub_coag, &! in-outs
@@ -518,6 +568,31 @@ if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then
          qnum_delaa  (:,iqtend_cond) = qnum_delaa  (:,iqtend_cond) + qnum_delsub_cond 
          qaer_delaa(:,:,iqtend_cond) = qaer_delaa(:,:,iqtend_cond) + qaer_delsub_cond 
       end if
+
+      if(print_out .and. ii==icolprnt(lchnk) .and. kk==kprnt) then  
+            do im = 1, 4
+               write(106,'(A,3(ES24.15e2,","),I2)')"mam_pcarbon_aging_1subarea_2:", qnum_cur(im),qnum_delsub_cond(im),qnum_delsub_coag(im),im-1
+            enddo
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,3(ES24.15e2,","),2I2)')"mam_pcarbon_aging_1subarea_3:",qaer_cur(is,im),qaer_delsub_cond(is,im),qaer_delsub_coag(is,im),is-1,im-1;
+               enddo
+            enddo
+            do is = 1, max_aer
+               do im = 1, max_agepair
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_pcarbon_aging_1subarea_4a:",qaer_delsub_coag_in(is,im), is-1, im-1
+               enddo
+            enddo
+            do im = 1, 4
+               write(106,'(A,(ES24.15e2,","),I2)')"mam_pcarbon_aging_1subarea_4b:",qnum_delaa(im,iqtend_cond),im-1
+            enddo
+
+            do is = 1, max_aer
+               do im = 1, 4
+                  write(106,'(A,(ES24.15e2,","),2I2)')"mam_pcarbon_aging_1subarea_4c:",qaer_delaa(is,im,iqtend_cond), is-1, im-1
+               enddo
+            enddo
+         endif
 
    end do jtsubstep_loop
    !***********************************

@@ -289,7 +289,7 @@ contains
 
              if (cloud_borne .and. cldfrc(icol,kk)>0._r8) then
                 xso4(icol,kk) = xso4c(icol,kk) / cldfrc(icol,kk)
-                if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'cldbrn_calc_sox_aqueous:',xso4(icol,kk)
+                !if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'cldbrn_calc_sox_aqueous:',xso4(icol,kk)
              endif
  
              call calc_ph_values(                      &
@@ -400,7 +400,7 @@ contains
           !............................
           
           if (xlwc >= small_value_lwc) then    !! WHEN CLOUD IS PRESENTED  
-          if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'bef_calc_sox_aqueous:',xso4(icol,kk),xso4_init(icol,kk)       
+          !if (icol == icolprnt(lchnk) .and. print_out .and. kk==kprnt)write(106,*)'bef_calc_sox_aqueous:',xso4(icol,kk),xso4_init(icol,kk)       
 
              call calc_sox_aqueous( print_out,kk,modal_aerosols,     & ! in
                 rah2o2, h2o2g, so2g,   o3g,   rao3,     & ! in
@@ -739,7 +739,7 @@ contains
 
     if (modal_aerosols) then
        xdelso4hp_ik  =  xso4 - xso4_init
-       if (print_out .and. kk==kprnt)write(106,*)'xdelso4hp_ik:',xdelso4hp_ik,xso4,xso4_init
+       !if (print_out .and. kk==kprnt)write(106,*)'xdelso4hp_ik:',xdelso4hp_ik,xso4,xso4_init
     endif
              !...........................
              !       S(IV) + O3 = S(VI)

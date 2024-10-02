@@ -370,9 +370,9 @@ contains
          vmr, & !in-out
          mbar, ncol ) !in
     if(print_out) then
-      write(106,*)'mbar:', mm, mbar(icolprnt(lchnk),kprnt)
+      !write(106,*)'mbar:', mm, mbar(icolprnt(lchnk),kprnt)
       do mm = 1, 31
-         write(106,'(A,2(ES24.15e2,","),I2)')'vmr-q-adv:', vmr(icolprnt(lchnk),kprnt,mm),mmr(icolprnt(lchnk),kprnt,mm)
+         write(106,'(A,2(ES24.15e2,","),I2)')'vmr-q-adv:', vmr(icolprnt(lchnk),kprnt,mm),mmr(icolprnt(lchnk),kprnt,mm), mm
       enddo
     endif
 
@@ -402,13 +402,13 @@ contains
     reaction_rates = -978654321.0_r8;      
     call setrxt( reaction_rates, & ! inout
          tfld, ncol )  ! in
-   if(print_out) then
-   do kk = kprnt , kprnt!pver
-      do mm = 1, rxntot
-           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
-        enddo
-      enddo
-    endif
+   !if(print_out) then
+   !do kk = kprnt , kprnt!pver
+   !   do mm = 1, rxntot
+   !        if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+   !     enddo
+   !   enddo
+   ! endif
     !-----------------------------------------------------------------
     !	... compute the relative humidity
     !-----------------------------------------------------------------
@@ -424,16 +424,16 @@ contains
     call usrrxt( reaction_rates, &  ! inout
          tfld, invariants, invariants(:,:,indexm), ncol,print_out, lchnk ) ! in
 if(print_out) then
-   do kk = kprnt , kprnt!pver
-      do mm = 1, rxntot
-           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-usrrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
-      enddo
-   enddo
-   do kk = kprnt , kprnt!pver
-   do mm = 1, rxntot
-        write(106,*)'invariants:', invariants(icolprnt(lchnk),kk,mm), invariants(icolprnt(lchnk),kk,indexm), mm, kk
-   enddo
-   enddo
+   !do kk = kprnt , kprnt!pver
+   !   do mm = 1, rxntot
+   !        if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-usrrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+   !   enddo
+   !enddo
+   !do kk = kprnt , kprnt!pver
+   !do mm = 1, rxntot
+   !     write(106,*)'invariants:', invariants(icolprnt(lchnk),kk,mm), invariants(icolprnt(lchnk),kk,indexm), mm, kk
+   !enddo
+   !enddo
 endif
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
@@ -446,11 +446,11 @@ endif
     call adjrxt( reaction_rates, & ! inout
          invariants, invariants(1,1,indexm), ncol )  ! in
     if(print_out) then
-      do kk = kprnt , kprnt!pver
-         do mm = 1, rxntot
-           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-adjrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
-         enddo
-      enddo
+    !  do kk = kprnt , kprnt!pver
+    !     do mm = 1, rxntot
+    !       if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-adjrxt:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm)
+    !     enddo
+    !  enddo
    endif
     !-----------------------------------------------------------------------
     !        ... Compute the photolysis rates at time = t(n+1)
@@ -503,9 +503,10 @@ endif
     !-----------------------------------------------------------------------
     !        ... Form the washout rates
     !-----------------------------------------------------------------------      
-    call sethet( het_rates, pmid, zmid, phis, tfld, &
-         cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
-         vmr, ncol, lchnk )
+    call sethet( het_rates, &!out
+      pmid, zmid, phis, tfld, & !in
+         cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), & !in
+         vmr, ncol, lchnk ) !in
 
     do ii = phtcnt+1,rxt_tag_cnt
        call outfld( tag_names(ii), reaction_rates(:ncol,:,rxt_tag_map(ii)), ncol, lchnk )
@@ -531,25 +532,25 @@ endif
     call t_startf('imp_sol')
 
     if(print_out) then
-      do kk = kprnt , kprnt
-         do mm = 1, rxntot
-           if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-bef_imp:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm),delt
-         enddo
-         do mm = 1, gas_pcnst
-           write(106,*)'het_rates-bef_imp:', mm, kk,het_rates(icolprnt(lchnk),kk,mm)
-         enddo
-         do mm = 1, extcnt
-            write(106,*)'extfrc-bef_imp:', mm, kk,extfrc(icolprnt(lchnk),kk,mm)
-         enddo
-      enddo
+      !do kk = kprnt , kprnt
+      !   do mm = 1, rxntot
+      !     if(reaction_rates(icolprnt(lchnk),kk,mm)>0)write(106,*)'React_rates-bef_imp:', mm, kk,reaction_rates(icolprnt(lchnk),kk,mm),delt
+      !   enddo
+      !   do mm = 1, gas_pcnst
+      !     write(106,*)'het_rates-bef_imp:', mm, kk,het_rates(icolprnt(lchnk),kk,mm)
+      !   enddo
+      !   do mm = 1, extcnt
+      !      write(106,*)'extfrc-bef_imp:', mm, kk,extfrc(icolprnt(lchnk),kk,mm)
+      !   enddo
+      !enddo
    endif
 
    if(print_out) then
-      do kk = kprnt , kprnt!pver
-         do mm = 1, 3!gas_pcnst
-           write(106,*)'q-bef_imp:', kk,mm,vmr(icolprnt(lchnk),kk,mm)
-         enddo
-      enddo
+      !do kk = kprnt , kprnt!pver
+      !   do mm = 1, 3!gas_pcnst
+      !     write(106,*)'q-bef_imp:', kk,mm,vmr(icolprnt(lchnk),kk,mm)
+      !   enddo
+      !enddo
    endif
 
     call imp_sol( print_out, vmr, reaction_rates, het_rates, extfrc, delt, &
@@ -557,7 +558,7 @@ endif
    if(print_out) then
       do kk = kprnt , kprnt!pver
          do mm = 1, 3!gas_pcnst
-           write(106,*)'q-aft_imp:', kk,vmr(icolprnt(lchnk),kk,mm)
+           write(106,'(A,(ES24.15e2,","),I2)')'q-aft_imp:', vmr(icolprnt(lchnk),kk,mm), mm
          enddo
       enddo
    endif
@@ -576,9 +577,9 @@ endif
     endif
 
     if(print_out) then
-      do kk = kprnt , kprnt!pver
-        write(106,*)'del_h2so4_gasprod:', kk,del_h2so4_gasprod(icolprnt(lchnk),kk)
-      enddo
+      !do kk = kprnt , kprnt!pver
+      !  write(106,*)'del_h2so4_gasprod:', kk,del_h2so4_gasprod(icolprnt(lchnk),kk)
+      !enddo
    endif
 
     !

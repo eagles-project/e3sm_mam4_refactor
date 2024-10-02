@@ -204,7 +204,7 @@ contains
              !-----------------------------------------------------------------------
              do mm = 1,gas_pcnst
                 lsol(mm) = base_sol(icol,lev,mm)
-                if (print_out .and. lev==1 .and. mm==2)write(106,*)'Base_sol-top:',base_sol(icolprnt(lchnk),lev,mm), stp_con_cnt
+                !if (print_out .and. lev==1 .and. mm==2)write(106,*)'Base_sol-top:',base_sol(icolprnt(lchnk),lev,mm), stp_con_cnt
              enddo
              !-----------------------------------------------------------------------
              ! ... transfer from base to class array
@@ -269,7 +269,7 @@ contains
              ! ... check for interval done
              !-----------------------------------------------------------------------
              interval_done = interval_done + dt
-             if (print_out .and. lev==1)write(106,*)'interval:',interval_done, dt
+             !if (print_out .and. lev==1)write(106,*)'interval:',interval_done, dt
              if( abs( delt - interval_done ) <= .0001_r8 ) then
                 if( fail_cnt > 0 ) then
                    write(iulog,*) 'imp_sol : @ (lchnk,lev,col) = ',lchnk,lev,icol,' failed ',fail_cnt,' times'
