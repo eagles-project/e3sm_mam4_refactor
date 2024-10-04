@@ -17,7 +17,7 @@
   !-----------------------------------------------------------------------------------------
   ! This is used when multiple sets of yaml output is needed
   !to cover different options (e.g., true and false)
-  ! character(len=200) :: ext_str
+  character(len=200) :: ext_str
   !-----------------------------------------------------------------------------------------
 
   type(yaml_vars) :: yaml
@@ -25,7 +25,7 @@
 
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
-
+  integer :: icolwrite
 
   !populate YAML structure
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
@@ -73,7 +73,6 @@
         yaml%lchnk_print = y_lchnk
         yaml%flag_print  = .true.
 
-
         !open I/O yaml files
         !(with an optional argument to pass a unique string to differentiate file names)
         call open_files('vert_interp', &  !intent-in
@@ -89,9 +88,17 @@
         
         call write_var(unit_input,unit_output,'ncol',ncol)
         call write_var(unit_input,unit_output,'levsiz',levsiz)
-        call write_var(unit_input,unit_output,'pin',pin(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'pmid',pmid(yaml%col_print,:))
-        call write_var(unit_input,unit_output,'datain',datain(yaml%col_print,:))
+
+        do icolwrite = 1, size(pin,1)
+
+        write(ext_str,'(A7,I1)') 'pin_col',icolwrite
+        call write_var(unit_input,unit_output,trim(ext_str),pin(icolwrite,:))
+        write(ext_str,'(A8,I1)') 'pmid_col',icolwrite
+        call write_var(unit_input,unit_output,trim(ext_str),pmid(icolwrite,:))
+        write(ext_str,'(A10,I1)') 'datain_col',icolwrite
+        call write_var(unit_input,unit_output,trim(ext_str),datain(icolwrite,:))
+
+        enddo
 
         ! below are external module inputs to vert_interp
 
@@ -105,6 +112,7 @@
         !close only the input file, not the output file
         close(unit_input)
         call freeunit(unit_input)
+
      endif
   endif
 #endif
