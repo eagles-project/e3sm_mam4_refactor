@@ -5,12 +5,8 @@
      call write_output_header(unit_output)
 
      !start writing data
-        do icolwrite = 1, size(dataout,1)
-     
-        write(ext_str,'(A11,I1)') 'dataout_col',icolwrite
-        call write_var(unit_output,trim(ext_str),dataout(icolwrite,:))
+     call write_var(unit_output,'dataout',dataout(:,:))
 
-        enddo
      !writes aerosol mmr from state%q or q vector(cloud borne and interstitial) in the output python module
      !"aer_num_only" is .ture. if printing aerosol num only
      !call write_output_aerosol_mmr_from_stateq(unit_output, fld_name, field, aer_num_only, inp_out_str)
