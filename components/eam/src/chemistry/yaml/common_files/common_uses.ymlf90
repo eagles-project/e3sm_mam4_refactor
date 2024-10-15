@@ -112,6 +112,12 @@ use spmd_utils,   only : masterproc
 ! gas and aerosol exchange
 ! #define YAML_GASAEREXCH
 
+! vertical interpolation
+! #define YAML_VINTERP
+
+! rebinning
+! #define YAML_REBIN
+
 use yaml_input_file_io
 
 

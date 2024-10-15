@@ -1,4 +1,5 @@
 module tracer_data
+#include "../yaml/common_files/common_uses.ymlf90"
 !----------------------------------------------------------------------- 
 ! module used to read (and interpolate) offline tracer data (sources and
 ! mixing ratios)
@@ -2278,7 +2279,6 @@ contains
   end subroutine read_trc_restart
 !------------------------------------------------------------------------------
    subroutine vert_interp_mixrat( ncol, nsrc, ntrg, trg_x, src, trg, p0, ps, hyai, hybi)
-  
     implicit none
 
     integer, intent(in)   :: ncol 
@@ -2385,6 +2385,7 @@ contains
     real(r8) :: dpu                ! upper level pressure difference
     real(r8) :: dpl                ! lower level pressure difference
 
+#include "../yaml/tracer_data/f90_yaml/vert_interp_beg_yml.f90" 
 
 
     !--------------------------------------------------------------------------
@@ -2429,7 +2430,7 @@ contains
        end do
     end do
 
-
+#include "../yaml/tracer_data/f90_yaml/vert_interp_end_yml.f90"
   end subroutine vert_interp
 
 !------------------------------------------------------------------------------

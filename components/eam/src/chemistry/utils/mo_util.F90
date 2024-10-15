@@ -1,5 +1,5 @@
 module mo_util
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use shr_kind_mod, only : r8 => shr_kind_r8
 
   implicit none
@@ -9,7 +9,7 @@ module mo_util
 
 contains
 
-  subroutine rebin( nsrc, ntrg, src_x, trg_x, src, trg )
+  subroutine rebin( nsrc, ntrg, src_x, trg_x, src, trg ) 
     !---------------------------------------------------------------
     !	... rebin src to trg
     !---------------------------------------------------------------
@@ -35,7 +35,7 @@ contains
     real(r8)     :: y
     real(r8)     :: sl, su
     real(r8)     :: tl, tu
-
+#include "../yaml/mo_util/f90_yaml/rebin_beg_yml.f90"
     !---------------------------------------------------------------
     !	... check interval overlap
     !---------------------------------------------------------------
@@ -74,6 +74,7 @@ contains
           trg(i) = 0._r8
        end if
     end do
+#include "../yaml/mo_util/f90_yaml/rebin_end_yml.f90"
   end subroutine rebin
 
   subroutine rebin_fast( nsrc, ntrg, ncol, src_x, trg_x, src, trg, status )
