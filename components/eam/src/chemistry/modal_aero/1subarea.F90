@@ -174,6 +174,7 @@ subroutine mam_amicphys_1subarea(&
    real(r8):: aircon                ! air molar density [kmol/m3]
    integer :: igas                  ! gas index
    logical :: do_aging_in_subarea
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1subarea_beg_yml.f90"
 
    !---------------------------------------------------------------------------------------
    ! Calculate air molar density [kmol/m3] to be passed on to individual parameterizations
@@ -416,5 +417,6 @@ subroutine mam_amicphys_1subarea(&
    end do jtsubstep_loop
    !***********************************
 
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1subarea_end_yml.f90"
 end subroutine mam_amicphys_1subarea
 !--------------------------------------------------------------------------------

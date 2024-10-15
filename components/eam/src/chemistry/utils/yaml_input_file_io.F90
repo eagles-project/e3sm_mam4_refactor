@@ -69,6 +69,8 @@ module yaml_input_file_io
      module procedure write_2d_var_int
      module procedure write_2d_var_real_drv
      module procedure write_2d_var_real
+     module procedure write_3d_var_real_drv
+     module procedure write_3d_var_real
 
      !output calls
      module procedure write_output_var_int
@@ -88,6 +90,8 @@ module yaml_input_file_io
      module procedure write_2d_output_var_int
      module procedure write_2d_output_var_real_drv
      module procedure write_2d_output_var_real
+     module procedure write_3d_output_var_real_drv
+     module procedure write_3d_output_var_real
   end interface write_var
 
   interface write_output_var
@@ -119,6 +123,14 @@ module yaml_input_file_io
      module procedure write_2d_output_var_real
      module procedure write_2d_output_var_int
   end interface write_2d_output_var
+
+  interface write_3d_var
+     module procedure write_3d_var_real
+  end interface write_3d_var
+
+  interface write_3d_output_var
+     module procedure write_3d_output_var_real
+  end interface write_3d_output_var
 
   interface write_aerosol_mmr_from_stateq
      module procedure write_aerosol_mmr_from_stateq_real
@@ -1765,4 +1777,149 @@ contains
   end subroutine write_2d_output_var_real
 
   !================================================================================
+
+  subroutine write_3d_var_real_drv(unit_input, unit_output, fld_name, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 3D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:,:)        ! field values in r8
+
+    call write_3d_var_real(unit_input, unit_output, fld_name, size(field,1), size(field,2), size(field,3), field)
+
+  end subroutine write_3d_var_real_drv
+
+  !================================================================================
+
+  subroutine write_3d_var_real(unit_input, unit_output, fld_name, dim1, dim2, dim3, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 3D input and output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_input      ! input stream unit number
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    integer, intent(in)   :: dim1, dim2, dim3  ! dimensions of the field
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:,:)      ! field values in r8
+
+    !local
+    integer :: d1, d2, d3
+
+    !check if file is open to write or not
+    call is_file_open(unit_input)
+
+    !format statement to write in double precision
+    !ensure that scientific notation has at least three digits in exponent
+10  format(E26.17E3)
+11  format(A,E26.17E3)
+
+    write(unit_input,'(3A)',advance="no")'    ',trim(adjustl(fld_name)),': ['
+
+    ! For maintaining format in the YAML inout file we have to  print first
+    ! element of the array first
+    write(unit_input,10,advance="no")remove_nan_real(field(lbound(field,1),lbound(field,2),lbound(field,3)))
+
+    d3 = lbound(field,3)
+    d2 = lbound(field,2) 
+    do d1 = lbound(field,1)+1, ubound(field,1) 
+       write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2,d3))
+    enddo
+
+    do d2 = lbound(field,2)+1, ubound(field,2)
+       do d1 = lbound(field,1), ubound(field,1) 
+          write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2,d3))
+       enddo
+    enddo
+
+    do d3 = lbound(field,3)+1, ubound(field,3)
+       do d2 = lbound(field,2), ubound(field,2)
+          do d1 = lbound(field,1), ubound(field,1)
+             write(unit_input,11,advance="no")',',remove_nan_real(field(d1,d2,d3))
+          enddo
+       enddo
+    enddo
+  
+    write(unit_input,'(A)')']'
+
+    call write_3d_output_var(unit_output, fld_name, dim1, dim2, dim3, field, "input")
+
+  end subroutine write_3d_var_real  
+
+  !================================================================================
+
+  subroutine write_3d_output_var_real_drv(unit_output, fld_name, field)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 3D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    real(r8), intent(in)  :: field(:,:,:)    ! field values in r8
+
+    call write_3d_output_var_real(unit_output, fld_name, size(field,1), size(field,2), size(field,3), field)
+
+  end subroutine write_3d_output_var_real_drv  
+
+  !================================================================================
+
+  subroutine write_3d_output_var_real(unit_output, fld_name, dim1, dim2, dim3, field, inp_out_str)
+    !------------------------------------------------------------------
+    !Purpose: Writes a 3D output field in a YAML file format
+    !for a given column
+    !------------------------------------------------------------------
+    implicit none
+
+    integer, intent(in)   :: unit_output     ! output stream unit number
+    character(len=*), intent(in) :: fld_name ! name of the field
+    integer, intent(in)   :: dim1, dim2, dim3      ! dimensions of the field
+    real(r8), intent(in)  :: field(:,:,:)    ! field values in r8
+
+    !optional input
+    !Since we capture for input and output of a subroutine in python format,
+    !this
+    !subroutine is called for writing both the input and the output
+    !Do not provide this optional argument if it is called from
+    !an external subroutine external to this file
+    character(len=*), intent(in), optional :: inp_out_str ! input or output
+
+    !local
+    integer :: d1, d2, d3
+    character(len=20) :: object
+
+    !check if file is open to write or not
+    call is_file_open(unit_output)
+
+    !format statement to write in double precision
+    !ensure that scientific notation has at least three digits in exponent
+12  format(E26.17E3,A)
+
+    object = "output"
+    if (present(inp_out_str)) then
+       object = trim(adjustl(inp_out_str))
+    endif
+
+    write(unit_output,'(4A)',advance="no")trim(adjustl(object)),'.',trim(adjustl(fld_name)),'=[['
+
+    do d3 = lbound(field,3), ubound(field,3)
+       do d2 = lbound(field,2), ubound(field,2)
+          do d1 = lbound(field,1), ubound(field,1)
+             write(unit_output,12,advance="no"),remove_nan_real(field(d1,d2,d3)),','
+          enddo
+       enddo
+    enddo
+
+    write(unit_output,'(A)')'],]'
+
+  end subroutine write_3d_output_var_real
+  
+
 end module yaml_input_file_io
