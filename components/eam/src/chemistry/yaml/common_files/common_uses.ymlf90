@@ -118,6 +118,9 @@ use spmd_utils,   only : masterproc
 ! rebinning
 ! #define YAML_REBIN
 
+! drydep_inti_xactive
+!#define YAML_INTI_DRYDEP
+
 use yaml_input_file_io
 
 
