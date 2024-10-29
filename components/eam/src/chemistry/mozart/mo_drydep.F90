@@ -334,6 +334,7 @@ contains
     
 
     call getfil (drydep_srf_file, locfn, 1, lexist)
+    write(116,*)'fraction_landuse:',locfn
     if(lexist) then
        call cam_pio_openfile(piofile, locfn, PIO_NOWRITE)
 

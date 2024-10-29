@@ -1449,7 +1449,7 @@ contains
     tim_ndx = pbuf_old_tim_idx()
     call pbuf_get_field(pbuf, ndx_prain,      prain,  start=(/1,1/), kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cld,        cldfr,  start=(/1,1,tim_ndx/), kount=(/ncol,pver,1/) )
-    if(print_out)write(105,'(A,72(E26.17E3,","),A)')'cldfrac_tot : [',cldfr(icolprnt(lchnk),:),']'
+    if(print_out)write(105,'(A,72(E26.17E3,","),A)')'cldfrac_liq : [',cldfr(icolprnt(lchnk),:),']'
     call pbuf_get_field(pbuf, ndx_cmfdqr,     cmfdqr, start=(/1,1/),         kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_nevapr,     nevapr, start=(/1,1/),         kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cldtop,     cldtop )

@@ -607,8 +607,19 @@ endif
          linoz_dPmL_dO3col, linoz_cariolle_psc, & !in
          vmr(:,:,o3_ndx) ) !in-out
 
+    if (print_out) then
+         do kk = 1, pver
+           write(106,*)'bef vmr(:,:,o3_ndx):', kk,vmr(icolprnt(lchnk),kk,o3_ndx)
+         enddo
+      endif
     call   lin_strat_sfcsink (ncol, lchnk, delt, pdel(:ncol,:), & !in
          vmr(:,:,o3_ndx)) !in-outs
+      if (print_out) then
+         do kk = 1, pver
+           write(106,*)'aft vmr(:,:,o3_ndx):', kk,vmr(icolprnt(lchnk),kk,o3_ndx)
+         enddo
+      endif 
+   
 
     !-----------------------------------------------------------------------      
     !         ... Check for negative values and reset to zero
