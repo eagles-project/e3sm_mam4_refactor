@@ -118,6 +118,9 @@ use spmd_utils,   only : masterproc
 ! rebinning
 ! #define YAML_REBIN
 
+! modal_aero_subarea
+!#define YAML_SUBAREA
+
 use yaml_input_file_io
 
 
