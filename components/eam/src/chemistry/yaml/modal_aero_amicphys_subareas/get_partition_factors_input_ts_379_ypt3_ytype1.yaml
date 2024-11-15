@@ -1,0 +1,9 @@
+# Data at [lat=  -5.57727434969463      , lon=   184.674947489650      , k=          55 , time step=         379 ] 
+mam4xx:
+  function: get_partition_factors
+input:
+  fixed:
+    qgcm_intrst: [  0.20917988964487075E-008]
+    qgcm_cldbrn: [  0.00000000000000000E+000]
+    fcldy: [  0.63094534408394366E-002]
+    fclea: [  0.99369054655916056E+000]

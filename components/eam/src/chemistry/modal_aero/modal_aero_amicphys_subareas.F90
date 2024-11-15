@@ -1,4 +1,5 @@
 module modal_aero_amicphys_subareas
+#include "../yaml/common_files/common_uses.ymlf90"
 !--------------------------------------------------------------------------------------
 ! This module contains subroutines that reconstruct cloudy and clear-air subareas 
 ! within a grid cell of a host model using information about grid cell mean values,
@@ -25,7 +26,7 @@ contains
 
 subroutine setup_subareas( cld,                                     &! in
                            nsubarea, ncldy_subarea, jclea, jcldy,   &! out
-                           iscldy_subarea, afracsub, fclea, fcldy )! out
+                           iscldy_subarea, afracsub, fclea, fcldy ) ! out
 !--------------------------------------------------------------------------------------
 ! Purpose: Determine the number of sub-areas and their fractional areas.
 !          Assign values to some bookkeeping variables.
@@ -49,6 +50,7 @@ subroutine setup_subareas( cld,                                     &! in
   ! Grid cells with cloud fraction larger than this cutoff is considered to be overcast
   real(wp), parameter :: fcld_hicutoff = 0.999_wp
 
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/setup_subareas_beg_yml.f90"
   ! if cloud fraction ~= 0, the grid-cell has a single clear  sub-area      (nsubarea = 1)
   ! if cloud fraction ~= 1, the grid-cell has a single cloudy sub-area      (nsubarea = 1)
   ! otherwise,              the grid-cell has a clear and a cloudy sub-area (nsubarea = 2)
@@ -87,11 +89,11 @@ subroutine setup_subareas( cld,                                     &! in
   afracsub(:) = 0.0_wp
   if (jclea>0) afracsub(jclea) = fclea
   if (jcldy>0) afracsub(jcldy) = fcldy
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/setup_subareas_end_yml.f90"
 end subroutine setup_subareas
 
 subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
-                           relhumsub                                     )! out
+                           relhumsub                                     ) ! out
 !----------------------------------------------------------------------------
 ! Purpose: Set relative humidity in subareas.
 !----------------------------------------------------------------------------
@@ -106,6 +108,7 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
   real(wp), intent(out) :: relhumsub(maxsubarea) ! relative humidity in subareas [unitless]
 
   real(wp) :: relhum_tmp
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_rh_beg_yml.f90"
 
   if (ncldy_subarea <= 0) then
   ! Entire grid cell is cloud-free. RH in subarea = grid cell mean.
@@ -124,12 +127,12 @@ subroutine set_subarea_rh( ncldy_subarea,jclea,jcldy,afracsub,relhumgcm, &! in
         relhumsub(jclea) = min_max_bound( 0.0_wp, 1.0_wp, relhum_tmp )
      end if
   end if
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_rh_end_yml.f90"
 end subroutine set_subarea_rh
 
 subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fclea, fcldy, &! in
                                            qgcm1, qgcm2, qqcwgcm2, qgcm3, qqcwgcm3,       &! in
-                                           qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        )! out
+                                           qsub1, qsub2, qqcwsub2, qsub3, qqcwsub3        ) ! out
 !------------------------------------------------------------------------------------------------
 ! Purpose: Partition grid cell mean mixing ratios to clear/cloudy subareas.
 !------------------------------------------------------------------------------------------------
@@ -178,7 +181,7 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   integer :: imode, ispec, icnst, jsub
 
   character(len=200) :: tmp_str
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_gases_and_aerosols_beg_yml.f90"
   !------------------------------------------------------------------------------------
   ! Initialize mixing ratios in subareas before the aerosol microphysics calculations
   !------------------------------------------------------------------------------------
@@ -232,7 +235,7 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
   ! the clear sub-area, as much of the aerosol is activated in the cloudy sub-area.
   !*************************************************************************************************
   else if ( gird_cell_is_partly_cldy ) then
-
+    
      !===================================
      ! Set gas mixing ratios in subareas
      !===================================
@@ -266,8 +269,7 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
      ! cloud fraction and the clear-sky values
 
      call compute_qsub_from_gcm_and_qsub_of_other_subarea( cnst_is_gas, fclea, fcldy, qgcm3, &! in
-                                                           qsub3(:,jclea), qsub3(:,jcldy)    )! inout
-
+                                                           qsub3(:,jclea), qsub3(:,jcldy)    ) ! inout
      !=========================================================================
      ! Set AEROSOL mixing ratios in subareas.
      ! Only need to do this for points 2 and 3 in the time integraion loop,
@@ -294,28 +296,27 @@ subroutine set_subarea_gases_and_aerosols( loffset, nsubarea, jclea, jcldy, fcle
 
      call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
-                                                 qgcm2, qsub2                         )! in, inout
+                                                 qgcm2, qsub2                         ) ! in, inout
 
      call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
-                                                 qgcm2, qsub2                         )! in, inout
+                                                 qgcm2, qsub2                         ) ! in, inout
 
      ! Partition mass and number before cloud chemistry
 
      call set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
-                                                 qgcm3, qsub3                         )! in, inout
+                                                 qgcm3, qsub3                         ) ! in, inout
 
      call set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                  qgcm2, qqcwgcm2,                     &! in
-                                                 qgcm3, qsub3                         )! in, inout
-
+                                                 qgcm3, qsub3                         ) ! in, inout
   end if ! different categories
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_gases_and_aerosols_end_yml.f90"
 end subroutine set_subarea_gases_and_aerosols
 
 subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea( lcompute, f_a, f_b, qgcm, &! in
-                                                            qsub_a, qsub_b            )! inout
+                                                            qsub_a, qsub_b            ) ! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Calculate the value of qsub_b assuming qgcm is a weighted average defined as
 !          qgcm = f_a*qsub_a + f_b*qsub_b.
@@ -328,6 +329,7 @@ subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea( lcompute, f_a, f_b, 
   real(wp),intent(inout) :: qsub_b(ncnst)     ! value in subarea B (to be calculated here)
 
   integer :: icnst    ! consitituent index
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/compute_qsub_from_gcm_and_qsub_of_other_subarea_beg_yml.f90"
 
   do icnst = 1, ncnst
    if (lcompute(icnst)) then
@@ -346,7 +348,7 @@ subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea( lcompute, f_a, f_b, 
 
    end if
   end do
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/compute_qsub_from_gcm_and_qsub_of_other_subarea_end_yml.f90"
 end subroutine compute_qsub_from_gcm_and_qsub_of_other_subarea
 
 subroutine set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
@@ -367,6 +369,7 @@ subroutine set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
 
    integer :: imode    ! mode index
    integer :: icnst    ! consitituent index 
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qnumb_for_cldbrn_aerosols_beg_yml.f90"
 
    !----------------------------------------------------------------
    do imode = 1, ntot_amode
@@ -378,7 +381,7 @@ subroutine set_subarea_qnumb_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
 
    end do
    !----------------------------------------------------------------
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qnumb_for_cldbrn_aerosols_end_yml.f90"
 end subroutine set_subarea_qnumb_for_cldbrn_aerosols
 
 subroutine set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, qqcwgcm, qqcwsub )
@@ -400,7 +403,7 @@ subroutine set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
    integer :: imode    ! mode index
    integer :: ispec    ! aerosol species index
    integer :: icnst    ! consitituent index 
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qmass_for_cldbrn_aerosols_beg_yml.f90"
    !----------------------------------------------------------------
    do imode = 1, ntot_amode          ! loop thru all modes
     do ispec = 1, nspec_amode(imode) ! loop thru all species in a mode
@@ -413,12 +416,12 @@ subroutine set_subarea_qmass_for_cldbrn_aerosols( loffset, jclea, jcldy, fcldy, 
     end do ! ispec - species loop
    end do ! imode - mode loop
    !----------------------------------------------------------------
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qmass_for_cldbrn_aerosols_end_yml.f90"
 end subroutine set_subarea_qmass_for_cldbrn_aerosols
 
 subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &! in
                                                   qgcm, qqcwgcm,                       &! in
-                                                  qgcmx,qsubx                          )! inout
+                                                  qgcmx,qsubx                          ) ! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the number mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -449,6 +452,7 @@ subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 
   real(wp) :: factor_clea  ! partitioning factor for clear  subarea [unitless]
   real(wp) :: factor_cldy  ! partitioning factor for cloudy subarea [unitless]
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qnumb_for_intrst_aerosols_beg_yml.f90"
 
   do imode = 1, ntot_amode
 
@@ -468,12 +472,12 @@ subroutine set_subarea_qnumb_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
      qsubx(icnst,jcldy) = qgcmx(icnst)*factor_cldy
 
   end do ! imode
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qnumb_for_intrst_aerosols_end_yml.f90"
 end subroutine set_subarea_qnumb_for_intrst_aerosols
 
 subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, fcldy, &
                                                   qgcm,  qqcwgcm, &
-                                                  qgcmx, qsubx    )! inout
+                                                  qgcmx, qsubx    ) ! inout
 !-----------------------------------------------------------------------------------------
 ! Purpose: Set the mass mixing ratios of interstitial aerosols in subareas.
 !          Interstitial aerosols can exist in both cloudy and clear subareas, so a
@@ -507,7 +511,7 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
 
   real(wp) :: factor_clea  ! partitioning factor for clear  subarea [unitless]
   real(wp) :: factor_cldy  ! partitioning factor for cloudy subarea [unitless]
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qmass_for_intrst_aerosols_beg_yml.f90"
   do imode = 1, ntot_amode
 
      ! calculcate partitioning factors
@@ -535,11 +539,11 @@ subroutine set_subarea_qmass_for_intrst_aerosols( loffset, jclea, jcldy, fclea, 
      end do ! ispec 
   end do ! imode
 
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/set_subarea_qmass_for_intrst_aerosols_end_yml.f90"
 end subroutine set_subarea_qmass_for_intrst_aerosols
 
 subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
-                                   factor_clea, factor_cldy                )! out
+                                   factor_clea, factor_cldy                ) ! out
 !------------------------------------------------------------------------------------
 ! Purpose: Calculate the partitioning factors for distributing interstitial aerosol
 !          mixing ratios to cloudy and clear subareas in a grid box.
@@ -561,7 +565,7 @@ subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
   real(wp) :: clea2gcm_ratio
 
   real(wp),parameter :: eps = 1.e-35_wp
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/get_partition_factors_beg_yml.f90"
   ! Calculate subarea-mean mixing ratios
 
   tmp_q_cldbrn_cldy = qgcm_cldbrn/fcldy                                              ! cloud-borne,  cloudy subarea
@@ -580,7 +584,7 @@ subroutine get_partition_factors(  qgcm_intrst, qgcm_cldbrn, fcldy, fclea, &! in
 
   factor_clea = clea2gcm_ratio/fclea
   factor_cldy = (1.0_wp-clea2gcm_ratio)/fcldy
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/get_partition_factors_end_yml.f90"
 end subroutine get_partition_factors
 
 !==================================================
@@ -610,6 +614,7 @@ subroutine form_gcm_of_gases_and_aerosols_from_subareas( nsubarea, ncldy_subarea
   !---
 
   integer :: jsub
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/form_gcm_of_gases_and_aerosols_from_subareas_beg_yml.f90"
 
   ! Gases and interstitial aerosols
 
@@ -632,7 +637,7 @@ subroutine form_gcm_of_gases_and_aerosols_from_subareas( nsubarea, ncldy_subarea
   end if
 
   qqcwgcm(:) = max( 0._wp, qqcwgcm(:) )
-
+#include "../yaml/modal_aero_amicphys_subareas/f90_yaml/form_gcm_of_gases_and_aerosols_from_subareas_end_yml.f90"
 end subroutine form_gcm_of_gases_and_aerosols_from_subareas
 
 end module modal_aero_amicphys_subareas
