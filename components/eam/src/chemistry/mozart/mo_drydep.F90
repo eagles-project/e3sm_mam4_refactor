@@ -159,6 +159,7 @@ contains
 
     character(len=shr_kind_cl) :: locfn
     logical :: prog_modal_aero
+#include "../yaml/mo_drydep/f90_yaml/drydep_inti_xactive_head_yml.f90"
 
     ! determine if modal aerosols are active so that fraction_landuse array is initialized for modal aerosal dry dep
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
@@ -264,6 +265,7 @@ contains
     ! So this code averages at the latitude of each grid point - not an ideal solution
     allocate(clat(plon))
     call get_horiz_grid_d(plon, clat_d_out=clat)
+#include "../yaml/mo_drydep/f90_yaml/drydep_inti_xactive_beg_yml.f90"
     jl = 1
     ju = plon
 
@@ -315,7 +317,7 @@ contains
           index_season_lai(j,m) = k_max
        end do
     end do
-
+#include "../yaml/mo_drydep/f90_yaml/drydep_inti_xactive_end_yml.f90"
     deallocate( lat_lai, wk_lai, clat, index_season_lai_j)
 
   end subroutine drydep_inti_xactive
