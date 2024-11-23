@@ -229,6 +229,7 @@ implicit none
 
    real(r8), dimension(pcols,gas_pcnst,   nqtendaa) ::     q_coltendaa
    real(r8), dimension(pcols,gas_pcnst,nqqcwtendaa) ::  qqcw_coltendaa
+#include "../yaml/modal_aero_amicphys/f90_yaml/modal_aero_amicphys_intr_beg_yml.f90"
    !------------------------------------------------------------------
 
    do_cond   = ( mdo_gasaerexch > 0 )
@@ -387,7 +388,7 @@ implicit none
       !================================================================
       call get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, &! in
                                              qsub_tendaa, qqcwsub_tendaa,       &! in
-                                             qgcm_tendaa, qqcwgcm_tendaa        )! out 
+                                             qgcm_tendaa, qqcwgcm_tendaa        ) ! out
 
       call accumulate_column_tend_integrals( pdel(ii,kk), gravit,                         &! in
                                              qgcm_tendaa,         qqcwgcm_tendaa,         &! in
@@ -409,7 +410,7 @@ implicit none
    call outfld_1proc_all_cnst( qqcw_coltendaa,pcols,nqqcwtendaa, iqqcwtend_rnam,       &
                                do_qqcw_coltendaa, cnst_name_cw, suffix_qqcw_coltendaa, &
                                mwdry, loffset, ncol, lchnk                             )
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/modal_aero_amicphys_intr_end_yml.f90"
 end subroutine modal_aero_amicphys_intr
 
 
@@ -524,7 +525,7 @@ subroutine mam_amicphys_1gridcell(          &
       real(r8) :: tmpa, tmpb, tmpc, tmpd, tmpe, tmpf, tmpn
 
       type ( misc_vars_aa_type ), dimension(nsubarea) :: misc_vars_aa_sub
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1gridcell_beg_yml.f90"
 
 ! the q--4 values will be equal to q--3 values unless they get changed
       qsub4(:,1:nsubarea) = qsub3(:,1:nsubarea)
@@ -700,7 +701,7 @@ main_jsub_loop: &
       end do main_jsub_loop
 
 
-
+#include "../yaml/modal_aero_amicphys/f90_yaml/mam_amicphys_1gridcell_end_yml.f90"
       return
       end subroutine mam_amicphys_1gridcell
 
