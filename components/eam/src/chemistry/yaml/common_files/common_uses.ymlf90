@@ -125,6 +125,8 @@ use spmd_utils,   only : masterproc
 ! modal_aero_subarea
 !#define YAML_SUBAREA
 
+! additional modal_aero_amicphys subroutines
+!#define YAML_AMIC2
 
 use yaml_input_file_io
 

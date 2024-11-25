@@ -1,5 +1,5 @@
 module modal_aero_amicphys_diags
-
+#include "../yaml/common_files/common_uses.ymlf90"
   use modal_aero_amicphys_control, only: ncnst=>gas_pcnst
 
   implicit none
@@ -73,7 +73,7 @@ subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, 
   real(wp),intent(out) :: qqcwgcm_tendaa(ncnst,nqqcwtendaa)
 
   integer :: jsub
-
+#include "../yaml/modal_aero_amicphys_diags/f90_yaml/get_gcm_tend_diags_from_subareas_beg_yml.f90"
   ! Gases and interstitial aerosols
 
   qgcm_tendaa(:,:) = 0.0_wp
@@ -93,7 +93,7 @@ subroutine get_gcm_tend_diags_from_subareas( nsubarea, ncldy_subarea, afracsub, 
                             + qqcwsub_tendaa(:,:,jsub)*afracsub(jsub)
      end do
   end if
-
+#include "../yaml/modal_aero_amicphys_diags/f90_yaml/get_gcm_tend_diags_from_subareas_end_yml.f90"
 end subroutine get_gcm_tend_diags_from_subareas
 
 !-------------------------------------------------------------------------------
