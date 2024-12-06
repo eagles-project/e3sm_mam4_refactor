@@ -23,9 +23,12 @@
 
   type(yaml_vars) :: yaml
   integer  :: unit_input, unit_output, y_nstep
+ !  print output from timestep nstep_print_lo to yaml%nstep_print
+  integer  :: nstep_print_lo
 
   ! some subroutines are called multiple times in one timestep, record the number of calls
   integer,save :: n_calls=0
+  integer,save :: y_nstep_old=0
 
   y_k = plev
 
@@ -33,6 +36,7 @@
   !(**remove yaml%lev_print, nstep_print, col_print if generating data for a dependent subroutines**)
   yaml%lev_print = 51       !level
   yaml%nstep_print = 355 !time step
+  nstep_print_lo = 340
 
   yaml%col_print = icolprnt(y_lchnk)                !column to write data
 
@@ -42,8 +46,9 @@
   !Flag to decide to write or not to write data
   yaml%flag_print = .false. !(**remove these if generating data for a dependent subroutines**)
 
-  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
-
+!  if(yaml%col_print == y_i .and. y_nstep==yaml%nstep_print .and. y_k == yaml%lev_print) then ! if this column exists in y_lchnk
+  !  print output for timesteps between nstep_print_lo and yaml%nstep_print
+  if(yaml%col_print == y_i .and. y_nstep<=yaml%nstep_print .and. y_nstep>=nstep_print_lo .and. y_k == yaml%lev_print) then
   !-----------------------------------------------------------------------------------------
   !In the case of y_i or y_k are not passed as arguments, use the following if condition:
   !if(yaml%col_print >0 .and. y_nstep==yaml%nstep_print) then
@@ -64,7 +69,14 @@
 
 
      !Record number of calls that can output yaml file if you only need to write one set of input/output
-     n_calls = n_calls+1
+     !Increment n_calls if current timestep, y_nstep, is same as for previous pass through this code.
+     !Otherwise, we are at a new timestep, can reset n_calls to 1.
+     if(y_nstep == y_nstep_old) then
+        n_calls = n_calls+1
+     else
+        n_calls = 1
+     endif
+     y_nstep_old = y_nstep
 
      if (n_calls==1) then ! output at the first call only, modify this if condition (see below) if writing out other calls
 
@@ -84,7 +96,7 @@
 
         !start by adding an input string
         call write_input_output_header(unit_input, unit_output,yaml%lchnk_print,yaml%col_print, &
-             'gas_washout',yaml%nstep_print, yaml%lev_print)
+             'gas_washout',y_nstep, yaml%lev_print)
 
         ! add code for writing data here
         
