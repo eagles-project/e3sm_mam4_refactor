@@ -91,6 +91,7 @@ module ndrop
   ! in the ptend object
 
   logical :: regen_fix
+  logical :: shoc_mix = .true.
 
   !===============================================================================
 contains
@@ -469,9 +470,14 @@ contains
        !  PART III:  perform explict integration of droplet/aerosol mixing using substepping
 
        nnew = 2
-
-       call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
+       
+       if (shoc_mix) then
+         call update_for_implmix(dtmicro,cldn(icol,:),   &  ! in
             nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
+       else
+         call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
+            nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
+       endif
 
        ! droplet number
 
@@ -1659,4 +1665,110 @@ contains
 
   !===============================================================================
 
+  subroutine update_for_implmix(dtmicro,cldn_col,   &  ! in
+       nact,mact,qcld,raercol,raercol_cw,nsav,nnew)  ! inout
+
+    ! input arguments
+    real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
+    real(r8), intent(in) :: cldn_col(:)   ! cloud fraction [fraction]
+
+    ! in/out arguments
+    real(r8), intent(inout) :: nact(:,:)  ! fractional aero. number  activation rate [/s]
+    real(r8), intent(inout) :: mact(:,:)  ! fractional aero. mass    activation rate [/s]
+    real(r8), intent(inout) :: qcld(:)  ! cloud droplet number mixing ratio [#/kg]
+    real(r8), intent(inout) :: raercol(:,:,:)    ! single column of saved aerosol mass, number mixing ratios [#/kg or kg/kg]
+    real(r8), intent(inout) :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase [#/kg or kg/kg]
+    integer, intent(inout) :: nnew, nsav   ! indices for old, new time levels in substepping
+   ! local arguments
+    integer :: kk           ! vertical level index
+    integer  :: imode       ! mode counter variable
+    integer  :: mm          ! local array index for MAM number, species
+    integer  :: lspec       ! species counter variable
+
+    real(r8) :: source(pver)  !  source rate for activated number or species mass [/s]
+    real(r8) :: dtmix    ! timescale for subloop [s]
+    real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
+    real(r8) :: srcn(pver)       ! droplet source rate [/s]
+
+    dtmix = dtmicro
+
+       do imode = 1, ntot_amode
+          mm = mam_idx(imode,0)
+
+          ! update droplet source
+
+          ! rce-comment- activation source in layer k involves particles from k+1
+          !            srcn(:)=srcn(:)+nact(:,m)*(raercol(:,mm,nsav))
+          srcn(top_lev:pver-1) = srcn(top_lev:pver-1) + nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+
+          ! rce-comment- new formulation for k=pver
+          !              srcn(  pver  )=srcn(  pver  )+nact(  pver  ,m)*(raercol(  pver,mm,nsav))
+          tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+               + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+          srcn(pver) = srcn(pver) + max(0.0_r8,tmpa)
+       enddo
+
+       do kk = top_lev, pver
+           qcld(kk) = qcld(kk) + dtmix * srcn(kk)
+       enddo
+       
+       do imode = 1, ntot_amode
+          mm = mam_idx(imode,0)
+          ! rce-comment -   activation source in layer k involves particles from k+1
+          !                   source(:)= nact(:,m)*(raercol(:,mm,nsav))
+          source(top_lev:pver-1) = nact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+          ! rce-comment - new formulation for k=pver
+          !               source(  pver  )= nact(  pver,  m)*(raercol(  pver,mm,nsav))
+          tmpa = raercol(pver,mm,nsav)*nact(pver,imode) &
+               + raercol_cw(pver,mm,nsav)*nact(pver,imode)
+          source(pver) = max(0.0_r8, tmpa)
+
+          do kk = top_lev, pver
+            raercol_cw(kk,mm,nnew) = raercol_cw(kk,mm,nnew) + dtmix * source(kk)
+            raercol   (kk,mm,nnew) = raercol   (kk,mm,nnew) - dtmix * source(kk)          
+          end do
+
+          ! update aerosol species mass
+
+          do lspec = 1, nspec_amode(imode)
+             mm = mam_idx(imode,lspec)
+             ! rce-comment -   activation source in layer k involves particles from k+1
+             !            source(:)= mact(:,m)*(raercol(:,mm,nsav))
+             source(top_lev:pver-1) = mact(top_lev:pver-1,imode)*(raercol(top_lev+1:pver,mm,nsav))
+             ! rce-comment- new formulation for k=pver
+             !                 source(  pver  )= mact(  pver  ,m)*(raercol(  pver,mm,nsav))
+             tmpa = raercol(pver,mm,nsav)*mact(pver,imode) &
+                  + raercol_cw(pver,mm,nsav)*mact(pver,imode)
+             source(pver) = max(0.0_r8, tmpa)
+
+             do kk = top_lev, pver
+               raercol_cw(kk,mm,nnew) = raercol_cw(kk,mm,nnew) + dtmix * source(kk)
+               raercol   (kk,mm,nnew) = raercol   (kk,mm,nnew) - dtmix * source(kk)
+             end do
+
+          enddo  ! lspec loop
+       enddo  !  imode loop
+    ! evaporate particles again if no cloud
+
+    do kk = top_lev, pver
+       if (cldn_col(kk) == 0._r8) then
+          ! no cloud
+          qcld(kk)=0._r8
+
+          ! convert activated aerosol to interstitial in decaying cloud
+          do imode = 1, ntot_amode
+             mm = mam_idx(imode,0)
+             raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+             raercol_cw(kk,mm,nnew) = 0._r8
+
+             do lspec = 1, nspec_amode(imode)
+                mm = mam_idx(imode,lspec)
+                raercol(kk,mm,nnew)    = raercol(kk,mm,nnew) + raercol_cw(kk,mm,nnew)
+                raercol_cw(kk,mm,nnew) = 0._r8
+             enddo
+          enddo
+       endif
+    enddo
+  end subroutine update_for_implmix
+    
 end module ndrop
