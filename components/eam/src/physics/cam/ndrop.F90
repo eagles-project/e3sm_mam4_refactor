@@ -1690,6 +1690,7 @@ contains
     real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
     real(r8) :: srcn(pver)       ! droplet source rate [/s]
 
+    srcn(:) = 0.0_r8
     dtmix = dtmicro
 
        do imode = 1, ntot_amode
