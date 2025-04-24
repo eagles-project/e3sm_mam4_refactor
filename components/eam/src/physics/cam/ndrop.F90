@@ -472,7 +472,7 @@ contains
        nnew = 2
        
        if (shoc_mix) then
-         call update_for_implmix(dtmicro,cldn(icol,:),   &  ! in
+         call update_for_implmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,    &  ! in
             nact,mact,qcld,raercol,raercol_cw,nsav,nnew)       ! inout
        else
          call update_from_explmix(dtmicro,csbot,cldn(icol,:),zn,zs,ekd,   &  ! in
@@ -1665,12 +1665,16 @@ contains
 
   !===============================================================================
 
-  subroutine update_for_implmix(dtmicro,cldn_col,   &  ! in
+  subroutine update_for_implmix(dtmicro,csbot,cldn_col,zn,zs,ekd,   &  ! in
        nact,mact,qcld,raercol,raercol_cw,nsav,nnew)  ! inout
 
     ! input arguments
     real(r8), intent(in) :: dtmicro     ! time step for microphysics [s]
+    real(r8), intent(in) :: csbot(pver)       ! air density at bottom (interface) of layer [kg/m^3]
     real(r8), intent(in) :: cldn_col(:)   ! cloud fraction [fraction]
+    real(r8), intent(in) :: zn(pver)   ! g/pdel for layer [m^2/kg]
+    real(r8), intent(in) :: zs(:)            ! inverse of distance between levels [m^-1]
+    real(r8), intent(in) :: ekd(:)     ! diffusivity for droplets [m^2/s]
 
     ! in/out arguments
     real(r8), intent(inout) :: nact(:,:)  ! fractional aero. number  activation rate [/s]
@@ -1689,9 +1693,26 @@ contains
     real(r8) :: dtmix    ! timescale for subloop [s]
     real(r8) :: tmpa             !  temporary aerosol tendency variable [/s]
     real(r8) :: srcn(pver)       ! droplet source rate [/s]
+    real(r8) :: ekkp(pver)      ! zn*zs*density*diffusivity [/s]
+    real(r8) :: ekk(0:pver)     ! density*diffusivity for droplets [kg/m/s]
 
     srcn(:) = 0.0_r8
     dtmix = dtmicro
+
+    ekk(top_lev-1) = 0.0_r8
+    ekk(pver)  = 0.0_r8
+    do kk = top_lev, pver-1
+       ekk(kk) = ekd(kk)*csbot(kk)
+    enddo
+    do kk = top_lev, pver
+       ekkp(kk) = zn(kk)*ekk(kk)*zs(kk)
+    enddo
+    do kk = top_lev, pver-1
+       do imode = 1, ntot_amode
+          nact(kk,imode) = min( nact(kk,imode), ekkp(kk) )
+          mact(kk,imode) = min( mact(kk,imode), ekkp(kk) )
+       enddo
+    enddo
 
        do imode = 1, ntot_amode
           mm = mam_idx(imode,0)
@@ -1725,8 +1746,10 @@ contains
           source(pver) = max(0.0_r8, tmpa)
 
           do kk = top_lev, pver
-            raercol_cw(kk,mm,nnew) = raercol_cw(kk,mm,nnew) + dtmix * source(kk)
-            raercol   (kk,mm,nnew) = raercol   (kk,mm,nnew) - dtmix * source(kk)          
+            raercol_cw(kk,mm,nnew)   = raercol_cw(kk,mm,nnew) + dtmix * source(kk)
+          end do
+          do kk = top_lev+1, pver
+            raercol   (kk,mm,nnew)   = raercol   (kk,mm,nnew) - dtmix * source(kk-1)          
           end do
 
           ! update aerosol species mass
@@ -1744,7 +1767,9 @@ contains
 
              do kk = top_lev, pver
                raercol_cw(kk,mm,nnew) = raercol_cw(kk,mm,nnew) + dtmix * source(kk)
-               raercol   (kk,mm,nnew) = raercol   (kk,mm,nnew) - dtmix * source(kk)
+             end do
+             do kk = top_lev+1, pver
+               raercol   (kk,mm,nnew) = raercol   (kk,mm,nnew) - dtmix * source(kk-1)
              end do
 
           enddo  ! lspec loop
