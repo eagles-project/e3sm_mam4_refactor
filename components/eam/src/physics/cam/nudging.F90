@@ -380,7 +380,7 @@ module nudging
   use spmd_utils  ,only:masterproc
   use cam_logfile ,only:iulog
   use shr_log_mod, only:errMsg => shr_log_errMsg
-  use perf_mod
+  !use perf_mod
 #ifdef SPMD
   use mpishorthand
 #endif
@@ -1371,7 +1371,7 @@ contains
       if ((Before_End).and.(Update_Model)) then
          select case (Nudge_Method)
             case ('Linear')
-                 call t_startf ('nudging_interp')
+                 !call t_startf ('nudging_interp')
                  if (Nudge_Uprof .ne. 0) then 
                     call linear_interpolation (INTP_U, Target_U)
                  end if
@@ -1384,7 +1384,7 @@ contains
                  if (Nudge_Tprof .ne. 0) then 
                     call linear_interpolation (INTP_T, Target_T)
                  end if
-                 call t_stopf ('nudging_interp')
+                 !call t_stopf ('nudging_interp')
             case default
                  ! No interpolation is needed for Step or IMT
          end select
@@ -1813,9 +1813,9 @@ contains
            call get_curr_date(Year,Month,Day,Sec)
            if (mod(Sec,Nudge_Step) .ne. 0) return  ! ensure that intermittent simulations work for restart run
            if (masterproc) then
-              call t_startf ('read_nudging_data')
+              !call t_startf ('read_nudging_data')
               call open_netcdf (ncid1, -Nudge_Step)
-              call t_stopf ('read_nudging_data')
+              !call t_stopf ('read_nudging_data')
               n_cnt = Sec/Nudge_Step + 1
               if (n_cnt .gt. Nudge_File_Ntime) then       ! account for one time slice per file
                  n_cnt = 1
@@ -1850,9 +1850,9 @@ contains
               if (first_file) then
                   first_file = .false.
                   if (masterproc) then
-                     call t_startf ('read_nudging_data')
+                     !call t_startf ('read_nudging_data')
                      call open_netcdf (ncid1, -Nudge_Step)
-                     call t_stopf ('read_nudging_data')
+                     !call t_stopf ('read_nudging_data')
                      strt3(1) = 1
                      strt3(2) = 1
                      strt3(3) = 1 
@@ -1891,7 +1891,7 @@ contains
                      call read_and_scatter_se(ncid, 'Q', strt3, cnt3, INTP_Q(:,:,:,2))
                   end if
 
-                  call t_startf ('read_nudging_data')
+                  !call t_startf ('read_nudging_data')
                   if (masterproc) then
                       istat=nf90_close(ncid1)
                       if (istat.ne.NF90_NOERR) then
@@ -1899,7 +1899,7 @@ contains
                          call endrun ('UPDATE_ANALYSES_SE_CLOSE_LINEAR_NETCDF')
                       end if
                   end if
-                  call t_stopf ('read_nudging_data')
+                  !call t_stopf ('read_nudging_data')
 
               else
                   ! The previous end point becomes the start point
@@ -1951,9 +1951,9 @@ contains
                   n_cnt = Sec/Nudge_Step + 1
                   if (n_cnt .eq. Nudge_File_Ntime) then
                      if (masterproc) then
-                        call t_startf ('read_nudging_data')
+                        !call t_startf ('read_nudging_data')
                         call open_netcdf (ncid1, -Nudge_Step)
-                        call t_stopf ('read_nudging_data')
+                        !call t_stopf ('read_nudging_data')
                         strt3(1) = 1
                         strt3(2) = 1
                         strt3(3) = n_cnt
@@ -1995,7 +1995,7 @@ contains
                         call read_and_scatter_se(ncid, 'Q', strt3, cnt3, INTP_Q(:,:,:,2))
                      end if
 
-                     call t_startf ('read_nudging_data')
+                     !call t_startf ('read_nudging_data')
                      if (masterproc) then
                          istat=nf90_close(ncid1)
                          if (istat.ne.NF90_NOERR) then
@@ -2003,7 +2003,7 @@ contains
                             call endrun ('UPDATE_ANALYSES_SE_CLOSE_LINEAR_NETCDF')
                          end if
                      end if
-                     call t_stopf ('read_nudging_data')
+                     !call t_stopf ('read_nudging_data')
                   else
                      ! two time slices are in the same nudging data file
                      do n = n_cnt, n_cnt+1
@@ -2541,9 +2541,9 @@ contains
            call get_curr_date(Year,Month,Day,Sec)
            if (mod(Sec,Nudge_Step) .ne. 0) return  ! ensure that intermittent simulations work for restart run
            if (masterproc) then
-              call t_startf ('read_nudging_data')
+              !call t_startf ('read_nudging_data')
               call open_netcdf (ncid1, -Nudge_Step)
-              call t_stopf ('read_nudging_data')
+              !call t_stopf ('read_nudging_data')
               n_cnt = Sec/Nudge_Step + 1
               if (n_cnt .gt. Nudge_File_Ntime) then       ! account for one time slice per file
                   n_cnt = 1
@@ -2579,9 +2579,9 @@ contains
               if (first_file) then
                   first_file = .false.
                   if (masterproc) then
-                     call t_startf ('read_nudging_data')
+                     !call t_startf ('read_nudging_data')
                      call open_netcdf (ncid1, -Nudge_Step)
-                     call t_stopf ('read_nudging_data')
+                     !call t_stopf ('read_nudging_data')
                      strt4(1) = 1
                      strt4(2) = 1
                      strt4(3) = 1
@@ -2622,7 +2622,7 @@ contains
                      call read_and_scatter_fv(ncid, 'Q', strt4, cnt4, INTP_Q(:,:,:,2))
                   end if
 
-                  call t_startf ('read_nudging_data')
+                  !call t_startf ('read_nudging_data')
                   if (masterproc) then
                       istat=nf90_close(ncid1)
                       if (istat.ne.NF90_NOERR) then
@@ -2630,7 +2630,7 @@ contains
                          call endrun ('UPDATE_ANALYSES_FV_CLOSE_LINEAR_NETCDF')
                       end if
                   end if
-                  call t_stopf ('read_nudging_data')
+                  !call t_stopf ('read_nudging_data')
 
               else
                   ! The previous end point becomes the start point
@@ -2684,9 +2684,9 @@ contains
                   n_cnt = Sec/Nudge_Step + 1
                   if (n_cnt .eq. Nudge_File_Ntime) then
                      if (masterproc) then
-                        call t_startf ('read_nudging_data')
+                        !call t_startf ('read_nudging_data')
                         call open_netcdf (ncid1, -Nudge_Step)
-                        call t_stopf ('read_nudging_data')
+                        !call t_stopf ('read_nudging_data')
                         strt4(1) = 1
                         strt4(2) = 1
                         strt4(3) = 1
@@ -2730,7 +2730,7 @@ contains
                         call read_and_scatter_fv(ncid, 'Q', strt4, cnt4, INTP_Q(:,:,:,2))
                      end if
 
-                     call t_startf ('read_nudging_data')
+                     !call t_startf ('read_nudging_data')
                      if (masterproc) then
                          istat=nf90_close(ncid1)
                          if (istat.ne.NF90_NOERR) then
@@ -2738,7 +2738,7 @@ contains
                             call endrun ('UPDATE_ANALYSES_SE_CLOSE_LINEAR_NETCDF')
                          end if
                      end if
-                     call t_stopf ('read_nudging_data')
+                     !call t_stopf ('read_nudging_data')
                   else
                      ! two time slices are in the same nudging data file
                      do n = n_cnt, n_cnt+1
@@ -3179,7 +3179,7 @@ contains
   integer                         :: istat, varid, varid1
 
   if (masterproc) then
-    call t_startf ('read_nudging_data')
+    !call t_startf ('read_nudging_data')
     istat = nf90_inq_varid(ncid,vname,varid)
     if (istat .ne. NF90_NOERR) then
         write(iulog,*) nf90_strerror(istat)
@@ -3190,7 +3190,7 @@ contains
         write(iulog,*) nf90_strerror(istat)
         call endrun ('ANALYSES_SE_GET_VAR')
     end if
-    call t_stopf ('read_nudging_data')
+    !call t_stopf ('read_nudging_data')
 
     ! check whether the time slice is read in correctly
     istat = nf90_inq_varid(ncid,'time',varid1)
@@ -3205,9 +3205,9 @@ contains
      end if         
      write(iulog,*) 'NUDGING: Current time slice is: ', tinfo, ', strt3(3) = ', strt3(3), ', reading variable: ', vname
   end if            
-  call t_startf ('distribute_data')         
+  !call t_startf ('distribute_data')         
   call scatter_field_to_chunk(1,Nudge_nlev,1,Nudge_ncol,Xanal,out_x)                
-  call t_stopf ('distribute_data')          
+  !call t_stopf ('distribute_data')          
                
   end subroutine               
                 
@@ -3233,7 +3233,7 @@ contains
                                      ilat, ilon, ilev          
                
   if (masterproc) then              
-     call t_startf ('read_nudging_data')            
+     !call t_startf ('read_nudging_data')            
      istat = nf90_inq_varid(ncid,vname,varid)               
      if (istat .ne. NF90_NOERR) then                
          write(iulog,*) nf90_strerror(istat)                
@@ -3244,7 +3244,7 @@ contains
          write(iulog,*) nf90_strerror(istat)                
          call endrun ('ANALYSES_FV_GET_VAR')                
      end if         
-     call t_stopf ('read_nudging_data')             
+     !call t_stopf ('read_nudging_data')             
             
      ! check whether the time slice is read in correctly            
      istat = nf90_inq_varid(ncid,'time',varid1)             
@@ -3266,9 +3266,9 @@ contains
        end do
     end do
   end if
-  call t_startf ('distribute_data')
+  !call t_startf ('distribute_data')
   call scatter_field_to_chunk(1,Nudge_nlev,1,Nudge_nlon,Xtrans,out_x)
-  call t_stopf ('distribute_data')
+  !call t_stopf ('distribute_data')
 
   end subroutine
 

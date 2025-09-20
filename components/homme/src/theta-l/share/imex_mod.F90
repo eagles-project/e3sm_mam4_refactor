@@ -137,7 +137,7 @@ contains
     verbosity = 1
     if (present(verbosity_in)) verbosity = verbosity_in
 
-    call t_startf('compute_stage_value_dirk')
+!     call t_startf('compute_stage_value_dirk')
 
     if (theta_hydrostatic_mode) then
        itercount=0

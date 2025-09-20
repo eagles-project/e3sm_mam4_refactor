@@ -67,7 +67,7 @@ contains
 
     real_time = dt*real(nstep,kind=real_kind)
 
-    call t_startf('advance_nonstag')
+!     call t_startf('advance_nonstag')
 
 
 
@@ -1012,7 +1012,7 @@ contains
   real (kind=real_kind) ::  v1,v2
   real (kind=real_kind) ::  vtens1,vtens2
 
-  call t_startf('compute_and_apply_rhs')
+!   call t_startf('compute_and_apply_rhs')
 
 
   ! ===================================

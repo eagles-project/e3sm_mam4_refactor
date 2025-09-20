@@ -16,7 +16,7 @@ module physics_types
   use cam_abortutils,   only: endrun
   use phys_control, only: waccmx_is, use_mass_borrower
   use shr_const_mod,only: shr_const_rwv
-  use perf_mod,     only: t_startf, t_stopf
+  !use perf_mod,     only: t_startf, t_stopf
 
   implicit none
   private          ! Make default type private to the module
@@ -278,7 +278,7 @@ contains
        end if
     end if
 
-    call t_startf ('physics_update_main')
+    !call t_startf ('physics_update_main')
     !-----------------------------------------------------------------------
     ! cpairv_loc and rairv_loc need to be allocated to a size which matches state and ptend
     ! If psetcols == pcols, the cpairv is the correct size and just copy
@@ -470,7 +470,7 @@ contains
     ptend%lu    = .false.
     ptend%lv    = .false.
     ptend%psetcols = 0
-    call t_stopf ('physics_update_main')
+    !call t_stopf ('physics_update_main')
 
   contains
 
@@ -713,7 +713,7 @@ contains
     integer :: ierr = 0
 
 !-----------------------------------------------------------------------
-    call t_startf('physics_ptend_sum')
+    !call t_startf('physics_ptend_sum')
     if (ptend%psetcols /= ptend_sum%psetcols) then
        call endrun('physics_ptend_sum error: ptend and ptend_sum must have the same value for psetcols')
     end if
@@ -842,7 +842,7 @@ contains
        end do
 
     end if
-    call t_stopf('physics_ptend_sum')
+    !call t_stopf('physics_ptend_sum')
 
   end subroutine physics_ptend_sum
 
@@ -868,7 +868,7 @@ contains
 
 !-----------------------------------------------------------------------
 
-    call t_startf('physics_ptend_scale')
+    !call t_startf('physics_ptend_scale')
 ! Update u,v fields
     if (ptend%lu) &
          call multiply_tendency(ptend%u, &
@@ -889,7 +889,7 @@ contains
             call multiply_tendency(ptend%q(:,:,m), &
             ptend%cflx_srf(:,m), ptend%cflx_top(:,m))
     end do
-    call t_stopf('physics_ptend_scale')
+    !call t_stopf('physics_ptend_scale')
 
   contains
 
@@ -1037,7 +1037,7 @@ end subroutine physics_ptend_copy
        return
     end if
 
-!pw call t_startf('physics_ptend_init')
+!pw !call t_startf('physics_ptend_init')
     if (present(ls)) then
        ptend%ls = ls
     else
@@ -1065,7 +1065,7 @@ end subroutine physics_ptend_copy
     call physics_ptend_alloc(ptend, psetcols)
 
     call physics_ptend_reset(ptend)
-!pw call t_stopf('physics_ptend_init')
+!pw !call t_stopf('physics_ptend_init')
 
     return
   end subroutine physics_ptend_init

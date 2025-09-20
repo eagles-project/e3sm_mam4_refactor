@@ -213,9 +213,9 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend,               &
   endif 
   
    call t_barrierf('sync_d_p_coupling', mpicom)
-   call t_startf('d_p_coupling')
+   !call t_startf('d_p_coupling')
    call d_p_coupling (phys_state, phys_tend,  pbuf2d, dyn_out )
-   call t_stopf('d_p_coupling') 
+   !call t_stopf('d_p_coupling') 
    
 end subroutine stepon_run1
 
@@ -258,13 +258,13 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
 
    ! copy from phys structures -> dynamics structures
    call t_barrierf('sync_p_d_coupling', mpicom)
-   call t_startf('p_d_coupling')
+   !call t_startf('p_d_coupling')
    call p_d_coupling(phys_state, phys_tend,  dyn_in)
-   call t_stopf('p_d_coupling')
+   !call t_stopf('p_d_coupling')
 
    if(.not.par%dynproc) return
 
-   call t_startf('stepon_bndry_exch')
+   !call t_startf('stepon_bndry_exch')
    ! do boundary exchange
    if (.not. single_column) then 
       do ie=1,nelemd
@@ -395,7 +395,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
       call applyCAMforcing_dynamics(dyn_in%elem,hvcoord,tl_f,dtime,1,nelemd)
    endif
 
-   call t_stopf('stepon_bndry_exch')
+   !call t_stopf('stepon_bndry_exch')
 
 
 
@@ -545,9 +545,9 @@ subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
    endif   
 
    call t_barrierf('sync_dyn_run', mpicom)
-   call t_startf ('dyn_run')
+   !call t_startf ('dyn_run')
    call dyn_run(dyn_out,rc)	
-   call t_stopf  ('dyn_run')
+   !call t_stopf  ('dyn_run')
    
    ! Update to get tendency 
 #if (defined E3SM_SCM_REPLAY) 

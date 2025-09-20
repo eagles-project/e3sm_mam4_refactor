@@ -388,14 +388,14 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend, pbuf2d,        &
 
    ! Dump state variables to IC file
    call t_barrierf('sync_diag_dynvar_ic', mpicom)
-   call t_startf ('diag_dynvar_ic')
+   !call t_startf ('diag_dynvar_ic')
    call diag_dynvar_ic (dyn_state%grid, dyn_out%phis, dyn_out%ps,             &
                         dyn_out%t3, dyn_out%u3s, dyn_out%v3s, dyn_out%tracer  )
-   call t_stopf  ('diag_dynvar_ic')
+   !call t_stopf  ('diag_dynvar_ic')
 
-   call t_startf ('comp_adv_tends1')
+   !call t_startf ('comp_adv_tends1')
    call compute_adv_tends_xyz(dyn_state%grid, dyn_in%tracer )
-   call t_stopf  ('comp_adv_tends1')
+   !call t_stopf  ('comp_adv_tends1')
    !
    !--------------------------------------------------------------------------
    ! Perform finite-volume dynamics -- this dynamical core contains some 
@@ -413,7 +413,7 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend, pbuf2d,        &
    ! transposes, and others are derived.
    !----------------------------------------------------------
    call t_barrierf('sync_dyn_run', mpicom)
-   call t_startf ('dyn_run')
+   !call t_startf ('dyn_run')
    call dyn_run(ptop,      pdt,     te0,         &
                 dyn_state, dyn_in,  dyn_out,  rc )
    if ( rc /= 0 ) then
@@ -421,19 +421,19 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend, pbuf2d,        &
      write(iulog,*) "Quitting."
      call endrun
    endif 
-   call t_stopf  ('dyn_run')
+   !call t_stopf  ('dyn_run')
 
-   call t_startf ('comp_adv_tends2')
+   !call t_startf ('comp_adv_tends2')
    call compute_adv_tends_xyz(dyn_state%grid, dyn_out%tracer )
-   call t_stopf  ('comp_adv_tends2')
+   !call t_stopf  ('comp_adv_tends2')
 
    !----------------------------------------------------------
    ! Move data into phys_state structure.
    !----------------------------------------------------------
    call t_barrierf('sync_d_p_coupling', mpicom)
-   call t_startf('d_p_coupling')
+   !call t_startf('d_p_coupling')
    call d_p_coupling(dyn_state%grid, phys_state, phys_tend,  pbuf2d, dyn_out)
-   call t_stopf('d_p_coupling')
+   !call t_stopf('d_p_coupling')
 
 !EOC
 end subroutine stepon_run1
@@ -483,10 +483,10 @@ subroutine stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
    grid => get_dyn_state_grid()
 
    call t_barrierf('sync_p_d_coupling', mpicom)
-   call t_startf ('p_d_coupling')
+   !call t_startf ('p_d_coupling')
    call p_d_coupling(grid, phys_state, phys_tend, &
                      dyn_in, dtime, zvir, cappa, ptop)
-   call t_stopf  ('p_d_coupling')
+   !call t_stopf  ('p_d_coupling')
 
 !EOC
 end subroutine stepon_run2
@@ -552,12 +552,12 @@ subroutine stepon_run3( dtime, cam_out, phys_state, dyn_in, dyn_out )
       grid => get_dyn_state_grid()
 
       call t_barrierf('sync_fv_out', mpicom)
-      call t_startf('fv_out')
+      !call t_startf('fv_out')
       call fv_out(grid, dyn_out%pk, dyn_out%pt,         &
                   ptop, dyn_out%ps, dyn_out%tracer,     &
                   dyn_out%delp, dyn_out%pe, cam_out,    &
                    phys_state, ncdate, ncsecp, moist_physics)
-      call t_stopf('fv_out')
+      !call t_stopf('fv_out')
    endif
 
 !EOC

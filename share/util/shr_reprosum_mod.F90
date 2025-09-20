@@ -457,7 +457,7 @@ module shr_reprosum_mod
          abort_inf_nan = .not. allow_infnan
       endif
 
-      call t_startf('shr_reprosum_INF_NaN_Chk')
+      !call t_startf('shr_reprosum_INF_NaN_Chk')
 
 ! initialize flags to indicate that no NaNs or INFs are present in the input data
       inf_nan_gchecks = .false.
@@ -496,11 +496,11 @@ module shr_reprosum_mod
             inf_nan_lchecks(3,ifld) = any(shr_infnan_isneginf(arr(:,ifld)))
          end do
 
-         call t_startf("repro_sum_allr_lor")
+         !call t_startf("repro_sum_allr_lor")
          call mpi_allreduce (inf_nan_lchecks, inf_nan_gchecks, 3*nflds, &
                              MPI_LOGICAL, MPI_LOR, mpi_comm, ierr)
          gbl_lor_red = 1
-         call t_stopf("repro_sum_allr_lor")
+         !call t_stopf("repro_sum_allr_lor")
 
          do ifld=1,nflds
             arr_gsum_infnan(ifld) = any(inf_nan_gchecks(:,ifld))
@@ -508,7 +508,7 @@ module shr_reprosum_mod
 
       endif
 
-      call t_stopf('shr_reprosum_INF_NaN_Chk')
+      !call t_stopf('shr_reprosum_INF_NaN_Chk')
 
 ! check whether should use shr_reprosum_ddpdd algorithm
       use_ddpdd_sum = repro_sum_use_ddpdd
@@ -523,17 +523,17 @@ module shr_reprosum_mod
 
       if ( use_ddpdd_sum ) then
 
-         call t_startf('shr_reprosum_ddpdd')
+         !call t_startf('shr_reprosum_ddpdd')
 
          call shr_reprosum_ddpdd(arr, arr_gsum, nsummands, dsummands, &
                               nflds, mpi_comm)
          repro_sum_fast = 1
 
-         call t_stopf('shr_reprosum_ddpdd')
+         !call t_stopf('shr_reprosum_ddpdd')
 
       else
 
-         call t_startf('shr_reprosum_int')
+         !call t_startf('shr_reprosum_int')
 
 ! get number of MPI tasks
          call mpi_comm_size(mpi_comm, tasks, ierr)
@@ -571,7 +571,7 @@ module shr_reprosum_mod
 
 ! determine maximum number of summands in local phases of the
 ! algorithm
-               call t_startf("repro_sum_allr_max")
+               !call t_startf("repro_sum_allr_max")
                if ( present(gbl_max_nsummands) ) then
                   if (gbl_max_nsummands < 1) then
                      call mpi_allreduce (nsummands, max_nsummands, 1, &
@@ -585,7 +585,7 @@ module shr_reprosum_mod
                                       MPI_INTEGER, MPI_MAX, mpi_comm, ierr)
                   gbl_max_red = 1
                endif
-               call t_stopf("repro_sum_allr_max")
+               !call t_stopf("repro_sum_allr_max")
 
 ! determine maximum shift. Shift needs to be small enough that summation
 !  does not exceed maximum number of digits in i8.
@@ -668,7 +668,7 @@ module shr_reprosum_mod
 !$omp default(shared)  &
 !$omp private(ithread, ifld, isum, arr_exp, arr_exp_tlmin, arr_exp_tlmax)
             do ithread=1,omp_nthreads
-               call t_startf('repro_sum_loopa')
+               !call t_startf('repro_sum_loopa')
                do ifld=1,nflds
                   arr_exp_tlmin = MAXEXPONENT(1._r8)
                   arr_exp_tlmax = MINEXPONENT(1._r8)
@@ -684,7 +684,7 @@ module shr_reprosum_mod
                   arr_tlmin_exp(ifld,ithread) = arr_exp_tlmin
                   arr_tlmax_exp(ifld,ithread) = arr_exp_tlmax
                end do
-               call t_stopf('repro_sum_loopa')
+               !call t_stopf('repro_sum_loopa')
             end do
 
             do ifld=1,nflds
@@ -696,10 +696,10 @@ module shr_reprosum_mod
             arr_lextremes(0,:) = -nsummands
             arr_lextremes(1:nflds,1) = -arr_lmax_exp(:)
             arr_lextremes(1:nflds,2) = arr_lmin_exp(:)
-            call t_startf("repro_sum_allr_minmax")
+            !call t_startf("repro_sum_allr_minmax")
             call mpi_allreduce (arr_lextremes, arr_gextremes, 2*(nflds+1), &
                                 MPI_INTEGER, MPI_MIN, mpi_comm, ierr)
-            call t_stopf("repro_sum_allr_minmax")
+            !call t_stopf("repro_sum_allr_minmax")
             max_nsummands   = -arr_gextremes(0,1)
             arr_gmax_exp(:) = -arr_gextremes(1:nflds,1)
             arr_gmin_exp(:) =  arr_gextremes(1:nflds,2)
@@ -785,7 +785,7 @@ module shr_reprosum_mod
 
          endif
 
-         call t_stopf('shr_reprosum_int')
+         !call t_stopf('shr_reprosum_int')
 
       endif
 
@@ -794,7 +794,7 @@ module shr_reprosum_mod
          if (shr_reprosum_reldiffmax >= 0.0_r8) then
 
             call t_barrierf('sync_nonrepro_sum',mpi_comm)
-            call t_startf('nonrepro_sum')
+            !call t_startf('nonrepro_sum')
 ! record statistic
             nonrepro_sum = 1
 ! compute nonreproducible sum
@@ -810,12 +810,12 @@ module shr_reprosum_mod
                endif
             end do
 
-            call t_startf("nonrepro_sum_allr_r8")
+            !call t_startf("nonrepro_sum_allr_r8")
             call mpi_allreduce (arr_lsum, arr_gsum_fast, nflds, &
                                 MPI_REAL8, MPI_SUM, mpi_comm, ierr)
-            call t_stopf("nonrepro_sum_allr_r8")
+            !call t_stopf("nonrepro_sum_allr_r8")
 
-            call t_stopf('nonrepro_sum')
+            !call t_stopf('nonrepro_sum')
 
 ! determine differences
 !$omp parallel do      &
@@ -1026,7 +1026,7 @@ module shr_reprosum_mod
 !$omp private(ithread, ifld, ioffset, isum, arr_frac, arr_exp, &
 !$omp         arr_shift, ilevel, i8_arr_level, arr_remainder, RX_8, IX_8)
       do ithread=1,omp_nthreads
-       call t_startf('repro_sum_loopb')
+       !call t_startf('repro_sum_loopb')
        do ifld=1,nflds
           ioffset = offset(ifld)
 
@@ -1115,7 +1115,7 @@ module shr_reprosum_mod
              endif
           enddo
        enddo
-       call t_stopf('repro_sum_loopb')
+       !call t_stopf('repro_sum_loopb')
       enddo
 
 ! sum contributions from different threads
@@ -1143,15 +1143,15 @@ module shr_reprosum_mod
 ! sum integer vector element-wise
 #if ( defined noI8 )
      ! Workaround for when shr_kind_i8 is not supported.
-      call t_startf("repro_sum_allr_i4")
+      !call t_startf("repro_sum_allr_i4")
       call mpi_allreduce (i8_arr_lsum_level, i8_arr_gsum_level, &
                           veclth, MPI_INTEGER, MPI_SUM, mpi_comm, ierr)
-      call t_stopf("repro_sum_allr_i4")
+      !call t_stopf("repro_sum_allr_i4")
 #else
-      call t_startf("repro_sum_allr_i8")
+      !call t_startf("repro_sum_allr_i8")
       call mpi_allreduce (i8_arr_lsum_level, i8_arr_gsum_level, &
                           veclth, MPI_INTEGER8, MPI_SUM, mpi_comm, ierr)
-      call t_stopf("repro_sum_allr_i8")
+      !call t_stopf("repro_sum_allr_i8")
 #endif
 
 ! Construct global sum from integer vector representation:
@@ -1484,10 +1484,10 @@ module shr_reprosum_mod
 
       enddo
 
-      call t_startf("repro_sum_allr_c16")
+      !call t_startf("repro_sum_allr_c16")
       call mpi_allreduce (arr_lsum_dd, arr_gsum_dd, nflds, &
                           MPI_COMPLEX16, mpi_sumdd, mpi_comm, ierr)
-      call t_stopf("repro_sum_allr_c16")
+      !call t_stopf("repro_sum_allr_c16")
 
       do ifld=1,nflds
          arr_gsum(ifld) = real(arr_gsum_dd(ifld))

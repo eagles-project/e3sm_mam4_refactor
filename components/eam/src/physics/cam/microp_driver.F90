@@ -18,7 +18,7 @@ use micro_mg_cam,   only: micro_mg_cam_readnl, micro_mg_cam_register, &
                           micro_mg_cam_init, micro_mg_cam_tend
 use cam_logfile,    only: iulog
 use cam_abortutils, only: endrun
-use perf_mod,       only: t_startf, t_stopf
+!use perf_mod,       only: t_startf, t_stopf
 
 implicit none
 private
@@ -189,9 +189,9 @@ subroutine microp_driver_tend(state, ptend, dtime, pbuf)
 
    select case (microp_scheme)
    case ('MG')
-      call t_startf('microp_mg_cam_tend')
+      !call t_startf('microp_mg_cam_tend')
       call micro_mg_cam_tend(state, ptend, dtime, pbuf)
-      call t_stopf('microp_mg_cam_tend')
+      !call t_stopf('microp_mg_cam_tend')
    ! microp_driver doesn't handle these other options
    case ('RK')
       continue

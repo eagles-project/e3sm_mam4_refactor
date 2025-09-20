@@ -106,7 +106,7 @@ contains
     ! Load the rhs in the cg struct...
     ! ========================================
 
-    call t_startf('pcg_presolver')
+!     call t_startf('pcg_presolver')
 
     do ie=nets,nete
        ieptr=ie-nets+1
@@ -122,7 +122,7 @@ contains
     end do
 
     do while (congrad(cg,red,maxits,tol))
-       call t_startf('in_congrad')
+!        call t_startf('in_congrad')
 
        do ie=nets,nete
           ieptr=ie-nets+1

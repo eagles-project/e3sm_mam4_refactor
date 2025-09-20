@@ -127,7 +127,7 @@ endif
       call edgeVpack_nlyr(edgebuf,elem(ie)%desc,stens(1,1,1,1,ie),ssize,kptr,nlyr_tot)
    enddo
    
-   call t_startf('biwkdp3d_bexchV')
+!    call t_startf('biwkdp3d_bexchV')
    call bndry_exchangeV(hybrid,edgebuf)
    call t_stopf('biwkdp3d_bexchV')
    

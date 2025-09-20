@@ -82,8 +82,8 @@ program prim_main
   if(par%masterproc) print *,"Primitive Equation Init1..."
   call t_initf('input.nl',LogPrint=par%masterproc, &
                Mpicom=par%comm, MasterTask=par%masterproc)
-  call t_startf('Total')
-  call t_startf('prim_init1')
+!   call t_startf('Total')
+!   call t_startf('prim_init1')
   call prim_init1(elem,  par,dom_mt,tl)
   call t_stopf('prim_init1')
 
@@ -164,7 +164,7 @@ program prim_main
   nete=dom_mt(ithr)%end
 
   if(hybrid%masterthread) print *,"Primitive Equation Init2..."
-  call t_startf('prim_init2')
+!   call t_startf('prim_init2')
   call prim_init2(elem, hybrid,nets,nete,tl, hvcoord)
   call t_stopf('prim_init2')
 #if (defined HORIZ_OPENMP)
@@ -202,7 +202,7 @@ program prim_main
   if(par%masterproc) print *,"I/O init..."
 ! initialize history files.  filename constructed with restart time
 ! so we have to do this after ReadRestart in prim_init2 above
-  call t_startf('prim_io_init')
+!   call t_startf('prim_io_init')
 #if defined PIO_INTERP
   call interp_movie_init( elem, par,  hvcoord, tl )
 #else
@@ -223,7 +223,7 @@ program prim_main
   call compose_test(par, hvcoord, dom_mt, elem)
 
   if(par%masterproc) print *,"Entering main timestepping loop"
-  call t_startf('prim_main_loop')
+!   call t_startf('prim_main_loop')
   do while(tl%nstep < nEndStep)
 #if (defined HORIZ_OPENMP)
      !$OMP PARALLEL NUM_THREADS(hthreads), DEFAULT(SHARED), PRIVATE(ithr,nets,nete,hybrid)
@@ -236,7 +236,7 @@ program prim_main
      
      nstep = nextoutputstep(tl)
      do while(tl%nstep<nstep)
-        call t_startf('prim_run')
+!         call t_startf('prim_run')
         call prim_run_subcycle(elem, hybrid,nets,nete, tstep, .false., tl, hvcoord,1)
         call t_stopf('prim_run')
      end do

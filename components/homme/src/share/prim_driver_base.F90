@@ -377,7 +377,7 @@ contains
 
     !DBG if(par%masterproc) call PrintGridVertex(GridVertex)
 
-    call t_startf('PartitioningTime')
+!     call t_startf('PartitioningTime')
 
     if (.not. can_scalably_init_grid) then
        if(partmethod .eq. SFCURVE) then
@@ -1110,7 +1110,7 @@ contains
 
 #if (USE_OPENACC)
        !    call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
-       call t_startf("copy_qdp_h2d")
+!        call t_startf("copy_qdp_h2d")
        call copy_qdp_h2d( elem , n0_qdp )
        call t_stopf("copy_qdp_h2d")
 #endif
@@ -1142,7 +1142,7 @@ contains
       call TimeLevel_Qdp( tl, dt_tracer_factor, n0_qdp, np1_qdp)
 
 #if (USE_OPENACC)
-      call t_startf("copy_qdp_h2d")
+!       call t_startf("copy_qdp_h2d")
       call copy_qdp_d2h( elem , np1_qdp )
       call t_stopf("copy_qdp_h2d")
 #endif
@@ -1285,9 +1285,9 @@ contains
     ! For dt_remap_factor=0: 
     !   if tracer scheme needs v on lagrangian levels it has to vertically interpolate
 
-    call t_startf("prim_step_advec")
+!     call t_startf("prim_step_advec")
     if (qsize > 0) then
-      call t_startf("PAT_remap")
+!       call t_startf("PAT_remap")
       call Prim_Advec_Tracers_remap(elem, deriv1,hvcoord,hybrid,dt_q,tl,nets,nete)
       call t_stopf("PAT_remap")
     end if
@@ -1348,7 +1348,7 @@ contains
 
     call set_tracer_transport_derived_values(elem, nets, nete, tl)
 
-    call t_startf("prim_step_dyn")
+!     call t_startf("prim_step_dyn")
     do n = 1, dt_tracer_factor
        compute_diagnostics_it = logical(compute_diagnostics .and. n == 1)
 
@@ -1408,7 +1408,7 @@ contains
     call t_stopf("prim_step_dyn")
 
     if (qsize > 0) then
-       call t_startf("PAT_remap")
+!        call t_startf("PAT_remap")
        call Prim_Advec_Tracers_remap(elem, deriv1, hvcoord, hybrid, dt_q, tl, nets, nete)
        call t_stopf("PAT_remap")
     end if
@@ -1435,7 +1435,7 @@ contains
     integer,              intent(in)    :: nets, nete, n
     logical,              intent(in)    :: t_before_advance
 
-    call t_startf("prim_diag")
+!     call t_startf("prim_diag")
     call prim_diag_scalars(elem, hvcoord, tl, n, t_before_advance, nets, nete)
     call prim_energy_halftimes(elem, hvcoord, tl, n, t_before_advance, nets, nete)
     call t_stopf("prim_diag")
@@ -1491,7 +1491,7 @@ contains
   integer,                intent(in)    :: n0,n0qdp,nets,nete
   integer                               :: ie
 
-  call t_startf("ApplyCAMForcing_remap")
+!   call t_startf("ApplyCAMForcing_remap")
   if (ftype==-1) then
     !do nothing
   elseif (ftype==0) then
@@ -1593,7 +1593,7 @@ contains
   sum_fq = 0
 #endif
 
-  call t_startf("ApplyCAMForcing_tracers")
+!   call t_startf("ApplyCAMForcing_tracers")
 
 #ifdef MODEL_THETA_L
   if (dt_remap_factor==0) then

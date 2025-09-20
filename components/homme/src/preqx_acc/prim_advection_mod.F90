@@ -54,7 +54,7 @@ contains
     type(element_t), intent(in) :: elem(:)
     integer        , intent(in) :: tl, nets , nete
     integer :: ie, k, j, i
-    call t_startf('qdp1_pcie')
+!     call t_startf('qdp1_pcie')
 #   if USE_OPENACC
       do ie = nets , nete
         data_pack(:,:,:,ie) = state_qdp(:,:,:,1,tl,ie)
@@ -90,7 +90,7 @@ contains
     type(element_t), intent(in) :: elem(:)
     integer        , intent(in) :: tl, nets , nete
     integer :: ie, k, j, i
-    call t_startf('qdp1_pcie')
+!     call t_startf('qdp1_pcie')
 #   if USE_OPENACC
       !$omp barrier
       !$omp master
@@ -194,7 +194,7 @@ contains
     integer :: n0_qdp, np1_qdp
 
     call t_barrierf('sync_prim_advec_tracers_remap_k2', hybrid%par%comm)
-    call t_startf('prim_advec_tracers_remap_rk2')
+!     call t_startf('prim_advec_tracers_remap_rk2')
     call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp) !time levels for qdp are not the same
     rkstage = 3 !   3 stage RKSSP scheme, with optimal SSP CFL
 
@@ -214,17 +214,17 @@ contains
     !rhs_multiplier is for obtaining dp_tracers at each stage:
     !dp_tracers(stage) = dp - rhs_multiplier*dt*divdp_proj
 
-    call t_startf('euler_step_0')
+!     call t_startf('euler_step_0')
     rhs_multiplier = 0
     call euler_step( np1_qdp , n0_qdp  , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSdiv_vdp_ave , rhs_multiplier )
     call t_stopf('euler_step_0')
 
-    call t_startf('euler_step_1')
+!     call t_startf('euler_step_1')
     rhs_multiplier = 1
     call euler_step( np1_qdp , np1_qdp , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSeta         , rhs_multiplier )
     call t_stopf('euler_step_1')
 
-    call t_startf('euler_step_2')
+!     call t_startf('euler_step_2')
     rhs_multiplier = 2
     call euler_step( np1_qdp , np1_qdp , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSomega       , rhs_multiplier )
     call t_stopf('euler_step_2')
@@ -339,7 +339,7 @@ contains
     integer :: density_scaling = 0
     if ( nu_q           == 0 ) return
     if ( hypervis_order /= 2 ) return
-    call t_startf('advance_hypervis_scalar')
+!     call t_startf('advance_hypervis_scalar')
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !  hyper viscosity  
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -396,12 +396,12 @@ contains
         enddo
       enddo
       call limiter2d_zero(state_Qdp,2,nt_qdp)
-      call t_startf('ah_scalar_PEU')
+!       call t_startf('ah_scalar_PEU')
       call edgeVpack_openacc(edge_g,state_qdp,qsize*nlev,0,qsize*nlev,1,nelemd,2,nt_qdp)
       !$omp end master
       !$omp barrier
 
-      call t_startf('ah_scalar_exch')
+!       call t_startf('ah_scalar_exch')
       call bndry_exchangeV( hybrid , edge_g )
       call t_stopf('ah_scalar_exch')
       
@@ -750,12 +750,12 @@ contains
   endif
   ! note: eta_dot_dpdn is actually dimension nlev+1, but nlev+1 data is
   ! all zero so we only have to DSS 1:nlev
-  call t_startf('eus_PEU')
+!   call t_startf('eus_PEU')
   call edgeVpack_openacc(edge_g , state_Qdp , nlev*qsize , 0 , nlev*qsize , 1 , nelemd , 2 , np1_qdp )
   !$omp end master
   !$omp barrier
 
-  call t_startf('eus_exch')
+!   call t_startf('eus_exch')
   call bndry_exchangeV( hybrid , edge_g )
   call t_stopf('eus_exch')
 
@@ -950,7 +950,7 @@ contains
     !$acc update host(derived_divdp,derived_divdp_proj)
     !$omp end master
     !$omp barrier
-    call t_startf('derived PEU')
+!     call t_startf('derived PEU')
     do ie = nets , nete
       ! note: eta_dot_dpdn is actually dimension nlev+1, but nlev+1 data is
       ! all zero so we only have to DSS 1:nlev

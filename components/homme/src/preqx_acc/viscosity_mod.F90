@@ -62,12 +62,12 @@ contains
     !$omp barrier
     !$omp master
     call laplace_sphere_wk_openacc(qtens,grads,deriv,elem,var_coef1,qtens,nlev*qsize,nets,nete,1,1)
-    call t_startf('biwksc_PEU')
+!     call t_startf('biwksc_PEU')
     call edgeVpack_openacc(edgeq,qtens,qsize*nlev,0,qsize*nlev,nets,nete,1,1)
     !$omp end master
     !$omp barrier
 
-    call t_startf('biwksc_exch')
+!     call t_startf('biwksc_exch')
     call bndry_exchangeV(hybrid,edgeq)
     call t_stopf('biwksc_exch')
     
@@ -113,13 +113,13 @@ contains
     ! compute Qmin, Qmax
     !$omp barrier
     !$omp master
-    call t_startf('nmm_PEU')
+!     call t_startf('nmm_PEU')
     call edgeSpack_openacc(edgeMinMax,min_neigh,nlev*qsize,0         ,2*nlev*qsize,elem(:),nets,nete,1,1)
     call edgeSpack_openacc(edgeMinMax,max_neigh,nlev*qsize,nlev*qsize,2*nlev*qsize,elem(:),nets,nete,1,1)
     !$omp end master
     !$omp barrier
 
-    call t_startf('nmm_exch')
+!     call t_startf('nmm_exch')
     call bndry_exchangeS(hybrid,edgeMinMax)
     call t_stopf('nmm_exch')
        

@@ -154,7 +154,7 @@ contains
     integer :: max_itercnt_g
     real (kind=real_kind) :: max_deltaerr_g, max_reserr_g
 
-    call t_startf('prim_printstate')
+!     call t_startf('prim_printstate')
     if (hybrid%masterthread) then 
        if (Time_at(tl%nstep) <= 3600) then
           write(iulog,*) "nstep=",tl%nstep," time=",Time_at(tl%nstep)," [s]"

@@ -173,7 +173,7 @@ contains
     use shr_orb_mod,       only : shr_orb_decl
     use cam_control_mod,   only : lambm0, eccen, mvelpp, obliqr
     use mo_chm_diags,      only : chm_diags, het_diags
-    use perf_mod,          only : t_startf, t_stopf
+    !use perf_mod,          only : t_startf, t_stopf
     use physics_buffer,    only : physics_buffer_desc
     use infnan,            only : nan, assignment(=)
     use rate_diags,        only : rate_diags_calc
@@ -300,7 +300,7 @@ contains
     real(r8) :: del_h2so4_gasprod(ncol,pver)
     real(r8) :: vmr0(ncol,pver,gas_pcnst)
 #include "../yaml/mo_gas_phase_chemdr/f90_yaml/gas_phase_chemdr_beg_yml.f90"
-    call t_startf('chemdr_init')
+    !call t_startf('chemdr_init')
 
     ! initialize to NaN to hopefully catch user defined rxts that go unset
     reaction_rates(:,:,:) = nan
@@ -478,7 +478,7 @@ contains
 
     vmr0(:ncol,:,:) = vmr(:ncol,:,:) ! mixing ratios before chemistry changes
 
-    call t_stopf('chemdr_init')
+    !call t_stopf('chemdr_init')
 
     !=======================================================================
     !        ... Call the class solution algorithms
@@ -488,10 +488,10 @@ contains
     !	... Solve for "Implicit" species
     !-----------------------------------------------------------------------
     !
-    call t_startf('imp_sol')
+    !call t_startf('imp_sol')
     call imp_sol( vmr, reaction_rates, het_rates, extfrc, delt, &
          invariants(1,1,indexm), ncol, lchnk, ltrop_sol(:ncol) )
-    call t_stopf('imp_sol')
+    !call t_stopf('imp_sol')
 
     if(convproc_do_aer) then 
        call vmr2mmr( vmr, mmr_new, mbar, ncol )  !RCE
@@ -514,13 +514,13 @@ contains
     call get_lat_all_p( lchnk, ncol, latndx )
     call get_lon_all_p( lchnk, ncol, lonndx )
 
-    call t_startf('aero_model_gasaerexch')
+    !call t_startf('aero_model_gasaerexch')
     call aero_model_gasaerexch( imozart-1, ncol, lchnk, delt, latndx, lonndx, & !in
          tfld, pmid, pdel, mbar, zm,  qh2o, cwat,      & !in
          cldfr, ncldwtr, invariants(:,:,indexm), vmr0, & !in
          pblh,                                         & !in
          vmr, qqcw, dgnum, dgnumwet, wetdens         ) ! inout
-    call t_stopf('aero_model_gasaerexch')
+    !call t_stopf('aero_model_gasaerexch')
 
     !
     ! LINOZ
@@ -566,7 +566,7 @@ contains
     wind_speed(:ncol) = sqrt( ufld(:ncol,pver)*ufld(:ncol,pver) + vfld(:ncol,pver)*vfld(:ncol,pver) )
     prect(:ncol) = precc(:ncol) + precl(:ncol)
 
-    call t_startf('drydep')
+    !call t_startf('drydep')
 
     !drydep_method == DD_XATM 
     call drydep_xactive( lchnk, ncol, latndx, &                                         ! in
@@ -574,7 +574,7 @@ contains
          qh2o(:,pver), wind_speed, prect, snowhland, fsds, mmr, &                       ! in
          depvel, &                                                                      ! out
          sflx)                                                                          ! inout
-    call t_stopf('drydep')
+    !call t_stopf('drydep')
 
     drydepflx(:,:) = 0._r8
     do mm = 1,pcnst
@@ -585,7 +585,7 @@ contains
        endif
     enddo
 
-    call t_startf('chemdr_diags')
+    !call t_startf('chemdr_diags')
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &       !intent-in
          depvel(:ncol,:),  sflx(:ncol,:), &                       !intent-in
          mmr_tend(:ncol,:,:), pdel(:ncol,:), pdeldry(:ncol,:), &  !intent-in
@@ -593,7 +593,7 @@ contains
 
     call rate_diags_calc( reaction_rates(:,:,:), &! inout
          vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk ) !in
-    call t_stopf('chemdr_diags')
+    !call t_stopf('chemdr_diags')
 #include "../yaml/mo_gas_phase_chemdr/f90_yaml/gas_phase_chemdr_end_yml.f90"
   end subroutine gas_phase_chemdr
 

@@ -666,7 +666,7 @@ subroutine dcmip2016_test1_pg_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl
   max_precl = -huge(rl)
   min_ps    = +huge(rl)
 
-  call t_startf('gfr_dyn_to_fv_phys')
+!   call t_startf('gfr_dyn_to_fv_phys')
   call gfr_dyn_to_fv_phys(hybrid, nt, hvcoord, elem, nets, nete, &
        pg_data%ps, pg_data%zs, pg_data%T, pg_data%uv, pg_data%omega_p, pg_data%q)
   call t_stopf('gfr_dyn_to_fv_phys')
@@ -794,7 +794,7 @@ subroutine dcmip2016_test1_pg_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl
      min_ps = min(min_ps, minval(elem(ie)%state%ps_v(:,:,nt)))
   enddo
 
-  call t_startf('gfr_fv_phys_to_dyn')
+!   call t_startf('gfr_fv_phys_to_dyn')
   call gfr_fv_phys_to_dyn(hybrid, nt, hvcoord, elem, nets, nete, &
        pg_data%T, pg_data%uv, pg_data%q)
   call t_stopf('gfr_fv_phys_to_dyn')

@@ -54,7 +54,7 @@ contains
     type (EdgeDescriptor_t),pointer            :: desc        ! =>elem(ie)%desc
     integer :: i,k,ir,ll,is,ie,in,iw,el,kc,kk
     integer, parameter :: kchunk = 64
-    call t_startf('edge_s_pack')
+!     call t_startf('edge_s_pack')
     if (nlyr < (kptr+vlyr) ) call haltmp('edgeSpack: Buffer overflow1: size of the vertical dimension must be increased!')
     if (edge%nlyr_max < (kptr+vlyr) ) call haltmp('edgeSpack: Buffer overflow: size of the vertical dimension must be increased!')
     edge%nlyr=nlyr      ! set total amount packed, for use by bndry_exchange
@@ -106,7 +106,7 @@ contains
     integer :: i,k,ll,is,ie,in,iw,el,kc,kk
     integer, parameter :: kchunk = 64
     real(kind=real_kind) :: vtmp(kchunk)
-    call t_startf('edge_s_unpack_min')
+!     call t_startf('edge_s_unpack_min')
     if (nlyr < (kptr+vlyr) ) call haltmp('edgeSunpackMin: Buffer overflow1: size of the vertical dimension must be increased!')
     if (edge%nlyr_max < (kptr+vlyr) ) call haltmp('edgeSunpackMin: Buffer overflow: size of the vertical dimension must be increased!')
     !$acc parallel loop gang collapse(2) present(v,edge) private(vtmp) vector_length(kchunk)
@@ -168,7 +168,7 @@ contains
     integer :: i,k,ll,is,ie,in,iw,el,kc,kk
     integer, parameter :: kchunk = 64
     real(kind=real_kind) :: vtmp(kchunk)
-    call t_startf('edge_s_unpack_max')
+!     call t_startf('edge_s_unpack_max')
     if (nlyr < (kptr+vlyr) ) call haltmp('edgeSunpackMax: Buffer overflow1: size of the vertical dimension must be increased!')
     if (edge%nlyr_max < (kptr+vlyr) ) call haltmp('edgeSunpackMax: Buffer overflow: size of the vertical dimension must be increased!')
     !$acc parallel loop gang collapse(2) present(v,edge) private(vtmp) vector_length(kchunk)
@@ -230,7 +230,7 @@ contains
     type (EdgeDescriptor_t),pointer            :: desc        ! =>elem(ie)%desc
     integer :: i,k,ir,ll,is,ie,in,iw,el,kc,kk
     integer, parameter :: kchunk = 32
-    call t_startf('edge_pack')
+!     call t_startf('edge_pack')
     if (nlyr < (kptr+vlyr) ) call haltmp('edgeVpack: Buffer overflow1: size of the vertical dimension must be increased!')
     if (edge%nlyr_max < nlyr ) call haltmp('edgeVpack: Buffer overflow2: size of the vertical dimension must be increased!')
     edge%nlyr=nlyr  ! set total amount packed for use by bndry_exchange
@@ -296,7 +296,7 @@ contains
     integer :: i,k,ll,is,ie,in,iw,el,kc,kk,glob_k,loc_ind,ii,jj, j
     integer, parameter :: kchunk = 32
     real(kind=real_kind) :: vtmp(np,np,kchunk)
-    call t_startf('edge_unpack')
+!     call t_startf('edge_unpack')
     if (nlyr < (kptr+vlyr) ) call haltmp('edgeVunpack: Buffer overflow1: size of the vertical dimension must be increased!')
     if (edge%nlyr_max < nlyr ) call haltmp('edgeVunpack: Buffer overflow2: size of the vertical dimension must be increased!')
     !$acc parallel loop gang collapse(2) present(v,edge) private(vtmp)

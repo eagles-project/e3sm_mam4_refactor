@@ -484,7 +484,7 @@ contains
     nullify(lon_coord)
 
     call t_adj_detailf(-2)
-    call t_startf("phys_grid_init")
+    !call t_startf("phys_grid_init")
 
     !-----------------------------------------------------------------------
     !
@@ -883,13 +883,13 @@ contains
           enddo
        endif
 
-       call t_startf("create_chunks")
+       !call t_startf("create_chunks")
        call create_chunks(lbal_opt, chunks_per_thread, pcols_opt, &
                           pcols_max, pcols_mult, pcols_proc)
 #ifndef PPCOLS
        pcols = pcols_proc(iam)
 #endif
-       call t_stopf("create_chunks")
+       !call t_stopf("create_chunks")
 
        ! Early clean-up, to minimize memory high water mark
        !deallocate( latlon_to_dyn_gcol_map ) !do not deallocate as it is being used in RRTMG radiation.F90
@@ -1366,7 +1366,7 @@ contains
     deallocate(pcols_proc)
     deallocate(npthreads)
 
-    call t_stopf("phys_grid_init")
+    !call t_stopf("phys_grid_init")
     call t_adj_detailf(+2)
     return
   end subroutine phys_grid_init

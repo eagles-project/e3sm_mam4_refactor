@@ -493,7 +493,7 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
    ! Call mcica sub-column generator for RRTMG_SW
 
    ! Call sub-column generator for McICA in radiation
-   call t_startf('mcica_subcol_sw')
+   !call t_startf('mcica_subcol_sw')
 
    ! Select cloud overlap approach (1=random, 2=maximum-random, 3=maximum)
    icld = 2
@@ -507,9 +507,9 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
       cld_stosw, cicewp_stosw, cliqwp_stosw, rei_stosw, rel_stosw, &
       tauc_stosw, ssac_stosw, asmc_stosw, fsfc_stosw, clm_rand_seed, pergro_mods) !BSINGH- added rngsw
 
-   call t_stopf('mcica_subcol_sw')
+   !call t_stopf('mcica_subcol_sw')
 
-   call t_startf('rrtmg_sw')
+   !call t_startf('rrtmg_sw')
 
    ! Call RRTMG_SW for all layers for daylight columns
 
@@ -609,7 +609,7 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
            (/Nday,rrtmg_levs,nbndsw/), order=(/3,1,2/))
    end if
 
-   call t_stopf('rrtmg_sw')
+   !call t_stopf('rrtmg_sw')
 
    ! Rearrange output arrays.
    !

@@ -542,7 +542,7 @@ subroutine stratiform_tend( &
    ! This is done before adding convectively detrained cloud water, 
    ! because the phase of the detrained water is unknown.
 
-   call t_startf('stratiform_sediment')
+   !!call t_startf('stratiform_sediment')
 
    call cld_sediment_vel( ncol,                                                           &
                           icefrac, landfrac, ocnfrac, state1%pmid, state1%pdel, state1%t, &
@@ -586,7 +586,7 @@ subroutine stratiform_tend( &
    ! Update physics state type state1 with ptend_loc 
    call physics_update( state1, ptend_loc, dtime )
 
-   call t_stopf('stratiform_sediment')
+   !call t_stopf('stratiform_sediment')
 
    ! Accumulate prec and snow flux at the surface [ m/s ]
    prec_str(:ncol) = prec_sed(:ncol)
@@ -654,7 +654,7 @@ subroutine stratiform_tend( &
    ! will be computed using this updated 'concld' in the stratiform macrophysics 
    ! scheme (mmacro_pcond) later below. 
 
-   call t_startf("cldfrc")
+   !call t_startf("cldfrc")
    call cldfrc( lchnk, ncol, pbuf,                                  &
                 state1%pmid, state1%t, state1%q(:,:,1), state1%omega, state1%phis, &
                 shfrc, use_shfrc,                                                  &
@@ -675,7 +675,7 @@ subroutine stratiform_tend( &
                 state1%q(:,:,ixcldice), icecldf2, liqcldf2,                        &
                 relhum2, 1 )              
 
-   call t_stopf("cldfrc")
+   !call t_stopf("cldfrc")
 
    rhu00(:ncol,1) = 2.0_r8
    do k = 1, pver
@@ -700,7 +700,7 @@ subroutine stratiform_tend( &
    ! Stratiform Cloud Macrophysics and Microphysics !
    ! ---------------------------------------------- !
 
-   call t_startf('stratiform_microphys')
+   !call t_startf('stratiform_microphys')
 
    rdtime = 1._r8/dtime
 
@@ -746,7 +746,7 @@ subroutine stratiform_tend( &
    call pbuf_get_field(pbuf, ls_flxprc_idx, rkflxprc)
    call pbuf_get_field(pbuf, ls_flxsnw_idx, rkflxsnw)
 
-   call t_startf('pcond')
+   !call t_startf('pcond')
    call pcond( lchnk, ncol,                                                 &
                state1%t, ttend, state1%q(1,1,1), qtend, state1%omega,       &
                totcw, state1%pmid , state1%pdel, cld, fice, fsnow,          &
@@ -755,7 +755,7 @@ subroutine stratiform_tend( &
                fsaut, fracw, fsacw, fsaci, ltend,                           &
                rhdfda, rhu00, landfrac, icefrac, state1%zi, ice2pr, liq2pr, &
                liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio )
-   call t_stopf('pcond')
+   !call t_stopf('pcond')
 
    lq(:)        = .FALSE.
    lq(1)        = .true.
@@ -855,7 +855,7 @@ subroutine stratiform_tend( &
 
    if (.not. cam_physpkg_is('cam3')) then
 
-      call t_startf("cldfrc")
+      !call t_startf("cldfrc")
       call cldfrc( lchnk, ncol, pbuf,                                  &
                    state1%pmid, state1%t, state1%q(:,:,1), state1%omega, state1%phis, &
                    shfrc, use_shfrc,                                                  &
@@ -864,7 +864,7 @@ subroutine stratiform_tend( &
                    ts, sst, state1%pint(:,pverp), zdu, ocnfrac, rhu00,                &
                    state1%q(:,:,ixcldice), icecldf, liqcldf,                          &
                    relhum, 0 )    
-      call t_stopf("cldfrc")
+      !call t_stopf("cldfrc")
 
    endif
 
@@ -891,7 +891,7 @@ subroutine stratiform_tend( &
    call outfld( 'EVAPPREC' , nevapr,      pcols, lchnk )
    call outfld( 'EVAPSNOW' , evapsnow,    pcols, lchnk )
 
-   call t_stopf('stratiform_microphys')
+   !call t_stopf('stratiform_microphys')
 
    prec_str(:ncol) = prec_str(:ncol) + prec_pcw(:ncol)
    snow_str(:ncol) = snow_str(:ncol) + snow_pcw(:ncol)

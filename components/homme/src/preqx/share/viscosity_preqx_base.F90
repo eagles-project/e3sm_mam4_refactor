@@ -107,7 +107,7 @@ logical var_coef1
 
    enddo
    
-   call t_startf('biwkdp3d_bexchV')
+!    call t_startf('biwkdp3d_bexchV')
    call bndry_exchangeV(hybrid,edge3)
    call t_stopf('biwkdp3d_bexchV')
    

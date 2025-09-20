@@ -188,7 +188,7 @@ contains
     ! ==========================
     ! begin executable code
     ! ==========================
-    call t_startf('sweq')
+!     call t_startf('sweq')
     hybrid = hybrid_create(par,ithr,hthreads)
     simday=0
        call test_global_integral(elem,hybrid,nets,nete)
@@ -927,7 +927,7 @@ contains
     ! ==========================
     ! begin executable code
     ! ==========================
-    call t_startf('sweq')
+!     call t_startf('sweq')
 
     hybrid = hybrid_create(par,ithr,hthreads)
 

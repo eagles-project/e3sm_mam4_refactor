@@ -50,7 +50,7 @@ contains
   real (kind=real_kind), dimension(np,np,nlev)  :: dp,dp_star
   real (kind=real_kind), dimension(np,np,nlev,2)  :: ttmp
 
-  call t_startf('vertical_remap')
+!   call t_startf('vertical_remap')
 
   ! reference levels:
   !   dp(k) = (hyai(k+1)-hyai(k))*ps0 + (hybi(k+1)-hybi(k))*ps_v(i,j)
@@ -113,7 +113,7 @@ contains
 #endif
         ttmp(:,:,:,1)=ttmp(:,:,:,1)*dp_star
 
-        call t_startf('vertical_remap1_1')
+!         call t_startf('vertical_remap1_1')
         call remap1(ttmp,np,1,dp_star,dp,vert_remap_q_alg)
         call t_stopf('vertical_remap1_1')
 
@@ -122,7 +122,7 @@ contains
         ttmp(:,:,:,1)=elem(ie)%state%v(:,:,1,:,np1)*dp_star
         ttmp(:,:,:,2)=elem(ie)%state%v(:,:,2,:,np1)*dp_star
 
-        call t_startf('vertical_remap1_2')
+!         call t_startf('vertical_remap1_2')
         call remap1(ttmp,np,2,dp_star,dp,vert_remap_q_alg)
         call t_stopf('vertical_remap1_2')
 
@@ -140,7 +140,7 @@ contains
      ! remap the gll tracers from lagrangian levels (dp_star)  to REF levels dp
      if (qsize>0 .and. np1_qdp > 0) then
 
-       call t_startf('vertical_remap1_3')
+!        call t_startf('vertical_remap1_3')
        call remap1(elem(ie)%state%Qdp(:,:,:,:,np1_qdp),np,qsize,dp_star,dp,vert_remap_q_alg)
        call t_stopf('vertical_remap1_3')
 

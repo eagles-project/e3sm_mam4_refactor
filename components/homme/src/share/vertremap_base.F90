@@ -112,7 +112,7 @@ subroutine remap1(Qdp,nx,qsize,dp1,dp2,remap_alg)
      return
   endif
 
-  call t_startf('remap_Q_noppm')
+!   call t_startf('remap_Q_noppm')
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(q,i,j,z1c,z2c,zv,k,dp_np1,dp_star,Qcol,zkr,ilev) &
 !$omp    private(jk,zgam,zhdp,h,zarg,rhs,lower_diag,diag,upper_diag,q_diag,tmp_cal,filter_code) &
@@ -541,7 +541,7 @@ subroutine remap_Q_ppm(Qdp,nx,qsize,dp1,dp2,remap_alg)
   integer :: i, j, k, q, kk, kid(nlev)
   logical :: limit_linear_extrap
 
-  call t_startf('remap_Q_ppm')
+!   call t_startf('remap_Q_ppm')
   do j = 1 , nx
     do i = 1 , nx
 

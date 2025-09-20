@@ -155,7 +155,7 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    ! Call mcica sub-column generator for RRTMG_LW
 
    ! Call sub-column generator for McICA in radiation
-   call t_startf('mcica_subcol_lw')
+   !!call t_startf('mcica_subcol_lw')
 
    ! Select cloud overlap approach (1=random, 2=maximum-random, 3=maximum)
    icld = 2
@@ -173,10 +173,10 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
       cld(:, pverp-rrtmg_levs+1:pverp-1), cicewp, cliqwp, rei, rel, tauc_lw(:, :ncol, pverp-rrtmg_levs+1:pverp-1), &
       cld_stolw, cicewp_stolw, cliqwp_stolw, rei_stolw, rel_stolw, tauc_stolw, clm_rand_seed, pergro_mods)
 
-   call t_stopf('mcica_subcol_lw')
+   !!call t_stopf('mcica_subcol_lw')
 
    
-   call t_startf('rrtmg_lw')
+   !!call t_startf('rrtmg_lw')
 
    !
    ! Call RRTMG_LW model
@@ -293,7 +293,7 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
            (/ncol,rrtmg_levs,nbndlw/), order=(/3,1,2/))
    end if
    
-   call t_stopf('rrtmg_lw')
+   !!call t_stopf('rrtmg_lw')
 
 end subroutine rad_rrtmg_lw
 

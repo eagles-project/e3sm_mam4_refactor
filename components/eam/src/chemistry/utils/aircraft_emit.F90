@@ -561,7 +561,7 @@ contains
     ! called by: phys_timestep_init (in physpkg.F90)
     !-------------------------------------------------------------------
 
-    use perf_mod,     only: t_startf, t_stopf
+    !use perf_mod,     only: t_startf, t_stopf
     use tracer_data,  only: advance_trcdata
     use physics_types,only: physics_state
     use ppgrid,       only: begchunk, endchunk
@@ -588,7 +588,7 @@ contains
     ! Return if aircraft_cnt is zero (no aircraft data to process)
     !------------------------------------------------------------------
     if (aircraft_cnt == 0 ) return
-    call t_startf('All_aircraft_emit_adv')
+    !call t_startf('All_aircraft_emit_adv')
 
     !-------------------------------------------------------------------
     !    For each field, read more data if needed and interpolate it to the current model time
@@ -674,7 +674,7 @@ contains
        enddo
     enddo
 
-    call t_stopf('All_aircraft_emit_adv')
+    !call t_stopf('All_aircraft_emit_adv')
   end subroutine aircraft_emit_adv
 
 

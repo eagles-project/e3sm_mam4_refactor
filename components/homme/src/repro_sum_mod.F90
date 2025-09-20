@@ -404,7 +404,7 @@ module repro_sum_mod
 
       if ( use_ddpdd_sum ) then
 
-         call t_startf('repro_sum_ddpdd')
+!          call t_startf('repro_sum_ddpdd')
 
          call repro_sum_ddpdd(arr, arr_gsum, nsummands, dsummands, &
                               nflds, mpi_comm)
@@ -414,7 +414,7 @@ module repro_sum_mod
 
       else
 
-         call t_startf('repro_sum_int')
+!          call t_startf('repro_sum_int')
 
 ! determine global number of summands
 #if ( defined SPMD )
@@ -576,7 +576,7 @@ module repro_sum_mod
 #if ( defined SPMD )
             call t_barrierf('sync_nonrepro_sum',mpi_comm)
 #endif
-            call t_startf('nonrepro_sum')
+!             call t_startf('nonrepro_sum')
 ! record statistic
             nonrepro_sum = 1
 ! compute nonreproducible sum

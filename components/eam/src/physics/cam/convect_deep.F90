@@ -15,7 +15,7 @@ module convect_deep
    use shr_kind_mod, only: r8=>shr_kind_r8
    use ppgrid,       only: pver, pcols, pverp
    use cam_logfile,  only: iulog
-   use perf_mod,     only: t_startf, t_stopf
+   !use perf_mod,     only: t_startf, t_stopf
 
    implicit none
 
@@ -278,7 +278,7 @@ subroutine convect_deep_tend( &
      call pbuf_get_field(pbuf, pblh_idx,  pblh)
      call pbuf_get_field(pbuf, tpert_idx, tpert)
 
-     call t_startf('zm_conv_tend')
+     !call t_startf('zm_conv_tend')
      call zm_conv_tend( pblh    ,mcon    ,cme     , &
           tpert   ,dlf     ,pflx    ,zdu      , &
           rliq    , &
@@ -286,7 +286,7 @@ subroutine convect_deep_tend( &
           jctop, jcbot , &
           state   ,ptend   ,landfrac, pbuf, mu, eu, &
           du, md, ed, dp, dsubcld, jt, maxg, ideep, lengath)
-     call t_stopf('zm_conv_tend')
+     !call t_stopf('zm_conv_tend')
 
 
   end select

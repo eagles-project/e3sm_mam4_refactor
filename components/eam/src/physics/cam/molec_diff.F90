@@ -18,7 +18,7 @@ module molec_diff
   !                    M. Mills, November  2011
   !------------------------------------------------------------------------------------------------- !
 
-  use perf_mod
+  !use perf_mod
   use physconst,    only : mbarv
   use constituents, only : pcnst
   use phys_control, only : waccmx_is             !WACCM-X runtime switch
@@ -396,7 +396,7 @@ contains
     ! a combination of ca and cc; they are not required by the solver.      !
     !---------------------------------------------------------------------- !
 
-    call t_startf('vd_lu_qdecomp')
+    !call t_startf('vd_lu_qdecomp')
 
     kmq(:,:)  = 0._r8
     cd_top(:) = 0._r8
@@ -561,7 +561,7 @@ contains
          ( cb(:ncol,k) - decomp%ca(:ncol,k) * decomp%ze(:ncol,k+1) )
 
     vd_lu_qdecomp = 1
-    call t_stopf('vd_lu_qdecomp')
+    !call t_stopf('vd_lu_qdecomp')
     return
 
   end function vd_lu_qdecomp

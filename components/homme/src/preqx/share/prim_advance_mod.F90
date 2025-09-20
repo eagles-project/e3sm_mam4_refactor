@@ -178,7 +178,7 @@ contains
   end interface
 #endif
 
-    call t_startf('prim_advance_exp')
+!     call t_startf('prim_advance_exp')
     nm1   = tl%nm1
     n0    = tl%n0
     np1   = tl%np1
@@ -243,7 +243,7 @@ contains
     if (method==0) then
        ! regular LF step
        dt2 = 2*dt
-       call t_startf("LF_timestep")
+!        call t_startf("LF_timestep")
        call compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,eta_ave_w)
        call t_stopf("LF_timestep")
@@ -251,7 +251,7 @@ contains
     else if (method==1) then
        ! RK2
        ! forward euler to u(dt/2) = u(0) + (dt/2) RHS(0)  (store in u(np1))
-       call t_startf("RK2_timestep")
+!        call t_startf("RK2_timestep")
        call compute_and_apply_rhs(np1,n0,n0,qn0,dt/2,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,0d0)
        ! leapfrog:  u(dt) = u(0) + dt RHS(dt/2)     (store in u(np1))
@@ -262,7 +262,7 @@ contains
        ! RK2-SSP 3 stage.  matches tracer scheme. optimal SSP CFL, but
        ! not optimal for regular CFL
        ! u1 = u0 + dt/2 RHS(u0)
-       call t_startf("RK2-SSP3_timestep")
+!        call t_startf("RK2-SSP3_timestep")
        call compute_and_apply_rhs(np1,n0,n0,qn0,dt/2,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,eta_ave_w/3)
        ! u2 = u1 + dt/2 RHS(u1)
@@ -284,7 +284,7 @@ contains
     else if (method==3) then
        ! classic RK3  CFL=sqrt(3)
        ! u1 = u0 + dt/3 RHS(u0)
-       call t_startf("RK3_timestep")
+!        call t_startf("RK3_timestep")
        call compute_and_apply_rhs(np1,n0,n0,qn0,dt/3,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,0d0)
        ! u2 = u0 + dt/2 RHS(u1)
@@ -298,7 +298,7 @@ contains
        ! KG 4th order 4 stage:   CFL=sqrt(8)
        ! low storage version of classic RK4
        ! u1 = u0 + dt/4 RHS(u0)
-       call t_startf("RK4_timestep")
+!        call t_startf("RK4_timestep")
        call compute_and_apply_rhs(np1,n0,n0,qn0,dt/4,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,0d0)
        ! u2 = u0 + dt/3 RHS(u1)
@@ -316,7 +316,7 @@ contains
        ! KG 3nd order 5 stage:   CFL=sqrt( 4^2 -1) = 3.87
        ! but nonlinearly only 2nd order
        ! u1 = u0 + dt/5 RHS(u0)
-       call t_startf("KG3-5stage_timestep")
+!        call t_startf("KG3-5stage_timestep")
        call compute_and_apply_rhs(np1,n0,n0,qn0,dt/5,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,0d0)
        ! u2 = u0 + dt/5 RHS(u1)
@@ -335,7 +335,7 @@ contains
 #else
        ! Ullrich 3nd order 5 stage:   CFL=sqrt( 4^2 -1) = 3.87
        ! u1 = u0 + dt/5 RHS(u0)  (save u1 in timelevel nm1)
-       call t_startf("U3-5stage_timestep")
+!        call t_startf("U3-5stage_timestep")
        call compute_and_apply_rhs(nm1,n0,n0,qn0,dt/5,elem,hvcoord,hybrid,&
             deriv,nets,nete,compute_diagnostics,eta_ave_w/4)
        ! u2 = u0 + dt/5 RHS(u1)
@@ -373,7 +373,7 @@ contains
 !      if (hybrid%masterthread) print*, "fully implicit integration is still under development"
 
 #ifdef TRILINOS
-      call t_startf("JFNK_imp_timestep")
+!       call t_startf("JFNK_imp_timestep")
       lenx=(np*np*nlev*3 + np*np*1)*(nete-nets+1)  ! 3 3d vars plus 1 2d vars
       allocate(xstate(lenx))
       xstate(:) = 0d0
@@ -628,7 +628,7 @@ contains
   if (nu_s == 0 .and. nu == 0 .and. nu_p==0 ) return;
 !JMD  call t_barrierf('sync_advance_hypervis', hybrid%par%comm)
 !pw   call t_adj_detailf(+1) 
-  call t_startf('advance_hypervis_dp')
+!   call t_startf('advance_hypervis_dp')
 
 
   dt=dt2/hypervis_subcycle
@@ -665,7 +665,7 @@ contains
            call edgeVpack_nlyr(edge_g,elem(ie)%desc,elem(ie)%state%v(:,:,:,:,nt),2*nlev,kptr,3*nlev)
         enddo
 
-        call t_startf('ahdp_bexchV1')
+!         call t_startf('ahdp_bexchV1')
         call bndry_exchangeV(hybrid,edge_g)
         call t_stopf('ahdp_bexchV1')
 
@@ -776,7 +776,7 @@ contains
 
         enddo
 
-        call t_startf('ahdp_bexchV2')
+!         call t_startf('ahdp_bexchV2')
         call bndry_exchangeV(hybrid,edge_g)
         call t_stopf('ahdp_bexchV2')
 
@@ -946,7 +946,7 @@ contains
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
   integer :: i,j,k,kptr,ie
 
-  call t_startf('compute_and_apply_rhs')
+!   call t_startf('compute_and_apply_rhs')
   do ie=nets,nete
      dp  => elem(ie)%state%dp3d(:,:,:,n0)
 
@@ -1364,7 +1364,7 @@ contains
   ! sync is required
   ! =============================================================
 
-  call t_startf('caar_bexchV')
+!   call t_startf('caar_bexchV')
   call bndry_exchangeV(hybrid,edge_g)
   call t_stopf('caar_bexchV')
 

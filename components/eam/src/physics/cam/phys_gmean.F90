@@ -31,7 +31,7 @@ module phys_gmean
 #if ( defined SPMD )
    use mpishorthand
 #endif
-   use perf_mod
+   !use perf_mod
    use cam_logfile,   only: iulog
 
    implicit none
@@ -79,9 +79,9 @@ module phys_gmean
 !
 !-----------------------------------------------------------------------
 !
-      call t_startf ('gmean_fixed_repro')
+      !call t_startf ('gmean_fixed_repro')
       call gmean_fixed_repro(arr, arr_gmean, rel_diff, nflds)
-      call t_stopf ('gmean_fixed_repro')
+      !call t_stopf ('gmean_fixed_repro')
 
       ! check that "fast" reproducible sum is accurate enough. If not, calculate
       ! using old method
@@ -91,9 +91,9 @@ module phys_gmean
          if ( shr_reprosum_recompute ) then
             do ifld=1,nflds
                if ( rel_diff(1,ifld) > shr_reprosum_reldiffmax ) then
-                  call t_startf ('gmean_float_repro')
+                  !call t_startf ('gmean_float_repro')
                   call gmean_float_repro(arr(:,:,ifld), arr_gmean(ifld), 1)
-                  call t_stopf ('gmean_float_repro')
+                  !call t_stopf ('gmean_float_repro')
                endif
             enddo
          endif

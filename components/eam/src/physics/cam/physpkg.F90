@@ -389,16 +389,16 @@ contains
        if (masterproc) write(iulog,*) 'NOT AN AQUA_PLANET simulation, initialize &
             &sgh, sgh30, land m using data from file.'
        fh_topo=>topo_file_get_id()
-       call t_startf('phys_inidat_infld')
+       !call t_startf('phys_inidat_infld')
        call infld('SGH', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
             sgh, found, gridname='physgrid')
-       call t_stopf('phys_inidat_infld')
+       !call t_stopf('phys_inidat_infld')
        if(.not. found) call endrun('ERROR: SGH not found on topo file')
 
-       call t_startf('phys_inidat_infld')
+       !call t_startf('phys_inidat_infld')
        call infld('SGH30', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
             sgh30, found, gridname='physgrid')
-       call t_stopf('phys_inidat_infld')
+       !call t_stopf('phys_inidat_infld')
 
        if(.not. found) then
           if (masterproc) write(iulog,*) 'Warning: Error reading SGH30 from topo file.'
@@ -409,10 +409,10 @@ contains
 
     allocate(tptr(1:pcols,begchunk:endchunk))
 
-    call t_startf('phys_inidat_infld')
+    !call t_startf('phys_inidat_infld')
     call infld('PBLH', fh_ini, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
          tptr(:,:), found, gridname='physgrid')
-    call t_stopf('phys_inidat_infld')
+    !call t_stopf('phys_inidat_infld')
 
     if(.not. found) then
        tptr(:,:) = 0._r8
@@ -784,9 +784,9 @@ contains
     if (adiabatic .or. ideal_phys) return
 
     if (nsrest .eq. 0) then
-       call t_startf ('phys_inidat')
+       !call t_startf ('phys_inidat')
        call phys_inidat(cam_out, pbuf2d) 
-       call t_stopf ('phys_inidat')
+       !call t_stopf ('phys_inidat')
     end if
 
     ! wv_saturation is relatively independent of everything else and
@@ -797,22 +797,22 @@ contains
     if (cam3_aero_data_on) call cam3_aero_data_init(phys_state)
 
     ! Initialize rad constituents and their properties
-    call t_startf ('rad_cnst_init')
+    !call t_startf ('rad_cnst_init')
     call rad_cnst_init()
-    call t_stopf ('rad_cnst_init')
+    !call t_stopf ('rad_cnst_init')
 
     call aer_rad_props_init()
     call cloud_rad_props_init()
 
     ! solar irradiance data modules
-    call t_startf ('solar_data_init')
+    !call t_startf ('solar_data_init')
     call solar_data_init()
-    call t_stopf ('solar_data_init')
+    !call t_stopf ('solar_data_init')
 
     ! Prognostic chemistry.
-    call t_startf ('chem_init')
+    !call t_startf ('chem_init')
     call chem_init(phys_state,pbuf2d, species_class)
-    call t_stopf ('chem_init')
+    !call t_stopf ('chem_init')
 
     ! Prescribed tracers
     call prescribed_ozone_init()
@@ -823,15 +823,15 @@ contains
     !when is_cmip6_volc is true ,cmip6 style volcanic file is read
     !Initialized to .false. here but it gets its values from prescribed_volcaero_init
     is_cmip6_volc = .false. 
-    call t_startf ('prescribed_volcaero_init')
+    !call t_startf ('prescribed_volcaero_init')
     call prescribed_volcaero_init(is_cmip6_volc)
-    call t_stopf ('prescribed_volcaero_init')
+    !call t_stopf ('prescribed_volcaero_init')
 
     ! Initialize ocean data
     if (has_mam_mom) then
-       call t_startf ('init_ocean_data')
+       !call t_startf ('init_ocean_data')
        call init_ocean_data()
-       call t_stopf ('init_ocean_data')
+       !call t_stopf ('init_ocean_data')
     end if
 
     ! co2 cycle            
@@ -859,9 +859,9 @@ contains
 
     call tsinti(tmelt, latvap, rair, stebol, latice)
 
-    call t_startf ('radiation_init')
+    !call t_startf ('radiation_init')
     call radiation_init(phys_state)
-    call t_stopf ('radiation_init')
+    !call t_stopf ('radiation_init')
 
     call rad_solar_var_init()
 
@@ -896,9 +896,9 @@ contains
 #endif
     call sslt_rebin_init()
 
-    call t_startf ('tropopause_init')
+    !call t_startf ('tropopause_init')
     call tropopause_init()
-    call t_stopf ('tropopause_init')
+    !call t_stopf ('tropopause_init')
 
     if(do_aerocom_ind3) call output_aerocom_aie_init()
 
@@ -998,7 +998,7 @@ contains
     real(r8)    :: chunk_cost                    ! measured cost per chunk
     type(physics_buffer_desc), pointer :: phys_buffer_chunk(:)
 
-    call t_startf ('physpkg_st1')
+    !call t_startf ('physpkg_st1')
     nstep = get_nstep()
 
 #if ( defined OFFLINE_DYN )
@@ -1014,17 +1014,17 @@ contains
     if (nstep == 0 .and. phys_do_flux_avg()) call flux_avg_init(cam_in,  pbuf2d)
 
     ! Compute total energy of input state and previous output state
-    call t_startf ('chk_en_gmean')
+    !call t_startf ('chk_en_gmean')
     call check_energy_gmean(phys_state, pbuf2d, ztodt, nstep)
-    call t_stopf ('chk_en_gmean')
+    !call t_stopf ('chk_en_gmean')
 
 
     if ( adiabatic .or. ideal_phys )then
-       call t_stopf ('physpkg_st1')
+       !call t_stopf ('physpkg_st1')
 
-       call t_startf ('bc_physics')
+       !call t_startf ('bc_physics')
        call phys_run1_adiabatic_or_ideal(ztodt, phys_state, phys_tend,  pbuf2d)
-       call t_stopf ('bc_physics')
+       !call t_stopf ('bc_physics')
     else
        call pbuf_allocate(pbuf2d, 'physpkg')
        call diag_allocate()
@@ -1033,11 +1033,11 @@ contains
        ! Advance time information
        !-----------------------------------------------------------------------
 
-       call t_startf('phys_timestep_init')
+       !call t_startf('phys_timestep_init')
        call phys_timestep_init( phys_state, cam_out, pbuf2d)
-       call t_stopf('phys_timestep_init')
+       !call t_stopf('phys_timestep_init')
 
-       call t_stopf ('physpkg_st1')
+       !call t_stopf ('physpkg_st1')
 
 #ifdef TRACER_CHECK
        call gmean_mass ('before tphysbc DRY', phys_state)
@@ -1055,7 +1055,7 @@ contains
        end do
 #endif
        call t_barrierf('sync_bc_physics', mpicom)
-       call t_startf ('bc_physics')
+       !call t_startf ('bc_physics')
        !call t_adj_detailf(+1)
 
        call system_clock(count=beg_proc_cnt)
@@ -1071,9 +1071,9 @@ contains
           !
           phys_buffer_chunk => pbuf_get_chunk(pbuf2d, c)
 
-          call t_startf ('diag_physvar_ic')
+          !call t_startf ('diag_physvar_ic')
           call diag_physvar_ic ( c,  phys_buffer_chunk, cam_out(c), cam_in(c) )
-          call t_stopf ('diag_physvar_ic')
+          !call t_stopf ('diag_physvar_ic')
 
           call tphysbc (ztodt, fsns(1,c), fsnt(1,c), flns(1,c), flnt(1,c), phys_state(c),        &
                phys_tend(c), phys_buffer_chunk,  fsds(1,c),                       &
@@ -1091,7 +1091,7 @@ contains
        phys_proc_cost = phys_proc_cost + real( (end_proc_cnt-beg_proc_cnt), r8)/real(sysclock_rate, r8)
 
        !call t_adj_detailf(-1)
-       call t_stopf ('bc_physics')
+       !call t_stopf ('bc_physics')
 
        ! Don't call the rest in CRM mode
        if(single_column.and.scm_crm_mode) return
@@ -1184,9 +1184,9 @@ contains
        end if
 
        if ( ideal_phys )then
-          call t_startf('tphysidl')
+          !call t_startf('tphysidl')
           call tphysidl(ztodt, phys_state(c), phys_tend(c))
-          call t_stopf('tphysidl')
+          !call t_stopf('tphysidl')
        end if
 
        ! Save total enery after physics for energy conservation checks
@@ -1281,12 +1281,12 @@ contains
     call get_met_srf2( cam_in )
 #endif
     ! Set lightning production of NO
-    call t_startf ('lightning_no_prod')
+    !call t_startf ('lightning_no_prod')
     call lightning_no_prod( phys_state, pbuf2d,  cam_in )
-    call t_stopf ('lightning_no_prod')
+    !call t_stopf ('lightning_no_prod')
 
     call t_barrierf('sync_ac_physics', mpicom)
-    call t_startf ('ac_physics')
+    !call t_startf ('ac_physics')
     !call t_adj_detailf(+1)
 
     nstep = get_nstep()
@@ -1320,9 +1320,9 @@ contains
        !
        ! surface diagnostics for history files
        !
-       call t_startf('diag_surf')
+       !call t_startf('diag_surf')
        call diag_surf(cam_in(c), cam_out(c), phys_state(c)%ps,trefmxav(1,c), trefmnav(1,c))
-       call t_stopf('diag_surf')
+       !call t_stopf('diag_surf')
 
        call tphysac(ztodt, cam_in(c),  &
             sgh(1,c), sgh30(1,c), cam_out(c),                              &
@@ -1341,18 +1341,18 @@ contains
     phys_proc_cost = phys_proc_cost + real( (end_proc_cnt-beg_proc_cnt), r8)/real(sysclock_rate, r8)
 
     !call t_adj_detailf(-1)
-    call t_stopf('ac_physics')
+    !call t_stopf('ac_physics')
 
 #ifdef TRACER_CHECK
     call gmean_mass ('after tphysac FV:WET)', phys_state)
 #endif
 
-    call t_startf ('physpkg_st2')
+    !call t_startf ('physpkg_st2')
     call pbuf_deallocate(pbuf2d, 'physpkg')
 
     call pbuf_update_tim_idx()
     call diag_deallocate()
-    call t_stopf ('physpkg_st2')
+    !call t_stopf ('physpkg_st2')
 
   end subroutine phys_run2
 
@@ -1383,21 +1383,21 @@ contains
     deallocate(phys_state)
     deallocate(phys_tend)
 
-    call t_startf ('chem_final')
+    !call t_startf ('chem_final')
     call chem_final
-    call t_stopf ('chem_final')
+    !call t_stopf ('chem_final')
 
-    call t_startf ('wv_sat_final')
+    !call t_startf ('wv_sat_final')
     call wv_sat_final
-    call t_stopf ('wv_sat_final')
+    !call t_stopf ('wv_sat_final')
 
-    call t_startf ('radiation_final')
+    !call t_startf ('radiation_final')
     call radiation_final()
-    call t_stopf ('radiation_final')
+    !call t_stopf ('radiation_final')
 
-    call t_startf ('print_cost_p')
+    !call t_startf ('print_cost_p')
     call print_cost_p
-    call t_stopf ('print_cost_p')
+    !call t_stopf ('print_cost_p')
 
   end subroutine phys_final
 
@@ -1570,7 +1570,7 @@ contains
     if (state_debug_checks) &
          call physics_state_check(state, name="before tphysac")
 
-    call t_startf('tphysac_init')
+    !call t_startf('tphysac_init')
     ! Associate pointers with physics buffer fields
     itim_old = pbuf_old_tim_idx()
 
@@ -1602,7 +1602,9 @@ contains
     if (l_tracer_aero) then
 
        ! emissions of aerosols and gas-phase chemistry constituents at surface
+       call t_startf('MAM4:chem_emissions')
        call chem_emissions( state, cam_in )
+       call t_stopf('MAM4:chem_emissions')
 
     end if ! l_tracer_aero
 
@@ -1630,15 +1632,15 @@ contains
 
     !!== KZ_WCON
 
-    call t_stopf('tphysac_init')
+    !call t_stopf('tphysac_init')
 
     if (l_tracer_aero) then
        !===================================================
        ! Source/sink terms for advected tracers.
        !===================================================
-       call t_startf('adv_tracer_src_snk')
+       !call t_startf('adv_tracer_src_snk')
        ! Test tracers
-
+       call t_startf('MAM4:adv_tracers_timestep_tend')
        call tracers_timestep_tend(state, ptend, cam_in%cflx, cam_in%landfrac, ztodt)      
        call physics_update(state, ptend, ztodt, tend)
        call check_tracers_chng(state, tracerint, "tracers_timestep_tend", nstep, ztodt,   &
@@ -1652,9 +1654,11 @@ contains
        ! add tendency from aircraft emissions
        call co2_cycle_set_ptend(state, pbuf, ptend)
        call physics_update(state, ptend, ztodt, tend)
+       call t_stopf('MAM4:adv_tracers_timestep_tend')
 
        ! Chemistry calculation
        if (chem_is_active()) then
+          call t_startf('MAM4:chem_timestep_tend')
           !get mmr of cloud borne aerosols
           call get_cldbrn_mmr(lchnk, pbuf, &! in
                qqcw) !out
@@ -1672,8 +1676,9 @@ contains
           call check_energy_chng(state, tend, "chem", nstep, ztodt, fh2o, zero, zero, zero)
           call check_tracers_chng(state, tracerint, "chem_timestep_tend", nstep, ztodt, &
                cam_in%cflx)
+          call t_stopf('MAM4:chem_timestep_tend')
        end if
-       call t_stopf('adv_tracer_src_snk')
+       !call t_stopf('adv_tracer_src_snk')
 
     end if ! l_tracer_aero
 
@@ -1687,15 +1692,17 @@ contains
     !   surface fluxes need to be updated here for constituents 
     if (do_clubb_sgs) then
 
+       call t_startf('EAM:clubb_surface')
        call clubb_surface ( state, ptend, ztodt, cam_in, surfric, obklen)
 
        ! Update surface flux constituents 
        call physics_update(state, ptend, ztodt, tend)
+       call t_stopf('EAM:clubb_surface')
 
     else
        if (l_vdiff) then
 
-          call t_startf('vertical_diffusion_tend')
+          !call t_startf('vertical_diffusion_tend')
           call vertical_diffusion_tend (ztodt ,state ,cam_in%wsx, cam_in%wsy,   &
                cam_in%shf     ,cam_in%cflx     ,surfric  ,obklen   ,ptend    ,ast    ,&
                cam_in%ocnfrac  , cam_in%landfrac ,        &
@@ -1709,7 +1716,7 @@ contains
           endif
 
           call physics_update(state, ptend, ztodt, tend)
-          call t_stopf ('vertical_diffusion_tend')
+          !call t_stopf ('vertical_diffusion_tend')
 
        end if ! l_vdiff
     endif
@@ -1719,10 +1726,10 @@ contains
        !===================================================
        ! Rayleigh friction calculation
        !===================================================
-       call t_startf('rayleigh_friction')
+       call t_startf('EAM:rayleigh_friction')
        call rayleigh_friction_tend( ztodt, state, ptend)
        call physics_update(state, ptend, ztodt, tend)
-       call t_stopf('rayleigh_friction')
+       call t_stopf('EAM:rayleigh_friction')
 
        if (do_clubb_sgs) then
           call check_energy_chng(state, tend, "vdiff", nstep, ztodt, zero, zero, zero, zero)
@@ -1738,7 +1745,7 @@ contains
     if (l_tracer_aero) then
 
        !  aerosol dry deposition processes
-       call t_startf('aero_drydep')
+       call t_startf('MAM4:aero_drydep')
        !get mmr of cloud borne aerosols
        call get_cldbrn_mmr(lchnk, pbuf, &! in
             qqcw) !out
@@ -1750,7 +1757,7 @@ contains
             state%q, dgncur_awet, wetdens, qqcw, obklen, surfric, cam_in%landfrac, cam_in%icefrac, cam_in%ocnfrac, &
             cam_in%fv, cam_in%ram1, ztodt, cam_out, ptend )
        call physics_update(state, ptend, ztodt, tend)
-       call t_stopf('aero_drydep')
+       call t_stopf('MAM4:aero_drydep')
 
        !---------------------------------------------------------------------------------
        !	... enforce charge neutrality
@@ -1763,23 +1770,25 @@ contains
        !===================================================
        ! Gravity wave drag
        !===================================================
-       call t_startf('gw_tend')
+       call t_startf('EAM:gw_tend')
 
        call gw_tend(state, sgh, pbuf, ztodt, ptend, cam_in)
 
        call physics_update(state, ptend, ztodt, tend)
        ! Check energy integrals
        call check_energy_chng(state, tend, "gwdrag", nstep, ztodt, zero, zero, zero, zero)
-       call t_stopf('gw_tend')
+       call t_stopf('EAM:gw_tend')
 
        ! QBO relaxation
+       call t_startf ( 'EAM:qbo_relax' )
        call qbo_relax(state, pbuf, ptend)
        call physics_update(state, ptend, ztodt, tend)
        ! Check energy integrals
        call check_energy_chng(state, tend, "qborelax", nstep, ztodt, zero, zero, zero, zero)
+       call t_stopf  ( 'EAM:qbo_relax' )
 
        ! Ion drag calculation
-       call t_startf ( 'iondrag' )
+       call t_startf ( 'EAM:iondrag' )
 
        if ( do_waccm_ions ) then
           call iondrag_calc( lchnk, ncol, state, ptend, pbuf,  ztodt )
@@ -1796,7 +1805,7 @@ contains
        call physics_update(state, ptend, ztodt, tend)
        ! Check energy integrals
        call check_energy_chng(state, tend, "iondrag", nstep, ztodt, zero, zero, zero, zero)
-       call t_stopf  ( 'iondrag' )
+       call t_stopf  ( 'EAM:iondrag' )
 
     end if ! l_gw_drag
 
@@ -2132,7 +2141,7 @@ contains
          )
 
     !-----------------------------------------------------------------------
-    call t_startf('bc_init')
+    !call t_startf('bc_init')
 
     zero = 0._r8
     zero_tracers(:,:) = 0._r8
@@ -2292,14 +2301,14 @@ contains
     ! compute mass integrals of input tracers state
     call check_tracers_init(state, tracerint)
 
-    call t_stopf('bc_init')
+    !call t_stopf('bc_init')
 
     !===================================================
     ! Global mean total energy fixer
     !===================================================
     if (l_bc_energy_fix) then
 
-       call t_startf('energy_fixer')
+       !call t_startf('energy_fixer')
 
        tini(:ncol,:pver) = state%t(:ncol,:pver)
        if (dycore_is('LR') .or. dycore_is('SE'))  then
@@ -2329,7 +2338,7 @@ contains
           call outfld( 'DTCORE', dtcore, pcols, lchnk )
        end if
 
-       call t_stopf('energy_fixer')
+       !call t_stopf('energy_fixer')
 
     end if
     !
@@ -2339,7 +2348,7 @@ contains
     !===================================================
     if (l_dry_adj) then
 
-       call t_startf('dry_adjustment')
+       call t_startf('EAM:dry_adjustment')
 
        ! Copy state info for input to dadadj
        ! This is a kludge, so that dadadj does not have to be correctly reformulated in dry static energy
@@ -2356,19 +2365,19 @@ contains
        ptend%q(:ncol,:,1) = (ptend%q(:ncol,:,1) - state%q(:ncol,:,1))/ztodt
        call physics_update(state, ptend, ztodt, tend)
 
-       call t_stopf('dry_adjustment')
+       call t_stopf('EAM:dry_adjustment')
 
     end if
     !
     !===================================================
     ! Moist convection
     !===================================================
-    call t_startf('moist_convection')
+    !call t_startf('moist_convection')
     !
     ! Since the PBL doesn't pass constituent perturbations, they
     ! are zeroed here for input to the moist convection routine
     !
-    call t_startf ('convect_deep_tend')
+    call t_startf ('EAM:convect_deep_tend')
     call convect_deep_tend(  &
          cmfmc,      cmfcme,             &
          dlf,        pflx,    zdu,       &
@@ -2376,10 +2385,10 @@ contains
          ztodt,   &
          state,   ptend, cam_in%landfrac, pbuf, mu, eu, du, md, ed, dp,   &
          dsubcld, jt, maxg, ideep, lengath) 
-    call t_stopf('convect_deep_tend')
+    
 
     call physics_update(state, ptend, ztodt, tend)
-
+    call t_stopf('EAM:convect_deep_tend')
     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp )
     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp )
     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh )
@@ -2403,21 +2412,22 @@ contains
     !
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
     !
-    call t_startf ('convect_shallow_tend')
+    call t_startf ('EAM:convect_shallow_tend')
 
     call convect_shallow_tend (ztodt   , cmfmc,  cmfmc2  ,&
          dlf        , dlf2   ,  rliq   , rliq2, & 
          state      , ptend  ,  pbuf   , sh_e_ed_ratio   , sgh, sgh30, cam_in) 
-    call t_stopf ('convect_shallow_tend')
+    
 
     call physics_update(state, ptend, ztodt, tend)
+    call t_stopf ('EAM:convect_shallow_tend')
 
     flx_cnd(:ncol) = prec_sh(:ncol) + rliq2(:ncol)
     call check_energy_chng(state, tend, "convect_shallow", nstep, ztodt, zero, flx_cnd, snow_sh, zero)
 
     call check_tracers_chng(state, tracerint, "convect_shallow", nstep, ztodt, zero_tracers)
 
-    call t_stopf('moist_convection')
+    !call t_stopf('moist_convection')
 
     if (l_tracer_aero) then
 
@@ -2442,19 +2452,25 @@ contains
        !=====================================================
        !   CLUBB call (PBL, shallow convection, macrophysics)
        !=====================================================  
+       call t_startf ('EAM:clubb_tend_cam')
        call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
             cmfmc, cam_in, sgh30, macmic_it, cld_macmic_num_steps, & 
             dlf, det_s, det_ice, lcldo)
 
        call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
        call physics_update(state, ptend, ztodt, tend)
+       call t_stopf ('EAM:clubb_tend_cam')
 
        !===================================================
        ! Calculate cloud microphysics 
        !===================================================
+       call t_startf('MAM4:microp_aero_run_aci')
        call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo) !<<<AEROSOLS
+       call t_stopf('MAM4:microp_aero_run_aci')
 
+       call t_startf('EAM:MG2-microp_driver')
        call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
+       call t_stopf('EAM:MG2-microp_driver')
        
        call physics_ptend_sum(ptend_aero, ptend, ncol)
        call physics_ptend_dealloc(ptend_aero)
@@ -2485,7 +2501,7 @@ contains
           ! transport in order to determine interstitial fraction.
           !======================================================================
 
-          call t_startf('tphysbc_aerosols')
+          call t_startf('MAM4: Wetdep')
 
           if (do_clubb_sgs) sh_e_ed_ratio = 0.0_r8
 
@@ -2495,12 +2511,15 @@ contains
                jt, maxg, ideep, lengath, species_class,           &
                cam_out, pbuf, ptend )                               ! outputs
           call physics_update(state, ptend, ztodt, tend)
+          call t_stopf('MAM4: Wetdep')
 
           ! deep convective aerosol transport
+          call t_startf('EAM:convect_deep_tend_2')
           call convect_deep_tend_2( state, ptend, ztodt, pbuf, &
                mu, eu, du, md, ed, dp, dsubcld, jt, maxg,    &
                ideep, lengath, species_class )
           call physics_update(state, ptend, ztodt, tend)
+          call t_stopf('EAM:convect_deep_tend_2')
 
           ! check tracer integrals
           call check_tracers_chng(state, tracerint, "cmfmca", nstep, ztodt,  zero_tracers)
@@ -2515,11 +2534,11 @@ contains
     ! send dynamical variables, and derived variables to history file
     !===================================================
 
-    call t_startf('bc_history_write')
+    !call t_startf('bc_history_write')
     call diag_phys_writeout(state, cam_out%psl)
     call diag_conv(state, ztodt, pbuf)
 
-    call t_stopf('bc_history_write')
+    !call t_stopf('bc_history_write')
 
     !===================================
     ! Update Nudging tendency if needed
@@ -2532,17 +2551,17 @@ contains
     ! Write cloud diagnostics on history file
     !===================================================
 
-    call t_startf('bc_cld_diag_history_write')
+    !call t_startf('bc_cld_diag_history_write')
 
     call cloud_diagnostics_calc(state, pbuf)
 
-    call t_stopf('bc_cld_diag_history_write')
+    !call t_stopf('bc_cld_diag_history_write')
 
     if (l_rad) then
        !===================================================
        ! Radiation computations
        !===================================================
-       call t_startf('radiation')
+       call t_startf('EAM:radiation')
 
 
        call radiation_tend(state,ptend, pbuf, &
@@ -2558,7 +2577,7 @@ contains
        call physics_update(state, ptend, ztodt, tend)
        call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
-       call t_stopf('radiation')
+       call t_stopf('EAM:radiation')
 
     end if ! l_rad
 
@@ -2572,19 +2591,19 @@ contains
     end if
 
     ! Diagnose the location of the tropopause and its location to the history file(s).
-    call t_startf('tropopause')
+    !call t_startf('tropopause')
     call tropopause_output(state)
-    call t_stopf('tropopause')
+    !call t_stopf('tropopause')
 
     ! Save atmospheric fields to force surface models
-    call t_startf('cam_export')
+    !call t_startf('cam_export')
     call cam_export (state,cam_out,pbuf)
-    call t_stopf('cam_export')
+    !call t_stopf('cam_export')
 
     ! Write export state to history file
-    call t_startf('diag_export')
+    !call t_startf('diag_export')
     call diag_export(cam_out)
-    call t_stopf('diag_export')
+    !call t_stopf('diag_export')
 
     call check_tracers_fini(tracerint)
 
@@ -2643,9 +2662,9 @@ contains
     call solar_data_advance()
 
     ! Time interpolate for chemistry.
-    call t_startf('chem_timestep_init')
+    call t_startf('MAM4:chem_timestep_init')
     call chem_timestep_init(phys_state, pbuf2d)
-    call t_stopf('chem_timestep_init')
+    call t_stopf('MAM4:chem_timestep_init')
 
     ! Prescribed tracers
     call prescribed_ozone_adv(phys_state, pbuf2d)
@@ -2653,14 +2672,14 @@ contains
     call prescribed_aero_adv(phys_state, pbuf2d)
     call aircraft_emit_adv(phys_state, pbuf2d)
 
-    call t_startf('prescribed_volcaero_adv')
+    !call t_startf('prescribed_volcaero_adv')
     call prescribed_volcaero_adv(phys_state, pbuf2d)
-    call t_stopf('prescribed_volcaero_adv')
+    !call t_stopf('prescribed_volcaero_adv')
 
     if (has_mam_mom) then
-       call t_startf('advance_ocean_data')
+       !call t_startf('advance_ocean_data')
        call advance_ocean_data(phys_state, pbuf2d)
-       call t_stopf('advance_ocean_data')
+       !call t_stopf('advance_ocean_data')
     end if
 
     ! prescribed aerosol deposition fluxes
@@ -2688,9 +2707,9 @@ contains
 
     if (do_waccm_ions) then
        ! Compute the electric field
-       call t_startf ('efield')
+       !call t_startf ('efield')
        call get_efield
-       call t_stopf ('efield')
+       !call t_stopf ('efield')
     endif
 
     ! Time interpolate for tracers, if appropriate

@@ -27,7 +27,7 @@ use cam_pio_utils,     only: cam_pio_openfile
 use cam_history,       only: addfld, horiz_only, add_default, outfld
 use cam_history_support,   only: fillvalue
 use cam_logfile,       only: iulog
-use perf_mod,          only: t_startf, t_stopf
+!use perf_mod,          only: t_startf, t_stopf
 use cam_abortutils,    only: endrun
 
 use modal_aero_data,  only: ntot_amode, nspec_amode, specdens_amode, &

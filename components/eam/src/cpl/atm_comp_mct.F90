@@ -235,7 +235,7 @@ CONTAINS
 
        endif
 
-       call t_startf('shr_taskmap_write')
+       !call t_startf('shr_taskmap_write')
        call shr_taskmap_write(iulog, mpicom_atm,                    &
                               'ATM #'//trim(adjustl(c_inst_index)), &
                               verbose=verbose_taskmap_output,       &
@@ -243,7 +243,7 @@ CONTAINS
                               save_nnodes=nsmps,                    &
                               save_task_node_map=proc_smp_map       )
        call shr_sys_flush(iulog)
-       call t_stopf('shr_taskmap_write')
+       !call t_stopf('shr_taskmap_write')
 
        ! 
        ! Consistency check                              
@@ -289,11 +289,11 @@ CONTAINS
        !
        ! Read namelist
        !
-       call t_startf('read_namelist')
+       !call t_startf('read_namelist')
        filein = "atm_in" // trim(inst_suffix)
        call read_namelist(single_column_in=single_column, scmlat_in=scmlat, &
             scmlon_in=scmlon, nlfilename_in=filein)
-       call t_stopf('read_namelist')
+       !call t_stopf('read_namelist')
        !
        ! Initialize cam time manager
        !
@@ -314,11 +314,11 @@ CONTAINS
        ! Set defaults then override with user-specified input and initialize time manager
        ! Note that the following arguments are needed to cam_init for timemgr_restart only
        !
-       call t_startf('cam_init')
+       !call t_startf('cam_init')
        call cam_init( cam_out, cam_in, mpicom_atm, &
             start_ymd, start_tod, ref_ymd, ref_tod, stop_ymd, stop_tod, &
             perpetual_run, perpetual_ymd, calendar)
-       call t_stopf('cam_init')
+       !call t_stopf('cam_init')
        !
        ! Check consistency of restart time information with input clock
        !
@@ -403,24 +403,24 @@ CONTAINS
        if (StepNo == 0) then
           call atm_import( x2a_a%rattr, cam_in )
 
-          call t_startf('CAM_run1')
+          !call t_startf('CAM_run1')
           call cam_run1 ( cam_in, cam_out ) 
-          call t_stopf('CAM_run1')
+          !call t_stopf('CAM_run1')
           
           call atm_export( cam_out, a2x_a%rattr )
        else
 
-          call t_startf('atm_read_srfrest_mct')
+          !call t_startf('atm_read_srfrest_mct')
           call atm_read_srfrest_mct( EClock, x2a_a, a2x_a )
-          call t_stopf('atm_read_srfrest_mct')
+          !call t_stopf('atm_read_srfrest_mct')
 
           ! Sent .true. as an optional argument so that restart_init is set to .true.  in atm_import
 	      ! This will ensure BFB restarts whenever qneg4 updates fluxes on the restart time step
           call atm_import( x2a_a%rattr, cam_in, .true. )
 
-          call t_startf('cam_run1')
+          !call t_startf('cam_run1')
           call cam_run1 ( cam_in, cam_out ) 
-          call t_stopf('cam_run1')
+          !call t_stopf('cam_run1')
        end if
 
        ! Compute time of next radiation computation, like in run method for exact restart
@@ -539,9 +539,9 @@ CONTAINS
 
     ! Map input from mct to cam data structure
 
-    call t_startf ('CAM_import')
+    !call t_startf ('CAM_import')
     call atm_import( x2a_a%rattr, cam_in )
-    call t_stopf  ('CAM_import')
+    !call t_stopf  ('CAM_import')
     
     ! Cycle over all time steps in the atm coupling interval
     
@@ -572,36 +572,36 @@ CONTAINS
 
        ! Run CAM (run2, run3, run4)
        
-       call t_startf ('CAM_run2')
+       !call t_startf ('CAM_run2')
        call cam_run2( cam_out, cam_in )
-       call t_stopf  ('CAM_run2')
+       !call t_stopf  ('CAM_run2')
 
-       call t_startf ('CAM_run3')
+       !call t_startf ('CAM_run3')
        call cam_run3( cam_out )
-       call t_stopf  ('CAM_run3')
+       !call t_stopf  ('CAM_run3')
        
-       call t_startf ('CAM_run4')
+       !call t_startf ('CAM_run4')
        call cam_run4( cam_out, cam_in, rstwr, nlend, &
             yr_spec=yr_sync, mon_spec=mon_sync, day_spec=day_sync, sec_spec=tod_sync)
-       call t_stopf  ('CAM_run4')
+       !call t_stopf  ('CAM_run4')
        
        ! Advance cam time step 
        
-       call t_startf ('CAM_adv_timestep')
+       !call t_startf ('CAM_adv_timestep')
        call advance_timestep()
-       call t_stopf  ('CAM_adv_timestep')
+       !call t_stopf  ('CAM_adv_timestep')
        
        ! Run cam radiation/clouds (run1)
           
-       call t_startf ('CAM_run1')
+       !call t_startf ('CAM_run1')
        call cam_run1 ( cam_in, cam_out ) 
-       call t_stopf  ('CAM_run1')
+       !call t_stopf  ('CAM_run1')
        
        ! Map output from cam to mct data structures
        
-       call t_startf ('CAM_export')
+       !call t_startf ('CAM_export')
        call atm_export( cam_out, a2x_a%rattr )
-       call t_stopf ('CAM_export')
+       !call t_stopf ('CAM_export')
        
     end do
 
@@ -625,10 +625,10 @@ CONTAINS
     ! Write merged surface data restart file if appropriate
     
     if (rstwr_sync) then
-       call t_startf('atm_write_srfrest_mct')
+       !call t_startf('atm_write_srfrest_mct')
        call atm_write_srfrest_mct( x2a_a, a2x_a, &
             yr_spec=yr_sync, mon_spec=mon_sync, day_spec=day_sync, sec_spec=tod_sync)
-       call t_stopf('atm_write_srfrest_mct')
+       !call t_stopf('atm_write_srfrest_mct')
     end if
     
     ! Check for consistency of internal cam clock with master sync clock 
@@ -668,9 +668,9 @@ CONTAINS
     type(mct_aVect)             ,intent(inout) :: x2a_a
     type(mct_aVect)             ,intent(inout) :: a2x_a
 
-    call t_startf('cam_final')
+    !call t_startf('cam_final')
     call cam_final( cam_out, cam_in )
-    call t_stopf('cam_final')
+    !call t_stopf('cam_final')
 
   end subroutine atm_final_mct
 

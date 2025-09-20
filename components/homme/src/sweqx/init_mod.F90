@@ -141,7 +141,7 @@ contains
 
     ! Read in model control information
     ! =====================================
-    call t_startf('init')
+!     call t_startf('init')
 
     call readnl(par)
     call homme_pio_init(par%rank,par%comm)

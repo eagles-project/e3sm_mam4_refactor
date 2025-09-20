@@ -112,7 +112,7 @@ logical var_coef1
       enddo
    enddo
 
-   call t_startf('biwksc_bexchV')
+!    call t_startf('biwksc_bexchV')
    call bndry_exchangeV(hybrid,edgeq)
    call t_stopf('biwksc_bexchV')
    
@@ -491,7 +491,7 @@ subroutine neighbor_minmax(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
       call  edgeSpack(edgeMinMax,max_neigh(:,:,ie),qsize*nlev,kptr,2*qsize*nlev,ie)
    enddo
    
-   call t_startf('nmm_bexchV')
+!    call t_startf('nmm_bexchV')
    call bndry_exchangeS(hybrid,edgeMinMax)
    call t_stopf('nmm_bexchV')
 
@@ -528,7 +528,7 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
       call  edgeSpack(edgeMinMax,max_neigh(:,:,ie),qsize*nlev,kptr,2*qsize*nlev,ie)
    enddo
 
-   call t_startf('nmm_bexchS_start')
+!    call t_startf('nmm_bexchS_start')
    call bndry_exchangeS_start(hybrid,edgeMinMax)
    call t_stopf('nmm_bexchS_start')
 
@@ -544,7 +544,7 @@ subroutine neighbor_minmax_finish(hybrid,edgeMinMax,nets,nete,min_neigh,max_neig
    ! local 
    integer :: ie,q, k,kptr
 
-   call t_startf('nmm_bexchS_fini')
+!    call t_startf('nmm_bexchS_fini')
    call bndry_exchangeS_finish(hybrid,edgeMinMax)
    call t_stopf('nmm_bexchS_fini')
 
@@ -597,7 +597,7 @@ subroutine smooth_phis(phis,elem,hybrid,deriv,nets,nete,minf,numcycle,p2filt,xgl
      call edgeVpack(edgebuf,pstens(:,:,ie),1,0,ie)
   enddo
 
-  call t_startf('smooth_phis_bexchV1')
+!   call t_startf('smooth_phis_bexchV1')
   call bndry_exchangeV(hybrid,edgebuf)
   call t_stopf('smooth_phis_bexchV1')
 
@@ -610,7 +610,7 @@ subroutine smooth_phis(phis,elem,hybrid,deriv,nets,nete,minf,numcycle,p2filt,xgl
      call edgeVpack(edgebuf,pstens(:,:,ie),1,0,ie)
   enddo
 
-  call t_startf('smooth_phis_bexchV2')
+!   call t_startf('smooth_phis_bexchV2')
   call bndry_exchangeV(hybrid,edgebuf)
   call t_stopf('smooth_phis_bexchV2')
 
@@ -675,7 +675,7 @@ subroutine smooth_phis(phis,elem,hybrid,deriv,nets,nete,minf,numcycle,p2filt,xgl
 
      enddo
 
-     call t_startf('smooth_phis_bexchV4')
+!      call t_startf('smooth_phis_bexchV4')
      call bndry_exchangeV(hybrid,edgebuf)
      call t_stopf('smooth_phis_bexchV4')
 
@@ -766,7 +766,7 @@ integer :: ie,k,q
        call edgeVpack(edge3,Qvar,nlev,2*nlev,ie)
     enddo
     
-    call t_startf('nmm_bexchV')
+!     call t_startf('nmm_bexchV')
     call bndry_exchangeV(hybrid,edge3)
     call t_stopf('nmm_bexchV')
        

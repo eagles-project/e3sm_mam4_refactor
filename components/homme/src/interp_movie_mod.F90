@@ -506,7 +506,7 @@ contains
 
     type (derivative_t)  :: deriv
 
-    call t_startf('interp_movie_output')
+!     call t_startf('interp_movie_output')
     n0 = tl%n0
     call TimeLevel_Qdp( tl, qsplit, n0_Q)
 

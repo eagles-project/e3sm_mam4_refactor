@@ -111,7 +111,7 @@ contains
     integer(C_INT)          :: ierr
 #endif
 
-    call t_startf('prim_advance_exp')
+!     call t_startf('prim_advance_exp')
     nm1   = tl%nm1
     n0    = tl%n0
     np1   = tl%np1
@@ -488,7 +488,7 @@ contains
     ! for consistency, dt_vis = t-1 - t*, so this is timestep method dependent
     ! forward-in-time, hypervis applied to dp3d
     if (compute_diagnostics) then
-       call t_startf("prim_diag")
+!        call t_startf("prim_diag")
        call prim_energy_halftimes(elem,hvcoord,tl,5,.false.,nets,nete)
        call prim_diag_scalars(elem,hvcoord,tl,5,.false.,nets,nete)
        call t_stopf("prim_diag")
@@ -502,7 +502,7 @@ contains
     if (dcmip16_mu>0) call advance_physical_vis(elem,hvcoord,hybrid,deriv,np1,nets,nete,dt,dcmip16_mu_s,dcmip16_mu)
 
     if (compute_diagnostics) then
-       call t_startf("prim_diag")
+!        call t_startf("prim_diag")
        call prim_energy_halftimes(elem,hvcoord,tl,6,.false.,nets,nete)
        call prim_diag_scalars(elem,hvcoord,tl,6,.false.,nets,nete)
        call t_stopf("prim_diag")
@@ -584,7 +584,7 @@ contains
   real (kind=real_kind) :: dt,xfac
 
   integer :: l1p,l2p,l1n,l2n,l
-  call t_startf('advance_hypervis')
+!   call t_startf('advance_hypervis')
 
 #ifdef HOMMEXX_BFB_TESTING
   ! Exchange all vars even in hydro mode, for the sake of bfb comparison with xx code
@@ -663,7 +663,7 @@ contains
         
      enddo
 
-     call t_startf('ahdp_bexchV2')
+!      call t_startf('ahdp_bexchV2')
      call bndry_exchangeV(hybrid,edge_g)
      call t_stopf('ahdp_bexchV2')
      
@@ -809,7 +809,7 @@ contains
         endif
      enddo
      
-     call t_startf('ahdp_bexchV2')
+!      call t_startf('ahdp_bexchV2')
      call bndry_exchangeV(hybrid,edge_g)
      call t_stopf('ahdp_bexchV2')
      
@@ -902,7 +902,7 @@ contains
 
   !if(test_case .ne. 'dcmip2016_test3') call abortmp("dcmip16_mu is currently limited to dcmip16 test 3")
 
-  call t_startf('advance_physical_vis')
+!   call t_startf('advance_physical_vis')
   delz = 20d3/nlev
   delz_i = 20d3/nlevp
 
@@ -1096,7 +1096,7 @@ contains
   real (kind=real_kind) ::  v1,v2,w,d_eta_dot_dpdn_dn, T0
   integer :: i,j,k,kptr,ie, nlyr_tot
 
-  call t_startf('compute_andor_apply_rhs')
+!   call t_startf('compute_andor_apply_rhs')
 
   if (theta_hydrostatic_mode) then
      nlyr_tot=4*nlev        ! dont bother to dss w_i and phinh_i
@@ -1675,7 +1675,7 @@ contains
 
    end do ! end do for the ie=nets,nete loop
 
-  call t_startf('caar_bexchV')
+!   call t_startf('caar_bexchV')
   call bndry_exchangeV(hybrid,edge_g)
   call t_stopf('caar_bexchV')
 

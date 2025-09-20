@@ -427,7 +427,7 @@ contains
     ! Test forcing is only for standalone Homme (and only for some tests/configurations)
     if (compute_forcing_and_push_to_c) then
       call compute_test_forcing_dummy(elem,hybrid,hvcoord,tl%n0,n0_qdp,max(dt_q,dt_remap),nets,nete,tl)
-      call t_startf('push_to_cxx')
+!       call t_startf('push_to_cxx')
       call push_forcing_to_c(elem_derived_FM,   elem_derived_FVTheta, elem_derived_FT, &
                              elem_derived_FPHI, elem_derived_FQ)
       call t_stopf('push_to_cxx')
@@ -456,7 +456,7 @@ contains
       elem_derived_omega_p_ptr = c_loc(elem_derived_omega_p)
 
       ! Copy cxx arrays back to f90 structures
-      call t_startf('push_to_f90')
+!       call t_startf('push_to_f90')
       call cxx_push_results_to_f90(elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr,   &
                                    elem_state_phinh_i_ptr, elem_state_dp3d_ptr, elem_state_ps_v_ptr, &
                                    elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr)

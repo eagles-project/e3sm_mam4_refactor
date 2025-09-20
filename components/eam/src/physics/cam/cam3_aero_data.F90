@@ -34,7 +34,7 @@ module cam3_aero_data
   use error_messages, only: handle_ncerr
   use physics_types,  only: physics_state
   use boundarydata,   only: boundarydata_init, boundarydata_type
-  use perf_mod,       only: t_startf, t_stopf
+  !use perf_mod,       only: t_startf, t_stopf
   use cam_logfile,    only: iulog
   use netcdf
 
@@ -294,7 +294,7 @@ subroutine cam3_aero_data_init(phys_state)
    character(len=*), parameter :: subname = 'cam3_aero_data_init'
    !------------------------------------------------------------------
 
-   call t_startf(subname)
+   !call t_startf(subname)
 
    allocate (aer_mass(pcols, pver, naer, begchunk:endchunk) )
 
@@ -533,7 +533,7 @@ subroutine cam3_aero_data_init(phys_state)
 
    end if   ! Check to see if this dataset is in ncol format. 
 
-   call t_stopf(subname)
+   !call t_stopf(subname)
 
 end subroutine cam3_aero_data_init
 
@@ -749,7 +749,7 @@ subroutine vert_interpolate (Match_ps, pint, n, aerosol_mass, ncol, c)
    character(len=*), parameter :: subname = 'cam3_aero_data.vert_interpolate'
    !-----------------------------------------------------------------------
 
-   call t_startf ('vert_interpolate')
+   !call t_startf ('vert_interpolate')
 !
 ! Initialize index array 
 !
@@ -887,7 +887,7 @@ subroutine vert_interpolate (Match_ps, pint, n, aerosol_mass, ncol, c)
       end do
    end if
 
-   call t_stopf ('vert_interpolate')
+   !call t_stopf ('vert_interpolate')
 
    return
 end subroutine vert_interpolate

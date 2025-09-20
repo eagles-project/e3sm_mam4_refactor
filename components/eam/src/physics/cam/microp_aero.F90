@@ -41,7 +41,7 @@ module microp_aero
   use cam_history,      only: addfld, add_default, outfld
   use cam_logfile,      only: iulog
   use cam_abortutils,       only: endrun
-  use perf_mod,         only: t_startf, t_stopf
+  !use perf_mod,         only: t_startf, t_stopf
 
   use error_messages, only: alloc_err
 

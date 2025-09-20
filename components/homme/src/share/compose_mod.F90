@@ -259,7 +259,7 @@ contains
     logical :: call_init_kokkos
 
 #ifdef HOMME_ENABLE_COMPOSE
-    call t_startf('compose_init')
+!     call t_startf('compose_init')
 
     call_init_kokkos = .true.
     if (present(init_kokkos)) call_init_kokkos = init_kokkos

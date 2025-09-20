@@ -16,7 +16,7 @@ module zm_conv_intr
    use ppgrid,       only: pver, pcols, pverp, begchunk, endchunk
    use zm_conv,      only: zm_conv_evap, zm_convr, convtran, momtran, trigdcape_ull, trig_dcape_only
    use cam_history,  only: outfld, addfld, horiz_only, add_default
-   use perf_mod
+   !use perf_mod
    use cam_logfile,  only: iulog
    
    implicit none
@@ -405,7 +405,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 !
 ! Begin with Zhang-McFarlane (1996) convection parameterization
 !
-   call t_startf ('zm_convr')
+   !call t_startf ('zm_convr')
    call zm_convr(   lchnk   ,ncol    , &
                     state%t       ,state%q(:,:,1)     ,prec    ,jctop   ,jcbot   , &
                     pblh    ,state%zm      ,state%phis    ,state%zi      ,ptend_loc%q(:,:,1)    , &
@@ -416,7 +416,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
                     dp ,dsubcld ,jt,maxg,ideep   , &
                     lengath ,ql      ,rliq  ,landfrac,  &
                     t_star, q_star, dcape)  
-   call t_stopf ('zm_convr')
+   !call t_stopf ('zm_convr')
 
    call outfld('CAPE', cape, pcols, lchnk)        ! RBN - CAPE output
 !
@@ -497,13 +497,13 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
     dp_cldliq(:ncol,:) = 0._r8
     dp_cldice(:ncol,:) = 0._r8
 
-    call t_startf ('zm_conv_evap')
+    !call t_startf ('zm_conv_evap')
     call zm_conv_evap(state1%ncol,state1%lchnk, &
          state1%t,state1%pmid,state1%pdel,state1%q(:pcols,:pver,1), &
          ptend_loc%s, tend_s_snwprd, tend_s_snwevmlt, ptend_loc%q(:pcols,:pver,1), &
          rprd, cld, ztodt, &
          prec, snow, ntprprd, ntsnprd , flxprec, flxsnow)
-    call t_stopf ('zm_conv_evap')
+    !call t_stopf ('zm_conv_evap')
 
     evapcdp(:ncol,:pver) = ptend_loc%q(:ncol,:pver,1)
 !
@@ -547,13 +547,13 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
      l_windt(1) = .true.
      l_windt(2) = .true.
 
-     call t_startf ('momtran')
+     !call t_startf ('momtran')
      call momtran (lchnk, ncol,                                        &
                    l_windt,winds, 2,  mu(1,1), md(1,1),   &
                    du(1,1), eu(1,1), ed(1,1), dp(1,1), dsubcld(1),  &
                    jt(1),maxg(1), ideep(1), 1, lengath,  &
                    nstep,  wind_tends, pguall, pgdall, icwu, icwd, ztodt, seten )  
-     call t_stopf ('momtran')
+     !call t_stopf ('momtran')
 
      ptend_loc%u(:ncol,:pver) = wind_tends(:ncol,:pver,1)
      ptend_loc%v(:ncol,:pver) = wind_tends(:ncol,:pver,2)
@@ -596,13 +596,13 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
    ! ratios are moist
    fake_dpdry(:,:) = 0._r8
 
-   call t_startf ('convtran1')
+   !call t_startf ('convtran1')
    call convtran (lchnk,                                        &
                   ptend_loc%lq,state1%q, pcnst,  mu, md,   &
                   du, eu, ed, dp, dsubcld,  &
                   jt,maxg, ideep, 1, lengath,  &
                   nstep,   fracis,  ptend_loc%q, fake_dpdry)
-   call t_stopf ('convtran1')
+   !call t_stopf ('convtran1')
 
    call outfld('ZMDICE ',ptend_loc%q(1,1,ixcldice) ,pcols   ,lchnk   )
    call outfld('ZMDLIQ ',ptend_loc%q(1,1,ixcldliq) ,pcols   ,lchnk   )
@@ -706,13 +706,13 @@ subroutine zm_conv_tend_2( state,  ptend,  ztodt, pbuf,mu, eu, &
          dpdry(i,:) = state%pdeldry(ideep(i),:)/100._r8
       end do
 
-      call t_startf ('convtran2')
+      !call t_startf ('convtran2')
       call convtran (lchnk,                                        &
                      ptend%lq,state%q, pcnst,  mu, md,   &
                      du, eu, ed, dp, dsubcld,  &
                      jt,maxg,ideep, 1, lengath,  &
                      nstep,   fracis,  ptend%q, dpdry)
-      call t_stopf ('convtran2')
+      !call t_stopf ('convtran2')
    end if
 
    if((convproc_do_aer .or. convproc_do_gas) .and. clim_modal_aero) then

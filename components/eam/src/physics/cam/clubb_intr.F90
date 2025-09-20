@@ -27,7 +27,7 @@ module clubb_intr
   use spmd_utils,    only: masterproc
   use constituents,  only: pcnst, cnst_add
   use pbl_utils,     only: calc_ustar, calc_obklen
-  use perf_mod,      only: t_startf, t_stopf
+  !use perf_mod,      only: t_startf, t_stopf
   use mpishorthand
   use cam_history_support, only: fillvalue
 #ifdef CLUBB_SGS
@@ -1501,7 +1501,7 @@ end subroutine clubb_init_cnst
    !-----------------------------------------------------------------------------------------------!
    !-----------------------------------------------------------------------------------------------!
 
-   call t_startf('clubb_tend_cam_init')
+   !call t_startf('clubb_tend_cam_init')
    invrs_hdtime = 1._r8 / hdtime
    invrs_gravit = 1._r8 / gravit
    frac_limit = 0.01_r8
@@ -1823,18 +1823,18 @@ end subroutine clubb_init_cnst
                   -state1%q(i,k,ixcldliq))
      enddo
    enddo
-   call t_stopf('clubb_tend_cam_init')
+   !call t_stopf('clubb_tend_cam_init')
 
    ! ------------------------------------------------- !
    ! Begin module to compute turbulent mountain stress !
    ! ------------------------------------------------- !
     if ( do_tms) then
-       call t_startf('compute_tms')
+       !call t_startf('compute_tms')
        call compute_tms( pcols,        pver,      ncol,                   &
                      state1%u,     state1%v,  state1%t,  state1%pmid, &
                      state1%exner, state1%zm, sgh30,     ksrftms,     &
                      tautmsx,      tautmsy,   cam_in%landfrac )
-       call t_stopf('compute_tms')
+       !call t_stopf('compute_tms')
     endif
 
    if (micro_do_icesupersat) then
@@ -1845,7 +1845,7 @@ end subroutine clubb_init_cnst
    ! End module to compute turbulent mountain stress   !
    ! ------------------------------------------------- !
 
-   call t_startf('adv_clubb_core_col_loop')
+   !call t_startf('adv_clubb_core_col_loop')
    !  Loop over all columns in lchnk to advance CLUBB core
    do i=1,ncol   ! loop over columns
 
@@ -2189,7 +2189,7 @@ end subroutine clubb_init_cnst
          pdf_params_zm%mixt_frac = pdf_zm_mixt_frac_inout
       end if
 
-      call t_startf('adv_clubb_core_ts_loop')
+      !call t_startf('adv_clubb_core_ts_loop')
       do t=1,nadv    ! do needed number of "sub" timesteps for each CAM step
 
          !  Increment the statistics then being stats timestep
@@ -2199,7 +2199,7 @@ end subroutine clubb_init_cnst
          endif
 
          !  Advance CLUBB CORE one timestep in the future
-         call t_startf('advance_clubb_core')
+         !call t_startf('advance_clubb_core')
          !Balli- to do: check whether initent-ins and intent-inouts are actually what they say
 
          call advance_clubb_core_api &
@@ -2236,7 +2236,7 @@ end subroutine clubb_init_cnst
               rcm_in_layer_out, cloud_cover_out, &                         ! intent(out)
               upwp_sfc_pert, vpwp_sfc_pert, &                              ! intent(in)
               um_pert_col, vm_pert_col, upwp_pert_col, vpwp_pert_col)      ! intent(inout)
-         call t_stopf('advance_clubb_core')
+         !call t_stopf('advance_clubb_core')
 
          if ( err_code == clubb_fatal_error ) then
             write(fstderr,*) "Fatal error in CLUBB: at timestep ", get_nstep(), &
@@ -2295,7 +2295,7 @@ end subroutine clubb_init_cnst
                                                      out_radzt,out_radzm,out_sfc)
 
       enddo  ! end time loop
-      call t_stopf('adv_clubb_core_ts_loop')
+      !call t_stopf('adv_clubb_core_ts_loop')
 
       if (clubb_do_adv) then
          if (macmic_it .eq. cld_macmic_num_steps) then
@@ -2498,7 +2498,7 @@ end subroutine clubb_init_cnst
       enddo
 
    enddo  ! end column loop
-   call t_stopf('adv_clubb_core_col_loop')
+   !call t_stopf('adv_clubb_core_col_loop')
 
    ! Add constant to ghost point so that output is not corrupted
    if (clubb_do_adv) then
@@ -2544,7 +2544,7 @@ end subroutine clubb_init_cnst
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ !
    ! ------------------------------------------------------------ !
-   call t_startf('clubb_tend_cam_diag')
+   !call t_startf('clubb_tend_cam_diag')
 
    ! --------------------------------------------------------------------------------- !
    !  COMPUTE THE ICE CLOUD DETRAINMENT                                                !
@@ -2562,7 +2562,7 @@ end subroutine clubb_init_cnst
 
    call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_det', ls=.true., lq=lqice)
 
-   call t_startf('ice_cloud_detrain_diag')
+   !call t_startf('ice_cloud_detrain_diag')
    do k=1,pver
       do i=1,ncol
          if( state1%t(i,k) > clubb_tk1 ) then
@@ -2597,7 +2597,7 @@ end subroutine clubb_init_cnst
    enddo
 
    det_ice(:ncol) = det_ice(:ncol)/1000._r8  ! divide by density of water
-   call t_stopf('ice_cloud_detrain_diag')
+   !call t_stopf('ice_cloud_detrain_diag')
 
    call outfld( 'DPDLFLIQ', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
    call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
@@ -2782,12 +2782,12 @@ end subroutine clubb_init_cnst
    !  use the aist_vector function to compute the ice cloud fraction                   !
    ! --------------------------------------------------------------------------------- !
 
-   call t_startf('ice_cloud_frac_diag')
+   !call t_startf('ice_cloud_frac_diag')
    do k=1,pver
       call aist_vector(state1%q(:,k,ixq),state1%t(:,k),state1%pmid(:,k),state1%q(:,k,ixcldice), &
            state1%q(:,k,ixnumice),cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
    enddo
-   call t_stopf('ice_cloud_frac_diag')
+   !call t_stopf('ice_cloud_frac_diag')
 
    ! --------------------------------------------------------------------------------- !
    !  THIS PART COMPUTES THE LIQUID STRATUS FRACTION                                   !
@@ -2825,7 +2825,7 @@ end subroutine clubb_init_cnst
    !  this is needed for aerosol code                                                  !
    ! --------------------------------------------------------------------------------- !
 
-   call t_startf('pbl_depth_diag')
+   !call t_startf('pbl_depth_diag')
    do i=1,ncol
       do k=1,pver
          th(i,k) = state1%t(i,k)*state1%exner(i,k)
@@ -2856,7 +2856,7 @@ end subroutine clubb_init_cnst
    call pblintd(ncol, thv, state1%zm, state1%u, state1%v, &
                 ustar2, obklen, kbfs, pblh, dummy2, &
                 state1%zi, cloud_frac(:,1:pver), 1._r8-cam_in%landfrac, dummy3)
-   call t_stopf('pbl_depth_diag')
+   !call t_stopf('pbl_depth_diag')
 
    !  Output the PBL depth
    call outfld('PBLH', pblh, pcols, lchnk)
@@ -2918,7 +2918,7 @@ end subroutine clubb_init_cnst
    call outfld('VMAGCL', vmag_gust_cl, pcols, lchnk)
    call outfld('TPERTBLT', tpert, pcols, lchnk)
 
-   call t_stopf('clubb_tend_cam_diag')
+   !call t_stopf('clubb_tend_cam_diag')
 
    ! --------------------------------------------------------------------------------- !
    !  END CLOUD FRACTION DIAGNOSIS, begin to store variables back into buffer          !

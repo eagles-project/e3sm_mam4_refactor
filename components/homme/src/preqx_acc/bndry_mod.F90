@@ -191,7 +191,7 @@ contains
     !$OMP BARRIER
     if(hybrid%ithr == 0) then 
       !$acc wait
-      call t_startf('bndry_timing')
+!       call t_startf('bndry_timing')
       pSchedule => Schedule(1)
       nlyr = buffer%nlyr
       nSendCycles = pSchedule%nSendCycles
@@ -228,7 +228,7 @@ contains
       enddo    ! icycle
 
       !Copy internal data to receive buffer
-      call t_startf('bndry_timing_internal_on_dev_copy')
+!       call t_startf('bndry_timing_internal_on_dev_copy')
       do ithr = 1 , hybrid%hthreads
         iptr   = nlyr*buffer%moveptr0(ithr) + 1
         length = nlyr*buffer%moveLength(ithr)
@@ -238,7 +238,7 @@ contains
       call t_stopf('bndry_timing_internal_on_dev_copy')
 
       !Launch PCI-e copies
-      call t_startf('bndry_timing_pcie_d2h')
+!       call t_startf('bndry_timing_pcie_d2h')
       do icycle = 1 , nSendCycles
         pCycle => pSchedule%SendCycle(icycle)
         iptr   =  pCycle%ptrP
@@ -259,7 +259,7 @@ contains
       call MPI_Waitall(nSendCycles,Srequest,status,ierr)
       call MPI_Waitall(nRecvCycles,Rrequest,status,ierr)
 
-      call t_startf('bndry_timing_pcie_h2d')
+!       call t_startf('bndry_timing_pcie_h2d')
       do icycle = 1 , nRecvCycles
         pCycle => pSchedule%RecvCycle(icycle)
         iptr   =  pCycle%ptrP

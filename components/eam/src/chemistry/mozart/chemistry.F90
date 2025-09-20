@@ -1320,7 +1320,7 @@ contains
 
     use spmd_utils,          only : iam
     use camsrfexch,          only : cam_in_t, cam_out_t     
-    use perf_mod,            only : t_startf, t_stopf
+    !use perf_mod,            only : t_startf, t_stopf
     use tropopause,          only : tropopause_find, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
     use mo_neu_wetdep,       only : neu_wetdep_tend, do_neu_wetdep
     use aerodep_flx,         only : aerodep_flx_prescribed
@@ -1442,7 +1442,7 @@ contains
             ncldwtr(:ncol,k) = state%q(:ncol,k,ixndrop)
     end do
 
-    call t_startf( 'chemdr' )
+    !call t_startf( 'chemdr' )
     call gas_phase_chemdr(lchnk, ncol, imozart, state%q, &
          state%phis, state%zm, state%zi, calday, &
          state%t, state%pmid, state%pdel, state%pdeldry, state%pint, &
@@ -1456,7 +1456,7 @@ contains
          drydepflx, cam_in%cflx, ptend%q, pbuf, qqcw, &
          dgnum, dgncur_awet, wetdens         ) ! inout
 
-    call t_stopf( 'chemdr' )
+    !call t_stopf( 'chemdr' )
 
     !-----------------------------------------------------------------------
     ! set flags for tracer tendencies (water and gas phase constituents)

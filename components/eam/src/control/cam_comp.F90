@@ -151,13 +151,13 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
 
    if ( nsrest == 0 )then
 
-      call t_startf('cam_initfiles_open')
+      !call t_startf('cam_initfiles_open')
       call cam_initfiles_open()
-      call t_stopf('cam_initfiles_open')
+      !call t_stopf('cam_initfiles_open')
 
-      call t_startf('cam_initial')
+      !call t_startf('cam_initial')
       call cam_initial(dyn_in, dyn_out, NLFileName=filein)
-      call t_stopf('cam_initial')
+      !call t_stopf('cam_initial')
 
       ! Allocate and setup surface exchange data
       call atm2hub_alloc(cam_out)
@@ -165,9 +165,9 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
 
    else
 
-      call t_startf('cam_read_restart')
+      !call t_startf('cam_read_restart')
       call cam_read_restart ( cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod, NLFileName=filein )
-      call t_stopf('cam_read_restart')
+      !call t_stopf('cam_read_restart')
 
      ! Commented out the hub2atm_alloc call as it overwrite cam_in, which is undesirable. The fields in cam_in are necessary for getting BFB restarts
 	 ! There are no side effects of commenting out this call as this call allocates cam_in and cam_in allocation has already been done in cam_init
@@ -177,9 +177,9 @@ subroutine cam_init( cam_out, cam_in, mpicom_atm, &
 #endif
    end if
 
-   call t_startf('phys_init')
+   !call t_startf('phys_init')
    call phys_init( phys_state, phys_tend, pbuf2d,  cam_out )
-   call t_stopf('phys_init')
+   !call t_stopf('phys_init')
 
    call bldfld ()       ! master field list (if branch, only does hash tables)
 
@@ -303,8 +303,8 @@ subroutine cam_run2( cam_out, cam_in )
    call t_stopf  ('stepon_run2')
 
    if (is_first_step() .or. is_first_restart_step()) then
-      call t_startf ('cam_run2_memusage')
-      call t_stopf  ('cam_run2_memusage')
+      !call t_startf ('cam_run2_memusage')
+      !call t_stopf  ('cam_run2_memusage')
    end if
 end subroutine cam_run2
 
@@ -339,8 +339,8 @@ subroutine cam_run3( cam_out )
    call t_stopf  ('stepon_run3')
 
    if (is_first_step() .or. is_first_restart_step()) then
-      call t_startf ('cam_run3_memusage')
-      call t_stopf  ('cam_run3_memusage')
+      !call t_startf ('cam_run3_memusage')
+      !call t_stopf  ('cam_run3_memusage')
    end if
 end subroutine cam_run3
 
@@ -386,9 +386,9 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
    !----------------------------------------------------------
    !
    call t_barrierf ('sync_wshist', mpicom)
-   call t_startf ('wshist')
+   !call t_startf ('wshist')
    call wshist ()
-   call t_stopf  ('wshist')
+   !call t_stopf  ('wshist')
 
 #if ( defined SPMD )
    stepon_time_end = mpi_wtime()
@@ -397,33 +397,33 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
    ! Write restart files
    !
    if (rstwr) then
-      call t_startf ('cam_write_restart')
+      !call t_startf ('cam_write_restart')
       if (present(yr_spec).and.present(mon_spec).and.present(day_spec).and.present(sec_spec)) then
          call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d, &
               yr_spec=yr_spec, mon_spec=mon_spec, day_spec=day_spec, sec_spec= sec_spec )
       else
          call cam_write_restart( cam_in, cam_out, dyn_out, pbuf2d )
       end if
-      call t_stopf  ('cam_write_restart')
+      !call t_stopf  ('cam_write_restart')
    end if
 
-   call t_startf ('cam_run4_wrapup')
+   !call t_startf ('cam_run4_wrapup')
    call wrapup(rstwr, nlend)
-   call t_stopf  ('cam_run4_wrapup')
+   !call t_stopf  ('cam_run4_wrapup')
 
    if (masterproc .and. print_step_cost) then
-      call t_startf ('cam_run4_print')
+      !call t_startf ('cam_run4_print')
       call t_stampf (wcend, usrend, sysend)
       write(iulog,'(a,3f8.3,a)')'Prv timestep wallclock, usr, sys=', &
                             wcend-wcstart, usrend-usrstart, sysend-sysstart, &
                             ' seconds'
-      call t_stopf  ('cam_run4_print')
+      !call t_stopf  ('cam_run4_print')
    end if
 
 #ifndef UNICOSMP
-   call t_startf ('cam_run4_flush')
+   !call t_startf ('cam_run4_flush')
    call shr_sys_flush(iulog)
-   call t_stopf  ('cam_run4_flush')
+   !call t_stopf  ('cam_run4_flush')
 #endif
 
 end subroutine cam_run4
@@ -468,18 +468,18 @@ subroutine cam_final( cam_out, cam_in )
    real(r8) :: mpi_wtime
 #endif
 
-   call t_startf ('phys_final')
+   !call t_startf ('phys_final')
    call phys_final( phys_state, phys_tend , pbuf2d)
-   call t_stopf ('phys_final')
+   !call t_stopf ('phys_final')
 
-   call t_startf ('stepon_final')
+   !call t_startf ('stepon_final')
    call stepon_final(dyn_in, dyn_out)
-   call t_stopf ('stepon_final')
+   !call t_stopf ('stepon_final')
 
    if(nsrest==0) then
-      call t_startf ('cam_initfiles_close')
+      !call t_startf ('cam_initfiles_close')
       call cam_initfiles_close()
-      call t_stopf ('cam_initfiles_close')
+      !call t_stopf ('cam_initfiles_close')
    end if
 
    call hub2atm_deallocate(cam_in)

@@ -166,7 +166,7 @@ contains
      integer*4			:: acount
      integer(kind=MPI_OFFSET_KIND) :: disp, iext,lb
 #endif
-     call t_startf('WriteState')
+!      call t_startf('WriteState')
 
 #if defined(_MPI) && defined(_PRESTART)
 if (COLLECTIVE_IO_WRITE) then
@@ -286,7 +286,7 @@ endif
      integer (kind=mpi_offset_kind) :: disp, iext,lb
 #endif
 
-     call t_startf('ReadState')
+!      call t_startf('ReadState')
 
 #if defined(_MPI) && defined(_PRESTART)
 if ( COLLECTIVE_IO_READ ) then

@@ -218,7 +218,7 @@ contains
     end if
 
 #ifdef HOMME_ENABLE_COMPOSE  
-    call t_startf('compose_stt')
+!     call t_startf('compose_stt')
     geometry_type = 0 ! sphere
     if (trim(geometry) == "plane") geometry_type = 1
     ! Set up time stepping and initialize q and density.
@@ -244,7 +244,7 @@ contains
     end if
     dt = twelve_days / nsteps
     call t_barrierf('compose_stt_step_start_barrier', hybrid%par%comm)
-    call t_startf('compose_stt_step')
+!     call t_startf('compose_stt_step')
     do i = 1, nsteps
        compose_h2d = i == 1
        compose_d2h = i == 1 .or. i == nsteps

@@ -113,10 +113,10 @@ CONTAINS
         !-----------------------------------------------------------------------
         ! Map dynamics state to FV physics grid
         !-----------------------------------------------------------------------
-        call t_startf('dyn_to_fv_phys')
+        !call t_startf('dyn_to_fv_phys')
         call gfr_dyn_to_fv_phys(par, dom_mt, tl_f, hvcoord, elem, ps_tmp, zs_tmp, &
              T_tmp, uv_tmp, om_tmp, q_tmp)
-        call t_stopf('dyn_to_fv_phys')
+        !call t_stopf('dyn_to_fv_phys')
 
         !-----------------------------------------------------------------------
         !-----------------------------------------------------------------------
@@ -124,7 +124,7 @@ CONTAINS
         !-----------------------------------------------------------------------
         ! Physics on GLL grid: collect unique points before copying
         !-----------------------------------------------------------------------
-        call t_startf('UniquePoints')
+        !call t_startf('UniquePoints')
         do ie = 1,nelemd
           ncols = elem(ie)%idxP%NumUniquePts
           call get_temperature(elem(ie),temperature,hvcoord,tl_f)
@@ -135,7 +135,7 @@ CONTAINS
           call UniquePoints(elem(ie)%idxP,2,nlev,elem(ie)%state%V(:,:,:,:,tl_f),uv_tmp(1:ncols,:,:,ie))
           call UniquePoints(elem(ie)%idxP,nlev,pcnst,elem(ie)%state%Q(:,:,:,:), q_tmp(1:ncols,:,:,ie))
         end do
-        call t_stopf('UniquePoints')
+        !call t_stopf('UniquePoints')
         !-----------------------------------------------------------------------
         !-----------------------------------------------------------------------
       end if ! fv_nphys > 0
@@ -155,7 +155,7 @@ CONTAINS
 
     end if ! par%dynproc
 
-    call t_startf('dpcopy')
+    !call t_startf('dpcopy')
     if (local_dp_map) then
 
       !$omp parallel do private (lchnk, ncols, pgcols, icol, idmb1, idmb2, idmb3, ie, ioff, ilyr, m, pbuf_chnk, pbuf_frontgf, pbuf_frontga)
@@ -238,9 +238,9 @@ CONTAINS
       end if ! par%dynproc
 
       call t_barrierf ('sync_blk_to_chk', mpicom)
-      call t_startf ('block_to_chunk')
+      !call t_startf ('block_to_chunk')
       call transpose_block_to_chunk(tsize, bbuffer, cbuffer)
-      call t_stopf  ('block_to_chunk')
+      !call t_stopf  ('block_to_chunk')
 
       !$omp parallel do private (lchnk, ncols, cpter, icol, ilyr, m, pbuf_chnk, pbuf_frontgf, pbuf_frontga)
       do lchnk = begchunk,endchunk
@@ -274,11 +274,11 @@ CONTAINS
       deallocate( cbuffer )
 
     end if ! local_dp_map
-    call t_stopf('dpcopy')
+    !call t_stopf('dpcopy')
 
-    call t_startf('derived_phys')
+    !call t_startf('derived_phys')
     call derived_phys(phys_state,phys_tend,pbuf2d)
-    call t_stopf('derived_phys')
+    !call t_stopf('derived_phys')
 
 !for theta there is no need to multiply omega_p by p
 #ifndef MODEL_THETA_L
@@ -386,7 +386,7 @@ CONTAINS
 
     if(adiabatic) return
 
-    call t_startf('pd_copy')
+    !call t_startf('pd_copy')
     if(local_dp_map) then
 
       !$omp parallel do private (lchnk, ncols, pgcols, icol, idmb1, idmb2, idmb3, ie, ioff, ilyr, m)
@@ -435,9 +435,9 @@ CONTAINS
       end do ! lchnk
 
       call t_barrierf('sync_chk_to_blk', mpicom)
-      call t_startf ('chunk_to_block')
+      !call t_startf ('chunk_to_block')
       call transpose_chunk_to_block(tsize, cbuffer, bbuffer)
-      call t_stopf  ('chunk_to_block')
+      !call t_stopf  ('chunk_to_block')
 
       if (par%dynproc) then
         !$omp parallel do private (ie, bpter, icol, ilyr, m, ncols)
@@ -465,20 +465,20 @@ CONTAINS
       deallocate( cbuffer )
        
     end if ! local_dp_map
-    call t_stopf('pd_copy')
+    !call t_stopf('pd_copy')
 
     if (par%dynproc) then
       if (fv_nphys > 0) then
-        call t_startf('fv_phys_to_dyn')
+        !call t_startf('fv_phys_to_dyn')
         ! Map FV physics state to dynamics grid
         dtime = get_step_size()
         call gfr_fv_phys_to_dyn(par, dom_mt, TimeLevel%n0, hvcoord, elem, T_tmp, &
              uv_tmp, q_tmp)
-        call t_stopf('fv_phys_to_dyn')
+        !call t_stopf('fv_phys_to_dyn')
 
       else ! physics is on GLL nodes
 
-        call t_startf('putUniquePoints')
+        !call t_startf('putUniquePoints')
         do ie = 1,nelemd
           ncols = elem(ie)%idxP%NumUniquePts
           call putUniquePoints(elem(ie)%idxP,    nlev,       T_tmp(1:ncols,:,ie),   &
@@ -488,7 +488,7 @@ CONTAINS
           call putUniquePoints(elem(ie)%idxP,    nlev,pcnst, q_tmp(1:ncols,:,:,ie),   &
                                elem(ie)%derived%fQ(:,:,:,:))
         end do ! ie
-        call t_stopf('putUniquePoints')
+        !call t_stopf('putUniquePoints')
 
       end if ! fv_nphys > 0
     end if ! par%dynproc

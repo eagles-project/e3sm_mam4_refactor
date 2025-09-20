@@ -180,9 +180,9 @@ contains
 
     !JMD  call t_barrierf('sync_residual', hybrid%par%comm)
     call t_adj_detailf(+1)
-    call t_startf('residual')
+!     call t_startf('residual')
 
-    call t_startf('residual_int')
+!     call t_startf('residual_int')
     !fvtens = 0.0d0
     !fttens = 0.0d0
     !fpstens = 0.0d0
@@ -229,7 +229,7 @@ contains
     end do
     call t_stopf('residual_int')
 
-    call t_startf('residual_cal')
+!     call t_startf('residual_cal')
 
     do ie=nets,nete
        !     ps => fptr%base(ie)%state%ps_v(:,:,n0)
@@ -755,7 +755,7 @@ contains
 
 
     call t_stopf('residual_cal')
-    call t_startf('residual_fin')
+!     call t_startf('residual_fin')
     lx = 1
     do ie=nets,nete
        do k=1,nlev
@@ -971,7 +971,7 @@ contains
     if (nu_s == 0 .and. nu == 0 .and. nu_p==0 ) return;
     !JMD  call t_barrierf('sync_advance_hypervis', hybrid%par%comm)
     call t_adj_detailf(+1)
-    call t_startf('rhs_advance_hypervis')
+!     call t_startf('rhs_advance_hypervis')
 
     dt=dt2
 
@@ -1213,7 +1213,7 @@ contains
     if (nu_s == 0 .and. nu == 0 .and. nu_p==0 ) return;
     !JMD  call t_barrierf('sync_advance_hypervis', hybrid%par%comm)
     call t_adj_detailf(+1)
-    call t_startf('rhs_advance_hypervis_dp')
+!     call t_startf('rhs_advance_hypervis_dp')
     dt=dt2
     !took out regluar viscosity option
 

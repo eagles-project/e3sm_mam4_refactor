@@ -8,7 +8,7 @@ module tracer_data
 ! Modified by : Cheryl Craig and Chih-Chieh (Jack) Chen  -- February 2010
 !----------------------------------------------------------------------- 
 
-  use perf_mod,     only : t_startf, t_stopf
+  !use perf_mod,     only : t_startf, t_stopf
   use shr_kind_mod, only : r8 => shr_kind_r8,r4 => shr_kind_r4, shr_kind_cl, SHR_KIND_CS
   use time_manager, only : get_curr_date, get_step_size, get_curr_calday
   use spmd_utils,   only : masterproc
@@ -622,7 +622,7 @@ contains
     real(r8) :: pmid(pcols,pver)       ! pressure at layer midpoints (pa)
 !--------------------------------------BLH-----------------------------------    
 
-    call t_startf('advance_trcdata')
+    !call t_startf('advance_trcdata')
     if ( .not.( file%fixed .and. file%initialized ) ) then
 
        call get_model_time(file)
@@ -639,9 +639,9 @@ contains
     ! For stepTime need to advance if the times are equal
     ! Should not impact other runs?
        if ( file%curr_mod_time >= data_time ) then
-          call t_startf('read_next_trcdata')
+          !call t_startf('read_next_trcdata')
           call read_next_trcdata(state, flds, file )
-          call t_stopf('read_next_trcdata')
+          !call t_stopf('read_next_trcdata')
           if(masterproc) write(iulog,*) 'READ_NEXT_TRCDATA ', flds%fldnam
        end if
 
@@ -649,17 +649,17 @@ contains
     
     ! need to interpolate the data, regardless
     ! each mpi task needs to interpolate
-    call t_startf('interpolate_trcdata')
+    !call t_startf('interpolate_trcdata')
     if(present(pbuf2d)) then
        call interpolate_trcdata( state, flds, file, pbuf2d )
     else
        call interpolate_trcdata( state, flds, file )
     endif
-    call t_stopf('interpolate_trcdata')
+    !call t_stopf('interpolate_trcdata')
 
     file%initialized = .true.
 
-    call t_stopf('advance_trcdata')
+    !call t_stopf('advance_trcdata')
 
   end subroutine advance_trcdata
 
@@ -1500,7 +1500,7 @@ contains
 
    if(file%weight_by_lat) then
 
-      call t_startf('xy_interp')
+      !call t_startf('xy_interp')
 
       do c = begchunk,endchunk
         ncols = get_ncols_p(c)
@@ -1511,7 +1511,7 @@ contains
                             lons,lats,file%count_x,file%count_y,file%index_x,file%index_y) 
       enddo
 
-      call t_stopf('xy_interp')
+      !call t_stopf('xy_interp')
 
     else
       do c=begchunk,endchunk
@@ -1666,7 +1666,7 @@ contains
 
    if(file%weight_by_lat) then
 
-     call t_startf('xy_interp')
+     !call t_startf('xy_interp')
 
      do c = begchunk,endchunk
         ncols = get_ncols_p(c)
@@ -1677,7 +1677,7 @@ contains
              loc_arr(:,:,c-begchunk+1), lons,lats,file%count_x,file%count_y,file%index_x,file%index_y) 
      enddo
 
-     call t_stopf('xy_interp')
+     !call t_stopf('xy_interp')
 
    else
     do c=begchunk,endchunk

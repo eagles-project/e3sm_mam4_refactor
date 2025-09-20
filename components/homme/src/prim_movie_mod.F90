@@ -491,7 +491,7 @@ contains
     integer(kind=nfsizekind) :: start(3), count(3), start2d(2),count2d(2), &
                                 startp1(3), countp1(3)
     integer :: ncnt
-    call t_startf('prim_movie_output:pio')
+!     call t_startf('prim_movie_output:pio')
 
     n0=tl%n0
     call TimeLevel_Qdp( tl, qsplit, n0_Q)

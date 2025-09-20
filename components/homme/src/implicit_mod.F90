@@ -111,8 +111,8 @@ contains
 
     comm = par%comm
 ! n+1 guess is result at n - need this to match up with time_mod bootstrap style
-    call t_startf('implicit header')
-    call t_startf('implicit_pre_noxsolve')
+!     call t_startf('implicit header')
+!     call t_startf('implicit_pre_noxsolve')
 
     shiftv = np*np*nlev*(nete-nets+1)
     shiftp = 2*np*np*nlev*(nete-nets+1)
@@ -132,7 +132,7 @@ contains
     
     call t_stopf('implicit_pre_noxsolve')
     
-    call t_startf('implicit_init')
+!     call t_startf('implicit_init')
 
     pc_elem=elem
     jac_elem=elem
@@ -159,11 +159,11 @@ contains
 
 ! ForTrilinos interface to use nox and loca, and returns xstate(n+1)
 
-    call t_startf('noxsolve')
+!     call t_startf('noxsolve')
     call noxsolve(size(xstate), xstate, c_ptr_to_object, c_ptr_to_pre, c_ptr_to_jac, ierr)   
     if (ierr /= 0) call abortmp('Error in noxsolve: Newton failed to converge')
     call t_stopf('noxsolve') 
-    call t_startf('implicit_post_noxsolve')
+!     call t_startf('implicit_post_noxsolve')
 
 !Moved conditionals out of do loops
       lx = 0
@@ -253,8 +253,8 @@ contains
     integer    :: nstep
     integer    :: lx
 
-    call t_startf('FE implicit')
-    call t_startf('FE_implicit_init')
+!     call t_startf('FE implicit')
+!     call t_startf('FE_implicit_init')
 
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
 
@@ -273,7 +273,7 @@ contains
 	shiftp = 2*np*np*nlev*(ne-ns+1)
 
        call t_stopf('FE_implicit_init')
-       call t_startf('FE_implicit_KE_resid_calc')
+!        call t_startf('FE_implicit_KE_resid_calc')
 	lx = 0
 	do ie=ns,ne
 		do j=1,np
@@ -452,7 +452,7 @@ contains
 
    !$OMP BARRIER
    !pw++
-   call t_startf('FE_implicit_bndry_ex')
+!    call t_startf('FE_implicit_bndry_ex')
    !pw--
    !$OMP BARRIER
    call bndry_exchangeV(fptr%hybrid,fptr%edge3)
@@ -463,7 +463,7 @@ contains
    !$OMP BARRIER
 
    !pw++
-   call t_startf('FE_implicit_bndry_unpack')
+!    call t_startf('FE_implicit_bndry_unpack')
    !pw--
    
 
@@ -486,7 +486,7 @@ contains
    ! Compute velocity and pressure tendencies for all levels
    ! ===========================================================
 
-   call t_startf('FE_implicit_vel_pres')
+!    call t_startf('FE_implicit_vel_pres')
  
 
    !Moved conditionals out of do loops
@@ -601,7 +601,7 @@ contains
     call c_f_pointer(c_ptr_to_object, fptr) ! convert C ptr to F ptr
     call c_f_pointer(c_ptr_to_pre, pptr) ! convert C ptr to F ptr
 
-    call t_startf('precon_gmres')
+!     call t_startf('precon_gmres')
 
     zt = z
     xt = xstate
@@ -716,7 +716,7 @@ contains
     pmean      = pptr%pmean
 
     lenscale=rearth
-    call t_startf('precon_si')
+!     call t_startf('precon_si')
 
 	shiftv = np*np*nlev*(ne-ns+1)
 	shiftp = 2*np*np*nlev*(ne-ns+1)
@@ -951,7 +951,7 @@ contains
     integer    :: nm1,n0,np1
     integer    :: lx
 
-    call t_startf('Precon Schur')
+!     call t_startf('Precon Schur')
 
 
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
@@ -1256,7 +1256,7 @@ contains
     integer    :: nm1,n0,np1
     integer    :: lx
 
-    call t_startf('Precon DFinvBt')
+!     call t_startf('Precon DFinvBt')
 
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
 
@@ -1434,7 +1434,7 @@ contains
     integer    :: nm1,n0,np1
     integer    :: lx
 
-    call t_startf('precon 11')
+!     call t_startf('precon 11')
 
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
 
@@ -1644,7 +1644,7 @@ contains
     integer    :: nm1,n0,np1
     integer    :: lx
 
-    call t_startf('picard 21')
+!     call t_startf('picard 21')
 
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
 
@@ -1829,7 +1829,7 @@ contains
     !write(6,*)'sw startf'
     !call flush(6)
     
-    call t_startf('sw jacobian op')
+!     call t_startf('sw jacobian op')
   
     call c_f_pointer(c_ptr_to_object,fptr) ! convert C ptr to F ptr
     

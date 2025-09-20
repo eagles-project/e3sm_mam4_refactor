@@ -136,7 +136,7 @@ contains
     integer               :: n0, n0q, nm1, np1
     integer               :: npts,n,q
     
-    call t_startf('prim_printstate')
+!     call t_startf('prim_printstate')
     if (hybrid%masterthread) then 
        write(iulog,*) "nstep=",tl%nstep," time=",Time_at(tl%nstep)/(24*3600)," [day]"
     end if

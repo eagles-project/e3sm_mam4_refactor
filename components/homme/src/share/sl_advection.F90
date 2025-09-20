@@ -98,7 +98,7 @@ contains
     logical :: slmm, cisl, qos, sl_test, independent_time_steps
 
 #ifdef HOMME_ENABLE_COMPOSE
-    call t_startf('sl_init1')
+!     call t_startf('sl_init1')
     if (transport_alg > 0) then
        call sl_parse_transport_alg(transport_alg, slmm, cisl, qos, sl_test, independent_time_steps)
        if (par%masterproc .and. nu_q > 0 .and. semi_lagrange_hv_q > 0) &
@@ -187,7 +187,7 @@ contains
 
 #ifdef HOMME_ENABLE_COMPOSE
     call t_barrierf('Prim_Advec_Tracers_remap_ALE', hybrid%par%comm)
-    call t_startf('Prim_Advec_Tracers_remap_ALE')
+!     call t_startf('Prim_Advec_Tracers_remap_ALE')
 
     call sl_parse_transport_alg(transport_alg, slmm, cisl, qos, sl_test, independent_time_steps)
     ! Until I get the DSS onto GPU, always need to h<->d.
@@ -201,7 +201,7 @@ contains
     call calc_trajectory(elem, deriv, hvcoord, hybrid, dt, tl, &
          independent_time_steps, nets, nete)
 
-    call t_startf('SLMM_csl')
+!     call t_startf('SLMM_csl')
     !todo Here and in the set-pointer loop for CEDR, do just in the first call.
     do ie = nets, nete
        call slmm_csl_set_elem_data(ie, elem(ie)%metdet, &
@@ -246,13 +246,13 @@ contains
           call cedr_sl_set_Q(ie, elem(ie)%state%Q)
        end do
        call cedr_sl_set_pointers_end(h2d, d2h)
-       call t_startf('CEDR')
+!        call t_startf('CEDR')
        ! No barrier needed: A barrier was already called.
        call cedr_sl_run_global(minq, maxq, nets, nete)
        ! No barrier needed: run_cdr has a horiz thread barrier at the end.
        if (barrier) call perf_barrier(hybrid)
        call t_stopf('CEDR')
-       call t_startf('CEDR_local')
+!        call t_startf('CEDR_local')
        call cedr_sl_run_local(minq, maxq, nets, nete, scalar_q_bounds, limiter_option)
        ! Barrier needed to protect edge_g buffers use in CEDR.
 #if (defined HORIZ_OPENMP)
@@ -276,12 +276,12 @@ contains
     ! dss_Qdp also DSSes derived%omega_p for diagnostics. It's important not to
     ! forget to do that, and we don't need to optimize for the
     ! semi_lagrange_cdr_alg <= 1 case, so just always call dss_Qdp.
-    call t_startf('SL_dss')
+!     call t_startf('SL_dss')
     call dss_Qdp(elem, nets, nete, hybrid, np1_qdp)
     if (barrier) call perf_barrier(hybrid)
     call t_stopf('SL_dss')
     if (semi_lagrange_cdr_check) then
-       call t_startf('CEDR_check')
+!        call t_startf('CEDR_check')
        call cedr_sl_check(minq, maxq, nets, nete)
        if (barrier) call perf_barrier(hybrid)
        call t_stopf('CEDR_check')
@@ -315,7 +315,7 @@ contains
        elem(ie)%derived%vn0 = elem(ie)%state%v(:,:,:,:,tl%np1)
     end do
     if (independent_time_steps) then
-       call t_startf('SLMM_reconstruct')
+!        call t_startf('SLMM_reconstruct')
        if (dp_tol < zero) then
           ! Thread write race condition; benign b/c written value is same in all threads.
           call set_dp_tol(hvcoord, dp_tol)
@@ -337,7 +337,7 @@ contains
     call ALE_RKdss(elem, nets, nete, hybrid, deriv, dt, tl, independent_time_steps)
 
     if (barrier) call perf_barrier(hybrid)
-    call t_startf('SLMM_v2x')
+!     call t_startf('SLMM_v2x')
     do ie = nets, nete
 #if (defined COLUMN_OPENMP)
        !$omp parallel do private(k)
@@ -437,7 +437,7 @@ contains
             call edgeVpack_nlyr(edge_g,elem(ie)%desc,elem(ie)%derived%divdp,nlev,2*nlev,nlyr)
     enddo
 
-    call t_startf('ALE_RKdss_bexchV')
+!     call t_startf('ALE_RKdss_bexchV')
     call bndry_exchangeV(hy,edge_g)
     call t_stopf('ALE_RKdss_bexchV')
 
@@ -577,7 +577,7 @@ contains
             nlev, qsize*nlev, (qsize+1)*nlev)
     enddo
 
-    call t_startf('SLMM_bexchV')
+!     call t_startf('SLMM_bexchV')
     call bndry_exchangeV(hybrid, edge_g)
     call t_stopf('SLMM_bexchV')
 
@@ -647,7 +647,7 @@ contains
     if ( nu_q           == 0 ) return
     if ( hypervis_order /= 2 ) return
     !   call t_barrierf('sync_advance_hypervis_scalar', hybrid%par%comm)
-    call t_startf('advance_hypervis_scalar')
+!     call t_startf('advance_hypervis_scalar')
 
     dt = dt2 / hypervis_subcycle_q
 
@@ -679,7 +679,7 @@ contains
           call edgeVpack_nlyr(edge_g , elem(ie)%desc, elem(ie)%state%Q , nq*nlev , 0 , nq*nlev )
        enddo ! ie loop
 
-       call t_startf('ah_scalar_bexchV')
+!        call t_startf('ah_scalar_bexchV')
        call bndry_exchangeV( hybrid , edge_g )
        call t_stopf('ah_scalar_bexchV')
 
@@ -745,7 +745,7 @@ contains
        enddo
     enddo
 
-    call t_startf('biwksc_bexchV')
+!     call t_startf('biwksc_bexchV')
     call bndry_exchangeV(hybrid,edgeq)
     call t_stopf('biwksc_bexchV')
 
@@ -1042,7 +1042,7 @@ contains
 
     integer :: ie, i, j, k, q, n0_qdp, np1_qdp
 
-    call t_startf('SLMM vertical remap')
+!     call t_startf('SLMM vertical remap')
     call TimeLevel_Qdp(tl, dt_tracer_factor, n0_qdp, np1_qdp)
     do ie = nets, nete
        ! divdp contains the reconstructed vertically Lagrangian level

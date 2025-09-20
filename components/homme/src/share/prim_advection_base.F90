@@ -153,7 +153,7 @@ contains
     integer :: n0_qdp, np1_qdp
 
     call t_barrierf('sync_prim_advec_tracers_remap_rk2', hybrid%par%comm)
-    call t_startf('prim_advec_tracers_remap_rk2')
+!     call t_startf('prim_advec_tracers_remap_rk2')
 !    call extrae_user_function(1)
     call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp) !time levels for qdp are not the same
     rkstage = 3 !   3 stage RKSSP scheme, with optimal SSP CFL
@@ -170,30 +170,30 @@ contains
     ! Also: save a copy of div(U dp) in derived%div(:,:,:,1), which will be DSS'd
     !       and a DSS'ed version stored in derived%div(:,:,:,2)
 
-    call t_startf('precomput_divdp')
+!     call t_startf('precomput_divdp')
     call precompute_divdp( elem , hybrid , deriv , dt , nets , nete , n0_qdp )   
     call t_stopf('precomput_divdp')
 
     !rhs_multiplier is for obtaining dp_tracers at each stage:
     !dp_tracers(stage) = dp - rhs_multiplier*dt*divdp_proj
 
-    call t_startf('euler_step_0')
+!     call t_startf('euler_step_0')
     rhs_multiplier = 0
     call euler_step( np1_qdp , n0_qdp  , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSdiv_vdp_ave , rhs_multiplier )
     call t_stopf('euler_step_0')
 
-    call t_startf('euler_step_1')
+!     call t_startf('euler_step_1')
     rhs_multiplier = 1
     call euler_step( np1_qdp , np1_qdp , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSeta         , rhs_multiplier )
     call t_stopf('euler_step_1')
 
-    call t_startf('euler_step_2')
+!     call t_startf('euler_step_2')
     rhs_multiplier = 2
     call euler_step( np1_qdp , np1_qdp , dt/2 , elem , hvcoord , hybrid , deriv , nets , nete , DSSomega       , rhs_multiplier )
     call t_stopf('euler_step_2')
 
     !to finish the 2D advection step, we need to average the t and t+2 results to get a second order estimate for t+1.
-    call t_startf('qdp_tavg')
+!     call t_startf('qdp_tavg')
     call qdp_time_avg( elem , rkstage , n0_qdp , np1_qdp , limiter_option , nu_p , nets , nete )
     call t_stopf('qdp_tavg')
 
@@ -203,7 +203,7 @@ contains
     if ( limiter_option == 8 .or. limiter_option == 9 ) then
       ! dissipation was applied in RHS.
     else
-      call t_startf('ah_scalar')
+!       call t_startf('ah_scalar')
       call advance_hypervis_scalar(elem,hvcoord,hybrid,deriv,tl%np1,np1_qdp,nets,nete,dt)
       call t_stopf('ah_scalar')
     endif
@@ -312,7 +312,7 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   rhs_viss = 0
   if ( limiter_option == 8 .or. limiter_option == 9 ) then
-    call t_startf('bihmix_qminmax')
+!     call t_startf('bihmix_qminmax')
     ! when running lim8, we also need to limit the biharmonic, so that term needs
     ! to be included in each euler step.  three possible algorithms here:
     ! 1) most expensive:
@@ -370,7 +370,7 @@ OMP_SIMD
     ! compute element qmin/qmax
     if ( rhs_multiplier == 0 ) then
       ! update qmin/qmax based on neighbor data for lim8
-      call t_startf('eus_neighbor_minmax1')
+!       call t_startf('eus_neighbor_minmax1')
       call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
       call t_stopf('eus_neighbor_minmax1')
     endif
@@ -427,7 +427,7 @@ OMP_SIMD
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !   2D Advection step
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  call t_startf('eus_2d_advec')
+!   call t_startf('eus_2d_advec')
   do ie = nets , nete
     ! note: eta_dot_dpdn is actually dimension nlev+1, but nlev+1 data is
     ! all zero so we only have to DSS 1:nlev
@@ -515,7 +515,7 @@ OMP_SIMD
     enddo
   enddo ! ie loop
 
-  call t_startf('eus_bexchV')
+!   call t_startf('eus_bexchV')
   call bndry_exchangeV( hybrid , edge_g )
   call t_stopf('eus_bexchV')
 
@@ -636,7 +636,7 @@ OMP_SIMD
   if ( nu_q           == 0 ) return
   if ( hypervis_order /= 2 ) return
 !   call t_barrierf('sync_advance_hypervis_scalar', hybrid%par%comm)
-  call t_startf('advance_hypervis_scalar')
+!   call t_startf('advance_hypervis_scalar')
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !  hyper viscosity
@@ -707,7 +707,7 @@ OMP_SIMD
       call edgeVpack_nlyr(edge_g , elem(ie)%desc, elem(ie)%state%Qdp(:,:,:,:,nt_qdp) , qsize*nlev , 0 , qsize*nlev )
     enddo ! ie loop
 
-    call t_startf('ah_scalar_bexchV')
+!     call t_startf('ah_scalar_bexchV')
     call bndry_exchangeV( hybrid , edge_g )
     call t_stopf('ah_scalar_bexchV')
 

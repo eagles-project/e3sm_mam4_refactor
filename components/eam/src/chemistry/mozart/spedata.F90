@@ -21,7 +21,7 @@ module spedata
                           pio_put_att, pio_inq_dimid, pio_char, pio_def_dim, pio_def_var, &
                           pio_inq_dimlen, pio_closefile
   use cam_pio_utils,only: cam_pio_openfile
-  use perf_mod,     only: t_startf, t_stopf
+  !use perf_mod,     only: t_startf, t_stopf
   use cam_logfile,  only: iulog
 
 #if ( defined SPMD )
@@ -240,7 +240,7 @@ contains
 
     if (.not. spe_run) return
 
-    call t_startf('MET__advance')
+    !call t_startf('MET__advance')
 
     call get_model_time()
 
@@ -256,7 +256,7 @@ contains
 ! each mpi tasks needs to interpolate
     call interpolate_spedata()
 
-    call t_stopf('MET__advance')
+    !call t_stopf('MET__advance')
 
   end subroutine advance_spedata
 
@@ -298,14 +298,14 @@ contains
 
     integer yr, mon, day, ncsec  ! components of a date
 
-    call t_startf('MET__get_model_time')
+    !call t_startf('MET__get_model_time')
 
     call get_curr_date(yr, mon, day, ncsec)
 
     curr_mod_time = get_time_float( yr, mon, day, ncsec )
     next_mod_time = curr_mod_time + get_step_size()/86400._r8
 
-    call t_stopf('MET__get_model_time')
+    !call t_stopf('MET__get_model_time')
 
   end subroutine get_model_time
 
@@ -530,7 +530,7 @@ contains
     integer :: cnt(2)            ! array of counts for each dimension
     integer :: strt(2)           ! array of starting indices
     integer :: ierr
-    call t_startf('MET__read_next_spedata')
+    !call t_startf('MET__read_next_spedata')
 
     call find_times( recnos, fids, datatimem, datatimep, curr_mod_time )
 
@@ -545,7 +545,7 @@ contains
 
     if (masterproc) write(iulog,*)'READ_NEXT_SPEDATA: Read soloar proton ionization data '
 
-    call t_stopf('MET__read_next_spedata')
+    !call t_stopf('MET__read_next_spedata')
 
   end subroutine read_next_spedata
 
@@ -559,7 +559,7 @@ contains
     real(r4) fact1, fact2
     real(r8) deltat 
 
-    call t_startf('MET__interpolate_spedata')
+    !call t_startf('MET__interpolate_spedata')
 
     deltat = datatimep - datatimem
 
@@ -568,7 +568,7 @@ contains
 
     ionpairs(:) = fact1*ionpairs_i(nm)%data(:) + fact2*ionpairs_i(np)%data(:)
 
-    call t_stopf('MET__interpolate_spedata')
+    !call t_stopf('MET__interpolate_spedata')
 
   end subroutine interpolate_spedata
 

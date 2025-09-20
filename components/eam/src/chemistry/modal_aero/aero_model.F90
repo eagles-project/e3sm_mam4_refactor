@@ -9,7 +9,7 @@ module aero_model
   use ppgrid,         only: pcols, pver, pverp
   use cam_abortutils, only: endrun
   use cam_logfile,    only: iulog
-  use perf_mod,       only: t_startf, t_stopf
+  !use perf_mod,       only: t_startf, t_stopf
   use camsrfexch,     only: cam_in_t, cam_out_t
   use aerodep_flx,    only: aerodep_flx_prescribed
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
@@ -827,7 +827,7 @@ contains
     ! Calculate aerosol size distribution parameters
     ! for prognostic modal aerosols the transfer of mass between aitken and
     ! accumulation modes is done in conjunction with the dry radius calculation
-    call t_startf('calcsize')
+    !call t_startf('calcsize')
     !get mmr of cloud borne aerosols
     call get_cldbrn_mmr(lchnk, pbuf, &! in
          qqcw) !out
@@ -835,15 +835,15 @@ contains
     !get the dry diameter from pbuf
     call pbuf_get_field(pbuf, dgnum_idx, dgncur_a)
     call modal_aero_calcsize_sub(state%ncol, state%lchnk, state%q, state%pdel, dt, qqcw, ptend, dgnumdry_m=dgncur_a)
-    call t_stopf('calcsize')
+    !call t_stopf('calcsize')
 
     ! Aerosol water uptake
-    call t_startf('wateruptake')
+    !call t_startf('wateruptake')
     call modal_aero_wateruptake_dr(lchnk, ncol, state_q, temperature, pmid, & ! in
          cldn, dgncur_a, & ! in
          dgnumwet,  qaerwat, & ! inout
          wetdens=wetdens     ) ! optional inout
-    call t_stopf('wateruptake')
+    !call t_stopf('wateruptake')
 
     ! skip wet deposition if nwetdep is non-positive
     if (nwetdep<1) return
@@ -1083,7 +1083,7 @@ contains
 
 #include "../yaml/aero_model/f90_yaml/aero_model_wetdep_end_yml.f90"
 
-    call t_startf('ma_convproc')
+    !call t_startf('ma_convproc')
     call ma_convproc_intr( state, dt,                         & ! in
          dp_frac, icwmrdp, rprddp, evapcdp,                & ! in
          sh_frac, icwmrsh, rprdsh, evapcsh,                & ! in
@@ -1092,7 +1092,7 @@ contains
          mu, md, du, eu, ed, dp, jt, maxg,                 & ! in
          ideep, lengath,  species_class,                   & ! in
          ptend, aerdepwetis                                ) ! inout
-    call t_stopf('ma_convproc')
+    !call t_stopf('ma_convproc')
 
     call wetdep_inputs_unset(dep_inputs)
 
@@ -1537,7 +1537,7 @@ contains
 
     ! do gas-aerosol exchange, nucleation, and coagulation using new routines
 
-    call t_startf('modal_aero_amicphys')
+    !call t_startf('modal_aero_amicphys')
     ! note that:
     !     vmr0 holds vmr before gas-phase chemistry
     !     vmr_pregas and vmr_precld hold vmr and vmrcw before aqueous chemistry
@@ -1555,7 +1555,7 @@ contains
          vmr_pregas,         vmr_precld,          & ! in
          dgnum,              dgnumwet,            & ! in
          wetdens                                  ) ! in
-    call t_stopf('modal_aero_amicphys')
+    !call t_stopf('modal_aero_amicphys')
 
     ! calculate cloudborne aerosols after exchange
     call vmr2qqcw( vmrcw, mbar, fldcw_all )

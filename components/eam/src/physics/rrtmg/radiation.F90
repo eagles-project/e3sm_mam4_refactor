@@ -1084,7 +1084,7 @@ end function radiation_nextsw_cday
     type(ptr2d_t) :: qqcw(pcnst)                 !cloud-borne aerosols mass and number mixing rations
 !----------------------------------------------------------------------
 
-    call t_startf ('radiation_tend_init')
+    !call t_startf ('radiation_tend_init')
 
     lchnk = state%lchnk
     ncol = state%ncol
@@ -1174,9 +1174,9 @@ end function radiation_nextsw_cday
           !end do
        endif
 
-       call t_stopf ('radiation_tend_init')
+       !call t_stopf ('radiation_tend_init')
 
-       call t_startf('cldoptics')
+       !call t_startf('cldoptics')
 
        if (dosw) then
           if(oldcldoptics) then
@@ -1290,7 +1290,7 @@ end function radiation_nextsw_cday
           cldfprime(1:ncol,:)=cld(1:ncol,:)
        endif
 
-       call t_stopf('cldoptics')
+       !call t_stopf('cldoptics')
 
        ! construct cgs unit reps of pmid and pint and get "eccf" - earthsundistancefactor
        call radinp(ncol, state%pmid, state%pint, pbr, pnm, eccf)
@@ -1310,7 +1310,7 @@ end function radiation_nextsw_cday
        ! Solar radiation computation
 
        if (dosw) then
-          call t_startf ('rad_sw')
+          !call t_startf ('rad_sw')
 
           call get_variability(sfac)
 
@@ -1318,7 +1318,7 @@ end function radiation_nextsw_cday
           call rad_cnst_get_call_list(active_calls)
 
           ! The climate (icall==0) calculation must occur last.
-          call t_startf ('rad_sw_loop')
+          !call t_startf ('rad_sw_loop')
           do icall = N_DIAG, 0, -1
 
               if (active_calls(icall)) then
@@ -1337,10 +1337,12 @@ end function radiation_nextsw_cday
 
                   itim_old    =  pbuf_old_tim_idx()
                   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+                  call t_startf('MAM:rad_aer_rad_props_sw')
                   call aer_rad_props_sw( dt, lchnk, ncol, state%zi, state%pmid, state%pint, state%t, state%zm, state%q, state%pdel, state%pdeldry, cldn, ssa_cmip6_sw, af_cmip6_sw, ext_cmip6_sw, nnite, idxnite, is_cmip6_volc, &
                                          qqcw, aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
+                  call t_stopf('MAM:rad_aer_rad_props_sw')                                          
 
-                  call t_startf ('rad_rrtmg_sw')
+                  !call t_startf ('rad_rrtmg_sw')
                   call rad_rrtmg_sw( &
                        lchnk,        ncol,         num_rrtmg_levs, r_state,                    &
                        state%pmid,   cldfprime,                                                &
@@ -1355,7 +1357,7 @@ end function radiation_nextsw_cday
                        su,           sd,                                                       &
                        E_cld_tau=c_cld_tau, E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g, E_cld_tau_w_f=c_cld_tau_w_f, &
                        old_convert = .false.)
-                  call t_stopf ('rad_rrtmg_sw')
+                  !call t_stopf ('rad_rrtmg_sw')
 
                   !  Output net fluxes at 200 mb
                   call vertinterp(ncol, pcols, pverp, state%pint, 20000._r8, fcns, fsn200c)
@@ -1429,7 +1431,7 @@ end function radiation_nextsw_cday
 
               end if ! (active_calls(icall))
           end do ! icall
-          call t_stopf ('rad_sw_loop')
+          !call t_stopf ('rad_sw_loop')
 
           ! Output cloud optical depth fields for the visible band
           tot_icld_vistau(:ncol,:)  = c_cld_tau(idx_sw_diag,:ncol,:)
@@ -1460,7 +1462,7 @@ end function radiation_nextsw_cday
              call outfld('SNOW_ICLD_VISTAU', snow_icld_vistau, pcols, lchnk)
           endif
 
-          call t_stopf ('rad_sw')
+          !call t_stopf ('rad_sw')
        end if   ! dosw
 
        ! Output aerosol mmr
@@ -1469,7 +1471,7 @@ end function radiation_nextsw_cday
        ! Longwave radiation computation
 
        if (dolw) then
-          call t_startf ('rad_lw')
+          !call t_startf ('rad_lw')
           !
           ! Convert upward longwave flux units to CGS
           !
@@ -1482,7 +1484,7 @@ end function radiation_nextsw_cday
           call rad_cnst_get_call_list(active_calls)
 
           ! The climate (icall==0) calculation must occur last.
-          call t_startf ('rad_lw_loop')
+          !call t_startf ('rad_lw_loop')
           do icall = N_DIAG, 0, -1
 
               if (active_calls(icall)) then
@@ -1493,10 +1495,12 @@ end function radiation_nextsw_cday
                   call pbuf_get_field(pbuf, cld_idx, cldn, start=(/1,1,itim_old/),   kount=(/pcols,pver,1/) )
                   !Obtain read in values for ext from the volcanic input file
                   ext_cmip6_lw => null(); call pbuf_get_field(pbuf, idx_ext_lw, ext_cmip6_lw)
+                  call t_startf('MAM:aer_rad_props_lw')
                   call aer_rad_props_lw(is_cmip6_volc, dt, lchnk, ncol, state%pmid, state%pint, state%t, state%zm, state%zi, state%q, state%pdel, state%pdeldry, cldn, ext_cmip6_lw, & ! in
                     qqcw, aer_lw_abs) !out
+                  call t_stopf('MAM:aer_rad_props_lw')
                   
-                  call t_startf ('rad_rrtmg_lw')
+                  !call t_startf ('rad_rrtmg_lw')
                   call rad_rrtmg_lw( &
                        lchnk,        ncol,         num_rrtmg_levs,  r_state,                     &
                        state%pmid,   aer_lw_abs,   cldfprime,       c_cld_lw_abs,                &
@@ -1504,7 +1508,7 @@ end function radiation_nextsw_cday
                        flns,         flnt,         flnsc,           flntc,        cam_out%flwds, &
                        flut,         flutc,        fnl,             fcnl,         fldsc,         &
                        clm_seed,     lu,           ld                                            )
-                  call t_stopf ('rad_rrtmg_lw')
+                  !call t_stopf ('rad_rrtmg_lw')
 
                   do i=1,ncol
                      lwcf(i)=flutc(i) - flut(i)
@@ -1531,9 +1535,9 @@ end function radiation_nextsw_cday
 
               end if
           end do
-          call t_stopf ('rad_lw_loop')
+          !call t_stopf ('rad_lw_loop')
 
-          call t_stopf ('rad_lw')
+          !call t_stopf ('rad_lw')
        end if  !dolw
 
        ! deconstruct the RRTMG state object
@@ -1547,7 +1551,7 @@ end function radiation_nextsw_cday
        nstep = get_nstep()
 
        if ( dohirs .and. (mod(nstep-1,ihirsfq) .eq. 0) ) then
-          call t_startf ('dohirs')
+          !call t_startf ('dohirs')
 
           do i= 1, ncol
              ts(i) = sqrt(sqrt(cam_in%lwup(i)/stebol))
@@ -1574,11 +1578,11 @@ end function radiation_nextsw_cday
 
           call calc_col_mean(state, co2, co2_col_mean)
 
-          call t_startf ('hirstrm')
+          !call t_startf ('hirstrm')
           call hirsrtm( lchnk  ,ncol , &
                         pintmb ,state%t  ,sp_hum ,co2_col_mean, &
                         o3     ,ts       ,oro    ,tb_ir  ,britemp )
-          call t_stopf ('hirstrm')
+          !call t_stopf ('hirstrm')
 
           do i = 1, pnb_hirs
              call outfld(hirsname(i),tb_ir(1,i),pcols,lchnk)
@@ -1587,7 +1591,7 @@ end function radiation_nextsw_cday
              call outfld(msuname(i),britemp(1,i),pcols,lchnk)
           end do
 
-          call t_stopf ('dohirs')
+          !call t_stopf ('dohirs')
        end if
 
        !! initialize and calculate emis
@@ -1618,12 +1622,12 @@ end function radiation_nextsw_cday
           if (cosp_nradsteps .eq. cosp_cnt(lchnk)) then
              !call should be compatible with camrt radiation.F90 interface too, should be with (in),optional
              ! N.B.: For snow optical properties, the GRID-BOX MEAN shortwave and longwave optical depths are passed.
-             call t_startf ('cosp_run')
+             !call t_startf ('cosp_run')
              call cospsimulator_intr_run(state,  pbuf, cam_in, emis, coszrs, &
                   cld_swtau_in=cld_tau(rrtmg_sw_cloudsim_band,:,:),&
                   snow_tau_in=gb_snow_tau,snow_emis_in=gb_snow_lw)
              cosp_cnt(lchnk) = 0  !! reset counter
-             call t_stopf ('cosp_run')
+             !call t_stopf ('cosp_run')
           end if
        end if
 
@@ -1645,24 +1649,24 @@ end function radiation_nextsw_cday
           end do
        end if
 
-       call t_stopf ('radiation_tend_init')
+       !call t_stopf ('radiation_tend_init')
 
     end if   !  if (dosw .or. dolw) then
 
-    call t_startf ('radheat_tend')
+    !call t_startf ('radheat_tend')
     ! Compute net radiative heating tendency
     call radheat_tend(state, pbuf,  ptend, qrl, qrs, fsns, &
                       fsnt, flns, flnt, cam_in%asdir, net_flx)
-    call t_stopf ('radheat_tend')
+    !call t_stopf ('radheat_tend')
 
     ! Compute heating rate for dtheta/dt 
-    call t_startf ('heating_rate')
+    !call t_startf ('heating_rate')
     do k=1,pver
        do i=1,ncol
           ftem(i,k) = (qrs(i,k) + qrl(i,k))/cpair * (1.e5_r8/state%pmid(i,k))**cappa
        end do
     end do
-    call t_stopf ('heating_rate')
+    !call t_stopf ('heating_rate')
 
     call outfld('HR      ',ftem    ,pcols   ,lchnk   )
 

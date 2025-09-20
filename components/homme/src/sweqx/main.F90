@@ -53,7 +53,7 @@ program main
   par=initmp()
   call t_initf('input.nl',LogPrint=par%masterproc, &
        Mpicom=par%comm, MasterTask=par%masterproc)
-  call t_startf('Total')
+!   call t_startf('Total')
   
   call init(elem,edge1,edge2,edge3,red,par,dom_mt)
   ! =====================================================
